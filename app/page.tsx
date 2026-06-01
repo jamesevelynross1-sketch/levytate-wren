@@ -29,115 +29,105 @@ type RequestItem = {
 
 const pathways: Pathway[] = [
   {
-    title: "Retail Sales & Design",
-    standard: "L3 Customer Service Specialist or L4 Sales Executive",
-    audience: "Showroom, kitchen design, sales support and customer-facing retail teams.",
-    businessBenefit: "More consistent sales capability and stronger customer experience in showrooms.",
-    learnerBenefit: "Practical customer, design and commercial skills with a clear progression route.",
+    title: "Procurement & Commercial",
+    standard: "L4 Commercial Procurement & Supply",
+    audience: "Framework, procurement, supplier engagement and commercial support colleagues.",
+    businessBenefit: "Stronger commercial confidence and more consistent framework delivery.",
+    learnerBenefit: "Recognised procurement skills with a practical progression route.",
     status: "Live",
     deliveryPartner: "Approved Provider A",
-    duration: "15 to 18 months",
-  },
-  {
-    title: "Manufacturing & Engineering",
-    standard: "L3 Engineering Technician",
-    audience: "Manufacturing, engineering, maintenance and production support colleagues.",
-    businessBenefit: "Stronger technical capability across site-based operations and quality routines.",
-    learnerBenefit: "Recognised engineering skills with practical evidence from the workplace.",
-    status: "Live",
-    deliveryPartner: "Approved Provider B",
-    duration: "36 to 42 months",
-  },
-  {
-    title: "Customer Service",
-    standard: "L3 Customer Service Specialist",
-    audience: "Customer services, contact centre, aftercare and customer operations teams.",
-    businessBenefit: "Improved service consistency, resolution quality and customer confidence.",
-    learnerBenefit: "A structured route to build communication, ownership and service judgement.",
-    status: "Live",
-    deliveryPartner: "Approved Provider A",
-    duration: "15 to 18 months",
-  },
-  {
-    title: "Transport & Logistics",
-    standard: "L3 Supply Chain Practitioner",
-    audience: "Transport, logistics, fleet coordination and supply chain support roles.",
-    businessBenefit: "Better planning discipline across delivery, capacity and customer fulfilment.",
-    learnerBenefit: "Practical supply chain skills linked to the operating model.",
-    status: "Ready",
-    deliveryPartner: "Approved Provider E",
     duration: "18 to 24 months",
-  },
-  {
-    title: "IT & Digital",
-    standard: "L3 Information Communications Technician",
-    audience: "IT support, digital operations, systems, reporting and technical service teams.",
-    businessBenefit: "More resilient digital support and clearer progression into specialist technology roles.",
-    learnerBenefit: "A practical technical toolkit with support from mentors and delivery partners.",
-    status: "Ready",
-    deliveryPartner: "Approved Provider C",
-    duration: "18 to 24 months",
-  },
-  {
-    title: "Finance & Business Support",
-    standard: "L3 Business Administrator",
-    audience: "Finance, compliance, administration and business support colleagues.",
-    businessBenefit: "Better process consistency, documentation and cross-functional support.",
-    learnerBenefit: "Professional business skills and a broader view of design, production and delivery.",
-    status: "Live",
-    deliveryPartner: "Approved Provider F",
-    duration: "15 to 18 months",
-  },
-  {
-    title: "HR, Training & Recruitment",
-    standard: "L3 Learning & Development Practitioner",
-    audience: "HR, recruitment, training, onboarding and people operations teams.",
-    businessBenefit: "Stronger internal capability for hiring, development and colleague support.",
-    learnerBenefit: "Specialist people skills that connect learning design with business needs.",
-    status: "Ready",
-    deliveryPartner: "Approved Provider F",
-    duration: "18 to 21 months",
   },
   {
     title: "Leadership & Management",
-    standard: "L3 Team Leader or L5 Operations Manager",
-    audience: "Team leaders, operational managers and colleagues stepping into people leadership.",
-    businessBenefit: "More consistent management practice across retail, manufacturing and support teams.",
+    standard: "L3 Team Leader / L5 Operations Manager",
+    audience: "People managers, operational leads and colleagues moving into team leadership.",
+    businessBenefit: "More consistent management practice across delivery, product and support teams.",
     learnerBenefit: "Confident leadership, planning and performance management skills.",
     status: "Live",
-    deliveryPartner: "Approved Provider D",
+    deliveryPartner: "Approved Provider B",
     duration: "15 to 27 months",
   },
   {
-    title: "Installation & Field Operations",
-    standard: "L3 Customer Service Specialist",
-    audience: "Installation coordination, field support and customer operations teams.",
-    businessBenefit: "Improved handoffs between planning, installation and customer aftercare.",
-    learnerBenefit: "A route to build ownership, communication and operational judgement.",
+    title: "Project Management",
+    standard: "L4 Associate Project Manager",
+    audience: "Delivery coordinators, workstream owners and client programme support roles.",
+    businessBenefit: "Sharper delivery governance and better stakeholder control.",
+    learnerBenefit: "Practical project methods and evidence-led delivery habits.",
+    status: "Live",
+    deliveryPartner: "Approved Provider C",
+    duration: "18 to 21 months",
+  },
+  {
+    title: "Data & Digital",
+    standard: "L4 Data Analyst / Digital pathways",
+    audience: "Sypro product, reporting, platform data and operational insight roles.",
+    businessBenefit: "Better reporting quality, decision data and technology adoption.",
+    learnerBenefit: "Analytical confidence and a practical digital toolkit.",
+    status: "Ready",
+    deliveryPartner: "Approved Provider D",
+    duration: "18 to 24 months",
+  },
+  {
+    title: "Social Value & Sustainability",
+    standard: "L4 Corporate Responsibility & Sustainability Practitioner",
+    audience: "Loop, social value, impact reporting, sustainability and responsible procurement roles.",
+    businessBenefit: "Improved social value evidence, impact measurement and client outcomes.",
+    learnerBenefit: "Specialist social value and sustainability capability.",
+    status: "Live",
+    deliveryPartner: "Approved Provider E",
+    duration: "18 to 24 months",
+  },
+  {
+    title: "Business Administration",
+    standard: "L3 Business Administrator",
+    audience: "Internal process, team coordination, finance, compliance and group support colleagues.",
+    businessBenefit: "Better process consistency, documentation and service quality.",
+    learnerBenefit: "Professional administration skills and wider business awareness.",
+    status: "Live",
+    deliveryPartner: "Approved Provider F",
+    duration: "15 to 18 months",
+  },
+  {
+    title: "Technology & Systems",
+    standard: "L3 Information Communications Technician",
+    audience: "Platform support, technology operations, product configuration and internal systems roles.",
+    businessBenefit: "More resilient platform support and clearer progression into technical capability.",
+    learnerBenefit: "Practical systems skills connected to product and client delivery.",
+    status: "Ready",
+    deliveryPartner: "Approved Provider D",
+    duration: "18 to 24 months",
+  },
+  {
+    title: "Operations & Delivery",
+    standard: "L3 Improvement Technician",
+    audience: "Operational delivery, service improvement, client support and implementation teams.",
+    businessBenefit: "Sharper operating rhythm across group initiatives, clients and delivery partners.",
+    learnerBenefit: "A route to build operational judgement, improvement skills and delivery confidence.",
     status: "Ready",
     deliveryPartner: "Approved Provider E",
-    duration: "15 to 18 months",
+    duration: "15 to 21 months",
   },
 ];
 
 const initialRequests: RequestItem[] = [
-  { id: 1, name: "Amelia Hart", role: "Kitchen Designer", department: "Retail", pathway: "Retail Sales & Design", manager: "Ryan Booth", status: "Manager review", note: "Showroom progression." },
-  { id: 2, name: "Marcus Lee", role: "Maintenance Technician", department: "Manufacturing", pathway: "Manufacturing & Engineering", manager: "Priya Nair", status: "Manager review", note: "Technical upskilling." },
-  { id: 3, name: "Sophie Clarke", role: "Customer Operations Advisor", department: "Customer Services", pathway: "Customer Service", manager: "Helen Ward", status: "Manager review", note: "Service ownership." },
-  { id: 4, name: "Noah Bennett", role: "Transport Coordinator", department: "Transport", pathway: "Transport & Logistics", manager: "Sam Ellis", status: "Manager review", note: "Route planning capability." },
-  { id: 5, name: "Grace Patel", role: "IT Support Analyst", department: "IT", pathway: "IT & Digital", manager: "Ryan Booth", status: "Manager review", note: "Digital support skills." },
-  { id: 6, name: "Leo Morgan", role: "Recruitment Coordinator", department: "HR, Training & Recruitment", pathway: "HR, Training & Recruitment", manager: "Helen Ward", status: "Manager review", note: "Training delivery." },
-  { id: 7, name: "Maya Singh", role: "Team Leader", department: "Manufacturing", pathway: "Leadership & Management", manager: "Priya Nair", status: "Provider introduction", note: "New shift leadership." },
-  { id: 8, name: "Ethan Brooks", role: "Finance Assistant", department: "Finance", pathway: "Finance & Business Support", manager: "Sam Ellis", status: "Live learner", note: "Business process confidence." },
+  { id: 1, name: "Amelia Hart", role: "Framework Coordinator", department: "Pagabo", pathway: "Procurement & Commercial", manager: "Ryan Booth", status: "Manager review", note: "Framework confidence." },
+  { id: 2, name: "Marcus Lee", role: "Product Support Lead", department: "Sypro", pathway: "Data & Digital", manager: "Priya Nair", status: "Manager review", note: "Reporting capability." },
+  { id: 3, name: "Sophie Clarke", role: "Social Value Coordinator", department: "Loop", pathway: "Social Value & Sustainability", manager: "Helen Ward", status: "Manager review", note: "Impact reporting." },
+  { id: 4, name: "Noah Bennett", role: "Operations Manager", department: "Group Operations", pathway: "Leadership & Management", manager: "Sam Ellis", status: "Manager review", note: "Collaborative growth." },
+  { id: 5, name: "Grace Patel", role: "Project Coordinator", department: "Delivery", pathway: "Project Management", manager: "Ryan Booth", status: "Manager review", note: "Client programme support." },
+  { id: 6, name: "Leo Morgan", role: "Systems Analyst", department: "Technology", pathway: "Technology & Systems", manager: "Helen Ward", status: "Manager review", note: "Platform support." },
+  { id: 7, name: "Maya Singh", role: "Delivery Lead", department: "Group Operations", pathway: "Operations & Delivery", manager: "Priya Nair", status: "Provider introduction", note: "Operational excellence." },
+  { id: 8, name: "Ethan Brooks", role: "Business Support Officer", department: "Group Services", pathway: "Business Administration", manager: "Sam Ellis", status: "Live learner", note: "Process improvement." },
 ];
 
 const providerRows = [
-  ["Retail Sales & Design", "L3 Customer Service Specialist or L4 Sales Executive", "Approved Provider A", "Blended", "92%", "Live"],
-  ["Manufacturing & Engineering", "L3 Engineering Technician", "Approved Provider B", "Site based", "91%", "Live"],
-  ["IT & Digital", "L3 Information Communications Technician", "Approved Provider C", "Remote + workshops", "89%", "Ready"],
-  ["Leadership & Management", "L3 Team Leader or L5 Operations Manager", "Approved Provider D", "Blended", "94%", "Live"],
-  ["Transport & Logistics", "L3 Supply Chain Practitioner", "Approved Provider E", "Hybrid", "87%", "Ready"],
-  ["HR, Training & Recruitment", "L3 Learning & Development Practitioner", "Approved Provider F", "Online + coaching", "88%", "Ready"],
+  ["Procurement & Commercial", "L4 Commercial Procurement & Supply", "Approved Provider A", "Blended", "94%", "Live"],
+  ["Leadership & Management", "L3 Team Leader / L5 Operations Manager", "Approved Provider B", "Online + workshops", "92%", "Live"],
+  ["Project Management", "L4 Associate Project Manager", "Approved Provider C", "Hybrid", "90%", "Live"],
+  ["Data & Digital", "L4 Data Analyst / Digital pathways", "Approved Provider D", "Remote + workshops", "89%", "Ready"],
+  ["Social Value & Sustainability", "ESG aligned pathway", "Approved Provider E", "Online + coaching", "88%", "Ready"],
+  ["Operations & Delivery", "L3 Improvement Technician", "Approved Provider F", "Blended", "87%", "Ready"],
 ];
 
 const userViews = ["Hub", "Pathways", "Expression", "Manager", "Department", "Guidance"];
@@ -209,11 +199,11 @@ export default function Home() {
             </div>
             <div className="h-8 w-px bg-[#102c3d]/10" />
             <div className="flex items-center gap-3">
-              <span className="overflow-hidden rounded-xl bg-[#26A85D] shadow-[0_8px_18px_rgba(29,134,74,0.18)]" aria-label="Wren Kitchens">
-                <Image src="/brand/wren-kitchens-logo.png" alt="Wren Kitchens" width={92} height={40} priority className="h-8 w-auto" />
+              <span className="overflow-hidden rounded-xl bg-[#001831] shadow-[0_8px_18px_rgba(0,24,49,0.14)]" aria-label="PAGABO Group">
+                <Image src="/brand/pagabo-group-logo.svg" alt="PAGABO Group" width={126} height={16} priority className="h-8 w-auto" />
               </span>
               <div>
-                <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#1D864A]">Employer environment</p>
+                <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#df5f73]">Employer environment</p>
                 <p className="text-sm font-medium text-[#102c3d]/54">Powered by LevyTate</p>
               </div>
             </div>
@@ -253,7 +243,7 @@ export default function Home() {
               Internal apprenticeship and capability hub powered by LevyTate.
             </p>
             <h1 className="max-w-4xl text-5xl font-semibold leading-[1.02] text-[#102c3d] md:text-7xl">
-              Wren Apprenticeship Hub
+              PAGABO Apprenticeship Hub
             </h1>
             <p className="mt-6 max-w-3xl text-xl font-normal leading-9 text-[#102c3d]/68">
               A simpler way to scale apprenticeship adoption, manage approvals and connect approved pathways to the right delivery partners.
@@ -407,7 +397,7 @@ function UserHub({
         </PanelShell>
         <div className="grid gap-4">
           <MiniInsight title="Current team interest" value={requests.length} copy="Requests across the internal environment" />
-          <MiniInsight title="Most active area" value="Manufacturing" copy="Strong demand for technical and team skills" />
+          <MiniInsight title="Most active area" value="Pagabo" copy="Strong demand for commercial and framework skills" />
           <MiniInsight title="Next action" value="Manager review" copy="A clear approval route is already in place" />
         </div>
       </div>
@@ -541,8 +531,8 @@ function UserHub({
         </PanelShell>
         <div className="grid gap-4">
           <MiniInsight title="Team members interested" value={requests.length} copy="Visible demand for future cohorts" />
-          <MiniInsight title="Recommended priorities" value="4" copy="Retail, manufacturing, digital and leadership" />
-          <MiniInsight title="Next cohort" value="Retail Sales" copy="Prepare the next showroom group" />
+          <MiniInsight title="Recommended priorities" value="4" copy="Procurement, social value, digital and leadership" />
+          <MiniInsight title="Next cohort" value="Commercial" copy="Prepare the next framework delivery group" />
         </div>
       </div>
     );
@@ -595,7 +585,7 @@ function AdminConsole({
         </PanelShell>
         <PanelShell title="Suggested actions" eyebrow="Next best moves">
           <div className="grid gap-3">
-            {["Review 6 manager approvals", "Confirm provider mapping for Manufacturing & Engineering", "Nudge departments with low engagement", "Prepare next Retail Sales & Design cohort"].map((action) => (
+            {["Review 6 manager approvals", "Confirm provider mapping for Social Value & Sustainability", "Nudge teams with low engagement", "Prepare next Procurement & Commercial cohort"].map((action) => (
               <div key={action} className="rounded-2xl bg-[#f4fbf8] p-4 text-sm font-medium text-[#102c3d]/72">{action}</div>
             ))}
           </div>
@@ -687,7 +677,7 @@ function AdminConsole({
           <InsightBars rows={Object.entries(statusCounts).map(([label, value]) => [label, value])} />
         </PanelShell>
         <PanelShell title="Pathway popularity" eyebrow="Demand signal">
-          <InsightBars rows={[["Retail Sales & Design", 9], ["Manufacturing & Engineering", 8], ["Leadership & Management", 7], ["IT & Digital", 6], ["Customer Service", 5]]} />
+          <InsightBars rows={[["Procurement & Commercial", 9], ["Social Value & Sustainability", 8], ["Leadership & Management", 7], ["Data & Digital", 6], ["Project Management", 5]]} />
         </PanelShell>
         <PanelShell title="Levy forecast" eyebrow="Finance view">
           <InsightBars rows={[["Current forecast", 73], ["Target", 85], ["At risk", 12]]} />
@@ -700,11 +690,11 @@ function AdminConsole({
     return (
       <div className="grid gap-6 lg:grid-cols-2">
         <PanelShell title="Department engagement" eyebrow="Rollout">
-          <InsightBars rows={[["Retail", 92], ["Manufacturing", 84], ["Customer Services", 76], ["IT", 68], ["Transport", 61], ["Finance", 24]]} />
+          <InsightBars rows={[["Pagabo", 92], ["Sypro", 76], ["Loop", 68], ["Group Operations", 61], ["Technology", 54], ["Finance", 24]]} />
         </PanelShell>
         <PanelShell title="Suggested nudges" eyebrow="Activation">
           <div className="grid gap-3">
-            {["Send Retail Sales & Design pathway reminder", "Invite manufacturing managers to engineering briefing", "Share manager approval guidance", "Confirm finance cohort demand"].map((item) => (
+            {["Send procurement pathway reminder", "Invite Sypro managers to digital briefing", "Share manager approval guidance", "Confirm Loop social value cohort demand"].map((item) => (
               <div key={item} className="rounded-2xl bg-[#f4fbf8] p-4 text-sm font-medium text-[#102c3d]/70">{item}</div>
             ))}
           </div>

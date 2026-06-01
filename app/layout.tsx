@@ -3,11 +3,11 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "Wren Apprenticeship Hub | LevyTate",
+    default: "PAGABO Apprenticeship Hub | LevyTate",
     template: "%s | LevyTate",
   },
   description:
-    "A Wren-branded internal apprenticeship hub powered by LevyTate.",
+    "A PAGABO-branded internal apprenticeship hub powered by LevyTate.",
 };
 
 export default function RootLayout({
