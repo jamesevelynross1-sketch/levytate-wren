@@ -208,9 +208,9 @@ export default function Home() {
               <span>Tate</span>
             </div>
             <div className="h-8 w-px bg-[#102c3d]/10" />
-            <div className="flex items-center gap-3">
-              <span className="overflow-hidden rounded-xl bg-[#294238] shadow-[0_8px_18px_rgba(41,66,56,0.18)]" aria-label="Ground Control">
-                <Image src="/brand/ground-control-logo-white.png" alt="Ground Control" width={112} height={40} priority className="h-8 w-auto" />
+            <div className="flex items-center gap-4">
+              <span className="overflow-visible rounded-xl bg-[#294238] px-4 py-2 shadow-[0_8px_18px_rgba(41,66,56,0.18)]" aria-label="Ground Control">
+                <Image src="/brand/ground-control-logo-white.png" alt="Ground Control" width={128} height={40} priority className="h-auto max-h-10 w-auto object-contain" />
               </span>
               <div>
                 <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#294238]">Employer environment</p>
