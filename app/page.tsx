@@ -29,115 +29,115 @@ type RequestItem = {
 
 const pathways: Pathway[] = [
   {
-    title: "Retail Sales & Design",
-    standard: "L3 Customer Service Specialist or L4 Sales Executive",
-    audience: "Showroom, kitchen design, sales support and customer-facing retail teams.",
-    businessBenefit: "More consistent sales capability and stronger customer experience in showrooms.",
-    learnerBenefit: "Practical customer, design and commercial skills with a clear progression route.",
+    title: "Grounds Maintenance",
+    standard: "L2 Horticulture or Landscape Operative",
+    audience: "Field teams, grounds maintenance operatives and colleagues supporting multi-site contracts.",
+    businessBenefit: "More consistent standards across maintained environments, customer sites and local teams.",
+    learnerBenefit: "Practical horticulture and landscape skills with a clear route into field progression.",
     status: "Live",
     deliveryPartner: "Approved Provider A",
-    duration: "15 to 18 months",
-  },
-  {
-    title: "Manufacturing & Engineering",
-    standard: "L3 Engineering Technician",
-    audience: "Manufacturing, engineering, maintenance and production support colleagues.",
-    businessBenefit: "Stronger technical capability across site-based operations and quality routines.",
-    learnerBenefit: "Recognised engineering skills with practical evidence from the workplace.",
-    status: "Live",
-    deliveryPartner: "Approved Provider B",
-    duration: "36 to 42 months",
-  },
-  {
-    title: "Customer Service",
-    standard: "L3 Customer Service Specialist",
-    audience: "Customer services, contact centre, aftercare and customer operations teams.",
-    businessBenefit: "Improved service consistency, resolution quality and customer confidence.",
-    learnerBenefit: "A structured route to build communication, ownership and service judgement.",
-    status: "Live",
-    deliveryPartner: "Approved Provider A",
-    duration: "15 to 18 months",
-  },
-  {
-    title: "Transport & Logistics",
-    standard: "L3 Supply Chain Practitioner",
-    audience: "Transport, logistics, fleet coordination and supply chain support roles.",
-    businessBenefit: "Better planning discipline across delivery, capacity and customer fulfilment.",
-    learnerBenefit: "Practical supply chain skills linked to the operating model.",
-    status: "Ready",
-    deliveryPartner: "Approved Provider E",
     duration: "18 to 24 months",
   },
   {
-    title: "IT & Digital",
-    standard: "L3 Information Communications Technician",
-    audience: "IT support, digital operations, systems, reporting and technical service teams.",
-    businessBenefit: "More resilient digital support and clearer progression into specialist technology roles.",
-    learnerBenefit: "A practical technical toolkit with support from mentors and delivery partners.",
+    title: "Arboriculture & Tree Works",
+    standard: "L2 Arborist",
+    audience: "Arboriculture, tree works, vegetation management and specialist field teams.",
+    businessBenefit: "Stronger technical capability for safe, compliant and sustainable tree operations.",
+    learnerBenefit: "Recognised arboriculture skills with practical evidence from live field work.",
+    status: "Live",
+    deliveryPartner: "Approved Provider B",
+    duration: "24 months",
+  },
+  {
+    title: "Landscaping & Construction",
+    standard: "L2 Landscape Operative",
+    audience: "Landscape construction, planting, hard and soft landscaping and project delivery teams.",
+    businessBenefit: "Sharper site delivery, stronger workmanship and more consistent project handovers.",
+    learnerBenefit: "A structured route to build practical landscape, safety and delivery skills.",
     status: "Ready",
     deliveryPartner: "Approved Provider C",
     duration: "18 to 24 months",
   },
   {
-    title: "Finance & Business Support",
-    standard: "L3 Business Administrator",
-    audience: "Finance, compliance, administration and business support colleagues.",
-    businessBenefit: "Better process consistency, documentation and cross-functional support.",
-    learnerBenefit: "Professional business skills and a broader view of design, production and delivery.",
-    status: "Live",
-    deliveryPartner: "Approved Provider F",
-    duration: "15 to 18 months",
+    title: "Winter Maintenance & Gritting",
+    standard: "L3 Supply Chain Practitioner",
+    audience: "Winter operations, gritting coordination, logistics planning and seasonal response teams.",
+    businessBenefit: "Better planning discipline across routes, mobilisation, safety and customer service.",
+    learnerBenefit: "Practical supply chain and operational planning skills linked to field delivery.",
+    status: "Ready",
+    deliveryPartner: "Approved Provider D",
+    duration: "18 to 24 months",
   },
   {
-    title: "HR, Training & Recruitment",
-    standard: "L3 Learning & Development Practitioner",
-    audience: "HR, recruitment, training, onboarding and people operations teams.",
-    businessBenefit: "Stronger internal capability for hiring, development and colleague support.",
-    learnerBenefit: "Specialist people skills that connect learning design with business needs.",
+    title: "Rail, Utilities & Infrastructure",
+    standard: "L3 Engineering Technician",
+    audience: "Infrastructure, utilities, rail access, civils and specialist operational teams.",
+    businessBenefit: "Improved technical confidence across critical access, compliance and site delivery.",
+    learnerBenefit: "A practical route into infrastructure skills with support from mentors and providers.",
     status: "Ready",
+    deliveryPartner: "Approved Provider E",
+    duration: "36 to 42 months",
+  },
+  {
+    title: "Biodiversity, Ecology & Sustainability",
+    standard: "L4 Corporate Responsibility & Sustainability Practitioner",
+    audience: "Biodiversity, ecology, environment, net zero and sustainability support roles.",
+    businessBenefit: "Stronger environmental evidence, impact measurement and client sustainability support.",
+    learnerBenefit: "Specialist sustainability capability connected to nature recovery and customer outcomes.",
+    status: "Live",
     deliveryPartner: "Approved Provider F",
-    duration: "18 to 21 months",
+    duration: "18 to 24 months",
+  },
+  {
+    title: "Fleet, Plant & Field Operations",
+    standard: "L3 Maintenance & Operations Engineering Technician",
+    audience: "Fleet, plant, equipment, field support and operational coordination teams.",
+    businessBenefit: "More resilient equipment routines and stronger operational readiness across field teams.",
+    learnerBenefit: "Practical maintenance and operational skills with clear field progression.",
+    status: "Ready",
+    deliveryPartner: "Approved Provider E",
+    duration: "30 to 36 months",
+  },
+  {
+    title: "Customer & Contract Management",
+    standard: "L3 Customer Service Specialist or L4 Sales Executive",
+    audience: "Contract support, customer operations, account teams and service delivery coordinators.",
+    businessBenefit: "Improved client communication, contract ownership and service consistency.",
+    learnerBenefit: "Commercial and customer skills that support confident contract progression.",
+    status: "Live",
+    deliveryPartner: "Approved Provider A",
+    duration: "15 to 18 months",
   },
   {
     title: "Leadership & Management",
     standard: "L3 Team Leader or L5 Operations Manager",
     audience: "Team leaders, operational managers and colleagues stepping into people leadership.",
-    businessBenefit: "More consistent management practice across retail, manufacturing and support teams.",
+    businessBenefit: "More consistent management practice across field teams, contracts and support functions.",
     learnerBenefit: "Confident leadership, planning and performance management skills.",
     status: "Live",
-    deliveryPartner: "Approved Provider D",
+    deliveryPartner: "Approved Provider F",
     duration: "15 to 27 months",
-  },
-  {
-    title: "Installation & Field Operations",
-    standard: "L3 Customer Service Specialist",
-    audience: "Installation coordination, field support and customer operations teams.",
-    businessBenefit: "Improved handoffs between planning, installation and customer aftercare.",
-    learnerBenefit: "A route to build ownership, communication and operational judgement.",
-    status: "Ready",
-    deliveryPartner: "Approved Provider E",
-    duration: "15 to 18 months",
   },
 ];
 
 const initialRequests: RequestItem[] = [
-  { id: 1, name: "Amelia Hart", role: "Kitchen Designer", department: "Retail", pathway: "Retail Sales & Design", manager: "Ryan Booth", status: "Manager review", note: "Showroom progression." },
-  { id: 2, name: "Marcus Lee", role: "Maintenance Technician", department: "Manufacturing", pathway: "Manufacturing & Engineering", manager: "Priya Nair", status: "Manager review", note: "Technical upskilling." },
-  { id: 3, name: "Sophie Clarke", role: "Customer Operations Advisor", department: "Customer Services", pathway: "Customer Service", manager: "Helen Ward", status: "Manager review", note: "Service ownership." },
-  { id: 4, name: "Noah Bennett", role: "Transport Coordinator", department: "Transport", pathway: "Transport & Logistics", manager: "Sam Ellis", status: "Manager review", note: "Route planning capability." },
-  { id: 5, name: "Grace Patel", role: "IT Support Analyst", department: "IT", pathway: "IT & Digital", manager: "Ryan Booth", status: "Manager review", note: "Digital support skills." },
-  { id: 6, name: "Leo Morgan", role: "Recruitment Coordinator", department: "HR, Training & Recruitment", pathway: "HR, Training & Recruitment", manager: "Helen Ward", status: "Manager review", note: "Training delivery." },
-  { id: 7, name: "Maya Singh", role: "Team Leader", department: "Manufacturing", pathway: "Leadership & Management", manager: "Priya Nair", status: "Provider introduction", note: "New shift leadership." },
-  { id: 8, name: "Ethan Brooks", role: "Finance Assistant", department: "Finance", pathway: "Finance & Business Support", manager: "Sam Ellis", status: "Live learner", note: "Business process confidence." },
+  { id: 1, name: "Amelia Hart", role: "Grounds Maintenance Operative", department: "Field Teams", pathway: "Grounds Maintenance", manager: "Ryan Booth", status: "Manager review", note: "Horticulture progression." },
+  { id: 2, name: "Marcus Lee", role: "Arborist Assistant", department: "Arboriculture", pathway: "Arboriculture & Tree Works", manager: "Priya Nair", status: "Manager review", note: "Tree works capability." },
+  { id: 3, name: "Sophie Clarke", role: "Contract Support Coordinator", department: "Customer & Contracts", pathway: "Customer & Contract Management", manager: "Helen Ward", status: "Manager review", note: "Client service ownership." },
+  { id: 4, name: "Noah Bennett", role: "Winter Operations Coordinator", department: "Winter Maintenance", pathway: "Winter Maintenance & Gritting", manager: "Sam Ellis", status: "Manager review", note: "Route planning capability." },
+  { id: 5, name: "Grace Patel", role: "Ecology Support Officer", department: "Biodiversity", pathway: "Biodiversity, Ecology & Sustainability", manager: "Ryan Booth", status: "Manager review", note: "Nature recovery skills." },
+  { id: 6, name: "Leo Morgan", role: "Plant Operations Assistant", department: "Fleet & Plant", pathway: "Fleet, Plant & Field Operations", manager: "Helen Ward", status: "Manager review", note: "Equipment readiness." },
+  { id: 7, name: "Maya Singh", role: "Field Team Leader", department: "Field Teams", pathway: "Leadership & Management", manager: "Priya Nair", status: "Provider introduction", note: "New regional leadership." },
+  { id: 8, name: "Ethan Brooks", role: "Infrastructure Coordinator", department: "Infrastructure", pathway: "Rail, Utilities & Infrastructure", manager: "Sam Ellis", status: "Live learner", note: "Critical site support." },
 ];
 
 const providerRows = [
-  ["Retail Sales & Design", "L3 Customer Service Specialist or L4 Sales Executive", "Approved Provider A", "Blended", "92%", "Live"],
-  ["Manufacturing & Engineering", "L3 Engineering Technician", "Approved Provider B", "Site based", "91%", "Live"],
-  ["IT & Digital", "L3 Information Communications Technician", "Approved Provider C", "Remote + workshops", "89%", "Ready"],
-  ["Leadership & Management", "L3 Team Leader or L5 Operations Manager", "Approved Provider D", "Blended", "94%", "Live"],
-  ["Transport & Logistics", "L3 Supply Chain Practitioner", "Approved Provider E", "Hybrid", "87%", "Ready"],
-  ["HR, Training & Recruitment", "L3 Learning & Development Practitioner", "Approved Provider F", "Online + coaching", "88%", "Ready"],
+  ["Grounds Maintenance", "L2 Horticulture or Landscape Operative", "Approved Provider A", "Site based", "93%", "Live"],
+  ["Arboriculture & Tree Works", "L2 Arborist", "Approved Provider B", "Field based", "91%", "Live"],
+  ["Landscaping & Construction", "L2 Landscape Operative", "Approved Provider C", "Site + workshops", "90%", "Ready"],
+  ["Leadership & Management", "L3 Team Leader or L5 Operations Manager", "Approved Provider F", "Blended", "94%", "Live"],
+  ["Winter Maintenance & Gritting", "L3 Supply Chain Practitioner", "Approved Provider D", "Hybrid", "87%", "Ready"],
+  ["Rail, Utilities & Infrastructure", "L3 Engineering Technician", "Approved Provider E", "Site based", "89%", "Ready"],
 ];
 
 const userViews = ["Hub", "Pathways", "Expression", "Manager", "Department", "Guidance"];
@@ -209,11 +209,11 @@ export default function Home() {
             </div>
             <div className="h-8 w-px bg-[#102c3d]/10" />
             <div className="flex items-center gap-3">
-              <span className="overflow-hidden rounded-xl bg-[#26A85D] shadow-[0_8px_18px_rgba(29,134,74,0.18)]" aria-label="Wren Kitchens">
-                <Image src="/brand/wren-kitchens-logo.png" alt="Wren Kitchens" width={92} height={40} priority className="h-8 w-auto" />
+              <span className="overflow-hidden rounded-xl bg-[#294238] shadow-[0_8px_18px_rgba(41,66,56,0.18)]" aria-label="Ground Control">
+                <Image src="/brand/ground-control-logo-white.png" alt="Ground Control" width={112} height={40} priority className="h-8 w-auto" />
               </span>
               <div>
-                <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#1D864A]">Employer environment</p>
+                <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#294238]">Employer environment</p>
                 <p className="text-sm font-medium text-[#102c3d]/54">Powered by LevyTate</p>
               </div>
             </div>
@@ -253,10 +253,10 @@ export default function Home() {
               Internal apprenticeship and capability hub powered by LevyTate.
             </p>
             <h1 className="max-w-4xl text-5xl font-semibold leading-[1.02] text-[#102c3d] md:text-7xl">
-              Wren Apprenticeship Hub
+              Ground Control Apprenticeship Hub
             </h1>
             <p className="mt-6 max-w-3xl text-xl font-normal leading-9 text-[#102c3d]/68">
-              A simpler way to scale apprenticeship adoption, manage approvals and connect approved pathways to the right delivery partners.
+              A simpler way to scale apprenticeship adoption, manage approvals and connect field, environmental and operational pathways to the right delivery partners.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <button onClick={() => setActiveUserView("Pathways")} className="rounded-full bg-[#102c3d] px-6 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(16,44,61,0.16)]">
@@ -407,7 +407,7 @@ function UserHub({
         </PanelShell>
         <div className="grid gap-4">
           <MiniInsight title="Current team interest" value={requests.length} copy="Requests across the internal environment" />
-          <MiniInsight title="Most active area" value="Manufacturing" copy="Strong demand for technical and team skills" />
+          <MiniInsight title="Most active area" value="Field Teams" copy="Strong demand for practical and team skills" />
           <MiniInsight title="Next action" value="Manager review" copy="A clear approval route is already in place" />
         </div>
       </div>
@@ -541,8 +541,8 @@ function UserHub({
         </PanelShell>
         <div className="grid gap-4">
           <MiniInsight title="Team members interested" value={requests.length} copy="Visible demand for future cohorts" />
-          <MiniInsight title="Recommended priorities" value="4" copy="Retail, manufacturing, digital and leadership" />
-          <MiniInsight title="Next cohort" value="Retail Sales" copy="Prepare the next showroom group" />
+          <MiniInsight title="Recommended priorities" value="4" copy="Field teams, arboriculture, infrastructure and leadership" />
+          <MiniInsight title="Next cohort" value="Grounds Maintenance" copy="Prepare the next field team group" />
         </div>
       </div>
     );
@@ -595,7 +595,7 @@ function AdminConsole({
         </PanelShell>
         <PanelShell title="Suggested actions" eyebrow="Next best moves">
           <div className="grid gap-3">
-            {["Review 6 manager approvals", "Confirm provider mapping for Manufacturing & Engineering", "Nudge departments with low engagement", "Prepare next Retail Sales & Design cohort"].map((action) => (
+            {["Review 6 manager approvals", "Confirm provider mapping for Arboriculture & Tree Works", "Nudge departments with low engagement", "Prepare next Grounds Maintenance cohort"].map((action) => (
               <div key={action} className="rounded-2xl bg-[#f4fbf8] p-4 text-sm font-medium text-[#102c3d]/72">{action}</div>
             ))}
           </div>
@@ -687,7 +687,7 @@ function AdminConsole({
           <InsightBars rows={Object.entries(statusCounts).map(([label, value]) => [label, value])} />
         </PanelShell>
         <PanelShell title="Pathway popularity" eyebrow="Demand signal">
-          <InsightBars rows={[["Retail Sales & Design", 9], ["Manufacturing & Engineering", 8], ["Leadership & Management", 7], ["IT & Digital", 6], ["Customer Service", 5]]} />
+          <InsightBars rows={[["Grounds Maintenance", 9], ["Arboriculture & Tree Works", 8], ["Leadership & Management", 7], ["Biodiversity & Sustainability", 6], ["Winter Maintenance", 5]]} />
         </PanelShell>
         <PanelShell title="Levy forecast" eyebrow="Finance view">
           <InsightBars rows={[["Current forecast", 73], ["Target", 85], ["At risk", 12]]} />
@@ -700,11 +700,11 @@ function AdminConsole({
     return (
       <div className="grid gap-6 lg:grid-cols-2">
         <PanelShell title="Department engagement" eyebrow="Rollout">
-          <InsightBars rows={[["Retail", 92], ["Manufacturing", 84], ["Customer Services", 76], ["IT", 68], ["Transport", 61], ["Finance", 24]]} />
+          <InsightBars rows={[["Field Teams", 92], ["Arboriculture", 84], ["Customer & Contracts", 76], ["Infrastructure", 68], ["Winter Maintenance", 61], ["Biodiversity", 24]]} />
         </PanelShell>
         <PanelShell title="Suggested nudges" eyebrow="Activation">
           <div className="grid gap-3">
-            {["Send Retail Sales & Design pathway reminder", "Invite manufacturing managers to engineering briefing", "Share manager approval guidance", "Confirm finance cohort demand"].map((item) => (
+            {["Send Grounds Maintenance pathway reminder", "Invite arboriculture managers to field skills briefing", "Share manager approval guidance", "Confirm biodiversity cohort demand"].map((item) => (
               <div key={item} className="rounded-2xl bg-[#f4fbf8] p-4 text-sm font-medium text-[#102c3d]/70">{item}</div>
             ))}
           </div>
