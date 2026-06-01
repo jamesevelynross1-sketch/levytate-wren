@@ -209,8 +209,8 @@ export default function Home() {
             </div>
             <div className="h-8 w-px bg-[#102c3d]/10" />
             <div className="flex items-center gap-4">
-              <span className="overflow-visible rounded-2xl border border-[#102c3d]/8 bg-white/80 px-2 py-1 shadow-[0_8px_18px_rgba(16,44,61,0.08)]" aria-label="Wren Kitchens">
-                <Image src="/brand/wren-kitchens-logo.png" alt="Wren Kitchens" width={112} height={40} priority className="h-auto max-h-10 w-auto object-contain" />
+              <span className="overflow-visible bg-transparent p-0 shadow-none" aria-label="Wren Kitchens">
+                <Image src="/brand/wren-kitchens-logo.png" alt="Wren Kitchens" width={112} height={48} priority className="h-auto max-h-12 w-auto object-contain" />
               </span>
               <div>
                 <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#1D864A]">Employer environment</p>
