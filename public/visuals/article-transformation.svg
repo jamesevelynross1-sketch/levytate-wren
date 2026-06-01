@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" role="img" aria-labelledby="title desc">
+  <title id="title">Capability stack</title>
+  <desc id="desc">A clean stacked framework for AI, digital, leadership, operational and data capability.</desc>
+  <rect width="960" height="520" rx="30" fill="#F7F2E8"/>
+  <rect x="70" y="64" width="820" height="392" rx="26" fill="#15392F"/>
+  <text x="128" y="118" fill="#2C8C83" font-family="Aptos, Arial, sans-serif" font-size="11" font-weight="800" letter-spacing="2.4">WORKFORCE CAPABILITY STACK</text>
+  <g font-family="Aptos, Arial, sans-serif" font-size="14" font-weight="800" letter-spacing=".8">
+    <rect x="250" y="148" width="460" height="48" rx="14" fill="#2C8C83" fill-opacity=".18" stroke="#2C8C83" stroke-opacity=".7"/>
+    <text x="480" y="178" text-anchor="middle" fill="#F7F2E8">AI CAPABILITY</text>
+    <rect x="222" y="208" width="516" height="48" rx="14" fill="#F7F2E8" fill-opacity=".075" stroke="#F7F2E8" stroke-opacity=".14"/>
+    <text x="480" y="238" text-anchor="middle" fill="#F7F2E8">DIGITAL CAPABILITY</text>
+    <rect x="194" y="268" width="572" height="48" rx="14" fill="#F7F2E8" fill-opacity=".075" stroke="#F7F2E8" stroke-opacity=".14"/>
+    <text x="480" y="298" text-anchor="middle" fill="#F7F2E8">LEADERSHIP CAPABILITY</text>
+    <rect x="166" y="328" width="628" height="48" rx="14" fill="#F7F2E8" fill-opacity=".075" stroke="#F7F2E8" stroke-opacity=".14"/>
+    <text x="480" y="358" text-anchor="middle" fill="#F7F2E8">OPERATIONAL CAPABILITY</text>
+    <rect x="138" y="388" width="684" height="48" rx="14" fill="#2C8C83" fill-opacity=".13" stroke="#2C8C83" stroke-opacity=".62"/>
+    <text x="480" y="418" text-anchor="middle" fill="#F7F2E8">DATA CAPABILITY</text>
+  </g>
+</svg>

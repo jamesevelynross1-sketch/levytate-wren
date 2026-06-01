@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MPR Group Logo System Preview</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --navy: #102b36;
+      --ink: #1f2d35;
+      --line: #d9e3e5;
+      --wash: #f5f8f8;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Inter, "Avenir Next", "Nunito Sans", Arial, sans-serif;
+      color: var(--ink);
+      background: #ffffff;
+    }
+
+    main {
+      width: min(1120px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 44px 0 64px;
+    }
+
+    h1 {
+      margin: 0 0 28px;
+      font-size: 24px;
+      font-weight: 760;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin: 0 0 16px;
+      font-size: 15px;
+      font-weight: 720;
+      letter-spacing: 0;
+    }
+
+    section {
+      padding: 28px 0;
+      border-top: 1px solid var(--line);
+    }
+
+    .surface {
+      display: grid;
+      align-items: center;
+      min-height: 260px;
+      padding: 34px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    .surface.dark {
+      background: var(--navy);
+      border-color: var(--navy);
+    }
+
+    .logo {
+      display: block;
+      width: min(620px, 100%);
+      height: auto;
+    }
+
+    .pair {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 24px;
+    }
+
+    .pair .logo {
+      width: 100%;
+    }
+
+    .icon-row {
+      display: flex;
+      align-items: center;
+      gap: 32px;
+      flex-wrap: wrap;
+      padding: 28px;
+      background: var(--wash);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    .icon-large {
+      width: 148px;
+      height: 148px;
+    }
+
+    .small-tests {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+
+    .avatar {
+      display: grid;
+      place-items: center;
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      background: #fff;
+      border: 1px solid var(--line);
+    }
+
+    .avatar.dark {
+      background: var(--navy);
+      border-color: var(--navy);
+    }
+
+    .avatar img {
+      width: 68px;
+      height: 68px;
+    }
+
+    .favicon {
+      width: 32px;
+      height: 32px;
+    }
+
+    @media (max-width: 760px) {
+      main {
+        width: min(100% - 24px, 1120px);
+        padding-top: 28px;
+      }
+
+      .surface {
+        min-height: 190px;
+        padding: 22px;
+      }
+
+      .pair {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>MPR Group Logo System Preview</h1>
+
+    <section>
+      <h2>Logo on white</h2>
+      <div class="surface">
+        <img class="logo" src="mpr-group-logo.svg" alt="MPR Group logo">
+      </div>
+    </section>
+
+    <section>
+      <h2>Logo on dark navy</h2>
+      <div class="surface dark">
+        <img class="logo" src="mpr-group-logo-dark-background.svg" alt="MPR Group logo on dark navy">
+      </div>
+    </section>
+
+    <section>
+      <h2>Icon only</h2>
+      <div class="icon-row">
+        <img class="icon-large" src="favicon-icon-only.svg" alt="MPR icon">
+        <img class="favicon" src="favicon-icon-only.svg" alt="MPR icon at favicon size">
+      </div>
+    </section>
+
+    <section>
+      <h2>MPR Group and MPR Consulting</h2>
+      <div class="pair">
+        <div class="surface">
+          <img class="logo" src="mpr-group-logo.svg" alt="MPR Group logo">
+        </div>
+        <div class="surface">
+          <img class="logo" src="mpr-consulting-logo-refined.svg" alt="MPR Consulting refined logo">
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Small-size test</h2>
+      <div class="small-tests">
+        <div class="avatar"><img src="favicon-icon-only.svg" alt="MPR icon in light avatar"></div>
+        <div class="avatar dark"><img src="favicon-icon-only.svg" alt="MPR icon in dark avatar"></div>
+        <img class="favicon" src="favicon-icon-only.svg" alt="MPR favicon size">
+        <img style="width: 180px; height: auto;" src="mpr-group-logo.svg" alt="MPR Group logo small">
+      </div>
+    </section>
+  </main>
+</body>
+</html>

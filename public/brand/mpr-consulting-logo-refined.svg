@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 260" role="img" aria-labelledby="title desc">
+  <title id="title">MPR Consulting refined logo</title>
+  <desc id="desc">Refined MPR Consulting logo using the same two-person icon and stacked wordmark system as MPR Group.</desc>
+  <metadata>
+    Font stack: Avenir Next, Nunito Sans, Inter, Circular, Gotham, Arial, sans-serif.
+    Text is intentionally live and editable. Convert to outlines in final production artwork when a licensed brand font is selected.
+  </metadata>
+  <g transform="translate(24 22)">
+    <circle cx="78" cy="48" r="26" fill="#175F7B"/>
+    <circle cx="142" cy="56" r="26" fill="#49A386"/>
+    <path fill="#175F7B" d="M78 84c-31 0-56 25-56 56v34c0 12 10 22 22 22h21c12 0 22-10 22-22v-36c0-11 9-20 20-20s20 9 20 20v18c0 12 10 22 22 22h12v-38c0-31-25-56-56-56H78Z"/>
+    <path fill="#49A386" d="M142 92c31 0 56 25 56 56v26c0 12-10 22-22 22h-21c-12 0-22-10-22-22v-36c0-11-9-20-20-20s-20 9-20 20v18c0 12-10 22-22 22H59v-30c0-31 25-56 56-56h27Z" opacity=".96"/>
+  </g>
+  <g fill="#1F2D35" font-family="Avenir Next, Nunito Sans, Inter, Circular, Gotham, Arial, sans-serif">
+    <text x="258" y="104" font-size="86" font-weight="800">MPR</text>
+    <text x="262" y="162" font-size="48" font-weight="650">Consulting</text>
+  </g>
+</svg>

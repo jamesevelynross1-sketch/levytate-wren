@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" role="img" aria-labelledby="title desc">
+  <title id="title">Compliance to capability</title>
+  <desc id="desc">A clean transformation framework showing box ticking evolving into workforce capability and business outcomes.</desc>
+  <rect width="960" height="520" rx="30" fill="#F7F2E8"/>
+  <rect x="70" y="64" width="820" height="392" rx="26" fill="#15392F"/>
+  <g font-family="Aptos, Arial, sans-serif">
+    <text x="128" y="118" fill="#2C8C83" font-size="11" font-weight="800" letter-spacing="2.4">FROM ACTIVITY TO OUTCOMES</text>
+    <rect x="126" y="162" width="292" height="210" rx="20" fill="#F7F2E8" fill-opacity=".07" stroke="#F7F2E8" stroke-opacity=".15"/>
+    <text x="272" y="212" text-anchor="middle" fill="#F7F2E8" font-size="17" font-weight="800" letter-spacing=".8">COMPLIANCE</text>
+    <text x="272" y="240" text-anchor="middle" fill="#F7F2E8" fill-opacity=".6" font-size="12" font-weight="700">forms / rules / obligations</text>
+    <g fill="none" stroke="#F7F2E8" stroke-opacity=".24">
+      <rect x="206" y="276" width="132" height="22" rx="5"/>
+      <path d="M220 287h18"/>
+      <rect x="206" y="318" width="132" height="22" rx="5"/>
+      <path d="M220 329h18"/>
+    </g>
+    <path d="M456 267h48" stroke="#2C8C83" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M504 267l-12-9v18l12-9Z" fill="#2C8C83"/>
+    <rect x="542" y="162" width="292" height="210" rx="20" fill="#2C8C83" fill-opacity=".13" stroke="#2C8C83" stroke-opacity=".7"/>
+    <text x="688" y="212" text-anchor="middle" fill="#F7F2E8" font-size="17" font-weight="800" letter-spacing=".8">CAPABILITY</text>
+    <text x="688" y="240" text-anchor="middle" fill="#F7F2E8" fill-opacity=".65" font-size="12" font-weight="700">planning / skills / outcomes</text>
+    <g fill="#F7F2E8" fill-opacity=".88">
+      <circle cx="626" cy="306" r="7"/>
+      <circle cx="688" cy="282" r="7"/>
+      <circle cx="750" cy="326" r="7"/>
+    </g>
+    <path d="M626 306l62-24 62 44" fill="none" stroke="#F7F2E8" stroke-opacity=".32" stroke-width="2"/>
+  </g>
+</svg>

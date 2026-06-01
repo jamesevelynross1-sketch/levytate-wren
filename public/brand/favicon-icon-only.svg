@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 220" role="img" aria-labelledby="title desc">
+  <title id="title">MPR icon</title>
+  <desc id="desc">Two abstract human figures forming a rounded m shape, with the left figure in deep teal blue and the right figure in green.</desc>
+  <g fill="none" fill-rule="evenodd">
+    <circle cx="78" cy="48" r="26" fill="#175F7B"/>
+    <circle cx="142" cy="56" r="26" fill="#49A386"/>
+    <path fill="#175F7B" d="M78 84c-31 0-56 25-56 56v34c0 12 10 22 22 22h21c12 0 22-10 22-22v-36c0-11 9-20 20-20s20 9 20 20v18c0 12 10 22 22 22h12v-38c0-31-25-56-56-56H78Z"/>
+    <path fill="#49A386" d="M142 92c31 0 56 25 56 56v26c0 12-10 22-22 22h-21c-12 0-22-10-22-22v-36c0-11-9-20-20-20s-20 9-20 20v18c0 12-10 22-22 22H59v-30c0-31 25-56 56-56h27Z" opacity=".96"/>
+  </g>
+</svg>

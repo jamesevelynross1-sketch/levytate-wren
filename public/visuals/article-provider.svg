@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" role="img" aria-labelledby="title desc">
+  <title id="title">Employer fit framework</title>
+  <desc id="desc">A minimal provider matching framework with employer fit at the centre and six evaluation criteria.</desc>
+  <rect width="960" height="520" rx="30" fill="#F7F2E8"/>
+  <rect x="70" y="64" width="820" height="392" rx="26" fill="#15392F"/>
+  <text x="128" y="118" fill="#2C8C83" font-family="Aptos, Arial, sans-serif" font-size="11" font-weight="800" letter-spacing="2.4">PROVIDER MATCHING METHOD</text>
+  <g font-family="Aptos, Arial, sans-serif" font-weight="800">
+    <circle cx="480" cy="260" r="76" fill="#2C8C83" fill-opacity=".16" stroke="#2C8C83" stroke-width="2"/>
+    <text x="480" y="254" text-anchor="middle" fill="#F7F2E8" font-size="16" letter-spacing=".8">EMPLOYER</text>
+    <text x="480" y="276" text-anchor="middle" fill="#F7F2E8" font-size="16" letter-spacing=".8">FIT</text>
+    <g font-size="12" letter-spacing=".6" fill="#F7F2E8">
+      <rect x="154" y="172" width="172" height="48" rx="14" fill="#F7F2E8" fill-opacity=".075" stroke="#F7F2E8" stroke-opacity=".14"/>
+      <text x="240" y="202" text-anchor="middle">OFSTED</text>
+      <rect x="154" y="300" width="172" height="48" rx="14" fill="#F7F2E8" fill-opacity=".075" stroke="#F7F2E8" stroke-opacity=".14"/>
+      <text x="240" y="330" text-anchor="middle">ADDED VALUE</text>
+      <rect x="394" y="104" width="172" height="48" rx="14" fill="#F7F2E8" fill-opacity=".075" stroke="#F7F2E8" stroke-opacity=".14"/>
+      <text x="480" y="134" text-anchor="middle">DELIVERY MODEL</text>
+      <rect x="394" y="368" width="172" height="48" rx="14" fill="#2C8C83" fill-opacity=".14" stroke="#2C8C83" stroke-opacity=".62"/>
+      <text x="480" y="398" text-anchor="middle">COMMERCIAL FIT</text>
+      <rect x="634" y="172" width="172" height="48" rx="14" fill="#F7F2E8" fill-opacity=".075" stroke="#F7F2E8" stroke-opacity=".14"/>
+      <text x="720" y="202" text-anchor="middle">EMPLOYER FEEDBACK</text>
+      <rect x="634" y="300" width="172" height="48" rx="14" fill="#F7F2E8" fill-opacity=".075" stroke="#F7F2E8" stroke-opacity=".14"/>
+      <text x="720" y="330" text-anchor="middle">LEARNER FEEDBACK</text>
+    </g>
+    <text x="480" y="454" text-anchor="middle" fill="#F7F2E8" fill-opacity=".62" font-size="12" letter-spacing="1.2">WORKFORCE IMPACT</text>
+  </g>
+</svg>
