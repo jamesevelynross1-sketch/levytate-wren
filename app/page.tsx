@@ -198,9 +198,9 @@ export default function Home() {
               <span>Tate</span>
             </div>
             <div className="h-8 w-px bg-[#102c3d]/10" />
-            <div className="flex items-center gap-3">
-              <span className="overflow-hidden rounded-xl bg-[#001831] shadow-[0_8px_18px_rgba(0,24,49,0.14)]" aria-label="PAGABO Group">
-                <Image src="/brand/pagabo-group-logo.svg" alt="PAGABO Group" width={126} height={16} priority className="h-8 w-auto" />
+            <div className="flex items-center gap-4">
+              <span className="overflow-visible rounded-xl bg-[#001831] px-4 py-2 shadow-[0_8px_18px_rgba(0,24,49,0.14)]" aria-label="PAGABO Group">
+                <Image src="/brand/pagabo-group-logo.svg" alt="PAGABO Group" width={112} height={14} priority className="h-auto max-h-7 w-auto object-contain" />
               </span>
               <div>
                 <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#df5f73]">Employer environment</p>
