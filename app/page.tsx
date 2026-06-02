@@ -209,9 +209,7 @@ export default function Home() {
             </div>
             <div className="h-8 w-px bg-[#102c3d]/10" />
             <div className="flex items-center gap-4">
-              <span className="overflow-visible bg-transparent p-0 shadow-none" aria-label="Wren Kitchens">
-                <Image src="/brand/wren-kitchens-logo.png" alt="Wren Kitchens" width={112} height={48} priority className="h-auto max-h-12 w-auto object-contain" />
-              </span>
+              <Image src="/brand/wren-kitchens-logo.png" alt="Wren Kitchens" width={112} height={44} priority className="h-[44px] w-auto rounded-xl object-contain" />
               <div>
                 <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#1D864A]">Employer environment</p>
                 <p className="text-sm font-medium text-[#102c3d]/54">Powered by LevyTate</p>
