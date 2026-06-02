@@ -263,16 +263,16 @@ export default function Home() {
   }
 
   const guideCopy: Record<Role, string> = {
-    Employee: "Employees can explore only approved pathways, save options and start a request without searching across providers.",
-    "Line Manager": "Managers can review business benefit, time commitment and team impact before approving demand.",
-    "Department Head": "Department leaders can see demand, engagement and cohort planning across priority capability areas.",
-    "Apprenticeship Lead": "Apprenticeship leads can manage approvals, provider mappings, bottlenecks and levy forecast in one place.",
+    Employee: "Explore approved pathways, save options and start a request without provider confusion.",
+    "Line Manager": "Review business fit, time commitment and team impact before approving.",
+    "Department Head": "See demand, engagement and cohorts across priority capability areas.",
+    "Apprenticeship Lead": "Manage approvals, provider mappings, bottlenecks and levy forecast in one place.",
   };
 
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#f7fffc_0%,#effaf6_44%,#f8fbfa_100%)] text-[#102c3d]">
       <header className="border-b border-[#102c3d]/8 bg-white/72 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl flex-col gap-5 px-5 py-5 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-4 lg:flex-row lg:items-center lg:justify-between lg:px-8">
           <div className="flex items-center gap-4">
             <div className="levytate-wordmark" aria-label="LevyTate">
               <span>Levy</span>
@@ -289,24 +289,24 @@ export default function Home() {
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <button onClick={() => setSelectedPathway(pathways[0])} className="rounded-full bg-white px-5 py-3 text-sm font-semibold text-[#102c3d] shadow-[0_14px_30px_rgba(16,44,61,0.10)]">
+            <button onClick={() => setSelectedPathway(pathways[0])} className="rounded-full bg-white px-4 py-2.5 text-sm font-semibold text-[#102c3d] shadow-[0_14px_30px_rgba(16,44,61,0.10)]">
               Explore pathways
             </button>
-            <button onClick={() => setRole("Apprenticeship Lead")} className="rounded-full bg-[#102c3d] px-5 py-3 text-sm font-semibold text-white shadow-[0_12px_26px_rgba(16,44,61,0.16)]">
+            <button onClick={() => setRole("Apprenticeship Lead")} className="rounded-full bg-[#102c3d] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_12px_26px_rgba(16,44,61,0.16)]">
               Open admin console
             </button>
           </div>
         </div>
       </header>
 
-      <section className="mx-auto max-w-7xl px-5 pb-8 pt-12 lg:px-8 lg:pb-12 lg:pt-16">
-        <div className="grid gap-10 lg:grid-cols-[1.04fr_0.96fr] lg:items-end">
+      <section className="mx-auto max-w-7xl px-5 pb-6 pt-8 lg:px-8 lg:pb-8 lg:pt-10">
+        <div className="grid gap-6 lg:grid-cols-[1.04fr_0.96fr] lg:items-end">
           <div>
-            <p className="mb-5 w-fit rounded-full bg-[#dff7ef] px-4 py-2 text-xs font-medium uppercase tracking-[0.14em] text-[#146b66]">
+            <p className="mb-4 w-fit rounded-full bg-[#dff7ef] px-3.5 py-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#146b66]">
               Internal apprenticeship and capability hub powered by LevyTate.
             </p>
             <h1 className="max-w-4xl text-5xl font-semibold leading-[1.02] text-[#102c3d] md:text-7xl">Wren Apprenticeship Hub</h1>
-            <p className="mt-6 max-w-3xl text-xl font-normal leading-9 text-[#102c3d]/68">
+            <p className="mt-4 max-w-3xl text-lg font-normal leading-8 text-[#102c3d]/68">
               A simpler way to scale apprenticeship adoption, manage approvals and connect approved pathways to the right delivery partners.
             </p>
             <RoleSwitcher role={role} setRole={setRole} />
@@ -315,10 +315,10 @@ export default function Home() {
           <OperatingSnapshot requests={requests} mappings={mappings} statusCounts={statusCounts} />
         </div>
 
-        <div className="mt-10 rounded-3xl bg-white/74 p-4 shadow-[0_18px_48px_rgba(16,44,61,0.08)]">
-          <div className="grid gap-3 text-center text-sm font-medium text-[#102c3d]/62 sm:grid-cols-6">
+        <div className="mt-6 rounded-3xl bg-white/74 p-3 shadow-[0_18px_48px_rgba(16,44,61,0.08)]">
+          <div className="grid gap-2 text-center text-xs font-medium text-[#102c3d]/58 sm:grid-cols-6">
             {publicStages.map((step, index) => (
-              <div key={step} className="rounded-2xl bg-[#f4fbf8] px-4 py-4">
+              <div key={step} className="rounded-2xl bg-[#f4fbf8] px-3 py-3">
                 <span className="mr-2 text-[#159b8f]">{String(index + 1).padStart(2, "0")}</span>
                 {step}
               </div>
@@ -327,8 +327,8 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="mx-auto grid max-w-7xl gap-6 px-5 pb-16 lg:grid-cols-[1fr_320px] lg:px-8">
-        <div className="grid gap-6">
+      <section className="mx-auto grid max-w-7xl gap-5 px-5 pb-12 lg:grid-cols-[minmax(0,1fr)_280px] lg:px-8">
+        <div className="grid gap-5">
           {role === "Employee" && (
             <EmployeeDashboard
               savedPathways={savedPathways}
@@ -355,7 +355,7 @@ export default function Home() {
           <ExecutiveSummary requests={requests} mappings={mappings} statusCounts={statusCounts} />
         </div>
 
-        <aside className="grid h-fit gap-4 lg:sticky lg:top-6">
+        <aside className="grid h-fit gap-3 lg:sticky lg:top-5">
           <GuidePanel role={role} copy={guideCopy[role]} />
           <DemoControls scenario={scenario} onScenario={setScenarioData} onSeed={seedRequest} onReset={() => setScenarioData("Medium")} />
         </aside>
@@ -377,13 +377,13 @@ export default function Home() {
 
 function RoleSwitcher({ role, setRole }: { role: Role; setRole: (role: Role) => void }) {
   return (
-    <div className="mt-8 w-fit max-w-full overflow-x-auto rounded-full bg-white/72 p-1 shadow-[0_10px_24px_rgba(16,44,61,0.08)]">
+    <div className="mt-6 w-fit max-w-full overflow-x-auto rounded-full bg-white/72 p-1 shadow-[0_10px_24px_rgba(16,44,61,0.08)]">
       <div className="flex gap-1">
         {roles.map((item) => (
           <button
             key={item}
             onClick={() => setRole(item)}
-            className={`whitespace-nowrap rounded-full px-4 py-2.5 text-sm font-medium transition ${
+            className={`whitespace-nowrap rounded-full px-3.5 py-2 text-sm font-medium transition ${
               role === item ? "bg-[#102c3d] text-white shadow-[0_10px_24px_rgba(16,44,61,0.12)]" : "text-[#102c3d]/58 hover:bg-[#dff7ef]"
             }`}
           >
@@ -411,14 +411,14 @@ function EmployeeDashboard({
   onSavePathway: (title: string) => void;
 }) {
   return (
-    <div className="grid gap-6">
+    <div className="grid gap-5">
       <PanelShell title="Welcome back, Amelia" eyebrow="Employee Dashboard">
-        <div className="grid gap-5 lg:grid-cols-[1fr_0.9fr]">
+        <div className="grid gap-4 lg:grid-cols-[1fr_0.72fr]">
           <div>
-            <p className="max-w-2xl text-base leading-7 text-[#102c3d]/64">
+            <p className="max-w-2xl text-sm leading-6 text-[#102c3d]/64">
               Explore approved development pathways across Wren, understand what fits your role or team, and start a request in minutes.
             </p>
-            <div className="mt-6 grid gap-3 sm:grid-cols-3">
+            <div className="mt-5 grid gap-3 sm:grid-cols-3">
               <MiniMetric label="Recommended" value="3" copy="Best fit pathways" />
               <MiniMetric label="Saved" value={savedPathways.length} copy="Ready to revisit" />
               <MiniMetric label="My status" value={selectedRequest.status} copy="Latest request stage" />
@@ -428,9 +428,9 @@ function EmployeeDashboard({
         </div>
       </PanelShell>
 
-      <div className="grid gap-6 xl:grid-cols-[1fr_0.85fr]">
+      <div className="grid gap-5 xl:grid-cols-[1fr_0.78fr]">
         <PanelShell title="Recommended pathways" eyebrow="Approved Development Pathways">
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             {pathways.slice(0, 4).map((pathway) => (
               <PathwayCard key={pathway.title} pathway={pathway} saved={savedPathways.includes(pathway.title)} onOpen={() => onOpenPathway(pathway)} onSave={() => onSavePathway(pathway.title)} />
             ))}
@@ -443,7 +443,7 @@ function EmployeeDashboard({
       </div>
 
       <PanelShell title="Explore all pathways" eyebrow="Capability Growth">
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {pathways.map((pathway) => (
             <PathwayCard key={pathway.title} pathway={pathway} saved={savedPathways.includes(pathway.title)} onOpen={() => onOpenPathway(pathway)} onSave={() => onSavePathway(pathway.title)} />
           ))}
@@ -456,18 +456,18 @@ function EmployeeDashboard({
 function ManagerDashboard({ requests, onStatus, onOpenPathway }: { requests: RequestItem[]; onStatus: (id: number, status: RequestStatus) => void; onOpenPathway: (pathway: Pathway) => void }) {
   const managerRequests = requests.filter((request) => request.status === "Manager review").slice(0, 5);
   return (
-    <div className="grid gap-6">
+    <div className="grid gap-5">
       <PanelShell title="Team requests awaiting review" eyebrow="Line Manager Dashboard">
         <div className="grid gap-4">
           {managerRequests.map((request) => {
             const pathway = pathways.find((item) => item.title === request.pathway) ?? pathways[0];
             return (
-              <article key={request.id} className="rounded-3xl bg-[#f8fbfa] p-5">
-                <div className="grid gap-5 xl:grid-cols-[1fr_0.8fr_auto]">
+            <article key={request.id} className="rounded-3xl bg-[#f8fbfa] p-4">
+                <div className="grid gap-4 xl:grid-cols-[1fr_0.8fr_auto]">
                   <div>
                     <p className="text-lg font-semibold">{request.name}</p>
                     <p className="mt-1 text-sm font-medium text-[#102c3d]/56">{request.role} | {request.team} | {request.pathway}</p>
-                    <textarea placeholder="Add business case note" className="mt-4 w-full rounded-2xl border border-[#102c3d]/10 bg-white px-4 py-3 text-sm outline-none focus:border-[#159b8f]" />
+                  <textarea placeholder="Add business case note" rows={3} className="mt-3 w-full rounded-2xl border border-[#102c3d]/10 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[#159b8f]" />
                   </div>
                   <div className="grid gap-3">
                     <SubtleRow label="Time commitment" value={pathway.commitment} />
@@ -495,13 +495,13 @@ function ManagerDashboard({ requests, onStatus, onOpenPathway }: { requests: Req
 function DepartmentDashboard({ requests, departmentCounts, onOpenPathway }: { requests: RequestItem[]; departmentCounts: Record<string, number>; onOpenPathway: (pathway: Pathway) => void }) {
   const suggested = ["Review upcoming leadership cohort", "Nudge managers with pending approvals", "Identify roles suitable for data pathway", "Plan next quarter's apprenticeship demand"];
   return (
-    <div className="grid gap-6">
-      <div className="grid gap-6 xl:grid-cols-[1fr_0.9fr]">
+    <div className="grid gap-5">
+      <div className="grid gap-5 xl:grid-cols-[1fr_0.86fr]">
         <PanelShell title="Demand by department" eyebrow="Department Head Dashboard">
           <InsightBars rows={Object.entries(departmentCounts).map(([label, value]) => [label, value])} />
         </PanelShell>
         <PanelShell title="Operational skills snapshot" eyebrow="Priority Areas">
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2">
             <MiniMetric label="Engagement score" value="82%" copy="Across priority departments" />
             <MiniMetric label="Skills gaps" value="4" copy="Digital, leadership, engineering, service" />
             <MiniMetric label="Recommended cohorts" value="3" copy="Retail, manufacturing, leadership" />
@@ -510,16 +510,16 @@ function DepartmentDashboard({ requests, departmentCounts, onOpenPathway }: { re
         </PanelShell>
       </div>
       <PanelShell title="Upcoming cohort planning" eyebrow="Capability Growth">
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-3">
           {pathways.slice(0, 3).map((pathway) => (
-            <button key={pathway.title} onClick={() => onOpenPathway(pathway)} className="rounded-3xl bg-[#f4fbf8] p-5 text-left transition hover:bg-[#e7f7f1]">
+            <button key={pathway.title} onClick={() => onOpenPathway(pathway)} className="rounded-3xl bg-[#f4fbf8] p-4 text-left transition hover:bg-[#e7f7f1]">
               <h3 className="text-lg font-semibold">{pathway.title}</h3>
               <p className="mt-2 text-sm leading-7 text-[#102c3d]/58">{pathway.cohort}</p>
             </button>
           ))}
         </div>
       </PanelShell>
-      <div className="grid gap-6 xl:grid-cols-[1fr_0.8fr]">
+      <div className="grid gap-5 xl:grid-cols-[1fr_0.72fr]">
         <PanelShell title="Requests grouped by team" eyebrow="Team Development Pipeline">
           <div className="grid gap-3">
             {Object.entries(countBy(requests, "team")).map(([team, value]) => (
@@ -560,12 +560,12 @@ function AdminDashboard({
   onOpenPathway: (pathway: Pathway) => void;
 }) {
   return (
-    <div className="grid gap-6">
+    <div className="grid gap-5">
       <PanelShell title="Advanced operating snapshot" eyebrow="Apprenticeship Lead Console">
         <p className="max-w-2xl text-base leading-7 text-[#102c3d]/64">
           LevyTate gives Wren apprenticeship leads one place to manage demand, approvals, provider mappings and internal rollout.
         </p>
-        <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           <ConsoleMetric title="Development pipeline" value={requests.length} copy="Live requests across the employer environment" />
           <ConsoleMetric title="Approval queue" value={(statusCounts["Manager review"] ?? 0) + (statusCounts["Lead review"] ?? 0)} copy="Items needing review" />
           <ConsoleMetric title="Provider mapping health" value="92%" copy="Delivery fit across live pathways" />
@@ -579,10 +579,10 @@ function AdminDashboard({
         <Kanban requests={requests} onMove={onMove} />
       </PanelShell>
 
-      <div className="grid gap-6 xl:grid-cols-[1fr_0.85fr]">
+      <div className="grid gap-5 xl:grid-cols-[1fr_0.78fr]">
         <ProviderMappingTable mappings={mappings} onMapping={onMapping} />
         <PanelShell title="Engagement and levy forecast" eyebrow="Operating Rhythm">
-          <div className="grid gap-6">
+          <div className="grid gap-5">
             <InsightBars rows={Object.entries(departmentCounts).map(([label, value]) => [label, value])} />
             <InsightBars rows={[["Current forecast", 73], ["Target utilisation", 85], ["At risk", 12]]} />
           </div>
@@ -595,19 +595,19 @@ function AdminDashboard({
             <thead>
               <tr className="border-b border-[#102c3d]/10 text-[#102c3d]/50">
                 {["Pathway", "Standard", "Status", "Cohort", "Approved delivery partner", "Action"].map((heading) => (
-                  <th key={heading} className="px-4 py-4 font-medium">{heading}</th>
+                  <th key={heading} className="px-3 py-3 font-medium">{heading}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {pathways.map((pathway) => (
                 <tr key={pathway.title} className="border-b border-[#102c3d]/6">
-                  <td className="px-4 py-5 font-medium text-[#102c3d]">{pathway.title}</td>
-                  <td className="px-4 py-5 text-[#102c3d]/64">{pathway.standard}</td>
-                  <td className="px-4 py-5 text-[#102c3d]/64">{pathway.status}</td>
-                  <td className="px-4 py-5 text-[#102c3d]/64">{pathway.cohort}</td>
-                  <td className="px-4 py-5 text-[#102c3d]/64">{pathway.deliveryPartner}</td>
-                  <td className="px-4 py-5"><SmallButton label="View details" onClick={() => onOpenPathway(pathway)} variant="mint" /></td>
+                  <td className="px-3 py-3.5 font-medium text-[#102c3d]">{pathway.title}</td>
+                  <td className="px-3 py-3.5 text-[#102c3d]/64">{pathway.standard}</td>
+                  <td className="px-3 py-3.5 text-[#102c3d]/64">{pathway.status}</td>
+                  <td className="px-3 py-3.5 text-[#102c3d]/64">{pathway.cohort}</td>
+                  <td className="px-3 py-3.5 text-[#102c3d]/64">{pathway.deliveryPartner}</td>
+                  <td className="px-3 py-3.5"><SmallButton label="View details" onClick={() => onOpenPathway(pathway)} variant="mint" /></td>
                 </tr>
               ))}
             </tbody>
@@ -616,9 +616,9 @@ function AdminDashboard({
       </PanelShell>
 
       <PanelShell title="Bottleneck alerts and suggested actions" eyebrow="Next Best Moves">
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-2 md:grid-cols-2">
           {["Review 6 manager approvals", "Confirm provider mapping for Manufacturing & Engineering", "Nudge departments with low engagement", "Prepare next Retail Sales & Design cohort"].map((action) => (
-            <div key={action} className="rounded-2xl bg-[#f4fbf8] p-4 text-sm font-medium text-[#102c3d]/72">{action}</div>
+            <div key={action} className="rounded-2xl bg-[#f4fbf8] px-4 py-3 text-sm font-medium text-[#102c3d]/72">{action}</div>
           ))}
         </div>
       </PanelShell>
@@ -634,22 +634,22 @@ function ProviderMappingTable({ mappings, onMapping }: { mappings: ProviderMappi
           <thead>
             <tr className="border-b border-[#102c3d]/10 text-[#102c3d]/50">
               {["Role family", "Apprenticeship pathway", "Standard", "Approved delivery partner", "Delivery model", "Fit score", "Mapping status", "Next action", "Actions"].map((heading) => (
-                <th key={heading} className="px-4 py-4 font-medium">{heading}</th>
+                <th key={heading} className="px-3 py-3 font-medium">{heading}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {mappings.map((row, index) => (
               <tr key={row.roleFamily} className="border-b border-[#102c3d]/6">
-                <td className="px-4 py-5 text-[#102c3d]/68">{row.roleFamily}</td>
-                <td className="px-4 py-5 font-medium text-[#102c3d]">{row.pathway}</td>
-                <td className="px-4 py-5 text-[#102c3d]/68">{row.standard}</td>
-                <td className="px-4 py-5 text-[#102c3d]/68">{row.partner}</td>
-                <td className="px-4 py-5 text-[#102c3d]/68">{row.deliveryModel}</td>
-                <td className="px-4 py-5 text-[#102c3d]/68">{row.fit}%</td>
-                <td className="px-4 py-5 text-[#102c3d]/68">{row.status}</td>
-                <td className="px-4 py-5 text-[#102c3d]/68">{row.nextAction}</td>
-                <td className="px-4 py-5">
+                <td className="px-3 py-3.5 text-[#102c3d]/68">{row.roleFamily}</td>
+                <td className="px-3 py-3.5 font-medium text-[#102c3d]">{row.pathway}</td>
+                <td className="px-3 py-3.5 text-[#102c3d]/68">{row.standard}</td>
+                <td className="px-3 py-3.5 text-[#102c3d]/68">{row.partner}</td>
+                <td className="px-3 py-3.5 text-[#102c3d]/68">{row.deliveryModel}</td>
+                <td className="px-3 py-3.5 text-[#102c3d]/68">{row.fit}%</td>
+                <td className="px-3 py-3.5 text-[#102c3d]/68">{row.status}</td>
+                <td className="px-3 py-3.5 text-[#102c3d]/68">{row.nextAction}</td>
+                <td className="px-3 py-3.5">
                   <div className="flex gap-2">
                     <SmallButton label="View details" onClick={() => onMapping(index, row.status, "Details reviewed")} variant="mint" />
                     <SmallButton label="Mark as live" onClick={() => onMapping(index, "Live", "Monitor cohort")} />
@@ -676,19 +676,19 @@ function OperatingSnapshot({ requests, mappings, statusCounts }: { requests: Req
   ];
 
   return (
-    <aside className="rounded-[2rem] bg-white p-6 shadow-[0_24px_70px_rgba(16,44,61,0.12)]">
-      <div className="flex items-start justify-between gap-6">
+    <aside className="rounded-[1.5rem] bg-white p-5 shadow-[0_20px_56px_rgba(16,44,61,0.10)]">
+      <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs font-medium uppercase tracking-[0.14em] text-[#df5f73]">Operational Skills Snapshot</p>
-          <h2 className="mt-2 text-3xl font-semibold">Live view of apprenticeship demand</h2>
+          <h2 className="mt-2 text-2xl font-semibold">Live demand view</h2>
         </div>
-        <div className="rounded-full bg-[#dff7ef] px-4 py-2 text-sm font-medium text-[#146b66]">Demo data</div>
+        <div className="rounded-full bg-[#dff7ef] px-3 py-1.5 text-xs font-medium text-[#146b66]">Demo data</div>
       </div>
-      <div className="mt-7 divide-y divide-[#102c3d]/8">
+      <div className="mt-5 divide-y divide-[#102c3d]/8">
         {items.map(([label, value]) => (
-          <div key={label} className="flex items-center justify-between gap-5 py-4">
+          <div key={label} className="flex items-center justify-between gap-5 py-3">
             <p className="text-sm font-medium text-[#102c3d]/58">{label}</p>
-            <p className="text-2xl font-semibold text-[#102c3d]">{value}</p>
+            <p className="text-xl font-semibold text-[#102c3d]">{value}</p>
           </div>
         ))}
       </div>
@@ -698,16 +698,16 @@ function OperatingSnapshot({ requests, mappings, statusCounts }: { requests: Req
 
 function PathwayCard({ pathway, saved, onOpen, onSave }: { pathway: Pathway; saved: boolean; onOpen: () => void; onSave: () => void }) {
   return (
-    <article className="rounded-3xl bg-white p-6 shadow-[0_16px_46px_rgba(16,44,61,0.08)]">
-      <div className="flex items-start justify-between gap-4">
-        <h3 className="text-xl font-semibold">{pathway.title}</h3>
-        <span className="rounded-full bg-[#dff7ef] px-3 py-1 text-xs font-medium text-[#146b66]">{pathway.status}</span>
+    <article className="rounded-3xl bg-white p-4 shadow-[0_14px_36px_rgba(16,44,61,0.07)]">
+      <div className="flex items-start justify-between gap-3">
+        <h3 className="text-lg font-semibold">{pathway.title}</h3>
+        <span className="rounded-full bg-[#dff7ef] px-2.5 py-1 text-[11px] font-medium text-[#146b66]">{pathway.status}</span>
       </div>
-      <p className="mt-3 text-sm font-medium text-[#159b8f]">{pathway.standard}</p>
-      <p className="mt-5 text-sm leading-7 text-[#102c3d]/62">{pathway.audience}</p>
-      <div className="mt-6 flex flex-wrap gap-2">
-        <button onClick={onOpen} className="rounded-full bg-[#102c3d] px-4 py-2 text-sm font-semibold text-white">View details</button>
-        <button onClick={onSave} className="rounded-full bg-[#f4fbf8] px-4 py-2 text-sm font-semibold text-[#102c3d]">{saved ? "Saved" : "Save"}</button>
+      <p className="mt-2 line-clamp-2 text-sm font-medium leading-6 text-[#159b8f]">{pathway.standard}</p>
+      <p className="mt-3 line-clamp-2 text-sm leading-6 text-[#102c3d]/58">{pathway.audience}</p>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button onClick={onOpen} className="rounded-full bg-[#102c3d] px-3.5 py-2 text-xs font-semibold text-white">View detail</button>
+        <button onClick={onSave} className="rounded-full bg-[#f4fbf8] px-3.5 py-2 text-xs font-semibold text-[#102c3d]">{saved ? "Saved" : "Save"}</button>
       </div>
     </article>
   );
@@ -715,25 +715,25 @@ function PathwayCard({ pathway, saved, onOpen, onSave }: { pathway: Pathway; sav
 
 function RequestForm({ onSubmit }: { onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
   return (
-    <form onSubmit={onSubmit} className="grid gap-4">
+    <form onSubmit={onSubmit} className="grid gap-3 md:grid-cols-2">
       <Field name="name" label="Name" defaultValue="Amelia Hart" />
       <Field name="role" label="Role" defaultValue="Kitchen Designer" />
       <Field name="department" label="Department" defaultValue="Retail" />
       <Field name="team" label="Team" defaultValue="Showroom North" />
-      <label className="grid gap-2 text-sm font-medium text-[#102c3d]/70">
+      <label className="grid gap-1.5 text-xs font-medium text-[#102c3d]/62">
         Selected pathway
-        <select name="pathway" className="rounded-2xl border border-[#102c3d]/10 bg-[#f8fbfa] px-4 py-3 outline-none focus:border-[#159b8f]">
+        <select name="pathway" className="rounded-2xl border border-[#102c3d]/10 bg-[#f8fbfa] px-3.5 py-2.5 text-sm outline-none focus:border-[#159b8f]">
           {pathways.map((pathway) => (
             <option key={pathway.title}>{pathway.title}</option>
           ))}
         </select>
       </label>
       <Field name="manager" label="Line manager" defaultValue="Ryan Booth" />
-      <label className="grid gap-2 text-sm font-medium text-[#102c3d]/70">
+      <label className="grid gap-1.5 text-xs font-medium text-[#102c3d]/62 md:col-span-2">
         Why is this needed?
-        <textarea name="need" rows={4} className="rounded-2xl border border-[#102c3d]/10 bg-[#f8fbfa] px-4 py-3 outline-none focus:border-[#159b8f]" defaultValue="I want to build stronger customer and design confidence." />
+        <textarea name="need" rows={3} className="rounded-2xl border border-[#102c3d]/10 bg-[#f8fbfa] px-3.5 py-2.5 text-sm outline-none focus:border-[#159b8f]" defaultValue="I want to build stronger customer and design confidence." />
       </label>
-      <button className="w-fit rounded-full bg-[#102c3d] px-6 py-3 text-sm font-semibold text-white">Submit request</button>
+      <button className="w-fit rounded-full bg-[#102c3d] px-5 py-2.5 text-sm font-semibold text-white md:col-span-2">Submit request</button>
     </form>
   );
 }
@@ -741,10 +741,10 @@ function RequestForm({ onSubmit }: { onSubmit: (event: FormEvent<HTMLFormElement
 function RequestTracker({ request }: { request: RequestItem }) {
   const activeIndex = requestStages.indexOf(request.status);
   return (
-    <div className="rounded-3xl bg-[#f8fbfa] p-5">
+    <div className="rounded-3xl bg-[#f8fbfa] p-4">
       <p className="text-sm font-medium text-[#102c3d]/50">My request status</p>
-      <h3 className="mt-2 text-xl font-semibold">{request.pathway}</h3>
-      <div className="mt-5 grid gap-3">
+      <h3 className="mt-2 text-lg font-semibold">{request.pathway}</h3>
+      <div className="mt-4 grid gap-2.5">
         {publicStages.map((stage, index) => (
           <div key={stage} className="flex items-center gap-3">
             <span className={`h-2.5 w-2.5 rounded-full ${index <= activeIndex ? "bg-[#159b8f]" : "bg-[#d9e8e2]"}`} />
@@ -758,17 +758,20 @@ function RequestTracker({ request }: { request: RequestItem }) {
 
 function Kanban({ requests, onMove, compact = false }: { requests: RequestItem[]; onMove?: (id: number, direction: 1 | -1) => void; compact?: boolean }) {
   return (
-    <div className="grid gap-4 xl:grid-cols-6">
+    <div className="flex gap-3 overflow-x-auto pb-2">
       {requestStages.map((column) => (
-        <div key={column} className="rounded-3xl bg-[#f8fbfa] p-4">
-          <h3 className="text-sm font-semibold text-[#102c3d]">{column}</h3>
-          <div className="mt-4 grid gap-3">
+        <div key={column} className="min-w-[180px] rounded-3xl bg-[#f8fbfa] p-3">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-xs font-semibold text-[#102c3d]">{column}</h3>
+            <span className="rounded-full bg-white px-2 py-1 text-[11px] font-medium text-[#102c3d]/54">{requests.filter((request) => request.status === column).length}</span>
+          </div>
+          <div className="mt-3 grid gap-2">
             {requests.filter((request) => request.status === column).slice(0, compact ? 2 : 8).map((request) => (
-              <article key={request.id} className="rounded-2xl bg-white p-4 shadow-[0_8px_18px_rgba(16,44,61,0.06)]">
+              <article key={request.id} className="rounded-2xl bg-white p-3 shadow-[0_8px_18px_rgba(16,44,61,0.05)]">
                 <p className="text-sm font-semibold">{request.name}</p>
-                <p className="mt-1 text-xs font-medium text-[#102c3d]/54">{request.pathway}</p>
+                <p className="mt-1 line-clamp-1 text-xs font-medium text-[#102c3d]/54">{request.pathway}</p>
                 {onMove && (
-                  <div className="mt-3 flex gap-2">
+                  <div className="mt-2 flex gap-2">
                     <button onClick={() => onMove(request.id, -1)} className="rounded-full bg-[#f4fbf8] px-3 py-1.5 text-xs font-medium text-[#102c3d]">Back</button>
                     <button onClick={() => onMove(request.id, 1)} className="rounded-full bg-[#102c3d] px-3 py-1.5 text-xs font-medium text-white">Next</button>
                   </div>
@@ -793,7 +796,7 @@ function ExecutiveSummary({ requests, mappings, statusCounts }: { requests: Requ
   ];
   return (
     <PanelShell title="Executive summary" eyebrow="Stakeholder View">
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-3">
         {summary.map(([label, value]) => (
           <MiniMetric key={label} label={label} value={value} copy="Mock presentation data" />
         ))}
@@ -804,24 +807,24 @@ function ExecutiveSummary({ requests, mappings, statusCounts }: { requests: Requ
 
 function GuidePanel({ role, copy }: { role: Role; copy: string }) {
   return (
-    <section className="rounded-[2rem] bg-white p-6 shadow-[0_18px_54px_rgba(16,44,61,0.08)]">
-      <p className="text-xs font-medium uppercase tracking-[0.14em] text-[#df5f73]">LevyTate Guide</p>
-      <h2 className="mt-2 text-2xl font-semibold text-[#102c3d]">{role} view</h2>
-      <p className="mt-4 text-sm leading-7 text-[#102c3d]/62">{copy}</p>
+    <section className="rounded-3xl bg-white p-4 shadow-[0_14px_38px_rgba(16,44,61,0.07)]">
+      <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#df5f73]">LevyTate Guide</p>
+      <h2 className="mt-1.5 text-lg font-semibold text-[#102c3d]">{role} view</h2>
+      <p className="mt-3 text-sm leading-6 text-[#102c3d]/62">{copy}</p>
     </section>
   );
 }
 
 function DemoControls({ scenario, onScenario, onSeed, onReset }: { scenario: DemandScenario; onScenario: (scenario: DemandScenario) => void; onSeed: () => void; onReset: () => void }) {
   return (
-    <section className="rounded-[2rem] bg-white p-6 shadow-[0_18px_54px_rgba(16,44,61,0.08)]">
-      <p className="text-xs font-medium uppercase tracking-[0.14em] text-[#df5f73]">Demo Mode</p>
-      <div className="mt-5 grid gap-3">
-        <button onClick={onReset} className="rounded-full bg-[#f4fbf8] px-4 py-2.5 text-sm font-semibold text-[#102c3d]">Reset demo data</button>
-        <button onClick={onSeed} className="rounded-full bg-[#102c3d] px-4 py-2.5 text-sm font-semibold text-white">Seed new request</button>
+    <section className="rounded-3xl bg-white p-4 shadow-[0_14px_38px_rgba(16,44,61,0.07)]">
+      <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#df5f73]">Demo Mode</p>
+      <div className="mt-4 grid gap-2.5">
+        <button onClick={onReset} className="rounded-full bg-[#f4fbf8] px-3.5 py-2 text-xs font-semibold text-[#102c3d]">Reset data</button>
+        <button onClick={onSeed} className="rounded-full bg-[#102c3d] px-3.5 py-2 text-xs font-semibold text-white">Seed request</button>
         <div className="grid grid-cols-3 rounded-full bg-[#eef8f5] p-1">
           {(["Low", "Medium", "High"] as DemandScenario[]).map((item) => (
-            <button key={item} onClick={() => onScenario(item)} className={`rounded-full px-3 py-2 text-xs font-medium ${scenario === item ? "bg-white text-[#102c3d] shadow-[0_8px_18px_rgba(16,44,61,0.08)]" : "text-[#102c3d]/54"}`}>
+            <button key={item} onClick={() => onScenario(item)} className={`rounded-full px-2 py-1.5 text-[11px] font-medium ${scenario === item ? "bg-white text-[#102c3d] shadow-[0_8px_18px_rgba(16,44,61,0.08)]" : "text-[#102c3d]/54"}`}>
               {item}
             </button>
           ))}
@@ -866,32 +869,32 @@ function PathwayModal({ pathway, onClose, onStart }: { pathway: Pathway; onClose
 
 function PanelShell({ title, eyebrow, children }: { title: string; eyebrow: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-[2rem] bg-white p-6 shadow-[0_18px_54px_rgba(16,44,61,0.08)] lg:p-8">
-      <p className="text-xs font-medium uppercase tracking-[0.14em] text-[#df5f73]">{eyebrow}</p>
-      <h2 className="mt-2 text-3xl font-semibold text-[#102c3d]">{title}</h2>
-      <div className="mt-6">{children}</div>
+    <section className="rounded-[1.5rem] bg-white p-5 shadow-[0_16px_44px_rgba(16,44,61,0.07)] lg:p-6">
+      <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#df5f73]">{eyebrow}</p>
+      <h2 className="mt-1.5 text-2xl font-semibold text-[#102c3d]">{title}</h2>
+      <div className="mt-4">{children}</div>
     </section>
   );
 }
 
 function MiniMetric({ label, value, copy }: { label: string; value: string | number; copy: string }) {
   return (
-    <article className="rounded-3xl bg-[#f8fbfa] p-5">
-      <p className="text-sm font-medium text-[#102c3d]/50">{label}</p>
-      <p className="mt-3 text-3xl font-semibold">{value}</p>
-      <p className="mt-2 text-sm leading-6 text-[#102c3d]/56">{copy}</p>
+    <article className="rounded-3xl bg-[#f8fbfa] p-4">
+      <p className="text-xs font-medium text-[#102c3d]/50">{label}</p>
+      <p className="mt-2 text-2xl font-semibold">{value}</p>
+      <p className="mt-1.5 text-xs leading-5 text-[#102c3d]/54">{copy}</p>
     </article>
   );
 }
 
 function ConsoleMetric({ title, value, copy }: { title: string; value: string | number; copy: string }) {
   return (
-    <article className="rounded-3xl bg-[#f8fbfa] p-5">
-      <div className="flex items-start justify-between gap-4">
-        <p className="text-sm font-medium text-[#102c3d]/62">{title}</p>
-        <p className="text-2xl font-semibold text-[#102c3d]">{value}</p>
+    <article className="rounded-3xl bg-[#f8fbfa] p-4">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-xs font-medium text-[#102c3d]/62">{title}</p>
+        <p className="text-xl font-semibold text-[#102c3d]">{value}</p>
       </div>
-      <p className="mt-4 text-sm leading-7 text-[#102c3d]/56">{copy}</p>
+      <p className="mt-3 text-xs leading-5 text-[#102c3d]/56">{copy}</p>
     </article>
   );
 }
@@ -899,17 +902,17 @@ function ConsoleMetric({ title, value, copy }: { title: string; value: string | 
 function SubtleRow({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#102c3d]/38">{label}</p>
-      <p className="mt-1 text-sm leading-7 text-[#102c3d]/64">{value}</p>
+      <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-[#102c3d]/38">{label}</p>
+      <p className="mt-1 text-sm leading-6 text-[#102c3d]/64">{value}</p>
     </div>
   );
 }
 
 function Field({ name, label, defaultValue = "" }: { name: string; label: string; defaultValue?: string }) {
   return (
-    <label className="grid gap-2 text-sm font-medium text-[#102c3d]/70">
+    <label className="grid gap-1.5 text-xs font-medium text-[#102c3d]/62">
       {label}
-      <input name={name} defaultValue={defaultValue} className="rounded-2xl border border-[#102c3d]/10 bg-[#f8fbfa] px-4 py-3 outline-none focus:border-[#159b8f]" />
+      <input name={name} defaultValue={defaultValue} className="rounded-2xl border border-[#102c3d]/10 bg-[#f8fbfa] px-3.5 py-2.5 text-sm outline-none focus:border-[#159b8f]" />
     </label>
   );
 }
@@ -921,13 +924,13 @@ function SmallButton({ label, onClick, variant = "dark" }: { label: string; onCl
     coral: "bg-[#ffe3e8] text-[#bf4159]",
   };
 
-  return <button onClick={onClick} className={`rounded-full px-4 py-2 text-xs font-semibold ${classes[variant]}`}>{label}</button>;
+  return <button onClick={onClick} className={`rounded-full px-3 py-1.5 text-[11px] font-semibold ${classes[variant]}`}>{label}</button>;
 }
 
 function InsightBars({ rows }: { rows: Array<[string, number]> }) {
   const max = Math.max(...rows.map(([, value]) => value), 1);
   return (
-    <div className="grid gap-5">
+    <div className="grid gap-4">
       {rows.map(([label, value]) => (
         <div key={label}>
           <div className="flex justify-between gap-4 text-sm font-medium text-[#102c3d]/64">
