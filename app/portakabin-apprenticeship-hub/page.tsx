@@ -378,13 +378,13 @@ export default function PortakabinApprenticeshipHub() {
   }
 
   return (
-    <main className="min-h-screen overflow-hidden bg-[#f5f7f4] text-[#102c3d]">
+    <main className="min-h-screen overflow-hidden bg-[linear-gradient(180deg,#f8faf8_0%,#f2f6f4_48%,#f6f8f7_100%)] text-[#102c3d]">
       <Sidebar activeSection={activeSection} onNavigate={openSection} />
 
       <div className="h-screen min-w-0 overflow-y-auto lg:ml-[296px]">
         <TopBar role={role} setRole={switchRole} onOpenAdmin={() => switchRole("Apprenticeship Lead")} />
 
-        <div className="mx-auto w-full max-w-[1500px] space-y-8 px-5 py-7 sm:px-7 lg:px-9">
+        <div className="mx-auto w-full max-w-[1500px] space-y-7 px-5 py-7 sm:px-7 lg:px-9">
           <HeroPanel role={role} requests={requests} mappings={mappings} statusCounts={statusCounts} onNavigate={openSection} />
           <RoleDashboard
             role={role}
@@ -425,12 +425,12 @@ export default function PortakabinApprenticeshipHub() {
 
 function Sidebar({ activeSection, onNavigate }: { activeSection: SectionKey; onNavigate: (section: SectionKey) => void }) {
   return (
-    <aside className="fixed inset-y-0 left-0 z-40 hidden w-[296px] border-r border-[#102c3d]/10 bg-white px-4 py-5 lg:flex lg:flex-col">
+    <aside className="fixed inset-y-0 left-0 z-40 hidden w-[296px] border-r border-[#102c3d]/[0.08] bg-white/95 px-4 py-5 shadow-[8px_0_32px_rgba(16,44,61,0.035)] backdrop-blur-xl lg:flex lg:flex-col">
       <div className="flex items-center px-2">
         <LevyTateLogo className="h-[44px]" />
       </div>
 
-      <div className="mt-5 rounded-2xl border border-[#102c3d]/[0.06] bg-[#f8faf4] px-4 py-3 text-[#102c3d]">
+      <div className="mt-5 rounded-2xl border border-[#102c3d]/[0.06] bg-[#f7faf6] px-4 py-3 text-[#102c3d]">
         <p className="text-[10px] font-medium uppercase tracking-[0.15em] text-[#102c3d]/40">Active client</p>
         <p className="mt-1 text-sm font-semibold tracking-tight">Portakabin</p>
       </div>
@@ -438,7 +438,7 @@ function Sidebar({ activeSection, onNavigate }: { activeSection: SectionKey; onN
       <nav className="mt-5 min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
         {navSections.map((section) => (
           <div key={section.title}>
-            <p className="px-2 text-[10px] font-medium uppercase tracking-[0.16em] text-[#102c3d]/34">{section.title}</p>
+            <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#102c3d]/32">{section.title}</p>
             <div className="mt-1.5 grid gap-1">
               {section.items.map((item) => {
                 const sectionKey = item as SectionKey;
@@ -447,8 +447,8 @@ function Sidebar({ activeSection, onNavigate }: { activeSection: SectionKey; onN
                   <button
                     key={item}
                     onClick={() => onNavigate(sectionKey)}
-                    className={`flex w-full items-center gap-2 rounded-xl px-2.5 py-2.5 text-left text-sm font-medium transition ${
-                      active ? "bg-[#f0f5ed] text-[#102c3d] shadow-[inset_3px_0_0_#159b8f]" : "text-[#102c3d]/58 hover:bg-[#f8faf4] hover:text-[#102c3d]"
+                    className={`flex w-full items-center gap-2 rounded-xl px-2.5 py-2.5 text-left text-sm font-medium transition duration-200 ${
+                      active ? "bg-[#edf6f2] text-[#102c3d] shadow-[inset_3px_0_0_#159b8f]" : "text-[#102c3d]/56 hover:bg-[#f7faf6] hover:text-[#102c3d]"
                     }`}
                   >
                     <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg text-[10px] font-semibold ${active ? "bg-white text-[#159b8f]" : "bg-[#f8faf4] text-[#102c3d]/46"}`}>
@@ -469,16 +469,16 @@ function Sidebar({ activeSection, onNavigate }: { activeSection: SectionKey; onN
 function TopBar({ role, setRole, onOpenAdmin }: { role: Role; setRole: (role: Role) => void; onOpenAdmin: () => void }) {
   return (
     <PlatformTopBar tenantName="Portakabin" tenantSubtitle="Internal apprenticeship and capability hub">
-      <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-center">
-        <div className="hidden min-w-[260px] rounded-full border border-[#102c3d]/10 bg-[#f8fbfa] px-4 py-2.5 text-sm text-[#102c3d]/42 xl:block">Search pathways, requests or teams</div>
-        <div className="flex flex-wrap rounded-full bg-[#edf5f1] p-1">
+      <div className="grid min-w-0 gap-3 md:grid-cols-[minmax(220px,300px)_auto] md:items-center 2xl:grid-cols-[minmax(260px,320px)_auto_auto]">
+        <div className="hidden h-10 items-center rounded-full border border-[#102c3d]/[0.08] bg-[#f8fbfa] px-4 text-sm text-[#102c3d]/44 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] xl:flex">Search pathways, requests or teams</div>
+        <div className="flex min-h-10 flex-wrap items-center rounded-[1.25rem] border border-[#102c3d]/[0.06] bg-[#edf5f1] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] 2xl:h-10 2xl:flex-nowrap 2xl:rounded-full">
           {roles.map((item) => (
-            <button key={item} onClick={() => setRole(item)} className={`rounded-full px-3 py-2 text-xs font-semibold transition ${role === item ? "bg-white text-[#102c3d] shadow-[0_8px_20px_rgba(16,44,61,0.08)]" : "text-[#102c3d]/52"}`}>
+            <button key={item} onClick={() => setRole(item)} className={`h-8 rounded-full px-3 text-xs font-semibold transition duration-200 ${role === item ? "bg-white text-[#102c3d] shadow-[0_6px_16px_rgba(16,44,61,0.08)]" : "text-[#102c3d]/52 hover:text-[#102c3d]"}`}>
               {item}
             </button>
           ))}
         </div>
-        <PlatformButton onClick={onOpenAdmin}>Admin console</PlatformButton>
+        <PlatformButton onClick={onOpenAdmin} className="h-10 whitespace-nowrap">Admin console</PlatformButton>
       </div>
     </PlatformTopBar>
   );
@@ -487,12 +487,12 @@ function TopBar({ role, setRole, onOpenAdmin }: { role: Role; setRole: (role: Ro
 function HeroPanel({ role, requests, mappings, statusCounts, onNavigate }: { role: Role; requests: RequestItem[]; mappings: ProviderMapping[]; statusCounts: Record<string, number>; onNavigate: (section: SectionKey) => void }) {
   const awaiting = (statusCounts["Manager review"] ?? 0) + (statusCounts["Lead review"] ?? 0);
   return (
-    <section className="grid gap-6 rounded-[1.75rem] border border-[#102c3d]/[0.06] bg-white p-6 shadow-[0_18px_48px_rgba(16,44,61,0.06)] xl:grid-cols-[minmax(0,1fr)_390px] xl:p-7">
+    <section className="grid gap-6 rounded-[1.6rem] border border-[#102c3d]/[0.06] bg-white/96 p-6 shadow-[0_22px_60px_rgba(16,44,61,0.055)] xl:grid-cols-[minmax(0,1fr)_390px] xl:p-7">
       <div className="min-w-0">
-        <p className="w-fit rounded-full bg-[#fff4bd] px-3 py-1.5 text-[10px] font-medium uppercase tracking-[0.14em] text-[#8a6a00]">Standalone employer environment</p>
-        <h1 className="mt-4 max-w-4xl text-4xl font-semibold leading-[1.03] tracking-[-0.02em] text-[#102c3d] md:text-5xl xl:text-6xl">Portakabin Apprenticeship Hub</h1>
-        <p className="mt-4 max-w-3xl text-base leading-7 text-[#102c3d]/66 md:text-lg">A focused LevyTate workspace for approved pathways, development demand and apprenticeship operations.</p>
-        <div className="mt-6 flex flex-wrap gap-2">
+        <p className="w-fit rounded-full bg-[#fff4bd] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-[#7b6100]">Standalone employer environment</p>
+        <h1 className="mt-5 max-w-4xl text-4xl font-semibold leading-[1.02] tracking-[-0.025em] text-[#102c3d] md:text-5xl xl:text-6xl">Portakabin Apprenticeship Hub</h1>
+        <p className="mt-4 max-w-3xl text-base leading-7 text-[#102c3d]/64 md:text-lg">A focused LevyTate workspace for approved pathways, development demand and apprenticeship operations.</p>
+        <div className="mt-7 flex flex-wrap gap-2.5">
           {roleSectionMap[role].map((section) => (
             <PlatformButton key={section} onClick={() => onNavigate(section)} variant="soft">
               {section}
@@ -501,8 +501,8 @@ function HeroPanel({ role, requests, mappings, statusCounts, onNavigate }: { rol
         </div>
       </div>
 
-      <div className="rounded-[1.4rem] border border-[#102c3d]/[0.05] bg-[#f8fbfa] p-5">
-        <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-[#df5f73]">Operating snapshot</p>
+      <div className="rounded-[1.35rem] border border-[#102c3d]/[0.055] bg-[#f8fbfa] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#c95568]">Operating snapshot</p>
         <div className="mt-4 grid grid-cols-2 gap-3">
           <MetricTile label="Requests" value={requests.length} />
           <MetricTile label="Awaiting" value={awaiting} />
@@ -580,11 +580,11 @@ type LaunchCardProps = {
 
 function LaunchCard({ title, value, copy, action, section, onNavigate }: LaunchCardProps & { onNavigate: (section: SectionKey) => void }) {
   return (
-    <button onClick={() => onNavigate(section)} className="group min-h-[190px] rounded-[1.35rem] border border-[#102c3d]/[0.06] bg-[#f8fbfa] p-5 text-left transition hover:-translate-y-1 hover:bg-white hover:shadow-[0_18px_38px_rgba(16,44,61,0.08)]">
-      <p className="text-xs font-medium text-[#102c3d]/48">{title}</p>
+    <button onClick={() => onNavigate(section)} className="group min-h-[198px] rounded-[1.25rem] border border-[#102c3d]/[0.06] bg-[#f8fbfa] p-5 text-left shadow-[0_8px_22px_rgba(16,44,61,0.035)] transition duration-200 hover:-translate-y-1 hover:border-[#159b8f]/20 hover:bg-white hover:shadow-[0_18px_42px_rgba(16,44,61,0.08)]">
+      <p className="text-xs font-semibold text-[#102c3d]/48">{title}</p>
       <p className="mt-3 text-3xl font-semibold tracking-[-0.025em] text-[#102c3d]">{value}</p>
       <p className="mt-3 min-h-[44px] text-sm leading-6 text-[#102c3d]/58">{copy}</p>
-      <span className="mt-5 inline-flex rounded-full bg-white px-4 py-2 text-xs font-semibold text-[#102c3d] group-hover:bg-[#102c3d] group-hover:text-white">{action}</span>
+      <span className="mt-5 inline-flex h-9 items-center rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d] ring-1 ring-[#102c3d]/[0.06] transition group-hover:bg-[#102c3d] group-hover:text-white group-hover:ring-[#102c3d]">{action}</span>
     </button>
   );
 }
@@ -745,13 +745,13 @@ function DashboardGuide({ role }: { role: Role }) {
 
 function ApprovalCard({ request, onStatus }: { request: RequestItem; onStatus: (id: number, status: RequestStatus) => void }) {
   return (
-    <article className="rounded-2xl bg-[#f8fbfa] p-4">
+    <article className="rounded-[1.2rem] border border-[#102c3d]/[0.055] bg-[#f8fbfa] p-4 shadow-[0_8px_22px_rgba(16,44,61,0.035)]">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
           <h3 className="text-lg font-semibold">{request.name}</h3>
           <p className="mt-1 text-sm leading-6 text-[#102c3d]/60">{request.role} - {request.team}</p>
         </div>
-        <span className="w-fit rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#102c3d]/56">{request.pathway}</span>
+        <span className="w-fit rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#102c3d]/56 ring-1 ring-[#102c3d]/[0.05]">{request.pathway}</span>
       </div>
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         <InfoBox label="Time commitment" value="Planned learning time agreed with manager" />
@@ -768,20 +768,20 @@ function ApprovalCard({ request, onStatus }: { request: RequestItem; onStatus: (
 
 function PathwayCard({ pathway, saved, onOpen, onSave }: { pathway: Pathway; saved: boolean; onOpen: () => void; onSave: () => void }) {
   return (
-    <article className="group flex min-h-[310px] min-w-0 flex-col rounded-[1.45rem] border border-[#102c3d]/[0.05] bg-[#f8fbfa] p-5 transition hover:-translate-y-1 hover:bg-white hover:shadow-[0_18px_38px_rgba(16,44,61,0.08)]">
+    <article className="group flex min-h-[310px] min-w-0 flex-col rounded-[1.25rem] border border-[#102c3d]/[0.055] bg-[#f8fbfa] p-5 shadow-[0_8px_22px_rgba(16,44,61,0.035)] transition duration-200 hover:-translate-y-1 hover:border-[#159b8f]/20 hover:bg-white hover:shadow-[0_18px_42px_rgba(16,44,61,0.08)]">
       <div className="flex items-start justify-between gap-3">
         <h3 className="min-w-0 text-xl font-semibold leading-7 tracking-[-0.01em] text-[#102c3d]">{pathway.title}</h3>
-        <span className="shrink-0 rounded-full bg-[#fff4bd] px-2.5 py-1 text-[11px] font-medium text-[#8a6a00]">{pathway.status}</span>
+        <span className="shrink-0 rounded-full bg-[#fff4bd] px-2.5 py-1 text-[11px] font-semibold text-[#7b6100] ring-1 ring-[#8a6a00]/[0.08]">{pathway.status}</span>
       </div>
       <p className="mt-2 text-sm font-semibold leading-6 text-[#159b8f]">{pathway.standard}</p>
       <p className="mt-4 text-sm leading-6 text-[#102c3d]/62">{pathway.audience}</p>
-      <div className="mt-4 rounded-2xl bg-white/72 p-3">
+      <div className="mt-4 rounded-2xl border border-[#102c3d]/[0.045] bg-white/78 p-3">
         <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-[#102c3d]/38">Business outcome</p>
         <p className="mt-1.5 text-sm leading-6 text-[#102c3d]/66">{pathway.businessBenefit}</p>
       </div>
       <div className="mt-4 flex flex-wrap gap-1.5">
         {pathway.departments.map((item) => (
-          <span key={item} className="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-[#102c3d]/54">{item}</span>
+          <span key={item} className="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-[#102c3d]/54 ring-1 ring-[#102c3d]/[0.045]">{item}</span>
         ))}
       </div>
       <div className="mt-auto flex flex-wrap gap-2 pt-5">
@@ -801,7 +801,7 @@ function RequestForm({ onSubmit }: { onSubmit: (event: FormEvent<HTMLFormElement
       <Field name="team" label="Team" defaultValue="Assembly Line A" />
       <label className="grid gap-1.5 text-xs font-medium text-[#102c3d]/62">
         Selected pathway
-        <select name="pathway" className="min-w-0 rounded-2xl border border-[#102c3d]/10 bg-[#f8fbfa] px-4 py-3.5 text-sm outline-none transition focus:border-[#159b8f] focus:bg-white">
+        <select name="pathway" className="min-w-0 rounded-2xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-4 py-3.5 text-sm outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10">
           {pathways.map((pathway) => (
             <option key={pathway.title}>{pathway.title}</option>
           ))}
@@ -810,9 +810,9 @@ function RequestForm({ onSubmit }: { onSubmit: (event: FormEvent<HTMLFormElement
       <Field name="manager" label="Line manager" defaultValue="Ryan Booth" />
       <label className="grid gap-1.5 text-xs font-medium text-[#102c3d]/62 md:col-span-2">
         Why is this needed?
-        <textarea name="need" rows={4} className="min-w-0 rounded-2xl border border-[#102c3d]/10 bg-[#f8fbfa] px-4 py-3.5 text-sm leading-6 outline-none transition focus:border-[#159b8f] focus:bg-white" defaultValue="I want to build stronger manufacturing and delivery confidence." />
+        <textarea name="need" rows={4} className="min-w-0 rounded-2xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-4 py-3.5 text-sm leading-6 outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10" defaultValue="I want to build stronger manufacturing and delivery confidence." />
       </label>
-      <div className="mt-1 flex flex-col gap-4 rounded-2xl bg-[#f8fbfa] p-4 md:col-span-2 md:flex-row md:items-center md:justify-between">
+      <div className="mt-1 flex flex-col gap-4 rounded-2xl border border-[#102c3d]/[0.045] bg-[#f8fbfa] p-4 md:col-span-2 md:flex-row md:items-center md:justify-between">
         <p className="text-sm leading-6 text-[#102c3d]/54">This creates an internal request for manager review.</p>
         <PlatformButton className="w-fit px-5 py-2.5 text-sm">Submit request</PlatformButton>
       </div>
@@ -840,14 +840,14 @@ function Kanban({ requests, onMove, compact = false }: { requests: RequestItem[]
       {requestStages.map((column) => {
         const columnRequests = requests.filter((request) => request.status === column);
         return (
-          <div key={column} className="rounded-2xl bg-[#f8fbfa] p-3">
+          <div key={column} className="rounded-2xl border border-[#102c3d]/[0.045] bg-[#f8fbfa] p-3">
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-xs font-semibold text-[#102c3d]">{column}</h3>
-              <span className="rounded-full bg-white px-2 py-1 text-[11px] font-medium text-[#102c3d]/54">{columnRequests.length}</span>
+              <span className="rounded-full bg-white px-2 py-1 text-[11px] font-semibold text-[#102c3d]/54 ring-1 ring-[#102c3d]/[0.04]">{columnRequests.length}</span>
             </div>
             <div className="mt-3 grid gap-2">
               {columnRequests.slice(0, compact ? 1 : 3).map((request) => (
-                <article key={request.id} className="rounded-2xl bg-white p-3 shadow-[0_8px_18px_rgba(16,44,61,0.05)]">
+                <article key={request.id} className="rounded-2xl bg-white p-3 shadow-[0_8px_18px_rgba(16,44,61,0.04)]">
                   <p className="text-sm font-semibold">{request.name}</p>
                   <p className="mt-1 text-xs leading-5 text-[#102c3d]/54">{request.pathway}</p>
                   {onMove && (
@@ -871,13 +871,13 @@ function ProviderMappingTable({ mappings, onMapping }: { mappings: ProviderMappi
     <PlatformPanel title="Provider mappings" eyebrow="Approved providers">
       <div className="grid gap-4 lg:grid-cols-2">
         {mappings.map((row, index) => (
-          <article key={row.roleFamily} className="rounded-2xl bg-[#f8fbfa] p-4">
+          <article key={row.roleFamily} className="rounded-[1.2rem] border border-[#102c3d]/[0.055] bg-[#f8fbfa] p-4 shadow-[0_8px_22px_rgba(16,44,61,0.035)]">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h3 className="text-lg font-semibold">{row.pathway}</h3>
                 <p className="mt-1 text-sm leading-6 text-[#102c3d]/58">{row.standard}</p>
               </div>
-              <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#102c3d]/56">{row.fit}% fit</span>
+              <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#102c3d]/56 ring-1 ring-[#102c3d]/[0.05]">{row.fit}% fit</span>
             </div>
             <div className="mt-4 grid gap-3 md:grid-cols-2">
               <InfoBox label="Recommended provider" value={row.partner} />
@@ -919,7 +919,7 @@ function ExecutiveSummary({ requests, mappings, statusCounts }: { requests: Requ
 
 function DemoControls({ scenario, onScenario, onSeed, onReset }: { scenario: DemandScenario; onScenario: (scenario: DemandScenario) => void; onSeed: () => void; onReset: () => void }) {
   return (
-    <section className="rounded-[1.35rem] bg-[#f8fbfa] p-4">
+    <section className="rounded-[1.2rem] border border-[#102c3d]/[0.055] bg-[#f8fbfa] p-4 shadow-[0_8px_22px_rgba(16,44,61,0.035)]">
       <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-[#df5f73]">Demo Mode</p>
       <div className="mt-3 grid gap-2">
         <button onClick={onReset} className="rounded-full bg-white px-3.5 py-2 text-xs font-semibold text-[#102c3d]">Reset data</button>
@@ -988,7 +988,7 @@ function MetricTile({ label, value }: { label: string; value: string | number })
 
 function InfoBox({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-white px-4 py-3 shadow-[0_8px_18px_rgba(16,44,61,0.04)]">
+    <div className="rounded-2xl border border-[#102c3d]/[0.045] bg-white px-4 py-3 shadow-[0_8px_18px_rgba(16,44,61,0.035)]">
       <p className="text-xs font-semibold text-[#102c3d]">{label}</p>
       <p className="mt-1 text-xs leading-5 text-[#102c3d]/56">{value}</p>
     </div>
@@ -997,7 +997,7 @@ function InfoBox({ label, value }: { label: string; value: string }) {
 
 function ActionCard({ title, action }: { title: string; action: string }) {
   return (
-    <button className="rounded-2xl bg-white px-4 py-5 text-left shadow-[0_8px_18px_rgba(16,44,61,0.04)]">
+    <button className="rounded-2xl border border-[#102c3d]/[0.045] bg-white px-4 py-5 text-left shadow-[0_8px_18px_rgba(16,44,61,0.035)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_30px_rgba(16,44,61,0.07)]">
       <p className="text-sm font-semibold text-[#102c3d]">{title}</p>
       <p className="mt-3 text-xs font-semibold text-[#159b8f]">{action}</p>
     </button>
@@ -1006,7 +1006,7 @@ function ActionCard({ title, action }: { title: string; action: string }) {
 
 function SubtleRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-[#f8fbfa] p-4">
+    <div className="rounded-2xl border border-[#102c3d]/[0.045] bg-[#f8fbfa] p-4">
       <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-[#102c3d]/38">{label}</p>
       <p className="mt-1 text-sm leading-6 text-[#102c3d]/66">{value}</p>
     </div>
@@ -1017,7 +1017,7 @@ function Field({ name, label, defaultValue = "" }: { name: string; label: string
   return (
     <label className="grid min-w-0 gap-1.5 text-xs font-medium text-[#102c3d]/62">
       {label}
-      <input name={name} defaultValue={defaultValue} className="min-w-0 rounded-2xl border border-[#102c3d]/10 bg-[#f8fbfa] px-4 py-3.5 text-sm outline-none transition focus:border-[#159b8f] focus:bg-white" />
+      <input name={name} defaultValue={defaultValue} className="min-w-0 rounded-2xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-4 py-3.5 text-sm outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10" />
     </label>
   );
 }

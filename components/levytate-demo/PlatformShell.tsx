@@ -20,7 +20,7 @@ type PlatformShellProps = {
 
 export function PlatformShell({ tenantName, tenantLabel, activeItem = "Dashboard", navSections, topBar, children, sideRail }: PlatformShellProps) {
   return (
-    <main className="min-h-screen bg-[#f5f7f4] text-[#102c3d]">
+    <main className="min-h-screen bg-[#f4f7f5] text-[#102c3d]">
       <div className="grid min-h-screen lg:grid-cols-[296px_minmax(0,1fr)]">
         <PlatformSidebar tenantName={tenantName} tenantLabel={tenantLabel} activeItem={activeItem} navSections={navSections} />
         <div className="min-w-0">
@@ -45,8 +45,8 @@ export function PlatformTopBar({
   children: ReactNode;
 }) {
   return (
-    <header className="sticky top-0 z-30 border-b border-[#102c3d]/10 bg-white/88 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-[1600px] flex-col gap-4 px-5 py-3.5 sm:px-7 lg:px-9 xl:flex-row xl:items-center xl:justify-between">
+    <header className="sticky top-0 z-30 border-b border-[#102c3d]/[0.08] bg-white/92 shadow-[0_1px_0_rgba(16,44,61,0.02)] backdrop-blur-xl">
+      <div className="mx-auto grid max-w-[1600px] gap-4 px-5 py-3.5 sm:px-7 lg:px-9 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
         <div className="flex min-w-0 flex-wrap items-center gap-4 sm:gap-5">
           <LevyTateLogo className="h-[40px] sm:h-[46px]" />
           <div className="h-9 w-px shrink-0 bg-[#102c3d]/10" />
@@ -85,11 +85,11 @@ export function PlatformPanel({
   className?: string;
 }) {
   return (
-    <section className={`min-w-0 rounded-[1.5rem] border border-[#102c3d]/[0.06] bg-white p-6 shadow-[0_18px_45px_rgba(16,44,61,0.055)] ${className}`}>
+    <section className={`min-w-0 rounded-[1.35rem] border border-[#102c3d]/[0.065] bg-white p-6 shadow-[0_18px_45px_rgba(16,44,61,0.045)] ${className}`}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          {eyebrow ? <p className="text-[10px] font-medium uppercase tracking-[0.15em] text-[#df5f73]">{eyebrow}</p> : null}
-          <h2 className="mt-1.5 text-[1.35rem] font-semibold leading-7 tracking-[-0.01em] text-[#102c3d]">{title}</h2>
+          {eyebrow ? <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">{eyebrow}</p> : null}
+          <h2 className="mt-1.5 text-[1.3rem] font-semibold leading-7 tracking-[-0.01em] text-[#102c3d]">{title}</h2>
         </div>
         {actions ? <div className="shrink-0">{actions}</div> : null}
       </div>
@@ -100,7 +100,7 @@ export function PlatformPanel({
 
 export function PlatformMetric({ label, value, copy }: { label: string; value: string | number; copy?: string }) {
   return (
-    <article className="rounded-[1.15rem] border border-[#102c3d]/[0.05] bg-white p-4 shadow-[0_12px_28px_rgba(16,44,61,0.045)]">
+    <article className="rounded-[1.1rem] border border-[#102c3d]/[0.055] bg-white p-4 shadow-[0_10px_24px_rgba(16,44,61,0.04)]">
       <p className="text-xs font-medium text-[#102c3d]/48">{label}</p>
       <p className="mt-2 text-3xl font-semibold tracking-[-0.025em] text-[#102c3d]">{value}</p>
       {copy ? <p className="mt-1.5 text-xs leading-5 text-[#102c3d]/54">{copy}</p> : null}
@@ -120,14 +120,14 @@ export function PlatformButton({
   className?: string;
 }) {
   const variants = {
-    dark: "bg-[#102c3d] text-white shadow-[0_12px_24px_rgba(16,44,61,0.12)]",
-    soft: "bg-[#f4f7f1] text-[#102c3d]",
-    amber: "bg-[#fff4bd] text-[#8a6a00]",
-    coral: "bg-[#ffe3e8] text-[#bf4159]",
+    dark: "bg-[#102c3d] text-white shadow-[0_10px_22px_rgba(16,44,61,0.12)] hover:bg-[#17394d]",
+    soft: "bg-[#f5f7f3] text-[#102c3d] ring-1 ring-[#102c3d]/[0.06] hover:bg-white",
+    amber: "bg-[#fff3bb] text-[#7b6100] ring-1 ring-[#8a6a00]/[0.08]",
+    coral: "bg-[#ffe4e9] text-[#ad344e] ring-1 ring-[#bf4159]/[0.08]",
   };
 
   return (
-    <button onClick={onClick} className={`rounded-full px-4 py-2 text-xs font-semibold transition hover:-translate-y-0.5 ${variants[variant]} ${className}`}>
+    <button onClick={onClick} className={`inline-flex h-10 items-center justify-center rounded-full px-4 text-xs font-semibold transition duration-200 hover:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-[#159b8f]/15 ${variants[variant]} ${className}`}>
       {children}
     </button>
   );
