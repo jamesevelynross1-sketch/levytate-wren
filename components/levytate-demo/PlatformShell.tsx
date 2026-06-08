@@ -47,10 +47,10 @@ export function PlatformTopBar({
   return (
     <header className="sticky top-0 z-30 border-b border-[#102c3d]/10 bg-white/88 backdrop-blur-xl">
       <div className="mx-auto flex max-w-[1600px] flex-col gap-4 px-5 py-3.5 sm:px-7 lg:px-9 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex min-w-0 items-center gap-5">
-          <LevyTateLogo className="h-[46px] sm:h-[52px]" />
-          <div className="h-10 w-px shrink-0 bg-[#102c3d]/10" />
-          <div className="flex min-w-0 items-center gap-4">
+        <div className="flex min-w-0 flex-wrap items-center gap-4 sm:gap-5">
+          <LevyTateLogo className="h-[40px] sm:h-[46px]" />
+          <div className="h-9 w-px shrink-0 bg-[#102c3d]/10" />
+          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
             <PortakabinLogoBadge tenantName={tenantName} />
             <div className="min-w-0 border-l border-[#102c3d]/10 pl-4">
               <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#0b6f63]">Employer environment</p>
@@ -67,7 +67,7 @@ export function PlatformTopBar({
 
 function PortakabinLogoBadge({ tenantName }: { tenantName: string }) {
   return (
-    <Image src="/brand/portakabin-logo.svg" alt={tenantName} width={1024} height={512} priority className="h-[46px] w-auto rounded-xl object-contain shadow-[inset_0_0_0_1px_rgba(16,44,61,0.14)]" />
+    <Image src="/brand/portakabin-logo.svg" alt={tenantName} width={1024} height={512} priority className="h-[40px] w-auto rounded-lg object-contain sm:h-[44px]" />
   );
 }
 
@@ -137,7 +137,7 @@ function PlatformSidebar({ tenantName, tenantLabel, activeItem, navSections }: {
   return (
     <aside className="hidden border-r border-[#102c3d]/10 bg-white px-4 py-5 lg:flex lg:h-screen lg:flex-col">
       <div className="flex items-center px-2">
-        <LevyTateLogo className="h-[44px]" />
+        <LevyTateLogo className="h-[42px]" />
       </div>
 
       <div className="mt-5 rounded-2xl border border-[#102c3d]/[0.06] bg-[#ffd200] px-4 py-3 text-[#102c3d] shadow-[0_14px_30px_rgba(16,44,61,0.08)]">
@@ -181,6 +181,6 @@ function PlatformSidebar({ tenantName, tenantLabel, activeItem, navSections }: {
 
 export function LevyTateLogo({ className = "" }: { className?: string }) {
   return (
-    <Image src="/brand/levytate-logo-supplied.png" alt="LevyTate" width={249} height={75} priority className={`w-auto object-contain ${className}`} />
+    <Image src="/logos/levytate-transparent.png" alt="LevyTate" width={219} height={53} priority className={`w-auto object-contain ${className}`} />
   );
 }
