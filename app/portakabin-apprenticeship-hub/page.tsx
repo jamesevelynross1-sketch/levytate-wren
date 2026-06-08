@@ -28,10 +28,23 @@ type RequestItem = {
   role: string;
   department: string;
   team: string;
+  site: string;
   pathway: string;
   manager: string;
   status: RequestStatus;
   note: string;
+};
+
+type Learner = {
+  name: string;
+  role: string;
+  department: string;
+  site: string;
+  programme: string;
+  status: RequestStatus;
+  progress: number;
+  lineManager: string;
+  startDate: string;
 };
 
 type ProviderMapping = {
@@ -63,6 +76,7 @@ type SectionKey =
   | "Levy Position"
   | "Forecast"
   | "Reporting"
+  | "Learners by Site"
   | "AI Assistant"
   | "Admin";
 
@@ -77,7 +91,7 @@ const navSections: PlatformNavSection[] = [
   { title: "Workforce Planning", items: ["Skills Map", "Department Demand", "Future Skills"] },
   { title: "Providers", items: ["Approved Providers", "Performance"] },
   { title: "Funding & Levy", items: ["Levy Position", "Forecast"] },
-  { title: "Reporting", items: ["Reporting"] },
+  { title: "Reporting", items: ["Reporting", "Learners by Site"] },
   { title: "AI Assistant", items: ["AI Assistant"] },
   { title: "Admin", items: ["Admin"] },
 ];
@@ -88,6 +102,53 @@ const roleSectionMap: Record<Role, SectionKey[]> = {
   "Department Head": ["Department Demand", "Skills Map", "Future Skills", "Forecast"],
   "Apprenticeship Lead": ["Requests", "Approved Providers", "Levy Position", "Reporting", "Admin"],
 };
+
+const allSitesLabel = "All sites";
+
+const portakabinSites = [
+  "York Head Office, Visitor Centre and UK Factory",
+  "Aberdeen Visitor Centre",
+  "Ashford Visitor Centre",
+  "Avonmouth Site Accommodation Visitor Centre",
+  "Aylesbury Site Accommodation Visitor Centre",
+  "Belfast Visitor Centre",
+  "Blackburn Visitor Centre",
+  "Bordon Site Accommodation Visitor Centre",
+  "Cardiff Visitor Centre",
+  "Carlisle Visitor Centre",
+  "Deeside Visitor Centre",
+  "Edinburgh Visitor Centre",
+  "Gateshead Visitor Centre",
+  "Glasgow Visitor Centre",
+  "Glasgow Site Accommodation Visitor Centre",
+  "Hayes London West Visitor Centre",
+  "Highbridge Visitor Centre",
+  "Inverness Visitor Centre",
+  "Leeds Visitor Centre",
+  "Lingfield London South Visitor Centre",
+  "London Central Visitor Centre",
+  "Merseyside Visitor Centre",
+  "Northampton Visitor Centre",
+  "Norwich Visitor Centre",
+  "Nottingham Visitor Centre",
+  "Oldham Manchester Visitor Centre",
+  "Oxford Visitor Centre",
+  "Peterborough Visitor Centre",
+  "Plymouth Visitor Centre",
+  "Purfleet London East Visitor Centre",
+  "Rugby Site Accommodation Visitor Centre",
+  "Sheffield Visitor Centre",
+  "Sherburn-in-Elmet Site Accommodation Visitor Centre",
+  "Sittingbourne Site Accommodation Visitor Centre",
+  "Smethwick Visitor Centre",
+  "Southampton Visitor Centre",
+  "St Albans Visitor Centre",
+  "Stockton Visitor Centre",
+  "Stoke Visitor Centre",
+  "Trafford Park Manchester Visitor Centre",
+  "Warrington Site Accommodation Visitor Centre",
+  "Witham Site Accommodation Visitor Centre",
+];
 
 const pathways: Pathway[] = [
   {
@@ -196,15 +257,66 @@ const pathways: Pathway[] = [
   },
 ];
 
+const portakabinLearners: Learner[] = [
+  { name: "Amelia Hart", role: "Production Team Member", department: "Manufacturing", site: "York Head Office, Visitor Centre and UK Factory", programme: "Manufacturing & Production", status: "Manager review", progress: 18, lineManager: "Ryan Booth", startDate: "2026-03-04" },
+  { name: "Maya Singh", role: "Shift Supervisor", department: "Manufacturing", site: "York Head Office, Visitor Centre and UK Factory", programme: "Leadership & Management", status: "Enrolment", progress: 42, lineManager: "Priya Nair", startDate: "2025-11-12" },
+  { name: "Isla Reid", role: "Quality Coordinator", department: "Manufacturing", site: "York Head Office, Visitor Centre and UK Factory", programme: "Health, Safety & Compliance", status: "Lead review", progress: 24, lineManager: "Priya Nair", startDate: "2026-01-19" },
+  { name: "Tom Harrison", role: "Maintenance Technician", department: "Manufacturing", site: "York Head Office, Visitor Centre and UK Factory", programme: "Manufacturing & Production", status: "Live learner", progress: 67, lineManager: "Ryan Booth", startDate: "2025-08-05" },
+  { name: "Marcus Lee", role: "Technical Design Assistant", department: "Design & Technical", site: "York Head Office, Visitor Centre and UK Factory", programme: "Design & Technical", status: "Manager review", progress: 16, lineManager: "Priya Nair", startDate: "2026-02-23" },
+  { name: "Sophie Clarke", role: "Customer Hire Coordinator", department: "Hire & Customer", site: "Leeds Visitor Centre", programme: "Hire, Sales & Customer Experience", status: "Lead review", progress: 28, lineManager: "Helen Ward", startDate: "2026-01-08" },
+  { name: "Noah Bennett", role: "Installation Coordinator", department: "Site Operations", site: "Sheffield Visitor Centre", programme: "Installation & Site Operations", status: "New interest", progress: 8, lineManager: "Sam Ellis", startDate: "2026-04-15" },
+  { name: "Grace Patel", role: "Project Coordinator", department: "Projects", site: "London Central Visitor Centre", programme: "Leadership & Management", status: "Provider introduction", progress: 35, lineManager: "Ryan Booth", startDate: "2025-12-02" },
+  { name: "Leo Morgan", role: "Materials Planner", department: "Supply Chain", site: "Warrington Site Accommodation Visitor Centre", programme: "Procurement & Supply Chain", status: "Manager review", progress: 21, lineManager: "Helen Ward", startDate: "2026-03-11" },
+  { name: "Ethan Brooks", role: "Compliance Assistant", department: "Compliance", site: "Smethwick Visitor Centre", programme: "Health, Safety & Compliance", status: "Live learner", progress: 74, lineManager: "Sam Ellis", startDate: "2025-07-21" },
+  { name: "Olivia Grant", role: "Account Support Lead", department: "Hire & Customer", site: "Trafford Park Manchester Visitor Centre", programme: "Hire, Sales & Customer Experience", status: "New interest", progress: 5, lineManager: "Ryan Booth", startDate: "2026-05-06" },
+  { name: "Daniel Fox", role: "Site Supervisor", department: "Site Operations", site: "Rugby Site Accommodation Visitor Centre", programme: "Installation & Site Operations", status: "Manager review", progress: 19, lineManager: "Sam Ellis", startDate: "2026-02-04" },
+  { name: "Ruby Carter", role: "Hire Controller", department: "Hire & Customer", site: "Aberdeen Visitor Centre", programme: "Hire, Sales & Customer Experience", status: "Live learner", progress: 58, lineManager: "Helen Ward", startDate: "2025-09-10" },
+  { name: "Jack Wilson", role: "Field Coordinator", department: "Site Operations", site: "Ashford Visitor Centre", programme: "Installation & Site Operations", status: "Enrolment", progress: 39, lineManager: "Sam Ellis", startDate: "2025-12-14" },
+  { name: "Ava Mitchell", role: "Customer Support Advisor", department: "Hire & Customer", site: "Avonmouth Site Accommodation Visitor Centre", programme: "Hire, Sales & Customer Experience", status: "Live learner", progress: 62, lineManager: "Helen Ward", startDate: "2025-10-02" },
+  { name: "Harry Thompson", role: "Yard Operations Lead", department: "Operations", site: "Aylesbury Site Accommodation Visitor Centre", programme: "Leadership & Management", status: "Lead review", progress: 25, lineManager: "Ryan Booth", startDate: "2026-01-27" },
+  { name: "Freya Evans", role: "Sales Coordinator", department: "Hire & Customer", site: "Belfast Visitor Centre", programme: "Hire, Sales & Customer Experience", status: "Manager review", progress: 22, lineManager: "Helen Ward", startDate: "2026-03-02" },
+  { name: "Joshua Green", role: "Service Planner", department: "Operations", site: "Blackburn Visitor Centre", programme: "Procurement & Supply Chain", status: "Provider introduction", progress: 33, lineManager: "Sam Ellis", startDate: "2025-12-08" },
+  { name: "Lily Walker", role: "Site Accommodation Coordinator", department: "Site Operations", site: "Bordon Site Accommodation Visitor Centre", programme: "Installation & Site Operations", status: "Live learner", progress: 71, lineManager: "Sam Ellis", startDate: "2025-06-18" },
+  { name: "Oscar Hall", role: "Customer Experience Advisor", department: "Hire & Customer", site: "Cardiff Visitor Centre", programme: "Hire, Sales & Customer Experience", status: "Live learner", progress: 64, lineManager: "Helen Ward", startDate: "2025-08-29" },
+  { name: "Mia Allen", role: "Operations Assistant", department: "Operations", site: "Carlisle Visitor Centre", programme: "Leadership & Management", status: "New interest", progress: 6, lineManager: "Ryan Booth", startDate: "2026-05-20" },
+  { name: "George Young", role: "Transport Coordinator", department: "Supply Chain", site: "Deeside Visitor Centre", programme: "Procurement & Supply Chain", status: "Manager review", progress: 17, lineManager: "Helen Ward", startDate: "2026-02-09" },
+  { name: "Ella King", role: "Hire Controller", department: "Hire & Customer", site: "Edinburgh Visitor Centre", programme: "Hire, Sales & Customer Experience", status: "Lead review", progress: 29, lineManager: "Helen Ward", startDate: "2026-01-15" },
+  { name: "Charlie Wright", role: "Project Support Officer", department: "Projects", site: "Gateshead Visitor Centre", programme: "Leadership & Management", status: "Enrolment", progress: 45, lineManager: "Ryan Booth", startDate: "2025-11-25" },
+  { name: "Zara Scott", role: "Data Coordinator", department: "Digital", site: "Glasgow Visitor Centre", programme: "Digital, Data & AI", status: "Live learner", progress: 69, lineManager: "Priya Nair", startDate: "2025-07-03" },
+  { name: "Finley Adams", role: "Accommodation Planner", department: "Site Operations", site: "Glasgow Site Accommodation Visitor Centre", programme: "Installation & Site Operations", status: "Provider introduction", progress: 31, lineManager: "Sam Ellis", startDate: "2025-12-18" },
+  { name: "Hannah Baker", role: "Customer Account Assistant", department: "Hire & Customer", site: "Hayes London West Visitor Centre", programme: "Hire, Sales & Customer Experience", status: "Live learner", progress: 76, lineManager: "Helen Ward", startDate: "2025-05-14" },
+  { name: "Archie Morris", role: "Site Supervisor", department: "Site Operations", site: "Highbridge Visitor Centre", programme: "Installation & Site Operations", status: "Manager review", progress: 20, lineManager: "Sam Ellis", startDate: "2026-03-18" },
+  { name: "Niamh Cooper", role: "Hire Administrator", department: "Hire & Customer", site: "Inverness Visitor Centre", programme: "Hire, Sales & Customer Experience", status: "New interest", progress: 4, lineManager: "Helen Ward", startDate: "2026-05-28" },
+  { name: "Theo Richardson", role: "Technical Coordinator", department: "Design & Technical", site: "Lingfield London South Visitor Centre", programme: "Design & Technical", status: "Lead review", progress: 27, lineManager: "Priya Nair", startDate: "2026-01-30" },
+  { name: "Millie Cox", role: "Operations Coordinator", department: "Operations", site: "Merseyside Visitor Centre", programme: "Leadership & Management", status: "Enrolment", progress: 48, lineManager: "Ryan Booth", startDate: "2025-10-19" },
+  { name: "Jacob Ward", role: "Customer Service Specialist", department: "Hire & Customer", site: "Northampton Visitor Centre", programme: "Hire, Sales & Customer Experience", status: "Live learner", progress: 66, lineManager: "Helen Ward", startDate: "2025-08-12" },
+  { name: "Erin Hughes", role: "Systems Assistant", department: "Digital", site: "Norwich Visitor Centre", programme: "Digital, Data & AI", status: "Manager review", progress: 18, lineManager: "Priya Nair", startDate: "2026-03-09" },
+  { name: "Logan Turner", role: "Sales Support Advisor", department: "Hire & Customer", site: "Nottingham Visitor Centre", programme: "Hire, Sales & Customer Experience", status: "Live learner", progress: 72, lineManager: "Helen Ward", startDate: "2025-06-02" },
+  { name: "Phoebe Phillips", role: "Customer Coordinator", department: "Hire & Customer", site: "Oldham Manchester Visitor Centre", programme: "Hire, Sales & Customer Experience", status: "Lead review", progress: 26, lineManager: "Helen Ward", startDate: "2026-02-01" },
+  { name: "Max Campbell", role: "Business Support Assistant", department: "Operations", site: "Oxford Visitor Centre", programme: "Leadership & Management", status: "New interest", progress: 7, lineManager: "Ryan Booth", startDate: "2026-04-22" },
+  { name: "Daisy Parker", role: "Hire Desk Advisor", department: "Hire & Customer", site: "Peterborough Visitor Centre", programme: "Hire, Sales & Customer Experience", status: "Live learner", progress: 61, lineManager: "Helen Ward", startDate: "2025-09-17" },
+  { name: "Toby Edwards", role: "Installation Planner", department: "Site Operations", site: "Plymouth Visitor Centre", programme: "Installation & Site Operations", status: "Provider introduction", progress: 34, lineManager: "Sam Ellis", startDate: "2025-12-21" },
+  { name: "Maisie Collins", role: "Site Accommodation Assistant", department: "Site Operations", site: "Purfleet London East Visitor Centre", programme: "Installation & Site Operations", status: "Manager review", progress: 19, lineManager: "Sam Ellis", startDate: "2026-03-22" },
+  { name: "Ben Stewart", role: "Stores Coordinator", department: "Supply Chain", site: "Sherburn-in-Elmet Site Accommodation Visitor Centre", programme: "Procurement & Supply Chain", status: "Live learner", progress: 57, lineManager: "Helen Ward", startDate: "2025-10-24" },
+  { name: "Imogen Russell", role: "Site Support Coordinator", department: "Site Operations", site: "Sittingbourne Site Accommodation Visitor Centre", programme: "Installation & Site Operations", status: "Enrolment", progress: 44, lineManager: "Sam Ellis", startDate: "2025-11-03" },
+  { name: "Lucas Price", role: "Hire Controller", department: "Hire & Customer", site: "Smethwick Visitor Centre", programme: "Hire, Sales & Customer Experience", status: "Live learner", progress: 68, lineManager: "Helen Ward", startDate: "2025-07-29" },
+  { name: "Alice Bennett", role: "Customer Support Advisor", department: "Hire & Customer", site: "Southampton Visitor Centre", programme: "Hire, Sales & Customer Experience", status: "Manager review", progress: 23, lineManager: "Helen Ward", startDate: "2026-02-16" },
+  { name: "Sam Roberts", role: "Operations Team Leader", department: "Operations", site: "St Albans Visitor Centre", programme: "Leadership & Management", status: "Lead review", progress: 30, lineManager: "Ryan Booth", startDate: "2026-01-22" },
+  { name: "Harriet James", role: "Hire Coordinator", department: "Hire & Customer", site: "Stockton Visitor Centre", programme: "Hire, Sales & Customer Experience", status: "Live learner", progress: 63, lineManager: "Helen Ward", startDate: "2025-08-21" },
+  { name: "Nathan Wood", role: "Yard Supervisor", department: "Operations", site: "Stoke Visitor Centre", programme: "Leadership & Management", status: "Provider introduction", progress: 36, lineManager: "Ryan Booth", startDate: "2025-12-05" },
+  { name: "Chloe Watson", role: "Logistics Assistant", department: "Supply Chain", site: "Trafford Park Manchester Visitor Centre", programme: "Procurement & Supply Chain", status: "Manager review", progress: 22, lineManager: "Helen Ward", startDate: "2026-03-13" },
+  { name: "Owen Brooks", role: "Accommodation Coordinator", department: "Site Operations", site: "Witham Site Accommodation Visitor Centre", programme: "Installation & Site Operations", status: "Live learner", progress: 59, lineManager: "Sam Ellis", startDate: "2025-09-05" },
+];
+
 const initialRequests: RequestItem[] = [
-  { id: 1, name: "Amelia Hart", role: "Production Team Member", department: "Manufacturing", team: "Assembly Line A", pathway: "Manufacturing & Production", manager: "Ryan Booth", status: "Manager review", note: "Technical progression." },
-  { id: 2, name: "Marcus Lee", role: "Technical Design Assistant", department: "Design & Technical", team: "Building Design", pathway: "Design & Technical", manager: "Priya Nair", status: "Manager review", note: "Design capability." },
-  { id: 3, name: "Sophie Clarke", role: "Customer Hire Coordinator", department: "Hire & Customer", team: "Customer Support", pathway: "Hire, Sales & Customer Experience", manager: "Helen Ward", status: "Lead review", note: "Customer confidence." },
-  { id: 4, name: "Noah Bennett", role: "Installation Coordinator", department: "Site Operations", team: "Field Delivery", pathway: "Installation & Site Operations", manager: "Sam Ellis", status: "New interest", note: "Site handover skills." },
-  { id: 5, name: "Grace Patel", role: "Project Coordinator", department: "Projects", team: "Delivery Office", pathway: "Leadership & Management", manager: "Ryan Booth", status: "Provider introduction", note: "Planning discipline." },
-  { id: 6, name: "Leo Morgan", role: "Materials Planner", department: "Supply Chain", team: "Materials Planning", pathway: "Procurement & Supply Chain", manager: "Helen Ward", status: "Manager review", note: "Supplier coordination." },
-  { id: 7, name: "Maya Singh", role: "Shift Supervisor", department: "Manufacturing", team: "Shift Leadership", pathway: "Leadership & Management", manager: "Priya Nair", status: "Enrolment", note: "New supervisor." },
-  { id: 8, name: "Ethan Brooks", role: "Compliance Assistant", department: "Compliance", team: "SHEQ", pathway: "Health, Safety & Compliance", manager: "Sam Ellis", status: "Live learner", note: "Safety evidence." },
+  { id: 1, name: "Amelia Hart", role: "Production Team Member", department: "Manufacturing", team: "Assembly Line A", site: "York Head Office, Visitor Centre and UK Factory", pathway: "Manufacturing & Production", manager: "Ryan Booth", status: "Manager review", note: "Technical progression." },
+  { id: 2, name: "Marcus Lee", role: "Technical Design Assistant", department: "Design & Technical", team: "Building Design", site: "York Head Office, Visitor Centre and UK Factory", pathway: "Design & Technical", manager: "Priya Nair", status: "Manager review", note: "Design capability." },
+  { id: 3, name: "Sophie Clarke", role: "Customer Hire Coordinator", department: "Hire & Customer", team: "Customer Support", site: "Leeds Visitor Centre", pathway: "Hire, Sales & Customer Experience", manager: "Helen Ward", status: "Lead review", note: "Customer confidence." },
+  { id: 4, name: "Noah Bennett", role: "Installation Coordinator", department: "Site Operations", team: "Field Delivery", site: "Sheffield Visitor Centre", pathway: "Installation & Site Operations", manager: "Sam Ellis", status: "New interest", note: "Site handover skills." },
+  { id: 5, name: "Grace Patel", role: "Project Coordinator", department: "Projects", team: "Delivery Office", site: "London Central Visitor Centre", pathway: "Leadership & Management", manager: "Ryan Booth", status: "Provider introduction", note: "Planning discipline." },
+  { id: 6, name: "Leo Morgan", role: "Materials Planner", department: "Supply Chain", team: "Materials Planning", site: "Warrington Site Accommodation Visitor Centre", pathway: "Procurement & Supply Chain", manager: "Helen Ward", status: "Manager review", note: "Supplier coordination." },
+  { id: 7, name: "Maya Singh", role: "Shift Supervisor", department: "Manufacturing", team: "Shift Leadership", site: "York Head Office, Visitor Centre and UK Factory", pathway: "Leadership & Management", manager: "Priya Nair", status: "Enrolment", note: "New supervisor." },
+  { id: 8, name: "Ethan Brooks", role: "Compliance Assistant", department: "Compliance", team: "SHEQ", site: "Smethwick Visitor Centre", pathway: "Health, Safety & Compliance", manager: "Sam Ellis", status: "Live learner", note: "Safety evidence." },
 ];
 
 const initialMappings: ProviderMapping[] = [
@@ -287,9 +399,9 @@ const scenarioSeeds: Record<DemandScenario, RequestItem[]> = {
   Medium: initialRequests,
   High: [
     ...initialRequests,
-    { id: 9, name: "Olivia Grant", role: "Account Support Lead", department: "Hire & Customer", team: "Commercial Support", pathway: "Hire, Sales & Customer Experience", manager: "Ryan Booth", status: "New interest", note: "Commercial progression." },
-    { id: 10, name: "Daniel Fox", role: "Site Supervisor", department: "Site Operations", team: "Field Delivery", pathway: "Installation & Site Operations", manager: "Sam Ellis", status: "Manager review", note: "Site coordination." },
-    { id: 11, name: "Isla Reid", role: "Quality Coordinator", department: "Manufacturing", team: "Quality", pathway: "Health, Safety & Compliance", manager: "Priya Nair", status: "Lead review", note: "Compliance confidence." },
+    { id: 9, name: "Olivia Grant", role: "Account Support Lead", department: "Hire & Customer", team: "Commercial Support", site: "Trafford Park Manchester Visitor Centre", pathway: "Hire, Sales & Customer Experience", manager: "Ryan Booth", status: "New interest", note: "Commercial progression." },
+    { id: 10, name: "Daniel Fox", role: "Site Supervisor", department: "Site Operations", team: "Field Delivery", site: "Rugby Site Accommodation Visitor Centre", pathway: "Installation & Site Operations", manager: "Sam Ellis", status: "Manager review", note: "Site coordination." },
+    { id: 11, name: "Isla Reid", role: "Quality Coordinator", department: "Manufacturing", team: "Quality", site: "York Head Office, Visitor Centre and UK Factory", pathway: "Health, Safety & Compliance", manager: "Priya Nair", status: "Lead review", note: "Compliance confidence." },
   ],
 };
 
@@ -301,11 +413,20 @@ export default function PortakabinApprenticeshipHub() {
   const [selectedPathway, setSelectedPathway] = useState<Pathway | null>(null);
   const [savedPathways, setSavedPathways] = useState<string[]>(["Manufacturing & Production", "Digital, Data & AI"]);
   const [scenario, setScenario] = useState<DemandScenario>("Medium");
+  const [selectedSite, setSelectedSite] = useState(allSitesLabel);
+  const [learnerSearch, setLearnerSearch] = useState("");
   const [success, setSuccess] = useState(false);
 
-  const statusCounts = useMemo(() => countBy(requests, "status"), [requests]);
-  const departmentCounts = useMemo(() => countBy(requests, "department"), [requests]);
-  const employeeRequest = requests.find((request) => request.name === "Amelia Hart") ?? requests[0];
+  const filteredRequests = useMemo(() => filterBySite(requests, selectedSite), [requests, selectedSite]);
+  const filteredLearners = useMemo(() => filterBySite(portakabinLearners, selectedSite), [selectedSite]);
+  const searchedLearners = useMemo(() => {
+    const query = learnerSearch.trim().toLowerCase();
+    if (!query) return filteredLearners;
+    return filteredLearners.filter((learner) => [learner.name, learner.role, learner.department, learner.site, learner.programme, learner.status, learner.lineManager].join(" ").toLowerCase().includes(query));
+  }, [filteredLearners, learnerSearch]);
+  const statusCounts = useMemo(() => countBy(filteredRequests, "status"), [filteredRequests]);
+  const departmentCounts = useMemo(() => countBy(filteredRequests, "department"), [filteredRequests]);
+  const employeeRequest = filteredRequests.find((request) => request.name === "Amelia Hart") ?? filteredRequests[0] ?? requests[0];
 
   function switchRole(nextRole: Role) {
     setRole(nextRole);
@@ -326,6 +447,7 @@ export default function PortakabinApprenticeshipHub() {
       role: String(data.get("role") || "Internal colleague"),
       department: String(data.get("department") || "Manufacturing"),
       team: String(data.get("team") || "Internal team"),
+      site: selectedSite === allSitesLabel ? "York Head Office, Visitor Centre and UK Factory" : selectedSite,
       pathway,
       manager: String(data.get("manager") || "Line manager"),
       status: "New interest",
@@ -362,6 +484,7 @@ export default function PortakabinApprenticeshipHub() {
         role: "Internal colleague",
         department: seed.departments[0],
         team: "Presentation demo",
+        site: selectedSite === allSitesLabel ? portakabinSites[current.length % portakabinSites.length] : selectedSite,
         pathway: seed.title,
         manager: "Demo manager",
         status: "New interest",
@@ -382,13 +505,14 @@ export default function PortakabinApprenticeshipHub() {
       <Sidebar activeSection={activeSection} onNavigate={openSection} />
 
       <div className="h-screen min-w-0 overflow-y-auto lg:ml-[296px]">
-        <TopBar role={role} setRole={switchRole} onOpenAdmin={() => switchRole("Apprenticeship Lead")} />
+        <TopBar role={role} setRole={switchRole} selectedSite={selectedSite} onSite={setSelectedSite} onOpenAdmin={() => switchRole("Apprenticeship Lead")} />
 
         <div className="mx-auto w-full max-w-[1500px] space-y-7 px-5 py-7 sm:px-7 lg:px-9">
-          <HeroPanel role={role} requests={requests} mappings={mappings} statusCounts={statusCounts} onNavigate={openSection} />
+          <HeroPanel role={role} requests={filteredRequests} learners={filteredLearners} mappings={mappings} statusCounts={statusCounts} selectedSite={selectedSite} onNavigate={openSection} />
+          {selectedSite !== allSitesLabel ? <SiteSummary site={selectedSite} learners={filteredLearners} requests={filteredRequests} /> : null}
           <RoleDashboard
             role={role}
-            requests={requests}
+            requests={filteredRequests}
             mappings={mappings}
             statusCounts={statusCounts}
             departmentCounts={departmentCounts}
@@ -398,16 +522,20 @@ export default function PortakabinApprenticeshipHub() {
           <DetailSection
             role={role}
             activeSection={activeSection}
-            requests={requests}
+            requests={filteredRequests}
             mappings={mappings}
             statusCounts={statusCounts}
             departmentCounts={departmentCounts}
             savedPathways={savedPathways}
             employeeRequest={employeeRequest}
+            selectedSite={selectedSite}
+            learners={searchedLearners}
+            learnerSearch={learnerSearch}
             scenario={scenario}
             success={success}
             onSubmit={handleSubmit}
             onOpenPathway={setSelectedPathway}
+            onLearnerSearch={setLearnerSearch}
             onSavePathway={(title) => setSavedPathways((current) => (current.includes(title) ? current.filter((item) => item !== title) : [...current, title]))}
             onStatus={setRequestStatus}
             onMove={moveRequest}
@@ -466,11 +594,37 @@ function Sidebar({ activeSection, onNavigate }: { activeSection: SectionKey; onN
   );
 }
 
-function TopBar({ role, setRole, onOpenAdmin }: { role: Role; setRole: (role: Role) => void; onOpenAdmin: () => void }) {
+function TopBar({
+  role,
+  setRole,
+  selectedSite,
+  onSite,
+  onOpenAdmin,
+}: {
+  role: Role;
+  setRole: (role: Role) => void;
+  selectedSite: string;
+  onSite: (site: string) => void;
+  onOpenAdmin: () => void;
+}) {
   return (
     <PlatformTopBar tenantName="Portakabin" tenantSubtitle="Internal apprenticeship and capability hub">
-      <div className="grid min-w-0 gap-3 md:grid-cols-[minmax(220px,300px)_auto] md:items-center 2xl:grid-cols-[minmax(260px,320px)_auto_auto]">
+      <div className="grid min-w-0 gap-3 md:grid-cols-[minmax(220px,300px)_minmax(190px,250px)] md:items-center 2xl:grid-cols-[minmax(260px,320px)_minmax(210px,270px)_auto_auto]">
         <div className="hidden h-10 items-center rounded-full border border-[#102c3d]/[0.08] bg-[#f8fbfa] px-4 text-sm text-[#102c3d]/44 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] xl:flex">Search pathways, requests or teams</div>
+        <label className="flex h-10 min-w-0 items-center gap-2 rounded-full border border-[#102c3d]/[0.08] bg-[#f8fbfa] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] transition focus-within:border-[#159b8f] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#159b8f]/10">
+          <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/38">Site</span>
+          <select
+            value={selectedSite}
+            onChange={(event) => onSite(event.target.value)}
+            className="h-full min-w-0 flex-1 bg-transparent text-sm font-medium text-[#102c3d]/74 outline-none"
+            aria-label="Site"
+          >
+            <option>{allSitesLabel}</option>
+            {portakabinSites.map((site) => (
+              <option key={site}>{site}</option>
+            ))}
+          </select>
+        </label>
         <div className="flex min-h-10 flex-wrap items-center rounded-[1.25rem] border border-[#102c3d]/[0.06] bg-[#edf5f1] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] 2xl:h-10 2xl:flex-nowrap 2xl:rounded-full">
           {roles.map((item) => (
             <button key={item} onClick={() => setRole(item)} className={`h-8 rounded-full px-3 text-xs font-semibold transition duration-200 ${role === item ? "bg-white text-[#102c3d] shadow-[0_6px_16px_rgba(16,44,61,0.08)]" : "text-[#102c3d]/52 hover:text-[#102c3d]"}`}>
@@ -484,14 +638,32 @@ function TopBar({ role, setRole, onOpenAdmin }: { role: Role; setRole: (role: Ro
   );
 }
 
-function HeroPanel({ role, requests, mappings, statusCounts, onNavigate }: { role: Role; requests: RequestItem[]; mappings: ProviderMapping[]; statusCounts: Record<string, number>; onNavigate: (section: SectionKey) => void }) {
+function HeroPanel({
+  role,
+  requests,
+  learners,
+  mappings,
+  statusCounts,
+  selectedSite,
+  onNavigate,
+}: {
+  role: Role;
+  requests: RequestItem[];
+  learners: Learner[];
+  mappings: ProviderMapping[];
+  statusCounts: Record<string, number>;
+  selectedSite: string;
+  onNavigate: (section: SectionKey) => void;
+}) {
   const awaiting = (statusCounts["Manager review"] ?? 0) + (statusCounts["Lead review"] ?? 0);
+  const liveRoutes = new Set(learners.map((learner) => learner.programme)).size || pathways.filter((item) => item.status === "Live").length;
   return (
     <section className="grid gap-6 rounded-[1.6rem] border border-[#102c3d]/[0.06] bg-white/96 p-6 shadow-[0_22px_60px_rgba(16,44,61,0.055)] xl:grid-cols-[minmax(0,1fr)_390px] xl:p-7">
       <div className="min-w-0">
         <p className="w-fit rounded-full bg-[#fff4bd] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-[#7b6100]">Standalone employer environment</p>
         <h1 className="mt-5 max-w-4xl text-4xl font-semibold leading-[1.02] tracking-[-0.025em] text-[#102c3d] md:text-5xl xl:text-6xl">Portakabin Apprenticeship Hub</h1>
         <p className="mt-4 max-w-3xl text-base leading-7 text-[#102c3d]/64 md:text-lg">A focused LevyTate workspace for approved pathways, development demand and apprenticeship operations.</p>
+        <p className="mt-3 text-sm font-medium text-[#102c3d]/54">View: {selectedSite}</p>
         <div className="mt-7 flex flex-wrap gap-2.5">
           {roleSectionMap[role].map((section) => (
             <PlatformButton key={section} onClick={() => onNavigate(section)} variant="soft">
@@ -506,11 +678,30 @@ function HeroPanel({ role, requests, mappings, statusCounts, onNavigate }: { rol
         <div className="mt-4 grid grid-cols-2 gap-3">
           <MetricTile label="Requests" value={requests.length} />
           <MetricTile label="Awaiting" value={awaiting} />
-          <MetricTile label="Live routes" value={pathways.filter((item) => item.status === "Live").length} />
+          <MetricTile label="Live routes" value={liveRoutes} />
           <MetricTile label="Mappings" value={mappings.filter((item) => item.status === "Live").length} />
+          <MetricTile label="Active learners" value={learners.length} />
         </div>
       </div>
     </section>
+  );
+}
+
+function SiteSummary({ site, learners, requests }: { site: string; learners: Learner[]; requests: RequestItem[] }) {
+  const programmes = new Set(learners.map((learner) => learner.programme));
+  const risk = learners.filter((learner) => learner.progress < 25 && learner.status !== "New interest").length;
+  const demand = topEntry(countBy([...learners.map((learner) => ({ programme: learner.programme })), ...requests.map((request) => ({ programme: request.pathway }))], "programme"));
+
+  return (
+    <PlatformPanel eyebrow="Site view" title={site}>
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <MetricTile label="Active learners" value={learners.length} />
+        <MetricTile label="Pending requests" value={requests.filter((request) => request.status === "New interest" || request.status === "Manager review").length} />
+        <MetricTile label="Programmes in use" value={programmes.size} />
+        <MetricTile label="Completion risk" value={risk} />
+        <MetricTile label="Main pathway demand" value={demand || "No signal"} />
+      </div>
+    </PlatformPanel>
   );
 }
 
@@ -598,10 +789,14 @@ function DetailSection({
   departmentCounts,
   savedPathways,
   employeeRequest,
+  selectedSite,
+  learners,
+  learnerSearch,
   scenario,
   success,
   onSubmit,
   onOpenPathway,
+  onLearnerSearch,
   onSavePathway,
   onStatus,
   onMove,
@@ -617,10 +812,14 @@ function DetailSection({
   departmentCounts: Record<string, number>;
   savedPathways: string[];
   employeeRequest: RequestItem;
+  selectedSite: string;
+  learners: Learner[];
+  learnerSearch: string;
   scenario: DemandScenario;
   success: boolean;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onOpenPathway: (pathway: Pathway) => void;
+  onLearnerSearch: (query: string) => void;
   onSavePathway: (title: string) => void;
   onStatus: (id: number, status: RequestStatus) => void;
   onMove: (id: number, direction: 1 | -1) => void;
@@ -708,7 +907,16 @@ function DetailSection({
   }
 
   if (activeSection === "Reporting") {
-    return <ExecutiveSummary requests={requests} mappings={mappings} statusCounts={statusCounts} />;
+    return (
+      <div className="grid gap-6">
+        <ExecutiveSummary requests={requests} mappings={mappings} statusCounts={statusCounts} />
+        <LearnersBySite selectedSite={selectedSite} learners={learners} learnerSearch={learnerSearch} onLearnerSearch={onLearnerSearch} />
+      </div>
+    );
+  }
+
+  if (activeSection === "Learners by Site") {
+    return <LearnersBySite selectedSite={selectedSite} learners={learners} learnerSearch={learnerSearch} onLearnerSearch={onLearnerSearch} />;
   }
 
   if (activeSection === "AI Assistant") {
@@ -897,6 +1105,72 @@ function ProviderMappingTable({ mappings, onMapping }: { mappings: ProviderMappi
   );
 }
 
+function LearnersBySite({
+  selectedSite,
+  learners,
+  learnerSearch,
+  onLearnerSearch,
+}: {
+  selectedSite: string;
+  learners: Learner[];
+  learnerSearch: string;
+  onLearnerSearch: (query: string) => void;
+}) {
+  return (
+    <PlatformPanel
+      title="Learners by site"
+      eyebrow="Site visibility"
+      actions={
+        <input
+          value={learnerSearch}
+          onChange={(event) => onLearnerSearch(event.target.value)}
+          placeholder="Search learners"
+          className="h-10 w-full min-w-0 rounded-full border border-[#102c3d]/[0.08] bg-[#f8fbfa] px-4 text-sm text-[#102c3d] outline-none transition placeholder:text-[#102c3d]/36 focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10 sm:w-[240px]"
+        />
+      }
+    >
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm leading-6 text-[#102c3d]/58">{selectedSite === allSitesLabel ? "Organisation-wide learner visibility across Portakabin UK sites." : `Learner visibility for ${selectedSite}.`}</p>
+        <span className="rounded-full bg-[#f8fbfa] px-3 py-1.5 text-xs font-semibold text-[#102c3d]/56 ring-1 ring-[#102c3d]/[0.05]">{learners.length} learners</span>
+      </div>
+      <div className="overflow-hidden rounded-[1.2rem] border border-[#102c3d]/[0.055]">
+        <div className="hidden grid-cols-[1.1fr_1fr_1.35fr_1.2fr_0.8fr_0.75fr_1fr] gap-3 bg-[#f8fbfa] px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/38 xl:grid">
+          <span>Learner</span>
+          <span>Role</span>
+          <span>Site</span>
+          <span>Programme</span>
+          <span>Status</span>
+          <span>Progress</span>
+          <span>Line Manager</span>
+        </div>
+        <div className="divide-y divide-[#102c3d]/[0.055] bg-white">
+          {learners.slice(0, 18).map((learner) => (
+            <article key={`${learner.name}-${learner.site}`} className="grid gap-3 px-4 py-4 text-sm xl:grid-cols-[1.1fr_1fr_1.35fr_1.2fr_0.8fr_0.75fr_1fr] xl:items-center">
+              <div>
+                <p className="font-semibold text-[#102c3d]">{learner.name}</p>
+                <p className="mt-1 text-xs text-[#102c3d]/42">Started {formatShortDate(learner.startDate)}</p>
+              </div>
+              <p className="text-[#102c3d]/62">{learner.role}</p>
+              <p className="text-[#102c3d]/62">{learner.site}</p>
+              <p className="font-medium text-[#102c3d]/72">{learner.programme}</p>
+              <span className="w-fit rounded-full bg-[#f8fbfa] px-3 py-1.5 text-xs font-semibold text-[#102c3d]/58 ring-1 ring-[#102c3d]/[0.05]">{learner.status}</span>
+              <div>
+                <p className="text-xs font-semibold text-[#102c3d]/58">{learner.progress}%</p>
+                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[#ecf6f2]">
+                  <div className="h-full rounded-full bg-[#159b8f]" style={{ width: `${learner.progress}%` }} />
+                </div>
+              </div>
+              <p className="text-[#102c3d]/62">{learner.lineManager}</p>
+            </article>
+          ))}
+          {learners.length === 0 ? <p className="px-4 py-6 text-sm text-[#102c3d]/56">No learners match this search or site selection.</p> : null}
+        </div>
+      </div>
+      {learners.length > 18 ? <p className="mt-3 text-xs text-[#102c3d]/44">Showing first 18 results for demo clarity. Search or select a specific site to narrow the list.</p> : null}
+    </PlatformPanel>
+  );
+}
+
 function ExecutiveSummary({ requests, mappings, statusCounts }: { requests: RequestItem[]; mappings: ProviderMapping[]; statusCounts: Record<string, number> }) {
   const summary = [
     ["Admin time saved", "14 hrs/mo"],
@@ -1064,6 +1338,19 @@ function dashboardGuide(role: Role) {
     "Apprenticeship Lead": "This dashboard launches the core operating areas without showing dense tables by default.",
   };
   return copy[role];
+}
+
+function filterBySite<T extends { site: string }>(items: T[], selectedSite: string) {
+  if (selectedSite === allSitesLabel) return items;
+  return items.filter((item) => item.site === selectedSite);
+}
+
+function topEntry(counts: Record<string, number>) {
+  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "";
+}
+
+function formatShortDate(value: string) {
+  return new Intl.DateTimeFormat("en-GB", { month: "short", year: "numeric" }).format(new Date(value));
 }
 
 function countBy<T, K extends keyof T>(items: T[], key: K) {
