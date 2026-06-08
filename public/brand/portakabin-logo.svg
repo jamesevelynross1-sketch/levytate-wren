@@ -1,0 +1,7 @@
+<svg width="1024" height="512" viewBox="0 0 1024 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
+  <title id="title">Portakabin</title>
+  <rect width="1024" height="512" fill="#EF332B"/>
+  <text x="49" y="364" fill="#FFFFFF" font-family="Arial Black, Arial, Helvetica, sans-serif" font-size="166" font-weight="900" letter-spacing="-8">Portakabin</text>
+  <text x="955" y="287" fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="36" font-weight="700">R</text>
+  <circle cx="969" cy="274" r="17" stroke="#FFFFFF" stroke-width="5"/>
+</svg>

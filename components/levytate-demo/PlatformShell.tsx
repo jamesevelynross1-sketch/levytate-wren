@@ -67,9 +67,7 @@ export function PlatformTopBar({
 
 function PortakabinLogoBadge({ tenantName }: { tenantName: string }) {
   return (
-    <div className="flex h-11 min-w-[126px] shrink-0 items-center justify-center rounded-xl bg-[#ffd200] px-4 text-[#102c3d] shadow-[inset_0_0_0_1px_rgba(16,44,61,0.18)]" aria-label={tenantName}>
-      <span className="text-lg font-extrabold tracking-[-0.025em]">{tenantName}</span>
-    </div>
+    <Image src="/brand/portakabin-logo.svg" alt={tenantName} width={1024} height={512} priority className="h-[46px] w-auto rounded-xl object-contain shadow-[inset_0_0_0_1px_rgba(16,44,61,0.14)]" />
   );
 }
 
@@ -183,6 +181,6 @@ function PlatformSidebar({ tenantName, tenantLabel, activeItem, navSections }: {
 
 export function LevyTateLogo({ className = "" }: { className?: string }) {
   return (
-    <Image src="/brand/levytate-logo.svg" alt="LevyTate" width={214} height={64} priority className={`w-auto object-contain ${className}`} />
+    <Image src="/brand/levytate-logo-supplied.png" alt="LevyTate" width={249} height={75} priority className={`w-auto object-contain ${className}`} />
   );
 }
