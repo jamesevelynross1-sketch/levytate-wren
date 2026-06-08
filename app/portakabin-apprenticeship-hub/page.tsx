@@ -39,10 +39,12 @@ type ProviderMapping = {
   pathway: string;
   standard: string;
   partner: string;
+  alternativePartner: string;
   deliveryModel: string;
   fit: number;
   status: MappingStatus;
   nextAction: string;
+  whyRecommended: string;
 };
 
 type SectionKey =
@@ -95,7 +97,7 @@ const pathways: Pathway[] = [
     businessBenefit: "Build stronger production capability, quality routines and manufacturing confidence.",
     learnerBenefit: "Recognised technical skills with evidence from live modular building work.",
     status: "Live",
-    deliveryPartner: "Approved Provider A",
+    deliveryPartner: "TEC Partnership",
     duration: "36 to 42 months",
     commitment: "Site learning blocks, coaching and workplace evidence.",
     cohort: "September manufacturing intake",
@@ -108,7 +110,7 @@ const pathways: Pathway[] = [
     businessBenefit: "Improve technical documentation and design to delivery handoffs.",
     learnerBenefit: "A practical route into design, standards and project evidence.",
     status: "Ready",
-    deliveryPartner: "Approved Provider B",
+    deliveryPartner: "TEC Partnership",
     duration: "24 to 30 months",
     commitment: "Blended learning with applied technical project evidence.",
     cohort: "October technical design group",
@@ -121,7 +123,7 @@ const pathways: Pathway[] = [
     businessBenefit: "Strengthen site readiness, handover discipline and customer delivery confidence.",
     learnerBenefit: "Practical site leadership and coordination skills linked to live projects.",
     status: "Live",
-    deliveryPartner: "Approved Provider C",
+    deliveryPartner: "Leeds College of Building",
     duration: "18 to 24 months",
     commitment: "Field evidence, site visits and coaching with manager support.",
     cohort: "November site operations cohort",
@@ -134,7 +136,7 @@ const pathways: Pathway[] = [
     businessBenefit: "Create stronger customer conversations and consistent commercial follow-through.",
     learnerBenefit: "Customer, commercial and service skills with a clear progression pathway.",
     status: "Live",
-    deliveryPartner: "Approved Provider D",
+    deliveryPartner: "Babington",
     duration: "15 to 18 months",
     commitment: "Monthly workshops with applied customer and sales evidence.",
     cohort: "Rolling customer experience starts",
@@ -147,7 +149,7 @@ const pathways: Pathway[] = [
     businessBenefit: "Improve material availability, supplier coordination and delivery planning.",
     learnerBenefit: "Practical supply chain skills connected to modular building operations.",
     status: "Ready",
-    deliveryPartner: "Approved Provider E",
+    deliveryPartner: "SR Apprenticeships",
     duration: "18 to 24 months",
     commitment: "Hybrid learning with planning and supplier evidence.",
     cohort: "January logistics group",
@@ -160,7 +162,7 @@ const pathways: Pathway[] = [
     businessBenefit: "Turn operational information into clearer decisions and smarter capacity planning.",
     learnerBenefit: "Build practical digital, data and AI confidence in a work-based setting.",
     status: "Ready",
-    deliveryPartner: "Approved Provider F",
+    deliveryPartner: "QA",
     duration: "18 to 24 months",
     commitment: "Remote workshops, applied data tasks and internal project evidence.",
     cohort: "Next quarter digital group",
@@ -173,7 +175,7 @@ const pathways: Pathway[] = [
     businessBenefit: "Improve compliance routines, safer sites and stronger evidence trails.",
     learnerBenefit: "Structured safety and compliance capability with workplace application.",
     status: "Ready",
-    deliveryPartner: "Approved Provider G",
+    deliveryPartner: "Learning Skills Partnership",
     duration: "18 to 24 months",
     commitment: "Online learning, site evidence and compliance projects.",
     cohort: "December compliance cohort",
@@ -186,7 +188,7 @@ const pathways: Pathway[] = [
     businessBenefit: "Create more consistent management practice across delivery and support teams.",
     learnerBenefit: "Confident leadership, planning and performance management skills.",
     status: "Live",
-    deliveryPartner: "Approved Provider H",
+    deliveryPartner: "Babington",
     duration: "15 to 27 months",
     commitment: "Blended workshops, coaching and live team improvement work.",
     cohort: "Quarterly leadership pipeline",
@@ -206,12 +208,78 @@ const initialRequests: RequestItem[] = [
 ];
 
 const initialMappings: ProviderMapping[] = [
-  { roleFamily: "Manufacturing", pathway: "Manufacturing & Production", standard: "L3 Engineering Technician", partner: "Approved Provider A", deliveryModel: "Site based", fit: 93, status: "Live", nextAction: "Confirm workshop timetable" },
-  { roleFamily: "Design & Technical", pathway: "Design & Technical", standard: "L3 Design and Draughting", partner: "Approved Provider B", deliveryModel: "Blended", fit: 89, status: "Ready", nextAction: "Validate technical mentors" },
-  { roleFamily: "Site Operations", pathway: "Installation & Site Operations", standard: "L3 Construction Site Supervisor", partner: "Approved Provider C", deliveryModel: "Field based", fit: 91, status: "Live", nextAction: "Prepare site cohort" },
-  { roleFamily: "Hire & Customer", pathway: "Hire, Sales & Customer Experience", standard: "L3 Customer Service Specialist", partner: "Approved Provider D", deliveryModel: "Online + workshops", fit: 92, status: "Live", nextAction: "Review customer cohort" },
-  { roleFamily: "Supply Chain", pathway: "Procurement & Supply Chain", standard: "L3 Supply Chain Practitioner", partner: "Approved Provider E", deliveryModel: "Hybrid", fit: 87, status: "Ready", nextAction: "Review delivery fit" },
-  { roleFamily: "Digital", pathway: "Digital, Data & AI", standard: "L3 Data Technician", partner: "Approved Provider F", deliveryModel: "Remote + workshops", fit: 88, status: "Ready", nextAction: "Confirm data projects" },
+  {
+    roleFamily: "Manufacturing",
+    pathway: "Manufacturing & Production",
+    standard: "L3 Engineering Technician / Engineering Maintenance Technician",
+    partner: "TEC Partnership",
+    alternativePartner: "North Lindsey College",
+    deliveryModel: "Site based",
+    fit: 93,
+    status: "Live",
+    nextAction: "Confirm workshop timetable",
+    whyRecommended: "Regional engineering and technical training fit.",
+  },
+  {
+    roleFamily: "Design & Technical",
+    pathway: "Design & Technical",
+    standard: "L3 Engineering Design Technician",
+    partner: "TEC Partnership",
+    alternativePartner: "Leeds College of Building",
+    deliveryModel: "Blended",
+    fit: 89,
+    status: "Ready",
+    nextAction: "Validate technical mentors",
+    whyRecommended: "Relevant engineering design technician apprenticeship coverage.",
+  },
+  {
+    roleFamily: "Site Operations",
+    pathway: "Installation & Site Operations",
+    standard: "L3 Construction Site Supervisor",
+    partner: "Leeds College of Building",
+    alternativePartner: "Learning Skills Partnership",
+    deliveryModel: "Field based",
+    fit: 91,
+    status: "Live",
+    nextAction: "Prepare site cohort",
+    whyRecommended: "Construction and site supervision training fit.",
+  },
+  {
+    roleFamily: "Hire & Customer",
+    pathway: "Hire, Sales & Customer Experience",
+    standard: "L3 Customer Service Specialist",
+    partner: "Babington",
+    alternativePartner: "Remit Training",
+    deliveryModel: "Online + workshops",
+    fit: 92,
+    status: "Live",
+    nextAction: "Review customer cohort",
+    whyRecommended: "National customer service apprenticeship delivery.",
+  },
+  {
+    roleFamily: "Supply Chain",
+    pathway: "Procurement & Supply Chain",
+    standard: "L3 Supply Chain Practitioner",
+    partner: "SR Apprenticeships",
+    alternativePartner: "Apprenticeship College",
+    deliveryModel: "Hybrid",
+    fit: 87,
+    status: "Ready",
+    nextAction: "Review delivery fit",
+    whyRecommended: "Specific supply chain practitioner apprenticeship delivery.",
+  },
+  {
+    roleFamily: "Digital",
+    pathway: "Digital, Data & AI",
+    standard: "L3 Data Technician",
+    partner: "QA",
+    alternativePartner: "Apprentify",
+    deliveryModel: "Remote + workshops",
+    fit: 88,
+    status: "Ready",
+    nextAction: "Confirm data projects",
+    whyRecommended: "Strong national data and digital apprenticeship delivery.",
+  },
 ];
 
 const scenarioSeeds: Record<DemandScenario, RequestItem[]> = {
@@ -812,8 +880,10 @@ function ProviderMappingTable({ mappings, onMapping }: { mappings: ProviderMappi
               <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#102c3d]/56">{row.fit}% fit</span>
             </div>
             <div className="mt-4 grid gap-3 md:grid-cols-2">
-              <InfoBox label="Approved delivery partner" value={row.partner} />
+              <InfoBox label="Recommended provider" value={row.partner} />
+              <InfoBox label="Alternative provider" value={row.alternativePartner} />
               <InfoBox label="Delivery model" value={row.deliveryModel} />
+              <InfoBox label="Why recommended" value={row.whyRecommended} />
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
               <SmallButton label="Mark live" onClick={() => onMapping(index, "Live", "Monitor cohort")} />
