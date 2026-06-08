@@ -1,0 +1,183 @@
+"use client";
+
+import type { ReactNode } from "react";
+
+export type PlatformNavSection = {
+  title: string;
+  items: string[];
+};
+
+type PlatformShellProps = {
+  tenantName: string;
+  tenantLabel: string;
+  activeItem?: string;
+  navSections: PlatformNavSection[];
+  topBar: ReactNode;
+  children: ReactNode;
+  sideRail?: ReactNode;
+};
+
+export function PlatformShell({ tenantName, tenantLabel, activeItem = "Dashboard", navSections, topBar, children, sideRail }: PlatformShellProps) {
+  return (
+    <main className="min-h-screen bg-[#f5f7f4] text-[#102c3d]">
+      <div className="grid min-h-screen lg:grid-cols-[296px_minmax(0,1fr)]">
+        <PlatformSidebar tenantName={tenantName} tenantLabel={tenantLabel} activeItem={activeItem} navSections={navSections} />
+        <div className="min-w-0">
+          {topBar}
+          <div className="mx-auto grid w-full max-w-[1600px] gap-8 px-5 py-7 sm:px-7 lg:px-9 2xl:grid-cols-[minmax(0,1fr)_360px]">
+            <section className="min-w-0 space-y-8">{children}</section>
+            {sideRail ? <aside className="grid h-fit gap-4 2xl:sticky 2xl:top-7">{sideRail}</aside> : null}
+          </div>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+export function PlatformTopBar({
+  tenantName,
+  tenantSubtitle,
+  children,
+}: {
+  tenantName: string;
+  tenantSubtitle: string;
+  children: ReactNode;
+}) {
+  return (
+    <header className="sticky top-0 z-30 border-b border-[#102c3d]/10 bg-white/88 backdrop-blur-xl">
+      <div className="mx-auto flex max-w-[1600px] flex-col gap-4 px-5 py-4 sm:px-7 lg:px-9 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex min-w-0 items-center gap-4">
+          <div className="lg:hidden">
+            <LevyTateWordmark className="scale-[0.78]" />
+          </div>
+          <div className="hidden h-10 w-px bg-[#102c3d]/10 lg:block" />
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="rounded-xl bg-[#ffd200] px-4 py-2 text-sm font-semibold tracking-tight text-[#102c3d]">{tenantName}</div>
+            <div className="min-w-0">
+              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#9b7600]">Employer environment</p>
+              <p className="truncate text-sm font-medium text-[#102c3d]/58">{tenantSubtitle}</p>
+            </div>
+          </div>
+        </div>
+        {children}
+      </div>
+    </header>
+  );
+}
+
+export function PlatformPanel({
+  eyebrow,
+  title,
+  actions,
+  children,
+  className = "",
+}: {
+  eyebrow?: string;
+  title: string;
+  actions?: ReactNode;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <section className={`min-w-0 rounded-[1.5rem] border border-[#102c3d]/[0.06] bg-white p-6 shadow-[0_18px_45px_rgba(16,44,61,0.055)] ${className}`}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          {eyebrow ? <p className="text-[10px] font-medium uppercase tracking-[0.15em] text-[#df5f73]">{eyebrow}</p> : null}
+          <h2 className="mt-1.5 text-[1.35rem] font-semibold leading-7 tracking-[-0.01em] text-[#102c3d]">{title}</h2>
+        </div>
+        {actions ? <div className="shrink-0">{actions}</div> : null}
+      </div>
+      <div className="mt-6">{children}</div>
+    </section>
+  );
+}
+
+export function PlatformMetric({ label, value, copy }: { label: string; value: string | number; copy?: string }) {
+  return (
+    <article className="rounded-[1.15rem] border border-[#102c3d]/[0.05] bg-white p-4 shadow-[0_12px_28px_rgba(16,44,61,0.045)]">
+      <p className="text-xs font-medium text-[#102c3d]/48">{label}</p>
+      <p className="mt-2 text-3xl font-semibold tracking-[-0.025em] text-[#102c3d]">{value}</p>
+      {copy ? <p className="mt-1.5 text-xs leading-5 text-[#102c3d]/54">{copy}</p> : null}
+    </article>
+  );
+}
+
+export function PlatformButton({
+  children,
+  onClick,
+  variant = "dark",
+  className = "",
+}: {
+  children: ReactNode;
+  onClick?: () => void;
+  variant?: "dark" | "soft" | "amber" | "coral";
+  className?: string;
+}) {
+  const variants = {
+    dark: "bg-[#102c3d] text-white shadow-[0_12px_24px_rgba(16,44,61,0.12)]",
+    soft: "bg-[#f4f7f1] text-[#102c3d]",
+    amber: "bg-[#fff4bd] text-[#8a6a00]",
+    coral: "bg-[#ffe3e8] text-[#bf4159]",
+  };
+
+  return (
+    <button onClick={onClick} className={`rounded-full px-4 py-2 text-xs font-semibold transition hover:-translate-y-0.5 ${variants[variant]} ${className}`}>
+      {children}
+    </button>
+  );
+}
+
+function PlatformSidebar({ tenantName, tenantLabel, activeItem, navSections }: { tenantName: string; tenantLabel: string; activeItem: string; navSections: PlatformNavSection[] }) {
+  return (
+    <aside className="hidden border-r border-[#102c3d]/10 bg-white px-4 py-5 lg:flex lg:h-screen lg:flex-col">
+      <div className="flex items-center px-2">
+        <LevyTateWordmark className="scale-[0.82]" />
+      </div>
+
+      <div className="mt-5 rounded-2xl border border-[#102c3d]/[0.06] bg-[#ffd200] px-4 py-3 text-[#102c3d] shadow-[0_14px_30px_rgba(16,44,61,0.08)]">
+        <p className="text-base font-semibold tracking-tight">{tenantName}</p>
+        <p className="mt-1 text-[11px] font-medium uppercase tracking-[0.14em] text-[#102c3d]/62">{tenantLabel}</p>
+      </div>
+
+      <nav className="mt-5 min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
+        {navSections.map((section) => (
+          <div key={section.title}>
+            <p className="px-2 text-[10px] font-medium uppercase tracking-[0.16em] text-[#102c3d]/34">{section.title}</p>
+            <div className="mt-1.5 grid gap-1">
+              {section.items.map((item) => {
+                const active = item === activeItem;
+                return (
+                  <button
+                    key={item}
+                    className={`flex w-full items-center gap-2 rounded-xl px-2.5 py-2.5 text-left text-sm font-medium transition ${
+                      active ? "bg-[#f0f5ed] text-[#102c3d] shadow-[inset_3px_0_0_#159b8f]" : "text-[#102c3d]/58 hover:bg-[#f8faf4] hover:text-[#102c3d]"
+                    }`}
+                  >
+                    <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg text-[10px] font-semibold ${active ? "bg-white text-[#159b8f]" : "bg-[#f8faf4] text-[#102c3d]/46"}`}>
+                      {item.split(" ").map((word) => word[0]).join("").slice(0, 2)}
+                    </span>
+                    <span className="truncate">{item}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </nav>
+
+      <div className="mt-5 rounded-2xl bg-[#f8faf4] px-4 py-3">
+        <p className="text-xs font-semibold text-[#102c3d]">Powered by LevyTate</p>
+        <p className="mt-1 text-xs leading-5 text-[#102c3d]/52">Reusable apprenticeship operating system.</p>
+      </div>
+    </aside>
+  );
+}
+
+function LevyTateWordmark({ className = "" }: { className?: string }) {
+  return (
+    <div className={`levytate-wordmark origin-left ${className}`} aria-label="LevyTate">
+      <span>Levy</span>
+      <span>Tate</span>
+    </div>
+  );
+}

@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
+import { PlatformButton, PlatformMetric, PlatformPanel, PlatformTopBar, type PlatformNavSection } from "@/components/levytate-demo/PlatformShell";
 
 type Role = "Employee" | "Line Manager" | "Department Head" | "Apprenticeship Lead";
 type DemandScenario = "Low" | "Medium" | "High";
@@ -186,16 +187,16 @@ const scenarioSeeds: Record<DemandScenario, RequestItem[]> = {
   ],
 };
 
-const navSections = [
-  { title: "Home", items: ["Dashboard"] },
-  { title: "Apprenticeships", items: ["Explore Pathways", "Recommended Programmes", "Skills Gap Analysis"] },
-  { title: "Applications", items: ["New Requests", "Awaiting Approval", "Approved", "Enrolments"] },
+const navSections: PlatformNavSection[] = [
+  { title: "Dashboard", items: ["Dashboard"] },
+  { title: "Apprenticeships", items: ["Explore Pathways", "Recommended Programmes", "Skills Analysis"] },
+  { title: "Applications", items: ["Requests", "Approvals", "Enrolments"] },
   { title: "Workforce Planning", items: ["Skills Map", "Department Demand", "Future Skills"] },
-  { title: "Providers", items: ["Approved Providers", "Provider Performance", "Programme Coverage"] },
-  { title: "Funding & Levy", items: ["Levy Position", "Forecast Spend", "Transfer Opportunities"] },
-  { title: "Reporting", items: ["Executive Dashboard", "Department Reports", "ROI & Impact"] },
-  { title: "AI Assistant", items: ["Ask LevyTate AI", "Build Apprenticeship Strategy", "Programme Recommendations"] },
-  { title: "Admin", items: ["Users", "Roles & Permissions", "Branding", "Audit Log"] },
+  { title: "Providers", items: ["Approved Providers", "Performance"] },
+  { title: "Funding & Levy", items: ["Levy Position", "Forecast"] },
+  { title: "Reporting", items: ["Reporting"] },
+  { title: "AI Assistant", items: ["AI Assistant"] },
+  { title: "Admin", items: ["Admin"] },
 ];
 
 export default function PortakabinApprenticeshipHub() {
@@ -278,15 +279,15 @@ export default function PortakabinApprenticeshipHub() {
   };
 
   return (
-    <main className="min-h-screen bg-[#f5f8f6] text-[#102c3d]">
-      <div className="grid min-h-screen lg:grid-cols-[280px_minmax(0,1fr)]">
+    <main className="min-h-screen bg-[#f5f7f4] text-[#102c3d]">
+      <div className="grid min-h-screen lg:grid-cols-[296px_minmax(0,1fr)]">
         <Sidebar />
 
         <div className="min-w-0">
           <TopBar role={role} setRole={setRole} onOpenAdmin={() => setRole("Apprenticeship Lead")} />
 
-          <div className="mx-auto grid w-full max-w-[1540px] gap-7 px-5 py-6 sm:px-6 lg:px-8 xl:grid-cols-[minmax(0,1fr)_340px]">
-            <section className="min-w-0 space-y-7">
+          <div className="mx-auto grid w-full max-w-[1600px] gap-8 px-5 py-7 sm:px-7 lg:px-9 2xl:grid-cols-[minmax(0,1fr)_360px]">
+            <section className="min-w-0 space-y-8">
               <HeroPanel requests={requests} mappings={mappings} statusCounts={statusCounts} role={role} setRole={setRole} />
               <StatusStrip request={employeeRequest} />
 
@@ -317,7 +318,7 @@ export default function PortakabinApprenticeshipHub() {
               <ExecutiveSummary requests={requests} mappings={mappings} statusCounts={statusCounts} />
             </section>
 
-            <aside className="grid h-fit gap-4 xl:sticky xl:top-6">
+            <aside className="grid h-fit gap-4 2xl:sticky 2xl:top-7">
               <GuidePanel role={role} copy={guideCopy[role]} />
               <DemoControls scenario={scenario} onScenario={setScenarioData} onSeed={seedRequest} onReset={() => setScenarioData("Medium")} />
               <QuickActions role={role} />
@@ -343,7 +344,7 @@ export default function PortakabinApprenticeshipHub() {
 
 function Sidebar() {
   return (
-    <aside className="hidden border-r border-[#102c3d]/10 bg-white/86 px-4 py-5 lg:block">
+    <aside className="hidden border-r border-[#102c3d]/10 bg-white px-4 py-5 lg:flex lg:h-screen lg:flex-col">
       <div className="flex items-center gap-3 px-2">
         <div className="levytate-wordmark scale-[0.82] origin-left" aria-label="LevyTate">
           <span>Levy</span>
@@ -356,17 +357,17 @@ function Sidebar() {
         <p className="mt-1 text-[11px] font-medium uppercase tracking-[0.14em] text-[#102c3d]/62">Employer environment</p>
       </div>
 
-      <nav className="mt-5 max-h-[calc(100vh-170px)] space-y-4 overflow-y-auto pr-1">
+      <nav className="mt-5 min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
         {navSections.map((section) => (
           <div key={section.title}>
-            <p className="px-2 text-[10px] font-medium uppercase tracking-[0.16em] text-[#102c3d]/38">{section.title}</p>
-            <div className="mt-1 grid gap-1">
+            <p className="px-2 text-[10px] font-medium uppercase tracking-[0.16em] text-[#102c3d]/34">{section.title}</p>
+            <div className="mt-1.5 grid gap-1">
               {section.items.map((item, index) => (
                 <button
                   key={item}
-                  className={`flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-xs font-medium transition ${section.title === "Home" && index === 0 ? "bg-[#f3f7ef] text-[#102c3d]" : "text-[#102c3d]/56 hover:bg-[#f8faf4] hover:text-[#102c3d]"}`}
+                  className={`flex w-full items-center gap-2 rounded-xl px-2.5 py-2.5 text-left text-sm font-medium transition ${section.title === "Dashboard" && index === 0 ? "bg-[#f0f5ed] text-[#102c3d] shadow-[inset_3px_0_0_#159b8f]" : "text-[#102c3d]/58 hover:bg-[#f8faf4] hover:text-[#102c3d]"}`}
                 >
-                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-white text-[10px] font-semibold text-[#102c3d]/54 shadow-[0_6px_14px_rgba(16,44,61,0.04)]">
+                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white text-[10px] font-semibold text-[#102c3d]/54 shadow-[0_6px_14px_rgba(16,44,61,0.04)]">
                     {item.split(" ").map((word) => word[0]).join("").slice(0, 2)}
                   </span>
                   <span className="truncate">{item}</span>
@@ -377,57 +378,41 @@ function Sidebar() {
         ))}
       </nav>
 
-      <p className="mt-5 px-2 text-xs leading-5 text-[#102c3d]/48">Powered by LevyTate</p>
+      <div className="mt-5 rounded-2xl bg-[#f8faf4] px-4 py-3">
+        <p className="text-xs font-semibold text-[#102c3d]">Powered by LevyTate</p>
+        <p className="mt-1 text-xs leading-5 text-[#102c3d]/52">Reusable apprenticeship operating system.</p>
+      </div>
     </aside>
   );
 }
 
 function TopBar({ role, setRole, onOpenAdmin }: { role: Role; setRole: (role: Role) => void; onOpenAdmin: () => void }) {
   return (
-    <header className="border-b border-[#102c3d]/10 bg-white/78 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-[1540px] flex-col gap-4 px-5 py-4 sm:px-6 lg:px-8 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex min-w-0 items-center gap-4">
-          <div className="lg:hidden">
-            <div className="levytate-wordmark scale-[0.78] origin-left" aria-label="LevyTate">
-              <span>Levy</span>
-              <span>Tate</span>
-            </div>
-          </div>
-          <div className="hidden h-9 w-px bg-[#102c3d]/12 lg:block" />
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="rounded-xl bg-[#ffd200] px-4 py-2 text-sm font-semibold tracking-tight text-[#102c3d]">Portakabin</div>
-            <div className="min-w-0">
-              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#9b7600]">Employer environment</p>
-              <p className="truncate text-sm font-medium text-[#102c3d]/58">Internal apprenticeship and capability hub</p>
-            </div>
-          </div>
+    <PlatformTopBar tenantName="Portakabin" tenantSubtitle="Internal apprenticeship and capability hub">
+      <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-center">
+        <div className="hidden min-w-[300px] rounded-full border border-[#102c3d]/10 bg-[#f8fbfa] px-4 py-2.5 text-sm text-[#102c3d]/42 xl:block">Search pathways, requests or teams</div>
+        <div className="flex max-w-full overflow-x-auto rounded-full bg-[#edf5f1] p-1">
+          {roles.map((item) => (
+            <button key={item} onClick={() => setRole(item)} className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-semibold transition ${role === item ? "bg-white text-[#102c3d] shadow-[0_8px_20px_rgba(16,44,61,0.08)]" : "text-[#102c3d]/52"}`}>
+              {item}
+            </button>
+          ))}
         </div>
-
-        <div className="flex flex-col gap-3 md:flex-row md:items-center">
-          <div className="hidden min-w-[260px] rounded-full border border-[#102c3d]/10 bg-[#f8fbfa] px-4 py-2.5 text-sm text-[#102c3d]/42 xl:block">Search pathways, requests or teams</div>
-          <div className="flex rounded-full bg-[#edf5f1] p-1">
-            {roles.map((item) => (
-              <button key={item} onClick={() => setRole(item)} className={`rounded-full px-3 py-2 text-xs font-semibold transition ${role === item ? "bg-white text-[#102c3d] shadow-[0_8px_20px_rgba(16,44,61,0.08)]" : "text-[#102c3d]/52"}`}>
-                {item}
-              </button>
-            ))}
-          </div>
-          <button onClick={onOpenAdmin} className="rounded-full bg-[#102c3d] px-4 py-2.5 text-sm font-semibold text-white">Admin console</button>
-        </div>
+        <PlatformButton onClick={onOpenAdmin}>Admin console</PlatformButton>
       </div>
-    </header>
+    </PlatformTopBar>
   );
 }
 
 function HeroPanel({ requests, mappings, statusCounts, role, setRole }: { requests: RequestItem[]; mappings: ProviderMapping[]; statusCounts: Record<string, number>; role: Role; setRole: (role: Role) => void }) {
   const awaiting = (statusCounts["Manager review"] ?? 0) + (statusCounts["Lead review"] ?? 0);
   return (
-    <section className="grid gap-5 rounded-[1.75rem] bg-white p-5 shadow-[0_18px_48px_rgba(16,44,61,0.07)] lg:grid-cols-[minmax(0,1fr)_360px] lg:p-6">
+    <section className="grid gap-6 rounded-[1.75rem] border border-[#102c3d]/[0.06] bg-white p-6 shadow-[0_18px_48px_rgba(16,44,61,0.06)] xl:grid-cols-[minmax(0,1fr)_380px] xl:p-7">
       <div className="min-w-0">
         <p className="w-fit rounded-full bg-[#fff4bd] px-3 py-1.5 text-[10px] font-medium uppercase tracking-[0.14em] text-[#8a6a00]">Portakabin environment powered by LevyTate</p>
         <h1 className="mt-4 max-w-4xl text-4xl font-semibold leading-[1.03] tracking-[-0.02em] text-[#102c3d] md:text-5xl xl:text-6xl">Portakabin Apprenticeship Hub</h1>
-        <p className="mt-4 max-w-3xl text-base leading-7 text-[#102c3d]/66">A simpler way to scale apprenticeship adoption, manage approvals and connect approved pathways to the right delivery partners.</p>
-        <div className="mt-5 flex flex-wrap gap-2">
+        <p className="mt-4 max-w-3xl text-base leading-7 text-[#102c3d]/66 md:text-lg">A simpler way to scale apprenticeship adoption, manage approvals and connect approved pathways to the right delivery partners.</p>
+        <div className="mt-6 flex flex-wrap gap-2">
           {roles.map((item) => (
             <button key={item} onClick={() => setRole(item)} className={`rounded-full px-3.5 py-2 text-xs font-semibold ${role === item ? "bg-[#102c3d] text-white" : "bg-[#f6f8f2] text-[#102c3d]/60"}`}>
               {item}
@@ -436,7 +421,7 @@ function HeroPanel({ requests, mappings, statusCounts, role, setRole }: { reques
         </div>
       </div>
 
-      <div className="rounded-[1.4rem] bg-[#f8fbfa] p-4">
+      <div className="rounded-[1.4rem] border border-[#102c3d]/[0.05] bg-[#f8fbfa] p-5">
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-[#df5f73]">Live demand</p>
@@ -444,7 +429,7 @@ function HeroPanel({ requests, mappings, statusCounts, role, setRole }: { reques
           </div>
           <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#102c3d]/60">Demo data</span>
         </div>
-        <div className="mt-4 grid grid-cols-2 gap-3">
+        <div className="mt-5 grid grid-cols-2 gap-3">
           <MetricTile label="Requests" value={requests.length} />
           <MetricTile label="Awaiting" value={awaiting} />
           <MetricTile label="Live routes" value={pathways.filter((item) => item.status === "Live").length} />
@@ -480,10 +465,10 @@ function StatusStrip({ request }: { request: RequestItem }) {
 
 function EmployeeDashboard({ savedPathways, selectedRequest, onSubmit, onOpenPathway, onSavePathway, success }: { savedPathways: string[]; selectedRequest: RequestItem; onSubmit: (event: FormEvent<HTMLFormElement>) => void; onOpenPathway: (pathway: Pathway) => void; onSavePathway: (title: string) => void; success: boolean }) {
   return (
-    <div className="space-y-7">
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+    <div className="space-y-8">
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
         <PanelShell eyebrow="Approved development pathways" title="Recommended programmes">
-          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+          <div className="grid gap-5 lg:grid-cols-2 min-[1500px]:grid-cols-3">
             {pathways.slice(0, 6).map((pathway) => (
               <PathwayCard key={pathway.title} pathway={pathway} saved={savedPathways.includes(pathway.title)} onOpen={() => onOpenPathway(pathway)} onSave={() => onSavePathway(pathway.title)} />
             ))}
@@ -502,7 +487,7 @@ function EmployeeDashboard({ savedPathways, selectedRequest, onSubmit, onOpenPat
         </PanelShell>
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
         <PanelShell eyebrow="Low friction request" title="Start an expression of interest">
           <RequestForm onSubmit={onSubmit} />
           {success && <p className="mt-4 rounded-2xl bg-[#eff8f4] px-4 py-3 text-sm font-semibold text-[#102c3d]">Request created and moved to internal review.</p>}
@@ -626,22 +611,26 @@ function AdminDashboard({ requests, mappings, statusCounts, departmentCounts, on
 
 function PathwayCard({ pathway, saved, onOpen, onSave }: { pathway: Pathway; saved: boolean; onOpen: () => void; onSave: () => void }) {
   return (
-    <article className="flex min-h-[270px] min-w-0 flex-col rounded-[1.35rem] bg-[#f8fbfa] p-4">
+    <article className="group flex min-h-[330px] min-w-0 flex-col rounded-[1.45rem] border border-[#102c3d]/[0.05] bg-[#f8fbfa] p-5 transition hover:-translate-y-1 hover:bg-white hover:shadow-[0_18px_38px_rgba(16,44,61,0.08)]">
       <div className="flex items-start justify-between gap-3">
-        <h3 className="min-w-0 text-lg font-semibold leading-6 text-[#102c3d]">{pathway.title}</h3>
+        <h3 className="min-w-0 text-xl font-semibold leading-7 tracking-[-0.01em] text-[#102c3d]">{pathway.title}</h3>
         <span className="shrink-0 rounded-full bg-[#fff4bd] px-2.5 py-1 text-[11px] font-medium text-[#8a6a00]">{pathway.status}</span>
       </div>
       <p className="mt-2 text-sm font-semibold leading-6 text-[#159b8f]">{pathway.standard}</p>
-      <p className="mt-3 text-sm leading-6 text-[#102c3d]/60">{pathway.audience}</p>
+      <p className="mt-4 text-sm leading-6 text-[#102c3d]/62">{pathway.audience}</p>
+      <div className="mt-4 rounded-2xl bg-white/72 p-3">
+        <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-[#102c3d]/38">Business outcome</p>
+        <p className="mt-1.5 text-sm leading-6 text-[#102c3d]/66">{pathway.businessBenefit}</p>
+      </div>
       <div className="mt-4 flex flex-wrap gap-1.5">
         {pathway.departments.slice(0, 3).map((item) => (
           <span key={item} className="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-[#102c3d]/54">{item}</span>
         ))}
       </div>
       <p className="mt-4 text-xs leading-5 text-[#102c3d]/52">Potentially fully funded through apprenticeship funding.</p>
-      <div className="mt-auto flex flex-wrap gap-2 pt-4">
-        <button onClick={onOpen} className="rounded-full bg-[#102c3d] px-4 py-2 text-xs font-semibold text-white">View detail</button>
-        <button onClick={onSave} className="rounded-full bg-white px-4 py-2 text-xs font-semibold text-[#102c3d]">{saved ? "Saved" : "Save"}</button>
+      <div className="mt-auto flex flex-wrap gap-2 pt-5">
+        <PlatformButton onClick={onOpen}>View detail</PlatformButton>
+        <PlatformButton onClick={onSave} variant="soft">{saved ? "Saved" : "Save"}</PlatformButton>
       </div>
     </article>
   );
@@ -649,14 +638,14 @@ function PathwayCard({ pathway, saved, onOpen, onSave }: { pathway: Pathway; sav
 
 function RequestForm({ onSubmit }: { onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
   return (
-    <form onSubmit={onSubmit} className="grid gap-4 md:grid-cols-2">
+    <form onSubmit={onSubmit} className="grid gap-5 md:grid-cols-2">
       <Field name="name" label="Name" defaultValue="Amelia Hart" />
       <Field name="role" label="Role" defaultValue="Production Team Member" />
       <Field name="department" label="Department" defaultValue="Manufacturing" />
       <Field name="team" label="Team" defaultValue="Assembly Line A" />
       <label className="grid gap-1.5 text-xs font-medium text-[#102c3d]/62">
         Selected pathway
-        <select name="pathway" className="min-w-0 rounded-2xl border border-[#102c3d]/10 bg-[#f8fbfa] px-3.5 py-3 text-sm outline-none focus:border-[#159b8f]">
+        <select name="pathway" className="min-w-0 rounded-2xl border border-[#102c3d]/10 bg-[#f8fbfa] px-4 py-3.5 text-sm outline-none transition focus:border-[#159b8f] focus:bg-white">
           {pathways.map((pathway) => (
             <option key={pathway.title}>{pathway.title}</option>
           ))}
@@ -665,11 +654,11 @@ function RequestForm({ onSubmit }: { onSubmit: (event: FormEvent<HTMLFormElement
       <Field name="manager" label="Line manager" defaultValue="Ryan Booth" />
       <label className="grid gap-1.5 text-xs font-medium text-[#102c3d]/62 md:col-span-2">
         Why is this needed?
-        <textarea name="need" rows={4} className="min-w-0 rounded-2xl border border-[#102c3d]/10 bg-[#f8fbfa] px-3.5 py-3 text-sm leading-6 outline-none focus:border-[#159b8f]" defaultValue="I want to build stronger manufacturing and delivery confidence." />
+        <textarea name="need" rows={4} className="min-w-0 rounded-2xl border border-[#102c3d]/10 bg-[#f8fbfa] px-4 py-3.5 text-sm leading-6 outline-none transition focus:border-[#159b8f] focus:bg-white" defaultValue="I want to build stronger manufacturing and delivery confidence." />
       </label>
-      <div className="flex flex-col gap-3 md:col-span-2 md:flex-row md:items-center md:justify-between">
+      <div className="mt-1 flex flex-col gap-4 rounded-2xl bg-[#f8fbfa] p-4 md:col-span-2 md:flex-row md:items-center md:justify-between">
         <p className="text-sm leading-6 text-[#102c3d]/54">This creates an internal request for manager review.</p>
-        <button className="w-fit rounded-full bg-[#102c3d] px-5 py-2.5 text-sm font-semibold text-white">Submit request</button>
+        <PlatformButton className="w-fit px-5 py-2.5 text-sm">Submit request</PlatformButton>
       </div>
     </form>
   );
@@ -871,31 +860,18 @@ function PathwayModal({ pathway, onClose, onStart }: { pathway: Pathway; onClose
 
 function PanelShell({ title, eyebrow, children }: { title: string; eyebrow: string; children: React.ReactNode }) {
   return (
-    <section className="min-w-0 rounded-[1.5rem] bg-white p-5 shadow-[0_16px_44px_rgba(16,44,61,0.06)] lg:p-6">
-      <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-[#df5f73]">{eyebrow}</p>
-      <h2 className="mt-1.5 text-2xl font-semibold tracking-[-0.01em] text-[#102c3d]">{title}</h2>
-      <div className="mt-5">{children}</div>
-    </section>
+    <PlatformPanel eyebrow={eyebrow} title={title}>
+      {children}
+    </PlatformPanel>
   );
 }
 
 function MetricCard({ label, value, copy }: { label: string; value: string | number; copy: string }) {
-  return (
-    <article className="rounded-[1.25rem] bg-white p-4 shadow-[0_12px_32px_rgba(16,44,61,0.06)]">
-      <p className="text-xs font-medium text-[#102c3d]/48">{label}</p>
-      <p className="mt-2 text-3xl font-semibold tracking-[-0.02em] text-[#102c3d]">{value}</p>
-      <p className="mt-1.5 text-xs leading-5 text-[#102c3d]/54">{copy}</p>
-    </article>
-  );
+  return <PlatformMetric label={label} value={value} copy={copy} />;
 }
 
 function MetricTile({ label, value }: { label: string; value: string | number }) {
-  return (
-    <article className="rounded-2xl bg-white px-4 py-3 shadow-[0_8px_18px_rgba(16,44,61,0.04)]">
-      <p className="text-xs font-medium text-[#102c3d]/48">{label}</p>
-      <p className="mt-1 text-2xl font-semibold tracking-[-0.02em]">{value}</p>
-    </article>
-  );
+  return <PlatformMetric label={label} value={value} />;
 }
 
 function InfoBox({ label, value }: { label: string; value: string }) {
@@ -930,19 +906,15 @@ function Field({ name, label, defaultValue = "" }: { name: string; label: string
   return (
     <label className="grid min-w-0 gap-1.5 text-xs font-medium text-[#102c3d]/62">
       {label}
-      <input name={name} defaultValue={defaultValue} className="min-w-0 rounded-2xl border border-[#102c3d]/10 bg-[#f8fbfa] px-3.5 py-3 text-sm outline-none focus:border-[#159b8f]" />
+      <input name={name} defaultValue={defaultValue} className="min-w-0 rounded-2xl border border-[#102c3d]/10 bg-[#f8fbfa] px-4 py-3.5 text-sm outline-none transition focus:border-[#159b8f] focus:bg-white" />
     </label>
   );
 }
 
 function SmallButton({ label, onClick, variant = "dark" }: { label: string; onClick: () => void; variant?: "dark" | "mint" | "coral" }) {
-  const classes = {
-    dark: "bg-[#102c3d] text-white",
-    mint: "bg-[#fff4bd] text-[#8a6a00]",
-    coral: "bg-[#ffe3e8] text-[#bf4159]",
-  };
+  const platformVariant = variant === "mint" ? "amber" : variant;
 
-  return <button onClick={onClick} className={`rounded-full px-3 py-1.5 text-[11px] font-semibold ${classes[variant]}`}>{label}</button>;
+  return <PlatformButton onClick={onClick} variant={platformVariant}>{label}</PlatformButton>;
 }
 
 function InsightBars({ rows }: { rows: Array<[string, number]> }) {
