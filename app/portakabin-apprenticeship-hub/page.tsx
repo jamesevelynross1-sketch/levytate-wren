@@ -352,9 +352,9 @@ function Sidebar() {
         </div>
       </div>
 
-      <div className="mt-5 rounded-2xl bg-[#ffd200] px-4 py-3 text-[#102c3d] shadow-[0_14px_30px_rgba(16,44,61,0.08)]">
-        <p className="text-base font-semibold tracking-tight">Portakabin</p>
-        <p className="mt-1 text-[11px] font-medium uppercase tracking-[0.14em] text-[#102c3d]/62">Employer environment</p>
+      <div className="mt-5 rounded-2xl border border-[#102c3d]/[0.06] bg-[#f8faf4] px-4 py-3 text-[#102c3d]">
+        <p className="text-[10px] font-medium uppercase tracking-[0.15em] text-[#102c3d]/40">Active client</p>
+        <p className="mt-1 text-sm font-semibold tracking-tight">Portakabin</p>
       </div>
 
       <nav className="mt-5 min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">

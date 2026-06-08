@@ -45,23 +45,30 @@ export function PlatformTopBar({
 }) {
   return (
     <header className="sticky top-0 z-30 border-b border-[#102c3d]/10 bg-white/88 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-[1600px] flex-col gap-4 px-5 py-4 sm:px-7 lg:px-9 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex min-w-0 items-center gap-4">
-          <div className="lg:hidden">
-            <LevyTateWordmark className="scale-[0.78]" />
-          </div>
-          <div className="hidden h-10 w-px bg-[#102c3d]/10 lg:block" />
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="rounded-xl bg-[#ffd200] px-4 py-2 text-sm font-semibold tracking-tight text-[#102c3d]">{tenantName}</div>
-            <div className="min-w-0">
-              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#9b7600]">Employer environment</p>
-              <p className="truncate text-sm font-medium text-[#102c3d]/58">{tenantSubtitle}</p>
+      <div className="mx-auto flex max-w-[1600px] flex-col gap-4 px-5 py-3.5 sm:px-7 lg:px-9 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex min-w-0 items-center gap-5">
+          <LevyTateWordmark className="scale-[0.78] sm:scale-[0.86]" />
+          <div className="h-10 w-px shrink-0 bg-[#102c3d]/10" />
+          <div className="flex min-w-0 items-center gap-4">
+            <PortakabinLogoBadge tenantName={tenantName} />
+            <div className="min-w-0 border-l border-[#102c3d]/10 pl-4">
+              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#0b6f63]">Employer environment</p>
+              <p className="truncate text-sm font-semibold text-[#102c3d]">Powered by LevyTate</p>
+              <p className="sr-only">{tenantSubtitle}</p>
             </div>
           </div>
         </div>
         {children}
       </div>
     </header>
+  );
+}
+
+function PortakabinLogoBadge({ tenantName }: { tenantName: string }) {
+  return (
+    <div className="flex h-11 shrink-0 items-center rounded-xl bg-[#ffd200] px-4 text-[#102c3d] shadow-[inset_0_0_0_1px_rgba(16,44,61,0.16)]" aria-label={tenantName}>
+      <span className="text-lg font-extrabold tracking-[-0.03em]">{tenantName}</span>
+    </div>
   );
 }
 
