@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
-import { PlatformButton, PlatformMetric, PlatformPanel, PlatformTopBar, type PlatformNavSection } from "@/components/levytate-demo/PlatformShell";
+import { LevyTateLogo, PlatformButton, PlatformMetric, PlatformPanel, PlatformTopBar, type PlatformNavSection } from "@/components/levytate-demo/PlatformShell";
 
 type Role = "Employee" | "Line Manager" | "Department Head" | "Apprenticeship Lead";
 type DemandScenario = "Low" | "Medium" | "High";
@@ -346,10 +346,7 @@ function Sidebar() {
   return (
     <aside className="hidden border-r border-[#102c3d]/10 bg-white px-4 py-5 lg:flex lg:h-screen lg:flex-col">
       <div className="flex items-center gap-3 px-2">
-        <div className="levytate-wordmark scale-[0.82] origin-left" aria-label="LevyTate">
-          <span>Levy</span>
-          <span>Tate</span>
-        </div>
+        <LevyTateLogo className="h-[44px]" />
       </div>
 
       <div className="mt-5 rounded-2xl border border-[#102c3d]/[0.06] bg-[#f8faf4] px-4 py-3 text-[#102c3d]">

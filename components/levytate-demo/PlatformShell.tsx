@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import Image from "next/image";
 
 export type PlatformNavSection = {
   title: string;
@@ -47,7 +48,7 @@ export function PlatformTopBar({
     <header className="sticky top-0 z-30 border-b border-[#102c3d]/10 bg-white/88 backdrop-blur-xl">
       <div className="mx-auto flex max-w-[1600px] flex-col gap-4 px-5 py-3.5 sm:px-7 lg:px-9 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex min-w-0 items-center gap-5">
-          <LevyTateWordmark className="scale-[0.78] sm:scale-[0.86]" />
+          <LevyTateLogo className="h-[46px] sm:h-[52px]" />
           <div className="h-10 w-px shrink-0 bg-[#102c3d]/10" />
           <div className="flex min-w-0 items-center gap-4">
             <PortakabinLogoBadge tenantName={tenantName} />
@@ -66,8 +67,8 @@ export function PlatformTopBar({
 
 function PortakabinLogoBadge({ tenantName }: { tenantName: string }) {
   return (
-    <div className="flex h-11 shrink-0 items-center rounded-xl bg-[#ffd200] px-4 text-[#102c3d] shadow-[inset_0_0_0_1px_rgba(16,44,61,0.16)]" aria-label={tenantName}>
-      <span className="text-lg font-extrabold tracking-[-0.03em]">{tenantName}</span>
+    <div className="flex h-11 min-w-[126px] shrink-0 items-center justify-center rounded-xl bg-[#ffd200] px-4 text-[#102c3d] shadow-[inset_0_0_0_1px_rgba(16,44,61,0.18)]" aria-label={tenantName}>
+      <span className="text-lg font-extrabold tracking-[-0.025em]">{tenantName}</span>
     </div>
   );
 }
@@ -138,7 +139,7 @@ function PlatformSidebar({ tenantName, tenantLabel, activeItem, navSections }: {
   return (
     <aside className="hidden border-r border-[#102c3d]/10 bg-white px-4 py-5 lg:flex lg:h-screen lg:flex-col">
       <div className="flex items-center px-2">
-        <LevyTateWordmark className="scale-[0.82]" />
+        <LevyTateLogo className="h-[44px]" />
       </div>
 
       <div className="mt-5 rounded-2xl border border-[#102c3d]/[0.06] bg-[#ffd200] px-4 py-3 text-[#102c3d] shadow-[0_14px_30px_rgba(16,44,61,0.08)]">
@@ -180,11 +181,8 @@ function PlatformSidebar({ tenantName, tenantLabel, activeItem, navSections }: {
   );
 }
 
-function LevyTateWordmark({ className = "" }: { className?: string }) {
+export function LevyTateLogo({ className = "" }: { className?: string }) {
   return (
-    <div className={`levytate-wordmark origin-left ${className}`} aria-label="LevyTate">
-      <span>Levy</span>
-      <span>Tate</span>
-    </div>
+    <Image src="/brand/levytate-logo.svg" alt="LevyTate" width={214} height={64} priority className={`w-auto object-contain ${className}`} />
   );
 }
