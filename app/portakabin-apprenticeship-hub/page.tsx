@@ -45,9 +45,47 @@ type ProviderMapping = {
   nextAction: string;
 };
 
+type SectionKey =
+  | "Dashboard"
+  | "Explore Pathways"
+  | "Recommended Programmes"
+  | "Skills Analysis"
+  | "Requests"
+  | "Approvals"
+  | "Enrolments"
+  | "Skills Map"
+  | "Department Demand"
+  | "Future Skills"
+  | "Approved Providers"
+  | "Performance"
+  | "Levy Position"
+  | "Forecast"
+  | "Reporting"
+  | "AI Assistant"
+  | "Admin";
+
 const roles: Role[] = ["Employee", "Line Manager", "Department Head", "Apprenticeship Lead"];
 const requestStages: RequestStatus[] = ["New interest", "Manager review", "Lead review", "Provider introduction", "Enrolment", "Live learner"];
 const publicStages = ["Interest submitted", "Manager review", "Apprenticeship lead review", "Provider introduction", "Enrolment in progress", "Live learner"];
+
+const navSections: PlatformNavSection[] = [
+  { title: "Dashboard", items: ["Dashboard"] },
+  { title: "Apprenticeships", items: ["Explore Pathways", "Recommended Programmes", "Skills Analysis"] },
+  { title: "Applications", items: ["Requests", "Approvals", "Enrolments"] },
+  { title: "Workforce Planning", items: ["Skills Map", "Department Demand", "Future Skills"] },
+  { title: "Providers", items: ["Approved Providers", "Performance"] },
+  { title: "Funding & Levy", items: ["Levy Position", "Forecast"] },
+  { title: "Reporting", items: ["Reporting"] },
+  { title: "AI Assistant", items: ["AI Assistant"] },
+  { title: "Admin", items: ["Admin"] },
+];
+
+const roleSectionMap: Record<Role, SectionKey[]> = {
+  Employee: ["Recommended Programmes", "Requests", "Explore Pathways"],
+  "Line Manager": ["Approvals", "Requests", "Skills Analysis", "Recommended Programmes"],
+  "Department Head": ["Department Demand", "Skills Map", "Future Skills", "Forecast"],
+  "Apprenticeship Lead": ["Requests", "Approved Providers", "Levy Position", "Reporting", "Admin"],
+};
 
 const pathways: Pathway[] = [
   {
@@ -187,20 +225,9 @@ const scenarioSeeds: Record<DemandScenario, RequestItem[]> = {
   ],
 };
 
-const navSections: PlatformNavSection[] = [
-  { title: "Dashboard", items: ["Dashboard"] },
-  { title: "Apprenticeships", items: ["Explore Pathways", "Recommended Programmes", "Skills Analysis"] },
-  { title: "Applications", items: ["Requests", "Approvals", "Enrolments"] },
-  { title: "Workforce Planning", items: ["Skills Map", "Department Demand", "Future Skills"] },
-  { title: "Providers", items: ["Approved Providers", "Performance"] },
-  { title: "Funding & Levy", items: ["Levy Position", "Forecast"] },
-  { title: "Reporting", items: ["Reporting"] },
-  { title: "AI Assistant", items: ["AI Assistant"] },
-  { title: "Admin", items: ["Admin"] },
-];
-
 export default function PortakabinApprenticeshipHub() {
   const [role, setRole] = useState<Role>("Employee");
+  const [activeSection, setActiveSection] = useState<SectionKey>("Dashboard");
   const [requests, setRequests] = useState<RequestItem[]>(initialRequests);
   const [mappings, setMappings] = useState<ProviderMapping[]>(initialMappings);
   const [selectedPathway, setSelectedPathway] = useState<Pathway | null>(null);
@@ -211,6 +238,15 @@ export default function PortakabinApprenticeshipHub() {
   const statusCounts = useMemo(() => countBy(requests, "status"), [requests]);
   const departmentCounts = useMemo(() => countBy(requests, "department"), [requests]);
   const employeeRequest = requests.find((request) => request.name === "Amelia Hart") ?? requests[0];
+
+  function switchRole(nextRole: Role) {
+    setRole(nextRole);
+    setActiveSection("Dashboard");
+  }
+
+  function openSection(section: SectionKey) {
+    setActiveSection(section);
+  }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -230,6 +266,7 @@ export default function PortakabinApprenticeshipHub() {
 
     setRequests((current) => [nextRequest, ...current]);
     setSuccess(true);
+    setActiveSection("Requests");
   }
 
   function setRequestStatus(id: number, status: RequestStatus) {
@@ -264,6 +301,7 @@ export default function PortakabinApprenticeshipHub() {
       },
       ...current,
     ]);
+    setActiveSection("Requests");
   }
 
   function setScenarioData(nextScenario: DemandScenario) {
@@ -271,81 +309,56 @@ export default function PortakabinApprenticeshipHub() {
     setRequests(scenarioSeeds[nextScenario]);
   }
 
-  const guideCopy: Record<Role, string> = {
-    Employee: "Employees can explore approved pathways, save options and start a request without provider confusion.",
-    "Line Manager": "Managers can review fit, time commitment and business benefit before approving.",
-    "Department Head": "Department heads can see demand, engagement and capability priorities across teams.",
-    "Apprenticeship Lead": "Apprenticeship leads can manage approvals, provider mappings, levy forecast and bottlenecks in one place.",
-  };
-
   return (
-    <main className="min-h-screen bg-[#f5f7f4] text-[#102c3d]">
-      <div className="grid min-h-screen lg:grid-cols-[296px_minmax(0,1fr)]">
-        <Sidebar />
+    <main className="min-h-screen overflow-hidden bg-[#f5f7f4] text-[#102c3d]">
+      <Sidebar activeSection={activeSection} onNavigate={openSection} />
 
-        <div className="min-w-0">
-          <TopBar role={role} setRole={setRole} onOpenAdmin={() => setRole("Apprenticeship Lead")} />
+      <div className="h-screen min-w-0 overflow-y-auto lg:ml-[296px]">
+        <TopBar role={role} setRole={switchRole} onOpenAdmin={() => switchRole("Apprenticeship Lead")} />
 
-          <div className="mx-auto grid w-full max-w-[1600px] gap-8 px-5 py-7 sm:px-7 lg:px-9 2xl:grid-cols-[minmax(0,1fr)_360px]">
-            <section className="min-w-0 space-y-8">
-              <HeroPanel requests={requests} mappings={mappings} statusCounts={statusCounts} role={role} setRole={setRole} />
-              <StatusStrip request={employeeRequest} />
-
-              {role === "Employee" && (
-                <EmployeeDashboard
-                  savedPathways={savedPathways}
-                  selectedRequest={employeeRequest}
-                  onSubmit={handleSubmit}
-                  onOpenPathway={setSelectedPathway}
-                  onSavePathway={(title) => setSavedPathways((current) => (current.includes(title) ? current.filter((item) => item !== title) : [...current, title]))}
-                  success={success}
-                />
-              )}
-              {role === "Line Manager" && <ManagerDashboard requests={requests} onStatus={setRequestStatus} />}
-              {role === "Department Head" && <DepartmentDashboard requests={requests} departmentCounts={departmentCounts} />}
-              {role === "Apprenticeship Lead" && (
-                <AdminDashboard
-                  requests={requests}
-                  mappings={mappings}
-                  statusCounts={statusCounts}
-                  departmentCounts={departmentCounts}
-                  onMove={moveRequest}
-                  onMapping={updateMapping}
-                  onOpenPathway={setSelectedPathway}
-                />
-              )}
-
-              <ExecutiveSummary requests={requests} mappings={mappings} statusCounts={statusCounts} />
-            </section>
-
-            <aside className="grid h-fit gap-4 2xl:sticky 2xl:top-7">
-              <GuidePanel role={role} copy={guideCopy[role]} />
-              <DemoControls scenario={scenario} onScenario={setScenarioData} onSeed={seedRequest} onReset={() => setScenarioData("Medium")} />
-              <QuickActions role={role} />
-              <AssistantPrompt />
-            </aside>
-          </div>
+        <div className="mx-auto w-full max-w-[1500px] space-y-8 px-5 py-7 sm:px-7 lg:px-9">
+          <HeroPanel role={role} requests={requests} mappings={mappings} statusCounts={statusCounts} onNavigate={openSection} />
+          <RoleDashboard
+            role={role}
+            requests={requests}
+            mappings={mappings}
+            statusCounts={statusCounts}
+            departmentCounts={departmentCounts}
+            savedPathways={savedPathways}
+            onNavigate={openSection}
+          />
+          <DetailSection
+            role={role}
+            activeSection={activeSection}
+            requests={requests}
+            mappings={mappings}
+            statusCounts={statusCounts}
+            departmentCounts={departmentCounts}
+            savedPathways={savedPathways}
+            employeeRequest={employeeRequest}
+            scenario={scenario}
+            success={success}
+            onSubmit={handleSubmit}
+            onOpenPathway={setSelectedPathway}
+            onSavePathway={(title) => setSavedPathways((current) => (current.includes(title) ? current.filter((item) => item !== title) : [...current, title]))}
+            onStatus={setRequestStatus}
+            onMove={moveRequest}
+            onMapping={updateMapping}
+            onScenario={setScenarioData}
+            onSeed={seedRequest}
+          />
         </div>
       </div>
 
-      {selectedPathway && (
-        <PathwayModal
-          pathway={selectedPathway}
-          onClose={() => setSelectedPathway(null)}
-          onStart={() => {
-            setSelectedPathway(null);
-            setRole("Employee");
-          }}
-        />
-      )}
+      {selectedPathway && <PathwayModal pathway={selectedPathway} onClose={() => setSelectedPathway(null)} onStart={() => setSelectedPathway(null)} />}
     </main>
   );
 }
 
-function Sidebar() {
+function Sidebar({ activeSection, onNavigate }: { activeSection: SectionKey; onNavigate: (section: SectionKey) => void }) {
   return (
-    <aside className="hidden border-r border-[#102c3d]/10 bg-white px-4 py-5 lg:flex lg:h-screen lg:flex-col">
-      <div className="flex items-center gap-3 px-2">
+    <aside className="fixed inset-y-0 left-0 z-40 hidden w-[296px] border-r border-[#102c3d]/10 bg-white px-4 py-5 lg:flex lg:flex-col">
+      <div className="flex items-center px-2">
         <LevyTateLogo className="h-[44px]" />
       </div>
 
@@ -359,26 +372,28 @@ function Sidebar() {
           <div key={section.title}>
             <p className="px-2 text-[10px] font-medium uppercase tracking-[0.16em] text-[#102c3d]/34">{section.title}</p>
             <div className="mt-1.5 grid gap-1">
-              {section.items.map((item, index) => (
-                <button
-                  key={item}
-                  className={`flex w-full items-center gap-2 rounded-xl px-2.5 py-2.5 text-left text-sm font-medium transition ${section.title === "Dashboard" && index === 0 ? "bg-[#f0f5ed] text-[#102c3d] shadow-[inset_3px_0_0_#159b8f]" : "text-[#102c3d]/58 hover:bg-[#f8faf4] hover:text-[#102c3d]"}`}
-                >
-                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white text-[10px] font-semibold text-[#102c3d]/54 shadow-[0_6px_14px_rgba(16,44,61,0.04)]">
-                    {item.split(" ").map((word) => word[0]).join("").slice(0, 2)}
-                  </span>
-                  <span className="truncate">{item}</span>
-                </button>
-              ))}
+              {section.items.map((item) => {
+                const sectionKey = item as SectionKey;
+                const active = activeSection === sectionKey;
+                return (
+                  <button
+                    key={item}
+                    onClick={() => onNavigate(sectionKey)}
+                    className={`flex w-full items-center gap-2 rounded-xl px-2.5 py-2.5 text-left text-sm font-medium transition ${
+                      active ? "bg-[#f0f5ed] text-[#102c3d] shadow-[inset_3px_0_0_#159b8f]" : "text-[#102c3d]/58 hover:bg-[#f8faf4] hover:text-[#102c3d]"
+                    }`}
+                  >
+                    <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg text-[10px] font-semibold ${active ? "bg-white text-[#159b8f]" : "bg-[#f8faf4] text-[#102c3d]/46"}`}>
+                      {item.split(" ").map((word) => word[0]).join("").slice(0, 2)}
+                    </span>
+                    <span className="truncate">{item}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         ))}
       </nav>
-
-      <div className="mt-5 rounded-2xl bg-[#f8faf4] px-4 py-3">
-        <p className="text-xs font-semibold text-[#102c3d]">Powered by LevyTate</p>
-        <p className="mt-1 text-xs leading-5 text-[#102c3d]/52">Reusable apprenticeship operating system.</p>
-      </div>
     </aside>
   );
 }
@@ -387,10 +402,10 @@ function TopBar({ role, setRole, onOpenAdmin }: { role: Role; setRole: (role: Ro
   return (
     <PlatformTopBar tenantName="Portakabin" tenantSubtitle="Internal apprenticeship and capability hub">
       <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-center">
-        <div className="hidden min-w-[300px] rounded-full border border-[#102c3d]/10 bg-[#f8fbfa] px-4 py-2.5 text-sm text-[#102c3d]/42 xl:block">Search pathways, requests or teams</div>
-        <div className="flex max-w-full overflow-x-auto rounded-full bg-[#edf5f1] p-1">
+        <div className="hidden min-w-[260px] rounded-full border border-[#102c3d]/10 bg-[#f8fbfa] px-4 py-2.5 text-sm text-[#102c3d]/42 xl:block">Search pathways, requests or teams</div>
+        <div className="flex flex-wrap rounded-full bg-[#edf5f1] p-1">
           {roles.map((item) => (
-            <button key={item} onClick={() => setRole(item)} className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-semibold transition ${role === item ? "bg-white text-[#102c3d] shadow-[0_8px_20px_rgba(16,44,61,0.08)]" : "text-[#102c3d]/52"}`}>
+            <button key={item} onClick={() => setRole(item)} className={`rounded-full px-3 py-2 text-xs font-semibold transition ${role === item ? "bg-white text-[#102c3d] shadow-[0_8px_20px_rgba(16,44,61,0.08)]" : "text-[#102c3d]/52"}`}>
               {item}
             </button>
           ))}
@@ -401,32 +416,26 @@ function TopBar({ role, setRole, onOpenAdmin }: { role: Role; setRole: (role: Ro
   );
 }
 
-function HeroPanel({ requests, mappings, statusCounts, role, setRole }: { requests: RequestItem[]; mappings: ProviderMapping[]; statusCounts: Record<string, number>; role: Role; setRole: (role: Role) => void }) {
+function HeroPanel({ role, requests, mappings, statusCounts, onNavigate }: { role: Role; requests: RequestItem[]; mappings: ProviderMapping[]; statusCounts: Record<string, number>; onNavigate: (section: SectionKey) => void }) {
   const awaiting = (statusCounts["Manager review"] ?? 0) + (statusCounts["Lead review"] ?? 0);
   return (
-    <section className="grid gap-6 rounded-[1.75rem] border border-[#102c3d]/[0.06] bg-white p-6 shadow-[0_18px_48px_rgba(16,44,61,0.06)] xl:grid-cols-[minmax(0,1fr)_380px] xl:p-7">
+    <section className="grid gap-6 rounded-[1.75rem] border border-[#102c3d]/[0.06] bg-white p-6 shadow-[0_18px_48px_rgba(16,44,61,0.06)] xl:grid-cols-[minmax(0,1fr)_390px] xl:p-7">
       <div className="min-w-0">
-        <p className="w-fit rounded-full bg-[#fff4bd] px-3 py-1.5 text-[10px] font-medium uppercase tracking-[0.14em] text-[#8a6a00]">Portakabin environment powered by LevyTate</p>
+        <p className="w-fit rounded-full bg-[#fff4bd] px-3 py-1.5 text-[10px] font-medium uppercase tracking-[0.14em] text-[#8a6a00]">Standalone employer environment</p>
         <h1 className="mt-4 max-w-4xl text-4xl font-semibold leading-[1.03] tracking-[-0.02em] text-[#102c3d] md:text-5xl xl:text-6xl">Portakabin Apprenticeship Hub</h1>
-        <p className="mt-4 max-w-3xl text-base leading-7 text-[#102c3d]/66 md:text-lg">A simpler way to scale apprenticeship adoption, manage approvals and connect approved pathways to the right delivery partners.</p>
+        <p className="mt-4 max-w-3xl text-base leading-7 text-[#102c3d]/66 md:text-lg">A focused LevyTate workspace for approved pathways, development demand and apprenticeship operations.</p>
         <div className="mt-6 flex flex-wrap gap-2">
-          {roles.map((item) => (
-            <button key={item} onClick={() => setRole(item)} className={`rounded-full px-3.5 py-2 text-xs font-semibold ${role === item ? "bg-[#102c3d] text-white" : "bg-[#f6f8f2] text-[#102c3d]/60"}`}>
-              {item}
-            </button>
+          {roleSectionMap[role].map((section) => (
+            <PlatformButton key={section} onClick={() => onNavigate(section)} variant="soft">
+              {section}
+            </PlatformButton>
           ))}
         </div>
       </div>
 
       <div className="rounded-[1.4rem] border border-[#102c3d]/[0.05] bg-[#f8fbfa] p-5">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-[#df5f73]">Live demand</p>
-            <h2 className="mt-1 text-xl font-semibold">Operating snapshot</h2>
-          </div>
-          <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#102c3d]/60">Demo data</span>
-        </div>
-        <div className="mt-5 grid grid-cols-2 gap-3">
+        <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-[#df5f73]">Operating snapshot</p>
+        <div className="mt-4 grid grid-cols-2 gap-3">
           <MetricTile label="Requests" value={requests.length} />
           <MetricTile label="Awaiting" value={awaiting} />
           <MetricTile label="Live routes" value={pathways.filter((item) => item.status === "Live").length} />
@@ -437,178 +446,261 @@ function HeroPanel({ requests, mappings, statusCounts, role, setRole }: { reques
   );
 }
 
-function StatusStrip({ request }: { request: RequestItem }) {
-  const activeIndex = requestStages.indexOf(request.status);
+function RoleDashboard({
+  role,
+  requests,
+  mappings,
+  statusCounts,
+  departmentCounts,
+  savedPathways,
+  onNavigate,
+}: {
+  role: Role;
+  requests: RequestItem[];
+  mappings: ProviderMapping[];
+  statusCounts: Record<string, number>;
+  departmentCounts: Record<string, number>;
+  savedPathways: string[];
+  onNavigate: (section: SectionKey) => void;
+}) {
+  const cards: Record<Role, LaunchCardProps[]> = {
+    Employee: [
+      { title: "My recommended pathways", value: "6", copy: "Approved routes matched to role family.", action: "View pathways", section: "Recommended Programmes" },
+      { title: "My request status", value: statusCounts["Manager review"] ?? 0, copy: "Current expression of interest progress.", action: "View status", section: "Requests" },
+      { title: "Saved pathways", value: savedPathways.length, copy: "Shortlist for manager conversation.", action: "Open saved", section: "Explore Pathways" },
+      { title: "Start expression of interest", value: "2 min", copy: "Submit a clean internal request.", action: "Start request", section: "Requests" },
+    ],
+    "Line Manager": [
+      { title: "Pending approvals", value: statusCounts["Manager review"] ?? 0, copy: "Requests needing manager review.", action: "Review requests", section: "Approvals" },
+      { title: "Team development requests", value: requests.filter((request) => request.manager === "Ryan Booth").length, copy: "Open demand across direct teams.", action: "Open requests", section: "Requests" },
+      { title: "Skills priorities", value: "4", copy: "Common capability areas to support.", action: "Open skills map", section: "Skills Analysis" },
+      { title: "Approved team pathways", value: pathways.filter((pathway) => pathway.status === "Live").length, copy: "Available routes for team development.", action: "View pathways", section: "Recommended Programmes" },
+    ],
+    "Department Head": [
+      { title: "Department demand snapshot", value: Object.keys(departmentCounts).length, copy: "Teams with active apprenticeship signals.", action: "View demand", section: "Department Demand" },
+      { title: "Skills gaps", value: "6", copy: "Priority capability gaps across the operation.", action: "Open skills map", section: "Skills Map" },
+      { title: "Priority roles", value: "9", copy: "Roles suitable for funded development.", action: "View roles", section: "Future Skills" },
+      { title: "Forecast demand", value: "Q3", copy: "Next quarter planning forecast.", action: "View forecast", section: "Forecast" },
+    ],
+    "Apprenticeship Lead": [
+      { title: "Live requests", value: requests.length, copy: "Total demand moving through the process.", action: "Open requests", section: "Requests" },
+      { title: "Provider mappings", value: mappings.length, copy: "Approved delivery partner coverage.", action: "Manage providers", section: "Approved Providers" },
+      { title: "Levy utilisation", value: "73%", copy: "Forecast utilisation across live routes.", action: "View levy forecast", section: "Levy Position" },
+      { title: "Reporting snapshot", value: "Ready", copy: "Executive summary and performance view.", action: "Open reporting", section: "Reporting" },
+      { title: "Admin actions", value: "5", copy: "Controls for setup, demo data and rollout.", action: "Open admin", section: "Admin" },
+    ],
+  };
+
   return (
-    <section className="rounded-[1.5rem] bg-white p-4 shadow-[0_14px_36px_rgba(16,44,61,0.06)]">
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-[#df5f73]">My request status</p>
-          <h2 className="mt-1 text-lg font-semibold">{request.pathway}</h2>
-        </div>
-        <p className="text-sm font-medium text-[#102c3d]/54">{request.name} - {request.team}</p>
-      </div>
-      <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
-        {publicStages.map((stage, index) => (
-          <div key={stage} className={`rounded-2xl px-3 py-2.5 text-sm font-medium ${index <= activeIndex ? "bg-[#eff8f4] text-[#102c3d]" : "bg-[#f8faf4] text-[#102c3d]/45"}`}>
-            <span className={`mr-2 inline-block h-2.5 w-2.5 rounded-full ${index <= activeIndex ? "bg-[#159b8f]" : "bg-[#dbe8e2]"}`} />
-            {stage}
-          </div>
+    <PlatformPanel eyebrow={`${role} dashboard`} title={dashboardPurpose(role)}>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {cards[role].map((card) => (
+          <LaunchCard key={card.title} {...card} onNavigate={onNavigate} />
         ))}
       </div>
-    </section>
+    </PlatformPanel>
   );
 }
 
-function EmployeeDashboard({ savedPathways, selectedRequest, onSubmit, onOpenPathway, onSavePathway, success }: { savedPathways: string[]; selectedRequest: RequestItem; onSubmit: (event: FormEvent<HTMLFormElement>) => void; onOpenPathway: (pathway: Pathway) => void; onSavePathway: (title: string) => void; success: boolean }) {
+type LaunchCardProps = {
+  title: string;
+  value: string | number;
+  copy: string;
+  action: string;
+  section: SectionKey;
+};
+
+function LaunchCard({ title, value, copy, action, section, onNavigate }: LaunchCardProps & { onNavigate: (section: SectionKey) => void }) {
   return (
-    <div className="space-y-8">
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <PanelShell eyebrow="Approved development pathways" title="Recommended programmes">
-          <div className="grid gap-5 lg:grid-cols-2 min-[1500px]:grid-cols-3">
-            {pathways.slice(0, 6).map((pathway) => (
-              <PathwayCard key={pathway.title} pathway={pathway} saved={savedPathways.includes(pathway.title)} onOpen={() => onOpenPathway(pathway)} onSave={() => onSavePathway(pathway.title)} />
-            ))}
-          </div>
-        </PanelShell>
-
-        <PanelShell eyebrow="Saved pathways" title="Shortlist">
-          <div className="grid gap-3">
-            {savedPathways.map((title) => (
-              <div key={title} className="rounded-2xl bg-[#f8fbfa] px-4 py-3">
-                <p className="text-sm font-semibold text-[#102c3d]">{title}</p>
-                <p className="mt-1 text-xs leading-5 text-[#102c3d]/54">Saved for manager conversation</p>
-              </div>
-            ))}
-          </div>
-        </PanelShell>
-      </section>
-
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <PanelShell eyebrow="Low friction request" title="Start an expression of interest">
-          <RequestForm onSubmit={onSubmit} />
-          {success && <p className="mt-4 rounded-2xl bg-[#eff8f4] px-4 py-3 text-sm font-semibold text-[#102c3d]">Request created and moved to internal review.</p>}
-        </PanelShell>
-        <PanelShell eyebrow="Workflow" title="Request route">
-          <RequestTracker request={selectedRequest} />
-        </PanelShell>
-      </section>
-    </div>
+    <button onClick={() => onNavigate(section)} className="group min-h-[190px] rounded-[1.35rem] border border-[#102c3d]/[0.06] bg-[#f8fbfa] p-5 text-left transition hover:-translate-y-1 hover:bg-white hover:shadow-[0_18px_38px_rgba(16,44,61,0.08)]">
+      <p className="text-xs font-medium text-[#102c3d]/48">{title}</p>
+      <p className="mt-3 text-3xl font-semibold tracking-[-0.025em] text-[#102c3d]">{value}</p>
+      <p className="mt-3 min-h-[44px] text-sm leading-6 text-[#102c3d]/58">{copy}</p>
+      <span className="mt-5 inline-flex rounded-full bg-white px-4 py-2 text-xs font-semibold text-[#102c3d] group-hover:bg-[#102c3d] group-hover:text-white">{action}</span>
+    </button>
   );
 }
 
-function ManagerDashboard({ requests, onStatus }: { requests: RequestItem[]; onStatus: (id: number, status: RequestStatus) => void }) {
-  const managerRequests = requests.filter((request) => request.status === "Manager review");
-  return (
-    <div className="space-y-7">
-      <PanelShell eyebrow="Manager approvals" title="Team requests awaiting review">
-        <div className="grid gap-4 xl:grid-cols-2">
-          {managerRequests.map((request) => (
-            <article key={request.id} className="rounded-2xl bg-[#f8fbfa] p-4">
-              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold">{request.name}</h3>
-                  <p className="mt-1 text-sm leading-6 text-[#102c3d]/60">{request.role} - {request.team}</p>
-                </div>
-                <span className="w-fit rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#102c3d]/56">{request.pathway}</span>
-              </div>
-              <div className="mt-4 grid gap-3 md:grid-cols-2">
-                <InfoBox label="Time commitment" value="Planned learning time agreed with manager" />
-                <InfoBox label="Business benefit" value="Supports capability growth and operational development" />
-              </div>
-              <label className="mt-4 grid gap-2 text-xs font-medium text-[#102c3d]/58">
-                Business case note
-                <textarea className="min-h-20 rounded-2xl border border-[#102c3d]/10 bg-white px-3.5 py-3 text-sm outline-none focus:border-[#159b8f]" defaultValue={request.note} />
-              </label>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <SmallButton label="Approve request" onClick={() => onStatus(request.id, "Lead review")} />
-                <SmallButton label="Request more information" onClick={() => onStatus(request.id, "New interest")} variant="mint" />
-                <SmallButton label="Decline request" onClick={() => onStatus(request.id, "New interest")} variant="coral" />
-              </div>
-            </article>
+function DetailSection({
+  role,
+  activeSection,
+  requests,
+  mappings,
+  statusCounts,
+  departmentCounts,
+  savedPathways,
+  employeeRequest,
+  scenario,
+  success,
+  onSubmit,
+  onOpenPathway,
+  onSavePathway,
+  onStatus,
+  onMove,
+  onMapping,
+  onScenario,
+  onSeed,
+}: {
+  role: Role;
+  activeSection: SectionKey;
+  requests: RequestItem[];
+  mappings: ProviderMapping[];
+  statusCounts: Record<string, number>;
+  departmentCounts: Record<string, number>;
+  savedPathways: string[];
+  employeeRequest: RequestItem;
+  scenario: DemandScenario;
+  success: boolean;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onOpenPathway: (pathway: Pathway) => void;
+  onSavePathway: (title: string) => void;
+  onStatus: (id: number, status: RequestStatus) => void;
+  onMove: (id: number, direction: 1 | -1) => void;
+  onMapping: (index: number, status: MappingStatus, nextAction: string) => void;
+  onScenario: (scenario: DemandScenario) => void;
+  onSeed: () => void;
+}) {
+  if (activeSection === "Dashboard") {
+    return <DashboardGuide role={role} />;
+  }
+
+  if (activeSection === "Recommended Programmes" || activeSection === "Explore Pathways") {
+    return (
+      <PlatformPanel eyebrow="Approved pathways" title={activeSection === "Explore Pathways" ? "Explore pathways" : "My recommended pathways"}>
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+          {pathways.slice(0, activeSection === "Explore Pathways" ? pathways.length : 6).map((pathway) => (
+            <PathwayCard key={pathway.title} pathway={pathway} saved={savedPathways.includes(pathway.title)} onOpen={() => onOpenPathway(pathway)} onSave={() => onSavePathway(pathway.title)} />
           ))}
         </div>
-      </PanelShell>
-      <PanelShell eyebrow="Team development pipeline" title="Progress by stage">
-        <Kanban requests={requests} compact />
-      </PanelShell>
-    </div>
-  );
-}
+      </PlatformPanel>
+    );
+  }
 
-function DepartmentDashboard({ requests, departmentCounts }: { requests: RequestItem[]; departmentCounts: Record<string, number> }) {
-  return (
-    <div className="space-y-7">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Engagement score" value="81%" copy="Departments with active demand" />
-        <MetricCard label="Recommended cohorts" value="4" copy="Next quarter planning view" />
-        <MetricCard label="Priority gaps" value="6" copy="Skills areas needing coverage" />
-        <MetricCard label="Open requests" value={requests.length} copy="Across Portakabin teams" />
-      </div>
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <PanelShell eyebrow="Department demand" title="Requests grouped by team">
-          <InsightBars rows={Object.entries(departmentCounts).map(([label, value]) => [label, value])} />
-        </PanelShell>
-        <PanelShell eyebrow="Suggested actions" title="Next planning moves">
-          <ActionList items={["Review upcoming leadership cohort", "Nudge managers with pending approvals", "Identify roles suitable for data pathway", "Plan next quarter apprenticeship demand"]} />
-        </PanelShell>
+  if (activeSection === "Requests") {
+    return (
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_390px]">
+        <PlatformPanel eyebrow="Expression of interest" title="Start expression of interest">
+          <RequestForm onSubmit={onSubmit} />
+          {success && <p className="mt-4 rounded-2xl bg-[#eff8f4] px-4 py-3 text-sm font-semibold text-[#102c3d]">Request created and moved to internal review.</p>}
+        </PlatformPanel>
+        <PlatformPanel eyebrow="Request status" title="My request status">
+          <RequestTracker request={employeeRequest} />
+        </PlatformPanel>
       </section>
-      <PanelShell eyebrow="Capability priorities" title="Skills gaps and cohort planning">
-        <div className="grid gap-4 md:grid-cols-3">
+    );
+  }
+
+  if (activeSection === "Approvals") {
+    const managerRequests = requests.filter((request) => request.status === "Manager review");
+    return (
+      <PlatformPanel eyebrow="Manager approvals" title="Pending approvals">
+        <div className="grid gap-4 lg:grid-cols-2">
+          {managerRequests.map((request) => (
+            <ApprovalCard key={request.id} request={request} onStatus={onStatus} />
+          ))}
+        </div>
+      </PlatformPanel>
+    );
+  }
+
+  if (activeSection === "Skills Analysis" || activeSection === "Skills Map" || activeSection === "Future Skills") {
+    return (
+      <PlatformPanel eyebrow="Workforce planning" title={activeSection}>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {["Manufacturing excellence", "Customer experience", "Digital reporting", "Site delivery confidence", "Leadership pipeline", "Supply chain resilience"].map((item) => (
             <InfoBox key={item} label={item} value="Recommended pathway available" />
           ))}
         </div>
-      </PanelShell>
-    </div>
+      </PlatformPanel>
+    );
+  }
+
+  if (activeSection === "Department Demand") {
+    return (
+      <PlatformPanel eyebrow="Demand snapshot" title="Department demand">
+        <InsightBars rows={Object.entries(departmentCounts).map(([label, value]) => [label, value])} />
+      </PlatformPanel>
+    );
+  }
+
+  if (activeSection === "Approved Providers" || activeSection === "Performance") {
+    return <ProviderMappingTable mappings={mappings} onMapping={onMapping} />;
+  }
+
+  if (activeSection === "Levy Position" || activeSection === "Forecast") {
+    return (
+      <PlatformPanel eyebrow="Funding and levy" title={activeSection === "Forecast" ? "Forecast apprenticeship demand" : "Levy utilisation"}>
+        <div className="grid gap-4 md:grid-cols-3">
+          <MetricCard label="Forecast utilisation" value="73%" copy="Estimated current year position" />
+          <MetricCard label="Target utilisation" value="85%" copy="Planning target for next quarter" />
+          <MetricCard label="At risk value" value="12%" copy="Potential unused funding to review" />
+        </div>
+      </PlatformPanel>
+    );
+  }
+
+  if (activeSection === "Reporting") {
+    return <ExecutiveSummary requests={requests} mappings={mappings} statusCounts={statusCounts} />;
+  }
+
+  if (activeSection === "AI Assistant") {
+    return <AssistantPrompt />;
+  }
+
+  if (activeSection === "Enrolments") {
+    return (
+      <PlatformPanel eyebrow="Enrolments" title="Learner progress">
+        <Kanban requests={requests} onMove={onMove} compact />
+      </PlatformPanel>
+    );
+  }
+
+  return (
+    <PlatformPanel eyebrow="Admin actions" title="Demo controls and operating actions">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <DemoControls scenario={scenario} onScenario={onScenario} onSeed={onSeed} onReset={() => onScenario("Medium")} />
+        <ActionCard title="Prepare provider review" action="Manage providers" />
+        <ActionCard title="Export reporting pack" action="Open reporting" />
+        <ActionCard title="Review rollout settings" action="Open admin" />
+      </div>
+    </PlatformPanel>
   );
 }
 
-function AdminDashboard({ requests, mappings, statusCounts, departmentCounts, onMove, onMapping, onOpenPathway }: { requests: RequestItem[]; mappings: ProviderMapping[]; statusCounts: Record<string, number>; departmentCounts: Record<string, number>; onMove: (id: number, direction: 1 | -1) => void; onMapping: (index: number, status: MappingStatus, nextAction: string) => void; onOpenPathway: (pathway: Pathway) => void }) {
+function DashboardGuide({ role }: { role: Role }) {
   return (
-    <div className="space-y-7">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Demand in progress" value={requests.length} copy="Live request pipeline" />
-        <MetricCard label="Approvals waiting" value={(statusCounts["Manager review"] ?? 0) + (statusCounts["Lead review"] ?? 0)} copy="Needs review" />
-        <MetricCard label="Departments engaged" value={Object.keys(departmentCounts).length} copy="Active demand signals" />
-        <MetricCard label="Levy forecast" value="73%" copy="Estimated utilisation" />
-      </div>
-      <PanelShell eyebrow="Approval flow" title="Approval pipeline Kanban">
-        <Kanban requests={requests} onMove={onMove} />
-      </PanelShell>
-      <ProviderMappingTable mappings={mappings} onMapping={onMapping} />
-      <PanelShell eyebrow="Approved routes" title="Pathway management">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[920px] text-left text-sm">
-            <thead>
-              <tr className="border-b border-[#102c3d]/10 text-[#102c3d]/48">
-                {["Pathway", "Standard", "Status", "Cohort", "Approved delivery partner", "Action"].map((heading) => (
-                  <th key={heading} className="px-3 py-3 font-medium">{heading}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {pathways.map((pathway) => (
-                <tr key={pathway.title} className="border-b border-[#102c3d]/6">
-                  <td className="px-3 py-3.5 font-medium text-[#102c3d]">{pathway.title}</td>
-                  <td className="px-3 py-3.5 text-[#102c3d]/62">{pathway.standard}</td>
-                  <td className="px-3 py-3.5 text-[#102c3d]/62">{pathway.status}</td>
-                  <td className="px-3 py-3.5 text-[#102c3d]/62">{pathway.cohort}</td>
-                  <td className="px-3 py-3.5 text-[#102c3d]/62">{pathway.deliveryPartner}</td>
-                  <td className="px-3 py-3.5"><SmallButton label="View detail" onClick={() => onOpenPathway(pathway)} variant="mint" /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+    <PlatformPanel eyebrow="Launchpad" title="Select a card or sidebar item to open detail">
+      <p className="max-w-3xl text-sm leading-6 text-[#102c3d]/58">{dashboardGuide(role)}</p>
+    </PlatformPanel>
+  );
+}
+
+function ApprovalCard({ request, onStatus }: { request: RequestItem; onStatus: (id: number, status: RequestStatus) => void }) {
+  return (
+    <article className="rounded-2xl bg-[#f8fbfa] p-4">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div>
+          <h3 className="text-lg font-semibold">{request.name}</h3>
+          <p className="mt-1 text-sm leading-6 text-[#102c3d]/60">{request.role} - {request.team}</p>
         </div>
-      </PanelShell>
-    </div>
+        <span className="w-fit rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#102c3d]/56">{request.pathway}</span>
+      </div>
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        <InfoBox label="Time commitment" value="Planned learning time agreed with manager" />
+        <InfoBox label="Business benefit" value="Supports capability growth and operational development" />
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <SmallButton label="Approve request" onClick={() => onStatus(request.id, "Lead review")} />
+        <SmallButton label="Request more information" onClick={() => onStatus(request.id, "New interest")} variant="mint" />
+        <SmallButton label="Decline request" onClick={() => onStatus(request.id, "New interest")} variant="coral" />
+      </div>
+    </article>
   );
 }
 
 function PathwayCard({ pathway, saved, onOpen, onSave }: { pathway: Pathway; saved: boolean; onOpen: () => void; onSave: () => void }) {
   return (
-    <article className="group flex min-h-[330px] min-w-0 flex-col rounded-[1.45rem] border border-[#102c3d]/[0.05] bg-[#f8fbfa] p-5 transition hover:-translate-y-1 hover:bg-white hover:shadow-[0_18px_38px_rgba(16,44,61,0.08)]">
+    <article className="group flex min-h-[310px] min-w-0 flex-col rounded-[1.45rem] border border-[#102c3d]/[0.05] bg-[#f8fbfa] p-5 transition hover:-translate-y-1 hover:bg-white hover:shadow-[0_18px_38px_rgba(16,44,61,0.08)]">
       <div className="flex items-start justify-between gap-3">
         <h3 className="min-w-0 text-xl font-semibold leading-7 tracking-[-0.01em] text-[#102c3d]">{pathway.title}</h3>
         <span className="shrink-0 rounded-full bg-[#fff4bd] px-2.5 py-1 text-[11px] font-medium text-[#8a6a00]">{pathway.status}</span>
@@ -620,11 +712,10 @@ function PathwayCard({ pathway, saved, onOpen, onSave }: { pathway: Pathway; sav
         <p className="mt-1.5 text-sm leading-6 text-[#102c3d]/66">{pathway.businessBenefit}</p>
       </div>
       <div className="mt-4 flex flex-wrap gap-1.5">
-        {pathway.departments.slice(0, 3).map((item) => (
+        {pathway.departments.map((item) => (
           <span key={item} className="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-[#102c3d]/54">{item}</span>
         ))}
       </div>
-      <p className="mt-4 text-xs leading-5 text-[#102c3d]/52">Potentially fully funded through apprenticeship funding.</p>
       <div className="mt-auto flex flex-wrap gap-2 pt-5">
         <PlatformButton onClick={onOpen}>View detail</PlatformButton>
         <PlatformButton onClick={onSave} variant="soft">{saved ? "Saved" : "Save"}</PlatformButton>
@@ -677,17 +768,17 @@ function RequestTracker({ request }: { request: RequestItem }) {
 
 function Kanban({ requests, onMove, compact = false }: { requests: RequestItem[]; onMove?: (id: number, direction: 1 | -1) => void; compact?: boolean }) {
   return (
-    <div className="flex gap-3 overflow-x-auto pb-2">
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
       {requestStages.map((column) => {
         const columnRequests = requests.filter((request) => request.status === column);
         return (
-          <div key={column} className="min-w-[210px] rounded-2xl bg-[#f8fbfa] p-3">
+          <div key={column} className="rounded-2xl bg-[#f8fbfa] p-3">
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-xs font-semibold text-[#102c3d]">{column}</h3>
               <span className="rounded-full bg-white px-2 py-1 text-[11px] font-medium text-[#102c3d]/54">{columnRequests.length}</span>
             </div>
             <div className="mt-3 grid gap-2">
-              {columnRequests.slice(0, compact ? 2 : 6).map((request) => (
+              {columnRequests.slice(0, compact ? 1 : 3).map((request) => (
                 <article key={request.id} className="rounded-2xl bg-white p-3 shadow-[0_8px_18px_rgba(16,44,61,0.05)]">
                   <p className="text-sm font-semibold">{request.name}</p>
                   <p className="mt-1 text-xs leading-5 text-[#102c3d]/54">{request.pathway}</p>
@@ -709,41 +800,30 @@ function Kanban({ requests, onMove, compact = false }: { requests: RequestItem[]
 
 function ProviderMappingTable({ mappings, onMapping }: { mappings: ProviderMapping[]; onMapping: (index: number, status: MappingStatus, nextAction: string) => void }) {
   return (
-    <PanelShell title="Provider mapping management" eyebrow="Delivery control">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[1120px] text-left text-sm">
-          <thead>
-            <tr className="border-b border-[#102c3d]/10 text-[#102c3d]/48">
-              {["Role family", "Apprenticeship pathway", "Standard", "Approved delivery partner", "Delivery model", "Fit score", "Mapping status", "Next action", "Actions"].map((heading) => (
-                <th key={heading} className="px-3 py-3 font-medium">{heading}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {mappings.map((row, index) => (
-              <tr key={row.roleFamily} className="border-b border-[#102c3d]/6">
-                <td className="px-3 py-3.5 text-[#102c3d]/66">{row.roleFamily}</td>
-                <td className="px-3 py-3.5 font-medium text-[#102c3d]">{row.pathway}</td>
-                <td className="px-3 py-3.5 text-[#102c3d]/66">{row.standard}</td>
-                <td className="px-3 py-3.5 text-[#102c3d]/66">{row.partner}</td>
-                <td className="px-3 py-3.5 text-[#102c3d]/66">{row.deliveryModel}</td>
-                <td className="px-3 py-3.5 text-[#102c3d]/66">{row.fit}%</td>
-                <td className="px-3 py-3.5 text-[#102c3d]/66">{row.status}</td>
-                <td className="px-3 py-3.5 text-[#102c3d]/66">{row.nextAction}</td>
-                <td className="px-3 py-3.5">
-                  <div className="flex gap-2">
-                    <SmallButton label="View details" onClick={() => onMapping(index, row.status, "Details reviewed")} variant="mint" />
-                    <SmallButton label="Mark live" onClick={() => onMapping(index, "Live", "Monitor cohort")} />
-                    <SmallButton label="Flag review" onClick={() => onMapping(index, "Review", "Review delivery fit")} variant="coral" />
-                    <SmallButton label="Replace" onClick={() => onMapping(index, "Review", "Replace provider")} variant="mint" />
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <PlatformPanel title="Provider mappings" eyebrow="Approved providers">
+      <div className="grid gap-4 lg:grid-cols-2">
+        {mappings.map((row, index) => (
+          <article key={row.roleFamily} className="rounded-2xl bg-[#f8fbfa] p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold">{row.pathway}</h3>
+                <p className="mt-1 text-sm leading-6 text-[#102c3d]/58">{row.standard}</p>
+              </div>
+              <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#102c3d]/56">{row.fit}% fit</span>
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <InfoBox label="Approved delivery partner" value={row.partner} />
+              <InfoBox label="Delivery model" value={row.deliveryModel} />
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <SmallButton label="Mark live" onClick={() => onMapping(index, "Live", "Monitor cohort")} />
+              <SmallButton label="Flag review" onClick={() => onMapping(index, "Review", "Review delivery fit")} variant="coral" />
+              <SmallButton label="Replace" onClick={() => onMapping(index, "Review", "Replace provider")} variant="mint" />
+            </div>
+          </article>
+        ))}
       </div>
-    </PanelShell>
+    </PlatformPanel>
   );
 }
 
@@ -757,32 +837,22 @@ function ExecutiveSummary({ requests, mappings, statusCounts }: { requests: Requ
     ["Bottlenecks reduced", `${Math.max(0, 8 - (statusCounts["Manager review"] ?? 0))}`],
   ];
   return (
-    <PanelShell title="Executive summary" eyebrow="Stakeholder view">
+    <PlatformPanel title="Reporting snapshot" eyebrow="Executive summary">
       <div className="grid gap-3 md:grid-cols-3">
         {summary.map(([label, value]) => (
           <MetricTile key={label} label={label} value={value} />
         ))}
       </div>
-    </PanelShell>
-  );
-}
-
-function GuidePanel({ role, copy }: { role: Role; copy: string }) {
-  return (
-    <section className="rounded-[1.35rem] bg-white p-4 shadow-[0_14px_38px_rgba(16,44,61,0.06)]">
-      <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-[#df5f73]">LevyTate Guide</p>
-      <h2 className="mt-1.5 text-lg font-semibold text-[#102c3d]">{role} view</h2>
-      <p className="mt-3 text-sm leading-6 text-[#102c3d]/62">{copy}</p>
-    </section>
+    </PlatformPanel>
   );
 }
 
 function DemoControls({ scenario, onScenario, onSeed, onReset }: { scenario: DemandScenario; onScenario: (scenario: DemandScenario) => void; onSeed: () => void; onReset: () => void }) {
   return (
-    <section className="rounded-[1.35rem] bg-white p-4 shadow-[0_14px_38px_rgba(16,44,61,0.06)]">
+    <section className="rounded-[1.35rem] bg-[#f8fbfa] p-4">
       <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-[#df5f73]">Demo Mode</p>
       <div className="mt-3 grid gap-2">
-        <button onClick={onReset} className="rounded-full bg-[#f8faf4] px-3.5 py-2 text-xs font-semibold text-[#102c3d]">Reset data</button>
+        <button onClick={onReset} className="rounded-full bg-white px-3.5 py-2 text-xs font-semibold text-[#102c3d]">Reset data</button>
         <button onClick={onSeed} className="rounded-full bg-[#102c3d] px-3.5 py-2 text-xs font-semibold text-white">Seed request</button>
         <div className="grid grid-cols-3 rounded-full bg-[#eef8f5] p-1">
           {(["Low", "Medium", "High"] as DemandScenario[]).map((item) => (
@@ -796,29 +866,12 @@ function DemoControls({ scenario, onScenario, onSeed, onReset }: { scenario: Dem
   );
 }
 
-function QuickActions({ role }: { role: Role }) {
-  const actions: Record<Role, string[]> = {
-    Employee: ["Compare saved programmes", "Start a request", "Review manager guidance"],
-    "Line Manager": ["Review pending approvals", "Add business case notes", "Check team pipeline"],
-    "Department Head": ["Review leadership cohort", "Nudge pending managers", "Plan next quarter demand"],
-    "Apprenticeship Lead": ["Review bottlenecks", "Confirm provider mapping", "Prepare next intake"],
-  };
-  return (
-    <section className="rounded-[1.35rem] bg-white p-4 shadow-[0_14px_38px_rgba(16,44,61,0.06)]">
-      <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-[#df5f73]">Suggested actions</p>
-      <ActionList items={actions[role]} />
-    </section>
-  );
-}
-
 function AssistantPrompt() {
   return (
-    <section className="rounded-[1.35rem] bg-[#102c3d] p-4 text-white shadow-[0_14px_38px_rgba(16,44,61,0.10)]">
-      <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-white/52">Ask LevyTate AI</p>
-      <h2 className="mt-2 text-lg font-semibold">Build a capability plan</h2>
-      <p className="mt-2 text-sm leading-6 text-white/68">Generate a concise apprenticeship strategy from demand, roles and approved pathways.</p>
-      <button className="mt-4 rounded-full bg-white px-4 py-2 text-xs font-semibold text-[#102c3d]">Open assistant</button>
-    </section>
+    <PlatformPanel eyebrow="Ask LevyTate AI" title="Build a capability plan">
+      <p className="max-w-2xl text-sm leading-6 text-[#102c3d]/62">Generate a concise apprenticeship strategy from demand, roles and approved pathways.</p>
+      <PlatformButton className="mt-4">Open assistant</PlatformButton>
+    </PlatformPanel>
   );
 }
 
@@ -855,14 +908,6 @@ function PathwayModal({ pathway, onClose, onStart }: { pathway: Pathway; onClose
   );
 }
 
-function PanelShell({ title, eyebrow, children }: { title: string; eyebrow: string; children: React.ReactNode }) {
-  return (
-    <PlatformPanel eyebrow={eyebrow} title={title}>
-      {children}
-    </PlatformPanel>
-  );
-}
-
 function MetricCard({ label, value, copy }: { label: string; value: string | number; copy: string }) {
   return <PlatformMetric label={label} value={value} copy={copy} />;
 }
@@ -880,13 +925,12 @@ function InfoBox({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ActionList({ items }: { items: string[] }) {
+function ActionCard({ title, action }: { title: string; action: string }) {
   return (
-    <div className="mt-3 grid gap-2">
-      {items.map((item) => (
-        <button key={item} className="rounded-2xl bg-[#f8fbfa] px-4 py-3 text-left text-sm font-medium text-[#102c3d]/68">{item}</button>
-      ))}
-    </div>
+    <button className="rounded-2xl bg-white px-4 py-5 text-left shadow-[0_8px_18px_rgba(16,44,61,0.04)]">
+      <p className="text-sm font-semibold text-[#102c3d]">{title}</p>
+      <p className="mt-3 text-xs font-semibold text-[#159b8f]">{action}</p>
+    </button>
   );
 }
 
@@ -910,7 +954,6 @@ function Field({ name, label, defaultValue = "" }: { name: string; label: string
 
 function SmallButton({ label, onClick, variant = "dark" }: { label: string; onClick: () => void; variant?: "dark" | "mint" | "coral" }) {
   const platformVariant = variant === "mint" ? "amber" : variant;
-
   return <PlatformButton onClick={onClick} variant={platformVariant}>{label}</PlatformButton>;
 }
 
@@ -931,6 +974,26 @@ function InsightBars({ rows }: { rows: Array<[string, number]> }) {
       ))}
     </div>
   );
+}
+
+function dashboardPurpose(role: Role) {
+  const purpose: Record<Role, string> = {
+    Employee: "Explore development options and submit interest.",
+    "Line Manager": "Manage team requests and development priorities.",
+    "Department Head": "See demand and workforce planning signals.",
+    "Apprenticeship Lead": "Manage the apprenticeship operation.",
+  };
+  return purpose[role];
+}
+
+function dashboardGuide(role: Role) {
+  const copy: Record<Role, string> = {
+    Employee: "This dashboard is intentionally focused on pathways, saved options and starting a request.",
+    "Line Manager": "This dashboard keeps approvals and team capability signals separate from operational admin.",
+    "Department Head": "This dashboard is a planning view for demand, skills gaps, priority roles and forecast demand.",
+    "Apprenticeship Lead": "This dashboard launches the core operating areas without showing dense tables by default.",
+  };
+  return copy[role];
 }
 
 function countBy<T, K extends keyof T>(items: T[], key: K) {
