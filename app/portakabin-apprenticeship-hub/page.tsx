@@ -543,44 +543,53 @@ export default function PortakabinApprenticeshipHub() {
         <TopBar role={role} setRole={switchRole} selectedSite={selectedSite} onSite={setSelectedSite} onOpenAdmin={() => switchRole("Admin Console")} />
 
         <div className="mx-auto w-full max-w-[1500px] space-y-7 px-5 py-7 sm:px-7 lg:px-9">
-          <HeroPanel role={role} requests={filteredRequests} learners={filteredLearners} mappings={mappings} statusCounts={statusCounts} selectedSite={selectedSite} onNavigate={openSection} />
-          {selectedSite !== allSitesLabel ? <SiteSummary site={selectedSite} learners={filteredLearners} requests={filteredRequests} /> : null}
-          <RoleDashboard
-            role={role}
-            requests={filteredRequests}
-            learners={filteredLearners}
-            mappings={mappings}
-            statusCounts={statusCounts}
-            departmentCounts={departmentCounts}
-            savedPathways={savedPathways}
-            employeeRequest={employeeRequest}
-            selectedSite={selectedSite}
-            onNavigate={openSection}
-          />
-          <DetailSection
-            role={role}
-            activeSection={activeSection}
-            requests={filteredRequests}
-            mappings={mappings}
-            statusCounts={statusCounts}
-            departmentCounts={departmentCounts}
-            savedPathways={savedPathways}
-            employeeRequest={employeeRequest}
-            selectedSite={selectedSite}
-            learners={searchedLearners}
-            learnerSearch={learnerSearch}
-            scenario={scenario}
-            success={success}
-            onSubmit={handleSubmit}
-            onOpenPathway={setSelectedPathway}
-            onLearnerSearch={setLearnerSearch}
-            onSavePathway={(title) => setSavedPathways((current) => (current.includes(title) ? current.filter((item) => item !== title) : [...current, title]))}
-            onStatus={setRequestStatus}
-            onMove={moveRequest}
-            onMapping={updateMapping}
-            onScenario={setScenarioData}
-            onSeed={seedRequest}
-          />
+          {activeSection === "Dashboard" ? (
+            <>
+              <HeroPanel role={role} requests={filteredRequests} learners={filteredLearners} mappings={mappings} statusCounts={statusCounts} selectedSite={selectedSite} onNavigate={openSection} />
+              {selectedSite !== allSitesLabel ? <SiteSummary site={selectedSite} learners={filteredLearners} requests={filteredRequests} /> : null}
+              <RoleDashboard
+                role={role}
+                requests={filteredRequests}
+                learners={filteredLearners}
+                mappings={mappings}
+                statusCounts={statusCounts}
+                departmentCounts={departmentCounts}
+                savedPathways={savedPathways}
+                employeeRequest={employeeRequest}
+                selectedSite={selectedSite}
+                onNavigate={openSection}
+              />
+              <DashboardGuide role={role} />
+            </>
+          ) : (
+            <>
+              <SectionHeader activeSection={activeSection} role={role} selectedSite={selectedSite} />
+              <DetailSection
+                role={role}
+                activeSection={activeSection}
+                requests={filteredRequests}
+                mappings={mappings}
+                statusCounts={statusCounts}
+                departmentCounts={departmentCounts}
+                savedPathways={savedPathways}
+                employeeRequest={employeeRequest}
+                selectedSite={selectedSite}
+                learners={searchedLearners}
+                learnerSearch={learnerSearch}
+                scenario={scenario}
+                success={success}
+                onSubmit={handleSubmit}
+                onOpenPathway={setSelectedPathway}
+                onLearnerSearch={setLearnerSearch}
+                onSavePathway={(title) => setSavedPathways((current) => (current.includes(title) ? current.filter((item) => item !== title) : [...current, title]))}
+                onStatus={setRequestStatus}
+                onMove={moveRequest}
+                onMapping={updateMapping}
+                onScenario={setScenarioData}
+                onSeed={seedRequest}
+              />
+            </>
+          )}
         </div>
       </div>
 
@@ -743,6 +752,23 @@ function SiteSummary({ site, learners, requests }: { site: string; learners: Lea
         <MetricTile label="Main pathway demand" value={demand || "No signal"} />
       </div>
     </PlatformPanel>
+  );
+}
+
+function SectionHeader({ activeSection, role, selectedSite }: { activeSection: SectionKey; role: Role; selectedSite: string }) {
+  return (
+    <section className="rounded-[1.6rem] border border-[#102c3d]/[0.06] bg-white/96 p-6 shadow-[0_22px_60px_rgba(16,44,61,0.055)] xl:p-7">
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+        <div className="min-w-0">
+          <p className="w-fit rounded-full bg-[#fff4bd] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-[#7b6100]">{role}</p>
+          <h1 className="mt-4 text-3xl font-semibold leading-tight tracking-[-0.025em] text-[#102c3d] md:text-4xl">{activeSection}</h1>
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-[#102c3d]/62 md:text-base">{sectionDescription(activeSection)}</p>
+        </div>
+        <div className="w-fit rounded-2xl border border-[#102c3d]/[0.055] bg-[#f8fbfa] px-4 py-3 text-sm font-semibold text-[#102c3d]/66">
+          View: {selectedSite}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -1714,6 +1740,56 @@ function dashboardGuide(role: Role) {
     "Admin Console": "This dashboard is reserved for platform administration, configuration and audit activity.",
   };
   return copy[role];
+}
+
+function sectionDescription(section: SectionKey) {
+  const descriptions: Partial<Record<SectionKey, string>> = {
+    "Recommended Pathways": "View apprenticeship pathways matched to your role, site and development goals.",
+    "Recommended Programmes": "Review approved programmes matched to current workforce needs.",
+    "Explore Pathways": "Browse approved apprenticeship routes available in the Portakabin environment.",
+    "Career Pathfinder": "Explore potential progression routes and the apprenticeships that support them.",
+    "Skills Analysis": "Understand skills gaps, competency strengths and recommended development actions.",
+    "My Applications": "Track your development requests from submission through enrolment.",
+    "Development Passport": "Review completed learning, qualifications, CPD activity and internal training.",
+    "My Team": "View direct report development status, active apprentices and progression signals.",
+    "Team Skills": "Explore team skills coverage across leadership, technical, data, commercial and digital capability.",
+    Requests: "Review apprenticeship requests and manage the approval workflow for your permitted scope.",
+    Approvals: "Review apprenticeship requests awaiting manager or department approval.",
+    Enrolments: "Track learner movement through provider introduction, enrolment and live learning.",
+    "Succession Planning": "Identify ready now, ready soon and high potential colleagues for critical roles.",
+    "Department Overview": "See department headcount, learner activity, requests and completion signals.",
+    "Skills Map": "View capability coverage and priority skill gaps across your permitted workforce view.",
+    "Department Demand": "Analyse development demand by team, department and capability area.",
+    "Future Demand": "Plan future skills demand and predicted workforce capability shortages.",
+    "Future Skills": "Plan future skills demand and priority development routes.",
+    "Site Performance": "Compare participation, learner progress and readiness across Portakabin sites.",
+    "Organisation Overview": "Monitor organisation-wide apprenticeship activity, learners, providers and readiness.",
+    "Levy Utilisation": "Review levy usage, available funding and planning opportunities.",
+    "Levy Position": "Review levy usage, available funding and planning opportunities.",
+    Forecast: "Review forecast apprenticeship demand and funding utilisation.",
+    Providers: "Manage approved delivery partner mappings and provider performance.",
+    "Approved Providers": "Manage approved delivery partner mappings and provider performance.",
+    Performance: "Review provider fit, delivery performance and mapping actions.",
+    Programmes: "Manage the approved apprenticeship programme catalogue.",
+    Compliance: "Monitor evidence status, review dates and apprenticeship risk indicators.",
+    "Site Adoption": "Compare site adoption, participation and Workforce Readiness Index signals.",
+    Reporting: "Open executive reporting, learner visibility and platform performance summaries.",
+    "Learners by Site": "Review learners, roles, programmes, status and progress by selected site.",
+    "AI Assistant": "Generate capability plans and concise workforce development recommendations.",
+    "User Management": "Manage users and stakeholder access across the platform.",
+    "Role Management": "Configure stakeholder roles and inherited visibility.",
+    "Permission Management": "Review permission groups and access boundaries.",
+    "Provider Management": "Administer approved delivery partners and provider setup.",
+    "Programme Catalogue": "Configure the internal apprenticeship catalogue.",
+    "Employer Configuration": "Manage employer environment settings and branding.",
+    "Site Configuration": "Maintain site records and site-level visibility.",
+    "Audit Logs": "Review configuration, permission and workflow activity.",
+    "Platform Analytics": "Analyse adoption, engagement and platform usage.",
+    "System Settings": "Manage platform-level settings for the demo environment.",
+    Admin: "Open platform administration controls and demo operating actions.",
+  };
+
+  return descriptions[section] ?? "Open the selected workforce development workspace.";
 }
 
 function filterBySite<T extends { site: string }>(items: T[], selectedSite: string) {
