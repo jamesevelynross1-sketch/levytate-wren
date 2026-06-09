@@ -5,7 +5,8 @@ import { LevyTateLogo, PlatformButton, PlatformMetric, PlatformPanel, PlatformTo
 
 type Role = "Employee" | "Line Manager" | "Department Head" | "Apprenticeship Lead" | "Admin Console";
 type DemandScenario = "Low" | "Medium" | "High";
-type RequestStatus = "New interest" | "Manager review" | "Lead review" | "Provider introduction" | "Enrolment" | "Live learner";
+type RequestStatus = "Draft" | "Submitted to Line Manager" | "Declined by Line Manager" | "Approved by Line Manager" | "Submitted to Apprenticeship Lead" | "Declined by Apprenticeship Lead" | "Approved for Enrolment";
+type LearnerStatus = "New interest" | "Manager review" | "Lead review" | "Provider introduction" | "Enrolment" | "Live learner";
 type MappingStatus = "Live" | "Ready" | "Review";
 
 type Pathway = {
@@ -33,6 +34,10 @@ type RequestItem = {
   manager: string;
   status: RequestStatus;
   note: string;
+  careerGoal: string;
+  supportRequired: string;
+  submittedDate: string;
+  decisionNotes: string;
 };
 
 type Learner = {
@@ -41,7 +46,7 @@ type Learner = {
   department: string;
   site: string;
   programme: string;
-  status: RequestStatus;
+  status: LearnerStatus;
   progress: number;
   lineManager: string;
   startDate: string;
@@ -67,8 +72,13 @@ type SectionKey =
   | "My Applications"
   | "Development Passport"
   | "My Team"
+  | "Applications to Review"
   | "Team Skills"
+  | "Team Development"
   | "Succession Planning"
+  | "Department Analytics"
+  | "Site Breakdown"
+  | "Apprenticeship Participation"
   | "Department Overview"
   | "Future Demand"
   | "Site Performance"
@@ -78,6 +88,8 @@ type SectionKey =
   | "Programmes"
   | "Compliance"
   | "Site Adoption"
+  | "Applications for Final Approval"
+  | "Approved for Enrolment"
   | "User Management"
   | "Role Management"
   | "Permission Management"
@@ -107,22 +119,22 @@ type SectionKey =
   | "Admin";
 
 const roles: Role[] = ["Employee", "Line Manager", "Department Head", "Apprenticeship Lead"];
-const requestStages: RequestStatus[] = ["New interest", "Manager review", "Lead review", "Provider introduction", "Enrolment", "Live learner"];
-const publicStages = ["Submitted", "Manager Review", "Department Approval", "Apprenticeship Team Review", "Provider Engagement", "Enrolment"];
+const requestStages: RequestStatus[] = ["Draft", "Submitted to Line Manager", "Declined by Line Manager", "Approved by Line Manager", "Submitted to Apprenticeship Lead", "Declined by Apprenticeship Lead", "Approved for Enrolment"];
+const publicStages: RequestStatus[] = ["Draft", "Submitted to Line Manager", "Approved by Line Manager", "Submitted to Apprenticeship Lead", "Approved for Enrolment"];
 
 const navSectionsByRole: Record<Role, PlatformNavSection[]> = {
   Employee: [
-    { title: "Employee", items: ["Dashboard", "Recommended Pathways", "Career Pathfinder", "Skills Analysis", "My Applications", "Development Passport"] },
+    { title: "Employee", items: ["Dashboard", "Recommended Pathways", "Career Pathfinder", "My Applications", "Development Passport"] },
   ],
   "Line Manager": [
-    { title: "Manager", items: ["Dashboard", "My Team", "Team Skills", "Requests", "Succession Planning"] },
+    { title: "Manager", items: ["Dashboard", "My Team", "Applications to Review", "Team Skills", "Team Development"] },
   ],
   "Department Head": [
-    { title: "Department", items: ["Dashboard", "Department Overview", "Skills Map", "Future Demand", "Succession Planning", "Site Performance"] },
+    { title: "Department", items: ["Dashboard", "Department Analytics", "Site Breakdown", "Apprenticeship Participation", "Skills Map", "Future Demand"] },
   ],
   "Apprenticeship Lead": [
-    { title: "Organisation", items: ["Dashboard", "Organisation Overview", "Levy Utilisation", "Providers", "Programmes", "Compliance", "Site Adoption"] },
-    { title: "Operations", items: ["Requests", "Learners by Site", "Reporting"] },
+    { title: "Applications", items: ["Dashboard", "Applications for Final Approval", "Approved for Enrolment"] },
+    { title: "Operations", items: ["Providers", "Programmes", "Compliance", "Site Adoption"] },
   ],
   "Admin Console": [
     { title: "Admin Console", items: ["Dashboard", "User Management", "Role Management", "Permission Management", "Provider Management", "Programme Catalogue"] },
@@ -132,9 +144,9 @@ const navSectionsByRole: Record<Role, PlatformNavSection[]> = {
 
 const roleSectionMap: Record<Role, SectionKey[]> = {
   Employee: ["Recommended Pathways", "Career Pathfinder", "My Applications"],
-  "Line Manager": ["My Team", "Requests", "Team Skills"],
-  "Department Head": ["Department Overview", "Skills Map", "Site Performance"],
-  "Apprenticeship Lead": ["Organisation Overview", "Levy Utilisation", "Site Adoption"],
+  "Line Manager": ["My Team", "Applications to Review", "Team Skills"],
+  "Department Head": ["Department Analytics", "Site Breakdown", "Future Demand"],
+  "Apprenticeship Lead": ["Applications for Final Approval", "Approved for Enrolment", "Providers"],
   "Admin Console": ["User Management", "Provider Management", "Platform Analytics"],
 };
 
@@ -344,14 +356,14 @@ const portakabinLearners: Learner[] = [
 ];
 
 const initialRequests: RequestItem[] = [
-  { id: 1, name: "Amelia Hart", role: "Production Team Member", department: "Manufacturing", team: "Assembly Line A", site: "York Head Office, Visitor Centre and UK Factory", pathway: "Manufacturing & Production", manager: "Ryan Booth", status: "Manager review", note: "Technical progression." },
-  { id: 2, name: "Marcus Lee", role: "Technical Design Assistant", department: "Design & Technical", team: "Building Design", site: "York Head Office, Visitor Centre and UK Factory", pathway: "Design & Technical", manager: "Priya Nair", status: "Manager review", note: "Design capability." },
-  { id: 3, name: "Sophie Clarke", role: "Customer Hire Coordinator", department: "Hire & Customer", team: "Customer Support", site: "Leeds Visitor Centre", pathway: "Hire, Sales & Customer Experience", manager: "Helen Ward", status: "Lead review", note: "Customer confidence." },
-  { id: 4, name: "Noah Bennett", role: "Installation Coordinator", department: "Site Operations", team: "Field Delivery", site: "Sheffield Visitor Centre", pathway: "Installation & Site Operations", manager: "Sam Ellis", status: "New interest", note: "Site handover skills." },
-  { id: 5, name: "Grace Patel", role: "Project Coordinator", department: "Projects", team: "Delivery Office", site: "London Central Visitor Centre", pathway: "Leadership & Management", manager: "Ryan Booth", status: "Provider introduction", note: "Planning discipline." },
-  { id: 6, name: "Leo Morgan", role: "Materials Planner", department: "Supply Chain", team: "Materials Planning", site: "Warrington Site Accommodation Visitor Centre", pathway: "Procurement & Supply Chain", manager: "Helen Ward", status: "Manager review", note: "Supplier coordination." },
-  { id: 7, name: "Maya Singh", role: "Shift Supervisor", department: "Manufacturing", team: "Shift Leadership", site: "York Head Office, Visitor Centre and UK Factory", pathway: "Leadership & Management", manager: "Priya Nair", status: "Enrolment", note: "New supervisor." },
-  { id: 8, name: "Ethan Brooks", role: "Compliance Assistant", department: "Compliance", team: "SHEQ", site: "Smethwick Visitor Centre", pathway: "Health, Safety & Compliance", manager: "Sam Ellis", status: "Live learner", note: "Safety evidence." },
+  { id: 1, name: "Amelia Hart", role: "Production Team Member", department: "Manufacturing", team: "Assembly Line A", site: "York Head Office, Visitor Centre and UK Factory", pathway: "Manufacturing & Production", manager: "Ryan Booth", status: "Submitted to Line Manager", note: "I want to build stronger production and engineering confidence.", careerGoal: "Progress into a maintenance technician role.", supportRequired: "Support with study time during shifts.", submittedDate: "2026-05-18", decisionNotes: "Awaiting Ryan Booth review." },
+  { id: 2, name: "Marcus Lee", role: "Technical Design Assistant", department: "Design & Technical", team: "Building Design", site: "York Head Office, Visitor Centre and UK Factory", pathway: "Design & Technical", manager: "Priya Nair", status: "Declined by Line Manager", note: "I want to formalise my design skills and contribute to technical standards.", careerGoal: "Move into a design technician role.", supportRequired: "Mentor support from senior designer.", submittedDate: "2026-05-12", decisionNotes: "Declined because current workload needs stabilising before a new programme starts." },
+  { id: 3, name: "Sophie Clarke", role: "Customer Hire Coordinator", department: "Hire & Customer", team: "Customer Support", site: "Leeds Visitor Centre", pathway: "Hire, Sales & Customer Experience", manager: "Helen Ward", status: "Approved by Line Manager", note: "I want to improve customer conversations and account confidence.", careerGoal: "Progress into account support leadership.", supportRequired: "Protected time for monthly workshops.", submittedDate: "2026-05-10", decisionNotes: "Approved by Helen Ward and ready for apprenticeship lead review." },
+  { id: 4, name: "Noah Bennett", role: "Installation Coordinator", department: "Site Operations", team: "Field Delivery", site: "Sheffield Visitor Centre", pathway: "Installation & Site Operations", manager: "Sam Ellis", status: "Submitted to Apprenticeship Lead", note: "I want to strengthen site handover and supervision skills.", careerGoal: "Become a site supervisor.", supportRequired: "Access to live site evidence.", submittedDate: "2026-05-08", decisionNotes: "Line manager approved. Awaiting final approval." },
+  { id: 5, name: "Grace Patel", role: "Project Coordinator", department: "Projects", team: "Delivery Office", site: "London Central Visitor Centre", pathway: "Leadership & Management", manager: "Ryan Booth", status: "Approved for Enrolment", note: "I want structured leadership development for delivery planning.", careerGoal: "Progress into project management.", supportRequired: "Coaching from project lead.", submittedDate: "2026-04-28", decisionNotes: "Final approved by apprenticeship lead. Ready for provider introduction and enrolment." },
+  { id: 6, name: "Leo Morgan", role: "Materials Planner", department: "Supply Chain", team: "Materials Planning", site: "Warrington Site Accommodation Visitor Centre", pathway: "Procurement & Supply Chain", manager: "Helen Ward", status: "Declined by Apprenticeship Lead", note: "I want to improve supplier coordination and planning confidence.", careerGoal: "Move into supply chain planning.", supportRequired: "Help with evidence mapping.", submittedDate: "2026-04-21", decisionNotes: "Declined by apprenticeship lead pending a better programme match." },
+  { id: 7, name: "Maya Singh", role: "Shift Supervisor", department: "Manufacturing", team: "Shift Leadership", site: "York Head Office, Visitor Centre and UK Factory", pathway: "Leadership & Management", manager: "Priya Nair", status: "Draft", note: "I am exploring leadership development options.", careerGoal: "Build confidence as a shift leader.", supportRequired: "Not confirmed yet.", submittedDate: "2026-06-01", decisionNotes: "Draft not yet submitted." },
+  { id: 8, name: "Ethan Brooks", role: "Compliance Assistant", department: "Compliance", team: "SHEQ", site: "Smethwick Visitor Centre", pathway: "Health, Safety & Compliance", manager: "Sam Ellis", status: "Submitted to Apprenticeship Lead", note: "I want to build stronger safety evidence and compliance practice.", careerGoal: "Progress into SHEQ coordinator role.", supportRequired: "Access to site audit evidence.", submittedDate: "2026-05-02", decisionNotes: "Line manager approved. Awaiting final apprenticeship lead decision." },
 ];
 
 const initialMappings: ProviderMapping[] = [
@@ -434,9 +446,9 @@ const scenarioSeeds: Record<DemandScenario, RequestItem[]> = {
   Medium: initialRequests,
   High: [
     ...initialRequests,
-    { id: 9, name: "Olivia Grant", role: "Account Support Lead", department: "Hire & Customer", team: "Commercial Support", site: "Trafford Park Manchester Visitor Centre", pathway: "Hire, Sales & Customer Experience", manager: "Ryan Booth", status: "New interest", note: "Commercial progression." },
-    { id: 10, name: "Daniel Fox", role: "Site Supervisor", department: "Site Operations", team: "Field Delivery", site: "Rugby Site Accommodation Visitor Centre", pathway: "Installation & Site Operations", manager: "Sam Ellis", status: "Manager review", note: "Site coordination." },
-    { id: 11, name: "Isla Reid", role: "Quality Coordinator", department: "Manufacturing", team: "Quality", site: "York Head Office, Visitor Centre and UK Factory", pathway: "Health, Safety & Compliance", manager: "Priya Nair", status: "Lead review", note: "Compliance confidence." },
+    { id: 9, name: "Olivia Grant", role: "Account Support Lead", department: "Hire & Customer", team: "Commercial Support", site: "Trafford Park Manchester Visitor Centre", pathway: "Hire, Sales & Customer Experience", manager: "Ryan Booth", status: "Submitted to Line Manager", note: "Commercial progression.", careerGoal: "Move into sales leadership.", supportRequired: "Manager coaching.", submittedDate: "2026-06-03", decisionNotes: "Awaiting line manager review." },
+    { id: 10, name: "Daniel Fox", role: "Site Supervisor", department: "Site Operations", team: "Field Delivery", site: "Rugby Site Accommodation Visitor Centre", pathway: "Installation & Site Operations", manager: "Sam Ellis", status: "Approved by Line Manager", note: "Site coordination.", careerGoal: "Lead complex site delivery.", supportRequired: "Site evidence access.", submittedDate: "2026-06-02", decisionNotes: "Approved by line manager." },
+    { id: 11, name: "Isla Reid", role: "Quality Coordinator", department: "Manufacturing", team: "Quality", site: "York Head Office, Visitor Centre and UK Factory", pathway: "Health, Safety & Compliance", manager: "Priya Nair", status: "Submitted to Apprenticeship Lead", note: "Compliance confidence.", careerGoal: "Progress into quality lead role.", supportRequired: "Audit evidence support.", submittedDate: "2026-05-30", decisionNotes: "Awaiting final approval." },
   ],
 };
 
@@ -482,20 +494,24 @@ export default function PortakabinApprenticeshipHub() {
       role: String(data.get("role") || "Internal colleague"),
       department: String(data.get("department") || "Manufacturing"),
       team: String(data.get("team") || "Internal team"),
-      site: selectedSite === allSitesLabel ? "York Head Office, Visitor Centre and UK Factory" : selectedSite,
+      site: String(data.get("site") || (selectedSite === allSitesLabel ? "York Head Office, Visitor Centre and UK Factory" : selectedSite)),
       pathway,
       manager: String(data.get("manager") || "Line manager"),
-      status: "New interest",
-      note: String(data.get("need") || "New development request."),
+      status: "Submitted to Line Manager",
+      note: String(data.get("reason") || "New development request."),
+      careerGoal: String(data.get("careerGoal") || "Progress into a future role."),
+      supportRequired: String(data.get("supportRequired") || "None noted."),
+      submittedDate: "2026-06-09",
+      decisionNotes: "Submitted to line manager for review.",
     };
 
     setRequests((current) => [nextRequest, ...current]);
     setSuccess(true);
-    setActiveSection("Requests");
+    setActiveSection("My Applications");
   }
 
   function setRequestStatus(id: number, status: RequestStatus) {
-    setRequests((current) => current.map((request) => (request.id === id ? { ...request, status } : request)));
+    setRequests((current) => current.map((request) => (request.id === id ? { ...request, status, decisionNotes: decisionNoteFor(status) } : request)));
   }
 
   function moveRequest(id: number, direction: 1 | -1) {
@@ -522,12 +538,16 @@ export default function PortakabinApprenticeshipHub() {
         site: selectedSite === allSitesLabel ? portakabinSites[current.length % portakabinSites.length] : selectedSite,
         pathway: seed.title,
         manager: "Demo manager",
-        status: "New interest",
+        status: "Submitted to Line Manager",
         note: "Seeded presentation request.",
+        careerGoal: "Build future capability.",
+        supportRequired: "Manager support for study time.",
+        submittedDate: "2026-06-09",
+        decisionNotes: "Submitted to line manager for review.",
       },
       ...current,
     ]);
-    setActiveSection("Requests");
+    setActiveSection("Applications to Review");
   }
 
   function setScenarioData(nextScenario: DemandScenario) {
@@ -552,7 +572,6 @@ export default function PortakabinApprenticeshipHub() {
                 requests={filteredRequests}
                 learners={filteredLearners}
                 mappings={mappings}
-                statusCounts={statusCounts}
                 departmentCounts={departmentCounts}
                 savedPathways={savedPathways}
                 employeeRequest={employeeRequest}
@@ -593,7 +612,7 @@ export default function PortakabinApprenticeshipHub() {
         </div>
       </div>
 
-      {selectedPathway && <PathwayModal pathway={selectedPathway} onClose={() => setSelectedPathway(null)} onStart={() => setSelectedPathway(null)} />}
+      {selectedPathway && <PathwayModal pathway={selectedPathway} onClose={() => setSelectedPathway(null)} onStart={() => { setSelectedPathway(null); setActiveSection("My Applications"); }} />}
     </main>
   );
 }
@@ -705,7 +724,7 @@ function HeroPanel({
   selectedSite: string;
   onNavigate: (section: SectionKey) => void;
 }) {
-  const awaiting = (statusCounts["Manager review"] ?? 0) + (statusCounts["Lead review"] ?? 0);
+  const awaiting = (statusCounts["Submitted to Line Manager"] ?? 0) + (statusCounts["Approved by Line Manager"] ?? 0) + (statusCounts["Submitted to Apprenticeship Lead"] ?? 0);
   const liveRoutes = new Set(learners.map((learner) => learner.programme)).size || pathways.filter((item) => item.status === "Live").length;
   return (
     <section className="grid gap-6 rounded-[1.6rem] border border-[#102c3d]/[0.06] bg-white/96 p-6 shadow-[0_22px_60px_rgba(16,44,61,0.055)] xl:grid-cols-[minmax(0,1fr)_390px] xl:p-7">
@@ -726,7 +745,7 @@ function HeroPanel({
       <div className="rounded-[1.35rem] border border-[#102c3d]/[0.055] bg-[#f8fbfa] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
         <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#c95568]">Operating snapshot</p>
         <div className="mt-4 grid grid-cols-2 gap-3">
-          <MetricTile label="Requests" value={requests.length} />
+          <MetricTile label="Applications" value={requests.length} />
           <MetricTile label="Awaiting" value={awaiting} />
           <MetricTile label="Live routes" value={liveRoutes} />
           <MetricTile label="Mappings" value={mappings.filter((item) => item.status === "Live").length} />
@@ -746,7 +765,7 @@ function SiteSummary({ site, learners, requests }: { site: string; learners: Lea
     <PlatformPanel eyebrow="Site view" title={site}>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         <MetricTile label="Active learners" value={learners.length} />
-        <MetricTile label="Pending requests" value={requests.filter((request) => request.status === "New interest" || request.status === "Manager review").length} />
+        <MetricTile label="Pending applications" value={requests.filter((request) => request.status === "Submitted to Line Manager" || request.status === "Approved by Line Manager" || request.status === "Submitted to Apprenticeship Lead").length} />
         <MetricTile label="Programmes in use" value={programmes.size} />
         <MetricTile label="Completion risk" value={risk} />
         <MetricTile label="Main pathway demand" value={demand || "No signal"} />
@@ -777,7 +796,6 @@ function RoleDashboard({
   requests,
   learners,
   mappings,
-  statusCounts,
   departmentCounts,
   savedPathways,
   employeeRequest,
@@ -788,7 +806,6 @@ function RoleDashboard({
   requests: RequestItem[];
   learners: Learner[];
   mappings: ProviderMapping[];
-  statusCounts: Record<string, number>;
   departmentCounts: Record<string, number>;
   savedPathways: string[];
   employeeRequest: RequestItem;
@@ -800,7 +817,7 @@ function RoleDashboard({
   }
 
   if (role === "Line Manager") {
-    return <ManagerDashboard requests={requests} learners={learners} statusCounts={statusCounts} onNavigate={onNavigate} />;
+    return <ManagerDashboard requests={requests} learners={learners} onNavigate={onNavigate} />;
   }
 
   if (role === "Department Head") {
@@ -847,7 +864,7 @@ function EmployeeDashboard({ employeeRequest, savedPathways, onNavigate }: { emp
             <MetricTile label="Saved pathways" value={savedPathways.length} />
             <MetricTile label="Completed learning" value="7" />
             <MetricTile label="CPD activity" value="18 hrs" />
-            <PlatformButton onClick={() => onNavigate("My Applications")}>Start new request</PlatformButton>
+            <PlatformButton onClick={() => onNavigate("My Applications")}>Start new application</PlatformButton>
           </div>
         </div>
       </PlatformPanel>
@@ -862,15 +879,16 @@ function EmployeeDashboard({ employeeRequest, savedPathways, onNavigate }: { emp
   );
 }
 
-function ManagerDashboard({ requests, learners, statusCounts, onNavigate }: { requests: RequestItem[]; learners: Learner[]; statusCounts: Record<string, number>; onNavigate: (section: SectionKey) => void }) {
-  const teamLearners = learners.filter((learner) => learner.lineManager === "Ryan Booth" || learner.lineManager === "Helen Ward").slice(0, 8);
+function ManagerDashboard({ requests, learners, onNavigate }: { requests: RequestItem[]; learners: Learner[]; onNavigate: (section: SectionKey) => void }) {
+  const teamLearners = learners.filter((learner) => learner.lineManager === "Ryan Booth").slice(0, 8);
+  const teamApplications = requests.filter((request) => request.manager === "Ryan Booth");
   return (
     <div className="grid gap-6">
       <PlatformPanel eyebrow="My team overview" title="Direct report development needs">
         <div className="grid gap-4 md:grid-cols-4">
           <MetricTile label="Team members" value={teamLearners.length} />
           <MetricTile label="Active apprentices" value={teamLearners.filter((learner) => learner.status === "Live learner").length} />
-          <MetricTile label="Pending requests" value={statusCounts["Manager review"] ?? 0} />
+          <MetricTile label="Applications to review" value={teamApplications.filter((request) => request.status === "Submitted to Line Manager").length} />
           <MetricTile label="Succession risk" value="Medium" />
         </div>
         <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
@@ -884,10 +902,10 @@ function ManagerDashboard({ requests, learners, statusCounts, onNavigate }: { re
           </div>
         </div>
       </PlatformPanel>
-      <PlatformPanel eyebrow="Requests awaiting review" title="Manager approval queue">
+      <PlatformPanel eyebrow="Applications awaiting review" title="Manager approval queue">
         <div className="grid gap-4 lg:grid-cols-2">
-          {requests.filter((request) => request.status === "Manager review").slice(0, 4).map((request) => (
-            <ApprovalCard key={request.id} request={request} onStatus={() => onNavigate("Requests")} />
+          {teamApplications.filter((request) => request.status === "Submitted to Line Manager").slice(0, 4).map((request) => (
+            <ApplicationCard key={request.id} request={request} scope="manager" onStatus={() => onNavigate("Applications to Review")} />
           ))}
         </div>
       </PlatformPanel>
@@ -902,7 +920,7 @@ function DepartmentHeadDashboard({ requests, learners, departmentCounts, selecte
         <div className="grid gap-4 md:grid-cols-4">
           <MetricTile label="Headcount in view" value={learners.length} />
           <MetricTile label="Learners" value={learners.filter((learner) => learner.status === "Live learner").length} />
-          <MetricTile label="Requests" value={requests.length} />
+          <MetricTile label="Pending applications" value={requests.filter((request) => request.status === "Submitted to Line Manager" || request.status === "Approved by Line Manager" || request.status === "Submitted to Apprenticeship Lead").length} />
           <MetricTile label="Completion rate" value="86%" />
         </div>
         <div className="mt-5 grid gap-5 xl:grid-cols-[360px_minmax(0,1fr)]">
@@ -912,8 +930,8 @@ function DepartmentHeadDashboard({ requests, learners, departmentCounts, selecte
       </PlatformPanel>
       <div className="grid gap-6 xl:grid-cols-3">
         <StrategyPanel title="Future skills demand" items={["Digital reporting", "Site delivery confidence", "Supply chain resilience"]} action="Open future demand" onClick={() => onNavigate("Future Demand")} />
-        <StrategyPanel title="Succession planning" items={["Ready now: 6", "Ready soon: 11", "High potential: 14"]} action="Review successors" onClick={() => onNavigate("Succession Planning")} />
-        <StrategyPanel title="Site performance" items={["York: 84/100", "Leeds: 72/100", "Manchester: 69/100"]} action="Compare sites" onClick={() => onNavigate("Site Performance")} />
+        <StrategyPanel title="Skills gaps" items={["Ready now: 6", "Ready soon: 11", "High potential: 14"]} action="Open skills map" onClick={() => onNavigate("Skills Map")} />
+        <StrategyPanel title="Site breakdown" items={["York: 84/100", "Leeds: 72/100", "Manchester: 69/100"]} action="Compare sites" onClick={() => onNavigate("Site Breakdown")} />
       </div>
     </div>
   );
@@ -1173,17 +1191,30 @@ function DetailSection({
     );
   }
 
-  if (activeSection === "Requests" || activeSection === "My Applications") {
+  if (activeSection === "My Applications") {
     return (
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_390px]">
         <PlatformPanel eyebrow="Expression of interest" title="Start expression of interest">
           <RequestForm onSubmit={onSubmit} />
-          {success && <p className="mt-4 rounded-2xl bg-[#eff8f4] px-4 py-3 text-sm font-semibold text-[#102c3d]">Request created and moved to internal review.</p>}
+          {success && <p className="mt-4 rounded-2xl bg-[#eff8f4] px-4 py-3 text-sm font-semibold text-[#102c3d]">Application submitted to line manager.</p>}
         </PlatformPanel>
-        <PlatformPanel eyebrow="Request status" title="My request status">
+        <PlatformPanel eyebrow="Application status" title="My application status">
           <RequestTracker request={employeeRequest} />
         </PlatformPanel>
       </section>
+    );
+  }
+
+  if (activeSection === "Applications to Review" || activeSection === "Requests") {
+    const managerRequests = requests.filter((request) => request.manager === "Ryan Booth" && request.status === "Submitted to Line Manager");
+    return (
+      <PlatformPanel eyebrow="Line manager review" title="Applications to review">
+        <div className="grid gap-4 lg:grid-cols-2">
+          {managerRequests.map((request) => (
+            <ApplicationCard key={request.id} request={request} scope="manager" onStatus={onStatus} />
+          ))}
+        </div>
+      </PlatformPanel>
     );
   }
 
@@ -1196,19 +1227,19 @@ function DetailSection({
   }
 
   if (activeSection === "Approvals") {
-    const managerRequests = requests.filter((request) => request.status === "Manager review");
+    const managerRequests = requests.filter((request) => request.manager === "Ryan Booth" && request.status === "Submitted to Line Manager");
     return (
-      <PlatformPanel eyebrow="Manager approvals" title="Pending approvals">
+      <PlatformPanel eyebrow="Manager approvals" title="Applications awaiting line manager approval">
         <div className="grid gap-4 lg:grid-cols-2">
           {managerRequests.map((request) => (
-            <ApprovalCard key={request.id} request={request} onStatus={onStatus} />
+            <ApplicationCard key={request.id} request={request} scope="manager" onStatus={onStatus} />
           ))}
         </div>
       </PlatformPanel>
     );
   }
 
-  if (activeSection === "Skills Analysis" || activeSection === "Skills Map" || activeSection === "Future Skills" || activeSection === "Team Skills" || activeSection === "Future Demand") {
+  if (activeSection === "Skills Analysis" || activeSection === "Skills Map" || activeSection === "Future Skills" || activeSection === "Team Skills" || activeSection === "Team Development" || activeSection === "Future Demand") {
     return (
       <PlatformPanel eyebrow="Workforce planning" title={activeSection}>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -1232,15 +1263,22 @@ function DetailSection({
     );
   }
 
-  if (activeSection === "Department Demand" || activeSection === "Department Overview") {
+  if (activeSection === "Department Demand" || activeSection === "Department Overview" || activeSection === "Department Analytics" || activeSection === "Apprenticeship Participation") {
     return (
-      <PlatformPanel eyebrow="Demand snapshot" title="Department demand">
-        <InsightBars rows={Object.entries(departmentCounts).map(([label, value]) => [label, value])} />
+      <PlatformPanel eyebrow="Department analytics" title="Management data and reporting">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <InsightBars rows={Object.entries(departmentCounts).map(([label, value]) => [label, value])} />
+          <div className="grid gap-3">
+            <MetricCard label="Participation rate" value="34%" copy="Department colleagues on programme" />
+            <MetricCard label="Pending applications" value={requests.filter((request) => request.status === "Submitted to Line Manager" || request.status === "Approved by Line Manager" || request.status === "Submitted to Apprenticeship Lead").length} copy="No approval action required" />
+            <MetricCard label="Approved applications" value={requests.filter((request) => request.status === "Approved for Enrolment").length} copy="Ready for enrolment" />
+          </div>
+        </div>
       </PlatformPanel>
     );
   }
 
-  if (activeSection === "Site Performance" || activeSection === "Site Adoption") {
+  if (activeSection === "Site Performance" || activeSection === "Site Adoption" || activeSection === "Site Breakdown") {
     return (
       <PlatformPanel eyebrow="Site intelligence" title="Site adoption and readiness">
         <div className="grid gap-4 md:grid-cols-3">
@@ -1268,6 +1306,31 @@ function DetailSection({
     );
   }
 
+  if (activeSection === "Applications for Final Approval") {
+    const leadRequests = requests.filter((request) => request.status === "Submitted to Apprenticeship Lead" || request.status === "Approved by Line Manager");
+    return (
+      <PlatformPanel eyebrow="Apprenticeship lead approval" title="Applications for final approval">
+        <div className="grid gap-4 lg:grid-cols-2">
+          {leadRequests.map((request) => (
+            <ApplicationCard key={request.id} request={request} scope="lead" onStatus={onStatus} />
+          ))}
+        </div>
+      </PlatformPanel>
+    );
+  }
+
+  if (activeSection === "Approved for Enrolment") {
+    return (
+      <PlatformPanel eyebrow="Final approved" title="Approved for enrolment">
+        <div className="grid gap-4 lg:grid-cols-2">
+          {requests.filter((request) => request.status === "Approved for Enrolment").map((request) => (
+            <ApplicationCard key={request.id} request={request} scope="readonly" onStatus={onStatus} />
+          ))}
+        </div>
+      </PlatformPanel>
+    );
+  }
+
   if (activeSection === "Levy Position" || activeSection === "Forecast" || activeSection === "Levy Utilisation") {
     return (
       <PlatformPanel eyebrow="Funding and levy" title={activeSection === "Forecast" ? "Forecast apprenticeship demand" : "Levy utilisation"}>
@@ -1285,7 +1348,7 @@ function DetailSection({
       <PlatformPanel eyebrow="Organisation overview" title="Enterprise apprenticeship performance">
         <div className="grid gap-4 md:grid-cols-4">
           <MetricTile label="Learners" value={learners.length} />
-          <MetricTile label="Requests" value={requests.length} />
+          <MetricTile label="Applications" value={requests.length} />
           <MetricTile label="Provider mappings" value={mappings.length} />
           <MetricTile label="Readiness Index" value={readinessScore(learners, requests)} />
         </div>
@@ -1362,7 +1425,10 @@ function DashboardGuide({ role }: { role: Role }) {
   );
 }
 
-function ApprovalCard({ request, onStatus }: { request: RequestItem; onStatus: (id: number, status: RequestStatus) => void }) {
+function ApplicationCard({ request, scope, onStatus }: { request: RequestItem; scope: "manager" | "lead" | "readonly"; onStatus: (id: number, status: RequestStatus) => void }) {
+  const currentApprover = request.status === "Submitted to Line Manager" ? request.manager : request.status === "Submitted to Apprenticeship Lead" || request.status === "Approved by Line Manager" ? "Apprenticeship Lead" : "None";
+  const actionRequired = request.status === "Submitted to Line Manager" ? "Line manager decision" : request.status === "Submitted to Apprenticeship Lead" || request.status === "Approved by Line Manager" ? "Final approval" : "No action";
+
   return (
     <article className="rounded-[1.2rem] border border-[#102c3d]/[0.055] bg-[#f8fbfa] p-4 shadow-[0_8px_22px_rgba(16,44,61,0.035)]">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -1370,17 +1436,40 @@ function ApprovalCard({ request, onStatus }: { request: RequestItem; onStatus: (
           <h3 className="text-lg font-semibold">{request.name}</h3>
           <p className="mt-1 text-sm leading-6 text-[#102c3d]/60">{request.role} - {request.team}</p>
         </div>
-        <span className="w-fit rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#102c3d]/56 ring-1 ring-[#102c3d]/[0.05]">{request.pathway}</span>
+        <span className="w-fit rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#102c3d]/56 ring-1 ring-[#102c3d]/[0.05]">{request.status}</span>
       </div>
       <div className="mt-4 grid gap-3 md:grid-cols-2">
-        <InfoBox label="Time commitment" value="Planned learning time agreed with manager" />
-        <InfoBox label="Business benefit" value="Supports capability growth and operational development" />
+        <InfoBox label="Programme" value={request.pathway} />
+        <InfoBox label="Site" value={request.site} />
+        <InfoBox label="Department" value={request.department} />
+        <InfoBox label="Submitted date" value={formatShortDate(request.submittedDate)} />
+        <InfoBox label="Current approver" value={currentApprover} />
+        <InfoBox label="Action required" value={actionRequired} />
       </div>
-      <div className="mt-4 flex flex-wrap gap-2">
-        <SmallButton label="Approve request" onClick={() => onStatus(request.id, "Lead review")} />
-        <SmallButton label="Request more information" onClick={() => onStatus(request.id, "New interest")} variant="mint" />
-        <SmallButton label="Decline request" onClick={() => onStatus(request.id, "New interest")} variant="coral" />
+      <div className="mt-4 rounded-2xl border border-[#102c3d]/[0.045] bg-white p-3">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/38">Application detail</p>
+        <p className="mt-2 text-sm leading-6 text-[#102c3d]/64">{request.note}</p>
+        <p className="mt-2 text-sm leading-6 text-[#102c3d]/64">Career goal: {request.careerGoal}</p>
+        <p className="mt-2 text-sm leading-6 text-[#102c3d]/64">Support required: {request.supportRequired}</p>
+        <p className="mt-2 text-xs leading-5 text-[#102c3d]/46">Decision notes: {request.decisionNotes}</p>
       </div>
+      {scope !== "readonly" ? (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {scope === "manager" ? (
+            <>
+              <SmallButton label="Approve and send to lead" onClick={() => onStatus(request.id, "Approved by Line Manager")} />
+              <SmallButton label="Request more information" onClick={() => onStatus(request.id, "Draft")} variant="mint" />
+              <SmallButton label="Decline with reason" onClick={() => onStatus(request.id, "Declined by Line Manager")} variant="coral" />
+            </>
+          ) : (
+            <>
+              <SmallButton label="Final approve" onClick={() => onStatus(request.id, "Approved for Enrolment")} />
+              <SmallButton label="Mark ready for enrolment" onClick={() => onStatus(request.id, "Approved for Enrolment")} variant="mint" />
+              <SmallButton label="Decline with reason" onClick={() => onStatus(request.id, "Declined by Apprenticeship Lead")} variant="coral" />
+            </>
+          )}
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -1414,26 +1503,36 @@ function PathwayCard({ pathway, saved, onOpen, onSave }: { pathway: Pathway; sav
 function RequestForm({ onSubmit }: { onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
   return (
     <form onSubmit={onSubmit} className="grid gap-5 md:grid-cols-2">
-      <Field name="name" label="Name" defaultValue="Amelia Hart" />
-      <Field name="role" label="Role" defaultValue="Production Team Member" />
-      <Field name="department" label="Department" defaultValue="Manufacturing" />
-      <Field name="team" label="Team" defaultValue="Assembly Line A" />
-      <label className="grid gap-1.5 text-xs font-medium text-[#102c3d]/62">
-        Selected pathway
+      <label className="grid gap-1.5 text-xs font-medium text-[#102c3d]/62 md:col-span-2">
+        Selected apprenticeship
         <select name="pathway" className="min-w-0 rounded-2xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-4 py-3.5 text-sm outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10">
           {pathways.map((pathway) => (
             <option key={pathway.title}>{pathway.title}</option>
           ))}
         </select>
       </label>
-      <Field name="manager" label="Line manager" defaultValue="Ryan Booth" />
       <label className="grid gap-1.5 text-xs font-medium text-[#102c3d]/62 md:col-span-2">
-        Why is this needed?
-        <textarea name="need" rows={4} className="min-w-0 rounded-2xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-4 py-3.5 text-sm leading-6 outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10" defaultValue="I want to build stronger manufacturing and delivery confidence." />
+        Reason for interest
+        <textarea name="reason" rows={3} className="min-w-0 rounded-2xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-4 py-3.5 text-sm leading-6 outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10" defaultValue="I want to build stronger manufacturing and delivery confidence." />
+      </label>
+      <Field name="careerGoal" label="Career goal" defaultValue="Progress into an operational leadership role" />
+      <Field name="role" label="Role" defaultValue="Production Team Member" />
+      <Field name="site" label="Site" defaultValue="York Head Office, Visitor Centre and UK Factory" />
+      <Field name="department" label="Department" defaultValue="Manufacturing" />
+      <Field name="manager" label="Line manager" defaultValue="Ryan Booth" />
+      <Field name="name" label="Employee name" defaultValue="Amelia Hart" />
+      <Field name="team" label="Team" defaultValue="Assembly Line A" />
+      <label className="grid gap-1.5 text-xs font-medium text-[#102c3d]/62 md:col-span-2">
+        Any support required
+        <textarea name="supportRequired" rows={3} className="min-w-0 rounded-2xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-4 py-3.5 text-sm leading-6 outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10" defaultValue="Support with study time and evidence collection." />
+      </label>
+      <label className="flex items-start gap-3 rounded-2xl border border-[#102c3d]/[0.045] bg-[#f8fbfa] p-4 text-sm leading-6 text-[#102c3d]/62 md:col-span-2">
+        <input name="confirm" type="checkbox" required className="mt-1 h-4 w-4 accent-[#159b8f]" />
+        I confirm this expression of interest can be shared with my line manager and the apprenticeship lead for approval.
       </label>
       <div className="mt-1 flex flex-col gap-4 rounded-2xl border border-[#102c3d]/[0.045] bg-[#f8fbfa] p-4 md:col-span-2 md:flex-row md:items-center md:justify-between">
-        <p className="text-sm leading-6 text-[#102c3d]/54">This creates an internal request for manager review.</p>
-        <PlatformButton className="w-fit px-5 py-2.5 text-sm">Submit request</PlatformButton>
+        <p className="text-sm leading-6 text-[#102c3d]/54">This sends the application to your line manager.</p>
+        <PlatformButton className="w-fit px-5 py-2.5 text-sm">Submit expression of interest</PlatformButton>
       </div>
     </form>
   );
@@ -1441,14 +1540,20 @@ function RequestForm({ onSubmit }: { onSubmit: (event: FormEvent<HTMLFormElement
 
 function RequestTracker({ request }: { request: RequestItem }) {
   const activeIndex = requestStages.indexOf(request.status);
+  const declined = request.status.includes("Declined");
   return (
     <div className="grid gap-2">
       {publicStages.map((stage, index) => (
         <div key={stage} className="flex items-center gap-3 rounded-2xl bg-[#f8fbfa] px-4 py-3">
-          <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${index <= activeIndex ? "bg-[#159b8f]" : "bg-[#d9e8e2]"}`} />
-          <span className={`text-sm font-medium ${index <= activeIndex ? "text-[#102c3d]" : "text-[#102c3d]/42"}`}>{stage}</span>
+          <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${!declined && index <= activeIndex ? "bg-[#159b8f]" : "bg-[#d9e8e2]"}`} />
+          <span className={`text-sm font-medium ${!declined && index <= activeIndex ? "text-[#102c3d]" : "text-[#102c3d]/42"}`}>{stage}</span>
         </div>
       ))}
+      {declined ? (
+        <div className="rounded-2xl bg-[#ffe4e9] px-4 py-3 text-sm font-semibold text-[#ad344e]">
+          {request.status}: {request.decisionNotes}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1589,7 +1694,7 @@ function ExecutiveSummary({ requests, mappings, statusCounts }: { requests: Requ
     ["Departments engaged", String(new Set(requests.map((request) => request.department)).size)],
     ["Provider mappings active", String(mappings.filter((mapping) => mapping.status === "Live").length)],
     ["Forecast levy utilisation", "73%"],
-    ["Bottlenecks reduced", `${Math.max(0, 8 - (statusCounts["Manager review"] ?? 0))}`],
+    ["Bottlenecks reduced", `${Math.max(0, 8 - ((statusCounts["Submitted to Line Manager"] ?? 0) + (statusCounts["Approved by Line Manager"] ?? 0) + (statusCounts["Submitted to Apprenticeship Lead"] ?? 0)))}`],
   ];
   return (
     <PlatformPanel title="Reporting snapshot" eyebrow="Executive summary">
@@ -1608,7 +1713,7 @@ function DemoControls({ scenario, onScenario, onSeed, onReset }: { scenario: Dem
       <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-[#df5f73]">Demo Mode</p>
       <div className="mt-3 grid gap-2">
         <button onClick={onReset} className="rounded-full bg-white px-3.5 py-2 text-xs font-semibold text-[#102c3d]">Reset data</button>
-        <button onClick={onSeed} className="rounded-full bg-[#102c3d] px-3.5 py-2 text-xs font-semibold text-white">Seed request</button>
+        <button onClick={onSeed} className="rounded-full bg-[#102c3d] px-3.5 py-2 text-xs font-semibold text-white">Seed application</button>
         <div className="grid grid-cols-3 rounded-full bg-[#eef8f5] p-1">
           {(["Low", "Medium", "High"] as DemandScenario[]).map((item) => (
             <button key={item} onClick={() => onScenario(item)} className={`rounded-full px-2 py-1.5 text-[11px] font-medium ${scenario === item ? "bg-white text-[#102c3d] shadow-[0_8px_18px_rgba(16,44,61,0.08)]" : "text-[#102c3d]/54"}`}>
@@ -1638,7 +1743,7 @@ function PathwayModal({ pathway, onClose, onStart }: { pathway: Pathway; onClose
     ["Learner benefit", pathway.learnerBenefit],
     ["Duration", pathway.duration],
     ["Commitment", pathway.commitment],
-    ["Approval route", "Employee request, manager review, apprenticeship lead review, provider introduction."],
+    ["Approval route", "Employee application, line manager review, apprenticeship lead final approval."],
     ["Approved delivery partner", pathway.deliveryPartner],
     ["Next cohort window", pathway.cohort],
   ];
@@ -1657,7 +1762,7 @@ function PathwayModal({ pathway, onClose, onStart }: { pathway: Pathway; onClose
             <SubtleRow key={label} label={label} value={value} />
           ))}
         </div>
-        <button onClick={onStart} className="mt-8 rounded-full bg-[#102c3d] px-6 py-3 text-sm font-semibold text-white">Start request</button>
+        <button onClick={onStart} className="mt-8 rounded-full bg-[#102c3d] px-6 py-3 text-sm font-semibold text-white">Apply</button>
       </section>
     </div>
   );
@@ -1733,7 +1838,7 @@ function InsightBars({ rows }: { rows: Array<[string, number]> }) {
 
 function dashboardGuide(role: Role) {
   const copy: Record<Role, string> = {
-    Employee: "This dashboard is intentionally focused on pathways, saved options and starting a request.",
+    Employee: "This dashboard is intentionally focused on pathways, saved options and starting an application.",
     "Line Manager": "This dashboard keeps approvals and team capability signals separate from operational admin.",
     "Department Head": "This dashboard is a planning view for demand, skills gaps, priority roles and forecast demand.",
     "Apprenticeship Lead": "This dashboard launches the core operating areas without showing dense tables by default.",
@@ -1749,21 +1854,27 @@ function sectionDescription(section: SectionKey) {
     "Explore Pathways": "Browse approved apprenticeship routes available in the Portakabin environment.",
     "Career Pathfinder": "Explore potential progression routes and the apprenticeships that support them.",
     "Skills Analysis": "Understand skills gaps, competency strengths and recommended development actions.",
-    "My Applications": "Track your development requests from submission through enrolment.",
+    "My Applications": "Track your apprenticeship applications from submission through final approval.",
     "Development Passport": "Review completed learning, qualifications, CPD activity and internal training.",
     "My Team": "View direct report development status, active apprentices and progression signals.",
     "Team Skills": "Explore team skills coverage across leadership, technical, data, commercial and digital capability.",
-    Requests: "Review apprenticeship requests and manage the approval workflow for your permitted scope.",
-    Approvals: "Review apprenticeship requests awaiting manager or department approval.",
+    Requests: "Review apprenticeship applications and manage the approval workflow for your permitted scope.",
+    "Applications to Review": "Review applications from direct reports and approve, decline or request more information.",
+    Approvals: "Review apprenticeship applications awaiting line manager approval.",
     Enrolments: "Track learner movement through provider introduction, enrolment and live learning.",
     "Succession Planning": "Identify ready now, ready soon and high potential colleagues for critical roles.",
-    "Department Overview": "See department headcount, learner activity, requests and completion signals.",
+    "Department Overview": "See department headcount, learner activity, applications and completion signals.",
+    "Department Analytics": "Review department participation, active learners, pending applications and readiness signals.",
+    "Site Breakdown": "Compare learner activity, applications and readiness by site.",
+    "Apprenticeship Participation": "Analyse department participation rates, programme usage and approved applications.",
     "Skills Map": "View capability coverage and priority skill gaps across your permitted workforce view.",
     "Department Demand": "Analyse development demand by team, department and capability area.",
     "Future Demand": "Plan future skills demand and predicted workforce capability shortages.",
     "Future Skills": "Plan future skills demand and priority development routes.",
     "Site Performance": "Compare participation, learner progress and readiness across Portakabin sites.",
     "Organisation Overview": "Monitor organisation-wide apprenticeship activity, learners, providers and readiness.",
+    "Applications for Final Approval": "Review applications approved by line managers and make the final apprenticeship decision.",
+    "Approved for Enrolment": "View applications approved for enrolment and ready for provider introduction.",
     "Levy Utilisation": "Review levy usage, available funding and planning opportunities.",
     "Levy Position": "Review levy usage, available funding and planning opportunities.",
     Forecast: "Review forecast apprenticeship demand and funding utilisation.",
@@ -1803,6 +1914,19 @@ function topEntry(counts: Record<string, number>) {
 
 function formatShortDate(value: string) {
   return new Intl.DateTimeFormat("en-GB", { month: "short", year: "numeric" }).format(new Date(value));
+}
+
+function decisionNoteFor(status: RequestStatus) {
+  const notes: Record<RequestStatus, string> = {
+    Draft: "More information requested before this can progress.",
+    "Submitted to Line Manager": "Submitted to line manager for review.",
+    "Declined by Line Manager": "Declined by line manager. Reason captured in review notes.",
+    "Approved by Line Manager": "Approved by line manager and ready for apprenticeship lead review.",
+    "Submitted to Apprenticeship Lead": "Approved by line manager and sent for final approval.",
+    "Declined by Apprenticeship Lead": "Declined by apprenticeship lead. Programme fit to be reviewed.",
+    "Approved for Enrolment": "Final approved and ready for provider introduction and enrolment.",
+  };
+  return notes[status];
 }
 
 function readinessScore(learners: Learner[], requests: RequestItem[]) {
