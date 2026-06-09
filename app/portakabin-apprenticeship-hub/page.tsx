@@ -3,7 +3,7 @@
 import { FormEvent, useMemo, useState } from "react";
 import { LevyTateLogo, PlatformButton, PlatformMetric, PlatformPanel, PlatformTopBar, type PlatformNavSection } from "@/components/levytate-demo/PlatformShell";
 
-type Role = "Employee" | "Line Manager" | "Department Head" | "Apprenticeship Lead";
+type Role = "Employee" | "Line Manager" | "Department Head" | "Apprenticeship Lead" | "Admin Console";
 type DemandScenario = "Low" | "Medium" | "High";
 type RequestStatus = "New interest" | "Manager review" | "Lead review" | "Provider introduction" | "Enrolment" | "Live learner";
 type MappingStatus = "Live" | "Ready" | "Review";
@@ -62,6 +62,32 @@ type ProviderMapping = {
 
 type SectionKey =
   | "Dashboard"
+  | "Recommended Pathways"
+  | "Career Pathfinder"
+  | "My Applications"
+  | "Development Passport"
+  | "My Team"
+  | "Team Skills"
+  | "Succession Planning"
+  | "Department Overview"
+  | "Future Demand"
+  | "Site Performance"
+  | "Organisation Overview"
+  | "Levy Utilisation"
+  | "Providers"
+  | "Programmes"
+  | "Compliance"
+  | "Site Adoption"
+  | "User Management"
+  | "Role Management"
+  | "Permission Management"
+  | "Provider Management"
+  | "Programme Catalogue"
+  | "Employer Configuration"
+  | "Site Configuration"
+  | "Audit Logs"
+  | "Platform Analytics"
+  | "System Settings"
   | "Explore Pathways"
   | "Recommended Programmes"
   | "Skills Analysis"
@@ -82,25 +108,34 @@ type SectionKey =
 
 const roles: Role[] = ["Employee", "Line Manager", "Department Head", "Apprenticeship Lead"];
 const requestStages: RequestStatus[] = ["New interest", "Manager review", "Lead review", "Provider introduction", "Enrolment", "Live learner"];
-const publicStages = ["Interest submitted", "Manager review", "Apprenticeship lead review", "Provider introduction", "Enrolment in progress", "Live learner"];
+const publicStages = ["Submitted", "Manager Review", "Department Approval", "Apprenticeship Team Review", "Provider Engagement", "Enrolment"];
 
-const navSections: PlatformNavSection[] = [
-  { title: "Dashboard", items: ["Dashboard"] },
-  { title: "Apprenticeships", items: ["Explore Pathways", "Recommended Programmes", "Skills Analysis"] },
-  { title: "Applications", items: ["Requests", "Approvals", "Enrolments"] },
-  { title: "Workforce Planning", items: ["Skills Map", "Department Demand", "Future Skills"] },
-  { title: "Providers", items: ["Approved Providers", "Performance"] },
-  { title: "Funding & Levy", items: ["Levy Position", "Forecast"] },
-  { title: "Reporting", items: ["Reporting", "Learners by Site"] },
-  { title: "AI Assistant", items: ["AI Assistant"] },
-  { title: "Admin", items: ["Admin"] },
-];
+const navSectionsByRole: Record<Role, PlatformNavSection[]> = {
+  Employee: [
+    { title: "Employee", items: ["Dashboard", "Recommended Pathways", "Career Pathfinder", "Skills Analysis", "My Applications", "Development Passport"] },
+  ],
+  "Line Manager": [
+    { title: "Manager", items: ["Dashboard", "My Team", "Team Skills", "Requests", "Succession Planning"] },
+  ],
+  "Department Head": [
+    { title: "Department", items: ["Dashboard", "Department Overview", "Skills Map", "Future Demand", "Succession Planning", "Site Performance"] },
+  ],
+  "Apprenticeship Lead": [
+    { title: "Organisation", items: ["Dashboard", "Organisation Overview", "Levy Utilisation", "Providers", "Programmes", "Compliance", "Site Adoption"] },
+    { title: "Operations", items: ["Requests", "Learners by Site", "Reporting"] },
+  ],
+  "Admin Console": [
+    { title: "Admin Console", items: ["Dashboard", "User Management", "Role Management", "Permission Management", "Provider Management", "Programme Catalogue"] },
+    { title: "Configuration", items: ["Employer Configuration", "Site Configuration", "Audit Logs", "Platform Analytics", "System Settings"] },
+  ],
+};
 
 const roleSectionMap: Record<Role, SectionKey[]> = {
-  Employee: ["Recommended Programmes", "Requests", "Explore Pathways"],
-  "Line Manager": ["Approvals", "Requests", "Skills Analysis", "Recommended Programmes"],
-  "Department Head": ["Department Demand", "Skills Map", "Future Skills", "Forecast"],
-  "Apprenticeship Lead": ["Requests", "Approved Providers", "Levy Position", "Reporting", "Admin"],
+  Employee: ["Recommended Pathways", "Career Pathfinder", "My Applications"],
+  "Line Manager": ["My Team", "Requests", "Team Skills"],
+  "Department Head": ["Department Overview", "Skills Map", "Site Performance"],
+  "Apprenticeship Lead": ["Organisation Overview", "Levy Utilisation", "Site Adoption"],
+  "Admin Console": ["User Management", "Provider Management", "Platform Analytics"],
 };
 
 const allSitesLabel = "All sites";
@@ -502,10 +537,10 @@ export default function PortakabinApprenticeshipHub() {
 
   return (
     <main className="min-h-screen overflow-hidden bg-[linear-gradient(180deg,#f8faf8_0%,#f2f6f4_48%,#f6f8f7_100%)] text-[#102c3d]">
-      <Sidebar activeSection={activeSection} onNavigate={openSection} />
+      <Sidebar role={role} activeSection={activeSection} onNavigate={openSection} />
 
       <div className="h-screen min-w-0 overflow-y-auto lg:ml-[296px]">
-        <TopBar role={role} setRole={switchRole} selectedSite={selectedSite} onSite={setSelectedSite} onOpenAdmin={() => switchRole("Apprenticeship Lead")} />
+        <TopBar role={role} setRole={switchRole} selectedSite={selectedSite} onSite={setSelectedSite} onOpenAdmin={() => switchRole("Admin Console")} />
 
         <div className="mx-auto w-full max-w-[1500px] space-y-7 px-5 py-7 sm:px-7 lg:px-9">
           <HeroPanel role={role} requests={filteredRequests} learners={filteredLearners} mappings={mappings} statusCounts={statusCounts} selectedSite={selectedSite} onNavigate={openSection} />
@@ -513,10 +548,13 @@ export default function PortakabinApprenticeshipHub() {
           <RoleDashboard
             role={role}
             requests={filteredRequests}
+            learners={filteredLearners}
             mappings={mappings}
             statusCounts={statusCounts}
             departmentCounts={departmentCounts}
             savedPathways={savedPathways}
+            employeeRequest={employeeRequest}
+            selectedSite={selectedSite}
             onNavigate={openSection}
           />
           <DetailSection
@@ -551,7 +589,9 @@ export default function PortakabinApprenticeshipHub() {
   );
 }
 
-function Sidebar({ activeSection, onNavigate }: { activeSection: SectionKey; onNavigate: (section: SectionKey) => void }) {
+function Sidebar({ role, activeSection, onNavigate }: { role: Role; activeSection: SectionKey; onNavigate: (section: SectionKey) => void }) {
+  const navSections = navSectionsByRole[role];
+
   return (
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-[296px] border-r border-[#102c3d]/[0.08] bg-white/95 px-4 py-5 shadow-[8px_0_32px_rgba(16,44,61,0.035)] backdrop-blur-xl lg:flex lg:flex-col">
       <div className="flex items-center px-2">
@@ -561,6 +601,7 @@ function Sidebar({ activeSection, onNavigate }: { activeSection: SectionKey; onN
       <div className="mt-5 rounded-2xl border border-[#102c3d]/[0.06] bg-[#f7faf6] px-4 py-3 text-[#102c3d]">
         <p className="text-[10px] font-medium uppercase tracking-[0.15em] text-[#102c3d]/40">Active client</p>
         <p className="mt-1 text-sm font-semibold tracking-tight">Portakabin</p>
+        <p className="mt-1 text-xs font-medium text-[#102c3d]/48">{role}</p>
       </div>
 
       <nav className="mt-5 min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
@@ -708,56 +749,290 @@ function SiteSummary({ site, learners, requests }: { site: string; learners: Lea
 function RoleDashboard({
   role,
   requests,
+  learners,
   mappings,
   statusCounts,
   departmentCounts,
   savedPathways,
+  employeeRequest,
+  selectedSite,
   onNavigate,
 }: {
   role: Role;
   requests: RequestItem[];
+  learners: Learner[];
   mappings: ProviderMapping[];
   statusCounts: Record<string, number>;
   departmentCounts: Record<string, number>;
   savedPathways: string[];
+  employeeRequest: RequestItem;
+  selectedSite: string;
   onNavigate: (section: SectionKey) => void;
 }) {
-  const cards: Record<Role, LaunchCardProps[]> = {
-    Employee: [
-      { title: "My recommended pathways", value: "6", copy: "Approved routes matched to role family.", action: "View pathways", section: "Recommended Programmes" },
-      { title: "My request status", value: statusCounts["Manager review"] ?? 0, copy: "Current expression of interest progress.", action: "View status", section: "Requests" },
-      { title: "Saved pathways", value: savedPathways.length, copy: "Shortlist for manager conversation.", action: "Open saved", section: "Explore Pathways" },
-      { title: "Start expression of interest", value: "2 min", copy: "Submit a clean internal request.", action: "Start request", section: "Requests" },
-    ],
-    "Line Manager": [
-      { title: "Pending approvals", value: statusCounts["Manager review"] ?? 0, copy: "Requests needing manager review.", action: "Review requests", section: "Approvals" },
-      { title: "Team development requests", value: requests.filter((request) => request.manager === "Ryan Booth").length, copy: "Open demand across direct teams.", action: "Open requests", section: "Requests" },
-      { title: "Skills priorities", value: "4", copy: "Common capability areas to support.", action: "Open skills map", section: "Skills Analysis" },
-      { title: "Approved team pathways", value: pathways.filter((pathway) => pathway.status === "Live").length, copy: "Available routes for team development.", action: "View pathways", section: "Recommended Programmes" },
-    ],
-    "Department Head": [
-      { title: "Department demand snapshot", value: Object.keys(departmentCounts).length, copy: "Teams with active apprenticeship signals.", action: "View demand", section: "Department Demand" },
-      { title: "Skills gaps", value: "6", copy: "Priority capability gaps across the operation.", action: "Open skills map", section: "Skills Map" },
-      { title: "Priority roles", value: "9", copy: "Roles suitable for funded development.", action: "View roles", section: "Future Skills" },
-      { title: "Forecast demand", value: "Q3", copy: "Next quarter planning forecast.", action: "View forecast", section: "Forecast" },
-    ],
-    "Apprenticeship Lead": [
-      { title: "Live requests", value: requests.length, copy: "Total demand moving through the process.", action: "Open requests", section: "Requests" },
-      { title: "Provider mappings", value: mappings.length, copy: "Approved delivery partner coverage.", action: "Manage providers", section: "Approved Providers" },
-      { title: "Levy utilisation", value: "73%", copy: "Forecast utilisation across live routes.", action: "View levy forecast", section: "Levy Position" },
-      { title: "Reporting snapshot", value: "Ready", copy: "Executive summary and performance view.", action: "Open reporting", section: "Reporting" },
-      { title: "Admin actions", value: "5", copy: "Controls for setup, demo data and rollout.", action: "Open admin", section: "Admin" },
-    ],
-  };
+  if (role === "Employee") {
+    return <EmployeeDashboard employeeRequest={employeeRequest} savedPathways={savedPathways} onNavigate={onNavigate} />;
+  }
 
+  if (role === "Line Manager") {
+    return <ManagerDashboard requests={requests} learners={learners} statusCounts={statusCounts} onNavigate={onNavigate} />;
+  }
+
+  if (role === "Department Head") {
+    return <DepartmentHeadDashboard requests={requests} learners={learners} departmentCounts={departmentCounts} selectedSite={selectedSite} onNavigate={onNavigate} />;
+  }
+
+  if (role === "Apprenticeship Lead") {
+    return <ApprenticeshipLeadDashboard requests={requests} learners={learners} mappings={mappings} selectedSite={selectedSite} onNavigate={onNavigate} />;
+  }
+
+  return <AdminConsoleDashboard mappings={mappings} onNavigate={onNavigate} />;
+}
+
+function EmployeeDashboard({ employeeRequest, savedPathways, onNavigate }: { employeeRequest: RequestItem; savedPathways: string[]; onNavigate: (section: SectionKey) => void }) {
   return (
-    <PlatformPanel eyebrow={`${role} dashboard`} title={dashboardPurpose(role)}>
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
+      <PlatformPanel eyebrow="My development profile" title="Personal growth workspace">
+        <div className="grid gap-4 md:grid-cols-2">
+          <ProfileRow label="Name" value={employeeRequest.name} />
+          <ProfileRow label="Role" value={employeeRequest.role} />
+          <ProfileRow label="Department" value={employeeRequest.department} />
+          <ProfileRow label="Site" value={employeeRequest.site} />
+          <ProfileRow label="Manager" value={employeeRequest.manager} />
+          <ProfileRow label="Career aspiration" value="Move into project and operational leadership." />
+        </div>
+        <div className="mt-5 grid gap-4 md:grid-cols-3">
+          <RecommendationCard title="Team Leader L3" score="94%" />
+          <RecommendationCard title="Data Technician L3" score="87%" />
+          <RecommendationCard title="Business Administrator L3" score="83%" />
+        </div>
+      </PlatformPanel>
+      <PlatformPanel eyebrow="Career pathfinder" title="Estimated progression pathway">
+        <ProgressionPath roles={["Project Coordinator", "Project Manager", "Senior Project Manager", "Programme Manager"]} />
+        <div className="mt-5 grid gap-3">
+          <SkillBar label="Existing capability" value={68} />
+          <SkillBar label="Target role readiness" value={54} />
+          <SkillBar label="Recommended action coverage" value={82} />
+        </div>
+      </PlatformPanel>
+      <PlatformPanel eyebrow="My applications" title="Request and passport">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <RequestTracker request={employeeRequest} />
+          <div className="grid gap-3">
+            <MetricTile label="Saved pathways" value={savedPathways.length} />
+            <MetricTile label="Completed learning" value="7" />
+            <MetricTile label="CPD activity" value="18 hrs" />
+            <PlatformButton onClick={() => onNavigate("My Applications")}>Start new request</PlatformButton>
+          </div>
+        </div>
+      </PlatformPanel>
+      <PlatformPanel eyebrow="Salary and career potential" title="Progression outlook">
+        <div className="grid gap-3 md:grid-cols-3">
+          <MetricCard label="Current range" value="£28k" copy="Role benchmark" />
+          <MetricCard label="Next role range" value="£36k" copy="Estimated internal benchmark" />
+          <MetricCard label="Future opportunity" value="High" copy="Based on skills trajectory" />
+        </div>
+      </PlatformPanel>
+    </div>
+  );
+}
+
+function ManagerDashboard({ requests, learners, statusCounts, onNavigate }: { requests: RequestItem[]; learners: Learner[]; statusCounts: Record<string, number>; onNavigate: (section: SectionKey) => void }) {
+  const teamLearners = learners.filter((learner) => learner.lineManager === "Ryan Booth" || learner.lineManager === "Helen Ward").slice(0, 8);
+  return (
+    <div className="grid gap-6">
+      <PlatformPanel eyebrow="My team overview" title="Direct report development needs">
+        <div className="grid gap-4 md:grid-cols-4">
+          <MetricTile label="Team members" value={teamLearners.length} />
+          <MetricTile label="Active apprentices" value={teamLearners.filter((learner) => learner.status === "Live learner").length} />
+          <MetricTile label="Pending requests" value={statusCounts["Manager review"] ?? 0} />
+          <MetricTile label="Succession risk" value="Medium" />
+        </div>
+        <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+          <TeamMemberList learners={teamLearners} />
+          <div className="grid gap-3">
+            <SkillBar label="Leadership" value={64} />
+            <SkillBar label="Technical" value={72} />
+            <SkillBar label="Data" value={48} />
+            <SkillBar label="Commercial" value={58} />
+            <SkillBar label="Digital" value={52} />
+          </div>
+        </div>
+      </PlatformPanel>
+      <PlatformPanel eyebrow="Requests awaiting review" title="Manager approval queue">
+        <div className="grid gap-4 lg:grid-cols-2">
+          {requests.filter((request) => request.status === "Manager review").slice(0, 4).map((request) => (
+            <ApprovalCard key={request.id} request={request} onStatus={() => onNavigate("Requests")} />
+          ))}
+        </div>
+      </PlatformPanel>
+    </div>
+  );
+}
+
+function DepartmentHeadDashboard({ requests, learners, departmentCounts, selectedSite, onNavigate }: { requests: RequestItem[]; learners: Learner[]; departmentCounts: Record<string, number>; selectedSite: string; onNavigate: (section: SectionKey) => void }) {
+  return (
+    <div className="grid gap-6">
+      <PlatformPanel eyebrow="Department overview" title="Workforce capability and succession planning">
+        <div className="grid gap-4 md:grid-cols-4">
+          <MetricTile label="Headcount in view" value={learners.length} />
+          <MetricTile label="Learners" value={learners.filter((learner) => learner.status === "Live learner").length} />
+          <MetricTile label="Requests" value={requests.length} />
+          <MetricTile label="Completion rate" value="86%" />
+        </div>
+        <div className="mt-5 grid gap-5 xl:grid-cols-[360px_minmax(0,1fr)]">
+          <ReadinessIndex label={selectedSite === allSitesLabel ? "Portakabin capability" : selectedSite} score={readinessScore(learners, requests)} />
+          <InsightBars rows={Object.entries(departmentCounts).map(([label, value]) => [label, value])} />
+        </div>
+      </PlatformPanel>
+      <div className="grid gap-6 xl:grid-cols-3">
+        <StrategyPanel title="Future skills demand" items={["Digital reporting", "Site delivery confidence", "Supply chain resilience"]} action="Open future demand" onClick={() => onNavigate("Future Demand")} />
+        <StrategyPanel title="Succession planning" items={["Ready now: 6", "Ready soon: 11", "High potential: 14"]} action="Review successors" onClick={() => onNavigate("Succession Planning")} />
+        <StrategyPanel title="Site performance" items={["York: 84/100", "Leeds: 72/100", "Manchester: 69/100"]} action="Compare sites" onClick={() => onNavigate("Site Performance")} />
+      </div>
+    </div>
+  );
+}
+
+function ApprenticeshipLeadDashboard({ requests, learners, mappings, selectedSite, onNavigate }: { requests: RequestItem[]; learners: Learner[]; mappings: ProviderMapping[]; selectedSite: string; onNavigate: (section: SectionKey) => void }) {
+  return (
+    <div className="grid gap-6">
+      <PlatformPanel eyebrow="Organisation overview" title="Apprenticeship operating command centre">
+        <div className="grid gap-4 md:grid-cols-4">
+          <MetricTile label="Total learners" value={learners.length} />
+          <MetricTile label="Active programmes" value={new Set(learners.map((learner) => learner.programme)).size} />
+          <MetricTile label="Applications" value={requests.length} />
+          <MetricTile label="Providers" value={mappings.length} />
+        </div>
+        <div className="mt-5 grid gap-5 xl:grid-cols-[360px_minmax(0,1fr)]">
+          <ReadinessIndex label={selectedSite === allSitesLabel ? "Organisation readiness" : selectedSite} score={readinessScore(learners, requests)} />
+          <Kanban requests={requests} compact />
+        </div>
+      </PlatformPanel>
+      <div className="grid gap-6 xl:grid-cols-3">
+        <StrategyPanel title="Levy utilisation" items={["Used: 73%", "Available: 27%", "Transfer opportunity: 8%"]} action="View levy" onClick={() => onNavigate("Levy Utilisation")} />
+        <StrategyPanel title="Provider performance" items={["Completion: 86%", "Satisfaction: 91%", "Attendance: 88%"]} action="Manage providers" onClick={() => onNavigate("Providers")} />
+        <StrategyPanel title="Compliance dashboard" items={["Evidence status: healthy", "Reviews due: 5", "Risk indicators: 2"]} action="Open compliance" onClick={() => onNavigate("Compliance")} />
+      </div>
+    </div>
+  );
+}
+
+function AdminConsoleDashboard({ mappings, onNavigate }: { mappings: ProviderMapping[]; onNavigate: (section: SectionKey) => void }) {
+  const adminCards: LaunchCardProps[] = [
+    { title: "User management", value: "148", copy: "Users, roles and permissions.", action: "Manage users", section: "User Management" },
+    { title: "Provider management", value: mappings.length, copy: "Approved delivery partner setup.", action: "Open providers", section: "Provider Management" },
+    { title: "Programme catalogue", value: pathways.length, copy: "Internal pathway catalogue.", action: "View catalogue", section: "Programme Catalogue" },
+    { title: "Platform analytics", value: "Live", copy: "Usage, adoption and audit signals.", action: "View analytics", section: "Platform Analytics" },
+  ];
+  return (
+    <PlatformPanel eyebrow="Admin console" title="Platform administration and configuration">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {cards[role].map((card) => (
+        {adminCards.map((card) => (
           <LaunchCard key={card.title} {...card} onNavigate={onNavigate} />
         ))}
       </div>
     </PlatformPanel>
+  );
+}
+
+function ProfileRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-[#102c3d]/[0.045] bg-[#f8fbfa] px-4 py-3">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/36">{label}</p>
+      <p className="mt-1 text-sm font-semibold text-[#102c3d]">{value}</p>
+    </div>
+  );
+}
+
+function RecommendationCard({ title, score }: { title: string; score: string }) {
+  return (
+    <article className="rounded-2xl border border-[#159b8f]/[0.12] bg-white p-4 shadow-[0_10px_24px_rgba(16,44,61,0.035)]">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm font-semibold text-[#102c3d]">{title}</p>
+        <span className="rounded-full bg-[#edf8f5] px-2.5 py-1 text-[11px] font-semibold text-[#0b6f63]">{score}</span>
+      </div>
+      <p className="mt-3 text-xs leading-5 text-[#102c3d]/54">Matched to role, aspiration and development profile.</p>
+    </article>
+  );
+}
+
+function ProgressionPath({ roles: pathRoles }: { roles: string[] }) {
+  return (
+    <div className="grid gap-3">
+      {pathRoles.map((item, index) => (
+        <div key={item} className="flex items-center gap-3">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#102c3d] text-xs font-semibold text-white">{index + 1}</span>
+          <div className="flex-1 rounded-2xl border border-[#102c3d]/[0.045] bg-[#f8fbfa] px-4 py-3">
+            <p className="text-sm font-semibold text-[#102c3d]">{item}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SkillBar({ label, value }: { label: string; value: number }) {
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-4">
+        <p className="text-xs font-semibold text-[#102c3d]/60">{label}</p>
+        <p className="text-xs font-semibold text-[#102c3d]">{value}%</p>
+      </div>
+      <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#ecf6f2]">
+        <div className="h-full rounded-full bg-[#159b8f]" style={{ width: `${value}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function TeamMemberList({ learners }: { learners: Learner[] }) {
+  return (
+    <div className="grid gap-2">
+      {learners.map((learner) => (
+        <div key={`${learner.name}-${learner.site}`} className="flex items-center justify-between gap-4 rounded-2xl border border-[#102c3d]/[0.045] bg-white px-4 py-3">
+          <div>
+            <p className="text-sm font-semibold text-[#102c3d]">{learner.name}</p>
+            <p className="mt-1 text-xs text-[#102c3d]/50">{learner.role}</p>
+          </div>
+          <span className="rounded-full bg-[#f8fbfa] px-3 py-1 text-xs font-semibold text-[#102c3d]/56">{learner.progress}%</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ReadinessIndex({ label, score }: { label: string; score: number }) {
+  const tone = score >= 78 ? "Green" : score >= 62 ? "Amber" : "Red";
+  const toneClass = tone === "Green" ? "text-[#0b6f63] bg-[#edf8f5]" : tone === "Amber" ? "text-[#7b6100] bg-[#fff4bd]" : "text-[#ad344e] bg-[#ffe4e9]";
+  return (
+    <article className="rounded-[1.35rem] border border-[#102c3d]/[0.055] bg-[#f8fbfa] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#c95568]">Workforce Readiness Index</p>
+      <div className="mt-4 flex items-end justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold text-[#102c3d]">{label}</p>
+          <p className="mt-2 text-5xl font-semibold tracking-[-0.04em] text-[#102c3d]">{score}</p>
+        </div>
+        <span className={`rounded-full px-3 py-1.5 text-xs font-semibold ${toneClass}`}>{tone}</span>
+      </div>
+      <div className="mt-5 h-2 overflow-hidden rounded-full bg-white">
+        <div className="h-full rounded-full bg-[#159b8f]" style={{ width: `${score}%` }} />
+      </div>
+      <p className="mt-3 text-xs leading-5 text-[#102c3d]/54">Blends skills coverage, succession readiness, participation, pipeline strength and completion signals.</p>
+    </article>
+  );
+}
+
+function StrategyPanel({ title, items, action, onClick }: { title: string; items: string[]; action: string; onClick: () => void }) {
+  return (
+    <button onClick={onClick} className="rounded-[1.25rem] border border-[#102c3d]/[0.06] bg-white p-5 text-left shadow-[0_12px_30px_rgba(16,44,61,0.04)] transition hover:-translate-y-1 hover:shadow-[0_20px_44px_rgba(16,44,61,0.08)]">
+      <p className="text-base font-semibold text-[#102c3d]">{title}</p>
+      <div className="mt-4 grid gap-2">
+        {items.map((item) => (
+          <p key={item} className="rounded-2xl bg-[#f8fbfa] px-3 py-2 text-xs font-medium text-[#102c3d]/62">{item}</p>
+        ))}
+      </div>
+      <span className="mt-4 inline-flex rounded-full bg-[#102c3d] px-4 py-2 text-xs font-semibold text-white">{action}</span>
+    </button>
   );
 }
 
@@ -831,7 +1106,7 @@ function DetailSection({
     return <DashboardGuide role={role} />;
   }
 
-  if (activeSection === "Recommended Programmes" || activeSection === "Explore Pathways") {
+  if (activeSection === "Recommended Programmes" || activeSection === "Explore Pathways" || activeSection === "Recommended Pathways") {
     return (
       <PlatformPanel eyebrow="Approved pathways" title={activeSection === "Explore Pathways" ? "Explore pathways" : "My recommended pathways"}>
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
@@ -843,7 +1118,36 @@ function DetailSection({
     );
   }
 
-  if (activeSection === "Requests") {
+  if (activeSection === "Career Pathfinder") {
+    return (
+      <PlatformPanel eyebrow="Career pathfinder" title="Progression map and recommended development">
+        <div className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
+          <ProgressionPath roles={["Project Coordinator", "Project Manager", "Senior Project Manager", "Programme Manager"]} />
+          <div className="grid gap-3">
+            <SkillBar label="Project planning" value={76} />
+            <SkillBar label="Stakeholder confidence" value={68} />
+            <SkillBar label="Commercial awareness" value={54} />
+            <SkillBar label="Leadership readiness" value={61} />
+          </div>
+        </div>
+      </PlatformPanel>
+    );
+  }
+
+  if (activeSection === "Development Passport") {
+    return (
+      <PlatformPanel eyebrow="Development passport" title="Completed learning and evidence record">
+        <div className="grid gap-4 md:grid-cols-4">
+          <MetricTile label="Completed apprenticeships" value="1" />
+          <MetricTile label="Courses" value="4" />
+          <MetricTile label="Qualifications" value="2" />
+          <MetricTile label="CPD activity" value="18 hrs" />
+        </div>
+      </PlatformPanel>
+    );
+  }
+
+  if (activeSection === "Requests" || activeSection === "My Applications") {
     return (
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_390px]">
         <PlatformPanel eyebrow="Expression of interest" title="Start expression of interest">
@@ -854,6 +1158,14 @@ function DetailSection({
           <RequestTracker request={employeeRequest} />
         </PlatformPanel>
       </section>
+    );
+  }
+
+  if (activeSection === "My Team") {
+    return (
+      <PlatformPanel eyebrow="My team" title="Team development status">
+        <TeamMemberList learners={learners.slice(0, 12)} />
+      </PlatformPanel>
     );
   }
 
@@ -870,7 +1182,7 @@ function DetailSection({
     );
   }
 
-  if (activeSection === "Skills Analysis" || activeSection === "Skills Map" || activeSection === "Future Skills") {
+  if (activeSection === "Skills Analysis" || activeSection === "Skills Map" || activeSection === "Future Skills" || activeSection === "Team Skills" || activeSection === "Future Demand") {
     return (
       <PlatformPanel eyebrow="Workforce planning" title={activeSection}>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -882,7 +1194,19 @@ function DetailSection({
     );
   }
 
-  if (activeSection === "Department Demand") {
+  if (activeSection === "Succession Planning") {
+    return (
+      <PlatformPanel eyebrow="Succession planning" title="Readiness and critical role coverage">
+        <div className="grid gap-4 md:grid-cols-3">
+          <MetricCard label="Ready now" value="6" copy="Colleagues prepared for next role" />
+          <MetricCard label="Ready soon" value="11" copy="Likely ready within 6 to 12 months" />
+          <MetricCard label="High potential" value="14" copy="Priority development conversations" />
+        </div>
+      </PlatformPanel>
+    );
+  }
+
+  if (activeSection === "Department Demand" || activeSection === "Department Overview") {
     return (
       <PlatformPanel eyebrow="Demand snapshot" title="Department demand">
         <InsightBars rows={Object.entries(departmentCounts).map(([label, value]) => [label, value])} />
@@ -890,11 +1214,35 @@ function DetailSection({
     );
   }
 
-  if (activeSection === "Approved Providers" || activeSection === "Performance") {
+  if (activeSection === "Site Performance" || activeSection === "Site Adoption") {
+    return (
+      <PlatformPanel eyebrow="Site intelligence" title="Site adoption and readiness">
+        <div className="grid gap-4 md:grid-cols-3">
+          {["York Head Office, Visitor Centre and UK Factory", "Leeds Visitor Centre", "Trafford Park Manchester Visitor Centre"].map((site, index) => (
+            <ReadinessIndex key={site} label={site} score={[84, 72, 69][index]} />
+          ))}
+        </div>
+      </PlatformPanel>
+    );
+  }
+
+  if (activeSection === "Approved Providers" || activeSection === "Performance" || activeSection === "Providers" || activeSection === "Provider Management") {
     return <ProviderMappingTable mappings={mappings} onMapping={onMapping} />;
   }
 
-  if (activeSection === "Levy Position" || activeSection === "Forecast") {
+  if (activeSection === "Programmes" || activeSection === "Programme Catalogue") {
+    return (
+      <PlatformPanel eyebrow="Programme catalogue" title="Approved apprenticeship programmes">
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+          {pathways.map((pathway) => (
+            <PathwayCard key={pathway.title} pathway={pathway} saved={savedPathways.includes(pathway.title)} onOpen={() => onOpenPathway(pathway)} onSave={() => onSavePathway(pathway.title)} />
+          ))}
+        </div>
+      </PlatformPanel>
+    );
+  }
+
+  if (activeSection === "Levy Position" || activeSection === "Forecast" || activeSection === "Levy Utilisation") {
     return (
       <PlatformPanel eyebrow="Funding and levy" title={activeSection === "Forecast" ? "Forecast apprenticeship demand" : "Levy utilisation"}>
         <div className="grid gap-4 md:grid-cols-3">
@@ -906,7 +1254,32 @@ function DetailSection({
     );
   }
 
-  if (activeSection === "Reporting") {
+  if (activeSection === "Organisation Overview") {
+    return (
+      <PlatformPanel eyebrow="Organisation overview" title="Enterprise apprenticeship performance">
+        <div className="grid gap-4 md:grid-cols-4">
+          <MetricTile label="Learners" value={learners.length} />
+          <MetricTile label="Requests" value={requests.length} />
+          <MetricTile label="Provider mappings" value={mappings.length} />
+          <MetricTile label="Readiness Index" value={readinessScore(learners, requests)} />
+        </div>
+      </PlatformPanel>
+    );
+  }
+
+  if (activeSection === "Compliance") {
+    return (
+      <PlatformPanel eyebrow="Compliance dashboard" title="Evidence, review dates and risk indicators">
+        <div className="grid gap-4 md:grid-cols-3">
+          <MetricCard label="Evidence status" value="92%" copy="Records complete across live learners" />
+          <MetricCard label="Reviews due" value="5" copy="Next 30 days" />
+          <MetricCard label="Risk indicators" value="2" copy="Require apprenticeship lead review" />
+        </div>
+      </PlatformPanel>
+    );
+  }
+
+  if (activeSection === "Reporting" || activeSection === "Platform Analytics") {
     return (
       <div className="grid gap-6">
         <ExecutiveSummary requests={requests} mappings={mappings} statusCounts={statusCounts} />
@@ -927,6 +1300,18 @@ function DetailSection({
     return (
       <PlatformPanel eyebrow="Enrolments" title="Learner progress">
         <Kanban requests={requests} onMove={onMove} compact />
+      </PlatformPanel>
+    );
+  }
+
+  if (["User Management", "Role Management", "Permission Management", "Employer Configuration", "Site Configuration", "Audit Logs", "System Settings", "Admin"].includes(activeSection)) {
+    return (
+      <PlatformPanel eyebrow="Admin console" title={activeSection}>
+        <div className="grid gap-4 md:grid-cols-3">
+          <MetricCard label="Configured users" value="148" copy="Demo users across employee and manager roles" />
+          <MetricCard label="Permission groups" value="5" copy="Employee, manager, department, lead and admin" />
+          <MetricCard label="Audit events" value="312" copy="Configuration and demo activity log" />
+        </div>
       </PlatformPanel>
     );
   }
@@ -1320,22 +1705,13 @@ function InsightBars({ rows }: { rows: Array<[string, number]> }) {
   );
 }
 
-function dashboardPurpose(role: Role) {
-  const purpose: Record<Role, string> = {
-    Employee: "Explore development options and submit interest.",
-    "Line Manager": "Manage team requests and development priorities.",
-    "Department Head": "See demand and workforce planning signals.",
-    "Apprenticeship Lead": "Manage the apprenticeship operation.",
-  };
-  return purpose[role];
-}
-
 function dashboardGuide(role: Role) {
   const copy: Record<Role, string> = {
     Employee: "This dashboard is intentionally focused on pathways, saved options and starting a request.",
     "Line Manager": "This dashboard keeps approvals and team capability signals separate from operational admin.",
     "Department Head": "This dashboard is a planning view for demand, skills gaps, priority roles and forecast demand.",
     "Apprenticeship Lead": "This dashboard launches the core operating areas without showing dense tables by default.",
+    "Admin Console": "This dashboard is reserved for platform administration, configuration and audit activity.",
   };
   return copy[role];
 }
@@ -1351,6 +1727,15 @@ function topEntry(counts: Record<string, number>) {
 
 function formatShortDate(value: string) {
   return new Intl.DateTimeFormat("en-GB", { month: "short", year: "numeric" }).format(new Date(value));
+}
+
+function readinessScore(learners: Learner[], requests: RequestItem[]) {
+  if (learners.length === 0) return 52;
+  const participation = Math.min(100, Math.round((learners.filter((learner) => learner.status === "Live learner" || learner.status === "Enrolment").length / learners.length) * 100));
+  const completion = Math.round(learners.reduce((sum, learner) => sum + learner.progress, 0) / learners.length);
+  const demandAlignment = Math.min(100, 58 + requests.length * 4);
+  const leadershipPipeline = learners.filter((learner) => learner.programme === "Leadership & Management").length * 7 + 55;
+  return Math.min(96, Math.max(42, Math.round((participation + completion + demandAlignment + leadershipPipeline) / 4)));
 }
 
 function countBy<T, K extends keyof T>(items: T[], key: K) {
