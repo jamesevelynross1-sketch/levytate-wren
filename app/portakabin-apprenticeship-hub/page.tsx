@@ -115,6 +115,19 @@ type ProviderMatchingRequest = {
   urgency: string;
 };
 
+type ApplicationDraft = {
+  name: string;
+  role: string;
+  department: string;
+  team: string;
+  site: string;
+  pathway: string;
+  manager: string;
+  reason: string;
+  careerGoal: string;
+  supportRequired: string;
+};
+
 type SectionKey =
   | "Dashboard"
   | "Recommended Pathways"
@@ -175,13 +188,13 @@ const publicStages: RequestStatus[] = ["Draft", "Submitted to Line Manager", "Ap
 
 const navSectionsByRole: Record<Role, PlatformNavSection[]> = {
   Employee: [
-    { title: "Employee", items: ["Dashboard", "Recommended Pathways", "Career Pathfinder", "Skills Analysis", "My Applications", "Development Passport"] },
+    { title: "Employee", items: ["Ask LevyTate AI", "Dashboard", "Recommended Pathways", "Career Pathfinder", "Skills Analysis", "My Applications", "Development Passport"] },
   ],
   "Line Manager": [
-    { title: "Manager", items: ["Dashboard", "My Team", "Applications to Review", "Team Skills", "Team Development", "Reporting"] },
+    { title: "Manager", items: ["Ask LevyTate AI", "Dashboard", "My Team", "Applications to Review", "Team Skills", "Team Development", "Reporting"] },
   ],
   "Department Head": [
-    { title: "Department", items: ["Dashboard", "Department Analytics", "Site Breakdown", "Apprenticeship Participation", "Skills Map", "Future Demand", "Reporting"] },
+    { title: "Department", items: ["Ask LevyTate AI", "Dashboard", "Department Analytics", "Site Breakdown", "Apprenticeship Participation", "Skills Map", "Future Demand", "Reporting"] },
   ],
   "Apprenticeship Lead": [
     { title: "Applications", items: ["Dashboard", "Applications for Final Approval", "Approved for Enrolment"] },
@@ -194,9 +207,9 @@ const navSectionsByRole: Record<Role, PlatformNavSection[]> = {
 };
 
 const roleSectionMap: Record<Role, SectionKey[]> = {
-  Employee: ["Recommended Pathways", "Career Pathfinder", "Skills Analysis", "My Applications"],
-  "Line Manager": ["My Team", "Applications to Review", "Reporting"],
-  "Department Head": ["Department Analytics", "Site Breakdown", "Reporting"],
+  Employee: ["Ask LevyTate AI", "Recommended Pathways", "Career Pathfinder", "Skills Analysis", "My Applications"],
+  "Line Manager": ["Ask LevyTate AI", "My Team", "Applications to Review", "Reporting"],
+  "Department Head": ["Ask LevyTate AI", "Department Analytics", "Site Breakdown", "Reporting"],
   "Apprenticeship Lead": ["Applications for Final Approval", "Providers", "Ask LevyTate AI", "Reporting"],
   "Admin Console": ["User Management", "Provider Management", "Platform Analytics"],
 };
@@ -795,29 +808,44 @@ export default function PortakabinApprenticeshipHub() {
     setSelectedEmployeeRole(nextPersona.role);
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const data = new FormData(event.currentTarget);
-    const pathway = String(data.get("pathway") || pathways[0].title);
+  function createApplication(draft: ApplicationDraft) {
     const nextRequest: RequestItem = {
       id: Math.max(...requests.map((request) => request.id), 0) + 1,
-      name: String(data.get("name") || "New colleague"),
-      role: String(data.get("role") || "Internal colleague"),
-      department: String(data.get("department") || "Manufacturing"),
-      team: String(data.get("team") || "Internal team"),
-      site: String(data.get("site") || (selectedSite === allSitesLabel ? "York Head Office, Visitor Centre and UK Factory" : selectedSite)),
-      pathway,
-      manager: String(data.get("manager") || "Line manager"),
+      name: draft.name,
+      role: draft.role,
+      department: draft.department,
+      team: draft.team,
+      site: draft.site,
+      pathway: draft.pathway,
+      manager: draft.manager,
       status: "Submitted to Line Manager",
-      note: String(data.get("reason") || "New development request."),
-      careerGoal: String(data.get("careerGoal") || "Progress into a future role."),
-      supportRequired: String(data.get("supportRequired") || "None noted."),
-      submittedDate: "2026-06-09",
+      note: draft.reason,
+      careerGoal: draft.careerGoal,
+      supportRequired: draft.supportRequired,
+      submittedDate: "2026-06-11",
       decisionNotes: "Submitted to line manager for review.",
     };
 
     setRequests((current) => [nextRequest, ...current]);
     setSuccess(true);
+    return nextRequest;
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    createApplication({
+      name: String(data.get("name") || "New colleague"),
+      role: String(data.get("role") || "Internal colleague"),
+      department: String(data.get("department") || "Manufacturing"),
+      team: String(data.get("team") || "Internal team"),
+      site: String(data.get("site") || (selectedSite === allSitesLabel ? "York Head Office, Visitor Centre and UK Factory" : selectedSite)),
+      pathway: String(data.get("pathway") || pathways[0].title),
+      manager: String(data.get("manager") || "Line manager"),
+      reason: String(data.get("reason") || "New development request."),
+      careerGoal: String(data.get("careerGoal") || "Progress into a future role."),
+      supportRequired: String(data.get("supportRequired") || "None noted."),
+    });
     setActiveSection("My Applications");
   }
 
@@ -920,6 +948,8 @@ export default function PortakabinApprenticeshipHub() {
                 onMapping={updateMapping}
                 onScenario={setScenarioData}
                 onSeed={seedRequest}
+                onNavigate={openSection}
+                onCreateApplication={createApplication}
               />
             </>
           )}
@@ -1784,6 +1814,8 @@ function DetailSection({
   onMapping,
   onScenario,
   onSeed,
+  onNavigate,
+  onCreateApplication,
 }: {
   role: Role;
   activeSection: SectionKey;
@@ -1810,6 +1842,8 @@ function DetailSection({
   onMapping: (index: number, status: MappingStatus, nextAction: string) => void;
   onScenario: (scenario: DemandScenario) => void;
   onSeed: () => void;
+  onNavigate: (section: SectionKey) => void;
+  onCreateApplication: (draft: ApplicationDraft) => RequestItem;
 }) {
   if (activeSection === "Dashboard") {
     return <DashboardGuide role={role} />;
@@ -2127,7 +2161,16 @@ function DetailSection({
   }
 
   if (activeSection === "Ask LevyTate AI") {
-    return <AskLevyTateAIPage />;
+    return (
+      <AskLevyTateAIPage
+        role={role}
+        selectedPersona={selectedPersona}
+        requests={requests}
+        onStatus={onStatus}
+        onNavigate={onNavigate}
+        onCreateApplication={onCreateApplication}
+      />
+    );
   }
 
   if (activeSection === "Enrolments") {
@@ -2802,7 +2845,37 @@ function DemoControls({ scenario, onScenario, onSeed, onReset }: { scenario: Dem
   );
 }
 
-function AskLevyTateAIPage() {
+function AskLevyTateAIPage({
+  role,
+  selectedPersona,
+  requests,
+  onStatus,
+  onNavigate,
+  onCreateApplication,
+}: {
+  role: Role;
+  selectedPersona: EmployeePersona;
+  requests: RequestItem[];
+  onStatus: (id: number, status: RequestStatus) => void;
+  onNavigate: (section: SectionKey) => void;
+  onCreateApplication: (draft: ApplicationDraft) => RequestItem;
+}) {
+  if (role === "Employee") {
+    return <EmployeeAIPage key={selectedPersona.name} selectedPersona={selectedPersona} requests={requests} onNavigate={onNavigate} onCreateApplication={onCreateApplication} />;
+  }
+
+  if (role === "Line Manager") {
+    return <LineManagerAIPage requests={requests} onStatus={onStatus} onNavigate={onNavigate} />;
+  }
+
+  if (role === "Department Head") {
+    return <DepartmentHeadAIPage requests={requests} onNavigate={onNavigate} />;
+  }
+
+  return <ApprenticeshipLeadAIPage />;
+}
+
+function ApprenticeshipLeadAIPage() {
   const [query, setQuery] = useState(advisoryPromptExamples[0].prompt);
   const [advice, setAdvice] = useState<ApprenticeshipAdvice>(() => getApprenticeshipAdvice(advisoryPromptExamples[0].prompt));
   const [matchingOpen, setMatchingOpen] = useState(false);
@@ -2956,6 +3029,429 @@ function AskLevyTateAIPage() {
       ) : null}
     </div>
   );
+}
+
+function EmployeeAIPage({
+  selectedPersona,
+  requests,
+  onNavigate,
+  onCreateApplication,
+}: {
+  selectedPersona: EmployeePersona;
+  requests: RequestItem[];
+  onNavigate: (section: SectionKey) => void;
+  onCreateApplication: (draft: ApplicationDraft) => RequestItem;
+}) {
+  const examples = ["I want to become a team leader.", "I work in production. What apprenticeships suit me?", "I'm interested in data and automation.", "Which pathway would help me progress at Portakabin?", "Can you help me apply?"];
+  const [query, setQuery] = useState(selectedPersona.name === "Daniel Carter" ? examples[2] : examples[0]);
+  const [response, setResponse] = useState(() => getEmployeeAIResponse(selectedPersona.name === "Daniel Carter" ? examples[2] : examples[0], selectedPersona));
+  const [savedMessage, setSavedMessage] = useState("");
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [applicationOpen, setApplicationOpen] = useState(false);
+  const [confirmation, setConfirmation] = useState<RequestItem | null>(null);
+  const employeeApplications = requests.filter((request) => request.name === selectedPersona.name);
+
+  function askQuestion(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setResponse(getEmployeeAIResponse(query, selectedPersona));
+    setApplicationOpen(false);
+    setConfirmation(null);
+  }
+
+  function applyPrompt(prompt: string) {
+    setQuery(prompt);
+    setResponse(getEmployeeAIResponse(prompt, selectedPersona));
+    setApplicationOpen(false);
+    setConfirmation(null);
+  }
+
+  function submitAIApplication(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const created = onCreateApplication({
+      name: selectedPersona.name,
+      role: selectedPersona.role,
+      department: selectedPersona.department,
+      team: selectedPersona.department === "Business Intelligence" ? "Data & Automation" : "Assembly Line A",
+      site: selectedPersona.site,
+      pathway: String(data.get("pathway") || response.primary.programme),
+      manager: selectedPersona.manager,
+      reason: String(data.get("reason") || response.primary.draftReason),
+      careerGoal: String(data.get("careerGoal") || selectedPersona.careerGoal),
+      supportRequired: String(data.get("supportRequired") || response.supportRequired),
+    });
+    setConfirmation(created);
+    setApplicationOpen(false);
+  }
+
+  return (
+    <div className="grid gap-5">
+      <PlatformPanel eyebrow="AI pathway assistant" title="Ask LevyTate AI">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <form onSubmit={askQuestion} className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-[#f8fbfa] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+            <p className="max-w-2xl text-sm leading-6 text-[#102c3d]/62">Tell us about your role, goals or interests and LevyTate will help you find the most relevant approved pathway.</p>
+            <label className="mt-4 grid gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#102c3d]/42">
+              Your question
+              <textarea
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                rows={4}
+                className="min-h-[112px] rounded-xl border border-[#102c3d]/[0.09] bg-white px-4 py-3 text-base font-medium normal-case leading-7 tracking-normal text-[#102c3d] outline-none transition placeholder:text-[#102c3d]/32 focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10"
+              />
+            </label>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <PlatformButton>Find pathway</PlatformButton>
+              <button type="button" onClick={() => applyPrompt("Can you help me apply?")} className="h-10 rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.06] transition hover:text-[#102c3d]">Help me apply</button>
+            </div>
+          </form>
+
+          <div className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-white p-4 shadow-[0_10px_26px_rgba(16,44,61,0.045)]">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#c95568]">Example prompts</p>
+            <div className="mt-3 grid gap-2">
+              {examples.map((prompt) => (
+                <button key={prompt} onClick={() => applyPrompt(prompt)} className="rounded-xl border border-[#102c3d]/[0.055] bg-[#f8fbfa] px-3.5 py-2.5 text-left text-sm font-semibold text-[#102c3d]/70 transition hover:border-[#159b8f]/25 hover:bg-white hover:text-[#102c3d]">
+                  {prompt}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </PlatformPanel>
+
+      <PlatformPanel eyebrow="Personal recommendation" title={`${selectedPersona.name.split(" ")[0]}'s recommended route`}>
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <article className="rounded-[1rem] border border-[#159b8f]/[0.18] bg-[#f8fbfa] p-5 shadow-[0_12px_28px_rgba(16,44,61,0.045)]">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold text-[#102c3d]/44">Primary recommendation</p>
+                <h3 className="mt-1 text-2xl font-semibold tracking-[-0.025em] text-[#102c3d]">{response.primary.programme}</h3>
+                <p className="mt-2 text-sm font-semibold text-[#159b8f]">{response.primary.pathway}</p>
+              </div>
+              <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#0b6f63] ring-1 ring-[#159b8f]/[0.14]">{response.primary.fit}% fit</span>
+            </div>
+            <p className="mt-4 text-sm leading-6 text-[#102c3d]/64">{response.primary.why}</p>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              <InfoBox label="Current role" value={selectedPersona.role} />
+              <InfoBox label="Career goal" value={selectedPersona.careerGoal} />
+              <InfoBox label="Approved delivery partner" value={response.primary.provider} />
+            </div>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <PlatformButton onClick={() => { setSavedMessage(`${response.primary.programme} saved for later.`); }}>Save pathway</PlatformButton>
+              <PlatformButton variant="soft" onClick={() => setCompareOpen((current) => !current)}>Compare pathways</PlatformButton>
+              <PlatformButton variant="amber" onClick={() => setApplicationOpen(true)}>Start application</PlatformButton>
+              <button onClick={() => applyPrompt("What else should I consider before applying?")} className="h-10 rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.06] transition hover:text-[#102c3d]">Ask follow-up</button>
+            </div>
+            {savedMessage ? <p className="mt-3 rounded-xl bg-white px-3 py-2 text-xs font-semibold text-[#0b6f63] ring-1 ring-[#102c3d]/[0.05]">{savedMessage}</p> : null}
+          </article>
+
+          <div className="grid gap-3">
+            {response.alternatives.map((item) => (
+              <article key={item.programme} className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-white p-4 shadow-[0_8px_20px_rgba(16,44,61,0.035)]">
+                <div className="flex items-start justify-between gap-3">
+                  <h3 className="text-sm font-semibold leading-5 text-[#102c3d]">{item.programme}</h3>
+                  <span className="rounded-full bg-[#f8fbfa] px-2.5 py-1 text-xs font-semibold text-[#102c3d]/56">{item.fit}%</span>
+                </div>
+                <p className="mt-2 text-xs leading-5 text-[#102c3d]/58">{item.why}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+
+        {compareOpen ? (
+          <div className="mt-5 grid gap-3 rounded-[1rem] border border-[#102c3d]/[0.055] bg-white p-4 md:grid-cols-3">
+            <InfoBox label="Best immediate fit" value={response.primary.programme} />
+            <InfoBox label="Alternative route" value={response.alternatives[0]?.programme ?? "No alternative"} />
+            <InfoBox label="Recommendation logic" value="Uses role, site, career goal, provider mappings and application history." />
+          </div>
+        ) : null}
+      </PlatformPanel>
+
+      {applicationOpen ? (
+        <PlatformPanel eyebrow="AI prepared application" title="Review and submit to line manager">
+          <form onSubmit={submitAIApplication} className="grid gap-4 md:grid-cols-2">
+            <Field name="pathway" label="Selected apprenticeship" defaultValue={response.primary.programme} />
+            <Field name="careerGoal" label="Career goal" defaultValue={selectedPersona.careerGoal} />
+            <Field name="role" label="Role" defaultValue={selectedPersona.role} />
+            <Field name="manager" label="Line manager" defaultValue={selectedPersona.manager} />
+            <label className="grid gap-1.5 text-xs font-medium text-[#102c3d]/62 md:col-span-2">
+              Reason for interest
+              <textarea name="reason" rows={4} className="min-w-0 rounded-xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3.5 py-3 text-sm leading-6 outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10" defaultValue={response.primary.draftReason} />
+            </label>
+            <label className="grid gap-1.5 text-xs font-medium text-[#102c3d]/62 md:col-span-2">
+              Any support required
+              <textarea name="supportRequired" rows={3} className="min-w-0 rounded-xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3.5 py-3 text-sm leading-6 outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10" defaultValue={response.supportRequired} />
+            </label>
+            <label className="flex items-start gap-3 rounded-xl border border-[#102c3d]/[0.045] bg-[#f8fbfa] p-3.5 text-sm leading-6 text-[#102c3d]/62 md:col-span-2">
+              <input type="checkbox" required className="mt-1 h-4 w-4 accent-[#159b8f]" />
+              I confirm this expression of interest can be shared with my line manager and the apprenticeship lead.
+            </label>
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#102c3d]/[0.045] bg-[#f8fbfa] p-3.5 md:col-span-2">
+              <p className="text-sm leading-6 text-[#102c3d]/54">This sends the application to {selectedPersona.manager} for review.</p>
+              <PlatformButton>Submit to Line Manager</PlatformButton>
+            </div>
+          </form>
+        </PlatformPanel>
+      ) : null}
+
+      {confirmation ? (
+        <PlatformPanel eyebrow="Application submitted" title="Application submitted to your Line Manager">
+          <p className="text-sm leading-6 text-[#102c3d]/62">Your {confirmation.pathway} application has been submitted to {confirmation.manager} for review.</p>
+          <div className="mt-4 grid gap-3 md:grid-cols-4">
+            <MetricTile label="Programme" value={confirmation.pathway} />
+            <MetricTile label="Line manager" value={confirmation.manager} />
+            <MetricTile label="Submitted date" value={formatShortDate(confirmation.submittedDate)} />
+            <MetricTile label="Current status" value={confirmation.status} />
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <PlatformButton onClick={() => onNavigate("My Applications")}>View My Applications</PlatformButton>
+            <PlatformButton variant="soft" onClick={() => onNavigate("Recommended Pathways")}>Explore more pathways</PlatformButton>
+          </div>
+        </PlatformPanel>
+      ) : null}
+
+      <PlatformPanel eyebrow="Recent activity" title="Application history">
+        <div className="grid gap-3 md:grid-cols-2">
+          {employeeApplications.length ? employeeApplications.slice(0, 4).map((request) => (
+            <ApplicationCard key={request.id} request={request} scope="readonly" onStatus={() => undefined} />
+          )) : <p className="rounded-xl bg-[#f8fbfa] p-4 text-sm text-[#102c3d]/58">No applications yet. Ask LevyTate AI can help you start one.</p>}
+        </div>
+      </PlatformPanel>
+    </div>
+  );
+}
+
+function LineManagerAIPage({ requests, onStatus, onNavigate }: { requests: RequestItem[]; onStatus: (id: number, status: RequestStatus) => void; onNavigate: (section: SectionKey) => void }) {
+  const examples = ["Should I approve Amelia's Team Leader application?", "Which members of my team could benefit from leadership development?", "Where are the biggest skills gaps in my team?", "What apprenticeship pathways suit my production team?"];
+  const [query, setQuery] = useState(examples[0]);
+  const [response, setResponse] = useState(() => getManagerAIResponse(examples[0], requests));
+  const pending = requests.filter((request) => request.status === "Submitted to Line Manager");
+  const target = pending[0];
+
+  function askQuestion(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setResponse(getManagerAIResponse(query, requests));
+  }
+
+  function applyPrompt(prompt: string) {
+    setQuery(prompt);
+    setResponse(getManagerAIResponse(prompt, requests));
+  }
+
+  return (
+    <div className="grid gap-5">
+      <PlatformPanel eyebrow="Manager AI support" title="Ask LevyTate AI">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <form onSubmit={askQuestion} className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-[#f8fbfa] p-4">
+            <p className="text-sm leading-6 text-[#102c3d]/62">Get support developing your team and reviewing apprenticeship requests.</p>
+            <textarea value={query} onChange={(event) => setQuery(event.target.value)} rows={4} className="mt-4 min-h-[112px] w-full rounded-xl border border-[#102c3d]/[0.09] bg-white px-4 py-3 text-base font-medium leading-7 text-[#102c3d] outline-none transition focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10" />
+            <PlatformButton className="mt-4">Generate manager guidance</PlatformButton>
+          </form>
+          <div className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-white p-4 shadow-[0_10px_26px_rgba(16,44,61,0.045)]">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#c95568]">Example prompts</p>
+            <div className="mt-3 grid gap-2">
+              {examples.map((prompt) => (
+                <button key={prompt} onClick={() => applyPrompt(prompt)} className="rounded-xl border border-[#102c3d]/[0.055] bg-[#f8fbfa] px-3.5 py-2.5 text-left text-sm font-semibold text-[#102c3d]/70 transition hover:border-[#159b8f]/25 hover:bg-white hover:text-[#102c3d]">{prompt}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </PlatformPanel>
+
+      <PlatformPanel eyebrow="AI recommendation" title={response.title}>
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-[#f8fbfa] p-4">
+            <p className="text-sm leading-6 text-[#102c3d]/64">{response.summary}</p>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              {response.signals.map(([label, value]) => <InfoBox key={label} label={label} value={value} />)}
+            </div>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <PlatformButton onClick={() => onNavigate("Applications to Review")}>Review application</PlatformButton>
+              <PlatformButton variant="soft" onClick={() => target && onStatus(target.id, "Approved by Line Manager")}>Approve application</PlatformButton>
+              <PlatformButton variant="coral" onClick={() => target && onStatus(target.id, "Declined by Line Manager")}>Decline with reason</PlatformButton>
+              <button onClick={() => target && onStatus(target.id, "Draft")} className="h-10 rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.06] transition hover:text-[#102c3d]">Request more information</button>
+              <button onClick={() => onNavigate("Team Skills")} className="h-10 rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.06] transition hover:text-[#102c3d]">View team skills gaps</button>
+            </div>
+          </div>
+          <div className="grid gap-3">
+            <MetricTile label="Applications awaiting review" value={pending.length} copy="Direct reports requiring manager approval." />
+            <MetricTile label="Recommended team pathway" value="Level 3 Team Leader" copy="Best current fit for production progression." />
+            <MetricTile label="Business benefit" value="Strong" copy="Leadership, handover and quality confidence." />
+          </div>
+        </div>
+      </PlatformPanel>
+    </div>
+  );
+}
+
+function DepartmentHeadAIPage({ requests, onNavigate }: { requests: RequestItem[]; onNavigate: (section: SectionKey) => void }) {
+  const examples = ["What percentage of my department is on an apprenticeship?", "Which sites have the lowest apprenticeship participation?", "Where are our future skills risks?", "What should I include in a department workforce plan?"];
+  const [query, setQuery] = useState(examples[0]);
+  const [response, setResponse] = useState(() => getDepartmentHeadAIResponse(examples[0], requests));
+  const [exported, setExported] = useState(false);
+
+  function askQuestion(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setResponse(getDepartmentHeadAIResponse(query, requests));
+    setExported(false);
+  }
+
+  function applyPrompt(prompt: string) {
+    setQuery(prompt);
+    setResponse(getDepartmentHeadAIResponse(prompt, requests));
+    setExported(false);
+  }
+
+  return (
+    <div className="grid gap-5">
+      <PlatformPanel eyebrow="Workforce intelligence" title="Ask LevyTate AI">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <form onSubmit={askQuestion} className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-[#f8fbfa] p-4">
+            <p className="text-sm leading-6 text-[#102c3d]/62">Understand department capability, participation and workforce risk. This role has no individual approval actions.</p>
+            <textarea value={query} onChange={(event) => setQuery(event.target.value)} rows={4} className="mt-4 min-h-[112px] w-full rounded-xl border border-[#102c3d]/[0.09] bg-white px-4 py-3 text-base font-medium leading-7 text-[#102c3d] outline-none transition focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10" />
+            <PlatformButton className="mt-4">Generate workforce insight</PlatformButton>
+          </form>
+          <div className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-white p-4 shadow-[0_10px_26px_rgba(16,44,61,0.045)]">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#c95568]">Example prompts</p>
+            <div className="mt-3 grid gap-2">
+              {examples.map((prompt) => (
+                <button key={prompt} onClick={() => applyPrompt(prompt)} className="rounded-xl border border-[#102c3d]/[0.055] bg-[#f8fbfa] px-3.5 py-2.5 text-left text-sm font-semibold text-[#102c3d]/70 transition hover:border-[#159b8f]/25 hover:bg-white hover:text-[#102c3d]">{prompt}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </PlatformPanel>
+
+      <PlatformPanel eyebrow="Department insight" title={response.title}>
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-[#f8fbfa] p-4">
+            <p className="text-sm leading-6 text-[#102c3d]/64">{response.summary}</p>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              {response.signals.map(([label, value]) => <InfoBox key={label} label={label} value={value} />)}
+            </div>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <PlatformButton onClick={() => onNavigate("Department Analytics")}>View department report</PlatformButton>
+              <PlatformButton variant="soft" onClick={() => onNavigate("Site Breakdown")}>View site breakdown</PlatformButton>
+              <PlatformButton variant="amber" onClick={() => onNavigate("Skills Map")}>View skills gap analysis</PlatformButton>
+              <button onClick={() => setExported(true)} className="h-10 rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.06] transition hover:text-[#102c3d]">Export report</button>
+            </div>
+            {exported ? <p className="mt-3 rounded-xl bg-white px-3 py-2 text-xs font-semibold text-[#0b6f63] ring-1 ring-[#102c3d]/[0.05]">Executive report prepared for demo export.</p> : null}
+          </div>
+          <div className="grid gap-3">
+            <MetricTile label="Department participation" value="18%" copy="Percentage of department currently on programme." />
+            <MetricTile label="Active learners" value="27" copy="Employees currently enrolled." />
+            <MetricTile label="Future skills risks" value="4" copy="Capability areas requiring attention." />
+          </div>
+        </div>
+      </PlatformPanel>
+    </div>
+  );
+}
+
+function getEmployeeAIResponse(prompt: string, persona: EmployeePersona) {
+  const normalised = prompt.toLowerCase();
+  const isDaniel = persona.name === "Daniel Carter";
+  const wantsAI = normalised.includes("ai") || normalised.includes("automation");
+
+  if (isDaniel && wantsAI) {
+    return {
+      primary: {
+        programme: "AI & Automation Workforce Programme",
+        pathway: "Digital, Data & AI",
+        provider: "QA",
+        fit: 94,
+        why: "This route supports practical AI adoption, automation opportunities and data-enabled process improvement.",
+        draftReason: "I am interested in the AI & Automation Workforce Programme because I want to build practical confidence using AI and automation to improve reporting workflows, reduce manual tasks and support data-enabled process improvement.",
+      },
+      alternatives: [
+        { programme: "Level 4 Data Analyst", fit: 91, why: "Best fit for deeper analysis, insight generation and data storytelling." },
+        { programme: "Level 3 Data Technician", fit: 86, why: "A practical route for strengthening data handling and dashboard confidence." },
+        { programme: "Level 4 Business Analyst", fit: 84, why: "Useful if Daniel wants to connect systems, process change and business requirements." },
+      ],
+      supportRequired: "Protected time for AI use case discovery, portfolio evidence and internal reporting projects.",
+    };
+  }
+
+  if (isDaniel) {
+    return {
+      primary: {
+        programme: "Level 4 Data Analyst",
+        pathway: "Digital, Data & AI",
+        provider: "QA",
+        fit: 92,
+        why: "This pathway supports Daniel's progression into senior data, insight and automation leadership.",
+        draftReason: "I am interested in the Level 4 Data Analyst pathway because I want to deepen my analysis, insight generation and data storytelling skills while progressing toward Head of Data & Automation.",
+      },
+      alternatives: [
+        { programme: "Level 3 Data Technician", fit: 86, why: "Supports practical data foundations and reporting confidence." },
+        { programme: "Level 4 Business Analyst", fit: 84, why: "Supports process improvement and systems change capability." },
+        { programme: "AI & Automation Workforce Programme", fit: 82, why: "Supports practical AI adoption and automation opportunity discovery." },
+      ],
+      supportRequired: "Protected time for portfolio evidence and internal reporting projects.",
+    };
+  }
+
+  return {
+    primary: {
+      programme: "Level 3 Team Leader",
+      pathway: "Leadership & Management",
+      provider: "Babington",
+      fit: 93,
+      why: "This pathway supports Amelia's progression into team leadership, shift coordination and production supervision.",
+      draftReason: "I am interested in the Level 3 Team Leader pathway because I would like to progress from Production Team Member into a Production Supervisor or Team Leader role. I want to build confidence in leadership, communication and coordinating work across the team.",
+    },
+    alternatives: [
+      { programme: "Level 3 Engineering Technician", fit: 88, why: "This supports stronger technical capability in a manufacturing environment." },
+      { programme: "Level 3 Engineering Maintenance Technician", fit: 82, why: "A suitable technical route if Amelia wants to move toward maintenance and fault finding." },
+    ],
+    supportRequired: "Support with study time and evidence collection.",
+  };
+}
+
+function getManagerAIResponse(prompt: string, requests: RequestItem[]) {
+  const pending = requests.filter((request) => request.status === "Submitted to Line Manager");
+  const normalised = prompt.toLowerCase();
+  const target = pending.find((request) => normalised.includes(request.name.split(" ")[0].toLowerCase())) ?? pending[0];
+
+  if (normalised.includes("skills gap") || normalised.includes("skills gaps")) {
+    return {
+      title: "Team skills gap summary",
+      summary: "The clearest team development priorities are leadership readiness, technical evidence quality and data confidence. LevyTate recommends using Level 3 Team Leader for emerging supervisors and Level 3 Engineering Technician for technical manufacturing progression.",
+      signals: [["Priority gap", "Leadership readiness"], ["Suggested cohort", "Production leadership"], ["Business benefit", "Better handovers and quality routines"]],
+    };
+  }
+
+  return {
+    title: target ? `Review guidance for ${target.name}` : "Manager review guidance",
+    summary: target ? `${target.name}'s application appears suitable because the selected programme aligns to their role, career goal and business benefit. Review study time, evidence access and coverage before approving.` : "There are no manager approvals in the current filtered view. Review team skills gaps or seed a new application for the presentation.",
+    signals: [["Application", target?.pathway ?? "None awaiting review"], ["Current approver", target?.manager ?? "No action"], ["Suggested decision", target ? "Approve if workload can support study time" : "No approval needed"]],
+  };
+}
+
+function getDepartmentHeadAIResponse(prompt: string, requests: RequestItem[]) {
+  const normalised = prompt.toLowerCase();
+  const pending = requests.filter((request) => request.status === "Submitted to Line Manager" || request.status === "Approved by Line Manager" || request.status === "Submitted to Apprenticeship Lead").length;
+
+  if (normalised.includes("site")) {
+    return {
+      title: "Site participation comparison",
+      summary: "York and Leeds show stronger apprenticeship activity, while several visitor centres have low participation. The next workforce plan should focus on consistent site adoption, especially for customer experience, site operations and supply chain roles.",
+      signals: [["Lowest participation", "Smaller visitor centres"], ["Pending demand", String(pending)], ["Action", "Review site breakdown"]],
+    };
+  }
+
+  if (normalised.includes("future") || normalised.includes("risk")) {
+    return {
+      title: "Future skills risk summary",
+      summary: "The main future skills risks are leadership pipeline, data confidence, technical manufacturing evidence and site supervision. Apprenticeship demand should be planned by department and site before the next intake window.",
+      signals: [["Skills risks", "4"], ["Highest priority", "Leadership pipeline"], ["Planning horizon", "Next quarter"]],
+    };
+  }
+
+  return {
+    title: "Department participation insight",
+    summary: "Department participation is improving, with active learners across manufacturing, site operations, customer experience and digital roles. Department Heads can use this view for workforce planning only, with no individual approval actions.",
+    signals: [["Participation", "18%"], ["Active learners", "27"], ["Pending applications", String(pending)]],
+  };
 }
 
 function ProviderMatchingRequestsTable({ requests }: { requests: ProviderMatchingRequest[] }) {
