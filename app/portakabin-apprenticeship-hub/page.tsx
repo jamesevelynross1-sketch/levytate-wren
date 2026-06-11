@@ -356,7 +356,7 @@ const portakabinLearners: Learner[] = [
 ];
 
 const initialRequests: RequestItem[] = [
-  { id: 1, name: "Amelia Hart", role: "Production Team Member", department: "Manufacturing", team: "Assembly Line A", site: "York Head Office, Visitor Centre and UK Factory", pathway: "Manufacturing & Production", manager: "Ryan Booth", status: "Submitted to Line Manager", note: "I want to build stronger production and engineering confidence.", careerGoal: "Progress into a maintenance technician role.", supportRequired: "Support with study time during shifts.", submittedDate: "2026-05-18", decisionNotes: "Awaiting Ryan Booth review." },
+  { id: 1, name: "Amelia Hart", role: "Production Team Member", department: "Manufacturing", team: "Assembly Line A", site: "York Head Office, Visitor Centre and UK Factory", pathway: "Leadership & Management", manager: "Ryan Booth", status: "Submitted to Line Manager", note: "I want to apply for the Level 3 Team Leader route so I can build confidence leading shift handovers and improvement work.", careerGoal: "Progress into a team leader role in production.", supportRequired: "Support with study time during shifts.", submittedDate: "2026-05-18", decisionNotes: "Awaiting Ryan Booth review." },
   { id: 2, name: "Marcus Lee", role: "Technical Design Assistant", department: "Design & Technical", team: "Building Design", site: "York Head Office, Visitor Centre and UK Factory", pathway: "Design & Technical", manager: "Priya Nair", status: "Declined by Line Manager", note: "I want to formalise my design skills and contribute to technical standards.", careerGoal: "Move into a design technician role.", supportRequired: "Mentor support from senior designer.", submittedDate: "2026-05-12", decisionNotes: "Declined because current workload needs stabilising before a new programme starts." },
   { id: 3, name: "Sophie Clarke", role: "Customer Hire Coordinator", department: "Hire & Customer", team: "Customer Support", site: "Leeds Visitor Centre", pathway: "Hire, Sales & Customer Experience", manager: "Helen Ward", status: "Approved by Line Manager", note: "I want to improve customer conversations and account confidence.", careerGoal: "Progress into account support leadership.", supportRequired: "Protected time for monthly workshops.", submittedDate: "2026-05-10", decisionNotes: "Approved by Helen Ward and ready for apprenticeship lead review." },
   { id: 4, name: "Noah Bennett", role: "Installation Coordinator", department: "Site Operations", team: "Field Delivery", site: "Sheffield Visitor Centre", pathway: "Installation & Site Operations", manager: "Sam Ellis", status: "Submitted to Apprenticeship Lead", note: "I want to strengthen site handover and supervision skills.", careerGoal: "Become a site supervisor.", supportRequired: "Access to live site evidence.", submittedDate: "2026-05-08", decisionNotes: "Line manager approved. Awaiting final approval." },
@@ -458,7 +458,7 @@ export default function PortakabinApprenticeshipHub() {
   const [requests, setRequests] = useState<RequestItem[]>(initialRequests);
   const [mappings, setMappings] = useState<ProviderMapping[]>(initialMappings);
   const [selectedPathway, setSelectedPathway] = useState<Pathway | null>(null);
-  const [savedPathways, setSavedPathways] = useState<string[]>(["Manufacturing & Production", "Digital, Data & AI"]);
+  const [savedPathways, setSavedPathways] = useState<string[]>(["Manufacturing & Production", "Digital, Data & AI", "Leadership & Management"]);
   const [scenario, setScenario] = useState<DemandScenario>("Medium");
   const [selectedSite, setSelectedSite] = useState(allSitesLabel);
   const [learnerSearch, setLearnerSearch] = useState("");
@@ -565,7 +565,7 @@ export default function PortakabinApprenticeshipHub() {
         <div className="mx-auto w-full max-w-[1500px] space-y-7 px-5 py-7 sm:px-7 lg:px-9">
           {activeSection === "Dashboard" ? (
             <>
-              <HeroPanel role={role} requests={filteredRequests} learners={filteredLearners} mappings={mappings} statusCounts={statusCounts} selectedSite={selectedSite} onNavigate={openSection} />
+              <HeroPanel role={role} selectedSite={selectedSite} onNavigate={openSection} />
               {selectedSite !== allSitesLabel ? <SiteSummary site={selectedSite} learners={filteredLearners} requests={filteredRequests} /> : null}
               <RoleDashboard
                 role={role}
@@ -709,31 +709,15 @@ function TopBar({
 
 function HeroPanel({
   role,
-  requests,
-  learners,
-  mappings,
-  statusCounts,
   selectedSite,
   onNavigate,
 }: {
   role: Role;
-  requests: RequestItem[];
-  learners: Learner[];
-  mappings: ProviderMapping[];
-  statusCounts: Record<string, number>;
   selectedSite: string;
   onNavigate: (section: SectionKey) => void;
 }) {
-  const awaiting = (statusCounts["Submitted to Line Manager"] ?? 0) + (statusCounts["Approved by Line Manager"] ?? 0) + (statusCounts["Submitted to Apprenticeship Lead"] ?? 0);
-  const liveRoutes = new Set(learners.map((learner) => learner.programme)).size || pathways.filter((item) => item.status === "Live").length;
-  const metricCards = operatingSnapshotMetrics({
-    role,
-    applications: requests.length,
-    awaiting,
-    liveRoutes,
-    mappings: mappings.filter((item) => item.status === "Live").length,
-    activeLearners: learners.length,
-  });
+  const primaryAction = primaryDashboardAction(role);
+  const metricCards = operatingSnapshotMetrics(role);
 
   return (
     <section className="grid gap-6 rounded-[1.6rem] border border-[#102c3d]/[0.06] bg-white/96 p-6 shadow-[0_22px_60px_rgba(16,44,61,0.055)] xl:grid-cols-[minmax(0,1fr)_390px] xl:p-7">
@@ -743,6 +727,9 @@ function HeroPanel({
         <p className="mt-4 max-w-3xl text-base leading-7 text-[#102c3d]/64 md:text-lg">A focused LevyTate workspace for approved pathways, development demand and apprenticeship operations.</p>
         <p className="mt-3 text-sm font-medium text-[#102c3d]/54">View: {selectedSite}</p>
         <div className="mt-7 flex flex-wrap gap-2.5">
+          <PlatformButton onClick={() => onNavigate(primaryAction.target)}>
+            {primaryAction.label}
+          </PlatformButton>
           {roleSectionMap[role].map((section) => (
             <PlatformButton key={section} onClick={() => onNavigate(section)} variant="soft">
               {section}
@@ -772,21 +759,7 @@ function HeroPanel({
   );
 }
 
-function operatingSnapshotMetrics({
-  role,
-  applications,
-  awaiting,
-  liveRoutes,
-  mappings,
-  activeLearners,
-}: {
-  role: Role;
-  applications: number;
-  awaiting: number;
-  liveRoutes: number;
-  mappings: number;
-  activeLearners: number;
-}): Array<{
+function operatingSnapshotMetrics(role: Role): Array<{
   label: string;
   value: string | number;
   copy: string;
@@ -795,120 +768,212 @@ function operatingSnapshotMetrics({
   actionLabel: string;
   target: SectionKey;
 }> {
-  const applicationCopy: Record<Role, { label: string; copy: string; target: SectionKey; action: string }> = {
-    Employee: {
-      label: "My applications",
-      copy: "Your apprenticeship requests currently progressing through the approval workflow.",
-      target: "My Applications",
-      action: "View my applications",
-    },
-    "Line Manager": {
-      label: "Applications to review",
-      copy: "Applications from your team that need a manager decision or next step.",
-      target: "Applications to Review",
-      action: "Review requests",
-    },
-    "Department Head": {
-      label: "Department applications",
-      copy: "Applications within your department, shown for reporting and planning.",
-      target: "Department Analytics",
-      action: "View analytics",
-    },
-    "Apprenticeship Lead": {
-      label: "Organisation applications",
-      copy: "Active apprenticeship requests currently progressing through approval workflows.",
-      target: "Applications for Final Approval",
-      action: "Open applications",
-    },
-    "Admin Console": {
-      label: "Applications",
-      copy: "Active apprenticeship requests currently progressing through approval workflows.",
-      target: "Platform Analytics",
-      action: "View reporting",
-    },
+  const snapshots: Record<Role, Array<{ label: string; value: string | number; copy: string; trend: string; tooltip: string; actionLabel: string; target: SectionKey }>> = {
+    Employee: [
+      {
+        label: "Recommended pathways",
+        value: 6,
+        copy: "Apprenticeships matched to your role and career goals.",
+        trend: "+2 new matches this month",
+        tooltip: "Measures approved pathways matched to Amelia's current role, site and career goal. It matters because employees see relevant options without provider confusion.",
+        actionLabel: "Explore pathways",
+        target: "Recommended Pathways",
+      },
+      {
+        label: "Applications in progress",
+        value: 2,
+        copy: "Requests currently progressing through approval.",
+        trend: "1 with Ryan Booth",
+        tooltip: "Measures Amelia's active applications that are not yet final approved or declined. It matters because she can track what is moving and who has the next decision.",
+        actionLabel: "Track applications",
+        target: "My Applications",
+      },
+      {
+        label: "Saved opportunities",
+        value: 3,
+        copy: "Pathways shortlisted for future consideration.",
+        trend: "+1 saved this week",
+        tooltip: "Measures pathways Amelia has saved for later review. It matters because development planning can happen before a formal application is submitted.",
+        actionLabel: "View saved pathways",
+        target: "Recommended Pathways",
+      },
+      {
+        label: "Development passport",
+        value: 7,
+        copy: "Completed training activities and qualifications.",
+        trend: "2 qualifications logged",
+        tooltip: "Measures completed learning evidence in Amelia's development passport. It matters because prior learning helps shape the right pathway and support plan.",
+        actionLabel: "View passport",
+        target: "Development Passport",
+      },
+    ],
+    "Line Manager": [
+      {
+        label: "Applications awaiting review",
+        value: 4,
+        copy: "Direct reports requiring manager approval.",
+        trend: "Amelia Hart needs review",
+        tooltip: "Measures applications from direct reports waiting for the line manager decision. It matters because manager approval is the first control point in the workflow.",
+        actionLabel: "Review applications",
+        target: "Applications to Review",
+      },
+      {
+        label: "Active team learners",
+        value: 12,
+        copy: "Team members currently on programme.",
+        trend: "+3 this quarter",
+        tooltip: "Measures direct reports already enrolled on apprenticeship programmes. It matters because managers need to plan time, cover and coaching.",
+        actionLabel: "View team learners",
+        target: "My Team",
+      },
+      {
+        label: "High potential employees",
+        value: 5,
+        copy: "Employees identified for future progression.",
+        trend: "2 ready for leadership route",
+        tooltip: "Measures team members flagged for progression based on role, performance signals and skills readiness. It matters because managers can build a stronger internal pipeline.",
+        actionLabel: "Open team development",
+        target: "Team Development",
+      },
+      {
+        label: "Team skills gaps",
+        value: 3,
+        copy: "Critical capability gaps requiring development.",
+        trend: "Leadership is priority",
+        tooltip: "Measures team-level gaps in priority capability areas. It matters because apprenticeship demand should map to real operational need.",
+        actionLabel: "View team skills",
+        target: "Team Skills",
+      },
+    ],
+    "Department Head": [
+      {
+        label: "Department participation",
+        value: "18%",
+        copy: "Percentage of department currently on programme.",
+        trend: "Up from 17% after manager approvals",
+        tooltip: "Measures the share of department employees enrolled on apprenticeships. It matters because department heads need participation trends, not individual approval actions.",
+        actionLabel: "View department analytics",
+        target: "Department Analytics",
+      },
+      {
+        label: "Active learners",
+        value: 27,
+        copy: "Employees currently enrolled.",
+        trend: "+4 this quarter",
+        tooltip: "Measures active learners in the department. It matters because it shows development adoption and operational capacity impact.",
+        actionLabel: "View participation",
+        target: "Apprenticeship Participation",
+      },
+      {
+        label: "Sites with learners",
+        value: 6,
+        copy: "Locations currently using apprenticeships.",
+        trend: "+1 site this month",
+        tooltip: "Measures the number of department locations with active learners. It matters because adoption should be visible across Portakabin sites.",
+        actionLabel: "View site breakdown",
+        target: "Site Breakdown",
+      },
+      {
+        label: "Future skills risks",
+        value: 4,
+        copy: "Capability areas requiring attention.",
+        trend: "Digital and leadership highest",
+        tooltip: "Measures priority capability risks for the next planning cycle. It matters because department heads use this to plan demand, not approve individual requests.",
+        actionLabel: "View skills demand",
+        target: "Future Demand",
+      },
+    ],
+    "Apprenticeship Lead": [
+      {
+        label: "Applications awaiting final approval",
+        value: 7,
+        copy: "Line-manager-approved requests ready for final apprenticeship decision.",
+        trend: "Amelia appears here after manager approval",
+        tooltip: "Measures applications that have passed manager review and need apprenticeship lead approval. It matters because this is the final internal decision before enrolment preparation.",
+        actionLabel: "Review approval queue",
+        target: "Applications for Final Approval",
+      },
+      {
+        label: "Active learners",
+        value: 48,
+        copy: "Employees currently enrolled across Portakabin.",
+        trend: "+12% this month",
+        tooltip: "Measures all active learner records across the selected Portakabin view. It matters because it shows the scale of live apprenticeship adoption.",
+        actionLabel: "View learners",
+        target: "Learners by Site",
+      },
+      {
+        label: "Provider partners",
+        value: 6,
+        copy: "Approved delivery partners mapped to Portakabin programmes.",
+        trend: "3 live, 3 ready",
+        tooltip: "Measures approved delivery partners in provider mappings. It matters because every pathway should have a delivery partner before launch.",
+        actionLabel: "Manage providers",
+        target: "Providers",
+      },
+      {
+        label: "Levy utilisation",
+        value: "82%",
+        copy: "Forecast apprenticeship levy committed to approved activity.",
+        trend: "+9% forecast this quarter",
+        tooltip: "Measures forecast levy commitment across active learners, approved starts and planned cohorts. It matters because levy funding should support priority workforce capability.",
+        actionLabel: "View levy reporting",
+        target: "Levy Utilisation",
+      },
+    ],
+    "Admin Console": [
+      {
+        label: "Total users",
+        value: 824,
+        copy: "User accounts available in the LevyTate platform.",
+        trend: "+38 added this month",
+        tooltip: "Measures all active and invited users in the platform. It matters because admins manage access, roles and adoption.",
+        actionLabel: "Manage users",
+        target: "User Management",
+      },
+      {
+        label: "Active employers",
+        value: 4,
+        copy: "Employer environments currently configured.",
+        trend: "All healthy",
+        tooltip: "Measures configured employer environments in the platform. It matters because admins need tenant-level oversight.",
+        actionLabel: "Open configuration",
+        target: "Employer Configuration",
+      },
+      {
+        label: "Programmes available",
+        value: 42,
+        copy: "Approved apprenticeship programmes available across environments.",
+        trend: "+6 in catalogue",
+        tooltip: "Measures available programmes in the platform catalogue. It matters because programme availability powers matching, mapping and approvals.",
+        actionLabel: "View catalogue",
+        target: "Programme Catalogue",
+      },
+      {
+        label: "Platform health",
+        value: "99.8%",
+        copy: "Current platform availability and operational health.",
+        trend: "No critical alerts",
+        tooltip: "Measures uptime and platform service status for the demo environment. It matters because enterprise users expect reliable operations.",
+        actionLabel: "Open settings",
+        target: "System Settings",
+      },
+    ],
   };
 
-  const approvalCopy: Record<Role, { copy: string; target: SectionKey; action: string }> = {
-    Employee: {
-      copy: "Your submitted applications that are waiting for a manager or apprenticeship lead decision.",
-      target: "My Applications",
-      action: "Track status",
-    },
-    "Line Manager": {
-      copy: "Applications currently waiting for your manager decision.",
-      target: "Applications to Review",
-      action: "Open approval queue",
-    },
-    "Department Head": {
-      copy: "Applications waiting for manager or apprenticeship lead decisions across your department.",
-      target: "Department Analytics",
-      action: "View bottlenecks",
-    },
-    "Apprenticeship Lead": {
-      copy: "Applications currently waiting for a manager or apprenticeship lead decision.",
-      target: "Applications for Final Approval",
-      action: "Open approval queue",
-    },
-    "Admin Console": {
-      copy: "Applications currently waiting for a manager or apprenticeship lead decision.",
-      target: "Platform Analytics",
-      action: "View workflow",
-    },
+  return snapshots[role];
+}
+
+function primaryDashboardAction(role: Role): { label: string; target: SectionKey } {
+  const actions: Record<Role, { label: string; target: SectionKey }> = {
+    Employee: { label: "Explore pathways", target: "Recommended Pathways" },
+    "Line Manager": { label: "Review applications", target: "Applications to Review" },
+    "Department Head": { label: "View department analytics", target: "Department Analytics" },
+    "Apprenticeship Lead": { label: "Review approval queue", target: "Applications for Final Approval" },
+    "Admin Console": { label: "Open admin console", target: "User Management" },
   };
 
-  const selectedApplication = applicationCopy[role];
-  const selectedApproval = approvalCopy[role];
-  const pathwayTarget: SectionKey = role === "Apprenticeship Lead" ? "Programmes" : role === "Admin Console" ? "Programme Catalogue" : "Recommended Pathways";
-  const mappingTarget: SectionKey = role === "Apprenticeship Lead" ? "Providers" : role === "Admin Console" ? "Provider Management" : role === "Department Head" ? "Skills Map" : "Recommended Pathways";
-  const learnerTarget: SectionKey = role === "Apprenticeship Lead" || role === "Admin Console" ? "Learners by Site" : role === "Department Head" ? "Site Breakdown" : role === "Line Manager" ? "My Team" : "Development Passport";
-
-  return [
-    {
-      label: selectedApplication.label,
-      value: applications,
-      copy: selectedApplication.copy,
-      trend: "+2 this week",
-      tooltip: "Measures open apprenticeship requests in the selected view. Calculated from submitted, approved, declined and enrolment-ready application records. It matters because it shows current demand.",
-      actionLabel: selectedApplication.action,
-      target: selectedApplication.target,
-    },
-    {
-      label: "Awaiting approval",
-      value: awaiting,
-      copy: selectedApproval.copy,
-      trend: "Down 2 compared with last month",
-      tooltip: "Measures applications waiting for a decision. Calculated from line manager and apprenticeship lead review statuses. It matters because delays here slow learner starts.",
-      actionLabel: selectedApproval.action,
-      target: selectedApproval.target,
-    },
-    {
-      label: "Live pathways",
-      value: liveRoutes,
-      copy: "Approved apprenticeship pathways currently available to employees in this view.",
-      trend: "+1 new pathway this month",
-      tooltip: "Measures the number of approved development pathways available or in active use. Calculated from live learner programmes and approved pathway status. It matters because it shows coverage for workforce needs.",
-      actionLabel: role === "Apprenticeship Lead" || role === "Admin Console" ? "View programmes" : "View pathways",
-      target: pathwayTarget,
-    },
-    {
-      label: "Role mappings",
-      value: mappings,
-      copy: "Role families currently linked to approved apprenticeship programmes and delivery partners.",
-      trend: "94% mapping confidence",
-      tooltip: "Measures live provider mappings for role families. Calculated from mappings marked live. It matters because employees should only see pathways that are approved and operationally ready.",
-      actionLabel: role === "Apprenticeship Lead" || role === "Admin Console" ? "Manage mappings" : "View matched pathways",
-      target: mappingTarget,
-    },
-    {
-      label: "Active learners",
-      value: activeLearners,
-      copy: "Employees currently enrolled on apprenticeship programmes in the selected view.",
-      trend: "Up 12% this month",
-      tooltip: "Measures employees with apprenticeship activity at the selected site or organisation level. Calculated from learner records after the site filter is applied. It matters because it shows adoption and live development capacity.",
-      actionLabel: role === "Apprenticeship Lead" || role === "Admin Console" ? "View learners" : role === "Employee" ? "View my development" : "View people data",
-      target: learnerTarget,
-    },
-  ];
+  return actions[role];
 }
 
 function SiteSummary({ site, learners, requests }: { site: string; learners: Learner[]; requests: RequestItem[] }) {
