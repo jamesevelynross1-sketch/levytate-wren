@@ -83,6 +83,38 @@ type EmployeePersona = {
   skills: Array<[string, number]>;
 };
 
+type AdviceStandard = {
+  name: string;
+  level: string;
+  suitability: number;
+  why: string;
+  bestFor: string;
+  delivery: string;
+};
+
+type ApprenticeshipAdvice = {
+  interpretedRole: string;
+  workforceNeed: string;
+  recommendedStandards: AdviceStandard[];
+  alternativeStandards: string[];
+  businessRationale: string;
+  fundingRoute: string;
+  providerMatchingPrompt: string;
+};
+
+type ProviderMatchingRequest = {
+  id: number;
+  date: string;
+  need: string;
+  programme: string;
+  sites: string;
+  learners: string;
+  status: "Submitted" | "Under Review" | "Provider Shortlist Being Prepared" | "Shortlist Ready";
+  delivery: string;
+  funding: string;
+  urgency: string;
+};
+
 type SectionKey =
   | "Dashboard"
   | "Recommended Pathways"
@@ -133,6 +165,7 @@ type SectionKey =
   | "Forecast"
   | "Reporting"
   | "Learners by Site"
+  | "Ask LevyTate AI"
   | "AI Assistant"
   | "Admin";
 
@@ -152,7 +185,7 @@ const navSectionsByRole: Record<Role, PlatformNavSection[]> = {
   ],
   "Apprenticeship Lead": [
     { title: "Applications", items: ["Dashboard", "Applications for Final Approval", "Approved for Enrolment"] },
-    { title: "Operations", items: ["Providers", "Programmes", "Compliance", "Site Adoption", "Reporting"] },
+    { title: "Operations", items: ["Providers", "Programmes", "Ask LevyTate AI", "Compliance", "Site Adoption", "Reporting"] },
   ],
   "Admin Console": [
     { title: "Admin Console", items: ["Dashboard", "User Management", "Role Management", "Permission Management", "Provider Management", "Programme Catalogue"] },
@@ -164,7 +197,7 @@ const roleSectionMap: Record<Role, SectionKey[]> = {
   Employee: ["Recommended Pathways", "Career Pathfinder", "Skills Analysis", "My Applications"],
   "Line Manager": ["My Team", "Applications to Review", "Reporting"],
   "Department Head": ["Department Analytics", "Site Breakdown", "Reporting"],
-  "Apprenticeship Lead": ["Applications for Final Approval", "Providers", "Reporting"],
+  "Apprenticeship Lead": ["Applications for Final Approval", "Providers", "Ask LevyTate AI", "Reporting"],
   "Admin Console": ["User Management", "Provider Management", "Platform Analytics"],
 };
 
@@ -453,6 +486,121 @@ const employeeRolePathwayMap: Record<string, Array<{ pathwayTitle: string; stand
     { pathwayTitle: "Health, Safety & Compliance", standard: "Level 3 Safety, Health and Environment Technician", summary: "Strengthen safety practice, compliance evidence and risk awareness." },
   ],
 };
+
+const advisoryPromptExamples = [
+  {
+    label: "Maintenance Manager",
+    prompt: "Which apprenticeship is suitable for a Maintenance Manager?",
+  },
+  {
+    label: "Procurement Lead Succession",
+    prompt: "Which apprenticeship would support succession planning for a Procurement Lead?",
+  },
+  {
+    label: "AI capability in Customer Service",
+    prompt: "We need future AI capability in our customer service team. What programmes should we consider?",
+  },
+  {
+    label: "Data skills for Operations",
+    prompt: "What apprenticeships would build data skills in our operations teams?",
+  },
+  {
+    label: "Leadership pipeline for Site Supervisors",
+    prompt: "Which apprenticeship standards support a leadership pipeline for Site Supervisors?",
+  },
+];
+
+const apprenticeshipAdviceMappings: Record<string, ApprenticeshipAdvice> = {
+  maintenance: {
+    interpretedRole: "Maintenance Manager",
+    workforceNeed: "Technical leadership, maintenance planning, compliance, team supervision and operational improvement.",
+    recommendedStandards: [
+      { name: "Engineering Technician", level: "Level 3", suitability: 88, why: "Strong fit for technical maintenance capability and engineering competence.", bestFor: "Maintenance capability and engineering evidence.", delivery: "Site evidence, technical workshops and workplace projects." },
+      { name: "Operations Manager", level: "Level 5", suitability: 82, why: "Strong fit where the role includes people management, planning and operational accountability.", bestFor: "Maintenance leaders with wider operational ownership.", delivery: "Blended management workshops and business improvement activity." },
+      { name: "Improvement Practitioner", level: "Level 4", suitability: 76, why: "Useful where the business wants process improvement and productivity gains.", bestFor: "Maintenance process, downtime and productivity projects.", delivery: "Project-based improvement coaching." },
+    ],
+    alternativeStandards: ["Level 3 Team Leader", "Level 4 Associate Project Manager"],
+    businessRationale: "For a Maintenance Manager, the strongest route depends on whether the priority is technical depth, leadership capability or operational improvement. If the individual already has strong technical skills, a management or improvement pathway may create greater business value.",
+    fundingRoute: "Potentially funded through apprenticeship levy or co-investment, subject to eligibility and programme suitability.",
+    providerMatchingPrompt: "Review provider fit for engineering delivery, site evidence, leadership coaching and operational improvement priorities.",
+  },
+  procurement: {
+    interpretedRole: "Procurement Lead",
+    workforceNeed: "Commercial capability, supplier performance, contract discipline, negotiation and succession readiness.",
+    recommendedStandards: [
+      { name: "Commercial Procurement and Supply", level: "Level 4", suitability: 92, why: "Direct fit for procurement practice, supplier management and commercial decision making.", bestFor: "Procurement leads and emerging category owners.", delivery: "Blended commercial workshops with live procurement evidence." },
+      { name: "Senior Procurement and Supply Chain Professional", level: "Level 6", suitability: 84, why: "Suitable for senior progression where strategic procurement ownership is expected.", bestFor: "Succession planning for senior procurement roles.", delivery: "Longer strategic programme with work-based commercial projects." },
+      { name: "Operations Manager", level: "Level 5", suitability: 78, why: "Useful where procurement leadership is linked to wider operational accountability.", bestFor: "Procurement leads moving into broader business leadership.", delivery: "Blended leadership and operational planning." },
+    ],
+    alternativeStandards: ["Level 3 Procurement and Supply Assistant", "Level 4 Business Analyst"],
+    businessRationale: "For procurement succession, LevyTate would usually separate technical procurement capability from broader leadership readiness. The strongest match depends on whether the priority is category expertise, contract discipline or progression into senior operational leadership.",
+    fundingRoute: "Potentially levy-funded or supported through co-investment, subject to learner eligibility and the selected standard.",
+    providerMatchingPrompt: "Identify providers with procurement depth, commercial tutor strength and delivery models suited to Portakabin locations.",
+  },
+  customerai: {
+    interpretedRole: "Customer Service AI Capability",
+    workforceNeed: "Future AI awareness, data confidence, customer insight, automation opportunities and service improvement.",
+    recommendedStandards: [
+      { name: "Data Technician", level: "Level 3", suitability: 86, why: "Builds practical data handling and reporting confidence for customer service teams.", bestFor: "Customer colleagues starting with data and automation.", delivery: "Remote workshops with customer service data projects." },
+      { name: "Data Analyst", level: "Level 4", suitability: 82, why: "Supports stronger insight generation, trend analysis and service performance reporting.", bestFor: "Customer insight and reporting roles.", delivery: "Applied analytics projects and portfolio evidence." },
+      { name: "Business Analyst", level: "Level 4", suitability: 80, why: "Useful where the team needs to redesign processes and improve systems adoption.", bestFor: "Service improvement and systems change.", delivery: "Workshops, stakeholder discovery and change documentation." },
+      { name: "AI and Automation Workforce Programme", level: "Workforce programme", suitability: 78, why: "Helps teams understand AI use cases and automation opportunities before formal apprenticeship demand is confirmed.", bestFor: "Early-stage AI capability building.", delivery: "Short strategic capability sprint and opportunity mapping." },
+    ],
+    alternativeStandards: ["Level 3 Team Leader", "Level 4 Improvement Practitioner"],
+    businessRationale: "For customer service AI capability, the best route depends on whether the immediate priority is data literacy, workflow automation or service process redesign. A staged approach may create stronger adoption before committing to a single cohort.",
+    fundingRoute: "Apprenticeship elements may be potentially levy-funded or co-invested, subject to eligibility. Non-apprenticeship workforce programmes would need separate commercial review.",
+    providerMatchingPrompt: "Review providers with data, business analysis and AI readiness capability, with delivery suited to customer operations.",
+  },
+  site: {
+    interpretedRole: "Site Supervisor",
+    workforceNeed: "Team leadership, site coordination, construction supervision, operational accountability and project handover discipline.",
+    recommendedStandards: [
+      { name: "Team Leader", level: "Level 3", suitability: 90, why: "Strong fit for first-line people leadership, performance routines and team coordination.", bestFor: "New or emerging site supervisors.", delivery: "Blended workshops with live team improvement activity." },
+      { name: "Construction Site Supervisor", level: "Level 4", suitability: 86, why: "Direct fit where site compliance, supervision and handover control are key.", bestFor: "Supervisors in construction or installation environments.", delivery: "Site evidence, technical supervision and compliance activity." },
+      { name: "Operations Manager", level: "Level 5", suitability: 79, why: "Appropriate where the role includes wider planning, resource control and operational ownership.", bestFor: "Experienced supervisors progressing into operations management.", delivery: "Leadership coaching and operational improvement projects." },
+    ],
+    alternativeStandards: ["Level 4 Associate Project Manager", "Level 4 Improvement Practitioner"],
+    businessRationale: "For Site Supervisors, the right pathway depends on whether the gap is first-line leadership, construction supervision or wider operational control. A mixed cohort may be useful if supervisor experience levels vary.",
+    fundingRoute: "Potentially funded through apprenticeship levy or co-investment, subject to eligibility and programme suitability.",
+    providerMatchingPrompt: "Match providers with site supervision credibility, regional coverage and flexible delivery for operational teams.",
+  },
+  operationsdata: {
+    interpretedRole: "Operations Data Skills",
+    workforceNeed: "Operational reporting, planning insight, workflow analysis, data quality and evidence-led decision making.",
+    recommendedStandards: [
+      { name: "Data Technician", level: "Level 3", suitability: 89, why: "Strong entry route for operational colleagues building reporting and data handling skills.", bestFor: "Operations teams starting with dashboards and data quality.", delivery: "Remote workshops with applied internal datasets." },
+      { name: "Data Analyst", level: "Level 4", suitability: 84, why: "Supports deeper insight, operational trend analysis and performance reporting.", bestFor: "Analysts and coordinators supporting capacity planning.", delivery: "Applied analytics with workplace projects." },
+      { name: "Business Analyst", level: "Level 4", suitability: 78, why: "Useful when data skills need to translate into systems improvement and process change.", bestFor: "Operations improvement and workflow redesign.", delivery: "Stakeholder discovery and process mapping evidence." },
+    ],
+    alternativeStandards: ["Level 4 Improvement Practitioner", "Level 5 Operations Manager"],
+    businessRationale: "For operations data capability, LevyTate would normally separate foundational data skills from process improvement and operating model change. The recommendation depends on whether the immediate need is reporting accuracy, insight capability or workflow redesign.",
+    fundingRoute: "Potentially levy-funded or co-invested where apprenticeship eligibility and role relevance are confirmed.",
+    providerMatchingPrompt: "Shortlist providers with data delivery strength, operational project experience and flexible workshop models.",
+  },
+  default: {
+    interpretedRole: "Workforce Capability Need",
+    workforceNeed: "Role capability, future skills, progression planning and programme fit review.",
+    recommendedStandards: [
+      { name: "Team Leader", level: "Level 3", suitability: 78, why: "Relevant where the requirement includes first-line leadership or progression readiness.", bestFor: "Emerging managers and supervisors.", delivery: "Blended workshops with workplace leadership evidence." },
+      { name: "Business Analyst", level: "Level 4", suitability: 74, why: "Useful where the need includes systems, process or change analysis.", bestFor: "Operational change and service improvement roles.", delivery: "Applied business analysis projects." },
+      { name: "Operations Manager", level: "Level 5", suitability: 72, why: "Suitable where the requirement includes accountability for teams, planning or delivery outcomes.", bestFor: "Experienced leaders with wider operational ownership.", delivery: "Leadership coaching and strategic improvement work." },
+    ],
+    alternativeStandards: ["Level 3 Data Technician", "Level 4 Improvement Practitioner"],
+    businessRationale: "The requirement needs a programme fit review to confirm whether the priority is leadership, technical capability, data confidence or operational improvement. LevyTate can qualify the need before provider matching.",
+    fundingRoute: "Potentially funded through apprenticeship levy or co-investment, subject to eligibility and programme suitability.",
+    providerMatchingPrompt: "Submit the requirement for LevyTate review so provider fit can be assessed against role, site, delivery model and employer priorities.",
+  },
+};
+
+function getApprenticeshipAdvice(query: string): ApprenticeshipAdvice {
+  const normalized = query.toLowerCase();
+  if (normalized.includes("maintenance")) return apprenticeshipAdviceMappings.maintenance;
+  if (normalized.includes("procurement") || normalized.includes("supply")) return apprenticeshipAdviceMappings.procurement;
+  if ((normalized.includes("customer") && (normalized.includes("ai") || normalized.includes("automation"))) || normalized.includes("service team")) return apprenticeshipAdviceMappings.customerai;
+  if (normalized.includes("site supervisor") || normalized.includes("site supervisors")) return apprenticeshipAdviceMappings.site;
+  if ((normalized.includes("data") && normalized.includes("operations")) || normalized.includes("operational data")) return apprenticeshipAdviceMappings.operationsdata;
+  return apprenticeshipAdviceMappings.default;
+}
 
 const portakabinLearners: Learner[] = [
   { name: "Amelia Hart", role: "Production Team Member", department: "Manufacturing", site: "York Head Office, Visitor Centre and UK Factory", programme: "Manufacturing & Production", status: "Manager review", progress: 18, lineManager: "Ryan Booth", startDate: "2026-03-04" },
@@ -1978,6 +2126,10 @@ function DetailSection({
     return <AssistantPrompt />;
   }
 
+  if (activeSection === "Ask LevyTate AI") {
+    return <AskLevyTateAIPage />;
+  }
+
   if (activeSection === "Enrolments") {
     return (
       <PlatformPanel eyebrow="Enrolments" title="Learner progress">
@@ -2650,6 +2802,264 @@ function DemoControls({ scenario, onScenario, onSeed, onReset }: { scenario: Dem
   );
 }
 
+function AskLevyTateAIPage() {
+  const [query, setQuery] = useState(advisoryPromptExamples[0].prompt);
+  const [advice, setAdvice] = useState<ApprenticeshipAdvice>(() => getApprenticeshipAdvice(advisoryPromptExamples[0].prompt));
+  const [matchingOpen, setMatchingOpen] = useState(false);
+  const [submittedSummary, setSubmittedSummary] = useState<ProviderMatchingRequest | null>(null);
+  const [matchingRequests, setMatchingRequests] = useState<ProviderMatchingRequest[]>([
+    { id: 1, date: "11 Jun 2026", need: "Procurement Lead succession", programme: "Level 4 Commercial Procurement and Supply", sites: "York Head Office", learners: "3", status: "Under Review", delivery: "Blended", funding: "Levy", urgency: "Within 6 months" },
+    { id: 2, date: "10 Jun 2026", need: "Data skills in Operations", programme: "Level 3 Data Technician", sites: "All sites", learners: "8", status: "Provider Shortlist Being Prepared", delivery: "Flexible", funding: "Unsure", urgency: "Within 3 months" },
+  ]);
+
+  function submitQuestion(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setAdvice(getApprenticeshipAdvice(query));
+    setSubmittedSummary(null);
+  }
+
+  function applyPrompt(prompt: string) {
+    setQuery(prompt);
+    setAdvice(getApprenticeshipAdvice(prompt));
+    setSubmittedSummary(null);
+  }
+
+  function submitProviderMatching(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const newRequest: ProviderMatchingRequest = {
+      id: matchingRequests.length + 1,
+      date: "11 Jun 2026",
+      need: String(data.get("need") || advice.interpretedRole),
+      programme: String(data.get("programme") || advice.recommendedStandards[0].name),
+      sites: String(data.get("sites") || "All sites"),
+      learners: String(data.get("learners") || "1"),
+      status: "Submitted",
+      delivery: String(data.get("delivery") || "Flexible"),
+      funding: String(data.get("funding") || "Unsure"),
+      urgency: String(data.get("urgency") || "Exploring"),
+    };
+    setMatchingRequests((current) => [newRequest, ...current]);
+    setSubmittedSummary(newRequest);
+    setMatchingOpen(false);
+  }
+
+  return (
+    <div className="grid gap-5">
+      <PlatformPanel eyebrow="AI advisory workspace" title="Ask LevyTate AI">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <form onSubmit={submitQuestion} className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-[#f8fbfa] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+            <label className="grid gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#102c3d]/42">
+              Advisory question
+              <textarea
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                rows={5}
+                placeholder="Which apprenticeship is suitable for a Maintenance Manager?"
+                className="min-h-[132px] rounded-xl border border-[#102c3d]/[0.09] bg-white px-4 py-3 text-base font-medium normal-case leading-7 tracking-normal text-[#102c3d] outline-none transition placeholder:text-[#102c3d]/32 focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10"
+              />
+            </label>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <PlatformButton>Generate recommendation</PlatformButton>
+              <button type="button" onClick={() => setQuery("")} className="h-10 rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.06] transition hover:text-[#102c3d]">Clear</button>
+            </div>
+          </form>
+
+          <div className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-white p-4 shadow-[0_10px_26px_rgba(16,44,61,0.045)]">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#c95568]">Example prompts</p>
+            <div className="mt-3 grid gap-2">
+              {advisoryPromptExamples.map((example) => (
+                <button key={example.label} onClick={() => applyPrompt(example.prompt)} className="rounded-xl border border-[#102c3d]/[0.055] bg-[#f8fbfa] px-3.5 py-2.5 text-left text-sm font-semibold text-[#102c3d]/70 transition hover:border-[#159b8f]/25 hover:bg-white hover:text-[#102c3d]">
+                  {example.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </PlatformPanel>
+
+      <PlatformPanel eyebrow="Structured recommendation" title="Programme fit review">
+        <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
+          <div className="grid gap-3">
+            <InfoBox label="Role" value={advice.interpretedRole} />
+            <InfoBox label="Workforce need" value={advice.workforceNeed} />
+            <div className="rounded-xl border border-[#159b8f]/[0.16] bg-[#edf8f5] px-3.5 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">Funding route</p>
+              <p className="mt-1.5 text-sm leading-6 text-[#102c3d]/68">{advice.fundingRoute}</p>
+            </div>
+          </div>
+
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#c95568]">Recommended standards</p>
+            <div className="mt-3 grid gap-3 lg:grid-cols-3">
+              {advice.recommendedStandards.map((standard) => (
+                <article key={`${standard.level}-${standard.name}`} className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-[#f8fbfa] p-4 shadow-[0_8px_20px_rgba(16,44,61,0.035)]">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold text-[#102c3d]/44">{standard.level}</p>
+                      <h3 className="mt-1 text-base font-semibold leading-6 text-[#102c3d]">{standard.name}</h3>
+                    </div>
+                    <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[#0b6f63] ring-1 ring-[#102c3d]/[0.06]">{standard.suitability}%</span>
+                  </div>
+                  <p className="mt-3 text-sm leading-5 text-[#102c3d]/62">{standard.why}</p>
+                  <div className="mt-3 grid gap-2">
+                    <InfoBox label="Best for" value={standard.bestFor} />
+                    <InfoBox label="Delivery considerations" value={standard.delivery} />
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-[#f8fbfa] p-4">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#c95568]">Business rationale</p>
+            <p className="mt-2 text-sm leading-6 text-[#102c3d]/66">{advice.businessRationale}</p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {advice.alternativeStandards.map((item) => (
+                <span key={item} className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#102c3d]/58 ring-1 ring-[#102c3d]/[0.06]">{item}</span>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-[1rem] border border-[#159b8f]/[0.18] bg-white p-4 shadow-[0_12px_28px_rgba(16,44,61,0.045)]">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#0b6f63]">Request Provider Matching</p>
+            <p className="mt-2 text-sm leading-6 text-[#102c3d]/62">LevyTate can review this requirement and identify suitable training providers based on programme fit, location, delivery model and employer priorities.</p>
+            <p className="mt-3 rounded-xl bg-[#f8fbfa] px-3 py-2 text-xs leading-5 text-[#102c3d]/58">{advice.providerMatchingPrompt}</p>
+            <PlatformButton onClick={() => setMatchingOpen(true)} className="mt-4 w-full">Submit provider matching request</PlatformButton>
+          </div>
+        </div>
+      </PlatformPanel>
+
+      {submittedSummary ? (
+        <PlatformPanel eyebrow="Submitted" title="Provider matching request submitted">
+          <p className="max-w-3xl text-sm leading-6 text-[#102c3d]/62">Your request has been sent to the LevyTate team. We will review the requirement and identify suitable provider options based on programme fit, delivery model, geography and employer priorities.</p>
+          <div className="mt-4 grid gap-3 md:grid-cols-4">
+            <MetricTile label="Programme" value={submittedSummary.programme} />
+            <MetricTile label="Sites" value={submittedSummary.sites} />
+            <MetricTile label="Learners" value={submittedSummary.learners} />
+            <MetricTile label="Status" value={submittedSummary.status} />
+          </div>
+        </PlatformPanel>
+      ) : null}
+
+      <ProviderMatchingRequestsTable requests={matchingRequests} />
+
+      {matchingOpen ? (
+        <ProviderMatchingModal
+          advice={advice}
+          query={query}
+          onClose={() => setMatchingOpen(false)}
+          onSubmit={submitProviderMatching}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function ProviderMatchingRequestsTable({ requests }: { requests: ProviderMatchingRequest[] }) {
+  return (
+    <PlatformPanel eyebrow="Commercial workflow" title="Recent provider matching requests">
+      <div className="overflow-hidden rounded-[1rem] border border-[#102c3d]/[0.06]">
+        <div className="hidden grid-cols-[0.75fr_1.25fr_1.3fr_1fr_0.6fr_1fr] gap-3 bg-[#f8fbfa] px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/38 xl:grid">
+          <span>Date</span>
+          <span>Role / need</span>
+          <span>Recommended programme</span>
+          <span>Sites</span>
+          <span>Learners</span>
+          <span>Status</span>
+        </div>
+        <div className="divide-y divide-[#102c3d]/[0.055] bg-white">
+          {requests.map((request) => (
+            <article key={request.id} className="grid gap-3 px-4 py-3 text-sm xl:grid-cols-[0.75fr_1.25fr_1.3fr_1fr_0.6fr_1fr] xl:items-center">
+              <p className="text-[#102c3d]/56">{request.date}</p>
+              <p className="font-semibold text-[#102c3d]">{request.need}</p>
+              <p className="text-[#102c3d]/66">{request.programme}</p>
+              <p className="text-[#102c3d]/58">{request.sites}</p>
+              <p className="font-semibold text-[#102c3d]">{request.learners}</p>
+              <span className="w-fit rounded-full bg-[#edf8f5] px-3 py-1.5 text-xs font-semibold text-[#0b6f63] ring-1 ring-[#159b8f]/[0.12]">{request.status}</span>
+            </article>
+          ))}
+        </div>
+      </div>
+    </PlatformPanel>
+  );
+}
+
+function ProviderMatchingModal({
+  advice,
+  query,
+  onClose,
+  onSubmit,
+}: {
+  advice: ApprenticeshipAdvice;
+  query: string;
+  onClose: () => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-[#102c3d]/30 px-5 py-8 backdrop-blur-sm">
+      <section className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-[1.5rem] bg-white p-5 shadow-[0_30px_90px_rgba(16,44,61,0.24)]">
+        <div className="flex items-start justify-between gap-6">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#c95568]">Provider matching request</p>
+            <h2 className="mt-1.5 text-2xl font-semibold tracking-[-0.02em] text-[#102c3d]">Submit to LevyTate Team</h2>
+          </div>
+          <button onClick={onClose} className="rounded-full bg-[#f8faf4] px-4 py-2 text-sm font-semibold text-[#102c3d]">Close</button>
+        </div>
+
+        <form onSubmit={onSubmit} className="mt-5 grid gap-4 md:grid-cols-2">
+          <Field name="employer" label="Employer" defaultValue="Portakabin" />
+          <Field name="need" label="Role or workforce need" defaultValue={advice.interpretedRole || query} />
+          <label className="grid min-w-0 gap-1.5 text-xs font-medium text-[#102c3d]/62 md:col-span-2">
+            Recommended programme
+            <select name="programme" defaultValue={`${advice.recommendedStandards[0].level} ${advice.recommendedStandards[0].name}`} className="min-w-0 rounded-xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3.5 py-3 text-sm outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10">
+              {advice.recommendedStandards.map((standard) => (
+                <option key={`${standard.level}-${standard.name}`}>{standard.level} {standard.name}</option>
+              ))}
+            </select>
+          </label>
+          <Field name="learners" label="Number of learners" defaultValue="3" />
+          <label className="grid min-w-0 gap-1.5 text-xs font-medium text-[#102c3d]/62">
+            Preferred sites
+            <select name="sites" defaultValue="York Head Office, Visitor Centre and UK Factory" className="min-w-0 rounded-xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3.5 py-3 text-sm outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10">
+              <option>All sites</option>
+              {portakabinSites.map((site) => (
+                <option key={site}>{site}</option>
+              ))}
+            </select>
+          </label>
+          <ChoiceSelect name="delivery" label="Delivery preference" options={["Online", "Face-to-face", "Blended", "Flexible"]} defaultValue="Blended" />
+          <ChoiceSelect name="funding" label="Funding position" options={["Levy", "Co-investment", "Unsure"]} defaultValue="Levy" />
+          <ChoiceSelect name="urgency" label="Urgency" options={["Exploring", "Within 3 months", "Within 6 months", "Immediate"]} defaultValue="Within 3 months" />
+          <label className="grid gap-1.5 text-xs font-medium text-[#102c3d]/62 md:col-span-2">
+            Additional notes
+            <textarea name="notes" rows={3} className="min-w-0 rounded-xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3.5 py-3 text-sm leading-6 outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10" defaultValue="Please review programme fit, provider capability, delivery model suitability and employer priority matching." />
+          </label>
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-[#102c3d]/[0.05] bg-[#f8fbfa] p-3.5 md:col-span-2">
+            <p className="text-sm leading-6 text-[#102c3d]/58">Creates a qualified provider matching request for LevyTate review.</p>
+            <PlatformButton className="whitespace-nowrap">Send to LevyTate Team</PlatformButton>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
+}
+
+function ChoiceSelect({ name, label, options, defaultValue }: { name: string; label: string; options: string[]; defaultValue: string }) {
+  return (
+    <label className="grid min-w-0 gap-1.5 text-xs font-medium text-[#102c3d]/62">
+      {label}
+      <select name={name} defaultValue={defaultValue} className="min-w-0 rounded-xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3.5 py-3 text-sm outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10">
+        {options.map((option) => (
+          <option key={option}>{option}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function AssistantPrompt() {
   return (
     <PlatformPanel eyebrow="Ask LevyTate AI" title="Build a capability plan">
@@ -2863,6 +3273,7 @@ function sectionDescription(section: SectionKey) {
     "Site Adoption": "Compare site adoption, participation and Workforce Readiness Index signals.",
     Reporting: "Open executive reporting, learner visibility and platform performance summaries.",
     "Learners by Site": "Review learners, roles, programmes, status and progress by selected site.",
+    "Ask LevyTate AI": "Ask which apprenticeship standards may suit a role, workforce challenge or future capability need.",
     "AI Assistant": "Generate capability plans and concise workforce development recommendations.",
     "User Management": "Manage users and stakeholder access across the platform.",
     "Role Management": "Configure stakeholder roles and inherited visibility.",
