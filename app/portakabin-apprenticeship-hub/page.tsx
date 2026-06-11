@@ -726,6 +726,15 @@ function HeroPanel({
 }) {
   const awaiting = (statusCounts["Submitted to Line Manager"] ?? 0) + (statusCounts["Approved by Line Manager"] ?? 0) + (statusCounts["Submitted to Apprenticeship Lead"] ?? 0);
   const liveRoutes = new Set(learners.map((learner) => learner.programme)).size || pathways.filter((item) => item.status === "Live").length;
+  const metricCards = operatingSnapshotMetrics({
+    role,
+    applications: requests.length,
+    awaiting,
+    liveRoutes,
+    mappings: mappings.filter((item) => item.status === "Live").length,
+    activeLearners: learners.length,
+  });
+
   return (
     <section className="grid gap-6 rounded-[1.6rem] border border-[#102c3d]/[0.06] bg-white/96 p-6 shadow-[0_22px_60px_rgba(16,44,61,0.055)] xl:grid-cols-[minmax(0,1fr)_390px] xl:p-7">
       <div className="min-w-0">
@@ -744,16 +753,162 @@ function HeroPanel({
 
       <div className="rounded-[1.35rem] border border-[#102c3d]/[0.055] bg-[#f8fbfa] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
         <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#c95568]">Operating snapshot</p>
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <MetricTile label="Applications" value={requests.length} />
-          <MetricTile label="Awaiting" value={awaiting} />
-          <MetricTile label="Live routes" value={liveRoutes} />
-          <MetricTile label="Mappings" value={mappings.filter((item) => item.status === "Live").length} />
-          <MetricTile label="Active learners" value={learners.length} />
+        <div className="mt-4 grid gap-3">
+          {metricCards.map((metric) => (
+            <MetricTile
+              key={metric.label}
+              label={metric.label}
+              value={metric.value}
+              copy={metric.copy}
+              trend={metric.trend}
+              actionLabel={metric.actionLabel}
+              tooltip={metric.tooltip}
+              onClick={() => onNavigate(metric.target)}
+            />
+          ))}
         </div>
       </div>
     </section>
   );
+}
+
+function operatingSnapshotMetrics({
+  role,
+  applications,
+  awaiting,
+  liveRoutes,
+  mappings,
+  activeLearners,
+}: {
+  role: Role;
+  applications: number;
+  awaiting: number;
+  liveRoutes: number;
+  mappings: number;
+  activeLearners: number;
+}): Array<{
+  label: string;
+  value: string | number;
+  copy: string;
+  trend: string;
+  tooltip: string;
+  actionLabel: string;
+  target: SectionKey;
+}> {
+  const applicationCopy: Record<Role, { label: string; copy: string; target: SectionKey; action: string }> = {
+    Employee: {
+      label: "My applications",
+      copy: "Your apprenticeship requests currently progressing through the approval workflow.",
+      target: "My Applications",
+      action: "View my applications",
+    },
+    "Line Manager": {
+      label: "Applications to review",
+      copy: "Applications from your team that need a manager decision or next step.",
+      target: "Applications to Review",
+      action: "Review requests",
+    },
+    "Department Head": {
+      label: "Department applications",
+      copy: "Applications within your department, shown for reporting and planning.",
+      target: "Department Analytics",
+      action: "View analytics",
+    },
+    "Apprenticeship Lead": {
+      label: "Organisation applications",
+      copy: "Active apprenticeship requests currently progressing through approval workflows.",
+      target: "Applications for Final Approval",
+      action: "Open applications",
+    },
+    "Admin Console": {
+      label: "Applications",
+      copy: "Active apprenticeship requests currently progressing through approval workflows.",
+      target: "Platform Analytics",
+      action: "View reporting",
+    },
+  };
+
+  const approvalCopy: Record<Role, { copy: string; target: SectionKey; action: string }> = {
+    Employee: {
+      copy: "Your submitted applications that are waiting for a manager or apprenticeship lead decision.",
+      target: "My Applications",
+      action: "Track status",
+    },
+    "Line Manager": {
+      copy: "Applications currently waiting for your manager decision.",
+      target: "Applications to Review",
+      action: "Open approval queue",
+    },
+    "Department Head": {
+      copy: "Applications waiting for manager or apprenticeship lead decisions across your department.",
+      target: "Department Analytics",
+      action: "View bottlenecks",
+    },
+    "Apprenticeship Lead": {
+      copy: "Applications currently waiting for a manager or apprenticeship lead decision.",
+      target: "Applications for Final Approval",
+      action: "Open approval queue",
+    },
+    "Admin Console": {
+      copy: "Applications currently waiting for a manager or apprenticeship lead decision.",
+      target: "Platform Analytics",
+      action: "View workflow",
+    },
+  };
+
+  const selectedApplication = applicationCopy[role];
+  const selectedApproval = approvalCopy[role];
+  const pathwayTarget: SectionKey = role === "Apprenticeship Lead" ? "Programmes" : role === "Admin Console" ? "Programme Catalogue" : "Recommended Pathways";
+  const mappingTarget: SectionKey = role === "Apprenticeship Lead" ? "Providers" : role === "Admin Console" ? "Provider Management" : role === "Department Head" ? "Skills Map" : "Recommended Pathways";
+  const learnerTarget: SectionKey = role === "Apprenticeship Lead" || role === "Admin Console" ? "Learners by Site" : role === "Department Head" ? "Site Breakdown" : role === "Line Manager" ? "My Team" : "Development Passport";
+
+  return [
+    {
+      label: selectedApplication.label,
+      value: applications,
+      copy: selectedApplication.copy,
+      trend: "+2 this week",
+      tooltip: "Measures open apprenticeship requests in the selected view. Calculated from submitted, approved, declined and enrolment-ready application records. It matters because it shows current demand.",
+      actionLabel: selectedApplication.action,
+      target: selectedApplication.target,
+    },
+    {
+      label: "Awaiting approval",
+      value: awaiting,
+      copy: selectedApproval.copy,
+      trend: "Down 2 compared with last month",
+      tooltip: "Measures applications waiting for a decision. Calculated from line manager and apprenticeship lead review statuses. It matters because delays here slow learner starts.",
+      actionLabel: selectedApproval.action,
+      target: selectedApproval.target,
+    },
+    {
+      label: "Live pathways",
+      value: liveRoutes,
+      copy: "Approved apprenticeship pathways currently available to employees in this view.",
+      trend: "+1 new pathway this month",
+      tooltip: "Measures the number of approved development pathways available or in active use. Calculated from live learner programmes and approved pathway status. It matters because it shows coverage for workforce needs.",
+      actionLabel: role === "Apprenticeship Lead" || role === "Admin Console" ? "View programmes" : "View pathways",
+      target: pathwayTarget,
+    },
+    {
+      label: "Role mappings",
+      value: mappings,
+      copy: "Role families currently linked to approved apprenticeship programmes and delivery partners.",
+      trend: "94% mapping confidence",
+      tooltip: "Measures live provider mappings for role families. Calculated from mappings marked live. It matters because employees should only see pathways that are approved and operationally ready.",
+      actionLabel: role === "Apprenticeship Lead" || role === "Admin Console" ? "Manage mappings" : "View matched pathways",
+      target: mappingTarget,
+    },
+    {
+      label: "Active learners",
+      value: activeLearners,
+      copy: "Employees currently enrolled on apprenticeship programmes in the selected view.",
+      trend: "Up 12% this month",
+      tooltip: "Measures employees with apprenticeship activity at the selected site or organisation level. Calculated from learner records after the site filter is applied. It matters because it shows adoption and live development capacity.",
+      actionLabel: role === "Apprenticeship Lead" || role === "Admin Console" ? "View learners" : role === "Employee" ? "View my development" : "View people data",
+      target: learnerTarget,
+    },
+  ];
 }
 
 function SiteSummary({ site, learners, requests }: { site: string; learners: Learner[]; requests: RequestItem[] }) {
@@ -1772,8 +1927,61 @@ function MetricCard({ label, value, copy }: { label: string; value: string | num
   return <PlatformMetric label={label} value={value} copy={copy} />;
 }
 
-function MetricTile({ label, value }: { label: string; value: string | number }) {
-  return <PlatformMetric label={label} value={value} />;
+function MetricTile({
+  label,
+  value,
+  copy,
+  trend,
+  actionLabel,
+  tooltip,
+  onClick,
+}: {
+  label: string;
+  value: string | number;
+  copy?: string;
+  trend?: string;
+  actionLabel?: string;
+  tooltip?: string;
+  onClick?: () => void;
+}) {
+  const content = (
+    <>
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-xs font-medium text-[#102c3d]/50">{label}</p>
+        {tooltip ? (
+          <span className="relative grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[#102c3d]/[0.06] text-[10px] font-semibold text-[#102c3d]/54 transition group-hover:bg-[#159b8f]/10 group-hover:text-[#0b6f63] group-focus-visible:bg-[#159b8f]/10 group-focus-visible:text-[#0b6f63]" aria-hidden="true">
+            i
+            <span className="pointer-events-none absolute right-0 top-7 z-20 hidden w-64 rounded-2xl border border-[#102c3d]/[0.08] bg-white p-3 text-left text-xs font-medium leading-5 text-[#102c3d]/66 shadow-[0_18px_40px_rgba(16,44,61,0.14)] group-hover:block group-focus-visible:block">
+              {tooltip}
+            </span>
+          </span>
+        ) : null}
+      </div>
+      <p className="mt-2 text-3xl font-semibold tracking-[-0.025em] text-[#102c3d]">{value}</p>
+      {copy ? <p className="mt-2 text-xs leading-5 text-[#102c3d]/58">{copy}</p> : null}
+      {trend ? <p className="mt-3 text-xs font-semibold text-[#0b7d70]">{trend}</p> : null}
+      {actionLabel ? <p className="mt-3 text-xs font-semibold text-[#102c3d]">{actionLabel} <span aria-hidden="true">-&gt;</span></p> : null}
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        title={tooltip}
+        className="group min-w-0 rounded-[1.1rem] border border-[#102c3d]/[0.055] bg-white p-4 text-left shadow-[0_10px_24px_rgba(16,44,61,0.04)] transition duration-200 hover:-translate-y-0.5 hover:border-[#159b8f]/25 hover:shadow-[0_16px_34px_rgba(16,44,61,0.075)] focus:outline-none focus:ring-4 focus:ring-[#159b8f]/12"
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <article title={tooltip} className="group min-w-0 rounded-[1.1rem] border border-[#102c3d]/[0.055] bg-white p-4 shadow-[0_10px_24px_rgba(16,44,61,0.04)]">
+      {content}
+    </article>
+  );
 }
 
 function InfoBox({ label, value }: { label: string; value: string }) {
