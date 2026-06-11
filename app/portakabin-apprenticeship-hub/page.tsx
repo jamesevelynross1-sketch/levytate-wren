@@ -2876,8 +2876,8 @@ function AskLevyTateAIPage({
 }
 
 function ApprenticeshipLeadAIPage() {
-  const [query, setQuery] = useState(advisoryPromptExamples[0].prompt);
-  const [advice, setAdvice] = useState<ApprenticeshipAdvice>(() => getApprenticeshipAdvice(advisoryPromptExamples[0].prompt));
+  const [query, setQuery] = useState("");
+  const [advice, setAdvice] = useState<ApprenticeshipAdvice | null>(null);
   const [matchingOpen, setMatchingOpen] = useState(false);
   const [submittedSummary, setSubmittedSummary] = useState<ProviderMatchingRequest | null>(null);
   const [matchingRequests, setMatchingRequests] = useState<ProviderMatchingRequest[]>([
@@ -2887,6 +2887,7 @@ function ApprenticeshipLeadAIPage() {
 
   function submitQuestion(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!query.trim()) return;
     setAdvice(getApprenticeshipAdvice(query));
     setSubmittedSummary(null);
   }
@@ -2899,6 +2900,7 @@ function ApprenticeshipLeadAIPage() {
 
   function submitProviderMatching(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!advice) return;
     const data = new FormData(event.currentTarget);
     const newRequest: ProviderMatchingRequest = {
       id: matchingRequests.length + 1,
@@ -2920,8 +2922,10 @@ function ApprenticeshipLeadAIPage() {
   return (
     <div className="grid gap-5">
       <PlatformPanel eyebrow="AI advisory workspace" title="Ask LevyTate AI">
+        <GuidedAIStepper current={submittedSummary ? "Submitted" : matchingOpen ? "Application" : advice ? "Recommendation" : "Ask"} />
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
           <form onSubmit={submitQuestion} className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-[#f8fbfa] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+            <p className="max-w-2xl text-sm leading-6 text-[#102c3d]/62">Tell LevyTate about your role, goals or interests and we will guide you towards the most relevant approved pathway.</p>
             <label className="grid gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#102c3d]/42">
               Advisory question
               <textarea
@@ -2951,6 +2955,7 @@ function ApprenticeshipLeadAIPage() {
         </div>
       </PlatformPanel>
 
+      {advice ? (
       <PlatformPanel eyebrow="Structured recommendation" title="Programme fit review">
         <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
           <div className="grid gap-3">
@@ -3004,6 +3009,7 @@ function ApprenticeshipLeadAIPage() {
           </div>
         </div>
       </PlatformPanel>
+      ) : null}
 
       {submittedSummary ? (
         <PlatformPanel eyebrow="Submitted" title="Provider matching request submitted">
@@ -3017,9 +3023,9 @@ function ApprenticeshipLeadAIPage() {
         </PlatformPanel>
       ) : null}
 
-      <ProviderMatchingRequestsTable requests={matchingRequests} />
+      {advice ? <ProviderMatchingRequestsTable requests={matchingRequests} /> : null}
 
-      {matchingOpen ? (
+      {matchingOpen && advice ? (
         <ProviderMatchingModal
           advice={advice}
           query={query}
@@ -3043,8 +3049,8 @@ function EmployeeAIPage({
   onCreateApplication: (draft: ApplicationDraft) => RequestItem;
 }) {
   const examples = ["I want to become a team leader.", "I work in production. What apprenticeships suit me?", "I'm interested in data and automation.", "Which pathway would help me progress at Portakabin?", "Can you help me apply?"];
-  const [query, setQuery] = useState(selectedPersona.name === "Daniel Carter" ? examples[2] : examples[0]);
-  const [response, setResponse] = useState(() => getEmployeeAIResponse(selectedPersona.name === "Daniel Carter" ? examples[2] : examples[0], selectedPersona));
+  const [query, setQuery] = useState("");
+  const [response, setResponse] = useState<ReturnType<typeof getEmployeeAIResponse> | null>(null);
   const [savedMessage, setSavedMessage] = useState("");
   const [compareOpen, setCompareOpen] = useState(false);
   const [applicationOpen, setApplicationOpen] = useState(false);
@@ -3053,6 +3059,7 @@ function EmployeeAIPage({
 
   function askQuestion(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!query.trim()) return;
     setResponse(getEmployeeAIResponse(query, selectedPersona));
     setApplicationOpen(false);
     setConfirmation(null);
@@ -3067,6 +3074,7 @@ function EmployeeAIPage({
 
   function submitAIApplication(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!response) return;
     const data = new FormData(event.currentTarget);
     const created = onCreateApplication({
       name: selectedPersona.name,
@@ -3087,15 +3095,17 @@ function EmployeeAIPage({
   return (
     <div className="grid gap-5">
       <PlatformPanel eyebrow="AI pathway assistant" title="Ask LevyTate AI">
+        <GuidedAIStepper current={confirmation ? "Submitted" : applicationOpen ? "Application" : response ? "Recommendation" : "Ask"} />
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
           <form onSubmit={askQuestion} className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-[#f8fbfa] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
-            <p className="max-w-2xl text-sm leading-6 text-[#102c3d]/62">Tell us about your role, goals or interests and LevyTate will help you find the most relevant approved pathway.</p>
+            <p className="max-w-2xl text-sm leading-6 text-[#102c3d]/62">Tell LevyTate about your role, goals or interests and we&apos;ll guide you towards the most relevant approved pathway.</p>
             <label className="mt-4 grid gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#102c3d]/42">
               Your question
               <textarea
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 rows={4}
+                placeholder="I want to become a team leader"
                 className="min-h-[112px] rounded-xl border border-[#102c3d]/[0.09] bg-white px-4 py-3 text-base font-medium normal-case leading-7 tracking-normal text-[#102c3d] outline-none transition placeholder:text-[#102c3d]/32 focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10"
               />
             </label>
@@ -3118,6 +3128,7 @@ function EmployeeAIPage({
         </div>
       </PlatformPanel>
 
+      {response ? (
       <PlatformPanel eyebrow="Personal recommendation" title={`${selectedPersona.name.split(" ")[0]}'s recommended route`}>
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
           <article className="rounded-[1rem] border border-[#159b8f]/[0.18] bg-[#f8fbfa] p-5 shadow-[0_12px_28px_rgba(16,44,61,0.045)]">
@@ -3165,8 +3176,9 @@ function EmployeeAIPage({
           </div>
         ) : null}
       </PlatformPanel>
+      ) : null}
 
-      {applicationOpen ? (
+      {applicationOpen && response ? (
         <PlatformPanel eyebrow="AI prepared application" title="Review and submit to line manager">
           <form onSubmit={submitAIApplication} className="grid gap-4 md:grid-cols-2">
             <Field name="pathway" label="Selected apprenticeship" defaultValue={response.primary.programme} />
@@ -3209,6 +3221,7 @@ function EmployeeAIPage({
         </PlatformPanel>
       ) : null}
 
+      {response || confirmation ? (
       <PlatformPanel eyebrow="Recent activity" title="Application history">
         <div className="grid gap-3 md:grid-cols-2">
           {employeeApplications.length ? employeeApplications.slice(0, 4).map((request) => (
@@ -3216,19 +3229,21 @@ function EmployeeAIPage({
           )) : <p className="rounded-xl bg-[#f8fbfa] p-4 text-sm text-[#102c3d]/58">No applications yet. Ask LevyTate AI can help you start one.</p>}
         </div>
       </PlatformPanel>
+      ) : null}
     </div>
   );
 }
 
 function LineManagerAIPage({ requests, onStatus, onNavigate }: { requests: RequestItem[]; onStatus: (id: number, status: RequestStatus) => void; onNavigate: (section: SectionKey) => void }) {
   const examples = ["Should I approve Amelia's Team Leader application?", "Which members of my team could benefit from leadership development?", "Where are the biggest skills gaps in my team?", "What apprenticeship pathways suit my production team?"];
-  const [query, setQuery] = useState(examples[0]);
-  const [response, setResponse] = useState(() => getManagerAIResponse(examples[0], requests));
+  const [query, setQuery] = useState("");
+  const [response, setResponse] = useState<ReturnType<typeof getManagerAIResponse> | null>(null);
   const pending = requests.filter((request) => request.status === "Submitted to Line Manager");
   const target = pending[0];
 
   function askQuestion(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!query.trim()) return;
     setResponse(getManagerAIResponse(query, requests));
   }
 
@@ -3240,10 +3255,11 @@ function LineManagerAIPage({ requests, onStatus, onNavigate }: { requests: Reque
   return (
     <div className="grid gap-5">
       <PlatformPanel eyebrow="Manager AI support" title="Ask LevyTate AI">
+        <GuidedAIStepper current={response ? "Recommendation" : "Ask"} />
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
           <form onSubmit={askQuestion} className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-[#f8fbfa] p-4">
             <p className="text-sm leading-6 text-[#102c3d]/62">Get support developing your team and reviewing apprenticeship requests.</p>
-            <textarea value={query} onChange={(event) => setQuery(event.target.value)} rows={4} className="mt-4 min-h-[112px] w-full rounded-xl border border-[#102c3d]/[0.09] bg-white px-4 py-3 text-base font-medium leading-7 text-[#102c3d] outline-none transition focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10" />
+            <textarea value={query} onChange={(event) => setQuery(event.target.value)} rows={4} placeholder="Should I approve Amelia's Team Leader application?" className="mt-4 min-h-[112px] w-full rounded-xl border border-[#102c3d]/[0.09] bg-white px-4 py-3 text-base font-medium leading-7 text-[#102c3d] outline-none transition placeholder:text-[#102c3d]/32 focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10" />
             <PlatformButton className="mt-4">Generate manager guidance</PlatformButton>
           </form>
           <div className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-white p-4 shadow-[0_10px_26px_rgba(16,44,61,0.045)]">
@@ -3257,6 +3273,7 @@ function LineManagerAIPage({ requests, onStatus, onNavigate }: { requests: Reque
         </div>
       </PlatformPanel>
 
+      {response ? (
       <PlatformPanel eyebrow="AI recommendation" title={response.title}>
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
           <div className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-[#f8fbfa] p-4">
@@ -3279,18 +3296,20 @@ function LineManagerAIPage({ requests, onStatus, onNavigate }: { requests: Reque
           </div>
         </div>
       </PlatformPanel>
+      ) : null}
     </div>
   );
 }
 
 function DepartmentHeadAIPage({ requests, onNavigate }: { requests: RequestItem[]; onNavigate: (section: SectionKey) => void }) {
   const examples = ["What percentage of my department is on an apprenticeship?", "Which sites have the lowest apprenticeship participation?", "Where are our future skills risks?", "What should I include in a department workforce plan?"];
-  const [query, setQuery] = useState(examples[0]);
-  const [response, setResponse] = useState(() => getDepartmentHeadAIResponse(examples[0], requests));
+  const [query, setQuery] = useState("");
+  const [response, setResponse] = useState<ReturnType<typeof getDepartmentHeadAIResponse> | null>(null);
   const [exported, setExported] = useState(false);
 
   function askQuestion(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!query.trim()) return;
     setResponse(getDepartmentHeadAIResponse(query, requests));
     setExported(false);
   }
@@ -3304,10 +3323,11 @@ function DepartmentHeadAIPage({ requests, onNavigate }: { requests: RequestItem[
   return (
     <div className="grid gap-5">
       <PlatformPanel eyebrow="Workforce intelligence" title="Ask LevyTate AI">
+        <GuidedAIStepper current={response ? "Recommendation" : "Ask"} />
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
           <form onSubmit={askQuestion} className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-[#f8fbfa] p-4">
             <p className="text-sm leading-6 text-[#102c3d]/62">Understand department capability, participation and workforce risk. This role has no individual approval actions.</p>
-            <textarea value={query} onChange={(event) => setQuery(event.target.value)} rows={4} className="mt-4 min-h-[112px] w-full rounded-xl border border-[#102c3d]/[0.09] bg-white px-4 py-3 text-base font-medium leading-7 text-[#102c3d] outline-none transition focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10" />
+            <textarea value={query} onChange={(event) => setQuery(event.target.value)} rows={4} placeholder="Where are our future skills risks?" className="mt-4 min-h-[112px] w-full rounded-xl border border-[#102c3d]/[0.09] bg-white px-4 py-3 text-base font-medium leading-7 text-[#102c3d] outline-none transition placeholder:text-[#102c3d]/32 focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10" />
             <PlatformButton className="mt-4">Generate workforce insight</PlatformButton>
           </form>
           <div className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-white p-4 shadow-[0_10px_26px_rgba(16,44,61,0.045)]">
@@ -3321,6 +3341,7 @@ function DepartmentHeadAIPage({ requests, onNavigate }: { requests: RequestItem[
         </div>
       </PlatformPanel>
 
+      {response ? (
       <PlatformPanel eyebrow="Department insight" title={response.title}>
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
           <div className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-[#f8fbfa] p-4">
@@ -3343,6 +3364,7 @@ function DepartmentHeadAIPage({ requests, onNavigate }: { requests: RequestItem[
           </div>
         </div>
       </PlatformPanel>
+      ) : null}
     </div>
   );
 }
@@ -3452,6 +3474,28 @@ function getDepartmentHeadAIResponse(prompt: string, requests: RequestItem[]) {
     summary: "Department participation is improving, with active learners across manufacturing, site operations, customer experience and digital roles. Department Heads can use this view for workforce planning only, with no individual approval actions.",
     signals: [["Participation", "18%"], ["Active learners", "27"], ["Pending applications", String(pending)]],
   };
+}
+
+function GuidedAIStepper({ current }: { current: "Ask" | "Recommendation" | "Application" | "Submitted" }) {
+  const steps: Array<"Ask" | "Recommendation" | "Application" | "Submitted"> = ["Ask", "Recommendation", "Application", "Submitted"];
+  const activeIndex = steps.indexOf(current);
+
+  return (
+    <div className="mb-5 grid gap-2 rounded-[1rem] border border-[#102c3d]/[0.055] bg-[#f8fbfa] p-2.5 sm:grid-cols-4">
+      {steps.map((step, index) => {
+        const completed = index < activeIndex;
+        const active = index === activeIndex;
+        return (
+          <div key={step} className={`rounded-xl px-3 py-2.5 transition ${active ? "bg-white shadow-[0_8px_18px_rgba(16,44,61,0.055)]" : completed ? "bg-[#edf8f5]" : "bg-transparent"}`}>
+            <div className="flex items-center gap-2">
+              <span className={`grid h-5 w-5 place-items-center rounded-full text-[10px] font-semibold ${active || completed ? "bg-[#159b8f] text-white" : "bg-[#102c3d]/[0.08] text-[#102c3d]/42"}`}>{index + 1}</span>
+              <p className={`text-xs font-semibold ${active ? "text-[#102c3d]" : completed ? "text-[#0b6f63]" : "text-[#102c3d]/38"}`}>{step}</p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 function ProviderMatchingRequestsTable({ requests }: { requests: ProviderMatchingRequest[] }) {
