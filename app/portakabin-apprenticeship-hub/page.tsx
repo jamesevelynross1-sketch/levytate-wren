@@ -623,7 +623,7 @@ function Sidebar({ role, activeSection, onNavigate }: { role: Role; activeSectio
   return (
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-[296px] border-r border-[#102c3d]/[0.08] bg-white/95 px-4 py-5 shadow-[8px_0_32px_rgba(16,44,61,0.035)] backdrop-blur-xl lg:flex lg:flex-col">
       <div className="flex items-center px-2">
-        <LevyTateLogo className="h-[44px]" />
+        <LevyTateLogo className="[--levytate-logo-size:2.65rem]" />
       </div>
 
       <div className="mt-5 rounded-2xl border border-[#102c3d]/[0.06] bg-[#f7faf6] px-4 py-3 text-[#102c3d]">

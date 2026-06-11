@@ -48,7 +48,7 @@ export function PlatformTopBar({
     <header className="sticky top-0 z-30 border-b border-[#102c3d]/[0.08] bg-white/92 shadow-[0_1px_0_rgba(16,44,61,0.02)] backdrop-blur-xl">
       <div className="mx-auto grid max-w-[1600px] gap-4 px-5 py-3.5 sm:px-7 lg:px-9 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
         <div className="flex min-w-0 flex-wrap items-center gap-4 sm:gap-5">
-          <LevyTateLogo className="h-[40px] sm:h-[46px]" />
+          <LevyTateLogo className="[--levytate-logo-size:2.55rem] sm:[--levytate-logo-size:2.9rem]" />
           <div className="h-9 w-px shrink-0 bg-[#102c3d]/10" />
           <div className="flex min-w-0 items-center gap-3 sm:gap-4">
             <PortakabinLogoBadge tenantName={tenantName} />
@@ -137,7 +137,7 @@ function PlatformSidebar({ tenantName, tenantLabel, activeItem, navSections }: {
   return (
     <aside className="hidden border-r border-[#102c3d]/10 bg-white px-4 py-5 lg:flex lg:h-screen lg:flex-col">
       <div className="flex items-center px-2">
-        <LevyTateLogo className="h-[42px]" />
+        <LevyTateLogo className="[--levytate-logo-size:2.65rem]" />
       </div>
 
       <div className="mt-5 rounded-2xl border border-[#102c3d]/[0.06] bg-[#ffd200] px-4 py-3 text-[#102c3d] shadow-[0_14px_30px_rgba(16,44,61,0.08)]">
@@ -181,6 +181,43 @@ function PlatformSidebar({ tenantName, tenantLabel, activeItem, navSections }: {
 
 export function LevyTateLogo({ className = "" }: { className?: string }) {
   return (
-    <Image src="/logos/levytate-transparent.png" alt="LevyTate" width={219} height={53} priority className={`w-auto object-contain ${className}`} />
+    <>
+      <style>{`
+        @font-face {
+          font-family: "Cherry Bomb One";
+          src: url("/fonts/cherry-bomb-one-latin.woff2") format("woff2");
+          font-style: normal;
+          font-weight: 400;
+          font-display: swap;
+        }
+
+        .levytate-wordmark {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.06em;
+          width: max-content;
+          max-width: 100%;
+          font-family: "Cherry Bomb One", Arial, Helvetica, sans-serif;
+          font-size: var(--levytate-logo-size, clamp(2.25rem, 4vw, 3.1rem));
+          line-height: 0.78;
+          letter-spacing: -0.05em;
+          text-shadow: 2px 2px 0 #17325c;
+          white-space: nowrap;
+          transform: translateZ(0);
+        }
+
+        .levytate-wordmark span:first-child {
+          color: #c7f0e4;
+        }
+
+        .levytate-wordmark span:last-child {
+          color: #ff8e95;
+        }
+      `}</style>
+      <div className={`levytate-wordmark ${className}`} aria-label="LevyTate" role="img">
+        <span>Levy</span>
+        <span>Tate</span>
+      </div>
+    </>
   );
 }
