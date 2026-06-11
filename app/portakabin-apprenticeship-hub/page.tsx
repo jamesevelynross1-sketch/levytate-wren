@@ -73,7 +73,6 @@ type EmployeePersona = {
   manager: string;
   careerGoal: string;
   recommendedPathways: number;
-  applicationsInProgress: number;
   savedOpportunities: number;
   passportActivities: number;
   currentRange: string;
@@ -400,7 +399,6 @@ const employeePersonas: EmployeePersona[] = [
     manager: "Ryan Booth",
     careerGoal: "Production Supervisor / Team Leader",
     recommendedPathways: 2,
-    applicationsInProgress: 1,
     savedOpportunities: 1,
     passportActivities: 7,
     currentRange: "£28k",
@@ -417,7 +415,6 @@ const employeePersonas: EmployeePersona[] = [
     manager: "Sarah Mitchell",
     careerGoal: "Head of Data & Automation",
     recommendedPathways: 6,
-    applicationsInProgress: 2,
     savedOpportunities: 3,
     passportActivities: 4,
     currentRange: "£34k",
@@ -669,7 +666,7 @@ const portakabinLearners: Learner[] = [
 
 const initialRequests: RequestItem[] = [
   { id: 1, name: "Amelia Hart", role: "Production Team Member", department: "Manufacturing", team: "Assembly Line A", site: "York Head Office, Visitor Centre and UK Factory", pathway: "Level 3 Team Leader", manager: "Ryan Booth", status: "Awaiting Manager Review", note: "I want to apply for the Level 3 Team Leader route so I can build confidence leading shift handovers and improvement work.", careerGoal: "Progress into a team leader role in production.", supportRequired: "Support with study time during shifts.", submittedDate: "2026-05-18", decisionNotes: "Awaiting Ryan Booth review." },
-  { id: 12, name: "Daniel Carter", role: "Data & Reporting Analyst", department: "Business Intelligence", team: "Data & Automation", site: "York Head Office, Visitor Centre and UK Factory", pathway: "Level 4 Data Analyst", manager: "Sarah Mitchell", status: "Submitted to Line Manager", note: "I want to deepen my data analysis, insight generation and automation skills.", careerGoal: "Progress toward Head of Data & Automation.", supportRequired: "Protected time for portfolio evidence and internal reporting projects.", submittedDate: "2026-05-22", decisionNotes: "Awaiting Sarah Mitchell review." },
+  { id: 12, name: "Daniel Carter", role: "Data & Reporting Analyst", department: "Business Intelligence", team: "Data & Automation", site: "York Head Office, Visitor Centre and UK Factory", pathway: "Level 4 Data Analyst", manager: "Sarah Mitchell", status: "Awaiting Manager Review", note: "I want to deepen my data analysis, insight generation and automation skills.", careerGoal: "Progress toward Head of Data & Automation.", supportRequired: "Protected time for portfolio evidence and internal reporting projects.", submittedDate: "2026-05-22", decisionNotes: "Awaiting Sarah Mitchell review." },
   { id: 2, name: "Marcus Lee", role: "Technical Design Assistant", department: "Design & Technical", team: "Building Design", site: "York Head Office, Visitor Centre and UK Factory", pathway: "Design & Technical", manager: "Priya Nair", status: "Declined by Line Manager", note: "I want to formalise my design skills and contribute to technical standards.", careerGoal: "Move into a design technician role.", supportRequired: "Mentor support from senior designer.", submittedDate: "2026-05-12", decisionNotes: "Declined because current workload needs stabilising before a new programme starts." },
   { id: 3, name: "Sophie Clarke", role: "Customer Hire Coordinator", department: "Hire & Customer", team: "Customer Support", site: "Leeds Visitor Centre", pathway: "Hire, Sales & Customer Experience", manager: "Helen Ward", status: "Approved by Line Manager", note: "I want to improve customer conversations and account confidence.", careerGoal: "Progress into account support leadership.", supportRequired: "Protected time for monthly workshops.", submittedDate: "2026-05-10", decisionNotes: "Approved by Helen Ward and ready for apprenticeship lead review." },
   { id: 4, name: "Noah Bennett", role: "Installation Coordinator", department: "Site Operations", team: "Field Delivery", site: "Sheffield Visitor Centre", pathway: "Installation & Site Operations", manager: "Sam Ellis", status: "Submitted to Apprenticeship Lead", note: "I want to strengthen site handover and supervision skills.", careerGoal: "Become a site supervisor.", supportRequired: "Access to live site evidence.", submittedDate: "2026-05-08", decisionNotes: "Line manager approved. Awaiting final approval." },
@@ -910,7 +907,7 @@ export default function PortakabinApprenticeshipHub() {
         <div className="mx-auto w-full max-w-[1500px] space-y-5 px-5 py-5 sm:px-7 lg:px-8">
           {activeSection === "Dashboard" ? (
             <>
-              <HeroPanel role={role} selectedSite={selectedSite} selectedPersona={selectedPersona} onEmployee={switchEmployee} onNavigate={openSection} />
+              <HeroPanel role={role} selectedSite={selectedSite} selectedPersona={selectedPersona} activeApplication={activeEmployeeApplication} onEmployee={switchEmployee} onNavigate={openSection} />
               {selectedSite !== allSitesLabel ? <SiteSummary site={selectedSite} learners={filteredLearners} requests={filteredRequests} /> : null}
               <RoleDashboard
                 role={role}
@@ -922,6 +919,7 @@ export default function PortakabinApprenticeshipHub() {
                 employeeRequest={employeeRequest}
                 selectedPersona={selectedPersona}
                 selectedSite={selectedSite}
+                activeApplication={activeEmployeeApplication}
                 onNavigate={openSection}
               />
             </>
@@ -1078,17 +1076,19 @@ function HeroPanel({
   role,
   selectedSite,
   selectedPersona,
+  activeApplication,
   onEmployee,
   onNavigate,
 }: {
   role: Role;
   selectedSite: string;
   selectedPersona: EmployeePersona;
+  activeApplication?: RequestItem;
   onEmployee: (name: string) => void;
   onNavigate: (section: SectionKey) => void;
 }) {
   const primaryAction = primaryDashboardAction(role);
-  const metricCards = operatingSnapshotMetrics(role, selectedPersona);
+  const metricCards = operatingSnapshotMetrics(role, selectedPersona, activeApplication);
 
   return (
     <section className="rounded-[1.1rem] border border-[#102c3d]/[0.065] bg-white/96 p-4 shadow-[0_12px_30px_rgba(16,44,61,0.045)]">
@@ -1175,7 +1175,7 @@ function DashboardSnapshotCard({
   );
 }
 
-function operatingSnapshotMetrics(role: Role, selectedPersona: EmployeePersona): Array<{
+function operatingSnapshotMetrics(role: Role, selectedPersona: EmployeePersona, activeApplication?: RequestItem): Array<{
   label: string;
   value: string | number;
   copy: string;
@@ -1196,12 +1196,12 @@ function operatingSnapshotMetrics(role: Role, selectedPersona: EmployeePersona):
         target: "Recommended Pathways",
       },
       {
-        label: "Applications in progress",
-        value: selectedPersona.applicationsInProgress,
-        copy: "Requests currently progressing through approval.",
-        trend: `${selectedPersona.manager} review`,
-        tooltip: `Measures ${selectedPersona.name}'s active applications that are not yet final approved or declined. It matters because they can track what is moving and who has the next decision.`,
-        actionLabel: "Track applications",
+        label: "Current Application",
+        value: activeApplication ? 1 : 0,
+        copy: activeApplication ? activeApplication.pathway : "No active apprenticeship application.",
+        trend: activeApplication ? `${activeApplication.status}. ${activeApplication.manager} reviewing` : "Ready to apply",
+        tooltip: activeApplication ? `Shows ${selectedPersona.name}'s one current apprenticeship application, its status and reviewer.` : `Shows whether ${selectedPersona.name} has a current apprenticeship application.`,
+        actionLabel: "Track progress",
         target: "My Applications",
       },
       {
@@ -1430,6 +1430,7 @@ function SectionHeader({ activeSection, role, selectedSite }: { activeSection: S
 function RoleDashboard({
   role,
   selectedPersona,
+  activeApplication,
   onNavigate,
 }: {
   role: Role;
@@ -1441,16 +1442,17 @@ function RoleDashboard({
   employeeRequest: RequestItem;
   selectedPersona: EmployeePersona;
   selectedSite: string;
+  activeApplication?: RequestItem;
   onNavigate: (section: SectionKey) => void;
 }) {
-  return <DashboardSummaryGrid role={role} selectedPersona={selectedPersona} onNavigate={onNavigate} />;
+  return <DashboardSummaryGrid role={role} selectedPersona={selectedPersona} activeApplication={activeApplication} onNavigate={onNavigate} />;
 }
 
-function DashboardSummaryGrid({ role, selectedPersona, onNavigate }: { role: Role; selectedPersona: EmployeePersona; onNavigate: (section: SectionKey) => void }) {
+function DashboardSummaryGrid({ role, selectedPersona, activeApplication, onNavigate }: { role: Role; selectedPersona: EmployeePersona; activeApplication?: RequestItem; onNavigate: (section: SectionKey) => void }) {
   const cards: Record<Role, LaunchCardProps[]> = {
     Employee: [
       { title: "Recommended Pathways", value: selectedPersona.recommendedPathways, copy: `Role-matched apprenticeship routes for ${selectedPersona.name.split(" ")[0]}.`, action: "Explore", section: "Recommended Pathways" },
-      { title: "Applications In Progress", value: selectedPersona.applicationsInProgress, copy: `Requests moving through ${selectedPersona.manager}'s review and lead approval.`, action: "Track", section: "My Applications" },
+      { title: "Current Application", value: activeApplication ? 1 : 0, copy: activeApplication ? `${activeApplication.pathway}. ${activeApplication.status}. ${activeApplication.manager} reviewing.` : "No active apprenticeship application.", action: "Track Progress", section: "My Applications" },
       { title: "Saved Opportunities", value: selectedPersona.savedOpportunities, copy: "Shortlisted routes for future consideration.", action: "Review", section: "Recommended Pathways" },
       { title: "Development Passport", value: selectedPersona.passportActivities, copy: "Completed learning and qualifications.", action: "Open", section: "Development Passport" },
     ],
@@ -1534,7 +1536,7 @@ function EmployeeDashboard({ employeeRequest, savedPathways, onNavigate }: { emp
             <MetricTile label="Saved pathways" value={savedPathways.length} />
             <MetricTile label="Completed learning" value="7" />
             <MetricTile label="CPD activity" value="18 hrs" />
-            <PlatformButton onClick={() => onNavigate("My Applications")}>Start new application</PlatformButton>
+            <PlatformButton onClick={() => onNavigate("My Applications")}>View current application</PlatformButton>
           </div>
         </div>
       </PlatformPanel>
@@ -1944,11 +1946,11 @@ function DetailSection({
   if (activeSection === "My Applications") {
     return (
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_370px]">
-        <PlatformPanel eyebrow="Expression of interest" title="Start expression of interest">
+        <PlatformPanel eyebrow="Expression of interest" title={activeApplication ? "Current application in progress" : "Start expression of interest"}>
           <RequestForm key={selectedPersona.name} onSubmit={onSubmit} selectedPersona={selectedPersona} activeApplication={activeApplication} onViewApplication={() => onNavigate("My Applications")} />
           {success && <p className="mt-4 rounded-2xl bg-[#eff8f4] px-4 py-3 text-sm font-semibold text-[#102c3d]">Application submitted to line manager.</p>}
         </PlatformPanel>
-        <PlatformPanel eyebrow="Application status" title={`${selectedPersona.name.split(" ")[0]}'s applications`}>
+        <PlatformPanel eyebrow="Application status" title={activeApplication ? "Current application" : `${selectedPersona.name.split(" ")[0]}'s application record`}>
           {employeeRequests.length ? (
             <div className="grid gap-5">
               {employeeRequests.map((request) => (
@@ -1956,7 +1958,7 @@ function DetailSection({
                   <div className="mb-4 flex items-start justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-[#102c3d]">{request.pathway}</p>
-                      <p className="mt-1 text-xs font-medium text-[#102c3d]/50">{request.manager} is the current line manager</p>
+                      <p className="mt-1 text-xs font-medium text-[#102c3d]/50">{request.manager} reviewing</p>
                     </div>
                     <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.06]">{request.status}</span>
                   </div>
@@ -1966,8 +1968,8 @@ function DetailSection({
             </div>
           ) : (
             <div className="rounded-[1.2rem] border border-[#102c3d]/[0.055] bg-[#f8fbfa] p-5">
-              <p className="text-sm font-semibold text-[#102c3d]">No applications for this site view</p>
-              <p className="mt-2 text-sm leading-6 text-[#102c3d]/58">{`${selectedPersona.name}'s applications remain private to their own profile and selected site context.`}</p>
+              <p className="text-sm font-semibold text-[#102c3d]">No current application for this site view</p>
+              <p className="mt-2 text-sm leading-6 text-[#102c3d]/58">{`${selectedPersona.name}'s application record remains private to their own profile and selected site context.`}</p>
             </div>
           )}
         </PlatformPanel>
@@ -3264,11 +3266,11 @@ function EmployeeAIPage({
       ) : null}
 
       {response || confirmation ? (
-      <PlatformPanel eyebrow="Recent activity" title="Application history">
+      <PlatformPanel eyebrow="Recent activity" title="Current application">
         <div className="grid gap-3 md:grid-cols-2">
           {employeeApplications.length ? employeeApplications.slice(0, 4).map((request) => (
             <ApplicationCard key={request.id} request={request} scope="readonly" onStatus={() => undefined} />
-          )) : <p className="rounded-xl bg-[#f8fbfa] p-4 text-sm text-[#102c3d]/58">No applications yet. Ask LevyTate AI can help you start one.</p>}
+          )) : <p className="rounded-xl bg-[#f8fbfa] p-4 text-sm text-[#102c3d]/58">No current application yet. Ask LevyTate AI can help you start one.</p>}
         </div>
       </PlatformPanel>
       ) : null}
@@ -3827,7 +3829,7 @@ function sectionDescription(section: SectionKey) {
     "Explore Pathways": "Browse approved apprenticeship routes available in the Portakabin environment.",
     "Career Pathfinder": "Explore potential progression routes and the apprenticeships that support them.",
     "Skills Analysis": "Understand skills gaps, competency strengths and recommended development actions.",
-    "My Applications": "Track your apprenticeship applications from submission through final approval.",
+    "My Applications": "Track your current apprenticeship application from submission through final approval.",
     "Development Passport": "Review completed learning, qualifications, CPD activity and internal training.",
     "My Team": "View direct report development status, active apprentices and progression signals.",
     "Team Skills": "Explore team skills coverage across leadership, technical, data, commercial and digital capability.",
