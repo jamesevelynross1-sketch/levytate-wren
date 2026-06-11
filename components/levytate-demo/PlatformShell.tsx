@@ -20,13 +20,13 @@ type PlatformShellProps = {
 
 export function PlatformShell({ tenantName, tenantLabel, activeItem = "Dashboard", navSections, topBar, children, sideRail }: PlatformShellProps) {
   return (
-    <main className="min-h-screen bg-[#f4f7f5] text-[#102c3d]">
+    <main className="min-h-screen bg-[#f5f7f6] text-[#102c3d]">
       <div className="grid min-h-screen lg:grid-cols-[296px_minmax(0,1fr)]">
         <PlatformSidebar tenantName={tenantName} tenantLabel={tenantLabel} activeItem={activeItem} navSections={navSections} />
         <div className="min-w-0">
           {topBar}
-          <div className="mx-auto grid w-full max-w-[1600px] gap-8 px-5 py-7 sm:px-7 lg:px-9 2xl:grid-cols-[minmax(0,1fr)_360px]">
-            <section className="min-w-0 space-y-8">{children}</section>
+          <div className="mx-auto grid w-full max-w-[1600px] gap-5 px-5 py-5 sm:px-7 lg:px-8 2xl:grid-cols-[minmax(0,1fr)_340px]">
+            <section className="min-w-0 space-y-5">{children}</section>
             {sideRail ? <aside className="grid h-fit gap-4 2xl:sticky 2xl:top-7">{sideRail}</aside> : null}
           </div>
         </div>
@@ -49,7 +49,7 @@ export function PlatformTopBar({
   if (controlsOnly) {
     return (
       <header className="sticky top-0 z-30 border-b border-[#102c3d]/[0.08] bg-white/92 shadow-[0_1px_0_rgba(16,44,61,0.02)] backdrop-blur-xl">
-        <div className="mx-auto flex max-w-[1600px] px-5 py-2.5 sm:px-7 lg:px-9">
+        <div className="mx-auto flex max-w-[1600px] px-5 py-2 sm:px-7 lg:px-8">
           {children}
         </div>
       </header>
@@ -97,24 +97,24 @@ export function PlatformPanel({
   className?: string;
 }) {
   return (
-    <section className={`min-w-0 rounded-[1.25rem] border border-[#102c3d]/[0.06] bg-white p-5 shadow-[0_14px_36px_rgba(16,44,61,0.045)] ${className}`}>
+    <section className={`min-w-0 rounded-[1rem] border border-[#102c3d]/[0.065] bg-white p-4 shadow-[0_10px_28px_rgba(16,44,61,0.045)] ${className}`}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           {eyebrow ? <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#c95568]">{eyebrow}</p> : null}
-          <h2 className="mt-1.5 text-xl font-semibold leading-7 tracking-[-0.01em] text-[#102c3d]">{title}</h2>
+          <h2 className="mt-1 text-lg font-semibold leading-6 tracking-[-0.01em] text-[#102c3d]">{title}</h2>
         </div>
         {actions ? <div className="shrink-0">{actions}</div> : null}
       </div>
-      <div className="mt-5">{children}</div>
+      <div className="mt-4">{children}</div>
     </section>
   );
 }
 
 export function PlatformMetric({ label, value, copy }: { label: string; value: string | number; copy?: string }) {
   return (
-    <article className="rounded-[1.1rem] border border-[#102c3d]/[0.055] bg-white p-4 shadow-[0_10px_24px_rgba(16,44,61,0.04)]">
+    <article className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-white p-3.5 shadow-[0_8px_20px_rgba(16,44,61,0.04)]">
       <p className="text-xs font-medium text-[#102c3d]/48">{label}</p>
-      <p className="mt-2 text-3xl font-semibold tracking-[-0.025em] text-[#102c3d]">{value}</p>
+      <p className="mt-1.5 text-2xl font-semibold tracking-[-0.025em] text-[#102c3d]">{value}</p>
       {copy ? <p className="mt-1.5 line-clamp-2 text-xs leading-5 text-[#102c3d]/54">{copy}</p> : null}
     </article>
   );
