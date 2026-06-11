@@ -65,6 +65,24 @@ type ProviderMapping = {
   whyRecommended: string;
 };
 
+type EmployeePersona = {
+  name: string;
+  role: string;
+  department: string;
+  site: string;
+  manager: string;
+  careerGoal: string;
+  recommendedPathways: number;
+  applicationsInProgress: number;
+  savedOpportunities: number;
+  passportActivities: number;
+  currentRange: string;
+  nextRange: string;
+  futureOpportunity: string;
+  progression: string[];
+  skills: Array<[string, number]>;
+};
+
 type SectionKey =
   | "Dashboard"
   | "Recommended Pathways"
@@ -124,7 +142,7 @@ const publicStages: RequestStatus[] = ["Draft", "Submitted to Line Manager", "Ap
 
 const navSectionsByRole: Record<Role, PlatformNavSection[]> = {
   Employee: [
-    { title: "Employee", items: ["Dashboard", "Recommended Pathways", "Career Pathfinder", "My Applications", "Development Passport"] },
+    { title: "Employee", items: ["Dashboard", "Recommended Pathways", "Career Pathfinder", "Skills Analysis", "My Applications", "Development Passport"] },
   ],
   "Line Manager": [
     { title: "Manager", items: ["Dashboard", "My Team", "Applications to Review", "Team Skills", "Team Development"] },
@@ -143,7 +161,7 @@ const navSectionsByRole: Record<Role, PlatformNavSection[]> = {
 };
 
 const roleSectionMap: Record<Role, SectionKey[]> = {
-  Employee: ["Recommended Pathways", "Career Pathfinder", "My Applications"],
+  Employee: ["Recommended Pathways", "Career Pathfinder", "Skills Analysis", "My Applications"],
   "Line Manager": ["My Team", "Applications to Review", "Team Skills"],
   "Department Head": ["Department Analytics", "Site Breakdown", "Future Demand"],
   "Apprenticeship Lead": ["Applications for Final Approval", "Approved for Enrolment", "Providers"],
@@ -306,6 +324,7 @@ const pathways: Pathway[] = [
 
 const employeeRoleOptions = [
   "Production Team Member",
+  "Data & Reporting Analyst",
   "Assembly Operative",
   "Manufacturing Operative",
   "Maintenance Technician",
@@ -325,10 +344,55 @@ const employeeRoleOptions = [
   "Health & Safety Coordinator",
 ];
 
+const employeePersonas: EmployeePersona[] = [
+  {
+    name: "Amelia Hart",
+    role: "Production Team Member",
+    department: "Manufacturing",
+    site: "York Head Office, Visitor Centre and UK Factory",
+    manager: "Ryan Booth",
+    careerGoal: "Production Supervisor / Team Leader",
+    recommendedPathways: 2,
+    applicationsInProgress: 1,
+    savedOpportunities: 1,
+    passportActivities: 7,
+    currentRange: "£28k",
+    nextRange: "£36k",
+    futureOpportunity: "High",
+    progression: ["Production Team Member", "Senior Operator", "Team Leader", "Production Supervisor"],
+    skills: [["Manufacturing confidence", 74], ["Leadership readiness", 58], ["Technical evidence", 68], ["Shift coordination", 61]],
+  },
+  {
+    name: "Daniel Carter",
+    role: "Data & Reporting Analyst",
+    department: "Business Intelligence",
+    site: "York Head Office, Visitor Centre and UK Factory",
+    manager: "Sarah Mitchell",
+    careerGoal: "Head of Data & Automation",
+    recommendedPathways: 6,
+    applicationsInProgress: 2,
+    savedOpportunities: 3,
+    passportActivities: 4,
+    currentRange: "£34k",
+    nextRange: "£52k",
+    futureOpportunity: "Very high",
+    progression: ["Data & Reporting Analyst", "Data Analyst", "Senior Data Analyst", "Head of Data & Automation"],
+    skills: [["Data analysis", 72], ["Automation", 54], ["Business intelligence", 78], ["AI readiness", 48]],
+  },
+];
+
 const employeeRolePathwayMap: Record<string, Array<{ pathwayTitle: string; standard: string; summary: string }>> = {
   "Production Team Member": [
     { pathwayTitle: "Manufacturing & Production", standard: "Level 3 Engineering Technician", summary: "Build technical production, maintenance and engineering confidence." },
     { pathwayTitle: "Leadership & Management", standard: "Level 3 Team Leader", summary: "Prepare for shift handovers, team coordination and improvement work." },
+  ],
+  "Data & Reporting Analyst": [
+    { pathwayTitle: "Digital, Data & AI", standard: "Level 3 Data Technician", summary: "Build practical data handling, dashboards and reporting confidence." },
+    { pathwayTitle: "Digital, Data & AI", standard: "Level 4 Data Analyst", summary: "Develop analysis, insight generation and data storytelling capability." },
+    { pathwayTitle: "Digital, Data & AI", standard: "Level 4 Business Analyst", summary: "Connect business needs, systems improvement and data-led change." },
+    { pathwayTitle: "Digital, Data & AI", standard: "Level 4 AI & Data Specialist", summary: "Apply AI, automation and data tools to operational reporting." },
+    { pathwayTitle: "Digital, Data & AI", standard: "Level 6 Data Scientist", summary: "Progress toward advanced modelling, experimentation and strategic analytics." },
+    { pathwayTitle: "Digital, Data & AI", standard: "AI & Automation Workforce Programme", summary: "Build automation confidence for reporting, workflows and internal productivity." },
   ],
   "Assembly Operative": [
     { pathwayTitle: "Manufacturing & Production", standard: "Level 3 Engineering Technician", summary: "Develop practical manufacturing and assembly capability." },
@@ -442,7 +506,9 @@ const portakabinLearners: Learner[] = [
 ];
 
 const initialRequests: RequestItem[] = [
-  { id: 1, name: "Amelia Hart", role: "Production Team Member", department: "Manufacturing", team: "Assembly Line A", site: "York Head Office, Visitor Centre and UK Factory", pathway: "Leadership & Management", manager: "Ryan Booth", status: "Submitted to Line Manager", note: "I want to apply for the Level 3 Team Leader route so I can build confidence leading shift handovers and improvement work.", careerGoal: "Progress into a team leader role in production.", supportRequired: "Support with study time during shifts.", submittedDate: "2026-05-18", decisionNotes: "Awaiting Ryan Booth review." },
+  { id: 1, name: "Amelia Hart", role: "Production Team Member", department: "Manufacturing", team: "Assembly Line A", site: "York Head Office, Visitor Centre and UK Factory", pathway: "Level 3 Team Leader", manager: "Ryan Booth", status: "Submitted to Line Manager", note: "I want to apply for the Level 3 Team Leader route so I can build confidence leading shift handovers and improvement work.", careerGoal: "Progress into a team leader role in production.", supportRequired: "Support with study time during shifts.", submittedDate: "2026-05-18", decisionNotes: "Awaiting Ryan Booth review." },
+  { id: 12, name: "Daniel Carter", role: "Data & Reporting Analyst", department: "Business Intelligence", team: "Data & Automation", site: "York Head Office, Visitor Centre and UK Factory", pathway: "Level 4 Data Analyst", manager: "Sarah Mitchell", status: "Submitted to Line Manager", note: "I want to deepen my data analysis, insight generation and automation skills.", careerGoal: "Progress toward Head of Data & Automation.", supportRequired: "Protected time for portfolio evidence and internal reporting projects.", submittedDate: "2026-05-22", decisionNotes: "Awaiting Sarah Mitchell review." },
+  { id: 13, name: "Daniel Carter", role: "Data & Reporting Analyst", department: "Business Intelligence", team: "Data & Automation", site: "York Head Office, Visitor Centre and UK Factory", pathway: "AI & Automation Workforce Programme", manager: "Sarah Mitchell", status: "Draft", note: "I am exploring how AI and automation could improve reporting workflows.", careerGoal: "Lead future automation and AI adoption across business intelligence.", supportRequired: "Needs final scope and manager input.", submittedDate: "2026-06-04", decisionNotes: "Draft not yet submitted." },
   { id: 2, name: "Marcus Lee", role: "Technical Design Assistant", department: "Design & Technical", team: "Building Design", site: "York Head Office, Visitor Centre and UK Factory", pathway: "Design & Technical", manager: "Priya Nair", status: "Declined by Line Manager", note: "I want to formalise my design skills and contribute to technical standards.", careerGoal: "Move into a design technician role.", supportRequired: "Mentor support from senior designer.", submittedDate: "2026-05-12", decisionNotes: "Declined because current workload needs stabilising before a new programme starts." },
   { id: 3, name: "Sophie Clarke", role: "Customer Hire Coordinator", department: "Hire & Customer", team: "Customer Support", site: "Leeds Visitor Centre", pathway: "Hire, Sales & Customer Experience", manager: "Helen Ward", status: "Approved by Line Manager", note: "I want to improve customer conversations and account confidence.", careerGoal: "Progress into account support leadership.", supportRequired: "Protected time for monthly workshops.", submittedDate: "2026-05-10", decisionNotes: "Approved by Helen Ward and ready for apprenticeship lead review." },
   { id: 4, name: "Noah Bennett", role: "Installation Coordinator", department: "Site Operations", team: "Field Delivery", site: "Sheffield Visitor Centre", pathway: "Installation & Site Operations", manager: "Sam Ellis", status: "Submitted to Apprenticeship Lead", note: "I want to strengthen site handover and supervision skills.", careerGoal: "Become a site supervisor.", supportRequired: "Access to live site evidence.", submittedDate: "2026-05-08", decisionNotes: "Line manager approved. Awaiting final approval." },
@@ -541,6 +607,7 @@ const scenarioSeeds: Record<DemandScenario, RequestItem[]> = {
 export default function PortakabinApprenticeshipHub() {
   const [role, setRole] = useState<Role>("Employee");
   const [activeSection, setActiveSection] = useState<SectionKey>("Dashboard");
+  const [selectedEmployeeName, setSelectedEmployeeName] = useState("Amelia Hart");
   const [selectedEmployeeRole, setSelectedEmployeeRole] = useState("Production Team Member");
   const [requests, setRequests] = useState<RequestItem[]>(initialRequests);
   const [mappings, setMappings] = useState<ProviderMapping[]>(initialMappings);
@@ -560,7 +627,9 @@ export default function PortakabinApprenticeshipHub() {
   }, [filteredLearners, learnerSearch]);
   const statusCounts = useMemo(() => countBy(filteredRequests, "status"), [filteredRequests]);
   const departmentCounts = useMemo(() => countBy(filteredRequests, "department"), [filteredRequests]);
-  const employeeRequest = filteredRequests.find((request) => request.name === "Amelia Hart") ?? filteredRequests[0] ?? requests[0];
+  const selectedPersona = employeePersonas.find((persona) => persona.name === selectedEmployeeName) ?? employeePersonas[0];
+  const employeeRequests = filteredRequests.filter((request) => request.name === selectedPersona.name);
+  const employeeRequest = employeeRequests[0] ?? filteredRequests[0] ?? requests[0];
 
   function switchRole(nextRole: Role) {
     setRole(nextRole);
@@ -569,6 +638,13 @@ export default function PortakabinApprenticeshipHub() {
 
   function openSection(section: SectionKey) {
     setActiveSection(section);
+  }
+
+  function switchEmployee(nextName: string) {
+    const nextPersona = employeePersonas.find((persona) => persona.name === nextName);
+    if (!nextPersona) return;
+    setSelectedEmployeeName(nextPersona.name);
+    setSelectedEmployeeRole(nextPersona.role);
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -647,12 +723,12 @@ export default function PortakabinApprenticeshipHub() {
       <Sidebar role={role} activeSection={activeSection} onNavigate={openSection} />
 
       <div className="h-screen min-w-0 overflow-y-auto lg:ml-[296px]">
-        <TopBar role={role} setRole={switchRole} selectedSite={selectedSite} onSite={setSelectedSite} onOpenAdmin={() => switchRole("Admin Console")} />
+        <TopBar role={role} setRole={switchRole} selectedSite={selectedSite} selectedPersona={selectedPersona} onEmployee={switchEmployee} onSite={setSelectedSite} onOpenAdmin={() => switchRole("Admin Console")} />
 
         <div className="mx-auto w-full max-w-[1500px] space-y-7 px-5 py-7 sm:px-7 lg:px-9">
           {activeSection === "Dashboard" ? (
             <>
-              <HeroPanel role={role} selectedSite={selectedSite} onNavigate={openSection} />
+              <HeroPanel role={role} selectedSite={selectedSite} selectedPersona={selectedPersona} onEmployee={switchEmployee} onNavigate={openSection} />
               {selectedSite !== allSitesLabel ? <SiteSummary site={selectedSite} learners={filteredLearners} requests={filteredRequests} /> : null}
               <RoleDashboard
                 role={role}
@@ -662,6 +738,7 @@ export default function PortakabinApprenticeshipHub() {
                 departmentCounts={departmentCounts}
                 savedPathways={savedPathways}
                 employeeRequest={employeeRequest}
+                selectedPersona={selectedPersona}
                 selectedSite={selectedSite}
                 onNavigate={openSection}
               />
@@ -677,7 +754,8 @@ export default function PortakabinApprenticeshipHub() {
                 statusCounts={statusCounts}
                 departmentCounts={departmentCounts}
                 savedPathways={savedPathways}
-                employeeRequest={employeeRequest}
+                employeeRequests={employeeRequests}
+                selectedPersona={selectedPersona}
                 selectedSite={selectedSite}
                 learners={searchedLearners}
                 learnerSearch={learnerSearch}
@@ -752,18 +830,22 @@ function TopBar({
   role,
   setRole,
   selectedSite,
+  selectedPersona,
+  onEmployee,
   onSite,
   onOpenAdmin,
 }: {
   role: Role;
   setRole: (role: Role) => void;
   selectedSite: string;
+  selectedPersona: EmployeePersona;
+  onEmployee: (name: string) => void;
   onSite: (site: string) => void;
   onOpenAdmin: () => void;
 }) {
   return (
     <PlatformTopBar tenantName="Portakabin" tenantSubtitle="Internal apprenticeship and capability hub">
-      <div className="grid min-w-0 gap-3 md:grid-cols-[minmax(220px,300px)_minmax(190px,250px)] md:items-center 2xl:grid-cols-[minmax(260px,320px)_minmax(210px,270px)_auto_auto]">
+      <div className="grid min-w-0 gap-3 md:grid-cols-[minmax(220px,300px)_minmax(190px,250px)] md:items-center 2xl:grid-cols-[minmax(220px,290px)_minmax(190px,240px)_minmax(190px,240px)_auto_auto]">
         <div className="hidden h-10 items-center rounded-full border border-[#102c3d]/[0.08] bg-[#f8fbfa] px-4 text-sm text-[#102c3d]/44 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] xl:flex">Search pathways, requests or teams</div>
         <label className="flex h-10 min-w-0 items-center gap-2 rounded-full border border-[#102c3d]/[0.08] bg-[#f8fbfa] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] transition focus-within:border-[#159b8f] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#159b8f]/10">
           <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/38">Site</span>
@@ -779,6 +861,21 @@ function TopBar({
             ))}
           </select>
         </label>
+        {role === "Employee" ? (
+          <label className="flex h-10 min-w-0 items-center gap-2 rounded-full border border-[#102c3d]/[0.08] bg-[#f8fbfa] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] transition focus-within:border-[#159b8f] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#159b8f]/10">
+            <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/38">Demo Employee</span>
+            <select
+              value={selectedPersona.name}
+              onChange={(event) => onEmployee(event.target.value)}
+              className="h-full min-w-0 flex-1 bg-transparent text-sm font-medium text-[#102c3d]/74 outline-none"
+              aria-label="Demo Employee"
+            >
+              {employeePersonas.map((persona) => (
+                <option key={persona.name}>{persona.name}</option>
+              ))}
+            </select>
+          </label>
+        ) : null}
         <div className="flex min-h-10 flex-wrap items-center rounded-[1.25rem] border border-[#102c3d]/[0.06] bg-[#edf5f1] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] 2xl:h-10 2xl:flex-nowrap 2xl:rounded-full">
           {roles.map((item) => (
             <button key={item} onClick={() => setRole(item)} className={`h-8 rounded-full px-3 text-xs font-semibold transition duration-200 ${role === item ? "bg-white text-[#102c3d] shadow-[0_6px_16px_rgba(16,44,61,0.08)]" : "text-[#102c3d]/52 hover:text-[#102c3d]"}`}>
@@ -795,22 +892,39 @@ function TopBar({
 function HeroPanel({
   role,
   selectedSite,
+  selectedPersona,
+  onEmployee,
   onNavigate,
 }: {
   role: Role;
   selectedSite: string;
+  selectedPersona: EmployeePersona;
+  onEmployee: (name: string) => void;
   onNavigate: (section: SectionKey) => void;
 }) {
   const primaryAction = primaryDashboardAction(role);
-  const metricCards = operatingSnapshotMetrics(role);
+  const metricCards = operatingSnapshotMetrics(role, selectedPersona);
 
   return (
     <section className="rounded-[1.45rem] border border-[#102c3d]/[0.06] bg-white/96 p-5 shadow-[0_18px_44px_rgba(16,44,61,0.05)] xl:p-6">
       <div className="grid gap-5 xl:grid-cols-[minmax(280px,0.72fr)_minmax(0,1.28fr)] xl:items-start">
         <div className="min-w-0">
-          <p className="w-fit rounded-full bg-[#fff4bd] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-[#7b6100]">Standalone employer environment</p>
-          <h1 className="mt-4 max-w-3xl text-3xl font-semibold leading-[1.04] tracking-[-0.025em] text-[#102c3d] md:text-4xl">Portakabin Apprenticeship Hub</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-[#102c3d]/62">A focused LevyTate workspace for approved pathways, development demand and apprenticeship operations.</p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <p className="w-fit rounded-full bg-[#fff4bd] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-[#7b6100]">Standalone employer environment</p>
+            {role === "Employee" ? (
+              <label className="grid w-full max-w-[240px] gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/40">
+                Demo Employee
+                <select value={selectedPersona.name} onChange={(event) => onEmployee(event.target.value)} className="h-10 rounded-full border border-[#102c3d]/[0.08] bg-[#f8fbfa] px-4 text-sm font-semibold normal-case tracking-normal text-[#102c3d] outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10">
+                  {employeePersonas.map((persona) => (
+                    <option key={persona.name}>{persona.name}</option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+          </div>
+          <h1 className="mt-4 max-w-3xl text-3xl font-semibold leading-[1.04] tracking-[-0.025em] text-[#102c3d] md:text-4xl">{role === "Employee" ? `Welcome ${selectedPersona.name}` : "Portakabin Apprenticeship Hub"}</h1>
+          <p className="mt-2 text-sm font-semibold text-[#102c3d]/72">{role === "Employee" ? selectedPersona.role : "Internal apprenticeship and capability hub"}</p>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-[#102c3d]/62">{role === "Employee" ? `${selectedPersona.department} at ${selectedPersona.site}. Career goal: ${selectedPersona.careerGoal}.` : "A focused LevyTate workspace for approved pathways, development demand and apprenticeship operations."}</p>
           <p className="mt-2 text-xs font-medium text-[#102c3d]/48">View: {selectedSite}</p>
         </div>
 
@@ -876,7 +990,7 @@ function DashboardSnapshotCard({
   );
 }
 
-function operatingSnapshotMetrics(role: Role): Array<{
+function operatingSnapshotMetrics(role: Role, selectedPersona: EmployeePersona): Array<{
   label: string;
   value: string | number;
   copy: string;
@@ -889,37 +1003,37 @@ function operatingSnapshotMetrics(role: Role): Array<{
     Employee: [
       {
         label: "Recommended pathways",
-        value: 6,
-        copy: "Apprenticeships matched to your role and career goals.",
-        trend: "+2 new matches this month",
-        tooltip: "Measures approved pathways matched to Amelia's current role, site and career goal. It matters because employees see relevant options without provider confusion.",
+        value: selectedPersona.recommendedPathways,
+        copy: `Apprenticeships matched to ${selectedPersona.name.split(" ")[0]}'s role and career goals.`,
+        trend: `${selectedPersona.role} profile`,
+        tooltip: `Measures approved pathways matched to ${selectedPersona.name}'s current role, site and career goal. It matters because employees see relevant options without provider confusion.`,
         actionLabel: "Explore pathways",
         target: "Recommended Pathways",
       },
       {
         label: "Applications in progress",
-        value: 2,
+        value: selectedPersona.applicationsInProgress,
         copy: "Requests currently progressing through approval.",
-        trend: "1 with Ryan Booth",
-        tooltip: "Measures Amelia's active applications that are not yet final approved or declined. It matters because she can track what is moving and who has the next decision.",
+        trend: `${selectedPersona.manager} review`,
+        tooltip: `Measures ${selectedPersona.name}'s active applications that are not yet final approved or declined. It matters because they can track what is moving and who has the next decision.`,
         actionLabel: "Track applications",
         target: "My Applications",
       },
       {
         label: "Saved opportunities",
-        value: 3,
+        value: selectedPersona.savedOpportunities,
         copy: "Pathways shortlisted for future consideration.",
-        trend: "+1 saved this week",
-        tooltip: "Measures pathways Amelia has saved for later review. It matters because development planning can happen before a formal application is submitted.",
+        trend: `${selectedPersona.savedOpportunities} shortlisted`,
+        tooltip: `Measures pathways ${selectedPersona.name} has saved for later review. It matters because development planning can happen before a formal application is submitted.`,
         actionLabel: "View saved pathways",
         target: "Recommended Pathways",
       },
       {
         label: "Development passport",
-        value: 7,
+        value: selectedPersona.passportActivities,
         copy: "Completed training activities and qualifications.",
-        trend: "2 qualifications logged",
-        tooltip: "Measures completed learning evidence in Amelia's development passport. It matters because prior learning helps shape the right pathway and support plan.",
+        trend: `${selectedPersona.passportActivities} activities logged`,
+        tooltip: `Measures completed learning evidence in ${selectedPersona.name}'s development passport. It matters because prior learning helps shape the right pathway and support plan.`,
         actionLabel: "View passport",
         target: "Development Passport",
       },
@@ -1130,6 +1244,7 @@ function SectionHeader({ activeSection, role, selectedSite }: { activeSection: S
 
 function RoleDashboard({
   role,
+  selectedPersona,
   onNavigate,
 }: {
   role: Role;
@@ -1139,19 +1254,20 @@ function RoleDashboard({
   departmentCounts: Record<string, number>;
   savedPathways: string[];
   employeeRequest: RequestItem;
+  selectedPersona: EmployeePersona;
   selectedSite: string;
   onNavigate: (section: SectionKey) => void;
 }) {
-  return <DashboardSummaryGrid role={role} onNavigate={onNavigate} />;
+  return <DashboardSummaryGrid role={role} selectedPersona={selectedPersona} onNavigate={onNavigate} />;
 }
 
-function DashboardSummaryGrid({ role, onNavigate }: { role: Role; onNavigate: (section: SectionKey) => void }) {
+function DashboardSummaryGrid({ role, selectedPersona, onNavigate }: { role: Role; selectedPersona: EmployeePersona; onNavigate: (section: SectionKey) => void }) {
   const cards: Record<Role, LaunchCardProps[]> = {
     Employee: [
-      { title: "Recommended Pathways", value: 6, copy: "Role-matched apprenticeship routes for Amelia.", action: "Explore", section: "Recommended Pathways" },
-      { title: "Applications In Progress", value: 2, copy: "Requests moving through manager and lead review.", action: "Track", section: "My Applications" },
-      { title: "Saved Opportunities", value: 3, copy: "Shortlisted routes for future consideration.", action: "Review", section: "Recommended Pathways" },
-      { title: "Development Passport", value: 7, copy: "Completed learning and qualifications.", action: "Open", section: "Development Passport" },
+      { title: "Recommended Pathways", value: selectedPersona.recommendedPathways, copy: `Role-matched apprenticeship routes for ${selectedPersona.name.split(" ")[0]}.`, action: "Explore", section: "Recommended Pathways" },
+      { title: "Applications In Progress", value: selectedPersona.applicationsInProgress, copy: `Requests moving through ${selectedPersona.manager}'s review and lead approval.`, action: "Track", section: "My Applications" },
+      { title: "Saved Opportunities", value: selectedPersona.savedOpportunities, copy: "Shortlisted routes for future consideration.", action: "Review", section: "Recommended Pathways" },
+      { title: "Development Passport", value: selectedPersona.passportActivities, copy: "Completed learning and qualifications.", action: "Open", section: "Development Passport" },
     ],
     "Line Manager": [
       { title: "Applications Awaiting Review", value: 4, copy: "Direct reports needing manager approval.", action: "Review", section: "Applications to Review" },
@@ -1502,7 +1618,8 @@ function DetailSection({
   statusCounts,
   departmentCounts,
   savedPathways,
-  employeeRequest,
+  employeeRequests,
+  selectedPersona,
   selectedSite,
   learners,
   learnerSearch,
@@ -1527,7 +1644,8 @@ function DetailSection({
   statusCounts: Record<string, number>;
   departmentCounts: Record<string, number>;
   savedPathways: string[];
-  employeeRequest: RequestItem;
+  employeeRequests: RequestItem[];
+  selectedPersona: EmployeePersona;
   selectedSite: string;
   learners: Learner[];
   learnerSearch: string;
@@ -1558,7 +1676,7 @@ function DetailSection({
         {role === "Employee" ? (
           <div className="mb-5 grid gap-4 rounded-[1.2rem] border border-[#102c3d]/[0.055] bg-[#f8fbfa] p-4 lg:grid-cols-[minmax(240px,320px)_minmax(0,1fr)_160px] lg:items-end">
             <label className="grid gap-1.5 text-xs font-medium text-[#102c3d]/60">
-              Select your role
+              Select Role
               <select value={selectedEmployeeRole} onChange={(event) => onEmployeeRole(event.target.value)} className="h-11 rounded-2xl border border-[#102c3d]/[0.08] bg-white px-4 text-sm font-semibold text-[#102c3d] outline-none transition focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10">
                 {employeeRoleOptions.map((item) => (
                   <option key={item}>{item}</option>
@@ -1567,7 +1685,7 @@ function DetailSection({
             </label>
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#c95568]">Role summary</p>
-              <p className="mt-1 text-sm leading-6 text-[#102c3d]/62">{roleSummaryFor(selectedEmployeeRole)}</p>
+              <p className="mt-1 text-sm leading-6 text-[#102c3d]/62">{selectedPersona.name}: {roleSummaryFor(selectedEmployeeRole)}</p>
             </div>
             <div className="rounded-2xl bg-white px-4 py-3 text-center shadow-[0_8px_18px_rgba(16,44,61,0.035)]">
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/36">Matched pathways</p>
@@ -1598,13 +1716,16 @@ function DetailSection({
   if (activeSection === "Career Pathfinder") {
     return (
       <PlatformPanel eyebrow="Career pathfinder" title="Progression map and recommended development">
+        <div className="mb-5 rounded-[1.2rem] border border-[#102c3d]/[0.055] bg-[#f8fbfa] p-4">
+          <p className="text-sm font-semibold text-[#102c3d]">{selectedPersona.name}</p>
+          <p className="mt-1 text-sm leading-6 text-[#102c3d]/58">{selectedPersona.role} to {selectedPersona.careerGoal}</p>
+        </div>
         <div className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
-          <ProgressionPath roles={["Project Coordinator", "Project Manager", "Senior Project Manager", "Programme Manager"]} />
+          <ProgressionPath roles={selectedPersona.progression} />
           <div className="grid gap-3">
-            <SkillBar label="Project planning" value={76} />
-            <SkillBar label="Stakeholder confidence" value={68} />
-            <SkillBar label="Commercial awareness" value={54} />
-            <SkillBar label="Leadership readiness" value={61} />
+            {selectedPersona.skills.map(([label, value]) => (
+              <SkillBar key={label} label={label} value={value} />
+            ))}
           </div>
         </div>
       </PlatformPanel>
@@ -1615,10 +1736,15 @@ function DetailSection({
     return (
       <PlatformPanel eyebrow="Development passport" title="Completed learning and evidence record">
         <div className="grid gap-4 md:grid-cols-4">
-          <MetricTile label="Completed apprenticeships" value="1" />
-          <MetricTile label="Courses" value="4" />
-          <MetricTile label="Qualifications" value="2" />
-          <MetricTile label="CPD activity" value="18 hrs" />
+          <MetricTile label="Completed activities" value={selectedPersona.passportActivities} />
+          <MetricTile label="Current role" value={selectedPersona.role} />
+          <MetricTile label="Target role" value={selectedPersona.careerGoal} />
+          <MetricTile label="Future opportunity" value={selectedPersona.futureOpportunity} />
+        </div>
+        <div className="mt-5 grid gap-4 md:grid-cols-3">
+          <MetricCard label="Current range" value={selectedPersona.currentRange} copy="Role benchmark" />
+          <MetricCard label="Next range" value={selectedPersona.nextRange} copy="Estimated progression benchmark" />
+          <MetricCard label="Manager" value={selectedPersona.manager} copy="Development sponsor" />
         </div>
       </PlatformPanel>
     );
@@ -1628,18 +1754,38 @@ function DetailSection({
     return (
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_390px]">
         <PlatformPanel eyebrow="Expression of interest" title="Start expression of interest">
-          <RequestForm onSubmit={onSubmit} />
+          <RequestForm key={selectedPersona.name} onSubmit={onSubmit} selectedPersona={selectedPersona} />
           {success && <p className="mt-4 rounded-2xl bg-[#eff8f4] px-4 py-3 text-sm font-semibold text-[#102c3d]">Application submitted to line manager.</p>}
         </PlatformPanel>
-        <PlatformPanel eyebrow="Application status" title="My application status">
-          <RequestTracker request={employeeRequest} />
+        <PlatformPanel eyebrow="Application status" title={`${selectedPersona.name.split(" ")[0]}'s applications`}>
+          {employeeRequests.length ? (
+            <div className="grid gap-5">
+              {employeeRequests.map((request) => (
+                <div key={request.id} className="rounded-[1.2rem] border border-[#102c3d]/[0.055] bg-[#f8fbfa] p-4">
+                  <div className="mb-4 flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-[#102c3d]">{request.pathway}</p>
+                      <p className="mt-1 text-xs font-medium text-[#102c3d]/50">{request.manager} is the current line manager</p>
+                    </div>
+                    <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.06]">{request.status}</span>
+                  </div>
+                  <RequestTracker request={request} />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-[1.2rem] border border-[#102c3d]/[0.055] bg-[#f8fbfa] p-5">
+              <p className="text-sm font-semibold text-[#102c3d]">No applications for this site view</p>
+              <p className="mt-2 text-sm leading-6 text-[#102c3d]/58">{`${selectedPersona.name}'s applications remain private to their own profile and selected site context.`}</p>
+            </div>
+          )}
         </PlatformPanel>
       </section>
     );
   }
 
   if (activeSection === "Applications to Review" || activeSection === "Requests") {
-    const managerRequests = requests.filter((request) => request.manager === "Ryan Booth" && request.status === "Submitted to Line Manager");
+    const managerRequests = requests.filter((request) => request.status === "Submitted to Line Manager");
     return (
       <PlatformPanel eyebrow="Line manager review" title="Applications to review">
         <div className="grid gap-4 lg:grid-cols-2">
@@ -1660,7 +1806,7 @@ function DetailSection({
   }
 
   if (activeSection === "Approvals") {
-    const managerRequests = requests.filter((request) => request.manager === "Ryan Booth" && request.status === "Submitted to Line Manager");
+    const managerRequests = requests.filter((request) => request.status === "Submitted to Line Manager");
     return (
       <PlatformPanel eyebrow="Manager approvals" title="Applications awaiting line manager approval">
         <div className="grid gap-4 lg:grid-cols-2">
@@ -1673,6 +1819,25 @@ function DetailSection({
   }
 
   if (activeSection === "Skills Analysis" || activeSection === "Skills Map" || activeSection === "Future Skills" || activeSection === "Team Skills" || activeSection === "Team Development" || activeSection === "Future Demand") {
+    if (role === "Employee") {
+      return (
+        <PlatformPanel eyebrow="Skills analysis" title={`${selectedPersona.name.split(" ")[0]}'s capability profile`}>
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+            <div className="grid gap-3">
+              {selectedPersona.skills.map(([label, value]) => (
+                <SkillBar key={label} label={label} value={value} />
+              ))}
+            </div>
+            <div className="grid gap-3">
+              <MetricCard label="Recommended routes" value={selectedPersona.recommendedPathways} copy="Matched to role and career goal" />
+              <MetricCard label="Career goal" value={selectedPersona.careerGoal} copy="Target progression pathway" />
+              <MetricCard label="Manager" value={selectedPersona.manager} copy="Development sponsor" />
+            </div>
+          </div>
+        </PlatformPanel>
+      );
+    }
+
     return (
       <PlatformPanel eyebrow="Workforce planning" title={activeSection}>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -1933,31 +2098,41 @@ function PathwayCard({ pathway, saved, onOpen, onSave }: { pathway: Pathway; sav
   );
 }
 
-function RequestForm({ onSubmit }: { onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
+function RequestForm({ onSubmit, selectedPersona }: { onSubmit: (event: FormEvent<HTMLFormElement>) => void; selectedPersona: EmployeePersona }) {
+  const matchedOptions = matchedPathwaysForRole(selectedPersona.role);
+  const defaultPathway = selectedPersona.name === "Daniel Carter" ? "Level 4 Data Analyst" : "Level 3 Team Leader";
+  const defaultReason = selectedPersona.name === "Daniel Carter"
+    ? "I want to deepen my data analysis, automation and AI confidence so I can improve reporting workflows."
+    : "I want to build stronger manufacturing, team coordination and delivery confidence.";
+  const defaultSupport = selectedPersona.name === "Daniel Carter"
+    ? "Protected time for portfolio evidence and internal reporting projects."
+    : "Support with study time and evidence collection.";
+  const defaultTeam = selectedPersona.department === "Business Intelligence" ? "Data & Automation" : "Assembly Line A";
+
   return (
     <form onSubmit={onSubmit} className="grid gap-5 md:grid-cols-2">
       <label className="grid gap-1.5 text-xs font-medium text-[#102c3d]/62 md:col-span-2">
         Selected apprenticeship
-        <select name="pathway" className="min-w-0 rounded-2xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-4 py-3.5 text-sm outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10">
-          {pathways.map((pathway) => (
-            <option key={pathway.title}>{pathway.title}</option>
+        <select name="pathway" defaultValue={defaultPathway} className="min-w-0 rounded-2xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-4 py-3.5 text-sm outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10">
+          {matchedOptions.map((pathway) => (
+            <option key={`${pathway.title}-${pathway.standard}`} value={pathway.standard}>{pathway.standard}</option>
           ))}
         </select>
       </label>
       <label className="grid gap-1.5 text-xs font-medium text-[#102c3d]/62 md:col-span-2">
         Reason for interest
-        <textarea name="reason" rows={3} className="min-w-0 rounded-2xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-4 py-3.5 text-sm leading-6 outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10" defaultValue="I want to build stronger manufacturing and delivery confidence." />
+        <textarea name="reason" rows={3} className="min-w-0 rounded-2xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-4 py-3.5 text-sm leading-6 outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10" defaultValue={defaultReason} />
       </label>
-      <Field name="careerGoal" label="Career goal" defaultValue="Progress into an operational leadership role" />
-      <Field name="role" label="Role" defaultValue="Production Team Member" />
-      <Field name="site" label="Site" defaultValue="York Head Office, Visitor Centre and UK Factory" />
-      <Field name="department" label="Department" defaultValue="Manufacturing" />
-      <Field name="manager" label="Line manager" defaultValue="Ryan Booth" />
-      <Field name="name" label="Employee name" defaultValue="Amelia Hart" />
-      <Field name="team" label="Team" defaultValue="Assembly Line A" />
+      <Field name="careerGoal" label="Career goal" defaultValue={selectedPersona.careerGoal} />
+      <Field name="role" label="Role" defaultValue={selectedPersona.role} />
+      <Field name="site" label="Site" defaultValue={selectedPersona.site} />
+      <Field name="department" label="Department" defaultValue={selectedPersona.department} />
+      <Field name="manager" label="Line manager" defaultValue={selectedPersona.manager} />
+      <Field name="name" label="Employee name" defaultValue={selectedPersona.name} />
+      <Field name="team" label="Team" defaultValue={defaultTeam} />
       <label className="grid gap-1.5 text-xs font-medium text-[#102c3d]/62 md:col-span-2">
         Any support required
-        <textarea name="supportRequired" rows={3} className="min-w-0 rounded-2xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-4 py-3.5 text-sm leading-6 outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10" defaultValue="Support with study time and evidence collection." />
+        <textarea name="supportRequired" rows={3} className="min-w-0 rounded-2xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-4 py-3.5 text-sm leading-6 outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10" defaultValue={defaultSupport} />
       </label>
       <label className="flex items-start gap-3 rounded-2xl border border-[#102c3d]/[0.045] bg-[#f8fbfa] p-4 text-sm leading-6 text-[#102c3d]/62 md:col-span-2">
         <input name="confirm" type="checkbox" required className="mt-1 h-4 w-4 accent-[#159b8f]" />
