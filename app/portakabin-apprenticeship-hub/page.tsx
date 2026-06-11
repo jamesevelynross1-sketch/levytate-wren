@@ -304,6 +304,92 @@ const pathways: Pathway[] = [
   },
 ];
 
+const employeeRoleOptions = [
+  "Production Team Member",
+  "Assembly Operative",
+  "Manufacturing Operative",
+  "Maintenance Technician",
+  "Project Coordinator",
+  "Technical Design Assistant",
+  "Estimator",
+  "Site Supervisor",
+  "Sales Executive",
+  "Procurement Administrator",
+  "Procurement Officer",
+  "Buyer",
+  "Senior Buyer",
+  "Office Administrator",
+  "Customer Service Advisor",
+  "HR Administrator",
+  "Finance Assistant",
+  "Health & Safety Coordinator",
+];
+
+const employeeRolePathwayMap: Record<string, Array<{ pathwayTitle: string; standard: string; summary: string }>> = {
+  "Production Team Member": [
+    { pathwayTitle: "Manufacturing & Production", standard: "Level 3 Engineering Technician", summary: "Build technical production, maintenance and engineering confidence." },
+    { pathwayTitle: "Leadership & Management", standard: "Level 3 Team Leader", summary: "Prepare for shift handovers, team coordination and improvement work." },
+  ],
+  "Assembly Operative": [
+    { pathwayTitle: "Manufacturing & Production", standard: "Level 3 Engineering Technician", summary: "Develop practical manufacturing and assembly capability." },
+    { pathwayTitle: "Health, Safety & Compliance", standard: "Level 3 Safety, Health and Environment Technician", summary: "Strengthen safe working, quality routines and evidence." },
+  ],
+  "Manufacturing Operative": [
+    { pathwayTitle: "Manufacturing & Production", standard: "Level 3 Engineering Technician", summary: "Formalise manufacturing skills and workplace evidence." },
+    { pathwayTitle: "Leadership & Management", standard: "Level 3 Team Leader", summary: "Support progression into production leadership." },
+  ],
+  "Maintenance Technician": [
+    { pathwayTitle: "Manufacturing & Production", standard: "Level 3 Engineering Maintenance Technician", summary: "Deepen maintenance, fault finding and technical engineering skills." },
+  ],
+  "Project Coordinator": [
+    { pathwayTitle: "Installation & Site Operations", standard: "Level 4 Associate Project Manager", summary: "Build project planning, stakeholder and delivery control skills." },
+    { pathwayTitle: "Leadership & Management", standard: "Level 5 Operations Manager", summary: "Prepare for wider operational ownership and team leadership." },
+  ],
+  "Technical Design Assistant": [
+    { pathwayTitle: "Design & Technical", standard: "Level 3 Design & Draughting", summary: "Develop technical drawing, documentation and design evidence." },
+    { pathwayTitle: "Design & Technical", standard: "Level 4 Construction Design", summary: "Build construction design capability and project coordination." },
+  ],
+  Estimator: [
+    { pathwayTitle: "Design & Technical", standard: "Level 4 Construction Design", summary: "Strengthen technical interpretation, commercial accuracy and specification work." },
+  ],
+  "Site Supervisor": [
+    { pathwayTitle: "Installation & Site Operations", standard: "Level 3 Construction Site Supervisor", summary: "Develop site coordination, readiness and handover confidence." },
+    { pathwayTitle: "Installation & Site Operations", standard: "Level 4 Construction Site Manager", summary: "Prepare for broader site management and delivery accountability." },
+  ],
+  "Sales Executive": [
+    { pathwayTitle: "Hire, Sales & Customer Experience", standard: "Level 4 Sales Executive", summary: "Improve consultative selling, account growth and customer outcomes." },
+  ],
+  "Procurement Administrator": [
+    { pathwayTitle: "Procurement & Supply Chain", standard: "Level 3 Supply Chain Practitioner", summary: "Build supplier coordination, purchasing support and planning skills." },
+  ],
+  "Procurement Officer": [
+    { pathwayTitle: "Procurement & Supply Chain", standard: "Level 4 Commercial Procurement & Supply", summary: "Develop sourcing, supplier management and commercial procurement capability." },
+  ],
+  Buyer: [
+    { pathwayTitle: "Procurement & Supply Chain", standard: "Level 4 Commercial Procurement & Supply", summary: "Build procurement practice, commercial judgement and supplier confidence." },
+    { pathwayTitle: "Procurement & Supply Chain", standard: "Level 6 Senior Procurement & Supply Chain Professional", summary: "Prepare for strategic procurement and supply chain leadership." },
+  ],
+  "Senior Buyer": [
+    { pathwayTitle: "Procurement & Supply Chain", standard: "Level 6 Senior Procurement & Supply Chain Professional", summary: "Support progression into strategic procurement leadership." },
+    { pathwayTitle: "Leadership & Management", standard: "Level 5 Operations Manager", summary: "Strengthen cross-functional leadership and operating discipline." },
+  ],
+  "Office Administrator": [
+    { pathwayTitle: "Digital, Data & AI", standard: "Level 3 Business Administrator", summary: "Develop administration, systems and process improvement capability." },
+  ],
+  "Customer Service Advisor": [
+    { pathwayTitle: "Hire, Sales & Customer Experience", standard: "Level 3 Customer Service Specialist", summary: "Improve customer conversations, service confidence and issue resolution." },
+  ],
+  "HR Administrator": [
+    { pathwayTitle: "Leadership & Management", standard: "Level 3 HR Support", summary: "Build HR administration, employee support and people process knowledge." },
+  ],
+  "Finance Assistant": [
+    { pathwayTitle: "Digital, Data & AI", standard: "Level 3 Assistant Accountant", summary: "Develop finance operations, controls and reporting confidence." },
+  ],
+  "Health & Safety Coordinator": [
+    { pathwayTitle: "Health, Safety & Compliance", standard: "Level 3 Safety, Health and Environment Technician", summary: "Strengthen safety practice, compliance evidence and risk awareness." },
+  ],
+};
+
 const portakabinLearners: Learner[] = [
   { name: "Amelia Hart", role: "Production Team Member", department: "Manufacturing", site: "York Head Office, Visitor Centre and UK Factory", programme: "Manufacturing & Production", status: "Manager review", progress: 18, lineManager: "Ryan Booth", startDate: "2026-03-04" },
   { name: "Maya Singh", role: "Shift Supervisor", department: "Manufacturing", site: "York Head Office, Visitor Centre and UK Factory", programme: "Leadership & Management", status: "Enrolment", progress: 42, lineManager: "Priya Nair", startDate: "2025-11-12" },
@@ -455,6 +541,7 @@ const scenarioSeeds: Record<DemandScenario, RequestItem[]> = {
 export default function PortakabinApprenticeshipHub() {
   const [role, setRole] = useState<Role>("Employee");
   const [activeSection, setActiveSection] = useState<SectionKey>("Dashboard");
+  const [selectedEmployeeRole, setSelectedEmployeeRole] = useState("Production Team Member");
   const [requests, setRequests] = useState<RequestItem[]>(initialRequests);
   const [mappings, setMappings] = useState<ProviderMapping[]>(initialMappings);
   const [selectedPathway, setSelectedPathway] = useState<Pathway | null>(null);
@@ -578,7 +665,6 @@ export default function PortakabinApprenticeshipHub() {
                 selectedSite={selectedSite}
                 onNavigate={openSection}
               />
-              <DashboardGuide role={role} />
             </>
           ) : (
             <>
@@ -600,6 +686,8 @@ export default function PortakabinApprenticeshipHub() {
                 onSubmit={handleSubmit}
                 onOpenPathway={setSelectedPathway}
                 onLearnerSearch={setLearnerSearch}
+                selectedEmployeeRole={selectedEmployeeRole}
+                onEmployeeRole={setSelectedEmployeeRole}
                 onSavePathway={(title) => setSavedPathways((current) => (current.includes(title) ? current.filter((item) => item !== title) : [...current, title]))}
                 onStatus={setRequestStatus}
                 onMove={moveRequest}
@@ -636,7 +724,7 @@ function Sidebar({ role, activeSection, onNavigate }: { role: Role; activeSectio
         {navSections.map((section) => (
           <div key={section.title}>
             <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#102c3d]/32">{section.title}</p>
-            <div className="mt-1.5 grid gap-1">
+            <div className="mt-2 grid gap-0.5">
               {section.items.map((item) => {
                 const sectionKey = item as SectionKey;
                 const active = activeSection === sectionKey;
@@ -644,13 +732,10 @@ function Sidebar({ role, activeSection, onNavigate }: { role: Role; activeSectio
                   <button
                     key={item}
                     onClick={() => onNavigate(sectionKey)}
-                    className={`flex w-full items-center gap-2 rounded-xl px-2.5 py-2.5 text-left text-sm font-medium transition duration-200 ${
+                    className={`flex w-full items-center rounded-xl px-3.5 py-2.5 text-left text-sm font-medium transition duration-200 ${
                       active ? "bg-[#edf6f2] text-[#102c3d] shadow-[inset_3px_0_0_#159b8f]" : "text-[#102c3d]/56 hover:bg-[#f7faf6] hover:text-[#102c3d]"
                     }`}
                   >
-                    <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg text-[10px] font-semibold ${active ? "bg-white text-[#159b8f]" : "bg-[#f8faf4] text-[#102c3d]/46"}`}>
-                      {item.split(" ").map((word) => word[0]).join("").slice(0, 2)}
-                    </span>
                     <span className="truncate">{item}</span>
                   </button>
                 );
@@ -720,13 +805,30 @@ function HeroPanel({
   const metricCards = operatingSnapshotMetrics(role);
 
   return (
-    <section className="grid gap-6 rounded-[1.6rem] border border-[#102c3d]/[0.06] bg-white/96 p-6 shadow-[0_22px_60px_rgba(16,44,61,0.055)] xl:grid-cols-[minmax(0,1fr)_390px] xl:p-7">
-      <div className="min-w-0">
-        <p className="w-fit rounded-full bg-[#fff4bd] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-[#7b6100]">Standalone employer environment</p>
-        <h1 className="mt-5 max-w-4xl text-4xl font-semibold leading-[1.02] tracking-[-0.025em] text-[#102c3d] md:text-5xl xl:text-6xl">Portakabin Apprenticeship Hub</h1>
-        <p className="mt-4 max-w-3xl text-base leading-7 text-[#102c3d]/64 md:text-lg">A focused LevyTate workspace for approved pathways, development demand and apprenticeship operations.</p>
-        <p className="mt-3 text-sm font-medium text-[#102c3d]/54">View: {selectedSite}</p>
-        <div className="mt-7 flex flex-wrap gap-2.5">
+    <section className="rounded-[1.45rem] border border-[#102c3d]/[0.06] bg-white/96 p-5 shadow-[0_18px_44px_rgba(16,44,61,0.05)] xl:p-6">
+      <div className="grid gap-5 xl:grid-cols-[minmax(280px,0.72fr)_minmax(0,1.28fr)] xl:items-start">
+        <div className="min-w-0">
+          <p className="w-fit rounded-full bg-[#fff4bd] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-[#7b6100]">Standalone employer environment</p>
+          <h1 className="mt-4 max-w-3xl text-3xl font-semibold leading-[1.04] tracking-[-0.025em] text-[#102c3d] md:text-4xl">Portakabin Apprenticeship Hub</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-[#102c3d]/62">A focused LevyTate workspace for approved pathways, development demand and apprenticeship operations.</p>
+          <p className="mt-2 text-xs font-medium text-[#102c3d]/48">View: {selectedSite}</p>
+        </div>
+
+        <div className="min-w-0">
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#c95568]">Operating snapshot</p>
+            <p className="text-xs font-medium text-[#102c3d]/44">{role}</p>
+          </div>
+          <div className="mt-3 grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
+            {metricCards.map((metric) => (
+              <DashboardSnapshotCard key={metric.label} metric={metric} onNavigate={onNavigate} />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-5 border-t border-[#102c3d]/[0.06] pt-4">
+        <div className="flex flex-wrap gap-2.5">
           <PlatformButton onClick={() => onNavigate(primaryAction.target)}>
             {primaryAction.label}
           </PlatformButton>
@@ -737,25 +839,40 @@ function HeroPanel({
           ))}
         </div>
       </div>
-
-      <div className="rounded-[1.35rem] border border-[#102c3d]/[0.055] bg-[#f8fbfa] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#c95568]">Operating snapshot</p>
-        <div className="mt-4 grid gap-3">
-          {metricCards.map((metric) => (
-            <MetricTile
-              key={metric.label}
-              label={metric.label}
-              value={metric.value}
-              copy={metric.copy}
-              trend={metric.trend}
-              actionLabel={metric.actionLabel}
-              tooltip={metric.tooltip}
-              onClick={() => onNavigate(metric.target)}
-            />
-          ))}
-        </div>
-      </div>
     </section>
+  );
+}
+
+function DashboardSnapshotCard({
+  metric,
+  onNavigate,
+}: {
+  metric: {
+    label: string;
+    value: string | number;
+    copy: string;
+    trend: string;
+    tooltip: string;
+    actionLabel: string;
+    target: SectionKey;
+  };
+  onNavigate: (section: SectionKey) => void;
+}) {
+  return (
+    <button
+      type="button"
+      title={metric.tooltip}
+      onClick={() => onNavigate(metric.target)}
+      className="group min-w-0 rounded-[1rem] border border-[#102c3d]/[0.055] bg-[#f8fbfa] p-3.5 text-left shadow-[0_8px_18px_rgba(16,44,61,0.035)] transition duration-200 hover:-translate-y-0.5 hover:border-[#159b8f]/20 hover:bg-white hover:shadow-[0_14px_30px_rgba(16,44,61,0.065)] focus:outline-none focus:ring-4 focus:ring-[#159b8f]/12"
+    >
+      <p className="truncate text-[11px] font-medium text-[#102c3d]/48">{metric.label}</p>
+      <p className="mt-1.5 text-2xl font-semibold tracking-[-0.025em] text-[#102c3d]">{metric.value}</p>
+      <p className="mt-2 line-clamp-2 text-xs leading-5 text-[#102c3d]/58">{metric.copy}</p>
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <p className="truncate text-[11px] font-semibold text-[#0b7d70]">{metric.trend}</p>
+        <span className="shrink-0 text-[11px] font-semibold text-[#102c3d]">View</span>
+      </div>
+    </button>
   );
 }
 
@@ -1013,13 +1130,6 @@ function SectionHeader({ activeSection, role, selectedSite }: { activeSection: S
 
 function RoleDashboard({
   role,
-  requests,
-  learners,
-  mappings,
-  departmentCounts,
-  savedPathways,
-  employeeRequest,
-  selectedSite,
   onNavigate,
 }: {
   role: Role;
@@ -1032,25 +1142,64 @@ function RoleDashboard({
   selectedSite: string;
   onNavigate: (section: SectionKey) => void;
 }) {
-  if (role === "Employee") {
-    return <EmployeeDashboard employeeRequest={employeeRequest} savedPathways={savedPathways} onNavigate={onNavigate} />;
-  }
-
-  if (role === "Line Manager") {
-    return <ManagerDashboard requests={requests} learners={learners} onNavigate={onNavigate} />;
-  }
-
-  if (role === "Department Head") {
-    return <DepartmentHeadDashboard requests={requests} learners={learners} departmentCounts={departmentCounts} selectedSite={selectedSite} onNavigate={onNavigate} />;
-  }
-
-  if (role === "Apprenticeship Lead") {
-    return <ApprenticeshipLeadDashboard requests={requests} learners={learners} mappings={mappings} selectedSite={selectedSite} onNavigate={onNavigate} />;
-  }
-
-  return <AdminConsoleDashboard mappings={mappings} onNavigate={onNavigate} />;
+  return <DashboardSummaryGrid role={role} onNavigate={onNavigate} />;
 }
 
+function DashboardSummaryGrid({ role, onNavigate }: { role: Role; onNavigate: (section: SectionKey) => void }) {
+  const cards: Record<Role, LaunchCardProps[]> = {
+    Employee: [
+      { title: "Recommended Pathways", value: 6, copy: "Role-matched apprenticeship routes for Amelia.", action: "Explore", section: "Recommended Pathways" },
+      { title: "Applications In Progress", value: 2, copy: "Requests moving through manager and lead review.", action: "Track", section: "My Applications" },
+      { title: "Saved Opportunities", value: 3, copy: "Shortlisted routes for future consideration.", action: "Review", section: "Recommended Pathways" },
+      { title: "Development Passport", value: 7, copy: "Completed learning and qualifications.", action: "Open", section: "Development Passport" },
+    ],
+    "Line Manager": [
+      { title: "Applications Awaiting Review", value: 4, copy: "Direct reports needing manager approval.", action: "Review", section: "Applications to Review" },
+      { title: "Active Team Learners", value: 12, copy: "Team members currently on programme.", action: "View team", section: "My Team" },
+      { title: "High Potential Employees", value: 5, copy: "People ready for future progression.", action: "Plan", section: "Team Development" },
+      { title: "Skills Gaps", value: 3, copy: "Priority capability gaps to address.", action: "Open", section: "Team Skills" },
+    ],
+    "Department Head": [
+      { title: "Participation Rate", value: "18%", copy: "Current department apprenticeship participation.", action: "Analyse", section: "Department Analytics" },
+      { title: "Active Learners", value: 27, copy: "Employees enrolled across the department.", action: "View", section: "Apprenticeship Participation" },
+      { title: "Sites With Learners", value: 6, copy: "Locations currently using apprenticeships.", action: "Compare", section: "Site Breakdown" },
+      { title: "Future Skills Risks", value: 4, copy: "Capability areas needing attention.", action: "Plan", section: "Future Demand" },
+    ],
+    "Apprenticeship Lead": [
+      { title: "Awaiting Final Approval", value: 7, copy: "Manager-approved requests ready for final decision.", action: "Review", section: "Applications for Final Approval" },
+      { title: "Active Learners", value: 48, copy: "Learners live across Portakabin.", action: "View", section: "Learners by Site" },
+      { title: "Provider Partners", value: 6, copy: "Approved partners mapped to programmes.", action: "Manage", section: "Providers" },
+      { title: "Levy Utilisation", value: "82%", copy: "Forecast levy committed to approved activity.", action: "Report", section: "Levy Utilisation" },
+    ],
+    "Admin Console": [
+      { title: "Total Users", value: 824, copy: "Active and invited platform users.", action: "Manage", section: "User Management" },
+      { title: "Active Employers", value: 4, copy: "Configured employer environments.", action: "Configure", section: "Employer Configuration" },
+      { title: "Programmes Available", value: 42, copy: "Approved programmes in the catalogue.", action: "Open", section: "Programme Catalogue" },
+      { title: "Platform Health", value: "99.8%", copy: "Availability and operational status.", action: "Settings", section: "System Settings" },
+    ],
+  };
+
+  return (
+    <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      {cards[role].map((card) => (
+        <DashboardLaunchCard key={card.title} {...card} onNavigate={onNavigate} />
+      ))}
+    </section>
+  );
+}
+
+function DashboardLaunchCard({ title, value, copy, action, section, onNavigate }: LaunchCardProps & { onNavigate: (section: SectionKey) => void }) {
+  return (
+    <button onClick={() => onNavigate(section)} className="group min-h-[142px] rounded-[1.1rem] border border-[#102c3d]/[0.055] bg-white p-4 text-left shadow-[0_10px_24px_rgba(16,44,61,0.04)] transition duration-200 hover:-translate-y-0.5 hover:border-[#159b8f]/20 hover:shadow-[0_16px_34px_rgba(16,44,61,0.07)]">
+      <p className="text-xs font-semibold text-[#102c3d]/48">{title}</p>
+      <p className="mt-2 text-3xl font-semibold tracking-[-0.025em] text-[#102c3d]">{value}</p>
+      <p className="mt-2 text-xs leading-5 text-[#102c3d]/56">{copy}</p>
+      <span className="mt-3 inline-flex text-xs font-semibold text-[#0b7d70]">{action} -&gt;</span>
+    </button>
+  );
+}
+
+/* eslint-disable @typescript-eslint/no-unused-vars */
 function EmployeeDashboard({ employeeRequest, savedPathways, onNavigate }: { employeeRequest: RequestItem; savedPathways: string[]; onNavigate: (section: SectionKey) => void }) {
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
@@ -1198,6 +1347,7 @@ function AdminConsoleDashboard({ mappings, onNavigate }: { mappings: ProviderMap
     </PlatformPanel>
   );
 }
+/* eslint-enable @typescript-eslint/no-unused-vars */
 
 function ProfileRow({ label, value }: { label: string; value: string }) {
   return (
@@ -1319,6 +1469,31 @@ function LaunchCard({ title, value, copy, action, section, onNavigate }: LaunchC
   );
 }
 
+function matchedPathwaysForRole(roleName: string): Pathway[] {
+  const matches = employeeRolePathwayMap[roleName] ?? [];
+
+  return matches.flatMap((match) => {
+    const basePathway = pathways.find((pathway) => pathway.title === match.pathwayTitle);
+    if (!basePathway) return [];
+
+    return [{
+      ...basePathway,
+      title: match.standard.replace(/^Level \d+\s/, ""),
+      standard: match.standard,
+      audience: `${roleName}: ${match.summary}`,
+      learnerBenefit: match.summary,
+    }];
+  });
+}
+
+function roleSummaryFor(roleName: string) {
+  const matches = employeeRolePathwayMap[roleName] ?? [];
+  if (!matches.length) return "No approved apprenticeship mapping is currently available for this role.";
+
+  const areas = Array.from(new Set(matches.map((match) => match.pathwayTitle.toLowerCase()))).join(", ");
+  return `${roleName} is currently mapped to ${matches.length} approved development route${matches.length === 1 ? "" : "s"} across ${areas}.`;
+}
+
 function DetailSection({
   role,
   activeSection,
@@ -1331,11 +1506,13 @@ function DetailSection({
   selectedSite,
   learners,
   learnerSearch,
+  selectedEmployeeRole,
   scenario,
   success,
   onSubmit,
   onOpenPathway,
   onLearnerSearch,
+  onEmployeeRole,
   onSavePathway,
   onStatus,
   onMove,
@@ -1354,11 +1531,13 @@ function DetailSection({
   selectedSite: string;
   learners: Learner[];
   learnerSearch: string;
+  selectedEmployeeRole: string;
   scenario: DemandScenario;
   success: boolean;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onOpenPathway: (pathway: Pathway) => void;
   onLearnerSearch: (query: string) => void;
+  onEmployeeRole: (role: string) => void;
   onSavePathway: (title: string) => void;
   onStatus: (id: number, status: RequestStatus) => void;
   onMove: (id: number, direction: 1 | -1) => void;
@@ -1371,13 +1550,47 @@ function DetailSection({
   }
 
   if (activeSection === "Recommended Programmes" || activeSection === "Explore Pathways" || activeSection === "Recommended Pathways") {
+    const roleMatchedPathways = matchedPathwaysForRole(selectedEmployeeRole);
+    const visiblePathways = role === "Employee" ? roleMatchedPathways : pathways.slice(0, activeSection === "Explore Pathways" ? pathways.length : 6);
+
     return (
       <PlatformPanel eyebrow="Approved pathways" title={activeSection === "Explore Pathways" ? "Explore pathways" : "My recommended pathways"}>
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {pathways.slice(0, activeSection === "Explore Pathways" ? pathways.length : 6).map((pathway) => (
-            <PathwayCard key={pathway.title} pathway={pathway} saved={savedPathways.includes(pathway.title)} onOpen={() => onOpenPathway(pathway)} onSave={() => onSavePathway(pathway.title)} />
-          ))}
-        </div>
+        {role === "Employee" ? (
+          <div className="mb-5 grid gap-4 rounded-[1.2rem] border border-[#102c3d]/[0.055] bg-[#f8fbfa] p-4 lg:grid-cols-[minmax(240px,320px)_minmax(0,1fr)_160px] lg:items-end">
+            <label className="grid gap-1.5 text-xs font-medium text-[#102c3d]/60">
+              Select your role
+              <select value={selectedEmployeeRole} onChange={(event) => onEmployeeRole(event.target.value)} className="h-11 rounded-2xl border border-[#102c3d]/[0.08] bg-white px-4 text-sm font-semibold text-[#102c3d] outline-none transition focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10">
+                {employeeRoleOptions.map((item) => (
+                  <option key={item}>{item}</option>
+                ))}
+              </select>
+            </label>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#c95568]">Role summary</p>
+              <p className="mt-1 text-sm leading-6 text-[#102c3d]/62">{roleSummaryFor(selectedEmployeeRole)}</p>
+            </div>
+            <div className="rounded-2xl bg-white px-4 py-3 text-center shadow-[0_8px_18px_rgba(16,44,61,0.035)]">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/36">Matched pathways</p>
+              <p className="mt-1 text-3xl font-semibold tracking-[-0.025em] text-[#102c3d]">{roleMatchedPathways.length}</p>
+            </div>
+          </div>
+        ) : null}
+
+        {visiblePathways.length ? (
+          <>
+            {role === "Employee" ? <h3 className="mb-4 text-lg font-semibold tracking-[-0.01em] text-[#102c3d]">Recommended Development Routes</h3> : null}
+            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+              {visiblePathways.map((pathway) => (
+                <PathwayCard key={`${pathway.title}-${pathway.standard}`} pathway={pathway} saved={savedPathways.includes(pathway.title)} onOpen={() => onOpenPathway(pathway)} onSave={() => onSavePathway(pathway.title)} />
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="rounded-[1.2rem] border border-[#102c3d]/[0.055] bg-[#f8fbfa] p-5">
+            <p className="text-sm font-semibold text-[#102c3d]">No mapped pathways yet</p>
+            <p className="mt-2 text-sm leading-6 text-[#102c3d]/58">This role does not currently have an approved pathway mapping. The apprenticeship lead can review future fit in the programme catalogue.</p>
+          </div>
+        )}
       </PlatformPanel>
     );
   }
