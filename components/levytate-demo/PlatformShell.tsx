@@ -38,12 +38,24 @@ export function PlatformShell({ tenantName, tenantLabel, activeItem = "Dashboard
 export function PlatformTopBar({
   tenantName,
   tenantSubtitle,
+  controlsOnly = false,
   children,
 }: {
   tenantName: string;
   tenantSubtitle: string;
+  controlsOnly?: boolean;
   children: ReactNode;
 }) {
+  if (controlsOnly) {
+    return (
+      <header className="sticky top-0 z-30 border-b border-[#102c3d]/[0.08] bg-white/92 shadow-[0_1px_0_rgba(16,44,61,0.02)] backdrop-blur-xl">
+        <div className="mx-auto flex max-w-[1600px] px-5 py-2.5 sm:px-7 lg:px-9">
+          {children}
+        </div>
+      </header>
+    );
+  }
+
   return (
     <header className="sticky top-0 z-30 border-b border-[#102c3d]/[0.08] bg-white/92 shadow-[0_1px_0_rgba(16,44,61,0.02)] backdrop-blur-xl">
       <div className="mx-auto grid max-w-[1600px] gap-4 px-5 py-3.5 sm:px-7 lg:px-9 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">

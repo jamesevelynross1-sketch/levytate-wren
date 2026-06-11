@@ -844,10 +844,10 @@ function TopBar({
   onOpenAdmin: () => void;
 }) {
   return (
-    <PlatformTopBar tenantName="Portakabin" tenantSubtitle="Internal apprenticeship and capability hub">
-      <div className="grid min-w-0 gap-3 md:grid-cols-[minmax(220px,300px)_minmax(190px,250px)] md:items-center 2xl:grid-cols-[minmax(220px,290px)_minmax(190px,240px)_minmax(190px,240px)_auto_auto]">
-        <div className="hidden h-10 items-center rounded-full border border-[#102c3d]/[0.08] bg-[#f8fbfa] px-4 text-sm text-[#102c3d]/44 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] xl:flex">Search pathways, requests or teams</div>
-        <label className="flex h-10 min-w-0 items-center gap-2 rounded-full border border-[#102c3d]/[0.08] bg-[#f8fbfa] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] transition focus-within:border-[#159b8f] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#159b8f]/10">
+    <PlatformTopBar tenantName="Portakabin" tenantSubtitle="Internal apprenticeship and capability hub" controlsOnly>
+      <div className="flex w-full min-w-0 flex-wrap items-center gap-3 xl:flex-nowrap">
+        <div className="flex h-10 min-w-[220px] flex-1 items-center rounded-full border border-[#102c3d]/[0.08] bg-[#f8fbfa] px-4 text-sm text-[#102c3d]/44 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">Search pathways, requests or teams</div>
+        <label className="flex h-10 min-w-[220px] flex-1 items-center gap-2 rounded-full border border-[#102c3d]/[0.08] bg-[#f8fbfa] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] transition focus-within:border-[#159b8f] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#159b8f]/10 xl:max-w-[280px]">
           <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/38">Site</span>
           <select
             value={selectedSite}
@@ -862,7 +862,7 @@ function TopBar({
           </select>
         </label>
         {role === "Employee" ? (
-          <label className="flex h-10 min-w-0 items-center gap-2 rounded-full border border-[#102c3d]/[0.08] bg-[#f8fbfa] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] transition focus-within:border-[#159b8f] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#159b8f]/10">
+          <label className="flex h-10 min-w-[220px] flex-1 items-center gap-2 rounded-full border border-[#102c3d]/[0.08] bg-[#f8fbfa] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] transition focus-within:border-[#159b8f] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#159b8f]/10 xl:max-w-[280px]">
             <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/38">Demo Employee</span>
             <select
               value={selectedPersona.name}
@@ -876,7 +876,7 @@ function TopBar({
             </select>
           </label>
         ) : null}
-        <div className="flex min-h-10 flex-wrap items-center rounded-[1.25rem] border border-[#102c3d]/[0.06] bg-[#edf5f1] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] 2xl:h-10 2xl:flex-nowrap 2xl:rounded-full">
+        <div className="flex min-h-10 shrink-0 flex-wrap items-center rounded-[1.25rem] border border-[#102c3d]/[0.06] bg-[#edf5f1] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] 2xl:h-10 2xl:flex-nowrap 2xl:rounded-full">
           {roles.map((item) => (
             <button key={item} onClick={() => setRole(item)} className={`h-8 rounded-full px-3 text-xs font-semibold transition duration-200 ${role === item ? "bg-white text-[#102c3d] shadow-[0_6px_16px_rgba(16,44,61,0.08)]" : "text-[#102c3d]/52 hover:text-[#102c3d]"}`}>
               {item}
