@@ -5,7 +5,7 @@ import { LevyTateLogo, PlatformButton, PlatformMetric, PlatformPanel, PlatformTo
 
 type Role = "Employee" | "Line Manager" | "Department Head" | "Apprenticeship Lead" | "Admin Console";
 type DemandScenario = "Low" | "Medium" | "High";
-type RequestStatus = "Draft" | "Submitted to Line Manager" | "Declined by Line Manager" | "Approved by Line Manager" | "Submitted to Apprenticeship Lead" | "Declined by Apprenticeship Lead" | "Approved for Enrolment";
+type RequestStatus = "Draft" | "Submitted to Line Manager" | "Awaiting Manager Review" | "Declined by Line Manager" | "Approved by Line Manager" | "Submitted to Apprenticeship Lead" | "Awaiting Final Approval" | "Declined by Apprenticeship Lead" | "Approved for Enrolment" | "Withdrawn" | "Completed" | "Cancelled";
 type LearnerStatus = "New interest" | "Manager review" | "Lead review" | "Provider introduction" | "Enrolment" | "Live learner";
 type MappingStatus = "Live" | "Ready" | "Review";
 
@@ -183,8 +183,9 @@ type SectionKey =
   | "Admin";
 
 const roles: Role[] = ["Employee", "Line Manager", "Department Head", "Apprenticeship Lead"];
-const requestStages: RequestStatus[] = ["Draft", "Submitted to Line Manager", "Declined by Line Manager", "Approved by Line Manager", "Submitted to Apprenticeship Lead", "Declined by Apprenticeship Lead", "Approved for Enrolment"];
-const publicStages: RequestStatus[] = ["Draft", "Submitted to Line Manager", "Approved by Line Manager", "Submitted to Apprenticeship Lead", "Approved for Enrolment"];
+const requestStages: RequestStatus[] = ["Draft", "Submitted to Line Manager", "Awaiting Manager Review", "Declined by Line Manager", "Approved by Line Manager", "Submitted to Apprenticeship Lead", "Awaiting Final Approval", "Declined by Apprenticeship Lead", "Approved for Enrolment", "Withdrawn", "Completed", "Cancelled"];
+const publicStages: RequestStatus[] = ["Draft", "Submitted to Line Manager", "Awaiting Manager Review", "Approved by Line Manager", "Submitted to Apprenticeship Lead", "Awaiting Final Approval", "Approved for Enrolment"];
+const activeApplicationStatuses: RequestStatus[] = ["Draft", "Submitted to Line Manager", "Awaiting Manager Review", "Approved by Line Manager", "Submitted to Apprenticeship Lead", "Awaiting Final Approval", "Approved for Enrolment"];
 
 const navSectionsByRole: Record<Role, PlatformNavSection[]> = {
   Employee: [
@@ -667,9 +668,8 @@ const portakabinLearners: Learner[] = [
 ];
 
 const initialRequests: RequestItem[] = [
-  { id: 1, name: "Amelia Hart", role: "Production Team Member", department: "Manufacturing", team: "Assembly Line A", site: "York Head Office, Visitor Centre and UK Factory", pathway: "Level 3 Team Leader", manager: "Ryan Booth", status: "Submitted to Line Manager", note: "I want to apply for the Level 3 Team Leader route so I can build confidence leading shift handovers and improvement work.", careerGoal: "Progress into a team leader role in production.", supportRequired: "Support with study time during shifts.", submittedDate: "2026-05-18", decisionNotes: "Awaiting Ryan Booth review." },
+  { id: 1, name: "Amelia Hart", role: "Production Team Member", department: "Manufacturing", team: "Assembly Line A", site: "York Head Office, Visitor Centre and UK Factory", pathway: "Level 3 Team Leader", manager: "Ryan Booth", status: "Awaiting Manager Review", note: "I want to apply for the Level 3 Team Leader route so I can build confidence leading shift handovers and improvement work.", careerGoal: "Progress into a team leader role in production.", supportRequired: "Support with study time during shifts.", submittedDate: "2026-05-18", decisionNotes: "Awaiting Ryan Booth review." },
   { id: 12, name: "Daniel Carter", role: "Data & Reporting Analyst", department: "Business Intelligence", team: "Data & Automation", site: "York Head Office, Visitor Centre and UK Factory", pathway: "Level 4 Data Analyst", manager: "Sarah Mitchell", status: "Submitted to Line Manager", note: "I want to deepen my data analysis, insight generation and automation skills.", careerGoal: "Progress toward Head of Data & Automation.", supportRequired: "Protected time for portfolio evidence and internal reporting projects.", submittedDate: "2026-05-22", decisionNotes: "Awaiting Sarah Mitchell review." },
-  { id: 13, name: "Daniel Carter", role: "Data & Reporting Analyst", department: "Business Intelligence", team: "Data & Automation", site: "York Head Office, Visitor Centre and UK Factory", pathway: "AI & Automation Workforce Programme", manager: "Sarah Mitchell", status: "Draft", note: "I am exploring how AI and automation could improve reporting workflows.", careerGoal: "Lead future automation and AI adoption across business intelligence.", supportRequired: "Needs final scope and manager input.", submittedDate: "2026-06-04", decisionNotes: "Draft not yet submitted." },
   { id: 2, name: "Marcus Lee", role: "Technical Design Assistant", department: "Design & Technical", team: "Building Design", site: "York Head Office, Visitor Centre and UK Factory", pathway: "Design & Technical", manager: "Priya Nair", status: "Declined by Line Manager", note: "I want to formalise my design skills and contribute to technical standards.", careerGoal: "Move into a design technician role.", supportRequired: "Mentor support from senior designer.", submittedDate: "2026-05-12", decisionNotes: "Declined because current workload needs stabilising before a new programme starts." },
   { id: 3, name: "Sophie Clarke", role: "Customer Hire Coordinator", department: "Hire & Customer", team: "Customer Support", site: "Leeds Visitor Centre", pathway: "Hire, Sales & Customer Experience", manager: "Helen Ward", status: "Approved by Line Manager", note: "I want to improve customer conversations and account confidence.", careerGoal: "Progress into account support leadership.", supportRequired: "Protected time for monthly workshops.", submittedDate: "2026-05-10", decisionNotes: "Approved by Helen Ward and ready for apprenticeship lead review." },
   { id: 4, name: "Noah Bennett", role: "Installation Coordinator", department: "Site Operations", team: "Field Delivery", site: "Sheffield Visitor Centre", pathway: "Installation & Site Operations", manager: "Sam Ellis", status: "Submitted to Apprenticeship Lead", note: "I want to strengthen site handover and supervision skills.", careerGoal: "Become a site supervisor.", supportRequired: "Access to live site evidence.", submittedDate: "2026-05-08", decisionNotes: "Line manager approved. Awaiting final approval." },
@@ -789,7 +789,8 @@ export default function PortakabinApprenticeshipHub() {
   const statusCounts = useMemo(() => countBy(filteredRequests, "status"), [filteredRequests]);
   const departmentCounts = useMemo(() => countBy(filteredRequests, "department"), [filteredRequests]);
   const selectedPersona = employeePersonas.find((persona) => persona.name === selectedEmployeeName) ?? employeePersonas[0];
-  const employeeRequests = filteredRequests.filter((request) => request.name === selectedPersona.name);
+  const employeeRequests = requests.filter((request) => request.name === selectedPersona.name);
+  const activeEmployeeApplication = activeApplicationFor(requests, selectedPersona.name);
   const employeeRequest = employeeRequests[0] ?? filteredRequests[0] ?? requests[0];
 
   function switchRole(nextRole: Role) {
@@ -809,6 +810,11 @@ export default function PortakabinApprenticeshipHub() {
   }
 
   function createApplication(draft: ApplicationDraft) {
+    if (activeApplicationFor(requests, draft.name)) {
+      setSuccess(false);
+      return null;
+    }
+
     const nextRequest: RequestItem = {
       id: Math.max(...requests.map((request) => request.id), 0) + 1,
       name: draft.name,
@@ -834,7 +840,7 @@ export default function PortakabinApprenticeshipHub() {
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
-    createApplication({
+    const created = createApplication({
       name: String(data.get("name") || "New colleague"),
       role: String(data.get("role") || "Internal colleague"),
       department: String(data.get("department") || "Manufacturing"),
@@ -846,7 +852,7 @@ export default function PortakabinApprenticeshipHub() {
       careerGoal: String(data.get("careerGoal") || "Progress into a future role."),
       supportRequired: String(data.get("supportRequired") || "None noted."),
     });
-    setActiveSection("My Applications");
+    if (created) setActiveSection("My Applications");
   }
 
   function setRequestStatus(id: number, status: RequestStatus) {
@@ -937,6 +943,7 @@ export default function PortakabinApprenticeshipHub() {
                 learnerSearch={learnerSearch}
                 scenario={scenario}
                 success={success}
+                activeApplication={activeEmployeeApplication}
                 onSubmit={handleSubmit}
                 onOpenPathway={setSelectedPathway}
                 onLearnerSearch={setLearnerSearch}
@@ -956,7 +963,7 @@ export default function PortakabinApprenticeshipHub() {
         </div>
       </div>
 
-      {selectedPathway && <PathwayModal pathway={selectedPathway} onClose={() => setSelectedPathway(null)} onStart={() => { setSelectedPathway(null); setActiveSection("My Applications"); }} />}
+      {selectedPathway && <PathwayModal pathway={selectedPathway} activeApplication={role === "Employee" ? activeEmployeeApplication : undefined} onClose={() => setSelectedPathway(null)} onStart={() => { setSelectedPathway(null); setActiveSection("My Applications"); }} />}
     </main>
   );
 }
@@ -1394,7 +1401,7 @@ function SiteSummary({ site, learners, requests }: { site: string; learners: Lea
     <PlatformPanel eyebrow="Site view" title={site}>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         <MetricTile label="Active learners" value={learners.length} />
-        <MetricTile label="Pending applications" value={requests.filter((request) => request.status === "Submitted to Line Manager" || request.status === "Approved by Line Manager" || request.status === "Submitted to Apprenticeship Lead").length} />
+        <MetricTile label="Pending applications" value={requests.filter((request) => request.status === "Submitted to Line Manager" || request.status === "Awaiting Manager Review" || request.status === "Approved by Line Manager" || request.status === "Submitted to Apprenticeship Lead" || request.status === "Awaiting Final Approval").length} />
         <MetricTile label="Programmes in use" value={programmes.size} />
         <MetricTile label="Completion risk" value={risk} />
         <MetricTile label="Main pathway demand" value={demand || "No signal"} />
@@ -1551,7 +1558,7 @@ function ManagerDashboard({ requests, learners, onNavigate }: { requests: Reques
         <div className="grid gap-4 md:grid-cols-4">
           <MetricTile label="Team members" value={teamLearners.length} />
           <MetricTile label="Active apprentices" value={teamLearners.filter((learner) => learner.status === "Live learner").length} />
-          <MetricTile label="Applications to review" value={teamApplications.filter((request) => request.status === "Submitted to Line Manager").length} />
+          <MetricTile label="Applications to review" value={teamApplications.filter((request) => request.status === "Submitted to Line Manager" || request.status === "Awaiting Manager Review").length} />
           <MetricTile label="Succession risk" value="Medium" />
         </div>
         <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
@@ -1567,7 +1574,7 @@ function ManagerDashboard({ requests, learners, onNavigate }: { requests: Reques
       </PlatformPanel>
       <PlatformPanel eyebrow="Applications awaiting review" title="Manager approval queue">
         <div className="grid gap-4 lg:grid-cols-2">
-          {teamApplications.filter((request) => request.status === "Submitted to Line Manager").slice(0, 4).map((request) => (
+          {teamApplications.filter((request) => request.status === "Submitted to Line Manager" || request.status === "Awaiting Manager Review").slice(0, 4).map((request) => (
             <ApplicationCard key={request.id} request={request} scope="manager" onStatus={() => onNavigate("Applications to Review")} />
           ))}
         </div>
@@ -1583,7 +1590,7 @@ function DepartmentHeadDashboard({ requests, learners, departmentCounts, selecte
         <div className="grid gap-4 md:grid-cols-4">
           <MetricTile label="Headcount in view" value={learners.length} />
           <MetricTile label="Learners" value={learners.filter((learner) => learner.status === "Live learner").length} />
-          <MetricTile label="Pending applications" value={requests.filter((request) => request.status === "Submitted to Line Manager" || request.status === "Approved by Line Manager" || request.status === "Submitted to Apprenticeship Lead").length} />
+          <MetricTile label="Pending applications" value={requests.filter((request) => request.status === "Submitted to Line Manager" || request.status === "Awaiting Manager Review" || request.status === "Approved by Line Manager" || request.status === "Submitted to Apprenticeship Lead" || request.status === "Awaiting Final Approval").length} />
           <MetricTile label="Completion rate" value="86%" />
         </div>
         <div className="mt-5 grid gap-5 xl:grid-cols-[360px_minmax(0,1fr)]">
@@ -1804,6 +1811,7 @@ function DetailSection({
   selectedEmployeeRole,
   scenario,
   success,
+  activeApplication,
   onSubmit,
   onOpenPathway,
   onLearnerSearch,
@@ -1832,6 +1840,7 @@ function DetailSection({
   selectedEmployeeRole: string;
   scenario: DemandScenario;
   success: boolean;
+  activeApplication?: RequestItem;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onOpenPathway: (pathway: Pathway) => void;
   onLearnerSearch: (query: string) => void;
@@ -1843,7 +1852,7 @@ function DetailSection({
   onScenario: (scenario: DemandScenario) => void;
   onSeed: () => void;
   onNavigate: (section: SectionKey) => void;
-  onCreateApplication: (draft: ApplicationDraft) => RequestItem;
+  onCreateApplication: (draft: ApplicationDraft) => RequestItem | null;
 }) {
   if (activeSection === "Dashboard") {
     return <DashboardGuide role={role} />;
@@ -1936,7 +1945,7 @@ function DetailSection({
     return (
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_370px]">
         <PlatformPanel eyebrow="Expression of interest" title="Start expression of interest">
-          <RequestForm key={selectedPersona.name} onSubmit={onSubmit} selectedPersona={selectedPersona} />
+          <RequestForm key={selectedPersona.name} onSubmit={onSubmit} selectedPersona={selectedPersona} activeApplication={activeApplication} onViewApplication={() => onNavigate("My Applications")} />
           {success && <p className="mt-4 rounded-2xl bg-[#eff8f4] px-4 py-3 text-sm font-semibold text-[#102c3d]">Application submitted to line manager.</p>}
         </PlatformPanel>
         <PlatformPanel eyebrow="Application status" title={`${selectedPersona.name.split(" ")[0]}'s applications`}>
@@ -1967,7 +1976,7 @@ function DetailSection({
   }
 
   if (activeSection === "Applications to Review" || activeSection === "Requests") {
-    const managerRequests = requests.filter((request) => request.status === "Submitted to Line Manager");
+    const managerRequests = requests.filter((request) => request.status === "Submitted to Line Manager" || request.status === "Awaiting Manager Review");
     return (
       <PlatformPanel eyebrow="Line manager review" title="Applications to review">
         <div className="grid gap-4 lg:grid-cols-2">
@@ -1988,7 +1997,7 @@ function DetailSection({
   }
 
   if (activeSection === "Approvals") {
-    const managerRequests = requests.filter((request) => request.status === "Submitted to Line Manager");
+    const managerRequests = requests.filter((request) => request.status === "Submitted to Line Manager" || request.status === "Awaiting Manager Review");
     return (
       <PlatformPanel eyebrow="Manager approvals" title="Applications awaiting line manager approval">
         <div className="grid gap-4 lg:grid-cols-2">
@@ -2050,7 +2059,7 @@ function DetailSection({
           <InsightBars rows={Object.entries(departmentCounts).map(([label, value]) => [label, value])} />
           <div className="grid gap-3">
             <MetricCard label="Participation rate" value="34%" copy="Department colleagues on programme" />
-            <MetricCard label="Pending applications" value={requests.filter((request) => request.status === "Submitted to Line Manager" || request.status === "Approved by Line Manager" || request.status === "Submitted to Apprenticeship Lead").length} copy="No approval action required" />
+            <MetricCard label="Pending applications" value={requests.filter((request) => request.status === "Submitted to Line Manager" || request.status === "Awaiting Manager Review" || request.status === "Approved by Line Manager" || request.status === "Submitted to Apprenticeship Lead" || request.status === "Awaiting Final Approval").length} copy="No approval action required" />
             <MetricCard label="Approved applications" value={requests.filter((request) => request.status === "Approved for Enrolment").length} copy="Ready for enrolment" />
           </div>
         </div>
@@ -2087,7 +2096,7 @@ function DetailSection({
   }
 
   if (activeSection === "Applications for Final Approval") {
-    const leadRequests = requests.filter((request) => request.status === "Submitted to Apprenticeship Lead" || request.status === "Approved by Line Manager");
+    const leadRequests = requests.filter((request) => request.status === "Submitted to Apprenticeship Lead" || request.status === "Awaiting Final Approval" || request.status === "Approved by Line Manager");
     return (
       <PlatformPanel eyebrow="Apprenticeship lead approval" title="Applications for final approval">
         <div className="grid gap-4 lg:grid-cols-2">
@@ -2169,6 +2178,7 @@ function DetailSection({
         onStatus={onStatus}
         onNavigate={onNavigate}
         onCreateApplication={onCreateApplication}
+        activeApplication={activeApplication}
       />
     );
   }
@@ -2214,8 +2224,10 @@ function DashboardGuide({ role }: { role: Role }) {
 }
 
 function ApplicationCard({ request, scope, onStatus }: { request: RequestItem; scope: "manager" | "lead" | "readonly"; onStatus: (id: number, status: RequestStatus) => void }) {
-  const currentApprover = request.status === "Submitted to Line Manager" ? request.manager : request.status === "Submitted to Apprenticeship Lead" || request.status === "Approved by Line Manager" ? "Apprenticeship Lead" : "None";
-  const actionRequired = request.status === "Submitted to Line Manager" ? "Line manager decision" : request.status === "Submitted to Apprenticeship Lead" || request.status === "Approved by Line Manager" ? "Final approval" : "No action";
+  const awaitingManager = request.status === "Submitted to Line Manager" || request.status === "Awaiting Manager Review";
+  const awaitingLead = request.status === "Submitted to Apprenticeship Lead" || request.status === "Awaiting Final Approval" || request.status === "Approved by Line Manager";
+  const currentApprover = awaitingManager ? request.manager : awaitingLead ? "Apprenticeship Lead" : "None";
+  const actionRequired = awaitingManager ? "Line manager decision" : awaitingLead ? "Final approval" : "No action";
 
   return (
     <article className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-[#f8fbfa] p-3.5 shadow-[0_8px_20px_rgba(16,44,61,0.035)]">
@@ -2288,7 +2300,7 @@ function PathwayCard({ pathway, saved, onOpen, onSave }: { pathway: Pathway; sav
   );
 }
 
-function RequestForm({ onSubmit, selectedPersona }: { onSubmit: (event: FormEvent<HTMLFormElement>) => void; selectedPersona: EmployeePersona }) {
+function RequestForm({ onSubmit, selectedPersona, activeApplication, onViewApplication }: { onSubmit: (event: FormEvent<HTMLFormElement>) => void; selectedPersona: EmployeePersona; activeApplication?: RequestItem; onViewApplication: () => void }) {
   const matchedOptions = matchedPathwaysForRole(selectedPersona.role);
   const defaultPathway = selectedPersona.name === "Daniel Carter" ? "Level 4 Data Analyst" : "Level 3 Team Leader";
   const defaultReason = selectedPersona.name === "Daniel Carter"
@@ -2301,9 +2313,14 @@ function RequestForm({ onSubmit, selectedPersona }: { onSubmit: (event: FormEven
 
   return (
     <form onSubmit={onSubmit} className="grid gap-4 md:grid-cols-2">
+      {activeApplication ? (
+        <div className="md:col-span-2">
+          <ActiveApplicationNotice application={activeApplication} onView={onViewApplication} />
+        </div>
+      ) : null}
       <label className="grid gap-1.5 text-xs font-medium text-[#102c3d]/62 md:col-span-2">
         Selected apprenticeship
-        <select name="pathway" defaultValue={defaultPathway} className="min-w-0 rounded-xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3.5 py-3 text-sm outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10">
+        <select name="pathway" defaultValue={defaultPathway} disabled={Boolean(activeApplication)} className="min-w-0 rounded-xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3.5 py-3 text-sm outline-none transition disabled:cursor-not-allowed disabled:text-[#102c3d]/38 focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10">
           {matchedOptions.map((pathway) => (
             <option key={`${pathway.title}-${pathway.standard}`} value={pathway.standard}>{pathway.standard}</option>
           ))}
@@ -2311,7 +2328,7 @@ function RequestForm({ onSubmit, selectedPersona }: { onSubmit: (event: FormEven
       </label>
       <label className="grid gap-1.5 text-xs font-medium text-[#102c3d]/62 md:col-span-2">
         Reason for interest
-        <textarea name="reason" rows={3} className="min-w-0 rounded-xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3.5 py-3 text-sm leading-6 outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10" defaultValue={defaultReason} />
+        <textarea name="reason" rows={3} disabled={Boolean(activeApplication)} className="min-w-0 rounded-xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3.5 py-3 text-sm leading-6 outline-none transition disabled:cursor-not-allowed disabled:text-[#102c3d]/38 focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10" defaultValue={defaultReason} />
       </label>
       <Field name="careerGoal" label="Career goal" defaultValue={selectedPersona.careerGoal} />
       <Field name="role" label="Role" defaultValue={selectedPersona.role} />
@@ -2325,12 +2342,12 @@ function RequestForm({ onSubmit, selectedPersona }: { onSubmit: (event: FormEven
         <textarea name="supportRequired" rows={3} className="min-w-0 rounded-xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3.5 py-3 text-sm leading-6 outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10" defaultValue={defaultSupport} />
       </label>
       <label className="flex items-start gap-3 rounded-xl border border-[#102c3d]/[0.045] bg-[#f8fbfa] p-3.5 text-sm leading-6 text-[#102c3d]/62 md:col-span-2">
-        <input name="confirm" type="checkbox" required className="mt-1 h-4 w-4 accent-[#159b8f]" />
+        <input name="confirm" type="checkbox" required disabled={Boolean(activeApplication)} className="mt-1 h-4 w-4 accent-[#159b8f] disabled:cursor-not-allowed" />
         I confirm this expression of interest can be shared with my line manager and the apprenticeship lead for approval.
       </label>
       <div className="mt-1 flex flex-col gap-3 rounded-xl border border-[#102c3d]/[0.045] bg-[#f8fbfa] p-3.5 md:col-span-2 md:flex-row md:items-center md:justify-between">
         <p className="text-sm leading-6 text-[#102c3d]/54">This sends the application to your line manager.</p>
-        <PlatformButton className="w-fit px-5 py-2.5 text-sm">Submit expression of interest</PlatformButton>
+        <button disabled={Boolean(activeApplication)} className={`inline-flex h-10 w-fit items-center justify-center rounded-full px-5 py-2.5 text-sm font-semibold transition ${activeApplication ? "cursor-not-allowed bg-[#f2f5f3] text-[#102c3d]/38 ring-1 ring-[#102c3d]/[0.06]" : "bg-[#102c3d] text-white shadow-[0_10px_22px_rgba(16,44,61,0.12)] hover:-translate-y-0.5 hover:bg-[#17394d]"}`}>Submit expression of interest</button>
       </div>
     </form>
   );
@@ -2352,6 +2369,20 @@ function RequestTracker({ request }: { request: RequestItem }) {
           {request.status}: {request.decisionNotes}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function ActiveApplicationNotice({ application, onView }: { application: RequestItem; onView: () => void }) {
+  return (
+    <div className="mt-4 rounded-[1rem] border border-[#fff4bd] bg-[#fff9dc] p-4 shadow-[0_8px_18px_rgba(123,97,0,0.055)]">
+      <p className="text-sm font-semibold text-[#102c3d]">You already have an active apprenticeship application in progress.</p>
+      <p className="mt-1.5 text-sm leading-6 text-[#102c3d]/62">You can track this in My Applications.</p>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.06]">{application.pathway}</span>
+        <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.06]">{application.status}</span>
+        <button type="button" onClick={onView} className="rounded-full bg-[#102c3d] px-4 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#17394d]">View My Application</button>
+      </div>
     </div>
   );
 }
@@ -2712,7 +2743,7 @@ function LineManagerReports({ learners, requests }: { learners: Learner[]; reque
     <div className="grid gap-5">
       <PlatformPanel eyebrow="Reports" title="Line manager reporting" actions={<ReportActions />}>
         <div className="grid gap-4 md:grid-cols-3">
-          <MetricTile label="Applications" value={requests.filter((request) => request.status === "Submitted to Line Manager").length} copy="Awaiting review" />
+          <MetricTile label="Applications" value={requests.filter((request) => request.status === "Submitted to Line Manager" || request.status === "Awaiting Manager Review").length} copy="Awaiting review" />
           <MetricTile label="Active learners" value={teamLearners.length} copy="Team programmes" />
           <MetricTile label="Participation" value="24%" copy="Team on programme" />
         </div>
@@ -2734,7 +2765,7 @@ function DepartmentHeadReports({ learners, requests, selectedSite }: { learners:
         <div className="grid gap-4 md:grid-cols-4">
           <MetricTile label="Participation" value="18%" copy="Department rate" />
           <MetricTile label="Active learners" value={learners.length} copy="In selected view" />
-          <MetricTile label="Pending" value={requests.filter((request) => request.status === "Submitted to Line Manager").length} copy="Applications in approval" />
+          <MetricTile label="Pending" value={requests.filter((request) => request.status === "Submitted to Line Manager" || request.status === "Awaiting Manager Review").length} copy="Applications in approval" />
           <MetricTile label="Readiness" value={readinessScore(learners, requests)} copy="Index score" />
         </div>
       </PlatformPanel>
@@ -2755,7 +2786,7 @@ function ApprenticeshipLeadReports({ learners, requests, mappings }: { learners:
     <div className="grid gap-5">
       <PlatformPanel eyebrow="Reports" title="Apprenticeship lead reporting" actions={<ReportActions />}>
         <div className="grid gap-4 md:grid-cols-4">
-          <MetricTile label="Final approvals" value={requests.filter((request) => request.status === "Submitted to Apprenticeship Lead" || request.status === "Approved by Line Manager").length} copy="Awaiting decision" />
+          <MetricTile label="Final approvals" value={requests.filter((request) => request.status === "Submitted to Apprenticeship Lead" || request.status === "Awaiting Final Approval" || request.status === "Approved by Line Manager").length} copy="Awaiting decision" />
           <MetricTile label="Active learners" value={learners.length} copy="Organisation view" />
           <MetricTile label="Provider partners" value={mappings.length} copy="Mapped partners" />
           <MetricTile label="Levy utilisation" value="82%" copy="Forecast committed" />
@@ -2813,7 +2844,7 @@ function ExecutiveSummary({ requests, mappings, statusCounts }: { requests: Requ
     ["Departments engaged", String(new Set(requests.map((request) => request.department)).size)],
     ["Provider mappings active", String(mappings.filter((mapping) => mapping.status === "Live").length)],
     ["Forecast levy utilisation", "73%"],
-    ["Bottlenecks reduced", `${Math.max(0, 8 - ((statusCounts["Submitted to Line Manager"] ?? 0) + (statusCounts["Approved by Line Manager"] ?? 0) + (statusCounts["Submitted to Apprenticeship Lead"] ?? 0)))}`],
+    ["Bottlenecks reduced", `${Math.max(0, 8 - ((statusCounts["Submitted to Line Manager"] ?? 0) + (statusCounts["Awaiting Manager Review"] ?? 0) + (statusCounts["Approved by Line Manager"] ?? 0) + (statusCounts["Submitted to Apprenticeship Lead"] ?? 0) + (statusCounts["Awaiting Final Approval"] ?? 0)))}`],
   ];
   return (
     <PlatformPanel title="Reporting snapshot" eyebrow="Executive summary">
@@ -2852,16 +2883,18 @@ function AskLevyTateAIPage({
   onStatus,
   onNavigate,
   onCreateApplication,
+  activeApplication,
 }: {
   role: Role;
   selectedPersona: EmployeePersona;
   requests: RequestItem[];
   onStatus: (id: number, status: RequestStatus) => void;
   onNavigate: (section: SectionKey) => void;
-  onCreateApplication: (draft: ApplicationDraft) => RequestItem;
+  onCreateApplication: (draft: ApplicationDraft) => RequestItem | null;
+  activeApplication?: RequestItem;
 }) {
   if (role === "Employee") {
-    return <EmployeeAIPage key={selectedPersona.name} selectedPersona={selectedPersona} requests={requests} onNavigate={onNavigate} onCreateApplication={onCreateApplication} />;
+    return <EmployeeAIPage key={selectedPersona.name} selectedPersona={selectedPersona} requests={requests} activeApplication={activeApplication} onNavigate={onNavigate} onCreateApplication={onCreateApplication} />;
   }
 
   if (role === "Line Manager") {
@@ -3040,13 +3073,15 @@ function ApprenticeshipLeadAIPage() {
 function EmployeeAIPage({
   selectedPersona,
   requests,
+  activeApplication,
   onNavigate,
   onCreateApplication,
 }: {
   selectedPersona: EmployeePersona;
   requests: RequestItem[];
+  activeApplication?: RequestItem;
   onNavigate: (section: SectionKey) => void;
-  onCreateApplication: (draft: ApplicationDraft) => RequestItem;
+  onCreateApplication: (draft: ApplicationDraft) => RequestItem | null;
 }) {
   const examples = ["I want to become a team leader.", "I work in production. What apprenticeships suit me?", "I'm interested in data and automation.", "Which pathway would help me progress at Portakabin?", "Can you help me apply?"];
   const [query, setQuery] = useState("");
@@ -3088,8 +3123,10 @@ function EmployeeAIPage({
       careerGoal: String(data.get("careerGoal") || selectedPersona.careerGoal),
       supportRequired: String(data.get("supportRequired") || response.supportRequired),
     });
-    setConfirmation(created);
-    setApplicationOpen(false);
+    if (created) {
+      setConfirmation(created);
+      setApplicationOpen(false);
+    }
   }
 
   return (
@@ -3149,10 +3186,15 @@ function EmployeeAIPage({
             <div className="mt-5 flex flex-wrap gap-2">
               <PlatformButton onClick={() => { setSavedMessage(`${response.primary.programme} saved for later.`); }}>Save pathway</PlatformButton>
               <PlatformButton variant="soft" onClick={() => setCompareOpen((current) => !current)}>Compare pathways</PlatformButton>
-              <PlatformButton variant="amber" onClick={() => setApplicationOpen(true)}>Start application</PlatformButton>
+              {activeApplication ? (
+                <button disabled className="inline-flex h-10 cursor-not-allowed items-center justify-center rounded-full bg-[#f2f5f3] px-4 text-xs font-semibold text-[#102c3d]/38 ring-1 ring-[#102c3d]/[0.06]">Start application</button>
+              ) : (
+                <PlatformButton variant="amber" onClick={() => setApplicationOpen(true)}>Start application</PlatformButton>
+              )}
               <button onClick={() => applyPrompt("What else should I consider before applying?")} className="h-10 rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.06] transition hover:text-[#102c3d]">Ask follow-up</button>
             </div>
             {savedMessage ? <p className="mt-3 rounded-xl bg-white px-3 py-2 text-xs font-semibold text-[#0b6f63] ring-1 ring-[#102c3d]/[0.05]">{savedMessage}</p> : null}
+            {activeApplication ? <ActiveApplicationNotice application={activeApplication} onView={() => onNavigate("My Applications")} /> : null}
           </article>
 
           <div className="grid gap-3">
@@ -3178,7 +3220,7 @@ function EmployeeAIPage({
       </PlatformPanel>
       ) : null}
 
-      {applicationOpen && response ? (
+      {applicationOpen && response && !activeApplication ? (
         <PlatformPanel eyebrow="AI prepared application" title="Review and submit to line manager">
           <form onSubmit={submitAIApplication} className="grid gap-4 md:grid-cols-2">
             <Field name="pathway" label="Selected apprenticeship" defaultValue={response.primary.programme} />
@@ -3238,7 +3280,7 @@ function LineManagerAIPage({ requests, onStatus, onNavigate }: { requests: Reque
   const examples = ["Should I approve Amelia's Team Leader application?", "Which members of my team could benefit from leadership development?", "Where are the biggest skills gaps in my team?", "What apprenticeship pathways suit my production team?"];
   const [query, setQuery] = useState("");
   const [response, setResponse] = useState<ReturnType<typeof getManagerAIResponse> | null>(null);
-  const pending = requests.filter((request) => request.status === "Submitted to Line Manager");
+  const pending = requests.filter((request) => request.status === "Submitted to Line Manager" || request.status === "Awaiting Manager Review");
   const target = pending[0];
 
   function askQuestion(event: FormEvent<HTMLFormElement>) {
@@ -3430,7 +3472,7 @@ function getEmployeeAIResponse(prompt: string, persona: EmployeePersona) {
 }
 
 function getManagerAIResponse(prompt: string, requests: RequestItem[]) {
-  const pending = requests.filter((request) => request.status === "Submitted to Line Manager");
+  const pending = requests.filter((request) => request.status === "Submitted to Line Manager" || request.status === "Awaiting Manager Review");
   const normalised = prompt.toLowerCase();
   const target = pending.find((request) => normalised.includes(request.name.split(" ")[0].toLowerCase())) ?? pending[0];
 
@@ -3451,7 +3493,7 @@ function getManagerAIResponse(prompt: string, requests: RequestItem[]) {
 
 function getDepartmentHeadAIResponse(prompt: string, requests: RequestItem[]) {
   const normalised = prompt.toLowerCase();
-  const pending = requests.filter((request) => request.status === "Submitted to Line Manager" || request.status === "Approved by Line Manager" || request.status === "Submitted to Apprenticeship Lead").length;
+  const pending = requests.filter((request) => request.status === "Submitted to Line Manager" || request.status === "Awaiting Manager Review" || request.status === "Approved by Line Manager" || request.status === "Submitted to Apprenticeship Lead" || request.status === "Awaiting Final Approval").length;
 
   if (normalised.includes("site")) {
     return {
@@ -3609,7 +3651,7 @@ function AssistantPrompt() {
   );
 }
 
-function PathwayModal({ pathway, onClose, onStart }: { pathway: Pathway; onClose: () => void; onStart: () => void }) {
+function PathwayModal({ pathway, activeApplication, onClose, onStart }: { pathway: Pathway; activeApplication?: RequestItem; onClose: () => void; onStart: () => void }) {
   const details = [
     ["Overview", pathway.standard],
     ["Who it is for", pathway.audience],
@@ -3636,7 +3678,11 @@ function PathwayModal({ pathway, onClose, onStart }: { pathway: Pathway; onClose
             <SubtleRow key={label} label={label} value={value} />
           ))}
         </div>
-        <button onClick={onStart} className="mt-8 rounded-full bg-[#102c3d] px-6 py-3 text-sm font-semibold text-white">Apply</button>
+        {activeApplication ? (
+          <ActiveApplicationNotice application={activeApplication} onView={onStart} />
+        ) : (
+          <button onClick={onStart} className="mt-8 rounded-full bg-[#102c3d] px-6 py-3 text-sm font-semibold text-white">Apply</button>
+        )}
       </section>
     </div>
   );
@@ -3836,6 +3882,14 @@ function filterBySite<T extends { site: string }>(items: T[], selectedSite: stri
   return items.filter((item) => item.site === selectedSite);
 }
 
+function isActiveApplicationStatus(status: RequestStatus) {
+  return activeApplicationStatuses.includes(status);
+}
+
+function activeApplicationFor(requests: RequestItem[], employeeName: string) {
+  return requests.find((request) => request.name === employeeName && isActiveApplicationStatus(request.status));
+}
+
 function topEntry(counts: Record<string, number>) {
   return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "";
 }
@@ -3848,11 +3902,16 @@ function decisionNoteFor(status: RequestStatus) {
   const notes: Record<RequestStatus, string> = {
     Draft: "More information requested before this can progress.",
     "Submitted to Line Manager": "Submitted to line manager for review.",
+    "Awaiting Manager Review": "Awaiting line manager review.",
     "Declined by Line Manager": "Declined by line manager. Reason captured in review notes.",
     "Approved by Line Manager": "Approved by line manager and ready for apprenticeship lead review.",
     "Submitted to Apprenticeship Lead": "Approved by line manager and sent for final approval.",
+    "Awaiting Final Approval": "Awaiting final apprenticeship lead approval.",
     "Declined by Apprenticeship Lead": "Declined by apprenticeship lead. Programme fit to be reviewed.",
     "Approved for Enrolment": "Final approved and ready for provider introduction and enrolment.",
+    Withdrawn: "Application withdrawn by the employee.",
+    Completed: "Application workflow completed.",
+    Cancelled: "Application cancelled.",
   };
   return notes[status];
 }
