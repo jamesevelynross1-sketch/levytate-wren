@@ -97,15 +97,15 @@ export function PlatformPanel({
   className?: string;
 }) {
   return (
-    <section className={`min-w-0 rounded-[1.35rem] border border-[#102c3d]/[0.065] bg-white p-6 shadow-[0_18px_45px_rgba(16,44,61,0.045)] ${className}`}>
+    <section className={`min-w-0 rounded-[1.25rem] border border-[#102c3d]/[0.06] bg-white p-5 shadow-[0_14px_36px_rgba(16,44,61,0.045)] ${className}`}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          {eyebrow ? <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">{eyebrow}</p> : null}
-          <h2 className="mt-1.5 text-[1.3rem] font-semibold leading-7 tracking-[-0.01em] text-[#102c3d]">{title}</h2>
+          {eyebrow ? <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#c95568]">{eyebrow}</p> : null}
+          <h2 className="mt-1.5 text-xl font-semibold leading-7 tracking-[-0.01em] text-[#102c3d]">{title}</h2>
         </div>
         {actions ? <div className="shrink-0">{actions}</div> : null}
       </div>
-      <div className="mt-6">{children}</div>
+      <div className="mt-5">{children}</div>
     </section>
   );
 }
@@ -115,7 +115,7 @@ export function PlatformMetric({ label, value, copy }: { label: string; value: s
     <article className="rounded-[1.1rem] border border-[#102c3d]/[0.055] bg-white p-4 shadow-[0_10px_24px_rgba(16,44,61,0.04)]">
       <p className="text-xs font-medium text-[#102c3d]/48">{label}</p>
       <p className="mt-2 text-3xl font-semibold tracking-[-0.025em] text-[#102c3d]">{value}</p>
-      {copy ? <p className="mt-1.5 text-xs leading-5 text-[#102c3d]/54">{copy}</p> : null}
+      {copy ? <p className="mt-1.5 line-clamp-2 text-xs leading-5 text-[#102c3d]/54">{copy}</p> : null}
     </article>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useMemo, useState, type ReactNode } from "react";
 import { LevyTateLogo, PlatformButton, PlatformMetric, PlatformPanel, PlatformTopBar, type PlatformNavSection } from "@/components/levytate-demo/PlatformShell";
 
 type Role = "Employee" | "Line Manager" | "Department Head" | "Apprenticeship Lead" | "Admin Console";
@@ -145,14 +145,14 @@ const navSectionsByRole: Record<Role, PlatformNavSection[]> = {
     { title: "Employee", items: ["Dashboard", "Recommended Pathways", "Career Pathfinder", "Skills Analysis", "My Applications", "Development Passport"] },
   ],
   "Line Manager": [
-    { title: "Manager", items: ["Dashboard", "My Team", "Applications to Review", "Team Skills", "Team Development"] },
+    { title: "Manager", items: ["Dashboard", "My Team", "Applications to Review", "Team Skills", "Team Development", "Reporting"] },
   ],
   "Department Head": [
-    { title: "Department", items: ["Dashboard", "Department Analytics", "Site Breakdown", "Apprenticeship Participation", "Skills Map", "Future Demand"] },
+    { title: "Department", items: ["Dashboard", "Department Analytics", "Site Breakdown", "Apprenticeship Participation", "Skills Map", "Future Demand", "Reporting"] },
   ],
   "Apprenticeship Lead": [
     { title: "Applications", items: ["Dashboard", "Applications for Final Approval", "Approved for Enrolment"] },
-    { title: "Operations", items: ["Providers", "Programmes", "Compliance", "Site Adoption"] },
+    { title: "Operations", items: ["Providers", "Programmes", "Compliance", "Site Adoption", "Reporting"] },
   ],
   "Admin Console": [
     { title: "Admin Console", items: ["Dashboard", "User Management", "Role Management", "Permission Management", "Provider Management", "Programme Catalogue"] },
@@ -162,9 +162,9 @@ const navSectionsByRole: Record<Role, PlatformNavSection[]> = {
 
 const roleSectionMap: Record<Role, SectionKey[]> = {
   Employee: ["Recommended Pathways", "Career Pathfinder", "Skills Analysis", "My Applications"],
-  "Line Manager": ["My Team", "Applications to Review", "Team Skills"],
-  "Department Head": ["Department Analytics", "Site Breakdown", "Future Demand"],
-  "Apprenticeship Lead": ["Applications for Final Approval", "Approved for Enrolment", "Providers"],
+  "Line Manager": ["My Team", "Applications to Review", "Reporting"],
+  "Department Head": ["Department Analytics", "Site Breakdown", "Reporting"],
+  "Apprenticeship Lead": ["Applications for Final Approval", "Providers", "Reporting"],
   "Admin Console": ["User Management", "Provider Management", "Platform Analytics"],
 };
 
@@ -1967,12 +1967,7 @@ function DetailSection({
   }
 
   if (activeSection === "Reporting" || activeSection === "Platform Analytics") {
-    return (
-      <div className="grid gap-6">
-        <ExecutiveSummary requests={requests} mappings={mappings} statusCounts={statusCounts} />
-        <LearnersBySite selectedSite={selectedSite} learners={learners} learnerSearch={learnerSearch} onLearnerSearch={onLearnerSearch} />
-      </div>
-    );
+    return <ReportingPage role={role} requests={requests} mappings={mappings} statusCounts={statusCounts} learners={learners} selectedSite={selectedSite} learnerSearch={learnerSearch} onLearnerSearch={onLearnerSearch} />;
   }
 
   if (activeSection === "Learners by Site") {
@@ -2292,6 +2287,327 @@ function LearnersBySite({
       </div>
       {learners.length > 18 ? <p className="mt-3 text-xs text-[#102c3d]/44">Showing first 18 results for demo clarity. Search or select a specific site to narrow the list.</p> : null}
     </PlatformPanel>
+  );
+}
+
+function ReportingPage({
+  role,
+  requests,
+  mappings,
+  statusCounts,
+  learners,
+  selectedSite,
+  learnerSearch,
+  onLearnerSearch,
+}: {
+  role: Role;
+  requests: RequestItem[];
+  mappings: ProviderMapping[];
+  statusCounts: Record<string, number>;
+  learners: Learner[];
+  selectedSite: string;
+  learnerSearch: string;
+  onLearnerSearch: (query: string) => void;
+}) {
+  if (role === "Line Manager") return <LineManagerReports learners={learners} requests={requests} />;
+  if (role === "Department Head") return <DepartmentHeadReports learners={learners} requests={requests} selectedSite={selectedSite} />;
+  if (role === "Apprenticeship Lead") return <ApprenticeshipLeadReports learners={learners} requests={requests} mappings={mappings} />;
+
+  return (
+    <div className="grid gap-5">
+      <ExecutiveSummary requests={requests} mappings={mappings} statusCounts={statusCounts} />
+      <LearnersBySite selectedSite={selectedSite} learners={learners} learnerSearch={learnerSearch} onLearnerSearch={onLearnerSearch} />
+    </div>
+  );
+}
+
+function ReportActions() {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {["Export PDF", "Export Excel", "Export PowerPoint"].map((label) => (
+        <button key={label} className="h-9 rounded-full border border-[#102c3d]/[0.07] bg-[#f8fbfa] px-3.5 text-xs font-semibold text-[#102c3d]/66 transition hover:bg-white hover:text-[#102c3d]">
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ReportCard({ title, eyebrow, children, className = "" }: { title: string; eyebrow: string; children: ReactNode; className?: string }) {
+  return (
+    <article className={`min-w-0 rounded-[1.25rem] border border-[#102c3d]/[0.055] bg-white p-5 shadow-[0_12px_32px_rgba(16,44,61,0.045)] ${className}`}>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#c95568]">{eyebrow}</p>
+      <h3 className="mt-1.5 text-base font-semibold leading-6 tracking-[-0.01em] text-[#102c3d]">{title}</h3>
+      <div className="mt-4">{children}</div>
+    </article>
+  );
+}
+
+function LineChart({ series, secondary }: { series: number[]; secondary?: number[] }) {
+  const points = toChartPoints(series);
+  const secondaryPoints = secondary ? toChartPoints(secondary) : "";
+  return (
+    <svg viewBox="0 0 320 150" role="img" aria-label="Trend chart" className="h-44 w-full overflow-visible">
+      {[30, 70, 110].map((y) => <line key={y} x1="0" x2="320" y1={y} y2={y} stroke="#102c3d" strokeOpacity="0.08" />)}
+      {secondaryPoints ? <polyline points={secondaryPoints} fill="none" stroke="#df5f73" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" opacity="0.75" /> : null}
+      <polyline points={points} fill="none" stroke="#159b8f" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+      {points.split(" ").map((point) => {
+        const [cx, cy] = point.split(",");
+        return <circle key={point} cx={cx} cy={cy} r="3.2" fill="#159b8f" />;
+      })}
+    </svg>
+  );
+}
+
+function toChartPoints(values: number[]) {
+  const max = Math.max(...values);
+  const min = Math.min(...values);
+  const range = Math.max(max - min, 1);
+  return values.map((value, index) => {
+    const x = (index / Math.max(values.length - 1, 1)) * 300 + 10;
+    const y = 130 - ((value - min) / range) * 110;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+}
+
+function BarChart({ rows }: { rows: Array<[string, number]> }) {
+  const max = Math.max(...rows.map(([, value]) => value), 1);
+  return (
+    <div className="grid gap-3">
+      {rows.map(([label, value]) => (
+        <div key={label}>
+          <div className="mb-1.5 flex justify-between gap-3 text-xs font-semibold text-[#102c3d]/58">
+            <span>{label}</span>
+            <span>{value}</span>
+          </div>
+          <div className="h-3 overflow-hidden rounded-full bg-[#ecf6f2]">
+            <div className="h-full rounded-full bg-[#159b8f]" style={{ width: `${Math.max(8, (value / max) * 100)}%` }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DonutChart({ rows, centerLabel }: { rows: Array<[string, number, string]>; centerLabel: string }) {
+  let cursor = 0;
+  const total = rows.reduce((sum, [, value]) => sum + value, 0);
+  const gradient = rows.map(([, value, color]) => {
+    const start = cursor;
+    cursor += (value / total) * 100;
+    return `${color} ${start}% ${cursor}%`;
+  }).join(", ");
+
+  return (
+    <div className="grid gap-4 sm:grid-cols-[150px_minmax(0,1fr)] sm:items-center">
+      <div className="grid aspect-square w-[150px] place-items-center rounded-full" style={{ background: `conic-gradient(${gradient})` }}>
+        <div className="grid h-[92px] w-[92px] place-items-center rounded-full bg-white text-center shadow-[inset_0_0_0_1px_rgba(16,44,61,0.06)]">
+          <p className="text-sm font-semibold text-[#102c3d]">{centerLabel}</p>
+        </div>
+      </div>
+      <div className="grid gap-2">
+        {rows.map(([label, value, color]) => (
+          <div key={label} className="flex items-center justify-between gap-3 text-sm">
+            <span className="flex items-center gap-2 text-[#102c3d]/62"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />{label}</span>
+            <span className="font-semibold text-[#102c3d]">{value}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RadarChart({ rows }: { rows: Array<[string, number]> }) {
+  const size = 180;
+  const center = size / 2;
+  const radius = 72;
+  const points = rows.map(([, value], index) => {
+    const angle = (Math.PI * 2 * index) / rows.length - Math.PI / 2;
+    const scale = value / 100;
+    return `${center + Math.cos(angle) * radius * scale},${center + Math.sin(angle) * radius * scale}`;
+  }).join(" ");
+
+  return (
+    <div className="grid gap-4 md:grid-cols-[190px_minmax(0,1fr)] md:items-center">
+      <svg viewBox={`0 0 ${size} ${size}`} className="h-48 w-full">
+        {[0.35, 0.7, 1].map((scale) => (
+          <circle key={scale} cx={center} cy={center} r={radius * scale} fill="none" stroke="#102c3d" strokeOpacity="0.08" />
+        ))}
+        {rows.map(([,], index) => {
+          const angle = (Math.PI * 2 * index) / rows.length - Math.PI / 2;
+          return <line key={index} x1={center} y1={center} x2={center + Math.cos(angle) * radius} y2={center + Math.sin(angle) * radius} stroke="#102c3d" strokeOpacity="0.08" />;
+        })}
+        <polygon points={points} fill="#159b8f" fillOpacity="0.2" stroke="#159b8f" strokeWidth="3" />
+      </svg>
+      <div className="grid gap-2">
+        {rows.map(([label, value]) => (
+          <div key={label} className="flex justify-between gap-3 rounded-2xl bg-[#f8fbfa] px-3 py-2 text-xs font-semibold text-[#102c3d]/62">
+            <span>{label}</span>
+            <span>{value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function GaugeChart({ value }: { value: number }) {
+  const circumference = 2 * Math.PI * 52;
+  return (
+    <div className="grid place-items-center">
+      <svg viewBox="0 0 140 140" className="h-44 w-44 -rotate-90">
+        <circle cx="70" cy="70" r="52" fill="none" stroke="#ecf6f2" strokeWidth="16" />
+        <circle cx="70" cy="70" r="52" fill="none" stroke="#159b8f" strokeWidth="16" strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={circumference * (1 - value / 100)} />
+      </svg>
+      <div className="-mt-32 mb-12 text-center">
+        <p className="text-4xl font-semibold tracking-[-0.03em] text-[#102c3d]">{value}%</p>
+        <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#102c3d]/40">Utilised</p>
+      </div>
+    </div>
+  );
+}
+
+function Heatmap({ teams, skills }: { teams: string[]; skills: string[] }) {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-[#102c3d]/[0.055]">
+      <div className="grid bg-[#f8fbfa]" style={{ gridTemplateColumns: `150px repeat(${skills.length}, minmax(92px, 1fr))` }}>
+        <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/36">Team</div>
+        {skills.map((skill) => <div key={skill} className="px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/36">{skill}</div>)}
+      </div>
+      {teams.map((team, teamIndex) => (
+        <div key={team} className="grid border-t border-[#102c3d]/[0.05]" style={{ gridTemplateColumns: `150px repeat(${skills.length}, minmax(92px, 1fr))` }}>
+          <div className="px-3 py-3 text-xs font-semibold text-[#102c3d]">{team}</div>
+          {skills.map((skill, skillIndex) => {
+            const value = 52 + ((teamIndex * 13 + skillIndex * 9) % 39);
+            const tone = value > 78 ? "bg-[#dff3ec] text-[#0b6f63]" : value > 64 ? "bg-[#fff4bd] text-[#7b6100]" : "bg-[#ffe4e9] text-[#ad344e]";
+            return <div key={`${team}-${skill}`} className={`m-1 rounded-xl px-3 py-2 text-center text-xs font-semibold ${tone}`}>{value}</div>;
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function WorkforceReadinessReport({ scope, score }: { scope: string; score: number }) {
+  const tone = score >= 78 ? "Green" : score >= 62 ? "Amber" : "Red";
+  return (
+    <ReportCard eyebrow="Flagship metric" title={`${scope} Workforce Readiness Index`}>
+      <div className="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-center">
+        <ReadinessIndex label={scope} score={score} />
+        <div className="grid gap-3 md:grid-cols-2">
+          {[
+            ["Skills coverage", "82%", "+4 pts"],
+            ["Succession readiness", "71%", "Amber"],
+            ["Participation", "18%", "+1 pt"],
+            ["Leadership pipeline", "74%", "Stable"],
+            ["Future demand alignment", "79%", "Green"],
+            ["Benchmark", "Top quartile", tone],
+          ].map(([label, value, trend]) => (
+            <MetricTile key={label} label={label} value={value} trend={trend} copy="Executive signal" />
+          ))}
+        </div>
+      </div>
+    </ReportCard>
+  );
+}
+
+function LineManagerReports({ learners, requests }: { learners: Learner[]; requests: RequestItem[] }) {
+  const teamLearners = learners.filter((learner) => learner.lineManager === "Ryan Booth").slice(0, 8);
+  return (
+    <div className="grid gap-5">
+      <PlatformPanel eyebrow="Reports" title="Line manager reporting" actions={<ReportActions />}>
+        <div className="grid gap-4 md:grid-cols-3">
+          <MetricTile label="Applications" value={requests.filter((request) => request.status === "Submitted to Line Manager").length} copy="Awaiting review" />
+          <MetricTile label="Active learners" value={teamLearners.length} copy="Team programmes" />
+          <MetricTile label="Participation" value="24%" copy="Team on programme" />
+        </div>
+      </PlatformPanel>
+      <div className="grid gap-5 xl:grid-cols-2">
+        <ReportCard eyebrow="Trend" title="Team development trend"><LineChart series={[5, 6, 6, 7, 8, 8, 9, 10, 10, 11, 12, 12]} /></ReportCard>
+        <ReportCard eyebrow="Skills" title="Team skills profile"><RadarChart rows={[["Leadership", 68], ["Technical", 74], ["Data", 56], ["Commercial", 61], ["Digital", 59]]} /></ReportCard>
+        <ReportCard eyebrow="Participation" title="Apprenticeship participation"><DonutChart centerLabel="24%" rows={[["On programme", 24, "#159b8f"], ["Not on programme", 76, "#ecf6f2"]]} /></ReportCard>
+        <ReportCard eyebrow="Report" title="Team progress report"><ProgressReport learners={teamLearners} /></ReportCard>
+      </div>
+    </div>
+  );
+}
+
+function DepartmentHeadReports({ learners, requests, selectedSite }: { learners: Learner[]; requests: RequestItem[]; selectedSite: string }) {
+  return (
+    <div className="grid gap-5">
+      <PlatformPanel eyebrow="Reports" title="Department reporting" actions={<ReportActions />}>
+        <div className="grid gap-4 md:grid-cols-4">
+          <MetricTile label="Participation" value="18%" copy="Department rate" />
+          <MetricTile label="Active learners" value={learners.length} copy="In selected view" />
+          <MetricTile label="Pending" value={requests.filter((request) => request.status === "Submitted to Line Manager").length} copy="Applications in approval" />
+          <MetricTile label="Readiness" value={readinessScore(learners, requests)} copy="Index score" />
+        </div>
+      </PlatformPanel>
+      <WorkforceReadinessReport scope={selectedSite === allSitesLabel ? "Department" : selectedSite} score={readinessScore(learners, requests)} />
+      <div className="grid gap-5 xl:grid-cols-2">
+        <ReportCard eyebrow="Site view" title="Participation by site"><BarChart rows={[["York", 27], ["Leeds", 18], ["Manchester", 14], ["Bristol", 11]]} /></ReportCard>
+        <ReportCard eyebrow="Trend" title="Workforce readiness trend"><LineChart series={[67, 68, 69, 70, 70, 72, 74, 75, 76, 78, 80, 82]} /></ReportCard>
+        <ReportCard eyebrow="Skills" title="Skills gap analysis" className="xl:col-span-2"><Heatmap teams={["Manufacturing", "Hire", "Site Ops", "Digital"]} skills={["Lead", "Tech", "Data", "Digital"]} /></ReportCard>
+        <ReportCard eyebrow="Distribution" title="Learner distribution"><DonutChart centerLabel="Portfolio" rows={[["Leadership", 34, "#159b8f"], ["Engineering", 26, "#102c3d"], ["Data", 18, "#df5f73"], ["Customer", 22, "#fff4bd"]]} /></ReportCard>
+        <ReportCard eyebrow="Executive view" title="Department workforce report"><ExecutiveBrief rows={[["Participation", "18%", "Up 1 pt"], ["Completion risk", "Low", "2 learners"], ["Priority demand", "Leadership", "Next cohort"], ["Board signal", "Improving", "Green"]]} /></ReportCard>
+      </div>
+    </div>
+  );
+}
+
+function ApprenticeshipLeadReports({ learners, requests, mappings }: { learners: Learner[]; requests: RequestItem[]; mappings: ProviderMapping[] }) {
+  return (
+    <div className="grid gap-5">
+      <PlatformPanel eyebrow="Reports" title="Apprenticeship lead reporting" actions={<ReportActions />}>
+        <div className="grid gap-4 md:grid-cols-4">
+          <MetricTile label="Final approvals" value={requests.filter((request) => request.status === "Submitted to Apprenticeship Lead" || request.status === "Approved by Line Manager").length} copy="Awaiting decision" />
+          <MetricTile label="Active learners" value={learners.length} copy="Organisation view" />
+          <MetricTile label="Provider partners" value={mappings.length} copy="Mapped partners" />
+          <MetricTile label="Levy utilisation" value="82%" copy="Forecast committed" />
+        </div>
+      </PlatformPanel>
+      <WorkforceReadinessReport scope="Organisation" score={84} />
+      <div className="grid gap-5 xl:grid-cols-2">
+        <ReportCard eyebrow="Funding" title="Levy utilisation"><GaugeChart value={82} /></ReportCard>
+        <ReportCard eyebrow="Sites" title="Active learners by site"><BarChart rows={[["York", 16], ["Leeds", 8], ["Manchester", 7], ["Bristol", 5], ["London", 4]]} /></ReportCard>
+        <ReportCard eyebrow="Providers" title="Provider performance"><BarChart rows={[["Completion", 86], ["Attendance", 91], ["Satisfaction", 88]]} /></ReportCard>
+        <ReportCard eyebrow="Trend" title="Starts vs completions"><LineChart series={[3, 4, 6, 5, 7, 8, 9, 9, 10, 12, 11, 13]} secondary={[2, 3, 3, 4, 5, 6, 6, 7, 8, 8, 9, 10]} /></ReportCard>
+        <ReportCard eyebrow="Portfolio" title="Programme portfolio"><DonutChart centerLabel="42" rows={[["Leadership", 30, "#159b8f"], ["Procurement", 16, "#102c3d"], ["Data", 22, "#df5f73"], ["AI", 12, "#fff4bd"], ["Engineering", 20, "#9bd9d0"]]} /></ReportCard>
+        <ReportCard eyebrow="Executive view" title="Workforce readiness report"><ExecutiveBrief rows={[["Organisation", "84", "Green"], ["Department", "78", "Green"], ["Site benchmark", "72", "Amber"], ["Risk focus", "Data", "Next quarter"]]} /></ReportCard>
+      </div>
+    </div>
+  );
+}
+
+function ProgressReport({ learners }: { learners: Learner[] }) {
+  const rows = learners.length ? learners : portakabinLearners.slice(0, 5);
+  return (
+    <div className="overflow-hidden rounded-2xl border border-[#102c3d]/[0.055]">
+      {rows.slice(0, 5).map((learner) => (
+        <div key={`${learner.name}-${learner.programme}`} className="grid gap-2 border-b border-[#102c3d]/[0.05] px-4 py-3 text-sm last:border-b-0 md:grid-cols-[1fr_1.2fr_0.7fr_0.8fr] md:items-center">
+          <p className="font-semibold text-[#102c3d]">{learner.name}</p>
+          <p className="text-[#102c3d]/60">{learner.programme}</p>
+          <p className="font-semibold text-[#102c3d]">{learner.progress}%</p>
+          <p className="text-[#102c3d]/58">{learner.status}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ExecutiveBrief({ rows }: { rows: Array<[string, string, string]> }) {
+  return (
+    <div className="grid gap-3">
+      {rows.map(([label, value, signal]) => (
+        <div key={label} className="flex items-center justify-between gap-4 rounded-2xl border border-[#102c3d]/[0.045] bg-[#f8fbfa] px-4 py-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#102c3d]/38">{label}</p>
+            <p className="mt-1 text-xl font-semibold tracking-[-0.02em] text-[#102c3d]">{value}</p>
+          </div>
+          <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#0b6f63] ring-1 ring-[#102c3d]/[0.05]">{signal}</span>
+        </div>
+      ))}
+    </div>
   );
 }
 
