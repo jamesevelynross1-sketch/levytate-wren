@@ -5,7 +5,8 @@
 Before making changes:
 
 1. Read `/docs/LEVYTATE_PRODUCT_SPEC.md`.
-2. Check the requested change against existing:
+2. Read `/docs/LEVYTATE_PRODUCT_BACKLOG.md`.
+3. Check the requested change against existing:
    - user roles
    - workflow rules
    - demo personas
@@ -15,6 +16,22 @@ Before making changes:
    - design system
 
 Do not implement partial changes that only update one screen while leaving other related screens inconsistent.
+
+## Required Project Documents
+
+Before implementing changes, read:
+
+- `/docs/LEVYTATE_PRODUCT_SPEC.md`
+- `/docs/LEVYTATE_PRODUCT_BACKLOG.md`
+
+Ensure new features align with:
+
+- Product strategy
+- Commercial objectives
+- Existing workflows
+- Existing personas
+
+Do not implement features that conflict with the product specification.
 
 ## Core Product Rules
 

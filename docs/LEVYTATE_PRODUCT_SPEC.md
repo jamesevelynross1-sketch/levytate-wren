@@ -11,6 +11,30 @@ LevyTate is a role-based apprenticeship and workforce development platform that 
 - improve internal apprenticeship culture
 - generate provider matching requests for the LevyTate team
 
+## Commercial Objectives
+
+LevyTate generates revenue through:
+
+1. Provider matching opportunities
+2. Provider subscriptions
+3. Consultancy projects
+4. Workforce planning support
+5. Strategic apprenticeship advisory
+
+The platform should support:
+
+- Lead generation
+- Consultancy opportunities
+- Provider matching opportunities
+- Workforce planning conversations
+- Employer engagement
+
+AI workflows should identify opportunities to create:
+
+- Provider matching requests
+- Workforce planning discussions
+- Strategic advisory opportunities
+
 ## Core User Roles
 
 ### Employee
