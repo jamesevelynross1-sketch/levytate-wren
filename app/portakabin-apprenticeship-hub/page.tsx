@@ -58,11 +58,21 @@ type ProviderMapping = {
   standard: string;
   partner: string;
   alternativePartner: string;
+  providerEmail: string;
   deliveryModel: string;
   fit: number;
   status: MappingStatus;
   nextAction: string;
   whyRecommended: string;
+};
+
+type EnrolmentSubmission = {
+  requestId: number;
+  provider: string;
+  providerEmail: string;
+  programme: string;
+  submittedAt: string;
+  emailStatus: "Sent";
 };
 
 type EmployeePersona = {
@@ -674,6 +684,7 @@ const initialMappings: ProviderMapping[] = [
     standard: "L3 Engineering Technician / Engineering Maintenance Technician",
     partner: "TEC Partnership",
     alternativePartner: "North Lindsey College",
+    providerEmail: "portakabin-enrolments@tecpartnership.ac.uk",
     deliveryModel: "Site based",
     fit: 93,
     status: "Live",
@@ -686,6 +697,7 @@ const initialMappings: ProviderMapping[] = [
     standard: "L3 Engineering Design Technician",
     partner: "TEC Partnership",
     alternativePartner: "Leeds College of Building",
+    providerEmail: "portakabin-enrolments@tecpartnership.ac.uk",
     deliveryModel: "Blended",
     fit: 89,
     status: "Ready",
@@ -698,6 +710,7 @@ const initialMappings: ProviderMapping[] = [
     standard: "L3 Construction Site Supervisor",
     partner: "Leeds College of Building",
     alternativePartner: "Learning Skills Partnership",
+    providerEmail: "portakabin-enrolments@lcb.ac.uk",
     deliveryModel: "Field based",
     fit: 91,
     status: "Live",
@@ -710,6 +723,7 @@ const initialMappings: ProviderMapping[] = [
     standard: "L3 Customer Service Specialist",
     partner: "Babington",
     alternativePartner: "Remit Training",
+    providerEmail: "portakabin-enrolments@babington.co.uk",
     deliveryModel: "Online + workshops",
     fit: 92,
     status: "Live",
@@ -722,6 +736,7 @@ const initialMappings: ProviderMapping[] = [
     standard: "L3 Supply Chain Practitioner",
     partner: "SR Apprenticeships",
     alternativePartner: "Apprenticeship College",
+    providerEmail: "portakabin-enrolments@srapprenticeships.co.uk",
     deliveryModel: "Hybrid",
     fit: 87,
     status: "Ready",
@@ -734,11 +749,25 @@ const initialMappings: ProviderMapping[] = [
     standard: "L3 Data Technician",
     partner: "QA",
     alternativePartner: "Apprentify",
+    providerEmail: "portakabin-enrolments@qa.com",
     deliveryModel: "Remote + workshops",
     fit: 88,
     status: "Ready",
     nextAction: "Confirm data projects",
     whyRecommended: "Strong national data and digital apprenticeship delivery.",
+  },
+  {
+    roleFamily: "Leadership",
+    pathway: "Leadership & Management",
+    standard: "L3 Team Leader / L5 Operations Manager",
+    partner: "Babington",
+    alternativePartner: "SR Apprenticeships",
+    providerEmail: "portakabin-enrolments@babington.co.uk",
+    deliveryModel: "Blended",
+    fit: 90,
+    status: "Live",
+    nextAction: "Submit approved learners for enrolment",
+    whyRecommended: "Strong national leadership and management apprenticeship delivery.",
   },
 ];
 
@@ -760,6 +789,7 @@ export default function PortakabinApprenticeshipHub() {
   const [selectedEmployeeRole, setSelectedEmployeeRole] = useState("Production Team Member");
   const [requests, setRequests] = useState<RequestItem[]>(initialRequests);
   const [mappings, setMappings] = useState<ProviderMapping[]>(initialMappings);
+  const [enrolmentSubmissions, setEnrolmentSubmissions] = useState<Record<number, EnrolmentSubmission>>({});
   const [selectedPathway, setSelectedPathway] = useState<Pathway | null>(null);
   const [savedPathways, setSavedPathways] = useState<string[]>(["Manufacturing & Production", "Digital, Data & AI", "Leadership & Management"]);
   const [scenario, setScenario] = useState<DemandScenario>("Medium");
@@ -860,6 +890,26 @@ export default function PortakabinApprenticeshipHub() {
     setMappings((current) => current.map((item, itemIndex) => (itemIndex === index ? { ...item, status, nextAction } : item)));
   }
 
+  function submitForProviderEnrolment(request: RequestItem) {
+    const mapping = findProviderMappingForRequest(request, mappings);
+    setEnrolmentSubmissions((current) => ({
+      ...current,
+      [request.id]: {
+        requestId: request.id,
+        provider: mapping?.partner ?? "Provider mapping required",
+        providerEmail: mapping?.providerEmail ?? "Add provider email in settings",
+        programme: mapping?.standard ?? request.pathway,
+        submittedAt: "15 Jun 2026",
+        emailStatus: "Sent",
+      },
+    }));
+    setRequests((current) => current.map((item) => (
+      item.id === request.id
+        ? { ...item, decisionNotes: `Submitted to ${mapping?.partner ?? "provider"} for enrolment. Provider notification email sent to ${mapping?.providerEmail ?? "configured provider contact"}.` }
+        : item
+    )));
+  }
+
   function seedRequest() {
     const seed = pathways[(requests.length + 1) % pathways.length];
     setRequests((current) => [
@@ -943,6 +993,8 @@ export default function PortakabinApprenticeshipHub() {
                 onStatus={setRequestStatus}
                 onMove={moveRequest}
                 onMapping={updateMapping}
+                enrolmentSubmissions={enrolmentSubmissions}
+                onSubmitToProvider={submitForProviderEnrolment}
                 onScenario={setScenarioData}
                 onSeed={seedRequest}
                 onNavigate={openSection}
@@ -1875,6 +1927,8 @@ function DetailSection({
   onStatus,
   onMove,
   onMapping,
+  enrolmentSubmissions,
+  onSubmitToProvider,
   onScenario,
   onSeed,
   onNavigate,
@@ -1904,6 +1958,8 @@ function DetailSection({
   onStatus: (id: number, status: RequestStatus) => void;
   onMove: (id: number, direction: 1 | -1) => void;
   onMapping: (index: number, status: MappingStatus, nextAction: string) => void;
+  enrolmentSubmissions: Record<number, EnrolmentSubmission>;
+  onSubmitToProvider: (request: RequestItem) => void;
   onScenario: (scenario: DemandScenario) => void;
   onSeed: () => void;
   onNavigate: (section: SectionKey) => void;
@@ -2169,12 +2225,20 @@ function DetailSection({
   }
 
   if (activeSection === "Approved for Enrolment") {
+    const approvedRequests = requests.filter((request) => request.status === "Approved for Enrolment");
     return (
       <PlatformPanel eyebrow="Final approved" title="Approved for enrolment">
         <div className="grid gap-4 lg:grid-cols-2">
-          {requests.filter((request) => request.status === "Approved for Enrolment").map((request) => (
-            <ApplicationCard key={request.id} request={request} scope="readonly" onStatus={onStatus} />
+          {approvedRequests.map((request) => (
+            <EnrolmentSubmissionCard
+              key={request.id}
+              request={request}
+              mapping={findProviderMappingForRequest(request, mappings)}
+              submission={enrolmentSubmissions[request.id]}
+              onSubmit={() => onSubmitToProvider(request)}
+            />
           ))}
+          {approvedRequests.length === 0 ? <p className="rounded-2xl bg-[#f8fbfa] p-4 text-sm text-[#102c3d]/56">No applications are approved for enrolment yet.</p> : null}
         </div>
       </PlatformPanel>
     );
@@ -2251,7 +2315,26 @@ function DetailSection({
     );
   }
 
-  if (["User Management", "Role Management", "Permission Management", "Employer Configuration", "Site Configuration", "Audit Logs", "System Settings", "Admin"].includes(activeSection)) {
+  if (activeSection === "System Settings") {
+    return (
+      <PlatformPanel eyebrow="Settings" title="Provider enrolment notification settings">
+        <div className="grid gap-3">
+          {mappings.map((mapping) => (
+            <article key={`${mapping.partner}-${mapping.pathway}`} className="grid gap-3 rounded-[1rem] border border-[#102c3d]/[0.055] bg-[#f8fbfa] p-4 md:grid-cols-[minmax(0,1fr)_minmax(240px,0.8fr)_auto] md:items-center">
+              <div>
+                <p className="text-sm font-semibold text-[#102c3d]">{mapping.partner}</p>
+                <p className="mt-1 text-xs leading-5 text-[#102c3d]/54">{mapping.pathway}</p>
+              </div>
+              <div className="rounded-xl bg-white px-3 py-2 text-sm font-semibold text-[#102c3d]/68 ring-1 ring-[#102c3d]/[0.05]">{mapping.providerEmail}</div>
+              <span className="w-fit rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#0b6f63] ring-1 ring-[#102c3d]/[0.05]">Configured</span>
+            </article>
+          ))}
+        </div>
+      </PlatformPanel>
+    );
+  }
+
+  if (["User Management", "Role Management", "Permission Management", "Employer Configuration", "Site Configuration", "Audit Logs", "Admin"].includes(activeSection)) {
     return (
       <PlatformPanel eyebrow="Admin console" title={activeSection}>
         <div className="grid gap-4 md:grid-cols-3">
@@ -2332,6 +2415,72 @@ function ApplicationCard({ request, scope, onStatus }: { request: RequestItem; s
           )}
         </div>
       ) : null}
+    </article>
+  );
+}
+
+function EnrolmentSubmissionCard({
+  request,
+  mapping,
+  submission,
+  onSubmit,
+}: {
+  request: RequestItem;
+  mapping?: ProviderMapping;
+  submission?: EnrolmentSubmission;
+  onSubmit: () => void;
+}) {
+  const provider = mapping?.partner ?? "Provider mapping required";
+  const providerEmail = mapping?.providerEmail ?? "Add provider email in settings";
+  const canSubmit = Boolean(mapping?.providerEmail) && !submission;
+
+  return (
+    <article className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-[#f8fbfa] p-3.5 shadow-[0_8px_20px_rgba(16,44,61,0.035)]">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div>
+          <h3 className="text-base font-semibold">{request.name}</h3>
+          <p className="mt-1 text-sm leading-6 text-[#102c3d]/60">{request.role} - {request.team}</p>
+        </div>
+        <span className="w-fit rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#0b6f63] ring-1 ring-[#102c3d]/[0.05]">
+          {submission ? "Submitted to provider" : request.status}
+        </span>
+      </div>
+      <div className="mt-3 grid gap-2.5 md:grid-cols-3">
+        <InfoBox label="Programme" value={request.pathway} />
+        <InfoBox label="Approved delivery partner" value={provider} />
+        <InfoBox label="Provider email" value={providerEmail} />
+      </div>
+      <div className="mt-3 rounded-xl border border-[#102c3d]/[0.05] bg-white px-3 py-3">
+        <div className="grid gap-2 text-sm leading-6 text-[#102c3d]/64">
+          <p>Standard: {mapping?.standard ?? request.pathway}</p>
+          <p>Delivery model: {mapping?.deliveryModel ?? "Confirm provider mapping"}</p>
+          <p>Site: {request.site}</p>
+          <p>Line manager: {request.manager}</p>
+        </div>
+      </div>
+      {submission ? (
+        <div className="mt-3 rounded-xl border border-[#159b8f]/[0.16] bg-[#edf8f5] px-3.5 py-3">
+          <p className="text-sm font-semibold text-[#0b6f63]">Submitted to {submission.provider} for enrolment</p>
+          <p className="mt-1 text-xs leading-5 text-[#102c3d]/58">Email notification sent to {submission.providerEmail} on {submission.submittedAt}.</p>
+        </div>
+      ) : (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#102c3d]/[0.05] bg-white px-3.5 py-3">
+          <p className="max-w-md text-sm leading-6 text-[#102c3d]/58">Submit this approved application to the mapped provider and send the configured enrolment notification email.</p>
+          <PlatformButton onClick={onSubmit} className={canSubmit ? "whitespace-nowrap" : "pointer-events-none whitespace-nowrap opacity-50"}>
+            Submit to provider for enrolment
+          </PlatformButton>
+        </div>
+      )}
+      <details className="mt-3 rounded-xl border border-[#102c3d]/[0.05] bg-white px-3 py-3">
+        <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.14em] text-[#102c3d]/44">View application detail</summary>
+        <div className="mt-3 grid gap-2 text-sm leading-6 text-[#102c3d]/64">
+          <p>Department: {request.department}</p>
+          <p>Reason: {request.note}</p>
+          <p>Career goal: {request.careerGoal}</p>
+          <p>Support required: {request.supportRequired}</p>
+          <p className="text-xs leading-5 text-[#102c3d]/46">Decision notes: {request.decisionNotes}</p>
+        </div>
+      </details>
     </article>
   );
 }
@@ -2540,6 +2689,7 @@ function ProviderMappingTable({ mappings, onMapping }: { mappings: ProviderMappi
               <div className="mt-3 grid gap-3 md:grid-cols-2">
                 <InfoBox label="Standard" value={row.standard} />
                 <InfoBox label="Alternative provider" value={row.alternativePartner} />
+                <InfoBox label="Enrolment email" value={row.providerEmail} />
                 <InfoBox label="Why recommended" value={row.whyRecommended} />
                 <InfoBox label="Next action" value={row.nextAction} />
               </div>
@@ -4096,6 +4246,28 @@ function decisionNoteFor(status: RequestStatus) {
     Cancelled: "Application cancelled.",
   };
   return notes[status];
+}
+
+function findProviderMappingForRequest(request: RequestItem, mappings: ProviderMapping[]) {
+  const source = normaliseMatchText(`${request.pathway} ${request.department} ${request.role}`);
+
+  return mappings.find((mapping) => {
+    const pathway = normaliseMatchText(mapping.pathway);
+    const family = normaliseMatchText(mapping.roleFamily);
+    const standard = normaliseMatchText(mapping.standard);
+
+    if (source.includes(pathway) || source.includes(family) || standard.includes(source)) return true;
+    if ((source.includes("team leader") || source.includes("operations manager") || source.includes("leadership")) && pathway.includes("leadership")) return true;
+    if ((source.includes("data") || source.includes("digital") || source.includes("analyst")) && pathway.includes("digital")) return true;
+    if ((source.includes("customer") || source.includes("hire") || source.includes("sales")) && pathway.includes("customer")) return true;
+    if ((source.includes("site") || source.includes("installation") || source.includes("construction")) && pathway.includes("installation")) return true;
+    if ((source.includes("supply") || source.includes("procurement")) && pathway.includes("supply")) return true;
+    return false;
+  });
+}
+
+function normaliseMatchText(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
 function readinessScore(learners: Learner[], requests: RequestItem[]) {
