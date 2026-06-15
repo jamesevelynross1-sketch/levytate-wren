@@ -37,6 +37,8 @@ Do not implement features that conflict with the product specification.
 
 LevyTate is a role-based apprenticeship and workforce development platform.
 
+LevyTate demo routes and strategic modules, including `/portakabin-apprenticeship-hub` and `/future-talent-portal`, must render as standalone LevyTate application environments. They must not inherit the public MPR Consulting website header, footer, navigation, logo, or marketing calls to action.
+
 Approval flow:
 
 Employee -> Line Manager -> Apprenticeship Lead -> Enrolment

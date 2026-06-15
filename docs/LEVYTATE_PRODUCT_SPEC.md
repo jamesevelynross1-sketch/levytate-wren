@@ -56,6 +56,9 @@ Primary users:
 Purpose:
 Allow employers to engage directly with pupils and schools to build future talent pipelines, improve career awareness and support progression into apprenticeships and employment.
 
+Environment rule:
+Future Talent Portal is a LevyTate strategic module. It must render inside a standalone LevyTate application shell and must not appear as a public MPR Consulting website page or inherit MPR Consulting marketing navigation.
+
 Primary users:
 
 - Employer
