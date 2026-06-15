@@ -43,6 +43,24 @@ Supports strategic decision making.
 
 ---
 
+### Future Talent Portal
+
+Status: In Development
+
+Purpose:
+Allow employers to engage pupils and schools directly through employer profiles, employee stories, pathway maps, challenges, badges and AI-guided career discovery.
+
+Core Users:
+
+- Employer
+- School
+- Pupil
+
+Business Value:
+Creates future apprenticeship demand, opens school engagement opportunities and supports strategic early talent pipeline conversations.
+
+---
+
 ## Priority 2 - Workforce Planning
 
 ### Skills Gap Analysis
@@ -59,6 +77,35 @@ Support succession planning.
 
 Purpose:
 Provide executive insight into workforce capability.
+
+---
+
+## Priority 2 - Future Talent and Early Careers
+
+### Employer Talent Brand Profiles
+
+Purpose:
+Help employers present real career pathways, employee stories and apprenticeship opportunities to pupils.
+
+### School Engagement Dashboard
+
+Purpose:
+Track pupil participation, activity completion and employer engagement across school partners.
+
+### Pupil Career Discovery
+
+Purpose:
+Allow pupils to explore industries, save employers, complete challenges and understand future apprenticeship routes.
+
+### Future Talent AI Guidance
+
+Purpose:
+Recommend careers, employers, apprenticeships and next activities based on pupil interests and strengths.
+
+### Future Talent Analytics
+
+Purpose:
+Help employers understand school reach, pupil interest, challenge completion and future pipeline demand.
 
 ---
 

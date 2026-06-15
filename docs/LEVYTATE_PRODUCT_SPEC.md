@@ -10,6 +10,7 @@ LevyTate is a role-based apprenticeship and workforce development platform that 
 - support workforce planning
 - improve internal apprenticeship culture
 - generate provider matching requests for the LevyTate team
+- build future talent pipelines through school and pupil engagement
 
 ## Commercial Objectives
 
@@ -34,6 +35,70 @@ AI workflows should identify opportunities to create:
 - Provider matching requests
 - Workforce planning discussions
 - Strategic advisory opportunities
+- Future talent and school engagement opportunities
+
+## Strategic Modules
+
+### Apprenticeship Operating System
+
+Purpose:
+Help employers increase apprenticeship adoption, manage approvals, map provider delivery and support workforce planning.
+
+Primary users:
+
+- Employee
+- Line Manager
+- Department Head
+- Apprenticeship Lead
+
+### Future Talent Portal
+
+Purpose:
+Allow employers to engage directly with pupils and schools to build future talent pipelines, improve career awareness and support progression into apprenticeships and employment.
+
+Primary users:
+
+- Employer
+- School
+- Pupil
+
+Employer capabilities:
+
+- Employer profile
+- Employee case studies
+- Career pathway maps
+- Apprenticeship information
+- Challenges and quizzes
+- Skills activities
+- Engagement analytics
+
+School capabilities:
+
+- School dashboard
+- Pupil participation
+- Activity completion
+- Employer engagement tracking
+
+Pupil capabilities:
+
+- Explore employers
+- View employee stories
+- Complete challenges
+- Earn badges
+- Career pathway explorer
+- Ask LevyTate AI
+- Save favourite employers
+
+Future Talent AI:
+Pupils can explore careers, industries, apprenticeships and future progression routes. AI recommendations should use interests and strengths to suggest suitable employers, career routes, apprenticeships and next activities.
+
+Commercial value:
+
+- Builds early employer engagement
+- Creates school partnership opportunities
+- Supports future apprenticeship demand
+- Generates strategic workforce pipeline conversations
+- Extends LevyTate beyond current employees into pre-employment talent development
 
 ## Core User Roles
 
