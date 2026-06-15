@@ -206,14 +206,6 @@ const navSectionsByRole: Record<Role, PlatformNavSection[]> = {
   ],
 };
 
-const roleSectionMap: Record<Role, SectionKey[]> = {
-  Employee: ["Ask LevyTate AI", "Recommended Pathways", "Career Pathfinder", "Skills Analysis", "My Applications"],
-  "Line Manager": ["Ask LevyTate AI", "My Team", "Applications to Review", "Reporting"],
-  "Department Head": ["Ask LevyTate AI", "Department Analytics", "Site Breakdown", "Reporting"],
-  "Apprenticeship Lead": ["Applications for Final Approval", "Providers", "Ask LevyTate AI", "Reporting"],
-  "Admin Console": ["User Management", "Provider Management", "Platform Analytics"],
-};
-
 const allSitesLabel = "All sites";
 
 const portakabinSites = [
@@ -414,7 +406,7 @@ const employeePersonas: EmployeePersona[] = [
     site: "York Head Office, Visitor Centre and UK Factory",
     manager: "Sarah Mitchell",
     careerGoal: "Head of Data & Automation",
-    recommendedPathways: 6,
+    recommendedPathways: 5,
     savedOpportunities: 3,
     passportActivities: 4,
     currentRange: "£34k",
@@ -434,7 +426,6 @@ const employeeRolePathwayMap: Record<string, Array<{ pathwayTitle: string; stand
     { pathwayTitle: "Digital, Data & AI", standard: "Level 3 Data Technician", summary: "Build practical data handling, dashboards and reporting confidence." },
     { pathwayTitle: "Digital, Data & AI", standard: "Level 4 Data Analyst", summary: "Develop analysis, insight generation and data storytelling capability." },
     { pathwayTitle: "Digital, Data & AI", standard: "Level 4 Business Analyst", summary: "Connect business needs, systems improvement and data-led change." },
-    { pathwayTitle: "Digital, Data & AI", standard: "Level 4 AI & Data Specialist", summary: "Apply AI, automation and data tools to operational reporting." },
     { pathwayTitle: "Digital, Data & AI", standard: "Level 6 Data Scientist", summary: "Progress toward advanced modelling, experimentation and strategic analytics." },
     { pathwayTitle: "Digital, Data & AI", standard: "AI & Automation Workforce Programme", summary: "Build automation confidence for reporting, workflows and internal productivity." },
   ],
@@ -1127,15 +1118,11 @@ function HeroPanel({
       </div>
 
       <div className="mt-4 border-t border-[#102c3d]/[0.055] pt-3">
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <PlatformButton onClick={() => onNavigate(primaryAction.target)}>
             {primaryAction.label}
           </PlatformButton>
-          {roleSectionMap[role].map((section) => (
-            <PlatformButton key={section} onClick={() => onNavigate(section)} variant="soft">
-              {section}
-            </PlatformButton>
-          ))}
+          <span className="rounded-full bg-[#f8fbfa] px-3 py-2 text-xs font-semibold text-[#102c3d]/50 ring-1 ring-[#102c3d]/[0.05]">Use the sidebar for detailed workspaces</span>
         </div>
       </div>
     </section>
@@ -1429,7 +1416,12 @@ function SectionHeader({ activeSection, role, selectedSite }: { activeSection: S
 
 function RoleDashboard({
   role,
+  requests,
+  learners,
+  mappings,
+  departmentCounts,
   selectedPersona,
+  selectedSite,
   activeApplication,
   onNavigate,
 }: {
@@ -1445,60 +1437,93 @@ function RoleDashboard({
   activeApplication?: RequestItem;
   onNavigate: (section: SectionKey) => void;
 }) {
-  return <DashboardSummaryGrid role={role} selectedPersona={selectedPersona} activeApplication={activeApplication} onNavigate={onNavigate} />;
-}
+  const managerRequests = requests.filter((request) => request.manager === "Ryan Booth" && (request.status === "Submitted to Line Manager" || request.status === "Awaiting Manager Review"));
+  const leadRequests = requests.filter((request) => request.status === "Submitted to Apprenticeship Lead" || request.status === "Awaiting Final Approval" || request.status === "Approved by Line Manager");
+  const liveLearners = learners.filter((learner) => learner.status === "Live learner");
 
-function DashboardSummaryGrid({ role, selectedPersona, activeApplication, onNavigate }: { role: Role; selectedPersona: EmployeePersona; activeApplication?: RequestItem; onNavigate: (section: SectionKey) => void }) {
-  const cards: Record<Role, LaunchCardProps[]> = {
-    Employee: [
-      { title: "Recommended Pathways", value: selectedPersona.recommendedPathways, copy: `Role-matched apprenticeship routes for ${selectedPersona.name.split(" ")[0]}.`, action: "Explore", section: "Recommended Pathways" },
-      { title: "Current Application", value: activeApplication ? 1 : 0, copy: activeApplication ? `${activeApplication.pathway}. ${activeApplication.status}. ${activeApplication.manager} reviewing.` : "No active apprenticeship application.", action: "Track Progress", section: "My Applications" },
-      { title: "Saved Opportunities", value: selectedPersona.savedOpportunities, copy: "Shortlisted routes for future consideration.", action: "Review", section: "Recommended Pathways" },
-      { title: "Development Passport", value: selectedPersona.passportActivities, copy: "Completed learning and qualifications.", action: "Open", section: "Development Passport" },
-    ],
-    "Line Manager": [
-      { title: "Applications Awaiting Review", value: 4, copy: "Direct reports needing manager approval.", action: "Review", section: "Applications to Review" },
-      { title: "Active Team Learners", value: 12, copy: "Team members currently on programme.", action: "View team", section: "My Team" },
-      { title: "High Potential Employees", value: 5, copy: "People ready for future progression.", action: "Plan", section: "Team Development" },
-      { title: "Skills Gaps", value: 3, copy: "Priority capability gaps to address.", action: "Open", section: "Team Skills" },
-    ],
-    "Department Head": [
-      { title: "Participation Rate", value: "18%", copy: "Current department apprenticeship participation.", action: "Analyse", section: "Department Analytics" },
-      { title: "Active Learners", value: 27, copy: "Employees enrolled across the department.", action: "View", section: "Apprenticeship Participation" },
-      { title: "Sites With Learners", value: 6, copy: "Locations currently using apprenticeships.", action: "Compare", section: "Site Breakdown" },
-      { title: "Future Skills Risks", value: 4, copy: "Capability areas needing attention.", action: "Plan", section: "Future Demand" },
-    ],
-    "Apprenticeship Lead": [
-      { title: "Awaiting Final Approval", value: 7, copy: "Manager-approved requests ready for final decision.", action: "Review", section: "Applications for Final Approval" },
-      { title: "Active Learners", value: 48, copy: "Learners live across Portakabin.", action: "View", section: "Learners by Site" },
-      { title: "Provider Partners", value: 6, copy: "Approved partners mapped to programmes.", action: "Manage", section: "Providers" },
-      { title: "Levy Utilisation", value: "82%", copy: "Forecast levy committed to approved activity.", action: "Report", section: "Levy Utilisation" },
-    ],
-    "Admin Console": [
-      { title: "Total Users", value: 824, copy: "Active and invited platform users.", action: "Manage", section: "User Management" },
-      { title: "Active Employers", value: 4, copy: "Configured employer environments.", action: "Configure", section: "Employer Configuration" },
-      { title: "Programmes Available", value: 42, copy: "Approved programmes in the catalogue.", action: "Open", section: "Programme Catalogue" },
-      { title: "Platform Health", value: "99.8%", copy: "Availability and operational status.", action: "Settings", section: "System Settings" },
-    ],
-  };
+  if (role === "Employee") {
+    return (
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <PlatformPanel eyebrow="Application journey" title="Current application">
+          {activeApplication ? <CompactApplicationTimeline request={activeApplication} /> : <p className="text-sm text-[#102c3d]/56">No active application yet.</p>}
+        </PlatformPanel>
+        <PlatformPanel eyebrow="Next action" title="Development focus">
+          <div className="grid gap-3">
+            <SignalRow label="Recommended pathways" value={selectedPersona.recommendedPathways} />
+            <SignalRow label="Development passport" value={selectedPersona.passportActivities} />
+            <SignalRow label="Saved opportunities" value={selectedPersona.savedOpportunities} />
+            <PlatformButton onClick={() => onNavigate(activeApplication ? "My Applications" : "Recommended Pathways")}>{activeApplication ? "Track progress" : "Explore pathways"}</PlatformButton>
+          </div>
+        </PlatformPanel>
+      </section>
+    );
+  }
+
+  if (role === "Line Manager") {
+    return (
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <PlatformPanel eyebrow="Team view" title="Participation trend">
+          <LineChart series={[7, 8, 8, 9, 10, 10, 11, 12]} />
+        </PlatformPanel>
+        <PlatformPanel eyebrow="Next action" title="Manager queue">
+          <div className="grid gap-3">
+            <SignalRow label="Awaiting review" value={managerRequests.length} />
+            <SignalRow label="Active team learners" value={learners.filter((learner) => learner.lineManager === "Ryan Booth").length} />
+            <SignalRow label="Skills risk" value="Leadership" />
+            <PlatformButton onClick={() => onNavigate("Applications to Review")}>Review applications</PlatformButton>
+          </div>
+        </PlatformPanel>
+      </section>
+    );
+  }
+
+  if (role === "Department Head") {
+    return (
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <PlatformPanel eyebrow="Site participation" title="Learners by priority site">
+          <BarChart rows={[["York", 27], ["Leeds", 18], ["Manchester", 14], ["London", 11]]} />
+        </PlatformPanel>
+        <PlatformPanel eyebrow="Workforce readiness" title="Planning signal">
+          <ReadinessIndex label={selectedSite === allSitesLabel ? "Department" : selectedSite} score={readinessScore(learners, requests)} />
+        </PlatformPanel>
+      </section>
+    );
+  }
+
+  if (role === "Apprenticeship Lead") {
+    return (
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <PlatformPanel eyebrow="Levy and learners" title="Operating view">
+          <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-center">
+            <GaugeChart value={82} />
+            <BarChart rows={[["York", 16], ["Leeds", 8], ["Manchester", 7], ["London", 4]]} />
+          </div>
+        </PlatformPanel>
+        <PlatformPanel eyebrow="Next action" title="Lead queue">
+          <div className="grid gap-3">
+            <SignalRow label="Final approvals" value={leadRequests.length} />
+            <SignalRow label="Active learners" value={liveLearners.length} />
+            <SignalRow label="Provider mappings" value={mappings.length} />
+            <PlatformButton onClick={() => onNavigate("Applications for Final Approval")}>Review final approvals</PlatformButton>
+          </div>
+        </PlatformPanel>
+      </section>
+    );
+  }
 
   return (
-    <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-      {cards[role].map((card) => (
-        <DashboardLaunchCard key={card.title} {...card} onNavigate={onNavigate} />
-      ))}
+    <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <PlatformPanel eyebrow="Platform health" title="Administration overview">
+        <LineChart series={[98, 98, 99, 99, 99, 100, 99, 100]} />
+      </PlatformPanel>
+      <PlatformPanel eyebrow="Admin focus" title="Configuration">
+        <div className="grid gap-3">
+          <SignalRow label="Configured users" value={824} />
+          <SignalRow label="Departments" value={Object.keys(departmentCounts).length} />
+          <SignalRow label="Programmes" value={42} />
+        </div>
+      </PlatformPanel>
     </section>
-  );
-}
-
-function DashboardLaunchCard({ title, value, copy, action, section, onNavigate }: LaunchCardProps & { onNavigate: (section: SectionKey) => void }) {
-  return (
-    <button onClick={() => onNavigate(section)} className="group min-h-[126px] rounded-[1rem] border border-[#102c3d]/[0.06] bg-white p-3.5 text-left shadow-[0_8px_22px_rgba(16,44,61,0.04)] transition duration-200 hover:-translate-y-0.5 hover:border-[#159b8f]/20 hover:shadow-[0_14px_30px_rgba(16,44,61,0.07)]">
-      <p className="text-xs font-semibold text-[#102c3d]/48">{title}</p>
-      <p className="mt-1.5 text-2xl font-semibold tracking-[-0.025em] text-[#102c3d]">{value}</p>
-      <p className="mt-1.5 line-clamp-2 text-xs leading-5 text-[#102c3d]/56">{copy}</p>
-      <span className="mt-2.5 inline-flex text-xs font-semibold text-[#0b7d70]">{action} -&gt;</span>
-    </button>
   );
 }
 
@@ -1888,14 +1913,11 @@ function DetailSection({
         ) : null}
 
         {visiblePathways.length ? (
-          <>
-            {role === "Employee" ? <h3 className="mb-4 text-lg font-semibold tracking-[-0.01em] text-[#102c3d]">Recommended Development Routes</h3> : null}
-            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-              {visiblePathways.map((pathway) => (
-                <PathwayCard key={`${pathway.title}-${pathway.standard}`} pathway={pathway} saved={savedPathways.includes(pathway.title)} onOpen={() => onOpenPathway(pathway)} onSave={() => onSavePathway(pathway.title)} />
-              ))}
-            </div>
-          </>
+          <div className="grid gap-3">
+            {visiblePathways.map((pathway) => (
+              <ExpandablePathwayCard key={`${pathway.title}-${pathway.standard}`} pathway={pathway} saved={savedPathways.includes(pathway.title)} onOpen={() => onOpenPathway(pathway)} onSave={() => onSavePathway(pathway.title)} />
+            ))}
+          </div>
         ) : (
           <div className="rounded-[1.2rem] border border-[#102c3d]/[0.055] bg-[#f8fbfa] p-5">
             <p className="text-sm font-semibold text-[#102c3d]">No mapped pathways yet</p>
@@ -1909,15 +1931,15 @@ function DetailSection({
   if (activeSection === "Career Pathfinder") {
     return (
       <PlatformPanel eyebrow="Career pathfinder" title="Progression map and recommended development">
-        <div className="mb-5 rounded-[1.2rem] border border-[#102c3d]/[0.055] bg-[#f8fbfa] p-4">
-          <p className="text-sm font-semibold text-[#102c3d]">{selectedPersona.name}</p>
-          <p className="mt-1 text-sm leading-6 text-[#102c3d]/58">{selectedPersona.role} to {selectedPersona.careerGoal}</p>
-        </div>
-        <div className="grid gap-5 xl:grid-cols-[340px_minmax(0,1fr)]">
+        <div className="grid gap-5 xl:grid-cols-[360px_minmax(0,1fr)]">
           <ProgressionPath roles={selectedPersona.progression} />
-          <div className="grid gap-3">
-            {selectedPersona.skills.map(([label, value]) => (
-              <SkillBar key={label} label={label} value={value} />
+          <div className="grid gap-3 content-start">
+            <p className="text-sm leading-6 text-[#102c3d]/62">{selectedPersona.role} to {selectedPersona.careerGoal}</p>
+            {selectedPersona.progression.map((stage, index) => (
+              <details key={stage} className="rounded-2xl border border-[#102c3d]/[0.055] bg-[#f8fbfa] px-4 py-3">
+                <summary className="cursor-pointer text-sm font-semibold text-[#102c3d]">Stage {index + 1}: {stage}</summary>
+                <p className="mt-2 text-sm leading-6 text-[#102c3d]/58">{index === 0 ? "Current role and evidence base." : index === selectedPersona.progression.length - 1 ? "Longer-term target role for future progression planning." : "Progression step supported by workplace evidence, manager coaching and pathway planning."}</p>
+              </details>
             ))}
           </div>
         </div>
@@ -1928,63 +1950,58 @@ function DetailSection({
   if (activeSection === "Development Passport") {
     return (
       <PlatformPanel eyebrow="Development passport" title="Completed learning and evidence record">
-        <div className="grid gap-4 md:grid-cols-4">
-          <MetricTile label="Completed activities" value={selectedPersona.passportActivities} />
-          <MetricTile label="Current role" value={selectedPersona.role} />
-          <MetricTile label="Target role" value={selectedPersona.careerGoal} />
-          <MetricTile label="Future opportunity" value={selectedPersona.futureOpportunity} />
-        </div>
-        <div className="mt-5 grid gap-4 md:grid-cols-3">
-          <MetricCard label="Current range" value={selectedPersona.currentRange} copy="Role benchmark" />
-          <MetricCard label="Next range" value={selectedPersona.nextRange} copy="Estimated progression benchmark" />
-          <MetricCard label="Manager" value={selectedPersona.manager} copy="Development sponsor" />
+        <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)] lg:items-start">
+          <ReadinessIndex label="Passport progress" score={Math.min(96, selectedPersona.passportActivities * 11)} />
+          <div className="grid gap-3">
+            {["Workplace learning", "Manager feedback", "Skills evidence", "Career conversation"].map((group, index) => (
+              <details key={group} className="rounded-2xl border border-[#102c3d]/[0.055] bg-[#f8fbfa] px-4 py-3" open={index === 0}>
+                <summary className="cursor-pointer text-sm font-semibold text-[#102c3d]">{group}</summary>
+                <p className="mt-2 text-sm leading-6 text-[#102c3d]/58">{selectedPersona.passportActivities - index > 0 ? `${Math.max(1, selectedPersona.passportActivities - index)} activities logged. Evidence supports progression toward ${selectedPersona.careerGoal}.` : "No evidence logged yet."}</p>
+              </details>
+            ))}
+          </div>
         </div>
       </PlatformPanel>
     );
   }
 
   if (activeSection === "My Applications") {
+    const currentApplication = activeApplication ?? employeeRequests.find((request) => isActiveApplicationStatus(request.status)) ?? employeeRequests[0];
     return (
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_370px]">
-        <PlatformPanel eyebrow="Expression of interest" title={activeApplication ? "Current application in progress" : "Start expression of interest"}>
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_390px]">
+        <PlatformPanel eyebrow="Current application" title={currentApplication ? currentApplication.pathway : "No active application"}>
+          {currentApplication ? (
+            <div className="grid gap-4">
+              <CompactApplicationTimeline request={currentApplication} />
+              <details className="rounded-2xl border border-[#102c3d]/[0.055] bg-[#f8fbfa] px-4 py-3">
+                <summary className="cursor-pointer text-sm font-semibold text-[#102c3d]">Application notes and approval history</summary>
+                <div className="mt-3 grid gap-2 text-sm leading-6 text-[#102c3d]/62">
+                  <p>Reason: {currentApplication.note}</p>
+                  <p>Career goal: {currentApplication.careerGoal}</p>
+                  <p>Support required: {currentApplication.supportRequired}</p>
+                  <p>Decision notes: {currentApplication.decisionNotes}</p>
+                </div>
+              </details>
+            </div>
+          ) : <p className="text-sm text-[#102c3d]/56">No current application.</p>}
+        </PlatformPanel>
+        <PlatformPanel eyebrow="Expression of interest" title={activeApplication ? "One active application only" : "Start expression of interest"}>
           <RequestForm key={selectedPersona.name} onSubmit={onSubmit} selectedPersona={selectedPersona} activeApplication={activeApplication} onViewApplication={() => onNavigate("My Applications")} />
           {success && <p className="mt-4 rounded-2xl bg-[#eff8f4] px-4 py-3 text-sm font-semibold text-[#102c3d]">Application submitted to line manager.</p>}
-        </PlatformPanel>
-        <PlatformPanel eyebrow="Application status" title={activeApplication ? "Current application" : `${selectedPersona.name.split(" ")[0]}'s application record`}>
-          {employeeRequests.length ? (
-            <div className="grid gap-5">
-              {employeeRequests.map((request) => (
-                <div key={request.id} className="rounded-[1.2rem] border border-[#102c3d]/[0.055] bg-[#f8fbfa] p-4">
-                  <div className="mb-4 flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-[#102c3d]">{request.pathway}</p>
-                      <p className="mt-1 text-xs font-medium text-[#102c3d]/50">{request.manager} reviewing</p>
-                    </div>
-                    <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.06]">{request.status}</span>
-                  </div>
-                  <RequestTracker request={request} />
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-[1.2rem] border border-[#102c3d]/[0.055] bg-[#f8fbfa] p-5">
-              <p className="text-sm font-semibold text-[#102c3d]">No current application for this site view</p>
-              <p className="mt-2 text-sm leading-6 text-[#102c3d]/58">{`${selectedPersona.name}'s application record remains private to their own profile and selected site context.`}</p>
-            </div>
-          )}
         </PlatformPanel>
       </section>
     );
   }
 
   if (activeSection === "Applications to Review" || activeSection === "Requests") {
-    const managerRequests = requests.filter((request) => request.status === "Submitted to Line Manager" || request.status === "Awaiting Manager Review");
+    const managerRequests = requests.filter((request) => request.manager === "Ryan Booth" && (request.status === "Submitted to Line Manager" || request.status === "Awaiting Manager Review"));
     return (
       <PlatformPanel eyebrow="Line manager review" title="Applications to review">
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-3">
           {managerRequests.map((request) => (
             <ApplicationCard key={request.id} request={request} scope="manager" onStatus={onStatus} />
           ))}
+          {managerRequests.length === 0 ? <p className="rounded-2xl bg-[#f8fbfa] p-4 text-sm text-[#102c3d]/56">No direct-report applications awaiting review.</p> : null}
         </div>
       </PlatformPanel>
     );
@@ -1993,7 +2010,10 @@ function DetailSection({
   if (activeSection === "My Team") {
     return (
       <PlatformPanel eyebrow="My team" title="Team development status">
-        <TeamMemberList learners={learners.slice(0, 12)} />
+        <div className="mb-4 flex flex-wrap gap-2">
+          {["All sites", "Live learner", "Manager review", "Leadership"].map((item) => <span key={item} className="rounded-full bg-[#f8fbfa] px-3 py-1.5 text-xs font-semibold text-[#102c3d]/54 ring-1 ring-[#102c3d]/[0.05]">{item}</span>)}
+        </div>
+        <TeamMemberList learners={learners.filter((learner) => learner.lineManager === "Ryan Booth").slice(0, 12)} />
       </PlatformPanel>
     );
   }
@@ -2016,15 +2036,15 @@ function DetailSection({
       return (
         <PlatformPanel eyebrow="Skills analysis" title={`${selectedPersona.name.split(" ")[0]}'s capability profile`}>
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
-            <div className="grid gap-3">
+            <RadarChart rows={selectedPersona.skills.map(([label, value]) => [label.split(" ")[0], value])} />
+            <div className="grid gap-3 content-start">
               {selectedPersona.skills.map(([label, value]) => (
                 <SkillBar key={label} label={label} value={value} />
               ))}
-            </div>
-            <div className="grid gap-3">
-              <MetricCard label="Recommended routes" value={selectedPersona.recommendedPathways} copy="Matched to role and career goal" />
-              <MetricCard label="Career goal" value={selectedPersona.careerGoal} copy="Target progression pathway" />
-              <MetricCard label="Manager" value={selectedPersona.manager} copy="Development sponsor" />
+              <details className="rounded-2xl border border-[#102c3d]/[0.055] bg-[#f8fbfa] px-4 py-3">
+                <summary className="cursor-pointer text-sm font-semibold text-[#102c3d]">Evidence and development detail</summary>
+                <p className="mt-2 text-sm leading-6 text-[#102c3d]/58">Mapped to {selectedPersona.careerGoal}. Sponsored by {selectedPersona.manager}.</p>
+              </details>
             </div>
           </div>
         </PlatformPanel>
@@ -2033,10 +2053,16 @@ function DetailSection({
 
     return (
       <PlatformPanel eyebrow="Workforce planning" title={activeSection}>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {["Manufacturing excellence", "Customer experience", "Digital reporting", "Site delivery confidence", "Leadership pipeline", "Supply chain resilience"].map((item) => (
-            <InfoBox key={item} label={item} value="Recommended pathway available" />
-          ))}
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <Heatmap teams={["Manufacturing", "Hire", "Site Ops", "Digital"]} skills={["Lead", "Tech", "Data", "Ops"]} />
+          <div className="grid gap-3 content-start">
+            {["Leadership pipeline", "Digital reporting", "Site delivery confidence"].map((item) => (
+              <details key={item} className="rounded-2xl border border-[#102c3d]/[0.055] bg-[#f8fbfa] px-4 py-3">
+                <summary className="cursor-pointer text-sm font-semibold text-[#102c3d]">{item}</summary>
+                <p className="mt-2 text-sm leading-6 text-[#102c3d]/58">Recommended pathway available. Use cohort planning to confirm demand and timing.</p>
+              </details>
+            ))}
+          </div>
         </div>
       </PlatformPanel>
     );
@@ -2061,8 +2087,8 @@ function DetailSection({
           <InsightBars rows={Object.entries(departmentCounts).map(([label, value]) => [label, value])} />
           <div className="grid gap-3">
             <MetricCard label="Participation rate" value="34%" copy="Department colleagues on programme" />
-            <MetricCard label="Pending applications" value={requests.filter((request) => request.status === "Submitted to Line Manager" || request.status === "Awaiting Manager Review" || request.status === "Approved by Line Manager" || request.status === "Submitted to Apprenticeship Lead" || request.status === "Awaiting Final Approval").length} copy="No approval action required" />
-            <MetricCard label="Approved applications" value={requests.filter((request) => request.status === "Approved for Enrolment").length} copy="Ready for enrolment" />
+            <MetricCard label="Demand in workflow" value={requests.filter((request) => request.status === "Submitted to Line Manager" || request.status === "Awaiting Manager Review" || request.status === "Approved by Line Manager" || request.status === "Submitted to Apprenticeship Lead" || request.status === "Awaiting Final Approval").length} copy="Reporting only" />
+            <MetricCard label="Approved enrolment demand" value={requests.filter((request) => request.status === "Approved for Enrolment").length} copy="Ready for enrolment" />
           </div>
         </div>
       </PlatformPanel>
@@ -2074,7 +2100,10 @@ function DetailSection({
       <PlatformPanel eyebrow="Site intelligence" title="Site adoption and readiness">
         <div className="grid gap-4 md:grid-cols-3">
           {["York Head Office, Visitor Centre and UK Factory", "Leeds Visitor Centre", "Trafford Park Manchester Visitor Centre"].map((site, index) => (
-            <ReadinessIndex key={site} label={site} score={[84, 72, 69][index]} />
+            <details key={site} className="rounded-2xl border border-[#102c3d]/[0.055] bg-[#f8fbfa] p-4">
+              <summary className="cursor-pointer text-sm font-semibold text-[#102c3d]">{site}</summary>
+              <div className="mt-3"><ReadinessIndex label="Readiness" score={[84, 72, 69][index]} /></div>
+            </details>
           ))}
         </div>
       </PlatformPanel>
@@ -2088,9 +2117,9 @@ function DetailSection({
   if (activeSection === "Programmes" || activeSection === "Programme Catalogue") {
     return (
       <PlatformPanel eyebrow="Programme catalogue" title="Approved apprenticeship programmes">
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-3">
           {pathways.map((pathway) => (
-            <PathwayCard key={pathway.title} pathway={pathway} saved={savedPathways.includes(pathway.title)} onOpen={() => onOpenPathway(pathway)} onSave={() => onSavePathway(pathway.title)} />
+            <ExpandablePathwayCard key={pathway.title} pathway={pathway} saved={savedPathways.includes(pathway.title)} onOpen={() => onOpenPathway(pathway)} onSave={() => onSavePathway(pathway.title)} />
           ))}
         </div>
       </PlatformPanel>
@@ -2101,10 +2130,11 @@ function DetailSection({
     const leadRequests = requests.filter((request) => request.status === "Submitted to Apprenticeship Lead" || request.status === "Awaiting Final Approval" || request.status === "Approved by Line Manager");
     return (
       <PlatformPanel eyebrow="Apprenticeship lead approval" title="Applications for final approval">
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-3">
           {leadRequests.map((request) => (
             <ApplicationCard key={request.id} request={request} scope="lead" onStatus={onStatus} />
           ))}
+          {leadRequests.length === 0 ? <p className="rounded-2xl bg-[#f8fbfa] p-4 text-sm text-[#102c3d]/56">No applications awaiting final approval.</p> : null}
         </div>
       </PlatformPanel>
     );
@@ -2240,21 +2270,23 @@ function ApplicationCard({ request, scope, onStatus }: { request: RequestItem; s
         </div>
         <span className="w-fit rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#102c3d]/56 ring-1 ring-[#102c3d]/[0.05]">{request.status}</span>
       </div>
-      <div className="mt-3 grid gap-2.5 md:grid-cols-2">
+      <div className="mt-3 grid gap-2.5 md:grid-cols-3">
         <InfoBox label="Programme" value={request.pathway} />
         <InfoBox label="Site" value={request.site} />
-        <InfoBox label="Department" value={request.department} />
         <InfoBox label="Submitted date" value={formatShortDate(request.submittedDate)} />
-        <InfoBox label="Current approver" value={currentApprover} />
-        <InfoBox label="Action required" value={actionRequired} />
       </div>
-      <div className="mt-3 rounded-xl border border-[#102c3d]/[0.05] bg-white p-3">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/38">Application detail</p>
-        <p className="mt-2 text-sm leading-6 text-[#102c3d]/64">{request.note}</p>
-        <p className="mt-2 text-sm leading-6 text-[#102c3d]/64">Career goal: {request.careerGoal}</p>
-        <p className="mt-2 text-sm leading-6 text-[#102c3d]/64">Support required: {request.supportRequired}</p>
-        <p className="mt-2 text-xs leading-5 text-[#102c3d]/46">Decision notes: {request.decisionNotes}</p>
-      </div>
+      <details className="mt-3 rounded-xl border border-[#102c3d]/[0.05] bg-white px-3 py-3">
+        <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.14em] text-[#102c3d]/44">View application detail</summary>
+        <div className="mt-3 grid gap-2 text-sm leading-6 text-[#102c3d]/64">
+          <p>Department: {request.department}</p>
+          <p>Current approver: {currentApprover}</p>
+          <p>Action required: {actionRequired}</p>
+          <p>Reason: {request.note}</p>
+          <p>Career goal: {request.careerGoal}</p>
+          <p>Support required: {request.supportRequired}</p>
+          <p className="text-xs leading-5 text-[#102c3d]/46">Decision notes: {request.decisionNotes}</p>
+        </div>
+      </details>
       {scope !== "readonly" ? (
         <div className="mt-3 flex flex-wrap gap-2">
           {scope === "manager" ? (
@@ -2276,28 +2308,32 @@ function ApplicationCard({ request, scope, onStatus }: { request: RequestItem; s
   );
 }
 
-function PathwayCard({ pathway, saved, onOpen, onSave }: { pathway: Pathway; saved: boolean; onOpen: () => void; onSave: () => void }) {
+function ExpandablePathwayCard({ pathway, saved, onOpen, onSave }: { pathway: Pathway; saved: boolean; onOpen: () => void; onSave: () => void }) {
   return (
-    <article className="group flex min-h-[260px] min-w-0 flex-col rounded-[1rem] border border-[#102c3d]/[0.06] bg-[#f8fbfa] p-4 shadow-[0_8px_22px_rgba(16,44,61,0.035)] transition duration-200 hover:-translate-y-0.5 hover:border-[#159b8f]/20 hover:bg-white hover:shadow-[0_14px_32px_rgba(16,44,61,0.075)]">
-      <div className="flex items-start justify-between gap-3">
-        <h3 className="min-w-0 text-lg font-semibold leading-6 tracking-[-0.01em] text-[#102c3d]">{pathway.title}</h3>
-        <span className="shrink-0 rounded-full bg-[#fff4bd] px-2.5 py-1 text-[11px] font-semibold text-[#7b6100] ring-1 ring-[#8a6a00]/[0.08]">{pathway.status}</span>
+    <article className="rounded-[1rem] border border-[#102c3d]/[0.055] bg-[#f8fbfa] p-4 shadow-[0_8px_20px_rgba(16,44,61,0.03)]">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-base font-semibold tracking-[-0.01em] text-[#102c3d]">{pathway.title}</h3>
+            <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-[#7b6100] ring-1 ring-[#102c3d]/[0.05]">{pathway.status}</span>
+          </div>
+          <p className="mt-1 text-sm font-semibold text-[#159b8f]">{pathway.standard}</p>
+          <p className="mt-2 line-clamp-1 text-sm text-[#102c3d]/58">{pathway.businessBenefit}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <PlatformButton onClick={onOpen}>View detail</PlatformButton>
+          <PlatformButton onClick={onSave} variant="soft">{saved ? "Saved" : "Save"}</PlatformButton>
+        </div>
       </div>
-      <p className="mt-2 text-sm font-semibold leading-6 text-[#159b8f]">{pathway.standard}</p>
-      <p className="mt-3 line-clamp-2 text-sm leading-5 text-[#102c3d]/62">{pathway.audience}</p>
-      <div className="mt-3 rounded-xl border border-[#102c3d]/[0.045] bg-white/78 p-3">
-        <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-[#102c3d]/38">Business outcome</p>
-        <p className="mt-1.5 line-clamp-2 text-sm leading-5 text-[#102c3d]/66">{pathway.businessBenefit}</p>
-      </div>
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        {pathway.departments.map((item) => (
-          <span key={item} className="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-[#102c3d]/54 ring-1 ring-[#102c3d]/[0.045]">{item}</span>
-        ))}
-      </div>
-      <div className="mt-auto flex flex-wrap gap-2 pt-4">
-        <PlatformButton onClick={onOpen}>View detail</PlatformButton>
-        <PlatformButton onClick={onSave} variant="soft">{saved ? "Saved" : "Save"}</PlatformButton>
-      </div>
+      <details className="mt-3 rounded-xl bg-white px-3 py-2 ring-1 ring-[#102c3d]/[0.05]">
+        <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.12em] text-[#102c3d]/42">Pathway detail</summary>
+        <div className="mt-3 grid gap-3 text-sm leading-6 text-[#102c3d]/62 md:grid-cols-2">
+          <InfoBox label="Who it is for" value={pathway.audience} />
+          <InfoBox label="Learner benefit" value={pathway.learnerBenefit} />
+          <InfoBox label="Commitment" value={pathway.commitment} />
+          <InfoBox label="Next cohort" value={pathway.cohort} />
+        </div>
+      </details>
     </article>
   );
 }
@@ -2375,6 +2411,40 @@ function RequestTracker({ request }: { request: RequestItem }) {
   );
 }
 
+function CompactApplicationTimeline({ request }: { request: RequestItem }) {
+  const stages: Array<{ label: string; statuses: RequestStatus[] }> = [
+    { label: "Submitted", statuses: ["Draft", "Submitted to Line Manager"] },
+    { label: "Manager Review", statuses: ["Awaiting Manager Review", "Approved by Line Manager"] },
+    { label: "Lead Approval", statuses: ["Submitted to Apprenticeship Lead", "Awaiting Final Approval"] },
+    { label: "Enrolment", statuses: ["Approved for Enrolment"] },
+  ];
+  const activeStage = Math.max(0, stages.findIndex((stage) => stage.statuses.includes(request.status)));
+
+  return (
+    <div>
+      <div className="flex items-center gap-2">
+        {stages.map((stage, index) => (
+          <div key={stage.label} className="flex min-w-0 flex-1 items-center gap-2">
+            <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-semibold ${index <= activeStage ? "bg-[#159b8f] text-white" : "bg-[#e6f0ec] text-[#102c3d]/42"}`}>{index + 1}</div>
+            {index < stages.length - 1 ? <div className={`h-1 min-w-0 flex-1 rounded-full ${index < activeStage ? "bg-[#159b8f]" : "bg-[#e6f0ec]"}`} /> : null}
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 grid gap-2 md:grid-cols-4">
+        {stages.map((stage, index) => (
+          <div key={stage.label} className="min-w-0">
+            <p className={`text-xs font-semibold ${index <= activeStage ? "text-[#102c3d]" : "text-[#102c3d]/42"}`}>{stage.label}</p>
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 rounded-2xl bg-[#f8fbfa] px-4 py-3">
+        <p className="text-sm font-semibold text-[#102c3d]">{request.pathway}</p>
+        <p className="mt-1 text-sm text-[#102c3d]/58">{request.status}. {request.manager} reviewing.</p>
+      </div>
+    </div>
+  );
+}
+
 function ActiveApplicationNotice({ application, onView }: { application: RequestItem; onView: () => void }) {
   return (
     <div className="mt-4 rounded-[1rem] border border-[#fff4bd] bg-[#fff9dc] p-4 shadow-[0_8px_18px_rgba(123,97,0,0.055)]">
@@ -2424,22 +2494,28 @@ function Kanban({ requests, onMove, compact = false }: { requests: RequestItem[]
 function ProviderMappingTable({ mappings, onMapping }: { mappings: ProviderMapping[]; onMapping: (index: number, status: MappingStatus, nextAction: string) => void }) {
   return (
     <PlatformPanel title="Provider mappings" eyebrow="Approved providers">
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-3">
         {mappings.map((row, index) => (
-          <article key={row.roleFamily} className="rounded-[1.2rem] border border-[#102c3d]/[0.055] bg-[#f8fbfa] p-4 shadow-[0_8px_22px_rgba(16,44,61,0.035)]">
-            <div className="flex items-start justify-between gap-4">
+          <article key={row.roleFamily} className="rounded-[1rem] border border-[#102c3d]/[0.055] bg-[#f8fbfa] p-4 shadow-[0_8px_20px_rgba(16,44,61,0.03)]">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <h3 className="text-lg font-semibold">{row.pathway}</h3>
-                <p className="mt-1 text-sm leading-6 text-[#102c3d]/58">{row.standard}</p>
+                <h3 className="text-base font-semibold">{row.roleFamily}: {row.pathway}</h3>
+                <p className="mt-1 text-sm leading-6 text-[#102c3d]/58">{row.partner} - {row.deliveryModel}</p>
               </div>
-              <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#102c3d]/56 ring-1 ring-[#102c3d]/[0.05]">{row.fit}% fit</span>
+              <div className="flex flex-wrap gap-2">
+                <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#102c3d]/56 ring-1 ring-[#102c3d]/[0.05]">{row.fit}% fit</span>
+                <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#0b6f63] ring-1 ring-[#102c3d]/[0.05]">{row.status}</span>
+              </div>
             </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
-              <InfoBox label="Recommended provider" value={row.partner} />
-              <InfoBox label="Alternative provider" value={row.alternativePartner} />
-              <InfoBox label="Delivery model" value={row.deliveryModel} />
-              <InfoBox label="Why recommended" value={row.whyRecommended} />
-            </div>
+            <details className="mt-3 rounded-xl bg-white px-3 py-3 ring-1 ring-[#102c3d]/[0.05]">
+              <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.12em] text-[#102c3d]/42">Provider mapping detail</summary>
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <InfoBox label="Standard" value={row.standard} />
+                <InfoBox label="Alternative provider" value={row.alternativePartner} />
+                <InfoBox label="Why recommended" value={row.whyRecommended} />
+                <InfoBox label="Next action" value={row.nextAction} />
+              </div>
+            </details>
             <div className="mt-4 flex flex-wrap gap-2">
               <SmallButton label="Mark live" onClick={() => onMapping(index, "Live", "Monitor cohort")} />
               <SmallButton label="Flag review" onClick={() => onMapping(index, "Review", "Review delivery fit")} variant="coral" />
@@ -2741,11 +2817,12 @@ function WorkforceReadinessReport({ scope, score }: { scope: string; score: numb
 
 function LineManagerReports({ learners, requests }: { learners: Learner[]; requests: RequestItem[] }) {
   const teamLearners = learners.filter((learner) => learner.lineManager === "Ryan Booth").slice(0, 8);
+  const teamRequests = requests.filter((request) => request.manager === "Ryan Booth");
   return (
     <div className="grid gap-5">
       <PlatformPanel eyebrow="Reports" title="Line manager reporting" actions={<ReportActions />}>
         <div className="grid gap-4 md:grid-cols-3">
-          <MetricTile label="Applications" value={requests.filter((request) => request.status === "Submitted to Line Manager" || request.status === "Awaiting Manager Review").length} copy="Awaiting review" />
+          <MetricTile label="Applications" value={teamRequests.filter((request) => request.status === "Submitted to Line Manager" || request.status === "Awaiting Manager Review").length} copy="Direct reports awaiting review" />
           <MetricTile label="Active learners" value={teamLearners.length} copy="Team programmes" />
           <MetricTile label="Participation" value="24%" copy="Team on programme" />
         </div>
@@ -2767,7 +2844,7 @@ function DepartmentHeadReports({ learners, requests, selectedSite }: { learners:
         <div className="grid gap-4 md:grid-cols-4">
           <MetricTile label="Participation" value="18%" copy="Department rate" />
           <MetricTile label="Active learners" value={learners.length} copy="In selected view" />
-          <MetricTile label="Pending" value={requests.filter((request) => request.status === "Submitted to Line Manager" || request.status === "Awaiting Manager Review").length} copy="Applications in approval" />
+          <MetricTile label="Demand signal" value={requests.filter((request) => request.status === "Submitted to Line Manager" || request.status === "Awaiting Manager Review").length} copy="Applications in workflow" />
           <MetricTile label="Readiness" value={readinessScore(learners, requests)} copy="Index score" />
         </div>
       </PlatformPanel>
@@ -3282,18 +3359,19 @@ function LineManagerAIPage({ requests, onStatus, onNavigate }: { requests: Reque
   const examples = ["Should I approve Amelia's Team Leader application?", "Which members of my team could benefit from leadership development?", "Where are the biggest skills gaps in my team?", "What apprenticeship pathways suit my production team?"];
   const [query, setQuery] = useState("");
   const [response, setResponse] = useState<ReturnType<typeof getManagerAIResponse> | null>(null);
-  const pending = requests.filter((request) => request.status === "Submitted to Line Manager" || request.status === "Awaiting Manager Review");
+  const teamRequests = requests.filter((request) => request.manager === "Ryan Booth");
+  const pending = teamRequests.filter((request) => request.status === "Submitted to Line Manager" || request.status === "Awaiting Manager Review");
   const target = pending[0];
 
   function askQuestion(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!query.trim()) return;
-    setResponse(getManagerAIResponse(query, requests));
+    setResponse(getManagerAIResponse(query, teamRequests));
   }
 
   function applyPrompt(prompt: string) {
     setQuery(prompt);
-    setResponse(getManagerAIResponse(prompt, requests));
+    setResponse(getManagerAIResponse(prompt, teamRequests));
   }
 
   return (
@@ -3756,6 +3834,15 @@ function InfoBox({ label, value }: { label: string; value: string }) {
     <div className="rounded-xl border border-[#102c3d]/[0.05] bg-white px-3.5 py-2.5 shadow-[0_6px_16px_rgba(16,44,61,0.03)]">
       <p className="text-xs font-semibold text-[#102c3d]">{label}</p>
       <p className="mt-1 text-xs leading-5 text-[#102c3d]/56">{value}</p>
+    </div>
+  );
+}
+
+function SignalRow({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="flex items-center justify-between gap-4 rounded-2xl bg-[#f8fbfa] px-4 py-3 ring-1 ring-[#102c3d]/[0.045]">
+      <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[#102c3d]/38">{label}</span>
+      <span className="text-sm font-semibold text-[#102c3d]">{value}</span>
     </div>
   );
 }
