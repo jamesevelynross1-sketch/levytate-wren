@@ -766,6 +766,7 @@ export default function PortakabinApprenticeshipHub() {
   const [selectedSite, setSelectedSite] = useState(allSitesLabel);
   const [learnerSearch, setLearnerSearch] = useState("");
   const [success, setSuccess] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const filteredRequests = useMemo(() => filterBySite(requests, selectedSite), [requests, selectedSite]);
   const filteredLearners = useMemo(() => filterBySite(portakabinLearners, selectedSite), [selectedSite]);
@@ -890,9 +891,9 @@ export default function PortakabinApprenticeshipHub() {
 
   return (
     <main className="min-h-screen overflow-hidden bg-[linear-gradient(180deg,#f8faf8_0%,#f2f6f4_48%,#f6f8f7_100%)] text-[#102c3d]">
-      <Sidebar role={role} activeSection={activeSection} onNavigate={openSection} />
+      <Sidebar role={role} activeSection={activeSection} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed((current) => !current)} onNavigate={openSection} />
 
-      <div className="h-screen min-w-0 overflow-y-auto lg:ml-[296px]">
+      <div className={`h-screen min-w-0 overflow-y-auto transition-[margin] duration-300 ease-out ${sidebarCollapsed ? "lg:ml-[88px]" : "lg:ml-[296px]"}`}>
         <TopBar role={role} setRole={switchRole} selectedSite={selectedSite} selectedPersona={selectedPersona} onEmployee={switchEmployee} onSite={setSelectedSite} onOpenAdmin={() => switchRole("Admin Console")} />
 
         <div className="mx-auto w-full max-w-[1500px] space-y-5 px-5 py-5 sm:px-7 lg:px-8">
@@ -957,26 +958,64 @@ export default function PortakabinApprenticeshipHub() {
   );
 }
 
-function Sidebar({ role, activeSection, onNavigate }: { role: Role; activeSection: SectionKey; onNavigate: (section: SectionKey) => void }) {
+function Sidebar({
+  role,
+  activeSection,
+  collapsed,
+  onToggle,
+  onNavigate,
+}: {
+  role: Role;
+  activeSection: SectionKey;
+  collapsed: boolean;
+  onToggle: () => void;
+  onNavigate: (section: SectionKey) => void;
+}) {
   const navSections = navSectionsByRole[role];
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-40 hidden w-[296px] border-r border-[#102c3d]/[0.08] bg-white/95 px-4 py-5 shadow-[8px_0_32px_rgba(16,44,61,0.035)] backdrop-blur-xl lg:flex lg:flex-col">
-      <div className="flex items-center px-2">
-        <LevyTateLogo className="[--levytate-logo-size:2.65rem]" />
+    <aside className={`fixed inset-y-0 left-0 z-40 hidden border-r border-[#102c3d]/[0.08] bg-white/95 py-5 shadow-[8px_0_32px_rgba(16,44,61,0.035)] backdrop-blur-xl transition-[width,padding] duration-300 ease-out lg:flex lg:flex-col ${collapsed ? "w-[88px] px-3" : "w-[296px] px-4"}`}>
+      <div className={`flex items-center ${collapsed ? "justify-center" : "justify-between px-2"}`}>
+        {collapsed ? (
+          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#f0fbf7] text-sm font-semibold text-[#102c3d] ring-1 ring-[#102c3d]/[0.06]" aria-label="LevyTate" role="img">
+            LT
+          </div>
+        ) : (
+          <LevyTateLogo className="[--levytate-logo-size:2.65rem]" />
+        )}
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}
+          title={collapsed ? "Expand navigation" : "Collapse navigation"}
+          className={`grid h-9 w-9 place-items-center rounded-full border border-[#102c3d]/[0.08] bg-white text-[#102c3d]/64 shadow-[0_8px_18px_rgba(16,44,61,0.06)] transition hover:-translate-y-0.5 hover:text-[#102c3d] focus:outline-none focus:ring-4 focus:ring-[#159b8f]/15 ${collapsed ? "absolute -right-4 top-6" : ""}`}
+        >
+          <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4">
+            <path d={collapsed ? "M7.5 4.5 12.5 10l-5 5.5" : "M12.5 4.5 7.5 10l5 5.5"} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
       </div>
 
-      <div className="mt-5 rounded-2xl border border-[#102c3d]/[0.06] bg-[#f7faf6] px-4 py-3 text-[#102c3d]">
-        <p className="text-[10px] font-medium uppercase tracking-[0.15em] text-[#102c3d]/40">Active client</p>
-        <p className="mt-1 text-sm font-semibold tracking-tight">Portakabin</p>
-        <p className="mt-1 text-xs font-medium text-[#102c3d]/48">{role}</p>
+      <div className={`mt-5 rounded-2xl border border-[#102c3d]/[0.06] bg-[#f7faf6] text-[#102c3d] transition-all duration-300 ${collapsed ? "px-2 py-3 text-center" : "px-4 py-3"}`}>
+        {collapsed ? (
+          <>
+            <p className="text-sm font-semibold tracking-tight">PK</p>
+            <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/42">{role.split(" ").map((word) => word[0]).join("").slice(0, 2)}</p>
+          </>
+        ) : (
+          <>
+            <p className="text-[10px] font-medium uppercase tracking-[0.15em] text-[#102c3d]/40">Active client</p>
+            <p className="mt-1 text-sm font-semibold tracking-tight">Portakabin</p>
+            <p className="mt-1 text-xs font-medium text-[#102c3d]/48">{role}</p>
+          </>
+        )}
       </div>
 
-      <nav className="mt-5 min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
+      <nav className={`mt-5 min-h-0 flex-1 space-y-4 overflow-y-auto ${collapsed ? "pr-0" : "pr-1"}`}>
         {navSections.map((section) => (
           <div key={section.title}>
-            <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#102c3d]/32">{section.title}</p>
-            <div className="mt-2 grid gap-0.5">
+            {collapsed ? <div className="mx-auto mb-2 h-px w-8 bg-[#102c3d]/[0.08]" /> : <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#102c3d]/32">{section.title}</p>}
+            <div className={`mt-2 grid ${collapsed ? "gap-1" : "gap-0.5"}`}>
               {section.items.map((item) => {
                 const sectionKey = item as SectionKey;
                 const active = activeSection === sectionKey;
@@ -984,11 +1023,21 @@ function Sidebar({ role, activeSection, onNavigate }: { role: Role; activeSectio
                   <button
                     key={item}
                     onClick={() => onNavigate(sectionKey)}
-                    className={`flex w-full items-center rounded-xl px-3.5 py-2.5 text-left text-sm font-medium transition duration-200 ${
+                    title={item}
+                    aria-label={item}
+                    className={`flex w-full items-center rounded-xl text-left text-sm font-medium transition duration-200 ${
+                      collapsed ? "justify-center px-2 py-2" : "px-3.5 py-2.5"
+                    } ${
                       active ? "bg-[#edf6f2] text-[#102c3d] shadow-[inset_3px_0_0_#159b8f]" : "text-[#102c3d]/56 hover:bg-[#f7faf6] hover:text-[#102c3d]"
                     }`}
                   >
-                    <span className="truncate">{item}</span>
+                    {collapsed ? (
+                      <span className={`grid h-8 w-8 place-items-center rounded-lg text-[10px] font-semibold ${active ? "bg-white text-[#159b8f]" : "bg-[#f8faf4] text-[#102c3d]/48"}`}>
+                        {item.split(" ").map((word) => word[0]).join("").slice(0, 2)}
+                      </span>
+                    ) : (
+                      <span className="truncate">{item}</span>
+                    )}
                   </button>
                 );
               })}
