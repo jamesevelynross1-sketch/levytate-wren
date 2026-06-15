@@ -893,7 +893,7 @@ export default function PortakabinApprenticeshipHub() {
     <main className="min-h-screen overflow-hidden bg-[linear-gradient(180deg,#f8faf8_0%,#f2f6f4_48%,#f6f8f7_100%)] text-[#102c3d]">
       <Sidebar role={role} activeSection={activeSection} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed((current) => !current)} onNavigate={openSection} />
 
-      <div className={`h-screen min-w-0 overflow-y-auto transition-[margin] duration-300 ease-out ${sidebarCollapsed ? "lg:ml-[88px]" : "lg:ml-[296px]"}`}>
+      <div className={`h-screen min-w-0 overflow-y-auto transition-[margin] duration-300 ease-out ${sidebarCollapsed ? "lg:ml-0" : "lg:ml-[296px]"}`}>
         <TopBar role={role} setRole={switchRole} selectedSite={selectedSite} selectedPersona={selectedPersona} onEmployee={switchEmployee} onSite={setSelectedSite} onOpenAdmin={() => switchRole("Admin Console")} />
 
         <div className="mx-auto w-full max-w-[1500px] space-y-5 px-5 py-5 sm:px-7 lg:px-8">
@@ -974,21 +974,15 @@ function Sidebar({
   const navSections = navSectionsByRole[role];
 
   return (
-    <aside className={`fixed inset-y-0 left-0 z-40 hidden border-r border-[#102c3d]/[0.08] bg-white/95 py-5 shadow-[8px_0_32px_rgba(16,44,61,0.035)] backdrop-blur-xl transition-[width,padding] duration-300 ease-out lg:flex lg:flex-col ${collapsed ? "w-[88px] px-3" : "w-[296px] px-4"}`}>
-      <div className={`flex items-center ${collapsed ? "justify-center" : "justify-between px-2"}`}>
-        {collapsed ? (
-          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#f0fbf7] text-sm font-semibold text-[#102c3d] ring-1 ring-[#102c3d]/[0.06]" aria-label="LevyTate" role="img">
-            LT
-          </div>
-        ) : (
-          <LevyTateLogo className="[--levytate-logo-size:2.65rem]" />
-        )}
+    <aside className={`fixed inset-y-0 left-0 z-40 hidden overflow-visible border-r bg-white/95 py-5 shadow-[8px_0_32px_rgba(16,44,61,0.035)] backdrop-blur-xl transition-[width,padding,border-color,box-shadow] duration-300 ease-out lg:flex lg:flex-col ${collapsed ? "w-0 border-transparent px-0 shadow-none" : "w-[296px] border-[#102c3d]/[0.08] px-4"}`}>
+      <div className={`flex items-center ${collapsed ? "h-0" : "justify-between px-2"}`}>
+        {collapsed ? null : <LevyTateLogo className="[--levytate-logo-size:2.65rem]" />}
         <button
           type="button"
           onClick={onToggle}
           aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}
           title={collapsed ? "Expand navigation" : "Collapse navigation"}
-          className={`grid h-9 w-9 place-items-center rounded-full border border-[#102c3d]/[0.08] bg-white text-[#102c3d]/64 shadow-[0_8px_18px_rgba(16,44,61,0.06)] transition hover:-translate-y-0.5 hover:text-[#102c3d] focus:outline-none focus:ring-4 focus:ring-[#159b8f]/15 ${collapsed ? "absolute -right-4 top-6" : ""}`}
+          className={`grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[#102c3d]/[0.08] bg-white text-[#102c3d]/64 shadow-[0_8px_18px_rgba(16,44,61,0.06)] transition hover:-translate-y-0.5 hover:text-[#102c3d] focus:outline-none focus:ring-4 focus:ring-[#159b8f]/15 ${collapsed ? "absolute left-3 top-6" : ""}`}
         >
           <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4">
             <path d={collapsed ? "M7.5 4.5 12.5 10l-5 5.5" : "M12.5 4.5 7.5 10l5 5.5"} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -996,26 +990,19 @@ function Sidebar({
         </button>
       </div>
 
-      <div className={`mt-5 rounded-2xl border border-[#102c3d]/[0.06] bg-[#f7faf6] text-[#102c3d] transition-all duration-300 ${collapsed ? "px-2 py-3 text-center" : "px-4 py-3"}`}>
-        {collapsed ? (
-          <>
-            <p className="text-sm font-semibold tracking-tight">PK</p>
-            <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/42">{role.split(" ").map((word) => word[0]).join("").slice(0, 2)}</p>
-          </>
-        ) : (
-          <>
-            <p className="text-[10px] font-medium uppercase tracking-[0.15em] text-[#102c3d]/40">Active client</p>
-            <p className="mt-1 text-sm font-semibold tracking-tight">Portakabin</p>
-            <p className="mt-1 text-xs font-medium text-[#102c3d]/48">{role}</p>
-          </>
-        )}
-      </div>
+      {collapsed ? null : (
+        <div className="mt-5 rounded-2xl border border-[#102c3d]/[0.06] bg-[#f7faf6] px-4 py-3 text-[#102c3d] transition-all duration-300">
+          <p className="text-[10px] font-medium uppercase tracking-[0.15em] text-[#102c3d]/40">Active client</p>
+          <p className="mt-1 text-sm font-semibold tracking-tight">Portakabin</p>
+          <p className="mt-1 text-xs font-medium text-[#102c3d]/48">{role}</p>
+        </div>
+      )}
 
-      <nav className={`mt-5 min-h-0 flex-1 space-y-4 overflow-y-auto ${collapsed ? "pr-0" : "pr-1"}`}>
+      {collapsed ? null : <nav className="mt-5 min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
         {navSections.map((section) => (
           <div key={section.title}>
-            {collapsed ? <div className="mx-auto mb-2 h-px w-8 bg-[#102c3d]/[0.08]" /> : <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#102c3d]/32">{section.title}</p>}
-            <div className={`mt-2 grid ${collapsed ? "gap-1" : "gap-0.5"}`}>
+            <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#102c3d]/32">{section.title}</p>
+            <div className="mt-2 grid gap-0.5">
               {section.items.map((item) => {
                 const sectionKey = item as SectionKey;
                 const active = activeSection === sectionKey;
@@ -1025,26 +1012,18 @@ function Sidebar({
                     onClick={() => onNavigate(sectionKey)}
                     title={item}
                     aria-label={item}
-                    className={`flex w-full items-center rounded-xl text-left text-sm font-medium transition duration-200 ${
-                      collapsed ? "justify-center px-2 py-2" : "px-3.5 py-2.5"
-                    } ${
+                    className={`flex w-full items-center rounded-xl px-3.5 py-2.5 text-left text-sm font-medium transition duration-200 ${
                       active ? "bg-[#edf6f2] text-[#102c3d] shadow-[inset_3px_0_0_#159b8f]" : "text-[#102c3d]/56 hover:bg-[#f7faf6] hover:text-[#102c3d]"
                     }`}
                   >
-                    {collapsed ? (
-                      <span className={`grid h-8 w-8 place-items-center rounded-lg text-[10px] font-semibold ${active ? "bg-white text-[#159b8f]" : "bg-[#f8faf4] text-[#102c3d]/48"}`}>
-                        {item.split(" ").map((word) => word[0]).join("").slice(0, 2)}
-                      </span>
-                    ) : (
-                      <span className="truncate">{item}</span>
-                    )}
+                    <span className="truncate">{item}</span>
                   </button>
                 );
               })}
             </div>
           </div>
         ))}
-      </nav>
+      </nav>}
     </aside>
   );
 }
@@ -1511,8 +1490,8 @@ function RoleDashboard({
   if (role === "Line Manager") {
     return (
       <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <PlatformPanel eyebrow="Team view" title="Participation trend">
-          <LineChart series={[7, 8, 8, 9, 10, 10, 11, 12]} />
+        <PlatformPanel eyebrow="Team view" title="Year-on-year team participation">
+          <YearOnYearParticipationChart />
         </PlatformPanel>
         <PlatformPanel eyebrow="Next action" title="Manager queue">
           <div className="grid gap-3">
@@ -1563,7 +1542,7 @@ function RoleDashboard({
   return (
     <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
       <PlatformPanel eyebrow="Platform health" title="Administration overview">
-        <LineChart series={[98, 98, 99, 99, 99, 100, 99, 100]} />
+        <LineChart series={[98, 98, 99, 99, 99, 100, 99, 100]} labels={["Q1", "Q2", "Q3", "Q4"]} primaryLabel="Platform health" />
       </PlatformPanel>
       <PlatformPanel eyebrow="Admin focus" title="Configuration">
         <div className="grid gap-3">
@@ -2696,19 +2675,83 @@ function ReportCard({ title, eyebrow, children, className = "" }: { title: strin
   );
 }
 
-function LineChart({ series, secondary }: { series: number[]; secondary?: number[] }) {
+const chartPalette = ["#159b8f", "#df5f73", "#7b61ff", "#f0b429", "#102c3d", "#38a169"];
+
+function YearOnYearParticipationChart({ compact = false }: { compact?: boolean }) {
+  const rows = [
+    { year: "2024", participation: 11, learners: 5, applications: 7, colour: "#7b61ff" },
+    { year: "2025", participation: 18, learners: 9, applications: 13, colour: "#df5f73" },
+    { year: "2026", participation: 24, learners: 12, applications: 16, colour: "#159b8f" },
+  ];
+  const max = Math.max(...rows.map((row) => row.participation), 1);
+
+  return (
+    <div className="grid gap-4">
+      <div className="grid gap-3 md:grid-cols-3">
+        {rows.map((row) => (
+          <div key={row.year} className="rounded-2xl border border-[#102c3d]/[0.055] bg-[#f8fbfa] px-4 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.13em] text-[#102c3d]/42">{row.year}</p>
+              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: row.colour }} />
+            </div>
+            <p className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[#102c3d]">{row.participation}%</p>
+            <p className="mt-1 text-xs leading-5 text-[#102c3d]/56">{row.learners} active learners, {row.applications} applications</p>
+          </div>
+        ))}
+      </div>
+      <div className="grid gap-3">
+        {rows.map((row) => (
+          <div key={`${row.year}-bar`} className="grid gap-1.5">
+            <div className="flex justify-between gap-3 text-xs font-semibold text-[#102c3d]/58">
+              <span>{row.year} team participation</span>
+              <span>{row.participation}%</span>
+            </div>
+            <div className="h-3 overflow-hidden rounded-full bg-[#eef3f0]">
+              <div className="h-full rounded-full" style={{ width: `${Math.max(10, (row.participation / max) * 100)}%`, backgroundColor: row.colour }} />
+            </div>
+          </div>
+        ))}
+      </div>
+      {!compact ? <p className="text-xs leading-5 text-[#102c3d]/48">Shows the share of Ryan Booth&apos;s direct-report team with an active apprenticeship or approved application, compared year on year.</p> : null}
+    </div>
+  );
+}
+
+function LineChart({
+  series,
+  secondary,
+  labels,
+  primaryLabel = "Current",
+  secondaryLabel = "Previous",
+}: {
+  series: number[];
+  secondary?: number[];
+  labels?: string[];
+  primaryLabel?: string;
+  secondaryLabel?: string;
+}) {
   const points = toChartPoints(series);
   const secondaryPoints = secondary ? toChartPoints(secondary) : "";
   return (
-    <svg viewBox="0 0 320 150" role="img" aria-label="Trend chart" className="h-36 w-full overflow-visible">
-      {[30, 70, 110].map((y) => <line key={y} x1="0" x2="320" y1={y} y2={y} stroke="#102c3d" strokeOpacity="0.08" />)}
-      {secondaryPoints ? <polyline points={secondaryPoints} fill="none" stroke="#df5f73" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" opacity="0.75" /> : null}
-      <polyline points={points} fill="none" stroke="#159b8f" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
-      {points.split(" ").map((point) => {
-        const [cx, cy] = point.split(",");
-        return <circle key={point} cx={cx} cy={cy} r="3.2" fill="#159b8f" />;
-      })}
-    </svg>
+    <div className="grid gap-3">
+      <svg viewBox="0 0 320 170" role="img" aria-label="Trend chart" className="h-40 w-full overflow-visible">
+        {[30, 70, 110].map((y) => <line key={y} x1="0" x2="320" y1={y} y2={y} stroke="#102c3d" strokeOpacity="0.08" />)}
+        {secondaryPoints ? <polyline points={secondaryPoints} fill="none" stroke="#df5f73" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" opacity="0.8" /> : null}
+        <polyline points={points} fill="none" stroke="#159b8f" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+        {points.split(" ").map((point) => {
+          const [cx, cy] = point.split(",");
+          return <circle key={point} cx={cx} cy={cy} r="3.2" fill="#159b8f" />;
+        })}
+        {labels ? labels.map((label, index) => {
+          const x = (index / Math.max(labels.length - 1, 1)) * 300 + 10;
+          return <text key={label} x={x} y="158" textAnchor="middle" className="fill-[#102c3d]/45 text-[9px] font-semibold">{label}</text>;
+        }) : null}
+      </svg>
+      <div className="flex flex-wrap gap-3 text-xs font-semibold text-[#102c3d]/58">
+        <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-[#159b8f]" />{primaryLabel}</span>
+        {secondary ? <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-[#df5f73]" />{secondaryLabel}</span> : null}
+      </div>
+    </div>
   );
 }
 
@@ -2727,14 +2770,14 @@ function BarChart({ rows }: { rows: Array<[string, number]> }) {
   const max = Math.max(...rows.map(([, value]) => value), 1);
   return (
     <div className="grid gap-3">
-      {rows.map(([label, value]) => (
+      {rows.map(([label, value], index) => (
         <div key={label}>
           <div className="mb-1.5 flex justify-between gap-3 text-xs font-semibold text-[#102c3d]/58">
             <span>{label}</span>
             <span>{value}</span>
           </div>
-          <div className="h-3 overflow-hidden rounded-full bg-[#ecf6f2]">
-            <div className="h-full rounded-full bg-[#159b8f]" style={{ width: `${Math.max(8, (value / max) * 100)}%` }} />
+          <div className="h-3 overflow-hidden rounded-full bg-[#eef3f0]">
+            <div className="h-full rounded-full" style={{ width: `${Math.max(8, (value / max) * 100)}%`, backgroundColor: chartPalette[index % chartPalette.length] }} />
           </div>
         </div>
       ))}
@@ -2790,7 +2833,7 @@ function RadarChart({ rows }: { rows: Array<[string, number]> }) {
           const angle = (Math.PI * 2 * index) / rows.length - Math.PI / 2;
           return <line key={index} x1={center} y1={center} x2={center + Math.cos(angle) * radius} y2={center + Math.sin(angle) * radius} stroke="#102c3d" strokeOpacity="0.08" />;
         })}
-        <polygon points={points} fill="#159b8f" fillOpacity="0.2" stroke="#159b8f" strokeWidth="3" />
+        <polygon points={points} fill="#7b61ff" fillOpacity="0.16" stroke="#7b61ff" strokeWidth="3" />
       </svg>
       <div className="grid gap-2">
         {rows.map(([label, value]) => (
@@ -2806,11 +2849,12 @@ function RadarChart({ rows }: { rows: Array<[string, number]> }) {
 
 function GaugeChart({ value }: { value: number }) {
   const circumference = 2 * Math.PI * 52;
+  const colour = value >= 80 ? "#159b8f" : value >= 65 ? "#f0b429" : "#df5f73";
   return (
     <div className="grid place-items-center">
       <svg viewBox="0 0 140 140" className="h-44 w-44 -rotate-90">
         <circle cx="70" cy="70" r="52" fill="none" stroke="#ecf6f2" strokeWidth="16" />
-        <circle cx="70" cy="70" r="52" fill="none" stroke="#159b8f" strokeWidth="16" strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={circumference * (1 - value / 100)} />
+        <circle cx="70" cy="70" r="52" fill="none" stroke={colour} strokeWidth="16" strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={circumference * (1 - value / 100)} />
       </svg>
       <div className="-mt-32 mb-12 text-center">
         <p className="text-3xl font-semibold tracking-[-0.03em] text-[#102c3d]">{value}%</p>
@@ -2877,7 +2921,7 @@ function LineManagerReports({ learners, requests }: { learners: Learner[]; reque
         </div>
       </PlatformPanel>
       <div className="grid gap-5 xl:grid-cols-2">
-        <ReportCard eyebrow="Trend" title="Team development trend"><LineChart series={[5, 6, 6, 7, 8, 8, 9, 10, 10, 11, 12, 12]} /></ReportCard>
+        <ReportCard eyebrow="Participation" title="Team participation year on year"><YearOnYearParticipationChart compact /></ReportCard>
         <ReportCard eyebrow="Skills" title="Team skills profile"><RadarChart rows={[["Leadership", 68], ["Technical", 74], ["Data", 56], ["Commercial", 61], ["Digital", 59]]} /></ReportCard>
         <ReportCard eyebrow="Participation" title="Apprenticeship participation"><DonutChart centerLabel="24%" rows={[["On programme", 24, "#159b8f"], ["Not on programme", 76, "#ecf6f2"]]} /></ReportCard>
         <ReportCard eyebrow="Report" title="Team progress report"><ProgressReport learners={teamLearners} /></ReportCard>
@@ -2900,7 +2944,7 @@ function DepartmentHeadReports({ learners, requests, selectedSite }: { learners:
       <WorkforceReadinessReport scope={selectedSite === allSitesLabel ? "Department" : selectedSite} score={readinessScore(learners, requests)} />
       <div className="grid gap-5 xl:grid-cols-2">
         <ReportCard eyebrow="Site view" title="Participation by site"><BarChart rows={[["York", 27], ["Leeds", 18], ["Manchester", 14], ["Bristol", 11]]} /></ReportCard>
-        <ReportCard eyebrow="Trend" title="Workforce readiness trend"><LineChart series={[67, 68, 69, 70, 70, 72, 74, 75, 76, 78, 80, 82]} /></ReportCard>
+        <ReportCard eyebrow="Trend" title="Workforce readiness trend"><LineChart series={[67, 68, 69, 70, 70, 72, 74, 75, 76, 78, 80, 82]} secondary={[61, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73]} labels={["2025 Q1", "2025 Q2", "2025 Q3", "2025 Q4", "2026 Q1", "2026 Q2"]} primaryLabel="Portakabin" secondaryLabel="Benchmark" /></ReportCard>
         <ReportCard eyebrow="Skills" title="Skills gap analysis" className="xl:col-span-2"><Heatmap teams={["Manufacturing", "Hire", "Site Ops", "Digital"]} skills={["Lead", "Tech", "Data", "Digital"]} /></ReportCard>
         <ReportCard eyebrow="Distribution" title="Learner distribution"><DonutChart centerLabel="Portfolio" rows={[["Leadership", 34, "#159b8f"], ["Engineering", 26, "#102c3d"], ["Data", 18, "#df5f73"], ["Customer", 22, "#fff4bd"]]} /></ReportCard>
         <ReportCard eyebrow="Executive view" title="Department workforce report"><ExecutiveBrief rows={[["Participation", "18%", "Up 1 pt"], ["Completion risk", "Low", "2 learners"], ["Priority demand", "Leadership", "Next cohort"], ["Board signal", "Improving", "Green"]]} /></ReportCard>
@@ -2925,7 +2969,7 @@ function ApprenticeshipLeadReports({ learners, requests, mappings }: { learners:
         <ReportCard eyebrow="Funding" title="Levy utilisation"><GaugeChart value={82} /></ReportCard>
         <ReportCard eyebrow="Sites" title="Active learners by site"><BarChart rows={[["York", 16], ["Leeds", 8], ["Manchester", 7], ["Bristol", 5], ["London", 4]]} /></ReportCard>
         <ReportCard eyebrow="Providers" title="Provider performance"><BarChart rows={[["Completion", 86], ["Attendance", 91], ["Satisfaction", 88]]} /></ReportCard>
-        <ReportCard eyebrow="Trend" title="Starts vs completions"><LineChart series={[3, 4, 6, 5, 7, 8, 9, 9, 10, 12, 11, 13]} secondary={[2, 3, 3, 4, 5, 6, 6, 7, 8, 8, 9, 10]} /></ReportCard>
+        <ReportCard eyebrow="Trend" title="Starts vs completions"><LineChart series={[3, 4, 6, 5, 7, 8, 9, 9, 10, 12, 11, 13]} secondary={[2, 3, 3, 4, 5, 6, 6, 7, 8, 8, 9, 10]} labels={["2025 Q1", "2025 Q2", "2025 Q3", "2025 Q4", "2026 Q1", "2026 Q2"]} primaryLabel="Starts" secondaryLabel="Completions" /></ReportCard>
         <ReportCard eyebrow="Portfolio" title="Programme portfolio"><DonutChart centerLabel="42" rows={[["Leadership", 30, "#159b8f"], ["Procurement", 16, "#102c3d"], ["Data", 22, "#df5f73"], ["AI", 12, "#fff4bd"], ["Engineering", 20, "#9bd9d0"]]} /></ReportCard>
         <ReportCard eyebrow="Executive view" title="Workforce readiness report"><ExecutiveBrief rows={[["Organisation", "84", "Green"], ["Department", "78", "Green"], ["Site benchmark", "72", "Amber"], ["Risk focus", "Data", "Next quarter"]]} /></ReportCard>
       </div>
