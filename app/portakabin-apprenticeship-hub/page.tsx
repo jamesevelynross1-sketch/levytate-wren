@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState, type ReactNode } from "react";
+import { FormEvent, useEffect, useMemo, useState, type ReactNode } from "react";
 import { LevyTateLogo, PlatformButton, PlatformMetric, PlatformPanel, PlatformTopBar, type PlatformNavSection } from "@/components/levytate-demo/PlatformShell";
 
 type Role = "Employee" | "Line Manager" | "Department Head" | "Apprenticeship Lead" | "Admin Console";
@@ -137,6 +137,19 @@ type ApplicationDraft = {
   supportRequired: string;
 };
 
+type SnapshotMetric = {
+  label: string;
+  value: string | number;
+  copy: string;
+  trend: string;
+  tooltip: string;
+  actionLabel: string;
+  target: SectionKey;
+  progress: number;
+  series: number[];
+  accent?: string;
+};
+
 type SectionKey =
   | "Dashboard"
   | "Recommended Pathways"
@@ -195,6 +208,8 @@ const roles: Role[] = ["Employee", "Line Manager", "Department Head", "Apprentic
 const requestStages: RequestStatus[] = ["Draft", "Submitted to Line Manager", "Awaiting Manager Review", "Declined by Line Manager", "Approved by Line Manager", "Submitted to Apprenticeship Lead", "Awaiting Final Approval", "Declined by Apprenticeship Lead", "Approved for Enrolment", "Withdrawn", "Completed", "Cancelled"];
 const publicStages: RequestStatus[] = ["Draft", "Submitted to Line Manager", "Awaiting Manager Review", "Approved by Line Manager", "Submitted to Apprenticeship Lead", "Awaiting Final Approval", "Approved for Enrolment"];
 const activeApplicationStatuses: RequestStatus[] = ["Draft", "Submitted to Line Manager", "Awaiting Manager Review", "Approved by Line Manager", "Submitted to Apprenticeship Lead", "Awaiting Final Approval", "Approved for Enrolment"];
+const currentManagerName = "Ryan Booth";
+const sidebarStateKey = "levytate:portakabin:sidebar-collapsed";
 
 const navSectionsByRole: Record<Role, PlatformNavSection[]> = {
   Employee: [
@@ -798,6 +813,17 @@ export default function PortakabinApprenticeshipHub() {
   const [success, setSuccess] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
+  useEffect(() => {
+    const stored = window.localStorage.getItem(sidebarStateKey);
+    if (stored) {
+      setSidebarCollapsed(stored === "true");
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(sidebarStateKey, String(sidebarCollapsed));
+  }, [sidebarCollapsed]);
+
   const filteredRequests = useMemo(() => filterBySite(requests, selectedSite), [requests, selectedSite]);
   const filteredLearners = useMemo(() => filterBySite(portakabinLearners, selectedSite), [selectedSite]);
   const searchedLearners = useMemo(() => {
@@ -943,13 +969,23 @@ export default function PortakabinApprenticeshipHub() {
     <main className="min-h-screen overflow-hidden bg-[linear-gradient(180deg,#f8faf8_0%,#f2f6f4_48%,#f6f8f7_100%)] text-[#102c3d]">
       <Sidebar role={role} activeSection={activeSection} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed((current) => !current)} onNavigate={openSection} />
 
-      <div className={`h-screen min-w-0 overflow-y-auto transition-[margin] duration-300 ease-out ${sidebarCollapsed ? "lg:ml-0" : "lg:ml-[296px]"}`}>
+      <div className={`h-screen min-w-0 overflow-y-auto transition-[margin] duration-300 ease-out ${sidebarCollapsed ? "lg:ml-[92px]" : "lg:ml-[296px]"}`}>
         <TopBar role={role} setRole={switchRole} selectedSite={selectedSite} selectedPersona={selectedPersona} onEmployee={switchEmployee} onSite={setSelectedSite} onOpenAdmin={() => switchRole("Admin Console")} />
 
-        <div className="mx-auto w-full max-w-[1500px] space-y-5 px-5 py-5 sm:px-7 lg:px-8">
+        <div className="mx-auto w-full max-w-[1500px] space-y-4 px-5 py-4 sm:px-7 lg:px-8">
           {activeSection === "Dashboard" ? (
             <>
-              <HeroPanel role={role} selectedSite={selectedSite} selectedPersona={selectedPersona} activeApplication={activeEmployeeApplication} onEmployee={switchEmployee} onNavigate={openSection} />
+              <HeroPanel
+                role={role}
+                selectedSite={selectedSite}
+                selectedPersona={selectedPersona}
+                activeApplication={activeEmployeeApplication}
+                requests={filteredRequests}
+                learners={filteredLearners}
+                mappings={mappings}
+                onEmployee={switchEmployee}
+                onNavigate={openSection}
+              />
               {selectedSite !== allSitesLabel ? <SiteSummary site={selectedSite} learners={filteredLearners} requests={filteredRequests} /> : null}
               <RoleDashboard
                 role={role}
@@ -1026,15 +1062,15 @@ function Sidebar({
   const navSections = navSectionsByRole[role];
 
   return (
-    <aside className={`fixed inset-y-0 left-0 z-40 hidden overflow-visible border-r bg-white/95 py-5 shadow-[8px_0_32px_rgba(16,44,61,0.035)] backdrop-blur-xl transition-[width,padding,border-color,box-shadow] duration-300 ease-out lg:flex lg:flex-col ${collapsed ? "w-0 border-transparent px-0 shadow-none" : "w-[296px] border-[#102c3d]/[0.08] px-4"}`}>
-      <div className={`flex items-center ${collapsed ? "h-0" : "justify-between px-2"}`}>
-        {collapsed ? null : <LevyTateLogo className="[--levytate-logo-size:2.65rem]" />}
+    <aside className={`fixed inset-y-0 left-0 z-40 hidden border-r bg-white/95 py-4 shadow-[10px_0_34px_rgba(16,44,61,0.04)] backdrop-blur-xl transition-[width,padding,border-color,box-shadow] duration-300 ease-out lg:flex lg:flex-col ${collapsed ? "w-[92px] border-[#102c3d]/[0.06] px-3" : "w-[296px] border-[#102c3d]/[0.08] px-4"}`}>
+      <div className={`flex items-center ${collapsed ? "justify-center" : "justify-between px-1.5"}`}>
+        <LevyTateLogo className={collapsed ? "[--levytate-logo-size:1.08rem]" : "[--levytate-logo-size:2.5rem]"} />
         <button
           type="button"
           onClick={onToggle}
           aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}
           title={collapsed ? "Expand navigation" : "Collapse navigation"}
-          className={`grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[#102c3d]/[0.08] bg-white text-[#102c3d]/64 shadow-[0_8px_18px_rgba(16,44,61,0.06)] transition hover:-translate-y-0.5 hover:text-[#102c3d] focus:outline-none focus:ring-4 focus:ring-[#159b8f]/15 ${collapsed ? "absolute left-3 top-6" : ""}`}
+          className={`grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[#102c3d]/[0.08] bg-white text-[#102c3d]/64 shadow-[0_8px_18px_rgba(16,44,61,0.06)] transition hover:-translate-y-0.5 hover:text-[#102c3d] focus:outline-none focus:ring-4 focus:ring-[#159b8f]/15 ${collapsed ? "absolute right-3 top-5" : ""}`}
         >
           <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4">
             <path d={collapsed ? "M7.5 4.5 12.5 10l-5 5.5" : "M12.5 4.5 7.5 10l5 5.5"} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -1043,18 +1079,18 @@ function Sidebar({
       </div>
 
       {collapsed ? null : (
-        <div className="mt-5 rounded-2xl border border-[#102c3d]/[0.06] bg-[#f7faf6] px-4 py-3 text-[#102c3d] transition-all duration-300">
+        <div className="mt-4 rounded-2xl border border-[#102c3d]/[0.06] bg-[#f7faf6] px-4 py-3 text-[#102c3d] transition-all duration-300">
           <p className="text-[10px] font-medium uppercase tracking-[0.15em] text-[#102c3d]/40">Active client</p>
           <p className="mt-1 text-sm font-semibold tracking-tight">Portakabin</p>
           <p className="mt-1 text-xs font-medium text-[#102c3d]/48">{role}</p>
         </div>
       )}
 
-      {collapsed ? null : <nav className="mt-5 min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
+      <nav className={`mt-4 min-h-0 flex-1 overflow-y-auto ${collapsed ? "space-y-3 px-0.5" : "space-y-4 pr-1"}`}>
         {navSections.map((section) => (
           <div key={section.title}>
-            <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#102c3d]/32">{section.title}</p>
-            <div className="mt-2 grid gap-0.5">
+            {collapsed ? null : <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#102c3d]/32">{section.title}</p>}
+            <div className={`grid ${collapsed ? "gap-1.5" : "mt-2 gap-0.5"}`}>
               {section.items.map((item) => {
                 const sectionKey = item as SectionKey;
                 const active = activeSection === sectionKey;
@@ -1064,19 +1100,76 @@ function Sidebar({
                     onClick={() => onNavigate(sectionKey)}
                     title={item}
                     aria-label={item}
-                    className={`flex w-full items-center rounded-xl px-3.5 py-2.5 text-left text-sm font-medium transition duration-200 ${
+                    className={`group relative flex w-full items-center rounded-xl text-left text-sm font-medium transition duration-200 ${
+                      collapsed ? "justify-center px-0 py-2.5" : "gap-3 px-3.5 py-2.5"
+                    } ${
                       active ? "bg-[#edf6f2] text-[#102c3d] shadow-[inset_3px_0_0_#159b8f]" : "text-[#102c3d]/56 hover:bg-[#f7faf6] hover:text-[#102c3d]"
                     }`}
                   >
-                    <span className="truncate">{item}</span>
+                    <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl transition ${active ? "bg-white text-[#159b8f] shadow-[0_6px_14px_rgba(16,44,61,0.06)]" : "bg-[#f8fbfa] text-[#102c3d]/46 group-hover:bg-white"}`}>
+                      <NavigationItemIcon section={sectionKey} />
+                    </span>
+                    {collapsed ? (
+                      <span className="pointer-events-none absolute left-[calc(100%+12px)] top-1/2 hidden -translate-y-1/2 whitespace-nowrap rounded-full border border-[#102c3d]/[0.06] bg-[#102c3d] px-3 py-1.5 text-xs font-semibold text-white shadow-[0_12px_24px_rgba(16,44,61,0.16)] group-hover:block">
+                        {item}
+                      </span>
+                    ) : (
+                      <span className="truncate">{item}</span>
+                    )}
                   </button>
                 );
               })}
             </div>
           </div>
         ))}
-      </nav>}
+      </nav>
+
+      {collapsed ? null : (
+        <div className="mt-4 rounded-2xl border border-[#102c3d]/[0.05] bg-[#f8fbfa] px-4 py-3">
+          <p className="text-xs font-semibold text-[#102c3d]">Powered by LevyTate</p>
+          <p className="mt-1 text-xs leading-5 text-[#102c3d]/52">Apprenticeship operating system for workforce readiness.</p>
+        </div>
+      )}
     </aside>
+  );
+}
+
+function NavigationItemIcon({ section }: { section: SectionKey }) {
+  const kind =
+    section === "Dashboard" ? "dashboard" :
+    section === "Ask LevyTate AI" || section === "AI Assistant" ? "assistant" :
+    ["Recommended Pathways", "Explore Pathways", "Recommended Programmes", "Career Pathfinder", "Development Passport", "Skills Analysis"].includes(section) ? "pathways" :
+    ["My Applications", "Applications to Review", "Applications for Final Approval", "Approved for Enrolment", "Requests", "Approvals", "Enrolments"].includes(section) ? "workflow" :
+    ["My Team", "Team Skills", "Team Development", "Succession Planning"].includes(section) ? "team" :
+    ["Department Analytics", "Site Breakdown", "Apprenticeship Participation", "Department Overview", "Skills Map", "Department Demand", "Future Demand", "Future Skills", "Levy Utilisation", "Levy Position", "Forecast", "Reporting", "Site Adoption", "Platform Analytics", "Learners by Site", "Organisation Overview", "Site Performance"].includes(section) ? "analytics" :
+    ["Providers", "Approved Providers", "Performance", "Provider Management"].includes(section) ? "providers" :
+    ["Programmes", "Programme Catalogue"].includes(section) ? "programmes" :
+    ["Compliance", "Permission Management", "Role Management", "Employer Configuration", "Site Configuration", "Audit Logs", "System Settings", "User Management", "Admin"].includes(section) ? "settings" :
+    "default";
+
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" className="h-[18px] w-[18px]">
+      {kind === "dashboard" ? <path d="M3.5 4.5h5v5h-5zm8 0h5v3.5h-5zm0 5.5h5v5.5h-5zm-8 1.5h5v4h-5z" fill="currentColor" /> : null}
+      {kind === "assistant" ? <path d="M10 2.8 11.9 7l4.5.5-3.4 3 1 4.4-4-2.3-4 2.3 1-4.4-3.4-3L8.1 7 10 2.8Z" fill="currentColor" /> : null}
+      {kind === "pathways" ? <path d="M4.2 4.5h4.8v3.1H4.2zm6.8 0h4.8v3.1H11zm-6.8 7.7h4.8v3.3H4.2zm8.9-6 2.7 1.7-2.7 1.7v1.8l4.7-3.5-4.7-3.4zM9 13.9h2.4v-1.8H9z" fill="currentColor" /> : null}
+      {kind === "workflow" ? (
+        <>
+          <path d="M5 4.2h7l3 3v8.6H5z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+          <path d="M8 8.1h4.5M8 11h4.5M8 13.9h3.2" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        </>
+      ) : null}
+      {kind === "team" ? <path d="M6.2 9.2a2.1 2.1 0 1 0 0-4.2 2.1 2.1 0 0 0 0 4.2Zm7.6 0a2.1 2.1 0 1 0 0-4.2 2.1 2.1 0 0 0 0 4.2ZM3.8 15.2c.7-2 2.1-3 4.2-3s3.5 1 4.2 3m.6 0c.5-1.4 1.7-2.2 3.4-2.2" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /> : null}
+      {kind === "analytics" ? (
+        <>
+          <path d="M4 14.5V10m4 4.5V6.8m4 7.7V8.8m4 5.7V4.8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          <path d="M3.5 15.8h13" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+        </>
+      ) : null}
+      {kind === "providers" ? <path d="M4.5 15.5V6.7L10 3.5l5.5 3.2v8.8M7 8.5h.1m2.9 0h.1m2.9 0h.1M7 11.3h.1m2.9 0h.1m2.9 0h.1" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /> : null}
+      {kind === "programmes" ? <path d="M4 5.3h12v3.4H4zm0 5.1h12v4.3H4z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" /> : null}
+      {kind === "settings" ? <path d="M10 3.8 11.3 5l1.9-.2.7 1.7 1.8.8-.2 1.9 1.2 1.3-1.2 1.3.2 1.9-1.8.8-.7 1.7-1.9-.2-1.3 1.2-1.3-1.2-1.9.2-.7-1.7-1.8-.8.2-1.9L3.3 10l1.2-1.3-.2-1.9 1.8-.8.7-1.7 1.9.2L10 3.8Zm0 3.4a2.8 2.8 0 1 0 0 5.6 2.8 2.8 0 0 0 0-5.6Z" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" /> : null}
+      {kind === "default" ? <path d="M5 5.2h10v2H5zm0 3.8h10v2H5zm0 3.8h10v2H5z" fill="currentColor" /> : null}
+    </svg>
   );
 }
 
@@ -1099,45 +1192,59 @@ function TopBar({
 }) {
   return (
     <PlatformTopBar tenantName="Portakabin" tenantSubtitle="Internal apprenticeship and capability hub" controlsOnly>
-      <div className="flex w-full min-w-0 flex-wrap items-center gap-3 xl:flex-nowrap">
-        <div className="flex h-10 min-w-[220px] flex-1 items-center rounded-full border border-[#102c3d]/[0.08] bg-[#f8fbfa] px-4 text-sm text-[#102c3d]/44 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">Search pathways, requests or teams</div>
-        <label className="flex h-10 min-w-[220px] flex-1 items-center gap-2 rounded-full border border-[#102c3d]/[0.08] bg-[#f8fbfa] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] transition focus-within:border-[#159b8f] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#159b8f]/10 xl:max-w-[280px]">
-          <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/38">Site</span>
-          <select
-            value={selectedSite}
-            onChange={(event) => onSite(event.target.value)}
-            className="h-full min-w-0 flex-1 bg-transparent text-sm font-medium text-[#102c3d]/74 outline-none"
-            aria-label="Site"
-          >
-            <option>{allSitesLabel}</option>
-            {portakabinSites.map((site) => (
-              <option key={site}>{site}</option>
-            ))}
-          </select>
-        </label>
-        {role === "Employee" ? (
-          <label className="flex h-10 min-w-[220px] flex-1 items-center gap-2 rounded-full border border-[#102c3d]/[0.08] bg-[#f8fbfa] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] transition focus-within:border-[#159b8f] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#159b8f]/10 xl:max-w-[280px]">
-            <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/38">Demo Employee</span>
+      <div className="grid w-full min-w-0 gap-3 xl:grid-cols-[minmax(280px,1fr)_auto] xl:items-center">
+        <div className="flex min-w-0 items-center gap-3">
+          <label className="flex h-11 min-w-0 flex-1 items-center gap-3 rounded-full border border-[#102c3d]/[0.08] bg-[#f8fbfa] px-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] transition focus-within:border-[#159b8f] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#159b8f]/10">
+            <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4 shrink-0 text-[#102c3d]/34">
+              <path d="m14.3 14.3 3.2 3.2M8.8 15.2a6.4 6.4 0 1 0 0-12.8 6.4 6.4 0 0 0 0 12.8Z" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+            </svg>
+            <input
+              readOnly
+              value="Search pathways, requests or teams"
+              aria-label="Search"
+              className="min-w-0 flex-1 bg-transparent text-sm font-medium text-[#102c3d]/58 outline-none"
+            />
+          </label>
+        </div>
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-3">
+          <label className="flex h-11 min-w-[210px] items-center gap-2 rounded-full border border-[#102c3d]/[0.08] bg-[#f8fbfa] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] transition focus-within:border-[#159b8f] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#159b8f]/10 xl:max-w-[250px]">
+            <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/38">Site</span>
             <select
-              value={selectedPersona.name}
-              onChange={(event) => onEmployee(event.target.value)}
-              className="h-full min-w-0 flex-1 bg-transparent text-sm font-medium text-[#102c3d]/74 outline-none"
-              aria-label="Demo Employee"
+              value={selectedSite}
+              onChange={(event) => onSite(event.target.value)}
+              className="h-full min-w-0 flex-1 bg-transparent text-sm font-semibold text-[#102c3d]/78 outline-none"
+              aria-label="Site"
             >
-              {employeePersonas.map((persona) => (
-                <option key={persona.name}>{persona.name}</option>
+              <option>{allSitesLabel}</option>
+              {portakabinSites.map((site) => (
+                <option key={site}>{site}</option>
               ))}
             </select>
           </label>
-        ) : null}
-        <div className="flex min-h-10 shrink-0 flex-wrap items-center rounded-[1.25rem] border border-[#102c3d]/[0.06] bg-[#edf5f1] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] 2xl:h-10 2xl:flex-nowrap 2xl:rounded-full">
-          {roles.map((item) => (
-            <button key={item} onClick={() => setRole(item)} className={`h-8 rounded-full px-3 text-xs font-semibold transition duration-200 ${role === item ? "bg-white text-[#102c3d] shadow-[0_6px_16px_rgba(16,44,61,0.08)]" : "text-[#102c3d]/52 hover:text-[#102c3d]"}`}>
-              {item}
-            </button>
-          ))}
+          {role === "Employee" ? (
+            <label className="flex h-11 min-w-[230px] items-center gap-2 rounded-full border border-[#102c3d]/[0.08] bg-[#f8fbfa] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] transition focus-within:border-[#159b8f] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#159b8f]/10 xl:max-w-[270px]">
+              <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/38">Demo employee</span>
+              <select
+                value={selectedPersona.name}
+                onChange={(event) => onEmployee(event.target.value)}
+                className="h-full min-w-0 flex-1 bg-transparent text-sm font-semibold text-[#102c3d]/78 outline-none"
+                aria-label="Demo Employee"
+              >
+                {employeePersonas.map((persona) => (
+                  <option key={persona.name}>{persona.name}</option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          <div className="flex min-h-11 shrink-0 flex-wrap items-center rounded-full border border-[#102c3d]/[0.06] bg-[#edf5f1] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.84)]">
+            {roles.map((item) => (
+              <button key={item} onClick={() => setRole(item)} className={`h-9 rounded-full px-3.5 text-xs font-semibold transition duration-200 ${role === item ? "bg-white text-[#102c3d] shadow-[0_8px_16px_rgba(16,44,61,0.08)]" : "text-[#102c3d]/54 hover:text-[#102c3d]"}`}>
+                {item}
+              </button>
+            ))}
+          </div>
+          <PlatformButton onClick={onOpenAdmin} className="h-11 whitespace-nowrap px-5">Admin console</PlatformButton>
         </div>
-        <PlatformButton onClick={onOpenAdmin} className="h-10 whitespace-nowrap">Admin console</PlatformButton>
       </div>
     </PlatformTopBar>
   );
@@ -1148,6 +1255,9 @@ function HeroPanel({
   selectedSite,
   selectedPersona,
   activeApplication,
+  requests,
+  learners,
+  mappings,
   onEmployee,
   onNavigate,
 }: {
@@ -1155,18 +1265,30 @@ function HeroPanel({
   selectedSite: string;
   selectedPersona: EmployeePersona;
   activeApplication?: RequestItem;
+  requests: RequestItem[];
+  learners: Learner[];
+  mappings: ProviderMapping[];
   onEmployee: (name: string) => void;
   onNavigate: (section: SectionKey) => void;
 }) {
   const primaryAction = primaryDashboardAction(role);
-  const metricCards = operatingSnapshotMetrics(role, selectedPersona, activeApplication);
+  const metricCards = operatingSnapshotMetrics({
+    role,
+    selectedPersona,
+    activeApplication,
+    requests,
+    learners,
+    mappings,
+  });
 
   return (
-    <section className="rounded-[1.1rem] border border-[#102c3d]/[0.065] bg-white/96 p-4 shadow-[0_12px_30px_rgba(16,44,61,0.045)]">
-      <div className="grid gap-4 xl:grid-cols-[minmax(260px,0.62fr)_minmax(0,1.38fr)] xl:items-start">
+    <section className="rounded-[1.1rem] border border-[#102c3d]/[0.06] bg-white/96 p-4 shadow-[0_14px_30px_rgba(16,44,61,0.045)]">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px] xl:items-start">
         <div className="min-w-0">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <p className="w-fit rounded-full bg-[#fff4bd] px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#7b6100]">Standalone employer environment</p>
+            <p className="w-fit rounded-full bg-[#fff4bd] px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#7b6100]">
+              {role === "Employee" ? "Guided employee workspace" : "Standalone employer environment"}
+            </p>
             {role === "Employee" ? (
               <label className="grid w-full max-w-[240px] gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/40">
                 Demo Employee
@@ -1178,34 +1300,109 @@ function HeroPanel({
               </label>
             ) : null}
           </div>
-          <h1 className="mt-3 max-w-3xl text-2xl font-semibold leading-tight tracking-[-0.02em] text-[#102c3d] md:text-3xl">{role === "Employee" ? `Welcome ${selectedPersona.name}` : "Portakabin Apprenticeship Hub"}</h1>
-          <p className="mt-2 text-sm font-semibold text-[#102c3d]/72">{role === "Employee" ? selectedPersona.role : "Internal apprenticeship and capability hub"}</p>
-          <p className="mt-2 max-w-2xl text-sm leading-5 text-[#102c3d]/60">{role === "Employee" ? `${selectedPersona.department} at ${selectedPersona.site}. Career goal: ${selectedPersona.careerGoal}.` : "A focused LevyTate workspace for approved pathways, demand and apprenticeship operations."}</p>
-          <p className="mt-2 text-xs font-medium text-[#102c3d]/48">View: {selectedSite}</p>
-        </div>
-
-        <div className="min-w-0">
-          <div className="flex items-center justify-between gap-4">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#c95568]">Operating snapshot</p>
-            <p className="text-xs font-medium text-[#102c3d]/44">{role}</p>
+          <h1 className="mt-3 max-w-3xl text-[2rem] font-semibold leading-[1.02] tracking-[-0.03em] text-[#102c3d]">
+            {role === "Employee" ? `Welcome ${selectedPersona.name}` : "Portakabin Apprenticeship Hub"}
+          </h1>
+          <p className="mt-2 text-sm font-semibold text-[#102c3d]/72">{role === "Employee" ? selectedPersona.role : "Internal apprenticeship and workforce readiness environment"}</p>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-[#102c3d]/58">
+            {role === "Employee"
+              ? `Start with Ask LevyTate AI to explore the right pathway for ${selectedPersona.careerGoal}, then track one clear application journey from manager review to enrolment.`
+              : "A focused LevyTate workspace for approved pathways, approval control, provider planning and executive workforce insight."}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <span className="rounded-full bg-[#f8fbfa] px-3 py-1.5 text-[11px] font-semibold text-[#102c3d]/58 ring-1 ring-[#102c3d]/[0.05]">View: {selectedSite}</span>
+            {role === "Employee" ? <span className="rounded-full bg-[#f8fbfa] px-3 py-1.5 text-[11px] font-semibold text-[#102c3d]/58 ring-1 ring-[#102c3d]/[0.05]">{selectedPersona.department}</span> : null}
+            {role === "Employee" ? <span className="rounded-full bg-[#f8fbfa] px-3 py-1.5 text-[11px] font-semibold text-[#102c3d]/58 ring-1 ring-[#102c3d]/[0.05]">Goal: {selectedPersona.careerGoal}</span> : null}
           </div>
-          <div className="mt-3 grid gap-2.5 md:grid-cols-2 2xl:grid-cols-4">
-            {metricCards.map((metric) => (
-              <DashboardSnapshotCard key={metric.label} metric={metric} onNavigate={onNavigate} />
-            ))}
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <PlatformButton onClick={() => onNavigate(primaryAction.target)}>{primaryAction.label}</PlatformButton>
+            {role === "Employee" ? <PlatformButton variant="soft" onClick={() => onNavigate("Recommended Pathways")}>View pathways</PlatformButton> : null}
           </div>
         </div>
+        <RolePurposeCard role={role} selectedPersona={selectedPersona} activeApplication={activeApplication} onNavigate={onNavigate} />
       </div>
-
-      <div className="mt-4 border-t border-[#102c3d]/[0.055] pt-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <PlatformButton onClick={() => onNavigate(primaryAction.target)}>
-            {primaryAction.label}
-          </PlatformButton>
-          <span className="rounded-full bg-[#f8fbfa] px-3 py-2 text-xs font-semibold text-[#102c3d]/50 ring-1 ring-[#102c3d]/[0.05]">Use the sidebar for detailed workspaces</span>
+      <div className="mt-4 border-t border-[#102c3d]/[0.055] pt-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#c95568]">Operating snapshot</p>
+          <span className="rounded-full bg-[#f8fbfa] px-3 py-1.5 text-[11px] font-semibold text-[#102c3d]/48 ring-1 ring-[#102c3d]/[0.05]">{role}</span>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {metricCards.map((metric) => (
+            <DashboardSnapshotCard key={metric.label} metric={metric} onNavigate={onNavigate} />
+          ))}
         </div>
       </div>
     </section>
+  );
+}
+
+function RolePurposeCard({
+  role,
+  selectedPersona,
+  activeApplication,
+  onNavigate,
+}: {
+  role: Role;
+  selectedPersona: EmployeePersona;
+  activeApplication?: RequestItem;
+  onNavigate: (section: SectionKey) => void;
+}) {
+  const content: Record<Role, { eyebrow: string; title: string; copy: string; cta: string; target: SectionKey }> = {
+    Employee: {
+      eyebrow: "Primary entry point",
+      title: "Ask LevyTate AI",
+      copy: activeApplication
+        ? `Your current application is already in motion. LevyTate AI can still guide your next development step and help you compare future pathways.`
+        : `Tell LevyTate about ${selectedPersona.role}, your goals and the support you need. It will guide you to the most relevant approved pathway.`,
+      cta: activeApplication ? "Open Ask LevyTate AI" : "Start with Ask LevyTate AI",
+      target: "Ask LevyTate AI",
+    },
+    "Line Manager": {
+      eyebrow: "Manager focus",
+      title: "Team development launchpad",
+      copy: "Review direct-report demand, spot capability risk early, and use apprenticeships as part of succession and team planning.",
+      cta: "Open team development",
+      target: "Team Development",
+    },
+    "Department Head": {
+      eyebrow: "Planning focus",
+      title: "Workforce readiness view",
+      copy: "See participation, future pipeline and site adoption without being pulled into day-to-day approval handling.",
+      cta: "Open department analytics",
+      target: "Department Analytics",
+    },
+    "Apprenticeship Lead": {
+      eyebrow: "Command centre",
+      title: "Organisation control",
+      copy: "Manage approvals, levy position, provider coverage and strategic workforce demand from one operating view.",
+      cta: "Open approvals",
+      target: "Applications for Final Approval",
+    },
+    "Admin Console": {
+      eyebrow: "Platform control",
+      title: "Configuration and governance",
+      copy: "Maintain user access, programme configuration and audit visibility across the demo environment.",
+      cta: "Open admin",
+      target: "User Management",
+    },
+  };
+
+  const item = content[role];
+
+  return (
+    <div className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-[#f8fbfa] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#c95568]">{item.eyebrow}</p>
+      <h2 className="mt-1.5 text-lg font-semibold leading-6 tracking-[-0.02em] text-[#102c3d]">{item.title}</h2>
+      <p className="mt-2 text-sm leading-6 text-[#102c3d]/58">{item.copy}</p>
+      <button
+        type="button"
+        onClick={() => onNavigate(item.target)}
+        className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[#0b7d70]"
+      >
+        {item.cta}
+        <span aria-hidden="true">-&gt;</span>
+      </button>
+    </div>
   );
 }
 
@@ -1213,15 +1410,7 @@ function DashboardSnapshotCard({
   metric,
   onNavigate,
 }: {
-  metric: {
-    label: string;
-    value: string | number;
-    copy: string;
-    trend: string;
-    tooltip: string;
-    actionLabel: string;
-    target: SectionKey;
-  };
+  metric: SnapshotMetric;
   onNavigate: (section: SectionKey) => void;
 }) {
   return (
@@ -1229,217 +1418,318 @@ function DashboardSnapshotCard({
       type="button"
       title={metric.tooltip}
       onClick={() => onNavigate(metric.target)}
-      className="group min-w-0 rounded-[0.95rem] border border-[#102c3d]/[0.06] bg-[#f8fbfa] p-3 text-left shadow-[0_7px_18px_rgba(16,44,61,0.035)] transition duration-200 hover:-translate-y-0.5 hover:border-[#159b8f]/20 hover:bg-white hover:shadow-[0_12px_26px_rgba(16,44,61,0.065)] focus:outline-none focus:ring-4 focus:ring-[#159b8f]/12"
+      className="group min-w-0 rounded-[1rem] border border-[#102c3d]/[0.06] bg-[#f8fbfa] p-3.5 text-left shadow-[0_8px_20px_rgba(16,44,61,0.035)] transition duration-200 hover:-translate-y-0.5 hover:border-[#159b8f]/20 hover:bg-white hover:shadow-[0_14px_28px_rgba(16,44,61,0.07)] focus:outline-none focus:ring-4 focus:ring-[#159b8f]/12"
     >
-      <p className="truncate text-[11px] font-medium text-[#102c3d]/48">{metric.label}</p>
-      <p className="mt-1 text-[1.55rem] font-semibold tracking-[-0.025em] text-[#102c3d]">{metric.value}</p>
-      <p className="mt-1.5 line-clamp-2 text-xs leading-5 text-[#102c3d]/58">{metric.copy}</p>
-      <div className="mt-2.5 flex items-center justify-between gap-3">
-        <p className="truncate text-[11px] font-semibold text-[#0b7d70]">{metric.trend}</p>
-        <span className="shrink-0 text-[11px] font-semibold text-[#102c3d]">View</span>
+      <div className="flex items-start justify-between gap-3">
+        <p className="truncate text-[11px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/42">{metric.label}</p>
+        <MetricSparkline series={metric.series} accent={metric.accent} />
+      </div>
+      <p className="mt-2 text-[1.7rem] font-semibold tracking-[-0.03em] text-[#102c3d]">{metric.value}</p>
+      <p className="mt-1.5 min-h-[40px] text-xs leading-5 text-[#102c3d]/58">{metric.copy}</p>
+      <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-white ring-1 ring-[#102c3d]/[0.04]">
+        <div className="h-full rounded-full" style={{ width: `${Math.max(12, metric.progress)}%`, backgroundColor: metric.accent ?? "#159b8f" }} />
+      </div>
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <p className="truncate text-[11px] font-semibold" style={{ color: metric.accent ?? "#0b7d70" }}>{metric.trend}</p>
+        <span className="shrink-0 text-[11px] font-semibold text-[#102c3d]">{metric.actionLabel}</span>
       </div>
     </button>
   );
 }
 
-function operatingSnapshotMetrics(role: Role, selectedPersona: EmployeePersona, activeApplication?: RequestItem): Array<{
-  label: string;
-  value: string | number;
-  copy: string;
-  trend: string;
-  tooltip: string;
-  actionLabel: string;
-  target: SectionKey;
-}> {
-  const snapshots: Record<Role, Array<{ label: string; value: string | number; copy: string; trend: string; tooltip: string; actionLabel: string; target: SectionKey }>> = {
+function MetricSparkline({ series, accent = "#159b8f" }: { series: number[]; accent?: string }) {
+  const points = toChartPoints(series);
+
+  return (
+    <svg viewBox="0 0 320 140" aria-hidden="true" className="h-7 w-20 shrink-0 overflow-visible">
+      <polyline points={points} fill="none" stroke={accent} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function CompactSignalMetric({ label, value, accent }: { label: string; value: string | number; accent: string }) {
+  return (
+    <div className="rounded-[1rem] border border-[#102c3d]/[0.055] bg-[#f8fbfa] p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)]">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/38">{label}</p>
+      <div className="mt-2 flex items-center justify-between gap-3">
+        <p className="text-lg font-semibold tracking-[-0.02em] text-[#102c3d]">{value}</p>
+        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: accent }} />
+      </div>
+    </div>
+  );
+}
+
+function operatingSnapshotMetrics({
+  role,
+  selectedPersona,
+  activeApplication,
+  requests,
+  learners,
+  mappings,
+}: {
+  role: Role;
+  selectedPersona: EmployeePersona;
+  activeApplication?: RequestItem;
+  requests: RequestItem[];
+  learners: Learner[];
+  mappings: ProviderMapping[];
+}): SnapshotMetric[] {
+  const managerRequests = requests.filter((request) => request.manager === currentManagerName && (request.status === "Submitted to Line Manager" || request.status === "Awaiting Manager Review"));
+  const managerLearners = learners.filter((learner) => learner.lineManager === currentManagerName);
+  const liveLearners = learners.filter((learner) => learner.status === "Live learner" || learner.status === "Enrolment");
+  const sitesWithLearners = new Set(learners.map((learner) => learner.site)).size;
+  const leadQueue = requests.filter((request) => request.status === "Submitted to Apprenticeship Lead" || request.status === "Awaiting Final Approval" || request.status === "Approved by Line Manager");
+  const readiness = readinessScore(learners, requests);
+  const employeeProgress = activeApplication ? Math.round(((publicStages.indexOf(activeApplication.status) + 1) / publicStages.length) * 100) : 14;
+  const teamHighPotential = managerLearners.filter((learner) => learner.progress >= 70 || learner.programme === "Leadership & Management").length || 3;
+  const departmentParticipation = `${Math.max(12, Math.min(28, Math.round((liveLearners.length / Math.max(learners.length || 1, 8)) * 100)))}%`;
+  const successionCoverage = `${Math.max(46, Math.min(88, readiness - 6))}%`;
+  const providerCoverage = `${Math.max(68, Math.min(96, Math.round((mappings.filter((mapping) => mapping.status === "Live").length / Math.max(mappings.length, 1)) * 100)))}%`;
+
+  const snapshots: Record<Role, SnapshotMetric[]> = {
     Employee: [
       {
         label: "Recommended pathways",
         value: selectedPersona.recommendedPathways,
-        copy: `Apprenticeships matched to ${selectedPersona.name.split(" ")[0]}'s role and career goals.`,
+        copy: `Approved pathways matched to ${selectedPersona.name.split(" ")[0]}'s role and progression goals.`,
         trend: `${selectedPersona.role} profile`,
         tooltip: `Measures approved pathways matched to ${selectedPersona.name}'s current role, site and career goal. It matters because employees see relevant options without provider confusion.`,
-        actionLabel: "Explore pathways",
+        actionLabel: "Explore",
         target: "Recommended Pathways",
+        progress: Math.min(100, selectedPersona.recommendedPathways * 18),
+        series: [28, 34, 38, 46, 54, 60, 66],
       },
       {
-        label: "Current Application",
+        label: "Current application",
         value: activeApplication ? 1 : 0,
         copy: activeApplication ? activeApplication.pathway : "No active apprenticeship application.",
-        trend: activeApplication ? `${activeApplication.status}. ${activeApplication.manager} reviewing` : "Ready to apply",
-        tooltip: activeApplication ? `Shows ${selectedPersona.name}'s one current apprenticeship application, its status and reviewer.` : `Shows whether ${selectedPersona.name} has a current apprenticeship application.`,
-        actionLabel: "Track progress",
+        trend: activeApplication ? `${activeApplication.manager} reviewing` : "Ready to begin",
+        tooltip: activeApplication ? `Shows ${selectedPersona.name}'s current apprenticeship application, its status and reviewer.` : `Shows whether ${selectedPersona.name} has an active apprenticeship application.`,
+        actionLabel: "Track",
         target: "My Applications",
+        progress: employeeProgress,
+        series: activeApplication ? [18, 34, 46, 58, 72, 84, employeeProgress] : [8, 10, 12, 14, 14, 14, 14],
+        accent: "#0b7d70",
       },
       {
         label: "Saved opportunities",
         value: selectedPersona.savedOpportunities,
-        copy: "Pathways shortlisted for future consideration.",
-        trend: `${selectedPersona.savedOpportunities} shortlisted`,
+        copy: "Shortlisted pathways for future consideration.",
+        trend: `${selectedPersona.savedOpportunities} saved`,
         tooltip: `Measures pathways ${selectedPersona.name} has saved for later review. It matters because development planning can happen before a formal application is submitted.`,
-        actionLabel: "View saved pathways",
+        actionLabel: "Review",
         target: "Recommended Pathways",
+        progress: Math.min(100, selectedPersona.savedOpportunities * 22),
+        series: [10, 18, 18, 26, 32, 44, 52],
+        accent: "#7b61ff",
       },
       {
         label: "Development passport",
         value: selectedPersona.passportActivities,
-        copy: "Completed training activities and qualifications.",
-        trend: `${selectedPersona.passportActivities} activities logged`,
+        copy: "Completed learning evidence and qualifications.",
+        trend: `${selectedPersona.passportActivities} logged`,
         tooltip: `Measures completed learning evidence in ${selectedPersona.name}'s development passport. It matters because prior learning helps shape the right pathway and support plan.`,
-        actionLabel: "View passport",
+        actionLabel: "Open",
         target: "Development Passport",
+        progress: Math.min(100, selectedPersona.passportActivities * 11),
+        series: [22, 28, 36, 44, 52, 62, Math.min(100, selectedPersona.passportActivities * 11)],
+        accent: "#df5f73",
       },
     ],
     "Line Manager": [
       {
         label: "Applications awaiting review",
-        value: 4,
-        copy: "Direct reports requiring manager approval.",
-        trend: "Amelia Hart needs review",
+        value: managerRequests.length,
+        copy: "Direct-report applications waiting for manager review.",
+        trend: managerRequests[0] ? `${managerRequests[0].name} is next` : "Queue is clear",
         tooltip: "Measures applications from direct reports waiting for the line manager decision. It matters because manager approval is the first control point in the workflow.",
-        actionLabel: "Review applications",
+        actionLabel: "Review",
         target: "Applications to Review",
+        progress: Math.min(100, managerRequests.length * 22),
+        series: [2, 3, 4, 4, 5, 4, managerRequests.length],
       },
       {
         label: "Active team learners",
-        value: 12,
-        copy: "Team members currently on programme.",
-        trend: "+3 this quarter",
+        value: managerLearners.length,
+        copy: "Team members currently on programme or in enrolment.",
+        trend: `${managerLearners.filter((learner) => learner.status === "Live learner").length} live now`,
         tooltip: "Measures direct reports already enrolled on apprenticeship programmes. It matters because managers need to plan time, cover and coaching.",
-        actionLabel: "View team learners",
+        actionLabel: "View team",
         target: "My Team",
+        progress: Math.min(100, managerLearners.length * 8),
+        series: [6, 7, 8, 9, 10, 11, managerLearners.length],
+        accent: "#159b8f",
       },
       {
         label: "High potential employees",
-        value: 5,
-        copy: "Employees identified for future progression.",
-        trend: "2 ready for leadership route",
+        value: teamHighPotential,
+        copy: "Team members with leadership or progression potential.",
+        trend: "Succession signal strengthening",
         tooltip: "Measures team members flagged for progression based on role, performance signals and skills readiness. It matters because managers can build a stronger internal pipeline.",
-        actionLabel: "Open team development",
+        actionLabel: "Plan",
         target: "Team Development",
+        progress: Math.min(100, teamHighPotential * 16),
+        series: [3, 3, 4, 4, 5, 5, teamHighPotential],
+        accent: "#7b61ff",
       },
       {
         label: "Team skills gaps",
         value: 3,
-        copy: "Critical capability gaps requiring development.",
-        trend: "Leadership is priority",
+        copy: "Priority capability areas still needing attention.",
+        trend: "Leadership remains first",
         tooltip: "Measures team-level gaps in priority capability areas. It matters because apprenticeship demand should map to real operational need.",
-        actionLabel: "View team skills",
+        actionLabel: "Analyse",
         target: "Team Skills",
+        progress: 58,
+        series: [74, 72, 68, 62, 58, 56, 54],
+        accent: "#f0b429",
       },
     ],
     "Department Head": [
       {
-        label: "Department participation",
-        value: "18%",
-        copy: "Percentage of department currently on programme.",
-        trend: "Up from 17% after manager approvals",
-        tooltip: "Measures the share of department employees enrolled on apprenticeships. It matters because department heads need participation trends, not individual approval actions.",
-        actionLabel: "View department analytics",
+        label: "Workforce readiness",
+        value: readiness,
+        copy: "Composite view of participation, capability and demand alignment.",
+        trend: "Board signal improving",
+        tooltip: "Measures overall department readiness using live learners, active demand and leadership pipeline signals.",
+        actionLabel: "Analyse",
         target: "Department Analytics",
+        progress: readiness,
+        series: [68, 70, 71, 74, 76, 79, readiness],
       },
       {
-        label: "Active learners",
-        value: 27,
-        copy: "Employees currently enrolled.",
-        trend: "+4 this quarter",
-        tooltip: "Measures active learners in the department. It matters because it shows development adoption and operational capacity impact.",
-        actionLabel: "View participation",
-        target: "Apprenticeship Participation",
+        label: "Department participation",
+        value: departmentParticipation,
+        copy: "Share of the selected workforce currently on programme.",
+        trend: "Adoption spreading by site",
+        tooltip: "Measures the share of employees enrolled on apprenticeships. It matters because department heads need participation trends, not approval admin.",
+        actionLabel: "Compare",
+        target: "Site Breakdown",
+        progress: Number.parseInt(departmentParticipation, 10),
+        series: [12, 13, 15, 15, 16, 17, Number.parseInt(departmentParticipation, 10)],
+        accent: "#159b8f",
       },
       {
         label: "Sites with learners",
-        value: 6,
-        copy: "Locations currently using apprenticeships.",
-        trend: "+1 site this month",
-        tooltip: "Measures the number of department locations with active learners. It matters because adoption should be visible across Portakabin sites.",
-        actionLabel: "View site breakdown",
+        value: sitesWithLearners,
+        copy: "Locations actively using apprenticeship pathways.",
+        trend: "York still leading",
+        tooltip: "Measures how many sites currently have apprenticeship activity. It matters because site adoption shows how evenly capability investment is spreading across the business.",
+        actionLabel: "Break down",
         target: "Site Breakdown",
+        progress: Math.min(100, sitesWithLearners * 11),
+        series: [2, 3, 4, 5, 5, 6, sitesWithLearners],
+        accent: "#7b61ff",
       },
       {
-        label: "Future skills risks",
-        value: 4,
-        copy: "Capability areas requiring attention.",
-        trend: "Digital and leadership highest",
-        tooltip: "Measures priority capability risks for the next planning cycle. It matters because department heads use this to plan demand, not approve individual requests.",
-        actionLabel: "View skills demand",
+        label: "Succession coverage",
+        value: successionCoverage,
+        copy: "Priority roles with a visible internal development route.",
+        trend: "Leadership pipeline steady",
+        tooltip: "Measures how much of the priority workforce plan has visible progression coverage. It matters because department heads need confidence in future capability depth.",
+        actionLabel: "Forecast",
         target: "Future Demand",
+        progress: Number.parseInt(successionCoverage, 10),
+        series: [48, 50, 54, 58, 63, 67, Number.parseInt(successionCoverage, 10)],
+        accent: "#df5f73",
       },
     ],
     "Apprenticeship Lead": [
       {
-        label: "Applications awaiting final approval",
-        value: 7,
-        copy: "Line-manager-approved requests ready for final apprenticeship decision.",
-        trend: "Amelia appears here after manager approval",
-        tooltip: "Measures applications that have passed manager review and need apprenticeship lead approval. It matters because this is the final internal decision before enrolment preparation.",
-        actionLabel: "Review approval queue",
+        label: "Final approval queue",
+        value: leadQueue.length,
+        copy: "Applications cleared by managers and ready for final decision.",
+        trend: `${Math.max(0, leadQueue.length - 1)} queued after review`,
+        tooltip: "Measures the final approval queue across the organisation. It matters because the apprenticeship lead controls the final decision before enrolment.",
+        actionLabel: "Open queue",
         target: "Applications for Final Approval",
-      },
-      {
-        label: "Active learners",
-        value: 48,
-        copy: "Employees currently enrolled across Portakabin.",
-        trend: "+12% this month",
-        tooltip: "Measures all active learner records across the selected Portakabin view. It matters because it shows the scale of live apprenticeship adoption.",
-        actionLabel: "View learners",
-        target: "Learners by Site",
-      },
-      {
-        label: "Provider partners",
-        value: 6,
-        copy: "Approved delivery partners mapped to Portakabin programmes.",
-        trend: "3 live, 3 ready",
-        tooltip: "Measures approved delivery partners in provider mappings. It matters because every pathway should have a delivery partner before launch.",
-        actionLabel: "Manage providers",
-        target: "Providers",
+        progress: Math.min(100, leadQueue.length * 16),
+        series: [3, 4, 5, 6, 6, 7, leadQueue.length],
       },
       {
         label: "Levy utilisation",
         value: "82%",
-        copy: "Forecast apprenticeship levy committed to approved activity.",
-        trend: "+9% forecast this quarter",
-        tooltip: "Measures forecast levy commitment across active learners, approved starts and planned cohorts. It matters because levy funding should support priority workforce capability.",
-        actionLabel: "View levy reporting",
+        copy: "Forecast committed against available levy funding.",
+        trend: "Healthy utilisation curve",
+        tooltip: "Measures committed or forecast levy usage. It matters because levy utilisation is one of the strongest executive signals for apprenticeship performance.",
+        actionLabel: "View levy",
         target: "Levy Utilisation",
+        progress: 82,
+        series: [58, 61, 67, 70, 74, 79, 82],
+        accent: "#159b8f",
+      },
+      {
+        label: "Provider coverage",
+        value: providerCoverage,
+        copy: "Live pathway coverage supported by mapped providers.",
+        trend: `${mappings.filter((mapping) => mapping.status === "Live").length} live mappings`,
+        tooltip: "Measures provider mapping strength across current pathways. It matters because provider coverage affects delivery confidence and cohort planning.",
+        actionLabel: "Manage",
+        target: "Providers",
+        progress: Number.parseInt(providerCoverage, 10),
+        series: [62, 66, 68, 72, 78, 82, Number.parseInt(providerCoverage, 10)],
+        accent: "#7b61ff",
+      },
+      {
+        label: "Workforce readiness",
+        value: readiness,
+        copy: "Organisation-level capability signal for executive reporting.",
+        trend: "Strategic view stabilising",
+        tooltip: "Measures organisation readiness across learners, demand and pipeline depth. It matters because the apprenticeship lead needs to show strategic value, not just workflow activity.",
+        actionLabel: "Report",
+        target: "Reporting",
+        progress: readiness,
+        series: [66, 69, 71, 74, 78, 81, readiness],
+        accent: "#df5f73",
       },
     ],
     "Admin Console": [
       {
         label: "Total users",
         value: 824,
-        copy: "User accounts available in the LevyTate platform.",
-        trend: "+38 added this month",
-        tooltip: "Measures all active and invited users in the platform. It matters because admins manage access, roles and adoption.",
-        actionLabel: "Manage users",
+        copy: "Configured users across demo employer environments.",
+        trend: "4 employers active",
+        tooltip: "Measures configured user access across the platform. It matters because admin teams need platform visibility rather than employer workflow detail.",
+        actionLabel: "Open users",
         target: "User Management",
+        progress: 86,
+        series: [620, 668, 702, 728, 760, 791, 824],
       },
       {
         label: "Active employers",
         value: 4,
         copy: "Employer environments currently configured.",
-        trend: "All healthy",
-        tooltip: "Measures configured employer environments in the platform. It matters because admins need tenant-level oversight.",
-        actionLabel: "Open configuration",
+        trend: "Portakabin standard",
+        tooltip: "Measures how many employer environments are currently active in the demo. It matters because LevyTate is designed as a reusable operating system.",
+        actionLabel: "Configure",
         target: "Employer Configuration",
+        progress: 72,
+        series: [1, 2, 2, 3, 3, 4, 4],
+        accent: "#159b8f",
       },
       {
         label: "Programmes available",
         value: 42,
-        copy: "Approved apprenticeship programmes available across environments.",
-        trend: "+6 in catalogue",
-        tooltip: "Measures available programmes in the platform catalogue. It matters because programme availability powers matching, mapping and approvals.",
-        actionLabel: "View catalogue",
+        copy: "Programmes available across configured employers.",
+        trend: "Catalogue healthy",
+        tooltip: "Measures configured programmes and pathways across the platform. It matters because admin teams oversee the shared catalogue and governance.",
+        actionLabel: "Open catalogue",
         target: "Programme Catalogue",
+        progress: 84,
+        series: [28, 30, 32, 35, 38, 40, 42],
+        accent: "#7b61ff",
       },
       {
         label: "Platform health",
         value: "99.8%",
-        copy: "Current platform availability and operational health.",
+        copy: "Demo environment uptime and operational readiness.",
         trend: "No critical alerts",
         tooltip: "Measures uptime and platform service status for the demo environment. It matters because enterprise users expect reliable operations.",
         actionLabel: "Open settings",
         target: "System Settings",
+        progress: 100,
+        series: [97, 97.5, 98, 98.6, 99, 99.4, 99.8],
+        accent: "#159b8f",
       },
     ],
   };
@@ -1449,7 +1739,7 @@ function operatingSnapshotMetrics(role: Role, selectedPersona: EmployeePersona, 
 
 function primaryDashboardAction(role: Role): { label: string; target: SectionKey } {
   const actions: Record<Role, { label: string; target: SectionKey }> = {
-    Employee: { label: "Explore pathways", target: "Recommended Pathways" },
+    Employee: { label: "Start with Ask LevyTate AI", target: "Ask LevyTate AI" },
     "Line Manager": { label: "Review applications", target: "Applications to Review" },
     "Department Head": { label: "View department analytics", target: "Department Analytics" },
     "Apprenticeship Lead": { label: "Review approval queue", target: "Applications for Final Approval" },
@@ -1465,13 +1755,13 @@ function SiteSummary({ site, learners, requests }: { site: string; learners: Lea
   const demand = topEntry(countBy([...learners.map((learner) => ({ programme: learner.programme })), ...requests.map((request) => ({ programme: request.pathway }))], "programme"));
 
   return (
-    <PlatformPanel eyebrow="Site view" title={site}>
+    <PlatformPanel eyebrow="Site view" title={site} className="bg-white/94">
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-        <MetricTile label="Active learners" value={learners.length} />
-        <MetricTile label="Pending applications" value={requests.filter((request) => request.status === "Submitted to Line Manager" || request.status === "Awaiting Manager Review" || request.status === "Approved by Line Manager" || request.status === "Submitted to Apprenticeship Lead" || request.status === "Awaiting Final Approval").length} />
-        <MetricTile label="Programmes in use" value={programmes.size} />
-        <MetricTile label="Completion risk" value={risk} />
-        <MetricTile label="Main pathway demand" value={demand || "No signal"} />
+        <CompactSignalMetric label="Active learners" value={learners.length} accent="#159b8f" />
+        <CompactSignalMetric label="Demand in workflow" value={requests.filter((request) => request.status === "Submitted to Line Manager" || request.status === "Awaiting Manager Review" || request.status === "Approved by Line Manager" || request.status === "Submitted to Apprenticeship Lead" || request.status === "Awaiting Final Approval").length} accent="#df5f73" />
+        <CompactSignalMetric label="Programmes in use" value={programmes.size} accent="#7b61ff" />
+        <CompactSignalMetric label="Completion risk" value={risk} accent="#f0b429" />
+        <CompactSignalMetric label="Main pathway demand" value={demand || "No signal"} accent="#102c3d" />
       </div>
     </PlatformPanel>
   );
@@ -1483,8 +1773,8 @@ function SectionHeader({ activeSection, role, selectedSite }: { activeSection: S
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0">
           <p className="w-fit rounded-full bg-[#fff4bd] px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#7b6100]">{role}</p>
-          <h1 className="mt-2.5 text-2xl font-semibold leading-tight tracking-[-0.02em] text-[#102c3d] md:text-3xl">{activeSection}</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-5 text-[#102c3d]/60">{sectionDescription(activeSection)}</p>
+          <h1 className="mt-2 text-[1.9rem] font-semibold leading-[1.05] tracking-[-0.03em] text-[#102c3d]">{activeSection}</h1>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-[#102c3d]/58">{sectionDescription(activeSection)}</p>
         </div>
         <div className="w-fit rounded-xl border border-[#102c3d]/[0.055] bg-[#f8fbfa] px-3 py-2 text-xs font-semibold text-[#102c3d]/60">
           View: {selectedSite}
@@ -1517,22 +1807,50 @@ function RoleDashboard({
   activeApplication?: RequestItem;
   onNavigate: (section: SectionKey) => void;
 }) {
-  const managerRequests = requests.filter((request) => request.manager === "Ryan Booth" && (request.status === "Submitted to Line Manager" || request.status === "Awaiting Manager Review"));
+  const managerRequests = requests.filter((request) => request.manager === currentManagerName && (request.status === "Submitted to Line Manager" || request.status === "Awaiting Manager Review"));
   const leadRequests = requests.filter((request) => request.status === "Submitted to Apprenticeship Lead" || request.status === "Awaiting Final Approval" || request.status === "Approved by Line Manager");
-  const liveLearners = learners.filter((learner) => learner.status === "Live learner");
+  const featuredPathway = matchedPathwaysForRole(selectedPersona.role)[0];
 
   if (role === "Employee") {
     return (
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <PlatformPanel eyebrow="Application journey" title="Current application">
-          {activeApplication ? <CompactApplicationTimeline request={activeApplication} /> : <p className="text-sm text-[#102c3d]/56">No active application yet.</p>}
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
+        <PlatformPanel eyebrow="Guided discovery" title="Use Ask LevyTate AI to start the journey">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+            <div>
+              <p className="text-sm leading-6 text-[#102c3d]/58">LevyTate guides the employee to one approved route at a time, keeping the application process simple and focused.</p>
+              {featuredPathway ? (
+                <div className="mt-4 rounded-[1rem] border border-[#102c3d]/[0.06] bg-[#f8fbfa] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">Recommended now</p>
+                      <h3 className="mt-1 text-base font-semibold tracking-[-0.015em] text-[#102c3d]">{featuredPathway.standard}</h3>
+                      <p className="mt-1 text-sm text-[#159b8f]">{featuredPathway.title}</p>
+                    </div>
+                    <span className="rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-[#0b6f63] ring-1 ring-[#102c3d]/[0.05]">Best fit</span>
+                  </div>
+                  <p className="mt-3 text-sm leading-6 text-[#102c3d]/58">{featuredPathway.learnerBenefit}</p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <PlatformButton onClick={() => onNavigate("Ask LevyTate AI")}>Open Ask LevyTate AI</PlatformButton>
+                    <PlatformButton variant="soft" onClick={() => onNavigate("Recommended Pathways")}>View pathways</PlatformButton>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+            <div className="grid gap-3">
+              <SubtleRow label="Career goal" value={selectedPersona.careerGoal} />
+              <SubtleRow label="Progression route" value={selectedPersona.progression.join(" -> ")} />
+              <SubtleRow label="Current focus" value="One active application, one clear next step, no provider confusion." />
+            </div>
+          </div>
         </PlatformPanel>
-        <PlatformPanel eyebrow="Next action" title="Development focus">
-          <div className="grid gap-3">
-            <SignalRow label="Recommended pathways" value={selectedPersona.recommendedPathways} />
-            <SignalRow label="Development passport" value={selectedPersona.passportActivities} />
-            <SignalRow label="Saved opportunities" value={selectedPersona.savedOpportunities} />
-            <PlatformButton onClick={() => onNavigate(activeApplication ? "My Applications" : "Recommended Pathways")}>{activeApplication ? "Track progress" : "Explore pathways"}</PlatformButton>
+        <PlatformPanel eyebrow="Development progress" title="Current application and growth signals">
+          <div className="grid gap-4">
+            {activeApplication ? <CompactApplicationTimeline request={activeApplication} /> : <p className="text-sm text-[#102c3d]/56">No active application yet.</p>}
+            <div className="grid gap-3">
+              {selectedPersona.skills.map(([label, value]) => (
+                <SkillBar key={label} label={label} value={value} />
+              ))}
+            </div>
           </div>
         </PlatformPanel>
       </section>
@@ -1541,52 +1859,95 @@ function RoleDashboard({
 
   if (role === "Line Manager") {
     return (
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <PlatformPanel eyebrow="Team view" title="Year-on-year team participation">
-          <YearOnYearParticipationChart />
-        </PlatformPanel>
-        <PlatformPanel eyebrow="Next action" title="Manager queue">
-          <div className="grid gap-3">
-            <SignalRow label="Awaiting review" value={managerRequests.length} />
-            <SignalRow label="Active team learners" value={learners.filter((learner) => learner.lineManager === "Ryan Booth").length} />
-            <SignalRow label="Skills risk" value="Leadership" />
-            <PlatformButton onClick={() => onNavigate("Applications to Review")}>Review applications</PlatformButton>
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.12fr)_minmax(320px,0.88fr)]">
+        <PlatformPanel eyebrow="Team development" title="Participation, skills gaps and succession confidence">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+            <YearOnYearParticipationChart compact />
+            <CompactSkillsHeatmap
+              title="Team skills heatmap"
+              rows={[
+                ["Assembly", [72, 61, 44, 58]],
+                ["Hire", [64, 57, 48, 63]],
+                ["Projects", [69, 54, 56, 60]],
+                ["Support", [58, 62, 73, 71]],
+              ]}
+              columns={["Leadership", "Technical", "Data", "Digital"]}
+            />
           </div>
         </PlatformPanel>
+        <div className="grid gap-4">
+          <PlatformPanel eyebrow="Approval focus" title="Applications needing manager action">
+            <ApprovalQueuePreview requests={managerRequests} emptyCopy="No direct-report applications are awaiting review right now." />
+            <div className="mt-4">
+              <PlatformButton onClick={() => onNavigate("Applications to Review")}>Review applications</PlatformButton>
+            </div>
+          </PlatformPanel>
+          <PlatformPanel eyebrow="Succession planning" title="Next capability priorities">
+            <div className="grid gap-3">
+              <SkillBar label="Leadership succession" value={74} />
+              <SkillBar label="Technical coverage" value={68} />
+              <SkillBar label="Data confidence" value={56} />
+              <SkillBar label="Customer capability" value={63} />
+            </div>
+          </PlatformPanel>
+        </div>
       </section>
     );
   }
 
   if (role === "Department Head") {
     return (
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <PlatformPanel eyebrow="Site participation" title="Learners by priority site">
-          <BarChart rows={[["York", 27], ["Leeds", 18], ["Manchester", 14], ["London", 11]]} />
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.08fr)_minmax(320px,0.92fr)]">
+        <PlatformPanel eyebrow="Department view" title="Participation and site comparison">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
+            <BarChart rows={[["York", 27], ["Leeds", 18], ["Manchester", 14], ["London", 11]]} />
+            <LineChart
+              series={[11, 12, 13, 14, 15, 16, 17, 18]}
+              secondary={[9, 10, 10, 11, 12, 13, 14, 15]}
+              labels={["2025 Q1", "2025 Q2", "2025 Q3", "2025 Q4"]}
+              primaryLabel="Participation"
+              secondaryLabel="Last year"
+            />
+          </div>
         </PlatformPanel>
-        <PlatformPanel eyebrow="Workforce readiness" title="Planning signal">
-          <ReadinessIndex label={selectedSite === allSitesLabel ? "Department" : selectedSite} score={readinessScore(learners, requests)} />
-        </PlatformPanel>
+        <div className="grid gap-4">
+          <PlatformPanel eyebrow="Future pipeline" title="Succession coverage and demand pressure">
+            <div className="grid gap-3">
+              <SkillBar label="Supervisor pipeline" value={78} />
+              <SkillBar label="Digital capability" value={62} />
+              <SkillBar label="Site leadership cover" value={71} />
+              <SkillBar label="Commercial progression" value={66} />
+            </div>
+          </PlatformPanel>
+          <PlatformPanel eyebrow="Workforce readiness" title="Planning signal">
+            <ReadinessIndex label={selectedSite === allSitesLabel ? "Department" : selectedSite} score={readinessScore(learners, requests)} />
+          </PlatformPanel>
+        </div>
       </section>
     );
   }
 
   if (role === "Apprenticeship Lead") {
     return (
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <PlatformPanel eyebrow="Levy and learners" title="Operating view">
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+        <PlatformPanel eyebrow="Command centre" title="Levy position and approval pipeline">
           <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-center">
             <GaugeChart value={82} />
-            <BarChart rows={[["York", 16], ["Leeds", 8], ["Manchester", 7], ["London", 4]]} />
+            <ApprovalPipelineBars requests={requests} />
           </div>
         </PlatformPanel>
-        <PlatformPanel eyebrow="Next action" title="Lead queue">
-          <div className="grid gap-3">
-            <SignalRow label="Final approvals" value={leadRequests.length} />
-            <SignalRow label="Active learners" value={liveLearners.length} />
-            <SignalRow label="Provider mappings" value={mappings.length} />
-            <PlatformButton onClick={() => onNavigate("Applications for Final Approval")}>Review final approvals</PlatformButton>
-          </div>
-        </PlatformPanel>
+        <div className="grid gap-4">
+          <PlatformPanel eyebrow="Provider coverage" title="Mapped delivery readiness">
+            <BarChart rows={mappings.slice(0, 4).map((mapping) => [mapping.roleFamily, mapping.fit])} />
+          </PlatformPanel>
+          <PlatformPanel eyebrow="Priority actions" title="What needs attention next">
+            <ApprovalQueuePreview requests={leadRequests.slice(0, 3)} emptyCopy="No applications are waiting for final approval." />
+            <div className="mt-4 flex flex-wrap gap-2">
+              <PlatformButton onClick={() => onNavigate("Applications for Final Approval")}>Review approvals</PlatformButton>
+              <PlatformButton variant="soft" onClick={() => onNavigate("Providers")}>Manage providers</PlatformButton>
+            </div>
+          </PlatformPanel>
+        </div>
       </section>
     );
   }
@@ -3009,6 +3370,89 @@ function GaugeChart({ value }: { value: number }) {
       <div className="-mt-32 mb-12 text-center">
         <p className="text-3xl font-semibold tracking-[-0.03em] text-[#102c3d]">{value}%</p>
         <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#102c3d]/40">Utilised</p>
+      </div>
+    </div>
+  );
+}
+
+function ApprovalPipelineBars({ requests }: { requests: RequestItem[] }) {
+  const columns: Array<[string, RequestStatus[]]> = [
+    ["Manager review", ["Submitted to Line Manager", "Awaiting Manager Review"]],
+    ["Lead approval", ["Approved by Line Manager", "Submitted to Apprenticeship Lead", "Awaiting Final Approval"]],
+    ["Enrolment ready", ["Approved for Enrolment"]],
+    ["Provider ready", ["Approved for Enrolment"]],
+  ];
+  const counts = columns.map(([label, statuses]) => ({
+    label,
+    value: requests.filter((request) => statuses.includes(request.status)).length,
+  }));
+  const max = Math.max(...counts.map((item) => item.value), 1);
+
+  return (
+    <div className="grid gap-3">
+      {counts.map((item, index) => (
+        <div key={item.label}>
+          <div className="mb-1.5 flex justify-between gap-3 text-xs font-semibold text-[#102c3d]/58">
+            <span>{item.label}</span>
+            <span>{item.value}</span>
+          </div>
+          <div className="h-3 overflow-hidden rounded-full bg-[#eef3f0]">
+            <div className="h-full rounded-full" style={{ width: `${Math.max(10, (item.value / max) * 100)}%`, backgroundColor: chartPalette[index % chartPalette.length] }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ApprovalQueuePreview({ requests, emptyCopy }: { requests: RequestItem[]; emptyCopy: string }) {
+  if (requests.length === 0) {
+    return <p className="rounded-xl bg-[#f8fbfa] p-3.5 text-sm leading-6 text-[#102c3d]/56">{emptyCopy}</p>;
+  }
+
+  return (
+    <div className="grid gap-2.5">
+      {requests.slice(0, 3).map((request) => (
+        <article key={request.id} className="rounded-[1rem] border border-[#102c3d]/[0.055] bg-[#f8fbfa] p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.84)]">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-[#102c3d]">{request.name}</p>
+              <p className="mt-1 text-xs leading-5 text-[#102c3d]/54">{request.pathway}</p>
+            </div>
+            <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold text-[#102c3d]/54 ring-1 ring-[#102c3d]/[0.05]">{request.status}</span>
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function CompactSkillsHeatmap({
+  title,
+  rows,
+  columns,
+}: {
+  title: string;
+  rows: Array<[string, number[]]>;
+  columns: string[];
+}) {
+  return (
+    <div className="rounded-[1rem] border border-[#102c3d]/[0.055] bg-[#f8fbfa] p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)]">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">{title}</p>
+      <div className="mt-3 grid gap-2">
+        <div className="grid grid-cols-[84px_repeat(4,minmax(0,1fr))] gap-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/36">
+          <span>Team</span>
+          {columns.map((column) => <span key={column} className="text-center">{column}</span>)}
+        </div>
+        {rows.map(([team, values]) => (
+          <div key={team} className="grid grid-cols-[84px_repeat(4,minmax(0,1fr))] gap-2">
+            <span className="self-center text-xs font-semibold text-[#102c3d]/62">{team}</span>
+            {values.map((value, index) => {
+              const tone = value >= 70 ? "bg-[#dff3ec] text-[#0b6f63]" : value >= 58 ? "bg-[#fff4bd] text-[#7b6100]" : "bg-[#ffe4e9] text-[#ad344e]";
+              return <span key={`${team}-${columns[index]}`} className={`rounded-lg px-2 py-2 text-center text-[11px] font-semibold ${tone}`}>{value}</span>;
+            })}
+          </div>
+        ))}
       </div>
     </div>
   );
