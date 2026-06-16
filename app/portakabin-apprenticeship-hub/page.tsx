@@ -213,17 +213,16 @@ const sidebarStateKey = "levytate:portakabin:sidebar-collapsed";
 
 const navSectionsByRole: Record<Role, PlatformNavSection[]> = {
   Employee: [
-    { title: "Employee", items: ["Ask LevyTate AI", "Dashboard", "Recommended Pathways", "Career Pathfinder", "Skills Analysis", "My Applications", "Development Passport"] },
+    { title: "Employee", items: ["Ask LevyTate AI", "Dashboard", "My Applications", "Development Passport"] },
   ],
   "Line Manager": [
-    { title: "Manager", items: ["Ask LevyTate AI", "Dashboard", "My Team", "Applications to Review", "Team Skills", "Team Development", "Reporting"] },
+    { title: "Manager", items: ["Dashboard", "Applications to Review", "Team Development", "Ask LevyTate AI"] },
   ],
   "Department Head": [
-    { title: "Department", items: ["Ask LevyTate AI", "Dashboard", "Department Analytics", "Site Breakdown", "Apprenticeship Participation", "Skills Map", "Future Demand", "Reporting"] },
+    { title: "Department", items: ["Dashboard", "Department Analytics", "Reporting", "Ask LevyTate AI"] },
   ],
   "Apprenticeship Lead": [
-    { title: "Applications", items: ["Dashboard", "Applications for Final Approval", "Approved for Enrolment"] },
-    { title: "Operations", items: ["Providers", "Programmes", "Ask LevyTate AI", "Compliance", "Site Adoption", "Reporting"] },
+    { title: "Operations", items: ["Dashboard", "Applications for Final Approval", "Approved for Enrolment", "Providers", "Reporting", "Ask LevyTate AI"] },
   ],
   "Admin Console": [
     { title: "Admin Console", items: ["Dashboard", "User Management", "Role Management", "Permission Management", "Provider Management", "Programme Catalogue"] },
@@ -983,10 +982,8 @@ export default function PortakabinApprenticeshipHub() {
                 requests={filteredRequests}
                 learners={filteredLearners}
                 mappings={mappings}
-                onEmployee={switchEmployee}
                 onNavigate={openSection}
               />
-              {selectedSite !== allSitesLabel ? <SiteSummary site={selectedSite} learners={filteredLearners} requests={filteredRequests} /> : null}
               <RoleDashboard
                 role={role}
                 requests={filteredRequests}
@@ -1258,7 +1255,6 @@ function HeroPanel({
   requests,
   learners,
   mappings,
-  onEmployee,
   onNavigate,
 }: {
   role: Role;
@@ -1268,10 +1264,10 @@ function HeroPanel({
   requests: RequestItem[];
   learners: Learner[];
   mappings: ProviderMapping[];
-  onEmployee: (name: string) => void;
   onNavigate: (section: SectionKey) => void;
 }) {
   const primaryAction = primaryDashboardAction(role);
+  const employeeSecondaryAction = activeApplication ? "My Applications" : "Recommended Pathways";
   const metricCards = operatingSnapshotMetrics({
     role,
     selectedPersona,
@@ -1283,50 +1279,42 @@ function HeroPanel({
 
   return (
     <section className="rounded-[1.1rem] border border-[#102c3d]/[0.06] bg-white/96 p-4 shadow-[0_14px_30px_rgba(16,44,61,0.045)]">
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px] xl:items-start">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px] xl:items-start">
         <div className="min-w-0">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <p className="w-fit rounded-full bg-[#fff4bd] px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#7b6100]">
               {role === "Employee" ? "Guided employee workspace" : "Standalone employer environment"}
             </p>
-            {role === "Employee" ? (
-              <label className="grid w-full max-w-[240px] gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/40">
-                Demo Employee
-                <select value={selectedPersona.name} onChange={(event) => onEmployee(event.target.value)} className="h-10 rounded-full border border-[#102c3d]/[0.08] bg-[#f8fbfa] px-4 text-sm font-semibold normal-case tracking-normal text-[#102c3d] outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10">
-                  {employeePersonas.map((persona) => (
-                    <option key={persona.name}>{persona.name}</option>
-                  ))}
-                </select>
-              </label>
-            ) : null}
           </div>
           <h1 className="mt-3 max-w-3xl text-[2rem] font-semibold leading-[1.02] tracking-[-0.03em] text-[#102c3d]">
-            {role === "Employee" ? `Welcome ${selectedPersona.name}` : "Portakabin Apprenticeship Hub"}
+            {role === "Employee" ? "What should you do next?" : "Portakabin Apprenticeship Hub"}
           </h1>
           <p className="mt-2 text-sm font-semibold text-[#102c3d]/72">{role === "Employee" ? selectedPersona.role : "Internal apprenticeship and workforce readiness environment"}</p>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[#102c3d]/58">
             {role === "Employee"
-              ? `Start with Ask LevyTate AI to explore the right pathway for ${selectedPersona.careerGoal}, then track one clear application journey from manager review to enrolment.`
+              ? `${selectedPersona.name} has one clear next step. Start with Ask LevyTate AI to explore the best approved pathway, then track a single application from manager review to enrolment.`
               : "A focused LevyTate workspace for approved pathways, approval control, provider planning and executive workforce insight."}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <span className="rounded-full bg-[#f8fbfa] px-3 py-1.5 text-[11px] font-semibold text-[#102c3d]/58 ring-1 ring-[#102c3d]/[0.05]">View: {selectedSite}</span>
-            {role === "Employee" ? <span className="rounded-full bg-[#f8fbfa] px-3 py-1.5 text-[11px] font-semibold text-[#102c3d]/58 ring-1 ring-[#102c3d]/[0.05]">{selectedPersona.department}</span> : null}
             {role === "Employee" ? <span className="rounded-full bg-[#f8fbfa] px-3 py-1.5 text-[11px] font-semibold text-[#102c3d]/58 ring-1 ring-[#102c3d]/[0.05]">Goal: {selectedPersona.careerGoal}</span> : null}
+            {role === "Employee" && activeApplication ? <span className="rounded-full bg-[#edf8f5] px-3 py-1.5 text-[11px] font-semibold text-[#0b6f63] ring-1 ring-[#159b8f]/15">{activeApplication.status}</span> : null}
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <PlatformButton onClick={() => onNavigate(primaryAction.target)}>{primaryAction.label}</PlatformButton>
-            {role === "Employee" ? <PlatformButton variant="soft" onClick={() => onNavigate("Recommended Pathways")}>View pathways</PlatformButton> : null}
+            {role === "Employee" ? <PlatformButton variant="soft" onClick={() => onNavigate(employeeSecondaryAction)}>{
+              activeApplication ? "Track current application" : "View pathways"
+            }</PlatformButton> : null}
           </div>
         </div>
         <RolePurposeCard role={role} selectedPersona={selectedPersona} activeApplication={activeApplication} onNavigate={onNavigate} />
       </div>
       <div className="mt-4 border-t border-[#102c3d]/[0.055] pt-4">
         <div className="mb-3 flex items-center justify-between gap-3">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#c95568]">Operating snapshot</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#c95568]">Decision snapshot</p>
           <span className="rounded-full bg-[#f8fbfa] px-3 py-1.5 text-[11px] font-semibold text-[#102c3d]/48 ring-1 ring-[#102c3d]/[0.05]">{role}</span>
         </div>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 md:grid-cols-3">
           {metricCards.map((metric) => (
             <DashboardSnapshotCard key={metric.label} metric={metric} onNavigate={onNavigate} />
           ))}
@@ -1349,32 +1337,32 @@ function RolePurposeCard({
 }) {
   const content: Record<Role, { eyebrow: string; title: string; copy: string; cta: string; target: SectionKey }> = {
     Employee: {
-      eyebrow: "Primary entry point",
+      eyebrow: "Start here",
       title: "Ask LevyTate AI",
       copy: activeApplication
-        ? `Your current application is already in motion. LevyTate AI can still guide your next development step and help you compare future pathways.`
+        ? `Your application is already in motion. Use AI to understand what fits next without starting a second request.`
         : `Tell LevyTate about ${selectedPersona.role}, your goals and the support you need. It will guide you to the most relevant approved pathway.`,
       cta: activeApplication ? "Open Ask LevyTate AI" : "Start with Ask LevyTate AI",
       target: "Ask LevyTate AI",
     },
     "Line Manager": {
       eyebrow: "Manager focus",
-      title: "Team development launchpad",
-      copy: "Review direct-report demand, spot capability risk early, and use apprenticeships as part of succession and team planning.",
+      title: "Team development",
+      copy: "See where approvals are blocked and where apprenticeships can close the next capability gap.",
       cta: "Open team development",
       target: "Team Development",
     },
     "Department Head": {
       eyebrow: "Planning focus",
       title: "Workforce readiness view",
-      copy: "See participation, future pipeline and site adoption without being pulled into day-to-day approval handling.",
-      cta: "Open department analytics",
+      copy: "See future capability, site momentum and participation without being pulled into workflow admin.",
+      cta: "Open analytics",
       target: "Department Analytics",
     },
     "Apprenticeship Lead": {
       eyebrow: "Command centre",
-      title: "Organisation control",
-      copy: "Manage approvals, levy position, provider coverage and strategic workforce demand from one operating view.",
+      title: "Investment control",
+      copy: "See where to invest next across approvals, levy position and provider coverage.",
       cta: "Open approvals",
       target: "Applications for Final Approval",
     },
@@ -1425,7 +1413,7 @@ function DashboardSnapshotCard({
         <MetricSparkline series={metric.series} accent={metric.accent} />
       </div>
       <p className="mt-2 text-[1.7rem] font-semibold tracking-[-0.03em] text-[#102c3d]">{metric.value}</p>
-      <p className="mt-1.5 min-h-[40px] text-xs leading-5 text-[#102c3d]/58">{metric.copy}</p>
+      <p className="mt-1.5 min-h-[34px] text-xs leading-5 text-[#102c3d]/58">{metric.copy}</p>
       <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-white ring-1 ring-[#102c3d]/[0.04]">
         <div className="h-full rounded-full" style={{ width: `${Math.max(12, metric.progress)}%`, backgroundColor: metric.accent ?? "#159b8f" }} />
       </div>
@@ -1483,177 +1471,140 @@ function operatingSnapshotMetrics({
   const employeeProgress = activeApplication ? Math.round(((publicStages.indexOf(activeApplication.status) + 1) / publicStages.length) * 100) : 14;
   const teamHighPotential = managerLearners.filter((learner) => learner.progress >= 70 || learner.programme === "Leadership & Management").length || 3;
   const departmentParticipation = `${Math.max(12, Math.min(28, Math.round((liveLearners.length / Math.max(learners.length || 1, 8)) * 100)))}%`;
-  const successionCoverage = `${Math.max(46, Math.min(88, readiness - 6))}%`;
   const providerCoverage = `${Math.max(68, Math.min(96, Math.round((mappings.filter((mapping) => mapping.status === "Live").length / Math.max(mappings.length, 1)) * 100)))}%`;
 
   const snapshots: Record<Role, SnapshotMetric[]> = {
     Employee: [
       {
-        label: "Recommended pathways",
-        value: selectedPersona.recommendedPathways,
-        copy: `Approved pathways matched to ${selectedPersona.name.split(" ")[0]}'s role and progression goals.`,
-        trend: `${selectedPersona.role} profile`,
-        tooltip: `Measures approved pathways matched to ${selectedPersona.name}'s current role, site and career goal. It matters because employees see relevant options without provider confusion.`,
-        actionLabel: "Explore",
-        target: "Recommended Pathways",
-        progress: Math.min(100, selectedPersona.recommendedPathways * 18),
-        series: [28, 34, 38, 46, 54, 60, 66],
-      },
-      {
         label: "Current application",
         value: activeApplication ? 1 : 0,
-        copy: activeApplication ? activeApplication.pathway : "No active apprenticeship application.",
-        trend: activeApplication ? `${activeApplication.manager} reviewing` : "Ready to begin",
-        tooltip: activeApplication ? `Shows ${selectedPersona.name}'s current apprenticeship application, its status and reviewer.` : `Shows whether ${selectedPersona.name} has an active apprenticeship application.`,
-        actionLabel: "Track",
-        target: "My Applications",
-        progress: employeeProgress,
-        series: activeApplication ? [18, 34, 46, 58, 72, 84, employeeProgress] : [8, 10, 12, 14, 14, 14, 14],
-        accent: "#0b7d70",
+        copy: activeApplication ? "Your active application awaiting manager review." : "No active apprenticeship application yet.",
+        trend: activeApplication ? activeApplication.pathway : "Ready to start",
+        tooltip: activeApplication ? `Shows ${selectedPersona.name}'s active application and who is reviewing it.` : `Shows whether ${selectedPersona.name} already has an active apprenticeship application.`,
+        actionLabel: activeApplication ? "Track" : "Start",
+        target: activeApplication ? "My Applications" : "Ask LevyTate AI",
+        progress: activeApplication ? employeeProgress : 14,
+        series: activeApplication ? [18, 26, 34, 42, 48, 56, 52] : [8, 10, 12, 14, 14, 14, 14],
+        accent: "#159b8f",
       },
       {
-        label: "Saved opportunities",
-        value: selectedPersona.savedOpportunities,
-        copy: "Shortlisted pathways for future consideration.",
-        trend: `${selectedPersona.savedOpportunities} saved`,
-        tooltip: `Measures pathways ${selectedPersona.name} has saved for later review. It matters because development planning can happen before a formal application is submitted.`,
-        actionLabel: "Review",
+        label: "Recommended pathways",
+        value: selectedPersona.recommendedPathways,
+        copy: "Approved pathways matched to your role and progression goal.",
+        trend: selectedPersona.careerGoal,
+        tooltip: `Shows approved pathways matched to ${selectedPersona.name}'s role, site and stated progression goal.`,
+        actionLabel: "Explore",
         target: "Recommended Pathways",
-        progress: Math.min(100, selectedPersona.savedOpportunities * 22),
-        series: [10, 18, 18, 26, 32, 44, 52],
-        accent: "#7b61ff",
+        progress: Math.min(100, selectedPersona.recommendedPathways * 30),
+        series: [20, 24, 30, 36, 42, 48, 54],
       },
       {
         label: "Development passport",
         value: selectedPersona.passportActivities,
-        copy: "Completed learning evidence and qualifications.",
-        trend: `${selectedPersona.passportActivities} logged`,
-        tooltip: `Measures completed learning evidence in ${selectedPersona.name}'s development passport. It matters because prior learning helps shape the right pathway and support plan.`,
+        copy: "Learning evidence and internal development already logged.",
+        trend: `${selectedPersona.savedOpportunities} saved for later`,
+        tooltip: `Shows learning evidence already captured in ${selectedPersona.name}'s development passport. It matters because this supports progression and application decisions.`,
         actionLabel: "Open",
         target: "Development Passport",
         progress: Math.min(100, selectedPersona.passportActivities * 11),
-        series: [22, 28, 36, 44, 52, 62, Math.min(100, selectedPersona.passportActivities * 11)],
+        series: [14, 18, 22, 27, 31, 38, 45],
         accent: "#df5f73",
       },
     ],
     "Line Manager": [
       {
-        label: "Applications awaiting review",
+        label: "Awaiting review",
         value: managerRequests.length,
-        copy: "Direct-report applications waiting for manager review.",
-        trend: managerRequests[0] ? `${managerRequests[0].name} is next` : "Queue is clear",
-        tooltip: "Measures applications from direct reports waiting for the line manager decision. It matters because manager approval is the first control point in the workflow.",
+        copy: "Direct-report applications waiting for a manager decision.",
+        trend: managerRequests.length ? `${managerRequests.length} ready now` : "Queue clear",
+        tooltip: "Shows the number of direct-report applications waiting for manager review.",
         actionLabel: "Review",
         target: "Applications to Review",
-        progress: Math.min(100, managerRequests.length * 22),
-        series: [2, 3, 4, 4, 5, 4, managerRequests.length],
+        progress: Math.min(100, managerRequests.length * 18),
+        series: [2, 2, 3, 3, 4, 4, Math.max(1, managerRequests.length)],
       },
       {
-        label: "Active team learners",
-        value: managerLearners.length,
-        copy: "Team members currently on programme or in enrolment.",
-        trend: `${managerLearners.filter((learner) => learner.status === "Live learner").length} live now`,
-        tooltip: "Measures direct reports already enrolled on apprenticeship programmes. It matters because managers need to plan time, cover and coaching.",
-        actionLabel: "View team",
-        target: "My Team",
-        progress: Math.min(100, managerLearners.length * 8),
-        series: [6, 7, 8, 9, 10, 11, managerLearners.length],
-        accent: "#159b8f",
-      },
-      {
-        label: "High potential employees",
-        value: teamHighPotential,
-        copy: "Team members with leadership or progression potential.",
-        trend: "Succession signal strengthening",
-        tooltip: "Measures team members flagged for progression based on role, performance signals and skills readiness. It matters because managers can build a stronger internal pipeline.",
-        actionLabel: "Plan",
+        label: "Team readiness",
+        value: `${Math.max(58, readiness - 8)}%`,
+        copy: "Current capability coverage across the manager's team.",
+        trend: `${teamHighPotential} high potential`,
+        tooltip: "Shows a readiness signal across the manager's team. It matters because managers need to know where development investment will have the most impact.",
+        actionLabel: "Open",
         target: "Team Development",
-        progress: Math.min(100, teamHighPotential * 16),
-        series: [3, 3, 4, 4, 5, 5, teamHighPotential],
+        progress: Math.max(58, readiness - 8),
+        series: [52, 54, 56, 58, 60, 62, Math.max(58, readiness - 8)],
         accent: "#7b61ff",
       },
       {
-        label: "Team skills gaps",
-        value: 3,
-        copy: "Priority capability areas still needing attention.",
-        trend: "Leadership remains first",
-        tooltip: "Measures team-level gaps in priority capability areas. It matters because apprenticeship demand should map to real operational need.",
-        actionLabel: "Analyse",
-        target: "Team Skills",
-        progress: 58,
-        series: [74, 72, 68, 62, 58, 56, 54],
-        accent: "#f0b429",
+        label: "Active team learners",
+        value: managerLearners.filter((learner) => learner.status === "Live learner" || learner.status === "Enrolment").length,
+        copy: "Team members currently building capability through live programmes.",
+        trend: "Use to plan cover",
+        tooltip: "Shows the team members already active on programme. It matters because managers need to plan support and cover alongside approvals.",
+        actionLabel: "View",
+        target: "Team Development",
+        progress: 68,
+        series: [4, 5, 6, 7, 8, 10, 12],
+        accent: "#df5f73",
       },
     ],
     "Department Head": [
       {
         label: "Workforce readiness",
-        value: readiness,
-        copy: "Composite view of participation, capability and demand alignment.",
-        trend: "Board signal improving",
-        tooltip: "Measures overall department readiness using live learners, active demand and leadership pipeline signals.",
-        actionLabel: "Analyse",
+        value: `${readiness}%`,
+        copy: "Overall capability readiness across the visible workforce.",
+        trend: "+4 year on year",
+        tooltip: "Shows the department's workforce readiness by combining participation, live learners, demand and pathway coverage.",
+        actionLabel: "Open",
         target: "Department Analytics",
         progress: readiness,
         series: [68, 70, 71, 74, 76, 79, readiness],
       },
       {
-        label: "Department participation",
+        label: "Participation",
         value: departmentParticipation,
-        copy: "Share of the selected workforce currently on programme.",
-        trend: "Adoption spreading by site",
-        tooltip: "Measures the share of employees enrolled on apprenticeships. It matters because department heads need participation trends, not approval admin.",
-        actionLabel: "Compare",
-        target: "Site Breakdown",
+        copy: "Visible workforce currently using apprenticeship routes.",
+        trend: "Up from last quarter",
+        tooltip: "Shows the share of visible workforce currently engaged in apprenticeship development.",
+        actionLabel: "Report",
+        target: "Reporting",
         progress: Number.parseInt(departmentParticipation, 10),
         series: [12, 13, 15, 15, 16, 17, Number.parseInt(departmentParticipation, 10)],
-        accent: "#159b8f",
-      },
-      {
-        label: "Sites with learners",
-        value: sitesWithLearners,
-        copy: "Locations actively using apprenticeship pathways.",
-        trend: "York still leading",
-        tooltip: "Measures how many sites currently have apprenticeship activity. It matters because site adoption shows how evenly capability investment is spreading across the business.",
-        actionLabel: "Break down",
-        target: "Site Breakdown",
-        progress: Math.min(100, sitesWithLearners * 11),
-        series: [2, 3, 4, 5, 5, 6, sitesWithLearners],
         accent: "#7b61ff",
       },
       {
-        label: "Succession coverage",
-        value: successionCoverage,
-        copy: "Priority roles with a visible internal development route.",
-        trend: "Leadership pipeline steady",
-        tooltip: "Measures how much of the priority workforce plan has visible progression coverage. It matters because department heads need confidence in future capability depth.",
-        actionLabel: "Forecast",
+        label: "Future skills risk",
+        value: 4,
+        copy: "Capability areas that need intervention or stronger succession cover.",
+        trend: `${sitesWithLearners} sites active`,
+        tooltip: "Shows how many future capability areas need action. It matters because department heads need to decide where development investment should go next.",
+        actionLabel: "Plan",
         target: "Future Demand",
-        progress: Number.parseInt(successionCoverage, 10),
-        series: [48, 50, 54, 58, 63, 67, Number.parseInt(successionCoverage, 10)],
+        progress: 62,
+        series: [7, 7, 6, 6, 5, 4, 4],
         accent: "#df5f73",
       },
     ],
     "Apprenticeship Lead": [
       {
-        label: "Final approval queue",
+        label: "Final approvals",
         value: leadQueue.length,
-        copy: "Applications cleared by managers and ready for final decision.",
-        trend: `${Math.max(0, leadQueue.length - 1)} queued after review`,
-        tooltip: "Measures the final approval queue across the organisation. It matters because the apprenticeship lead controls the final decision before enrolment.",
-        actionLabel: "Open queue",
+        copy: "Applications waiting for final apprenticeship lead approval.",
+        trend: leadQueue.length ? `${leadQueue.length} need decision` : "Queue clear",
+        tooltip: "Shows the number of applications that have passed line manager review and now need final approval.",
+        actionLabel: "Review",
         target: "Applications for Final Approval",
         progress: Math.min(100, leadQueue.length * 16),
-        series: [3, 4, 5, 6, 6, 7, leadQueue.length],
+        series: [3, 4, 5, 6, 6, 7, Math.max(1, leadQueue.length)],
       },
       {
         label: "Levy utilisation",
         value: "82%",
-        copy: "Forecast committed against available levy funding.",
-        trend: "Healthy utilisation curve",
-        tooltip: "Measures committed or forecast levy usage. It matters because levy utilisation is one of the strongest executive signals for apprenticeship performance.",
-        actionLabel: "View levy",
-        target: "Levy Utilisation",
+        copy: "Forecast levy use against approved demand and live routes.",
+        trend: "+6 this quarter",
+        tooltip: "Shows forecast levy drawdown against approved demand.",
+        actionLabel: "Report",
+        target: "Reporting",
         progress: 82,
         series: [58, 61, 67, 70, 74, 79, 82],
         accent: "#159b8f",
@@ -1661,62 +1612,39 @@ function operatingSnapshotMetrics({
       {
         label: "Provider coverage",
         value: providerCoverage,
-        copy: "Live pathway coverage supported by mapped providers.",
+        copy: "Approved pathways with live delivery coverage in place.",
         trend: `${mappings.filter((mapping) => mapping.status === "Live").length} live mappings`,
-        tooltip: "Measures provider mapping strength across current pathways. It matters because provider coverage affects delivery confidence and cohort planning.",
+        tooltip: "Shows how much of the approved pathway catalogue is covered by live provider mappings.",
         actionLabel: "Manage",
         target: "Providers",
         progress: Number.parseInt(providerCoverage, 10),
         series: [62, 66, 68, 72, 78, 82, Number.parseInt(providerCoverage, 10)],
         accent: "#7b61ff",
       },
-      {
-        label: "Workforce readiness",
-        value: readiness,
-        copy: "Organisation-level capability signal for executive reporting.",
-        trend: "Strategic view stabilising",
-        tooltip: "Measures organisation readiness across learners, demand and pipeline depth. It matters because the apprenticeship lead needs to show strategic value, not just workflow activity.",
-        actionLabel: "Report",
-        target: "Reporting",
-        progress: readiness,
-        series: [66, 69, 71, 74, 78, 81, readiness],
-        accent: "#df5f73",
-      },
     ],
     "Admin Console": [
       {
-        label: "Total users",
-        value: 824,
-        copy: "Configured users across demo employer environments.",
-        trend: "4 employers active",
-        tooltip: "Measures configured user access across the platform. It matters because admin teams need platform visibility rather than employer workflow detail.",
-        actionLabel: "Open users",
-        target: "User Management",
-        progress: 86,
-        series: [620, 668, 702, 728, 760, 791, 824],
-      },
-      {
         label: "Active employers",
         value: 4,
-        copy: "Employer environments currently configured.",
-        trend: "Portakabin standard",
-        tooltip: "Measures how many employer environments are currently active in the demo. It matters because LevyTate is designed as a reusable operating system.",
-        actionLabel: "Configure",
+        copy: "Employer environments currently configured in the platform.",
+        trend: "Multi-tenant ready",
+        tooltip: "Shows how many employer environments are configured.",
+        actionLabel: "Open",
         target: "Employer Configuration",
-        progress: 72,
-        series: [1, 2, 2, 3, 3, 4, 4],
+        progress: 80,
+        series: [1, 1, 2, 2, 3, 4, 4],
         accent: "#159b8f",
       },
       {
         label: "Programmes available",
         value: 42,
-        copy: "Programmes available across configured employers.",
-        trend: "Catalogue healthy",
-        tooltip: "Measures configured programmes and pathways across the platform. It matters because admin teams oversee the shared catalogue and governance.",
-        actionLabel: "Open catalogue",
+        copy: "Approved programmes currently available across the catalogue.",
+        trend: "6 added this quarter",
+        tooltip: "Shows catalogue breadth across the platform.",
+        actionLabel: "View",
         target: "Programme Catalogue",
         progress: 84,
-        series: [28, 30, 32, 35, 38, 40, 42],
+        series: [28, 30, 33, 36, 38, 40, 42],
         accent: "#7b61ff",
       },
       {
@@ -1724,12 +1652,12 @@ function operatingSnapshotMetrics({
         value: "99.8%",
         copy: "Demo environment uptime and operational readiness.",
         trend: "No critical alerts",
-        tooltip: "Measures uptime and platform service status for the demo environment. It matters because enterprise users expect reliable operations.",
+        tooltip: "Shows platform uptime and service status.",
         actionLabel: "Open settings",
         target: "System Settings",
         progress: 100,
         series: [97, 97.5, 98, 98.6, 99, 99.4, 99.8],
-        accent: "#159b8f",
+        accent: "#df5f73",
       },
     ],
   };
@@ -1747,24 +1675,6 @@ function primaryDashboardAction(role: Role): { label: string; target: SectionKey
   };
 
   return actions[role];
-}
-
-function SiteSummary({ site, learners, requests }: { site: string; learners: Learner[]; requests: RequestItem[] }) {
-  const programmes = new Set(learners.map((learner) => learner.programme));
-  const risk = learners.filter((learner) => learner.progress < 25 && learner.status !== "New interest").length;
-  const demand = topEntry(countBy([...learners.map((learner) => ({ programme: learner.programme })), ...requests.map((request) => ({ programme: request.pathway }))], "programme"));
-
-  return (
-    <PlatformPanel eyebrow="Site view" title={site} className="bg-white/94">
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-        <CompactSignalMetric label="Active learners" value={learners.length} accent="#159b8f" />
-        <CompactSignalMetric label="Demand in workflow" value={requests.filter((request) => request.status === "Submitted to Line Manager" || request.status === "Awaiting Manager Review" || request.status === "Approved by Line Manager" || request.status === "Submitted to Apprenticeship Lead" || request.status === "Awaiting Final Approval").length} accent="#df5f73" />
-        <CompactSignalMetric label="Programmes in use" value={programmes.size} accent="#7b61ff" />
-        <CompactSignalMetric label="Completion risk" value={risk} accent="#f0b429" />
-        <CompactSignalMetric label="Main pathway demand" value={demand || "No signal"} accent="#102c3d" />
-      </div>
-    </PlatformPanel>
-  );
 }
 
 function SectionHeader({ activeSection, role, selectedSite }: { activeSection: SectionKey; role: Role; selectedSite: string }) {
@@ -1810,14 +1720,33 @@ function RoleDashboard({
   const managerRequests = requests.filter((request) => request.manager === currentManagerName && (request.status === "Submitted to Line Manager" || request.status === "Awaiting Manager Review"));
   const leadRequests = requests.filter((request) => request.status === "Submitted to Apprenticeship Lead" || request.status === "Awaiting Final Approval" || request.status === "Approved by Line Manager");
   const featuredPathway = matchedPathwaysForRole(selectedPersona.role)[0];
+  const readiness = readinessScore(learners, requests);
+  const activeTeamLearners = learners.filter((learner) => learner.lineManager === currentManagerName && (learner.status === "Live learner" || learner.status === "Enrolment")).length;
+  const liveMappings = mappings.filter((mapping) => mapping.status === "Live").length;
 
   if (role === "Employee") {
     return (
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
-        <PlatformPanel eyebrow="Guided discovery" title="Use Ask LevyTate AI to start the journey">
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)]">
+        <PlatformPanel eyebrow="Next step" title="Start with Ask LevyTate AI">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-start">
             <div>
-              <p className="text-sm leading-6 text-[#102c3d]/58">LevyTate guides the employee to one approved route at a time, keeping the application process simple and focused.</p>
+              <p className="text-sm leading-6 text-[#102c3d]/58">LevyTate guides the employee to one approved route at a time, so the next step is clear and the application journey stays simple.</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {[
+                  "I want to become a team leader",
+                  "What apprenticeship fits my role?",
+                  "Help me with my application",
+                ].map((prompt) => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    onClick={() => onNavigate("Ask LevyTate AI")}
+                    className="rounded-full border border-[#102c3d]/[0.06] bg-white px-3 py-1.5 text-[11px] font-semibold text-[#102c3d]/62 transition hover:border-[#159b8f]/20 hover:text-[#102c3d]"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
               {featuredPathway ? (
                 <div className="mt-4 rounded-[1rem] border border-[#102c3d]/[0.06] bg-[#f8fbfa] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
                   <div className="flex items-start justify-between gap-3">
@@ -1838,18 +1767,21 @@ function RoleDashboard({
             </div>
             <div className="grid gap-3">
               <SubtleRow label="Career goal" value={selectedPersona.careerGoal} />
-              <SubtleRow label="Progression route" value={selectedPersona.progression.join(" -> ")} />
-              <SubtleRow label="Current focus" value="One active application, one clear next step, no provider confusion." />
+              <SubtleRow label="Current focus" value={activeApplication ? "One active application is already in motion. Use AI for guidance, not a second request." : "Use AI to explore one best-fit pathway, then start a single application."} />
             </div>
           </div>
         </PlatformPanel>
-        <PlatformPanel eyebrow="Development progress" title="Current application and growth signals">
+        <PlatformPanel eyebrow="Where you are now" title="Current application and readiness">
           <div className="grid gap-4">
             {activeApplication ? <CompactApplicationTimeline request={activeApplication} /> : <p className="text-sm text-[#102c3d]/56">No active application yet.</p>}
             <div className="grid gap-3">
-              {selectedPersona.skills.map(([label, value]) => (
+              {selectedPersona.skills.slice(0, 3).map(([label, value]) => (
                 <SkillBar key={label} label={label} value={value} />
               ))}
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <SubtleRow label="Saved opportunities" value={`${selectedPersona.savedOpportunities} shortlisted pathway${selectedPersona.savedOpportunities === 1 ? "" : "s"}`} />
+              <SubtleRow label="Development evidence" value={`${selectedPersona.passportActivities} learning items already logged`} />
             </div>
           </div>
         </PlatformPanel>
@@ -1859,9 +1791,9 @@ function RoleDashboard({
 
   if (role === "Line Manager") {
     return (
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.12fr)_minmax(320px,0.88fr)]">
-        <PlatformPanel eyebrow="Team development" title="Participation, skills gaps and succession confidence">
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.06fr)_minmax(320px,0.94fr)]">
+        <PlatformPanel eyebrow="Team capability" title="How do I develop my team?">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
             <YearOnYearParticipationChart compact />
             <CompactSkillsHeatmap
               title="Team skills heatmap"
@@ -1875,32 +1807,29 @@ function RoleDashboard({
             />
           </div>
         </PlatformPanel>
-        <div className="grid gap-4">
-          <PlatformPanel eyebrow="Approval focus" title="Applications needing manager action">
+        <PlatformPanel eyebrow="Manager action" title="What needs attention now?">
+          <div className="grid gap-4">
             <ApprovalQueuePreview requests={managerRequests} emptyCopy="No direct-report applications are awaiting review right now." />
-            <div className="mt-4">
+            <div className="grid gap-3 md:grid-cols-2">
+              <CompactSignalMetric label="Active team learners" value={activeTeamLearners} accent="#159b8f" />
+              <CompactSignalMetric label="High potential" value={Math.max(2, Math.round((readiness - 48) / 6))} accent="#7b61ff" />
+            </div>
+            <div className="flex flex-wrap gap-2">
               <PlatformButton onClick={() => onNavigate("Applications to Review")}>Review applications</PlatformButton>
+              <PlatformButton variant="soft" onClick={() => onNavigate("Team Development")}>Open team development</PlatformButton>
             </div>
-          </PlatformPanel>
-          <PlatformPanel eyebrow="Succession planning" title="Next capability priorities">
-            <div className="grid gap-3">
-              <SkillBar label="Leadership succession" value={74} />
-              <SkillBar label="Technical coverage" value={68} />
-              <SkillBar label="Data confidence" value={56} />
-              <SkillBar label="Customer capability" value={63} />
-            </div>
-          </PlatformPanel>
-        </div>
+          </div>
+        </PlatformPanel>
       </section>
     );
   }
 
   if (role === "Department Head") {
     return (
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.08fr)_minmax(320px,0.92fr)]">
-        <PlatformPanel eyebrow="Department view" title="Participation and site comparison">
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
-            <BarChart rows={[["York", 27], ["Leeds", 18], ["Manchester", 14], ["London", 11]]} />
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.92fr)]">
+        <PlatformPanel eyebrow="Future capability" title="Do we have future capability?">
+          <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-start">
+            <ReadinessIndex label={selectedSite === allSitesLabel ? "Portakabin capability" : selectedSite} score={readiness} />
             <LineChart
               series={[11, 12, 13, 14, 15, 16, 17, 18]}
               secondary={[9, 10, 10, 11, 12, 13, 14, 15]}
@@ -1910,44 +1839,47 @@ function RoleDashboard({
             />
           </div>
         </PlatformPanel>
-        <div className="grid gap-4">
-          <PlatformPanel eyebrow="Future pipeline" title="Succession coverage and demand pressure">
+        <PlatformPanel eyebrow="Where to intervene" title="Participation, demand and site pressure">
+          <div className="grid gap-4">
+            <BarChart rows={Object.entries(departmentCounts).map(([label, value]) => [label, value] as [string, number]).slice(0, 4)} />
             <div className="grid gap-3">
               <SkillBar label="Supervisor pipeline" value={78} />
               <SkillBar label="Digital capability" value={62} />
               <SkillBar label="Site leadership cover" value={71} />
-              <SkillBar label="Commercial progression" value={66} />
             </div>
-          </PlatformPanel>
-          <PlatformPanel eyebrow="Workforce readiness" title="Planning signal">
-            <ReadinessIndex label={selectedSite === allSitesLabel ? "Department" : selectedSite} score={readinessScore(learners, requests)} />
-          </PlatformPanel>
-        </div>
+            <div className="flex flex-wrap gap-2">
+              <PlatformButton onClick={() => onNavigate("Reporting")}>Open reporting</PlatformButton>
+              <PlatformButton variant="soft" onClick={() => onNavigate("Future Demand")}>Plan future demand</PlatformButton>
+            </div>
+          </div>
+        </PlatformPanel>
       </section>
     );
   }
 
   if (role === "Apprenticeship Lead") {
     return (
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
-        <PlatformPanel eyebrow="Command centre" title="Levy position and approval pipeline">
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.04fr)_minmax(320px,0.96fr)]">
+        <PlatformPanel eyebrow="Command centre" title="Where should we invest?">
           <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-center">
             <GaugeChart value={82} />
             <ApprovalPipelineBars requests={requests} />
           </div>
         </PlatformPanel>
-        <div className="grid gap-4">
-          <PlatformPanel eyebrow="Provider coverage" title="Mapped delivery readiness">
+        <PlatformPanel eyebrow="Delivery readiness" title="Provider coverage and next actions">
+          <div className="grid gap-4">
             <BarChart rows={mappings.slice(0, 4).map((mapping) => [mapping.roleFamily, mapping.fit])} />
-          </PlatformPanel>
-          <PlatformPanel eyebrow="Priority actions" title="What needs attention next">
+            <div className="grid gap-3 md:grid-cols-2">
+              <CompactSignalMetric label="Live mappings" value={liveMappings} accent="#159b8f" />
+              <CompactSignalMetric label="Ready for enrolment" value={requests.filter((request) => request.status === "Approved for Enrolment").length} accent="#7b61ff" />
+            </div>
             <ApprovalQueuePreview requests={leadRequests.slice(0, 3)} emptyCopy="No applications are waiting for final approval." />
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2">
               <PlatformButton onClick={() => onNavigate("Applications for Final Approval")}>Review approvals</PlatformButton>
               <PlatformButton variant="soft" onClick={() => onNavigate("Providers")}>Manage providers</PlatformButton>
             </div>
-          </PlatformPanel>
-        </div>
+          </div>
+        </PlatformPanel>
       </section>
     );
   }
@@ -2327,7 +2259,7 @@ function DetailSection({
   onCreateApplication: (draft: ApplicationDraft) => RequestItem | null;
 }) {
   if (activeSection === "Dashboard") {
-    return <DashboardGuide role={role} />;
+    return <DashboardGuide />;
   }
 
   if (activeSection === "Recommended Programmes" || activeSection === "Explore Pathways" || activeSection === "Recommended Pathways") {
@@ -2719,12 +2651,8 @@ function DetailSection({
   );
 }
 
-function DashboardGuide({ role }: { role: Role }) {
-  return (
-    <PlatformPanel eyebrow="Launchpad" title="Select a card or sidebar item to open detail">
-      <p className="max-w-3xl text-sm leading-6 text-[#102c3d]/58">{dashboardGuide(role)}</p>
-    </PlatformPanel>
-  );
+function DashboardGuide() {
+  return null;
 }
 
 function ApplicationCard({ request, scope, onStatus }: { request: RequestItem; scope: "manager" | "lead" | "readonly"; onStatus: (id: number, status: RequestStatus) => void }) {
@@ -4585,17 +4513,6 @@ function InsightBars({ rows }: { rows: Array<[string, number]> }) {
   );
 }
 
-function dashboardGuide(role: Role) {
-  const copy: Record<Role, string> = {
-    Employee: "This dashboard is intentionally focused on pathways, saved options and starting an application.",
-    "Line Manager": "This dashboard keeps approvals and team capability signals separate from operational admin.",
-    "Department Head": "This dashboard is a planning view for demand, skills gaps, priority roles and forecast demand.",
-    "Apprenticeship Lead": "This dashboard launches the core operating areas without showing dense tables by default.",
-    "Admin Console": "This dashboard is reserved for platform administration, configuration and audit activity.",
-  };
-  return copy[role];
-}
-
 function sectionDescription(section: SectionKey) {
   const descriptions: Partial<Record<SectionKey, string>> = {
     "Recommended Pathways": "View apprenticeship pathways matched to your role, site and development goals.",
@@ -4603,8 +4520,8 @@ function sectionDescription(section: SectionKey) {
     "Explore Pathways": "Browse approved apprenticeship routes available in the Portakabin environment.",
     "Career Pathfinder": "Explore potential progression routes and the apprenticeships that support them.",
     "Skills Analysis": "Understand skills gaps, competency strengths and recommended development actions.",
-    "My Applications": "Track your current apprenticeship application from submission through final approval.",
-    "Development Passport": "Review completed learning, qualifications, CPD activity and internal training.",
+    "My Applications": "Track your one active apprenticeship application and the next approval step.",
+    "Development Passport": "Review the learning evidence and development activity that supports your next move.",
     "My Team": "View direct report development status, active apprentices and progression signals.",
     "Team Skills": "Explore team skills coverage across leadership, technical, data, commercial and digital capability.",
     Requests: "Review apprenticeship applications and manage the approval workflow for your permitted scope.",
@@ -4613,7 +4530,7 @@ function sectionDescription(section: SectionKey) {
     Enrolments: "Track learner movement through provider introduction, enrolment and live learning.",
     "Succession Planning": "Identify ready now, ready soon and high potential colleagues for critical roles.",
     "Department Overview": "See department headcount, learner activity, applications and completion signals.",
-    "Department Analytics": "Review department participation, active learners, pending applications and readiness signals.",
+    "Department Analytics": "Review workforce readiness, participation and where future capability needs attention.",
     "Site Breakdown": "Compare learner activity, applications and readiness by site.",
     "Apprenticeship Participation": "Analyse department participation rates, programme usage and approved applications.",
     "Skills Map": "View capability coverage and priority skill gaps across your permitted workforce view.",
@@ -4633,9 +4550,9 @@ function sectionDescription(section: SectionKey) {
     Programmes: "Manage the approved apprenticeship programme catalogue.",
     Compliance: "Monitor evidence status, review dates and apprenticeship risk indicators.",
     "Site Adoption": "Compare site adoption, participation and Workforce Readiness Index signals.",
-    Reporting: "Open executive reporting, learner visibility and platform performance summaries.",
+    Reporting: "Open the executive pack for workforce readiness, participation and investment decisions.",
     "Learners by Site": "Review learners, roles, programmes, status and progress by selected site.",
-    "Ask LevyTate AI": "Ask which apprenticeship standards may suit a role, workforce challenge or future capability need.",
+    "Ask LevyTate AI": "Use LevyTate's guided AI to identify the best next pathway, decision or workforce action.",
     "AI Assistant": "Generate capability plans and concise workforce development recommendations.",
     "User Management": "Manage users and stakeholder access across the platform.",
     "Role Management": "Configure stakeholder roles and inherited visibility.",
@@ -4664,10 +4581,6 @@ function isActiveApplicationStatus(status: RequestStatus) {
 
 function activeApplicationFor(requests: RequestItem[], employeeName: string) {
   return requests.find((request) => request.name === employeeName && isActiveApplicationStatus(request.status));
-}
-
-function topEntry(counts: Record<string, number>) {
-  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "";
 }
 
 function formatShortDate(value: string) {
