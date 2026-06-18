@@ -258,6 +258,14 @@ function providerMatchDraftFromLeadGuidance(guidance: LeadGuidance): LevyTatePro
   };
 }
 
+function employeeManagerMessageDraft(persona: PersonaSummary, guidance: EmployeeGuidance, activeApplication?: RequestSummary) {
+  if (activeApplication) {
+    return `Hi ${persona.manager}, I wanted to share why ${activeApplication.pathway} is important for my development. It aligns with my goal of ${persona.careerGoal} and would help me build stronger capability in my current role as ${persona.role}.`;
+  }
+
+  return `Hi ${persona.manager}, I would like to apply for ${guidance.primary.programme}. It fits my goal of ${persona.careerGoal} and would help me build stronger capability in my current role as ${persona.role}.`;
+}
+
 function employeeRecommendedPathways(guidance: EmployeeGuidance) {
   return [
     {
@@ -304,6 +312,9 @@ export function buildFallbackResponse(request: LevyTateAiRequest): LevyTateAiRes
     };
     const activeApplication = request.contextData?.activeApplication ?? activeApplicationFor(safeRequests, persona.name);
     const guidance = getEmployeeGuidance(request.userMessage, persona);
+    const applicationWarning = activeApplication
+      ? "You already have an active apprenticeship application in progress. You can track this in My Applications."
+      : null;
 
     return {
       source: "mock",
@@ -325,9 +336,11 @@ export function buildFallbackResponse(request: LevyTateAiRequest): LevyTateAiRes
           },
       providerMatchDraft: null,
       nextStep: activeApplication ? "open_my_applications" : "start_application",
-      safetyNotes: activeApplication
-        ? ["You already have an active apprenticeship application in progress. You can track this in My Applications."]
+      safetyNotes: activeApplication && applicationWarning
+        ? [applicationWarning]
         : ["Employees may only have one active apprenticeship application at a time."],
+      applicationWarning,
+      managerMessageDraft: employeeManagerMessageDraft(persona, guidance, activeApplication),
       employeeGuidance: guidance,
     };
   }
@@ -348,6 +361,8 @@ export function buildFallbackResponse(request: LevyTateAiRequest): LevyTateAiRes
       providerMatchDraft: null,
       nextStep: "open_review_queue",
       safetyNotes: ["Manager guidance supports review decisions but does not approve applications automatically."],
+      applicationWarning: null,
+      managerMessageDraft: null,
       managerGuidance: guidance,
     };
   }
@@ -366,6 +381,8 @@ export function buildFallbackResponse(request: LevyTateAiRequest): LevyTateAiRes
       providerMatchDraft: null,
       nextStep: "open_department_analytics",
       safetyNotes: ["Department Head access is analytics-only. No approval actions are available in this role."],
+      applicationWarning: null,
+      managerMessageDraft: null,
       departmentGuidance: guidance,
     };
   }
@@ -386,6 +403,8 @@ export function buildFallbackResponse(request: LevyTateAiRequest): LevyTateAiRes
       "Provider matching is routed to the LevyTate Team, not exposed as an employee marketplace.",
       "Funding language should remain potentially levy-funded or potentially funded through levy/co-investment.",
     ],
+    applicationWarning: null,
+    managerMessageDraft: null,
     leadGuidance: guidance,
   };
 }

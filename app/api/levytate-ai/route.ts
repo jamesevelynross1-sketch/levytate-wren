@@ -4,7 +4,22 @@ import { buildLevyTateAiContext } from "@/lib/levytate-ai/context";
 import { buildFallbackResponse } from "@/lib/levytate-ai/fallback";
 import { buildLevyTateAiSystemPrompt, buildLevyTateAiUserPrompt } from "@/lib/levytate-ai/prompts";
 import { applyLevyTateAiSafety } from "@/lib/levytate-ai/safety";
-import { parseLevyTateAiRequest, type LevyTateAiResponse } from "@/lib/levytate-ai/response-schema";
+import {
+  parseLevyTateAiRequest,
+  type LevyTateAiRequest,
+  type LevyTateAiResponse,
+  type LevyTateRecommendedPathway,
+} from "@/lib/levytate-ai/response-schema";
+
+type RewritePayload = {
+  assistantMessage: string | null;
+  safetyNotes: string[];
+};
+
+type EmployeePayload = RewritePayload & {
+  managerMessageDraft: string | null;
+  recommendedPathwayTitles: string[];
+};
 
 function aiEnabled() {
   if (process.env.LEVYTATE_AI_ENABLED === "true") return true;
@@ -40,7 +55,7 @@ function extractOutputText(payload: unknown) {
   return typeof text === "string" ? text.trim() : "";
 }
 
-function parseAssistantRewrite(raw: string) {
+function parseRewritePayload(raw: string): RewritePayload {
   try {
     const parsed = JSON.parse(raw) as {
       assistantMessage?: string;
@@ -64,7 +79,77 @@ function parseAssistantRewrite(raw: string) {
   }
 }
 
-async function rewriteWithOpenAI(systemPrompt: string, userPrompt: string) {
+function parseEmployeePayload(raw: string): EmployeePayload {
+  try {
+    const parsed = JSON.parse(raw) as {
+      assistantMessage?: string;
+      safetyNotes?: string[];
+      recommendedPathwayTitles?: string[];
+      managerMessageDraft?: string | null;
+    };
+
+    return {
+      assistantMessage:
+        typeof parsed.assistantMessage === "string" && parsed.assistantMessage.trim()
+          ? parsed.assistantMessage.trim()
+          : null,
+      safetyNotes: Array.isArray(parsed.safetyNotes)
+        ? parsed.safetyNotes.filter((item): item is string => typeof item === "string" && Boolean(item.trim()))
+        : [],
+      recommendedPathwayTitles: Array.isArray(parsed.recommendedPathwayTitles)
+        ? parsed.recommendedPathwayTitles.filter((item): item is string => typeof item === "string" && Boolean(item.trim()))
+        : [],
+      managerMessageDraft:
+        typeof parsed.managerMessageDraft === "string" && parsed.managerMessageDraft.trim()
+          ? parsed.managerMessageDraft.trim()
+          : null,
+    };
+  } catch {
+    return {
+      assistantMessage: null,
+      safetyNotes: [],
+      recommendedPathwayTitles: [],
+      managerMessageDraft: null,
+    };
+  }
+}
+
+function outputSchemaFor(role: LevyTateAiRequest["role"]) {
+  if (role === "Employee") {
+    return {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        assistantMessage: { type: "string" },
+        recommendedPathwayTitles: {
+          type: "array",
+          items: { type: "string" },
+        },
+        safetyNotes: {
+          type: "array",
+          items: { type: "string" },
+        },
+        managerMessageDraft: { type: "string" },
+      },
+      required: ["assistantMessage", "recommendedPathwayTitles", "safetyNotes", "managerMessageDraft"],
+    };
+  }
+
+  return {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      assistantMessage: { type: "string" },
+      safetyNotes: {
+        type: "array",
+        items: { type: "string" },
+      },
+    },
+    required: ["assistantMessage", "safetyNotes"],
+  };
+}
+
+async function requestOpenAI(request: LevyTateAiRequest, systemPrompt: string, userPrompt: string) {
   const apiKey = process.env.OPENAI_API_KEY;
 
   if (!apiKey) {
@@ -93,22 +178,11 @@ async function rewriteWithOpenAI(systemPrompt: string, userPrompt: string) {
         format: {
           type: "json_schema",
           name: "levytate_ai_guidance",
-          schema: {
-            type: "object",
-            additionalProperties: false,
-            properties: {
-              assistantMessage: { type: "string" },
-              safetyNotes: {
-                type: "array",
-                items: { type: "string" },
-              },
-            },
-            required: ["assistantMessage", "safetyNotes"],
-          },
+          schema: outputSchemaFor(request.role),
           strict: true,
         },
       },
-      max_output_tokens: 320,
+      max_output_tokens: request.role === "Employee" ? 640 : 320,
     }),
   });
 
@@ -124,7 +198,65 @@ async function rewriteWithOpenAI(systemPrompt: string, userPrompt: string) {
     throw new Error("OpenAI Responses API returned empty output.");
   }
 
-  return parseAssistantRewrite(outputText);
+  return request.role === "Employee" ? parseEmployeePayload(outputText) : parseRewritePayload(outputText);
+}
+
+function mergeSafetyNotes(fallback: string[], generated: string[]) {
+  const ordered = [...generated, ...fallback];
+  const seen = new Set<string>();
+  return ordered.filter((item) => {
+    const key = item.trim().toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function mergeEmployeePathways(
+  fallbackPathways: LevyTateRecommendedPathway[],
+  recommendedTitles: string[],
+) {
+  const fallbackByTitle = new Map(
+    fallbackPathways.map((item) => [item.title.trim().toLowerCase(), item] as const),
+  );
+
+  const prioritised = recommendedTitles
+    .map((title) => fallbackByTitle.get(title.trim().toLowerCase()))
+    .filter((item): item is LevyTateRecommendedPathway => Boolean(item));
+
+  const seen = new Set(prioritised.map((item) => item.title.trim().toLowerCase()));
+  const remaining = fallbackPathways.filter((item) => !seen.has(item.title.trim().toLowerCase()));
+
+  return prioritised.length ? [...prioritised, ...remaining] : fallbackPathways;
+}
+
+function mergeEmployeeResponse(
+  request: LevyTateAiRequest,
+  fallback: LevyTateAiResponse,
+  generated: EmployeePayload,
+): LevyTateAiResponse {
+  const activeApplication = request.contextData?.activeApplication ?? null;
+
+  return {
+    ...fallback,
+    source: generated.assistantMessage ? "openai" : "mock",
+    assistantMessage: generated.assistantMessage ?? fallback.assistantMessage,
+    recommendedPathways: mergeEmployeePathways(fallback.recommendedPathways, generated.recommendedPathwayTitles),
+    safetyNotes: mergeSafetyNotes(fallback.safetyNotes, generated.safetyNotes),
+    applicationWarning: activeApplication
+      ? "You already have an active apprenticeship application in progress. You can track this in My Applications."
+      : fallback.applicationWarning,
+    managerMessageDraft: generated.managerMessageDraft ?? fallback.managerMessageDraft,
+  };
+}
+
+function mergeRewriteResponse(fallback: LevyTateAiResponse, generated: RewritePayload): LevyTateAiResponse {
+  return {
+    ...fallback,
+    source: generated.assistantMessage ? "openai" : "mock",
+    assistantMessage: generated.assistantMessage ?? fallback.assistantMessage,
+    safetyNotes: mergeSafetyNotes(fallback.safetyNotes, generated.safetyNotes),
+  };
 }
 
 export async function POST(request: Request) {
@@ -146,17 +278,16 @@ export async function POST(request: Request) {
     }
 
     const groundedContext = buildLevyTateAiContext(parsed);
-    const rewrite = await rewriteWithOpenAI(
+    const generated = await requestOpenAI(
+      parsed,
       buildLevyTateAiSystemPrompt(parsed),
       buildLevyTateAiUserPrompt({ request: parsed, groundedContext, fallback }),
     );
 
-    const merged: LevyTateAiResponse = {
-      ...fallback,
-      source: rewrite.assistantMessage ? "openai" : "mock",
-      assistantMessage: rewrite.assistantMessage ?? fallback.assistantMessage,
-      safetyNotes: rewrite.safetyNotes.length ? rewrite.safetyNotes : fallback.safetyNotes,
-    };
+    const merged =
+      parsed.role === "Employee"
+        ? mergeEmployeeResponse(parsed, fallback, generated as EmployeePayload)
+        : mergeRewriteResponse(fallback, generated as RewritePayload);
 
     return NextResponse.json(applyLevyTateAiSafety(parsed, merged));
   } catch (error) {
@@ -168,10 +299,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       {
-        message:
-          error instanceof Error
-            ? error.message
-            : "LevyTate AI request failed.",
+        message: error instanceof Error ? error.message : "LevyTate AI request failed.",
       },
       { status: 500 },
     );

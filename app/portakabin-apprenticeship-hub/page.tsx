@@ -3508,6 +3508,7 @@ async function requestLevyTateAI(payload: ApiLevyTateAiRequest): Promise<ApiLevy
 
 function AIGuidanceCallout({ result }: { result: ApiLevyTateAiResponse }) {
   const sourceLabel = result.source === "openai" ? "Live GenAI guidance" : "Guided fallback";
+  const showEmployeeExtras = Boolean(result.employeeGuidance || result.applicationWarning || result.managerMessageDraft);
 
   return (
     <div className="rounded-[1rem] border border-[#102c3d]/[0.055] bg-[#f8fbfa] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.84)]">
@@ -3516,6 +3517,26 @@ function AIGuidanceCallout({ result }: { result: ApiLevyTateAiResponse }) {
         {result.safetyNotes[0] ? <span className="rounded-full bg-white px-3 py-1 text-[10px] font-semibold text-[#102c3d]/52 ring-1 ring-[#102c3d]/[0.06]">{result.safetyNotes[0]}</span> : null}
       </div>
       <p className="mt-2 text-sm leading-6 text-[#102c3d]/66">{result.assistantMessage}</p>
+      {showEmployeeExtras && result.recommendedPathways.length ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {result.recommendedPathways.slice(0, 3).map((pathway) => (
+            <span key={pathway.title} className="rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-[#102c3d]/60 ring-1 ring-[#102c3d]/[0.06]">
+              {pathway.title}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      {result.applicationWarning ? (
+        <div className="mt-3 rounded-xl border border-[#fff4bd] bg-[#fff9dc] px-3.5 py-3 text-sm leading-6 text-[#102c3d]/66">
+          {result.applicationWarning}
+        </div>
+      ) : null}
+      {result.managerMessageDraft ? (
+        <div className="mt-3 rounded-xl bg-white px-3.5 py-3 ring-1 ring-[#102c3d]/[0.06]">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">Optional manager note</p>
+          <p className="mt-1.5 text-sm leading-6 text-[#102c3d]/66">{result.managerMessageDraft}</p>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -3761,6 +3782,25 @@ function EmployeeAIPage({
   const [confirmation, setConfirmation] = useState<RequestItem | null>(null);
   const employeeApplications = requests.filter((request) => request.name === selectedPersona.name);
   const response = result?.employeeGuidance ?? null;
+  const aiPathways = result?.recommendedPathways ?? [];
+
+  function handleRecommendedAction(action: ApiLevyTateAiResponse["recommendedActions"][number]) {
+    if (action.type === "open_my_applications") {
+      onNavigate("My Applications");
+      return;
+    }
+
+    if (action.type === "start_application") {
+      if (!activeApplication) {
+        setApplicationOpen(true);
+      }
+      return;
+    }
+
+    if (action.type === "open_pathway") {
+      onNavigate("Recommended Pathways");
+    }
+  }
 
   async function runEmployeeQuery(promptText: string) {
     if (!promptText.trim()) return;
@@ -3859,6 +3899,19 @@ function EmployeeAIPage({
       {response ? (
       <PlatformPanel eyebrow="Personal recommendation" title={`${selectedPersona.name.split(" ")[0]}'s recommended route`}>
         {result ? <div className="mb-4"><AIGuidanceCallout result={result} /></div> : null}
+        {result?.recommendedActions.length ? (
+          <div className="mb-4 flex flex-wrap gap-2">
+            {result.recommendedActions.map((action) => (
+              <PlatformButton
+                key={`${action.type}-${action.label}`}
+                variant={action.type === "start_application" ? "amber" : "soft"}
+                onClick={() => handleRecommendedAction(action)}
+              >
+                {action.label}
+              </PlatformButton>
+            ))}
+          </div>
+        ) : null}
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
           <article className="rounded-[1rem] border border-[#159b8f]/[0.18] bg-[#f8fbfa] p-5 shadow-[0_12px_28px_rgba(16,44,61,0.045)]">
             <div className="flex flex-wrap items-start justify-between gap-4">
@@ -3890,6 +3943,18 @@ function EmployeeAIPage({
           </article>
 
           <div className="grid gap-3">
+            {aiPathways
+              .filter((item) => item.title !== response.primary.programme && !response.alternatives.some((alternative) => alternative.programme === item.title))
+              .slice(0, 3)
+              .map((item) => (
+                <article key={item.title} className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-white p-4 shadow-[0_8px_20px_rgba(16,44,61,0.035)]">
+                  <div className="flex items-start justify-between gap-3">
+                    <h3 className="text-sm font-semibold leading-5 text-[#102c3d]">{item.title}</h3>
+                    {item.fit ? <span className="rounded-full bg-[#f8fbfa] px-2.5 py-1 text-xs font-semibold text-[#102c3d]/56">{item.fit}%</span> : null}
+                  </div>
+                  <p className="mt-2 text-xs leading-5 text-[#102c3d]/58">{item.reason}</p>
+                </article>
+              ))}
             {response.alternatives.map((item) => (
               <article key={item.programme} className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-white p-4 shadow-[0_8px_20px_rgba(16,44,61,0.035)]">
                 <div className="flex items-start justify-between gap-3">

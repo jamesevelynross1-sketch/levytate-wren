@@ -171,6 +171,8 @@ export type LevyTateAiResponse = {
   providerMatchDraft: LevyTateProviderMatchDraft | null;
   nextStep: string | null;
   safetyNotes: string[];
+  applicationWarning: string | null;
+  managerMessageDraft: string | null;
   employeeGuidance?: EmployeeGuidance;
   managerGuidance?: ManagerGuidance;
   departmentGuidance?: DepartmentGuidance;

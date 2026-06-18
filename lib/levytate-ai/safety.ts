@@ -18,6 +18,12 @@ export function applyLevyTateAiSafety(
   const safetyNotes = response.safetyNotes.map((note) =>
     sanitiseMarketplaceLanguage(sanitiseFundingLanguage(note)),
   );
+  const applicationWarning = response.applicationWarning
+    ? sanitiseMarketplaceLanguage(sanitiseFundingLanguage(response.applicationWarning))
+    : null;
+  const managerMessageDraft = response.managerMessageDraft
+    ? sanitiseMarketplaceLanguage(sanitiseFundingLanguage(response.managerMessageDraft))
+    : null;
 
   const restrictedActions =
     request.role === "Department Head"
@@ -28,6 +34,8 @@ export function applyLevyTateAiSafety(
     ...response,
     assistantMessage,
     safetyNotes,
+    applicationWarning,
+    managerMessageDraft,
     recommendedActions: restrictedActions,
   };
 }
