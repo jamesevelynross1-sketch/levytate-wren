@@ -3507,14 +3507,20 @@ async function requestLevyTateAI(payload: ApiLevyTateAiRequest): Promise<ApiLevy
 }
 
 function AIGuidanceCallout({ result }: { result: ApiLevyTateAiResponse }) {
-  const sourceLabel = result.source === "openai" ? "Live GenAI guidance" : "Guided fallback";
+  const sourceLabel = result.employeeGuidance
+    ? result.source === "openai"
+      ? "Good question"
+      : "Here's what I'd suggest"
+    : result.source === "openai"
+      ? "Live GenAI guidance"
+      : "Guided response";
   const showEmployeeExtras = Boolean(result.employeeGuidance || result.applicationWarning || result.managerMessageDraft);
 
   return (
     <div className="rounded-[1rem] border border-[#102c3d]/[0.055] bg-[#f8fbfa] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.84)]">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">{sourceLabel}</p>
-        {result.safetyNotes[0] ? <span className="rounded-full bg-white px-3 py-1 text-[10px] font-semibold text-[#102c3d]/52 ring-1 ring-[#102c3d]/[0.06]">{result.safetyNotes[0]}</span> : null}
+        {!result.employeeGuidance && result.safetyNotes[0] ? <span className="rounded-full bg-white px-3 py-1 text-[10px] font-semibold text-[#102c3d]/52 ring-1 ring-[#102c3d]/[0.06]">{result.safetyNotes[0]}</span> : null}
       </div>
       <p className="mt-2 text-sm leading-6 text-[#102c3d]/66">{result.assistantMessage}</p>
       {showEmployeeExtras && result.recommendedPathways.length ? (
@@ -3527,7 +3533,7 @@ function AIGuidanceCallout({ result }: { result: ApiLevyTateAiResponse }) {
         </div>
       ) : null}
       {result.applicationWarning ? (
-        <div className="mt-3 rounded-xl border border-[#fff4bd] bg-[#fff9dc] px-3.5 py-3 text-sm leading-6 text-[#102c3d]/66">
+        <div className="mt-3 rounded-xl border border-[#102c3d]/[0.055] bg-white px-3.5 py-2.5 text-xs leading-5 text-[#102c3d]/58">
           {result.applicationWarning}
         </div>
       ) : null}
@@ -3573,6 +3579,52 @@ function AskLevyTateAIPage({
   }
 
   return <ApprenticeshipLeadAIPage selectedSite={selectedSite} />;
+}
+
+function employeeConversationTitle(result: ApiLevyTateAiResponse | null, firstName: string) {
+  const intent = result?.employeeGuidance?.intent;
+
+  if (intent === "data_ai_interest" || intent === "automation_interest") return "Exploring data and automation";
+  if (intent === "management_interest") return "Exploring a management route";
+  if (intent === "compare_routes") return "Comparing your options";
+  if (intent === "manager_conversation") return "Preparing a manager conversation";
+  if (intent === "change_of_mind") return "Thinking through a change of direction";
+  if (intent === "application_help") return "Planning your next application step";
+
+  return `${firstName}, let's explore this`;
+}
+
+function EmployeeAIStepper({ current }: { current: "Ask" | "Explore" | "Plan" | "Act" }) {
+  const steps: Array<"Ask" | "Explore" | "Plan" | "Act"> = ["Ask", "Explore", "Plan", "Act"];
+  const activeIndex = steps.indexOf(current);
+
+  return (
+    <div className="mb-5 grid gap-2 rounded-[1rem] border border-[#102c3d]/[0.055] bg-[#f8fbfa] p-2.5 sm:grid-cols-4">
+      {steps.map((step, index) => {
+        const completed = index < activeIndex;
+        const active = index === activeIndex;
+        return (
+          <div key={step} className={`rounded-xl px-3 py-2.5 transition ${active ? "bg-white shadow-[0_8px_18px_rgba(16,44,61,0.055)]" : completed ? "bg-[#edf8f5]" : "bg-transparent"}`}>
+            <div className="flex items-center gap-2">
+              <span className={`grid h-5 w-5 place-items-center rounded-full text-[10px] font-semibold ${active || completed ? "bg-[#159b8f] text-white" : "bg-[#102c3d]/[0.08] text-[#102c3d]/42"}`}>{index + 1}</span>
+              <p className={`text-xs font-semibold ${active ? "text-[#102c3d]" : completed ? "text-[#0b6f63]" : "text-[#102c3d]/38"}`}>{step}</p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function CurrentApplicationReminder({ application, onView }: { application: RequestItem; onView: () => void }) {
+  return (
+    <div className="rounded-xl border border-[#102c3d]/[0.055] bg-white px-3.5 py-3 text-sm leading-6 text-[#102c3d]/62">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p><span className="font-semibold text-[#102c3d]">Current application:</span> {application.pathway} is {application.status.toLowerCase()}.</p>
+        <button type="button" onClick={onView} className="rounded-full bg-[#f8fbfa] px-3 py-1.5 text-xs font-semibold text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.06] transition hover:text-[#102c3d]">View application</button>
+      </div>
+    </div>
+  );
 }
 
 function ApprenticeshipLeadAIPage({ selectedSite }: { selectedSite: string }) {
@@ -3783,10 +3835,28 @@ function EmployeeAIPage({
   const employeeApplications = requests.filter((request) => request.name === selectedPersona.name);
   const response = result?.employeeGuidance ?? null;
   const aiPathways = result?.recommendedPathways ?? [];
+  const firstName = selectedPersona.name.split(" ")[0];
+  const employeeStep = confirmation || applicationOpen ? "Act" : compareOpen || savedMessage ? "Plan" : response ? "Explore" : "Ask";
 
   function handleRecommendedAction(action: ApiLevyTateAiResponse["recommendedActions"][number]) {
     if (action.type === "open_my_applications") {
       onNavigate("My Applications");
+      return;
+    }
+
+    if (action.type === "compare_routes") {
+      setCompareOpen(true);
+      setSavedMessage("I've opened a route comparison below.");
+      return;
+    }
+
+    if (action.type === "save_interest") {
+      setSavedMessage(`${action.target ?? "This interest"} saved for later.`);
+      return;
+    }
+
+    if (action.type === "prepare_manager_message") {
+      setSavedMessage("Manager conversation note prepared below.");
       return;
     }
 
@@ -3798,7 +3868,8 @@ function EmployeeAIPage({
     }
 
     if (action.type === "open_pathway") {
-      onNavigate("Recommended Pathways");
+      setCompareOpen(true);
+      setSavedMessage(`Exploring ${action.target ?? "this route"} below.`);
     }
   }
 
@@ -3863,10 +3934,10 @@ function EmployeeAIPage({
   return (
     <div className="grid gap-5">
       <PlatformPanel eyebrow="AI pathway assistant" title="Ask LevyTate AI">
-        <GuidedAIStepper current={confirmation ? "Submitted" : applicationOpen ? "Application" : response ? "Recommendation" : "Ask"} />
+        <EmployeeAIStepper current={employeeStep} />
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
           <form onSubmit={askQuestion} className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-[#f8fbfa] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
-            <p className="max-w-2xl text-sm leading-6 text-[#102c3d]/62">Tell LevyTate about your role, goals or interests and we&apos;ll guide you towards the most relevant approved pathway.</p>
+            <p className="max-w-2xl text-sm leading-6 text-[#102c3d]/62">Tell LevyTate what you&apos;re curious about. We can explore future options, compare routes, save ideas or help you prepare a manager conversation.</p>
             <label className="mt-4 grid gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#102c3d]/42">
               Your question
               <textarea
@@ -3878,7 +3949,7 @@ function EmployeeAIPage({
               />
             </label>
             <div className="mt-4 flex flex-wrap gap-2">
-              <PlatformButton>{loading ? "Finding guidance..." : "Find pathway"}</PlatformButton>
+              <PlatformButton>{loading ? "Thinking it through..." : "Ask LevyTate AI"}</PlatformButton>
               <button type="button" onClick={() => void applyPrompt("Can you help me apply?")} className="h-10 rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.06] transition hover:text-[#102c3d]">Help me apply</button>
             </div>
           </form>
@@ -3897,7 +3968,7 @@ function EmployeeAIPage({
       </PlatformPanel>
 
       {response ? (
-      <PlatformPanel eyebrow="Personal recommendation" title={`${selectedPersona.name.split(" ")[0]}'s recommended route`}>
+      <PlatformPanel eyebrow="Assistant response" title={employeeConversationTitle(result, firstName)}>
         {result ? <div className="mb-4"><AIGuidanceCallout result={result} /></div> : null}
         {result?.recommendedActions.length ? (
           <div className="mb-4 flex flex-wrap gap-2">
@@ -3916,7 +3987,7 @@ function EmployeeAIPage({
           <article className="rounded-[1rem] border border-[#159b8f]/[0.18] bg-[#f8fbfa] p-5 shadow-[0_12px_28px_rgba(16,44,61,0.045)]">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <p className="text-xs font-semibold text-[#102c3d]/44">Primary recommendation</p>
+                <p className="text-xs font-semibold text-[#102c3d]/44">Route to explore</p>
                 <h3 className="mt-1 text-2xl font-semibold tracking-[-0.025em] text-[#102c3d]">{response.primary.programme}</h3>
                 <p className="mt-2 text-sm font-semibold text-[#159b8f]">{response.primary.pathway}</p>
               </div>
@@ -3939,12 +4010,46 @@ function EmployeeAIPage({
               <button type="button" onClick={() => void applyPrompt("What else should I consider before applying?")} className="h-10 rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.06] transition hover:text-[#102c3d]">Ask follow-up</button>
             </div>
             {savedMessage ? <p className="mt-3 rounded-xl bg-white px-3 py-2 text-xs font-semibold text-[#0b6f63] ring-1 ring-[#102c3d]/[0.05]">{savedMessage}</p> : null}
-            {activeApplication ? <ActiveApplicationNotice application={activeApplication} onView={() => onNavigate("My Applications")} /> : null}
+            {activeApplication ? <div className="mt-3"><CurrentApplicationReminder application={activeApplication} onView={() => onNavigate("My Applications")} /></div> : null}
           </article>
 
           <div className="grid gap-3">
+            {response.availableNow?.length ? (
+              <div className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-white p-4 shadow-[0_8px_20px_rgba(16,44,61,0.035)]">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">Available now</p>
+                <div className="mt-3 grid gap-3">
+                  {response.availableNow.map((item) => (
+                    <div key={item.programme} className="rounded-xl bg-[#f8fbfa] px-3 py-2.5">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="text-sm font-semibold text-[#102c3d]">{item.programme}</p>
+                        <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-[#0b6f63]">{item.fit}%</span>
+                      </div>
+                      <p className="mt-1 text-xs leading-5 text-[#102c3d]/58">{item.why}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            {response.futureInterests?.length ? (
+              <div className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-white p-4 shadow-[0_8px_20px_rgba(16,44,61,0.035)]">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">Worth discussing later</p>
+                <div className="mt-3 grid gap-3">
+                  {response.futureInterests.map((item) => (
+                    <div key={item.programme} className="rounded-xl bg-[#fff9dc] px-3 py-2.5">
+                      <p className="text-sm font-semibold text-[#102c3d]">{item.programme}</p>
+                      <p className="mt-1 text-xs leading-5 text-[#102c3d]/58">{item.why}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             {aiPathways
-              .filter((item) => item.title !== response.primary.programme && !response.alternatives.some((alternative) => alternative.programme === item.title))
+              .filter((item) =>
+                item.title !== response.primary.programme &&
+                !response.alternatives.some((alternative) => alternative.programme === item.title) &&
+                !response.availableNow?.some((available) => available.programme === item.title) &&
+                !response.futureInterests?.some((future) => future.programme === item.title)
+              )
               .slice(0, 3)
               .map((item) => (
                 <article key={item.title} className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-white p-4 shadow-[0_8px_20px_rgba(16,44,61,0.035)]">

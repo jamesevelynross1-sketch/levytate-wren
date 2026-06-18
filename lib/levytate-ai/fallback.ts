@@ -1,6 +1,7 @@
 import type {
   DepartmentGuidance,
   EmployeeGuidance,
+  EmployeeIntent,
   LeadGuidance,
   LevyTateAiRequest,
   LevyTateAiResponse,
@@ -21,6 +22,27 @@ const activeApplicationStatuses = new Set([
 ]);
 
 const currentManagerName = "Ryan Booth";
+
+function classifyEmployeeIntent(prompt: string): EmployeeIntent {
+  const normalised = prompt.toLowerCase();
+
+  if (normalised.includes("compare") || normalised.includes("versus") || normalised.includes(" vs ")) return "compare_routes";
+  if (
+    normalised.includes("my manager") ||
+    normalised.includes("line manager") ||
+    normalised.includes("conversation") ||
+    normalised.includes("talk to")
+  ) return "manager_conversation";
+  if (normalised.includes("apply") || normalised.includes("application") || normalised.includes("submit")) return "application_help";
+  if (normalised.includes("change") || normalised.includes("different") || normalised.includes("changed my mind")) return "change_of_mind";
+  if (normalised.includes("data") || normalised.includes("ai")) return "data_ai_interest";
+  if (normalised.includes("automation") || normalised.includes("automate")) return "automation_interest";
+  if (normalised.includes("manager") || normalised.includes("management") || normalised.includes("leader") || normalised.includes("supervisor")) return "management_interest";
+  if (normalised.includes("what is") || normalised.includes("explain") || normalised.includes("mean")) return "pathway_explanation";
+  if (normalised.includes("career") || normalised.includes("progress") || normalised.includes("future")) return "career_exploration";
+
+  return "general_support";
+}
 
 const advisoryMappings: Record<string, LeadGuidance> = {
   maintenance: {
@@ -110,12 +132,14 @@ function activeApplicationFor(requests: RequestSummary[], employeeName?: string)
 }
 
 function getEmployeeGuidance(prompt: string, persona: PersonaSummary): EmployeeGuidance {
-  const normalised = prompt.toLowerCase();
   const isDaniel = persona.name === "Daniel Carter";
-  const wantsAI = normalised.includes("ai") || normalised.includes("automation");
+  const intent = classifyEmployeeIntent(prompt);
+  const wantsAI = intent === "data_ai_interest" || intent === "automation_interest";
+  const wantsManagement = intent === "management_interest";
 
   if (isDaniel && wantsAI) {
     return {
+      intent,
       primary: {
         programme: "AI & Automation Workforce Programme",
         pathway: "Digital, Data & AI",
@@ -130,11 +154,46 @@ function getEmployeeGuidance(prompt: string, persona: PersonaSummary): EmployeeG
         { programme: "Level 4 Business Analyst", fit: 84, why: "Useful if Daniel wants to connect systems, process change and business requirements." },
       ],
       supportRequired: "Protected time for AI use case discovery, portfolio evidence and internal reporting projects.",
+      availableNow: [
+        { programme: "Level 4 Data Analyst", fit: 91, why: "Available now and already aligned to data, reporting and automation leadership." },
+        { programme: "Level 3 Data Technician", fit: 86, why: "Useful for practical data foundations if Daniel wants a more hands-on route." },
+      ],
+      futureInterests: [
+        { programme: "AI & Automation Workforce Programme", fit: 94, why: "Worth discussing as a future workforce programme alongside the current application." },
+      ],
+    };
+  }
+
+  if (isDaniel && wantsManagement) {
+    return {
+      intent,
+      primary: {
+        programme: "Level 4 Data Analyst",
+        pathway: "Digital, Data & AI",
+        provider: "QA",
+        fit: 91,
+        why: "This still supports a management route if Daniel wants to lead data, reporting or automation work rather than move into general people management straight away.",
+        draftReason: "I am interested in the Level 4 Data Analyst pathway because I want to build the data leadership, insight and automation confidence needed for a future management role.",
+      },
+      alternatives: [
+        { programme: "Level 3 Team Leader", fit: 83, why: "Better if Daniel wants broader first-line people management." },
+        { programme: "Level 5 Operations Manager", fit: 79, why: "Better if Daniel wants wider operational accountability in the future." },
+        { programme: "Level 4 Business Analyst", fit: 78, why: "Useful if the management route is linked to systems, process and change work." },
+      ],
+      supportRequired: "Protected time for portfolio evidence, leadership conversations and internal reporting projects.",
+      availableNow: [
+        { programme: "Level 4 Data Analyst", fit: 91, why: "Best if the goal is data leadership, reporting ownership or automation improvement." },
+      ],
+      futureInterests: [
+        { programme: "Level 3 Team Leader", fit: 83, why: "Worth discussing if Daniel wants a broader people management route." },
+        { programme: "Level 5 Operations Manager", fit: 79, why: "Worth discussing later if Daniel moves toward wider operational leadership." },
+      ],
     };
   }
 
   if (isDaniel) {
     return {
+      intent,
       primary: {
         programme: "Level 4 Data Analyst",
         pathway: "Digital, Data & AI",
@@ -149,10 +208,47 @@ function getEmployeeGuidance(prompt: string, persona: PersonaSummary): EmployeeG
         { programme: "AI & Automation Workforce Programme", fit: 82, why: "Supports practical AI adoption and automation opportunity discovery." },
       ],
       supportRequired: "Protected time for portfolio evidence and internal reporting projects.",
+      availableNow: [
+        { programme: "Level 4 Data Analyst", fit: 92, why: "Available now and aligned to Daniel's current application and career goal." },
+        { programme: "Level 4 Business Analyst", fit: 84, why: "Available as a related route for process and systems capability." },
+      ],
+      futureInterests: [
+        { programme: "AI & Automation Workforce Programme", fit: 82, why: "Worth discussing as a future interest once the current application is resolved." },
+      ],
+    };
+  }
+
+  if (wantsAI) {
+    return {
+      intent,
+      primary: {
+        programme: "Level 3 Team Leader",
+        pathway: "Leadership & Management",
+        provider: "Babington",
+        fit: 88,
+        why: "Data and automation could still be relevant to Amelia's production role, especially if the goal is using better information to improve shift decisions, quality routines and team coordination.",
+        draftReason: "I am interested in building confidence with data and automation because I want to understand how digital tools and better information can support production planning, improvement and future team leadership.",
+      },
+      alternatives: [
+        { programme: "Level 3 Engineering Technician", fit: 86, why: "Available now if Amelia wants a more technical improvement and process understanding route." },
+        { programme: "Level 3 Data Technician", fit: 74, why: "Worth discussing as a future route if the goal becomes more data-focused." },
+        { programme: "AI & Automation Workforce Programme", fit: 72, why: "Worth discussing for future development or a short workforce capability conversation." },
+      ],
+      supportRequired: "Support with study time, evidence collection and a manager conversation about digital improvement opportunities in production.",
+      availableNow: [
+        { programme: "Level 3 Team Leader", fit: 88, why: "Available now if Amelia wants to use data to lead better shift decisions." },
+        { programme: "Level 3 Engineering Technician", fit: 86, why: "Available now if Amelia wants more technical improvement and process understanding." },
+      ],
+      futureInterests: [
+        { programme: "Level 3 Data Technician", fit: 74, why: "Worth discussing if Amelia wants a more data-focused route later." },
+        { programme: "AI & Automation Workforce Programme", fit: 72, why: "Worth discussing as a future development interest." },
+        { programme: "Improvement Practitioner", fit: 70, why: "Worth discussing if the focus becomes process improvement or automation opportunities." },
+      ],
     };
   }
 
   return {
+    intent,
     primary: {
       programme: "Level 3 Team Leader",
       pathway: "Leadership & Management",
@@ -166,6 +262,13 @@ function getEmployeeGuidance(prompt: string, persona: PersonaSummary): EmployeeG
       { programme: "Level 3 Engineering Maintenance Technician", fit: 82, why: "A suitable technical route if Amelia wants to move toward maintenance and fault finding." },
     ],
     supportRequired: "Support with study time and evidence collection.",
+    availableNow: [
+      { programme: "Level 3 Team Leader", fit: 93, why: "Available now and aligned to Amelia's production leadership goal." },
+      { programme: "Level 3 Engineering Technician", fit: 88, why: "Available now if Amelia wants stronger technical manufacturing capability." },
+    ],
+    futureInterests: [
+      { programme: "Improvement Practitioner", fit: 72, why: "Worth discussing later if Amelia wants to focus on process improvement." },
+    ],
   };
 }
 
@@ -227,11 +330,44 @@ function getLeadGuidance(query: string): LeadGuidance {
 }
 
 function employeeAssistantMessage(persona: PersonaSummary, guidance: EmployeeGuidance, activeApplication?: RequestSummary) {
-  if (activeApplication) {
-    return `${persona.name.split(" ")[0]}, your current apprenticeship application is already active, so LevyTate is keeping you on one clear route. The strongest approved next fit remains ${guidance.primary.programme}, and you can use this workspace to understand why it suits your role while tracking ${activeApplication.manager}'s review.`;
+  const firstName = persona.name.split(" ")[0];
+  const activeBoundary = activeApplication
+    ? ` You already have ${activeApplication.pathway} in progress, so you cannot submit a second application right now. We can still explore options, compare routes, save ideas for later and prepare a conversation with ${activeApplication.manager}.`
+    : "";
+
+  if (guidance.intent === "data_ai_interest" || guidance.intent === "automation_interest") {
+    if (persona.name === "Daniel Carter") {
+      return `Good question, ${firstName}. Data and automation is very close to your current direction. Your Level 4 Data Analyst route can support deeper reporting, insight and automation leadership, while an AI and automation interest is still worth saving for a future development conversation.${activeBoundary}`;
+    }
+
+    return `Good question, ${firstName}. Data and automation could still be relevant to your production role at Portakabin. It could mean using data to improve production planning, spotting automation opportunities on the shop floor, building confidence with digital tools, or moving toward a future improvement, team leader or data-focused role.${activeBoundary}`;
   }
 
-  return `${persona.name.split(" ")[0]}, based on your current role as ${persona.role} and your goal of ${persona.careerGoal}, the strongest approved pathway is ${guidance.primary.programme}. It gives you the clearest next step inside Portakabin without opening multiple competing requests.`;
+  if (guidance.intent === "management_interest") {
+    if (persona.name === "Daniel Carter") {
+      return `That makes sense, ${firstName}. Your current Level 4 Data Analyst application could still support a management route if your future role is data leadership rather than general people management. If you want broader people or operational management, Level 3 Team Leader or Level 5 Operations Manager would be better routes to discuss with ${persona.manager}.${activeBoundary}`;
+    }
+
+    return `That makes sense, ${firstName}. A management route can grow from your production experience, especially if you want to build confidence in shift decisions, handovers and team coordination.${activeBoundary}`;
+  }
+
+  if (guidance.intent === "change_of_mind") {
+    return `Let's think that through, ${firstName}. Changing direction is fine to explore. The key is separating what you want to learn now from what you can apply for now, because LevyTate keeps one active application open at a time.${activeBoundary}`;
+  }
+
+  if (guidance.intent === "compare_routes") {
+    return `Let's compare the routes, ${firstName}. The best choice depends on whether you want technical depth, leadership confidence, data capability or wider operational development.${activeBoundary}`;
+  }
+
+  if (guidance.intent === "manager_conversation") {
+    return `A manager conversation is a good next step, ${firstName}. You can use LevyTate to turn your interest into a clear note about the role you want, the skills you want to build and how it could help the team.${activeBoundary}`;
+  }
+
+  if (activeApplication) {
+    return `Let's explore this together, ${firstName}. ${guidance.primary.programme} is one relevant route for your current role and goal, but we can still look at alternatives and future interests while your current application is being reviewed by ${activeApplication.manager}.`;
+  }
+
+  return `Let's think this through, ${firstName}. Based on your current role as ${persona.role} and your goal of ${persona.careerGoal}, ${guidance.primary.programme} looks like a useful route to explore. We can compare it with alternatives before you decide whether to apply.`;
 }
 
 function managerAssistantMessage(guidance: ManagerGuidance, pendingCount: number) {
@@ -259,6 +395,14 @@ function providerMatchDraftFromLeadGuidance(guidance: LeadGuidance): LevyTatePro
 }
 
 function employeeManagerMessageDraft(persona: PersonaSummary, guidance: EmployeeGuidance, activeApplication?: RequestSummary) {
+  if (guidance.intent === "data_ai_interest" || guidance.intent === "automation_interest") {
+    return `Hi ${persona.manager}, I am interested in exploring how data, digital tools or automation could support my future development. Could we talk about whether this links to my current route or whether it is something to save for later?`;
+  }
+
+  if (guidance.intent === "management_interest") {
+    return `Hi ${persona.manager}, I am interested in developing toward management. Could we talk about whether my current route supports that goal or whether a leadership pathway would be better later?`;
+  }
+
   if (activeApplication) {
     return `Hi ${persona.manager}, I wanted to share why ${activeApplication.pathway} is important for my development. It aligns with my goal of ${persona.careerGoal} and would help me build stronger capability in my current role as ${persona.role}.`;
   }
@@ -267,6 +411,13 @@ function employeeManagerMessageDraft(persona: PersonaSummary, guidance: Employee
 }
 
 function employeeRecommendedPathways(guidance: EmployeeGuidance) {
+  const futureInterestPathways = guidance.futureInterests?.map((item) => ({
+    title: item.programme,
+    reason: item.why,
+    availability: "not_available" as const,
+    fit: item.fit,
+  })) ?? [];
+
   return [
     {
       title: guidance.primary.programme,
@@ -282,6 +433,42 @@ function employeeRecommendedPathways(guidance: EmployeeGuidance) {
       availability: "alternative" as const,
       fit: item.fit,
     })),
+    ...futureInterestPathways,
+  ];
+}
+
+function employeeActions(guidance: EmployeeGuidance, activeApplication?: RequestSummary) {
+  if (activeApplication) {
+    if (guidance.intent === "data_ai_interest" || guidance.intent === "automation_interest") {
+      return [
+        { label: "Explore data and automation routes", type: "open_pathway" as const, target: "Digital, Data & AI" },
+        { label: "Compare with my current application", type: "compare_routes" as const, target: activeApplication.pathway },
+        { label: "Save this interest for later", type: "save_interest" as const, target: guidance.primary.programme },
+        { label: "Prepare a message for my manager", type: "prepare_manager_message" as const, target: activeApplication.manager },
+      ];
+    }
+
+    if (guidance.intent === "management_interest") {
+      return [
+        { label: "Compare routes", type: "compare_routes" as const, target: activeApplication.pathway },
+        { label: "Prepare manager conversation", type: "prepare_manager_message" as const, target: activeApplication.manager },
+        { label: "Save management interest", type: "save_interest" as const, target: guidance.primary.programme },
+        { label: "View current application", type: "open_my_applications" as const, target: "My Applications" },
+      ];
+    }
+
+    return [
+      { label: "Compare routes", type: "compare_routes" as const, target: activeApplication.pathway },
+      { label: "Save this interest", type: "save_interest" as const, target: guidance.primary.programme },
+      { label: "Prepare manager note", type: "prepare_manager_message" as const, target: activeApplication.manager },
+      { label: "View My Application", type: "open_my_applications" as const, target: "My Applications" },
+    ];
+  }
+
+  return [
+    { label: "View pathway", type: "open_pathway" as const, target: guidance.primary.programme },
+    { label: "Compare routes", type: "compare_routes" as const, target: guidance.primary.programme },
+    { label: "Start Application", type: "start_application" as const, target: guidance.primary.programme },
   ];
 }
 
@@ -313,18 +500,13 @@ export function buildFallbackResponse(request: LevyTateAiRequest): LevyTateAiRes
     const activeApplication = request.contextData?.activeApplication ?? activeApplicationFor(safeRequests, persona.name);
     const guidance = getEmployeeGuidance(request.userMessage, persona);
     const applicationWarning = activeApplication
-      ? "You already have an active apprenticeship application in progress. You can track this in My Applications."
+      ? "You have one active application in progress, so new submissions are paused. Exploration, comparison and manager conversations are still open."
       : null;
 
     return {
       source: "mock",
       assistantMessage: employeeAssistantMessage(persona, guidance, activeApplication),
-      recommendedActions: activeApplication
-        ? [{ label: "View My Application", type: "open_my_applications", target: "My Applications" }]
-        : [
-            { label: "View pathway", type: "open_pathway", target: guidance.primary.programme },
-            { label: "Start Application", type: "start_application", target: guidance.primary.programme },
-          ],
+      recommendedActions: employeeActions(guidance, activeApplication),
       recommendedPathways: employeeRecommendedPathways(guidance),
       applicationPrefill: activeApplication
         ? null

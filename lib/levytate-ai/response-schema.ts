@@ -46,7 +46,22 @@ export type EmployeeGuidance = {
   primary: EmployeePrimaryRecommendation;
   alternatives: EmployeeAlternativeRecommendation[];
   supportRequired: string;
+  intent?: EmployeeIntent;
+  availableNow?: EmployeeAlternativeRecommendation[];
+  futureInterests?: EmployeeAlternativeRecommendation[];
 };
+
+export type EmployeeIntent =
+  | "career_exploration"
+  | "data_ai_interest"
+  | "automation_interest"
+  | "management_interest"
+  | "application_help"
+  | "change_of_mind"
+  | "compare_routes"
+  | "manager_conversation"
+  | "pathway_explanation"
+  | "general_support";
 
 export type InsightSignal = [string, string];
 
@@ -118,7 +133,11 @@ export type LevyTateAiAction = {
     | "open_site_breakdown"
     | "open_reporting"
     | "open_final_approvals"
-    | "request_provider_matching";
+    | "request_provider_matching"
+    | "compare_routes"
+    | "save_interest"
+    | "prepare_manager_message"
+    | "ask_follow_up";
   target?: string;
 };
 

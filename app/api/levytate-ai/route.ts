@@ -244,7 +244,7 @@ function mergeEmployeeResponse(
     recommendedPathways: mergeEmployeePathways(fallback.recommendedPathways, generated.recommendedPathwayTitles),
     safetyNotes: mergeSafetyNotes(fallback.safetyNotes, generated.safetyNotes),
     applicationWarning: activeApplication
-      ? "You already have an active apprenticeship application in progress. You can track this in My Applications."
+      ? "You have one active application in progress, so new submissions are paused. Exploration, comparison and manager conversations are still open."
       : fallback.applicationWarning,
     managerMessageDraft: generated.managerMessageDraft ?? fallback.managerMessageDraft,
   };
