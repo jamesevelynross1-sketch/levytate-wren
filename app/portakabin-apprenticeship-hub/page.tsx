@@ -2,6 +2,12 @@
 
 import { FormEvent, useEffect, useMemo, useState, type ReactNode } from "react";
 import { LevyTateLogo, PlatformButton, PlatformMetric, PlatformPanel, PlatformTopBar, type PlatformNavSection } from "@/components/levytate-demo/PlatformShell";
+import { buildFallbackResponse } from "@/lib/levytate-ai/fallback";
+import type {
+  LevyTateAiRequest as ApiLevyTateAiRequest,
+  LevyTateAiResponse as ApiLevyTateAiResponse,
+  LevyTateConversationMessage,
+} from "@/lib/levytate-ai/response-schema";
 
 type Role = "Employee" | "Line Manager" | "Department Head" | "Apprenticeship Lead" | "Admin Console";
 type DemandScenario = "Low" | "Medium" | "High";
@@ -535,98 +541,6 @@ const advisoryPromptExamples = [
     prompt: "Which apprenticeship standards support a leadership pipeline for Site Supervisors?",
   },
 ];
-
-const apprenticeshipAdviceMappings: Record<string, ApprenticeshipAdvice> = {
-  maintenance: {
-    interpretedRole: "Maintenance Manager",
-    workforceNeed: "Technical leadership, maintenance planning, compliance, team supervision and operational improvement.",
-    recommendedStandards: [
-      { name: "Engineering Technician", level: "Level 3", suitability: 88, why: "Strong fit for technical maintenance capability and engineering competence.", bestFor: "Maintenance capability and engineering evidence.", delivery: "Site evidence, technical workshops and workplace projects." },
-      { name: "Operations Manager", level: "Level 5", suitability: 82, why: "Strong fit where the role includes people management, planning and operational accountability.", bestFor: "Maintenance leaders with wider operational ownership.", delivery: "Blended management workshops and business improvement activity." },
-      { name: "Improvement Practitioner", level: "Level 4", suitability: 76, why: "Useful where the business wants process improvement and productivity gains.", bestFor: "Maintenance process, downtime and productivity projects.", delivery: "Project-based improvement coaching." },
-    ],
-    alternativeStandards: ["Level 3 Team Leader", "Level 4 Associate Project Manager"],
-    businessRationale: "For a Maintenance Manager, the strongest route depends on whether the priority is technical depth, leadership capability or operational improvement. If the individual already has strong technical skills, a management or improvement pathway may create greater business value.",
-    fundingRoute: "Potentially funded through apprenticeship levy or co-investment, subject to eligibility and programme suitability.",
-    providerMatchingPrompt: "Review provider fit for engineering delivery, site evidence, leadership coaching and operational improvement priorities.",
-  },
-  procurement: {
-    interpretedRole: "Procurement Lead",
-    workforceNeed: "Commercial capability, supplier performance, contract discipline, negotiation and succession readiness.",
-    recommendedStandards: [
-      { name: "Commercial Procurement and Supply", level: "Level 4", suitability: 92, why: "Direct fit for procurement practice, supplier management and commercial decision making.", bestFor: "Procurement leads and emerging category owners.", delivery: "Blended commercial workshops with live procurement evidence." },
-      { name: "Senior Procurement and Supply Chain Professional", level: "Level 6", suitability: 84, why: "Suitable for senior progression where strategic procurement ownership is expected.", bestFor: "Succession planning for senior procurement roles.", delivery: "Longer strategic programme with work-based commercial projects." },
-      { name: "Operations Manager", level: "Level 5", suitability: 78, why: "Useful where procurement leadership is linked to wider operational accountability.", bestFor: "Procurement leads moving into broader business leadership.", delivery: "Blended leadership and operational planning." },
-    ],
-    alternativeStandards: ["Level 3 Procurement and Supply Assistant", "Level 4 Business Analyst"],
-    businessRationale: "For procurement succession, LevyTate would usually separate technical procurement capability from broader leadership readiness. The strongest match depends on whether the priority is category expertise, contract discipline or progression into senior operational leadership.",
-    fundingRoute: "Potentially levy-funded or supported through co-investment, subject to learner eligibility and the selected standard.",
-    providerMatchingPrompt: "Identify providers with procurement depth, commercial tutor strength and delivery models suited to Portakabin locations.",
-  },
-  customerai: {
-    interpretedRole: "Customer Service AI Capability",
-    workforceNeed: "Future AI awareness, data confidence, customer insight, automation opportunities and service improvement.",
-    recommendedStandards: [
-      { name: "Data Technician", level: "Level 3", suitability: 86, why: "Builds practical data handling and reporting confidence for customer service teams.", bestFor: "Customer colleagues starting with data and automation.", delivery: "Remote workshops with customer service data projects." },
-      { name: "Data Analyst", level: "Level 4", suitability: 82, why: "Supports stronger insight generation, trend analysis and service performance reporting.", bestFor: "Customer insight and reporting roles.", delivery: "Applied analytics projects and portfolio evidence." },
-      { name: "Business Analyst", level: "Level 4", suitability: 80, why: "Useful where the team needs to redesign processes and improve systems adoption.", bestFor: "Service improvement and systems change.", delivery: "Workshops, stakeholder discovery and change documentation." },
-      { name: "AI and Automation Workforce Programme", level: "Workforce programme", suitability: 78, why: "Helps teams understand AI use cases and automation opportunities before formal apprenticeship demand is confirmed.", bestFor: "Early-stage AI capability building.", delivery: "Short strategic capability sprint and opportunity mapping." },
-    ],
-    alternativeStandards: ["Level 3 Team Leader", "Level 4 Improvement Practitioner"],
-    businessRationale: "For customer service AI capability, the best route depends on whether the immediate priority is data literacy, workflow automation or service process redesign. A staged approach may create stronger adoption before committing to a single cohort.",
-    fundingRoute: "Apprenticeship elements may be potentially levy-funded or co-invested, subject to eligibility. Non-apprenticeship workforce programmes would need separate commercial review.",
-    providerMatchingPrompt: "Review providers with data, business analysis and AI readiness capability, with delivery suited to customer operations.",
-  },
-  site: {
-    interpretedRole: "Site Supervisor",
-    workforceNeed: "Team leadership, site coordination, construction supervision, operational accountability and project handover discipline.",
-    recommendedStandards: [
-      { name: "Team Leader", level: "Level 3", suitability: 90, why: "Strong fit for first-line people leadership, performance routines and team coordination.", bestFor: "New or emerging site supervisors.", delivery: "Blended workshops with live team improvement activity." },
-      { name: "Construction Site Supervisor", level: "Level 4", suitability: 86, why: "Direct fit where site compliance, supervision and handover control are key.", bestFor: "Supervisors in construction or installation environments.", delivery: "Site evidence, technical supervision and compliance activity." },
-      { name: "Operations Manager", level: "Level 5", suitability: 79, why: "Appropriate where the role includes wider planning, resource control and operational ownership.", bestFor: "Experienced supervisors progressing into operations management.", delivery: "Leadership coaching and operational improvement projects." },
-    ],
-    alternativeStandards: ["Level 4 Associate Project Manager", "Level 4 Improvement Practitioner"],
-    businessRationale: "For Site Supervisors, the right pathway depends on whether the gap is first-line leadership, construction supervision or wider operational control. A mixed cohort may be useful if supervisor experience levels vary.",
-    fundingRoute: "Potentially funded through apprenticeship levy or co-investment, subject to eligibility and programme suitability.",
-    providerMatchingPrompt: "Match providers with site supervision credibility, regional coverage and flexible delivery for operational teams.",
-  },
-  operationsdata: {
-    interpretedRole: "Operations Data Skills",
-    workforceNeed: "Operational reporting, planning insight, workflow analysis, data quality and evidence-led decision making.",
-    recommendedStandards: [
-      { name: "Data Technician", level: "Level 3", suitability: 89, why: "Strong entry route for operational colleagues building reporting and data handling skills.", bestFor: "Operations teams starting with dashboards and data quality.", delivery: "Remote workshops with applied internal datasets." },
-      { name: "Data Analyst", level: "Level 4", suitability: 84, why: "Supports deeper insight, operational trend analysis and performance reporting.", bestFor: "Analysts and coordinators supporting capacity planning.", delivery: "Applied analytics with workplace projects." },
-      { name: "Business Analyst", level: "Level 4", suitability: 78, why: "Useful when data skills need to translate into systems improvement and process change.", bestFor: "Operations improvement and workflow redesign.", delivery: "Stakeholder discovery and process mapping evidence." },
-    ],
-    alternativeStandards: ["Level 4 Improvement Practitioner", "Level 5 Operations Manager"],
-    businessRationale: "For operations data capability, LevyTate would normally separate foundational data skills from process improvement and operating model change. The recommendation depends on whether the immediate need is reporting accuracy, insight capability or workflow redesign.",
-    fundingRoute: "Potentially levy-funded or co-invested where apprenticeship eligibility and role relevance are confirmed.",
-    providerMatchingPrompt: "Shortlist providers with data delivery strength, operational project experience and flexible workshop models.",
-  },
-  default: {
-    interpretedRole: "Workforce Capability Need",
-    workforceNeed: "Role capability, future skills, progression planning and programme fit review.",
-    recommendedStandards: [
-      { name: "Team Leader", level: "Level 3", suitability: 78, why: "Relevant where the requirement includes first-line leadership or progression readiness.", bestFor: "Emerging managers and supervisors.", delivery: "Blended workshops with workplace leadership evidence." },
-      { name: "Business Analyst", level: "Level 4", suitability: 74, why: "Useful where the need includes systems, process or change analysis.", bestFor: "Operational change and service improvement roles.", delivery: "Applied business analysis projects." },
-      { name: "Operations Manager", level: "Level 5", suitability: 72, why: "Suitable where the requirement includes accountability for teams, planning or delivery outcomes.", bestFor: "Experienced leaders with wider operational ownership.", delivery: "Leadership coaching and strategic improvement work." },
-    ],
-    alternativeStandards: ["Level 3 Data Technician", "Level 4 Improvement Practitioner"],
-    businessRationale: "The requirement needs a programme fit review to confirm whether the priority is leadership, technical capability, data confidence or operational improvement. LevyTate can qualify the need before provider matching.",
-    fundingRoute: "Potentially funded through apprenticeship levy or co-investment, subject to eligibility and programme suitability.",
-    providerMatchingPrompt: "Submit the requirement for LevyTate review so provider fit can be assessed against role, site, delivery model and employer priorities.",
-  },
-};
-
-function getApprenticeshipAdvice(query: string): ApprenticeshipAdvice {
-  const normalized = query.toLowerCase();
-  if (normalized.includes("maintenance")) return apprenticeshipAdviceMappings.maintenance;
-  if (normalized.includes("procurement") || normalized.includes("supply")) return apprenticeshipAdviceMappings.procurement;
-  if ((normalized.includes("customer") && (normalized.includes("ai") || normalized.includes("automation"))) || normalized.includes("service team")) return apprenticeshipAdviceMappings.customerai;
-  if (normalized.includes("site supervisor") || normalized.includes("site supervisors")) return apprenticeshipAdviceMappings.site;
-  if ((normalized.includes("data") && normalized.includes("operations")) || normalized.includes("operational data")) return apprenticeshipAdviceMappings.operationsdata;
-  return apprenticeshipAdviceMappings.default;
-}
 
 const portakabinLearners: Learner[] = [
   { name: "Amelia Hart", role: "Production Team Member", department: "Manufacturing", site: "York Head Office, Visitor Centre and UK Factory", programme: "Manufacturing & Production", status: "Manager review", progress: 18, lineManager: "Ryan Booth", startDate: "2026-03-04" },
@@ -2590,6 +2504,7 @@ function DetailSection({
     return (
       <AskLevyTateAIPage
         role={role}
+        selectedSite={selectedSite}
         selectedPersona={selectedPersona}
         requests={requests}
         onStatus={onStatus}
@@ -3570,8 +3485,44 @@ function DemoControls({ scenario, onScenario, onSeed, onReset }: { scenario: Dem
   );
 }
 
+async function requestLevyTateAI(payload: ApiLevyTateAiRequest): Promise<ApiLevyTateAiResponse> {
+  try {
+    const response = await fetch("/api/levytate-ai", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      throw new Error(`LevyTate AI request failed with status ${response.status}.`);
+    }
+
+    return (await response.json()) as ApiLevyTateAiResponse;
+  } catch (error) {
+    console.error("Falling back to deterministic LevyTate AI guidance.", error);
+    return buildFallbackResponse(payload);
+  }
+}
+
+function AIGuidanceCallout({ result }: { result: ApiLevyTateAiResponse }) {
+  const sourceLabel = result.source === "openai" ? "Live GenAI guidance" : "Guided fallback";
+
+  return (
+    <div className="rounded-[1rem] border border-[#102c3d]/[0.055] bg-[#f8fbfa] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.84)]">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">{sourceLabel}</p>
+        {result.safetyNotes[0] ? <span className="rounded-full bg-white px-3 py-1 text-[10px] font-semibold text-[#102c3d]/52 ring-1 ring-[#102c3d]/[0.06]">{result.safetyNotes[0]}</span> : null}
+      </div>
+      <p className="mt-2 text-sm leading-6 text-[#102c3d]/66">{result.assistantMessage}</p>
+    </div>
+  );
+}
+
 function AskLevyTateAIPage({
   role,
+  selectedSite,
   selectedPersona,
   requests,
   onStatus,
@@ -3580,6 +3531,7 @@ function AskLevyTateAIPage({
   activeApplication,
 }: {
   role: Role;
+  selectedSite: string;
   selectedPersona: EmployeePersona;
   requests: RequestItem[];
   onStatus: (id: number, status: RequestStatus) => void;
@@ -3592,37 +3544,57 @@ function AskLevyTateAIPage({
   }
 
   if (role === "Line Manager") {
-    return <LineManagerAIPage requests={requests} onStatus={onStatus} onNavigate={onNavigate} />;
+    return <LineManagerAIPage requests={requests} selectedSite={selectedSite} onStatus={onStatus} onNavigate={onNavigate} />;
   }
 
   if (role === "Department Head") {
-    return <DepartmentHeadAIPage requests={requests} onNavigate={onNavigate} />;
+    return <DepartmentHeadAIPage requests={requests} selectedSite={selectedSite} onNavigate={onNavigate} />;
   }
 
-  return <ApprenticeshipLeadAIPage />;
+  return <ApprenticeshipLeadAIPage selectedSite={selectedSite} />;
 }
 
-function ApprenticeshipLeadAIPage() {
+function ApprenticeshipLeadAIPage({ selectedSite }: { selectedSite: string }) {
   const [query, setQuery] = useState("");
-  const [advice, setAdvice] = useState<ApprenticeshipAdvice | null>(null);
+  const [result, setResult] = useState<ApiLevyTateAiResponse | null>(null);
+  const [history, setHistory] = useState<LevyTateConversationMessage[]>([]);
+  const [loading, setLoading] = useState(false);
   const [matchingOpen, setMatchingOpen] = useState(false);
   const [submittedSummary, setSubmittedSummary] = useState<ProviderMatchingRequest | null>(null);
   const [matchingRequests, setMatchingRequests] = useState<ProviderMatchingRequest[]>([
     { id: 1, date: "11 Jun 2026", need: "Procurement Lead succession", programme: "Level 4 Commercial Procurement and Supply", sites: "York Head Office", learners: "3", status: "Under Review", delivery: "Blended", funding: "Levy", urgency: "Within 6 months" },
     { id: 2, date: "10 Jun 2026", need: "Data skills in Operations", programme: "Level 3 Data Technician", sites: "All sites", learners: "8", status: "Provider Shortlist Being Prepared", delivery: "Flexible", funding: "Unsure", urgency: "Within 3 months" },
   ]);
+  const advice = result?.leadGuidance ?? null;
 
-  function submitQuestion(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!query.trim()) return;
-    setAdvice(getApprenticeshipAdvice(query));
+  async function runLeadQuery(promptText: string) {
+    if (!promptText.trim()) return;
+
+    setLoading(true);
+    const nextHistory: LevyTateConversationMessage[] = [...history, { role: "user", content: promptText }];
+    const aiResult = await requestLevyTateAI({
+      role: "Apprenticeship Lead",
+      selectedSite,
+      currentSection: "Ask LevyTate AI",
+      userMessage: promptText,
+      conversationHistory: nextHistory,
+      employerContext: "Portakabin",
+    });
+    setResult(aiResult);
+    setHistory([...nextHistory, { role: "assistant", content: aiResult.assistantMessage }]);
     setSubmittedSummary(null);
+    setMatchingOpen(false);
+    setLoading(false);
   }
 
-  function applyPrompt(prompt: string) {
+  async function submitQuestion(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await runLeadQuery(query);
+  }
+
+  async function applyPrompt(prompt: string) {
     setQuery(prompt);
-    setAdvice(getApprenticeshipAdvice(prompt));
-    setSubmittedSummary(null);
+    await runLeadQuery(prompt);
   }
 
   function submitProviderMatching(event: FormEvent<HTMLFormElement>) {
@@ -3664,7 +3636,7 @@ function ApprenticeshipLeadAIPage() {
               />
             </label>
             <div className="mt-4 flex flex-wrap items-center gap-2">
-              <PlatformButton>Generate recommendation</PlatformButton>
+              <PlatformButton>{loading ? "Generating guidance..." : "Generate recommendation"}</PlatformButton>
               <button type="button" onClick={() => setQuery("")} className="h-10 rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.06] transition hover:text-[#102c3d]">Clear</button>
             </div>
           </form>
@@ -3673,7 +3645,7 @@ function ApprenticeshipLeadAIPage() {
             <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#c95568]">Example prompts</p>
             <div className="mt-3 grid gap-2">
               {advisoryPromptExamples.map((example) => (
-                <button key={example.label} onClick={() => applyPrompt(example.prompt)} className="rounded-xl border border-[#102c3d]/[0.055] bg-[#f8fbfa] px-3.5 py-2.5 text-left text-sm font-semibold text-[#102c3d]/70 transition hover:border-[#159b8f]/25 hover:bg-white hover:text-[#102c3d]">
+                <button key={example.label} type="button" onClick={() => void applyPrompt(example.prompt)} className="rounded-xl border border-[#102c3d]/[0.055] bg-[#f8fbfa] px-3.5 py-2.5 text-left text-sm font-semibold text-[#102c3d]/70 transition hover:border-[#159b8f]/25 hover:bg-white hover:text-[#102c3d]">
                   {example.label}
                 </button>
               ))}
@@ -3684,6 +3656,7 @@ function ApprenticeshipLeadAIPage() {
 
       {advice ? (
       <PlatformPanel eyebrow="Structured recommendation" title="Programme fit review">
+        {result ? <div className="mb-4"><AIGuidanceCallout result={result} /></div> : null}
         <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
           <div className="grid gap-3">
             <InfoBox label="Role" value={advice.interpretedRole} />
@@ -3779,26 +3752,50 @@ function EmployeeAIPage({
 }) {
   const examples = ["I want to become a team leader.", "I work in production. What apprenticeships suit me?", "I'm interested in data and automation.", "Which pathway would help me progress at Portakabin?", "Can you help me apply?"];
   const [query, setQuery] = useState("");
-  const [response, setResponse] = useState<ReturnType<typeof getEmployeeAIResponse> | null>(null);
+  const [result, setResult] = useState<ApiLevyTateAiResponse | null>(null);
+  const [history, setHistory] = useState<LevyTateConversationMessage[]>([]);
+  const [loading, setLoading] = useState(false);
   const [savedMessage, setSavedMessage] = useState("");
   const [compareOpen, setCompareOpen] = useState(false);
   const [applicationOpen, setApplicationOpen] = useState(false);
   const [confirmation, setConfirmation] = useState<RequestItem | null>(null);
   const employeeApplications = requests.filter((request) => request.name === selectedPersona.name);
+  const response = result?.employeeGuidance ?? null;
 
-  function askQuestion(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!query.trim()) return;
-    setResponse(getEmployeeAIResponse(query, selectedPersona));
+  async function runEmployeeQuery(promptText: string) {
+    if (!promptText.trim()) return;
+
+    setLoading(true);
+    const nextHistory: LevyTateConversationMessage[] = [...history, { role: "user", content: promptText }];
+    const aiResult = await requestLevyTateAI({
+      role: "Employee",
+      selectedEmployee: selectedPersona.name,
+      selectedSite: selectedPersona.site,
+      currentSection: "Ask LevyTate AI",
+      userMessage: promptText,
+      conversationHistory: nextHistory,
+      employerContext: "Portakabin",
+      contextData: {
+        selectedPersona,
+        activeApplication: activeApplication ?? null,
+        requests,
+      },
+    });
+    setResult(aiResult);
+    setHistory([...nextHistory, { role: "assistant", content: aiResult.assistantMessage }]);
     setApplicationOpen(false);
     setConfirmation(null);
+    setLoading(false);
   }
 
-  function applyPrompt(prompt: string) {
+  async function askQuestion(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await runEmployeeQuery(query);
+  }
+
+  async function applyPrompt(prompt: string) {
     setQuery(prompt);
-    setResponse(getEmployeeAIResponse(prompt, selectedPersona));
-    setApplicationOpen(false);
-    setConfirmation(null);
+    await runEmployeeQuery(prompt);
   }
 
   function submitAIApplication(event: FormEvent<HTMLFormElement>) {
@@ -3841,8 +3838,8 @@ function EmployeeAIPage({
               />
             </label>
             <div className="mt-4 flex flex-wrap gap-2">
-              <PlatformButton>Find pathway</PlatformButton>
-              <button type="button" onClick={() => applyPrompt("Can you help me apply?")} className="h-10 rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.06] transition hover:text-[#102c3d]">Help me apply</button>
+              <PlatformButton>{loading ? "Finding guidance..." : "Find pathway"}</PlatformButton>
+              <button type="button" onClick={() => void applyPrompt("Can you help me apply?")} className="h-10 rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.06] transition hover:text-[#102c3d]">Help me apply</button>
             </div>
           </form>
 
@@ -3850,7 +3847,7 @@ function EmployeeAIPage({
             <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#c95568]">Example prompts</p>
             <div className="mt-3 grid gap-2">
               {examples.map((prompt) => (
-                <button key={prompt} onClick={() => applyPrompt(prompt)} className="rounded-xl border border-[#102c3d]/[0.055] bg-[#f8fbfa] px-3.5 py-2.5 text-left text-sm font-semibold text-[#102c3d]/70 transition hover:border-[#159b8f]/25 hover:bg-white hover:text-[#102c3d]">
+                <button key={prompt} type="button" onClick={() => void applyPrompt(prompt)} className="rounded-xl border border-[#102c3d]/[0.055] bg-[#f8fbfa] px-3.5 py-2.5 text-left text-sm font-semibold text-[#102c3d]/70 transition hover:border-[#159b8f]/25 hover:bg-white hover:text-[#102c3d]">
                   {prompt}
                 </button>
               ))}
@@ -3861,6 +3858,7 @@ function EmployeeAIPage({
 
       {response ? (
       <PlatformPanel eyebrow="Personal recommendation" title={`${selectedPersona.name.split(" ")[0]}'s recommended route`}>
+        {result ? <div className="mb-4"><AIGuidanceCallout result={result} /></div> : null}
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
           <article className="rounded-[1rem] border border-[#159b8f]/[0.18] bg-[#f8fbfa] p-5 shadow-[0_12px_28px_rgba(16,44,61,0.045)]">
             <div className="flex flex-wrap items-start justify-between gap-4">
@@ -3885,7 +3883,7 @@ function EmployeeAIPage({
               ) : (
                 <PlatformButton variant="amber" onClick={() => setApplicationOpen(true)}>Start application</PlatformButton>
               )}
-              <button onClick={() => applyPrompt("What else should I consider before applying?")} className="h-10 rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.06] transition hover:text-[#102c3d]">Ask follow-up</button>
+              <button type="button" onClick={() => void applyPrompt("What else should I consider before applying?")} className="h-10 rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.06] transition hover:text-[#102c3d]">Ask follow-up</button>
             </div>
             {savedMessage ? <p className="mt-3 rounded-xl bg-white px-3 py-2 text-xs font-semibold text-[#0b6f63] ring-1 ring-[#102c3d]/[0.05]">{savedMessage}</p> : null}
             {activeApplication ? <ActiveApplicationNotice application={activeApplication} onView={() => onNavigate("My Applications")} /> : null}
@@ -3917,17 +3915,17 @@ function EmployeeAIPage({
       {applicationOpen && response && !activeApplication ? (
         <PlatformPanel eyebrow="AI prepared application" title="Review and submit to line manager">
           <form onSubmit={submitAIApplication} className="grid gap-4 md:grid-cols-2">
-            <Field name="pathway" label="Selected apprenticeship" defaultValue={response.primary.programme} />
-            <Field name="careerGoal" label="Career goal" defaultValue={selectedPersona.careerGoal} />
+            <Field name="pathway" label="Selected apprenticeship" defaultValue={result?.applicationPrefill?.selectedApprenticeship ?? response.primary.programme} />
+            <Field name="careerGoal" label="Career goal" defaultValue={result?.applicationPrefill?.careerGoal ?? selectedPersona.careerGoal} />
             <Field name="role" label="Role" defaultValue={selectedPersona.role} />
             <Field name="manager" label="Line manager" defaultValue={selectedPersona.manager} />
             <label className="grid gap-1.5 text-xs font-medium text-[#102c3d]/62 md:col-span-2">
               Reason for interest
-              <textarea name="reason" rows={4} className="min-w-0 rounded-xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3.5 py-3 text-sm leading-6 outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10" defaultValue={response.primary.draftReason} />
+              <textarea name="reason" rows={4} className="min-w-0 rounded-xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3.5 py-3 text-sm leading-6 outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10" defaultValue={result?.applicationPrefill?.reasonForInterest ?? response.primary.draftReason} />
             </label>
             <label className="grid gap-1.5 text-xs font-medium text-[#102c3d]/62 md:col-span-2">
               Any support required
-              <textarea name="supportRequired" rows={3} className="min-w-0 rounded-xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3.5 py-3 text-sm leading-6 outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10" defaultValue={response.supportRequired} />
+              <textarea name="supportRequired" rows={3} className="min-w-0 rounded-xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3.5 py-3 text-sm leading-6 outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10" defaultValue={result?.applicationPrefill?.supportRequired ?? response.supportRequired} />
             </label>
             <label className="flex items-start gap-3 rounded-xl border border-[#102c3d]/[0.045] bg-[#f8fbfa] p-3.5 text-sm leading-6 text-[#102c3d]/62 md:col-span-2">
               <input type="checkbox" required className="mt-1 h-4 w-4 accent-[#159b8f]" />
@@ -3970,23 +3968,46 @@ function EmployeeAIPage({
   );
 }
 
-function LineManagerAIPage({ requests, onStatus, onNavigate }: { requests: RequestItem[]; onStatus: (id: number, status: RequestStatus) => void; onNavigate: (section: SectionKey) => void }) {
+function LineManagerAIPage({ requests, selectedSite, onStatus, onNavigate }: { requests: RequestItem[]; selectedSite: string; onStatus: (id: number, status: RequestStatus) => void; onNavigate: (section: SectionKey) => void }) {
   const examples = ["Should I approve Amelia's Team Leader application?", "Which members of my team could benefit from leadership development?", "Where are the biggest skills gaps in my team?", "What apprenticeship pathways suit my production team?"];
   const [query, setQuery] = useState("");
-  const [response, setResponse] = useState<ReturnType<typeof getManagerAIResponse> | null>(null);
+  const [result, setResult] = useState<ApiLevyTateAiResponse | null>(null);
+  const [history, setHistory] = useState<LevyTateConversationMessage[]>([]);
+  const [loading, setLoading] = useState(false);
   const teamRequests = requests.filter((request) => request.manager === "Ryan Booth");
   const pending = teamRequests.filter((request) => request.status === "Submitted to Line Manager" || request.status === "Awaiting Manager Review");
   const target = pending[0];
+  const response = result?.managerGuidance ?? null;
 
-  function askQuestion(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!query.trim()) return;
-    setResponse(getManagerAIResponse(query, teamRequests));
+  async function runManagerQuery(promptText: string) {
+    if (!promptText.trim()) return;
+
+    setLoading(true);
+    const nextHistory: LevyTateConversationMessage[] = [...history, { role: "user", content: promptText }];
+    const aiResult = await requestLevyTateAI({
+      role: "Line Manager",
+      selectedSite,
+      currentSection: "Ask LevyTate AI",
+      userMessage: promptText,
+      conversationHistory: nextHistory,
+      employerContext: "Portakabin",
+      contextData: {
+        requests,
+      },
+    });
+    setResult(aiResult);
+    setHistory([...nextHistory, { role: "assistant", content: aiResult.assistantMessage }]);
+    setLoading(false);
   }
 
-  function applyPrompt(prompt: string) {
+  async function askQuestion(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await runManagerQuery(query);
+  }
+
+  async function applyPrompt(prompt: string) {
     setQuery(prompt);
-    setResponse(getManagerAIResponse(prompt, teamRequests));
+    await runManagerQuery(prompt);
   }
 
   return (
@@ -3997,13 +4018,13 @@ function LineManagerAIPage({ requests, onStatus, onNavigate }: { requests: Reque
           <form onSubmit={askQuestion} className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-[#f8fbfa] p-4">
             <p className="text-sm leading-6 text-[#102c3d]/62">Get support developing your team and reviewing apprenticeship requests.</p>
             <textarea value={query} onChange={(event) => setQuery(event.target.value)} rows={4} placeholder="Should I approve Amelia's Team Leader application?" className="mt-4 min-h-[112px] w-full rounded-xl border border-[#102c3d]/[0.09] bg-white px-4 py-3 text-base font-medium leading-7 text-[#102c3d] outline-none transition placeholder:text-[#102c3d]/32 focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10" />
-            <PlatformButton className="mt-4">Generate manager guidance</PlatformButton>
+            <PlatformButton className="mt-4">{loading ? "Generating guidance..." : "Generate manager guidance"}</PlatformButton>
           </form>
           <div className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-white p-4 shadow-[0_10px_26px_rgba(16,44,61,0.045)]">
             <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#c95568]">Example prompts</p>
             <div className="mt-3 grid gap-2">
               {examples.map((prompt) => (
-                <button key={prompt} onClick={() => applyPrompt(prompt)} className="rounded-xl border border-[#102c3d]/[0.055] bg-[#f8fbfa] px-3.5 py-2.5 text-left text-sm font-semibold text-[#102c3d]/70 transition hover:border-[#159b8f]/25 hover:bg-white hover:text-[#102c3d]">{prompt}</button>
+                <button key={prompt} type="button" onClick={() => void applyPrompt(prompt)} className="rounded-xl border border-[#102c3d]/[0.055] bg-[#f8fbfa] px-3.5 py-2.5 text-left text-sm font-semibold text-[#102c3d]/70 transition hover:border-[#159b8f]/25 hover:bg-white hover:text-[#102c3d]">{prompt}</button>
               ))}
             </div>
           </div>
@@ -4012,6 +4033,7 @@ function LineManagerAIPage({ requests, onStatus, onNavigate }: { requests: Reque
 
       {response ? (
       <PlatformPanel eyebrow="AI recommendation" title={response.title}>
+        {result ? <div className="mb-4"><AIGuidanceCallout result={result} /></div> : null}
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
           <div className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-[#f8fbfa] p-4">
             <p className="text-sm leading-6 text-[#102c3d]/64">{response.summary}</p>
@@ -4038,23 +4060,45 @@ function LineManagerAIPage({ requests, onStatus, onNavigate }: { requests: Reque
   );
 }
 
-function DepartmentHeadAIPage({ requests, onNavigate }: { requests: RequestItem[]; onNavigate: (section: SectionKey) => void }) {
+function DepartmentHeadAIPage({ requests, selectedSite, onNavigate }: { requests: RequestItem[]; selectedSite: string; onNavigate: (section: SectionKey) => void }) {
   const examples = ["What percentage of my department is on an apprenticeship?", "Which sites have the lowest apprenticeship participation?", "Where are our future skills risks?", "What should I include in a department workforce plan?"];
   const [query, setQuery] = useState("");
-  const [response, setResponse] = useState<ReturnType<typeof getDepartmentHeadAIResponse> | null>(null);
+  const [result, setResult] = useState<ApiLevyTateAiResponse | null>(null);
+  const [history, setHistory] = useState<LevyTateConversationMessage[]>([]);
+  const [loading, setLoading] = useState(false);
   const [exported, setExported] = useState(false);
+  const response = result?.departmentGuidance ?? null;
 
-  function askQuestion(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!query.trim()) return;
-    setResponse(getDepartmentHeadAIResponse(query, requests));
+  async function runDepartmentQuery(promptText: string) {
+    if (!promptText.trim()) return;
+
+    setLoading(true);
+    const nextHistory: LevyTateConversationMessage[] = [...history, { role: "user", content: promptText }];
+    const aiResult = await requestLevyTateAI({
+      role: "Department Head",
+      selectedSite,
+      currentSection: "Ask LevyTate AI",
+      userMessage: promptText,
+      conversationHistory: nextHistory,
+      employerContext: "Portakabin",
+      contextData: {
+        requests,
+      },
+    });
+    setResult(aiResult);
+    setHistory([...nextHistory, { role: "assistant", content: aiResult.assistantMessage }]);
     setExported(false);
+    setLoading(false);
   }
 
-  function applyPrompt(prompt: string) {
+  async function askQuestion(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await runDepartmentQuery(query);
+  }
+
+  async function applyPrompt(prompt: string) {
     setQuery(prompt);
-    setResponse(getDepartmentHeadAIResponse(prompt, requests));
-    setExported(false);
+    await runDepartmentQuery(prompt);
   }
 
   return (
@@ -4065,13 +4109,13 @@ function DepartmentHeadAIPage({ requests, onNavigate }: { requests: RequestItem[
           <form onSubmit={askQuestion} className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-[#f8fbfa] p-4">
             <p className="text-sm leading-6 text-[#102c3d]/62">Understand department capability, participation and workforce risk. This role has no individual approval actions.</p>
             <textarea value={query} onChange={(event) => setQuery(event.target.value)} rows={4} placeholder="Where are our future skills risks?" className="mt-4 min-h-[112px] w-full rounded-xl border border-[#102c3d]/[0.09] bg-white px-4 py-3 text-base font-medium leading-7 text-[#102c3d] outline-none transition placeholder:text-[#102c3d]/32 focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10" />
-            <PlatformButton className="mt-4">Generate workforce insight</PlatformButton>
+            <PlatformButton className="mt-4">{loading ? "Generating insight..." : "Generate workforce insight"}</PlatformButton>
           </form>
           <div className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-white p-4 shadow-[0_10px_26px_rgba(16,44,61,0.045)]">
             <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#c95568]">Example prompts</p>
             <div className="mt-3 grid gap-2">
               {examples.map((prompt) => (
-                <button key={prompt} onClick={() => applyPrompt(prompt)} className="rounded-xl border border-[#102c3d]/[0.055] bg-[#f8fbfa] px-3.5 py-2.5 text-left text-sm font-semibold text-[#102c3d]/70 transition hover:border-[#159b8f]/25 hover:bg-white hover:text-[#102c3d]">{prompt}</button>
+                <button key={prompt} type="button" onClick={() => void applyPrompt(prompt)} className="rounded-xl border border-[#102c3d]/[0.055] bg-[#f8fbfa] px-3.5 py-2.5 text-left text-sm font-semibold text-[#102c3d]/70 transition hover:border-[#159b8f]/25 hover:bg-white hover:text-[#102c3d]">{prompt}</button>
               ))}
             </div>
           </div>
@@ -4080,6 +4124,7 @@ function DepartmentHeadAIPage({ requests, onNavigate }: { requests: RequestItem[
 
       {response ? (
       <PlatformPanel eyebrow="Department insight" title={response.title}>
+        {result ? <div className="mb-4"><AIGuidanceCallout result={result} /></div> : null}
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
           <div className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-[#f8fbfa] p-4">
             <p className="text-sm leading-6 text-[#102c3d]/64">{response.summary}</p>
@@ -4104,113 +4149,6 @@ function DepartmentHeadAIPage({ requests, onNavigate }: { requests: RequestItem[
       ) : null}
     </div>
   );
-}
-
-function getEmployeeAIResponse(prompt: string, persona: EmployeePersona) {
-  const normalised = prompt.toLowerCase();
-  const isDaniel = persona.name === "Daniel Carter";
-  const wantsAI = normalised.includes("ai") || normalised.includes("automation");
-
-  if (isDaniel && wantsAI) {
-    return {
-      primary: {
-        programme: "AI & Automation Workforce Programme",
-        pathway: "Digital, Data & AI",
-        provider: "QA",
-        fit: 94,
-        why: "This route supports practical AI adoption, automation opportunities and data-enabled process improvement.",
-        draftReason: "I am interested in the AI & Automation Workforce Programme because I want to build practical confidence using AI and automation to improve reporting workflows, reduce manual tasks and support data-enabled process improvement.",
-      },
-      alternatives: [
-        { programme: "Level 4 Data Analyst", fit: 91, why: "Best fit for deeper analysis, insight generation and data storytelling." },
-        { programme: "Level 3 Data Technician", fit: 86, why: "A practical route for strengthening data handling and dashboard confidence." },
-        { programme: "Level 4 Business Analyst", fit: 84, why: "Useful if Daniel wants to connect systems, process change and business requirements." },
-      ],
-      supportRequired: "Protected time for AI use case discovery, portfolio evidence and internal reporting projects.",
-    };
-  }
-
-  if (isDaniel) {
-    return {
-      primary: {
-        programme: "Level 4 Data Analyst",
-        pathway: "Digital, Data & AI",
-        provider: "QA",
-        fit: 92,
-        why: "This pathway supports Daniel's progression into senior data, insight and automation leadership.",
-        draftReason: "I am interested in the Level 4 Data Analyst pathway because I want to deepen my analysis, insight generation and data storytelling skills while progressing toward Head of Data & Automation.",
-      },
-      alternatives: [
-        { programme: "Level 3 Data Technician", fit: 86, why: "Supports practical data foundations and reporting confidence." },
-        { programme: "Level 4 Business Analyst", fit: 84, why: "Supports process improvement and systems change capability." },
-        { programme: "AI & Automation Workforce Programme", fit: 82, why: "Supports practical AI adoption and automation opportunity discovery." },
-      ],
-      supportRequired: "Protected time for portfolio evidence and internal reporting projects.",
-    };
-  }
-
-  return {
-    primary: {
-      programme: "Level 3 Team Leader",
-      pathway: "Leadership & Management",
-      provider: "Babington",
-      fit: 93,
-      why: "This pathway supports Amelia's progression into team leadership, shift coordination and production supervision.",
-      draftReason: "I am interested in the Level 3 Team Leader pathway because I would like to progress from Production Team Member into a Production Supervisor or Team Leader role. I want to build confidence in leadership, communication and coordinating work across the team.",
-    },
-    alternatives: [
-      { programme: "Level 3 Engineering Technician", fit: 88, why: "This supports stronger technical capability in a manufacturing environment." },
-      { programme: "Level 3 Engineering Maintenance Technician", fit: 82, why: "A suitable technical route if Amelia wants to move toward maintenance and fault finding." },
-    ],
-    supportRequired: "Support with study time and evidence collection.",
-  };
-}
-
-function getManagerAIResponse(prompt: string, requests: RequestItem[]) {
-  const pending = requests.filter((request) => request.status === "Submitted to Line Manager" || request.status === "Awaiting Manager Review");
-  const normalised = prompt.toLowerCase();
-  const target = pending.find((request) => normalised.includes(request.name.split(" ")[0].toLowerCase())) ?? pending[0];
-
-  if (normalised.includes("skills gap") || normalised.includes("skills gaps")) {
-    return {
-      title: "Team skills gap summary",
-      summary: "The clearest team development priorities are leadership readiness, technical evidence quality and data confidence. LevyTate recommends using Level 3 Team Leader for emerging supervisors and Level 3 Engineering Technician for technical manufacturing progression.",
-      signals: [["Priority gap", "Leadership readiness"], ["Suggested cohort", "Production leadership"], ["Business benefit", "Better handovers and quality routines"]],
-    };
-  }
-
-  return {
-    title: target ? `Review guidance for ${target.name}` : "Manager review guidance",
-    summary: target ? `${target.name}'s application appears suitable because the selected programme aligns to their role, career goal and business benefit. Review study time, evidence access and coverage before approving.` : "There are no manager approvals in the current filtered view. Review team skills gaps or seed a new application for the presentation.",
-    signals: [["Application", target?.pathway ?? "None awaiting review"], ["Current approver", target?.manager ?? "No action"], ["Suggested decision", target ? "Approve if workload can support study time" : "No approval needed"]],
-  };
-}
-
-function getDepartmentHeadAIResponse(prompt: string, requests: RequestItem[]) {
-  const normalised = prompt.toLowerCase();
-  const pending = requests.filter((request) => request.status === "Submitted to Line Manager" || request.status === "Awaiting Manager Review" || request.status === "Approved by Line Manager" || request.status === "Submitted to Apprenticeship Lead" || request.status === "Awaiting Final Approval").length;
-
-  if (normalised.includes("site")) {
-    return {
-      title: "Site participation comparison",
-      summary: "York and Leeds show stronger apprenticeship activity, while several visitor centres have low participation. The next workforce plan should focus on consistent site adoption, especially for customer experience, site operations and supply chain roles.",
-      signals: [["Lowest participation", "Smaller visitor centres"], ["Pending demand", String(pending)], ["Action", "Review site breakdown"]],
-    };
-  }
-
-  if (normalised.includes("future") || normalised.includes("risk")) {
-    return {
-      title: "Future skills risk summary",
-      summary: "The main future skills risks are leadership pipeline, data confidence, technical manufacturing evidence and site supervision. Apprenticeship demand should be planned by department and site before the next intake window.",
-      signals: [["Skills risks", "4"], ["Highest priority", "Leadership pipeline"], ["Planning horizon", "Next quarter"]],
-    };
-  }
-
-  return {
-    title: "Department participation insight",
-    summary: "Department participation is improving, with active learners across manufacturing, site operations, customer experience and digital roles. Department Heads can use this view for workforce planning only, with no individual approval actions.",
-    signals: [["Participation", "18%"], ["Active learners", "27"], ["Pending applications", String(pending)]],
-  };
 }
 
 function GuidedAIStepper({ current }: { current: "Ask" | "Recommendation" | "Application" | "Submitted" }) {
