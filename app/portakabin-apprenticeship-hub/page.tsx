@@ -3581,19 +3581,6 @@ function AskLevyTateAIPage({
   return <ApprenticeshipLeadAIPage selectedSite={selectedSite} />;
 }
 
-function employeeConversationTitle(result: ApiLevyTateAiResponse | null, firstName: string) {
-  const intent = result?.employeeGuidance?.intent;
-
-  if (intent === "data_ai_interest" || intent === "automation_interest") return "Exploring data and automation";
-  if (intent === "management_interest") return "Exploring a management route";
-  if (intent === "compare_routes") return "Comparing your options";
-  if (intent === "manager_conversation") return "Preparing a manager conversation";
-  if (intent === "change_of_mind") return "Thinking through a change of direction";
-  if (intent === "application_help") return "Planning your next application step";
-
-  return `${firstName}, let's explore this`;
-}
-
 function EmployeeAIStepper({ current }: { current: "Ask" | "Explore" | "Plan" | "Act" }) {
   const steps: Array<"Ask" | "Explore" | "Plan" | "Act"> = ["Ask", "Explore", "Plan", "Act"];
   const activeIndex = steps.indexOf(current);
@@ -3623,6 +3610,271 @@ function CurrentApplicationReminder({ application, onView }: { application: Requ
         <p><span className="font-semibold text-[#102c3d]">Current application:</span> {application.pathway} is {application.status.toLowerCase()}.</p>
         <button type="button" onClick={onView} className="rounded-full bg-[#f8fbfa] px-3 py-1.5 text-xs font-semibold text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.06] transition hover:text-[#102c3d]">View application</button>
       </div>
+    </div>
+  );
+}
+
+type EmployeeChatAction = {
+  label: string;
+  type: "compare" | "save" | "manager" | "view_application" | "start_application";
+  target?: string;
+};
+
+type EmployeeChatMessage = {
+  id: number;
+  sender: "assistant" | "user";
+  content: string;
+  quickReplies?: string[];
+  actions?: EmployeeChatAction[];
+  result?: ApiLevyTateAiResponse | null;
+};
+
+type EmployeeConversationState = {
+  turns: number;
+  inferredIntent: "data_automation" | "management" | "application" | "general" | null;
+  selectedInterest: string | null;
+  selectedGoal: "data_role" | "current_role_automation" | "not_sure" | "management" | null;
+  suggestedPathway: string | null;
+  hasActiveApplication: boolean;
+  nextRecommendedAction: string | null;
+};
+
+function createEmployeeConversationState(hasActiveApplication = false): EmployeeConversationState {
+  return {
+    turns: 0,
+    inferredIntent: null,
+    selectedInterest: null,
+    selectedGoal: null,
+    suggestedPathway: null,
+    hasActiveApplication,
+    nextRecommendedAction: null,
+  };
+}
+
+function employeeChatFallback(
+  selectedPersona: EmployeePersona,
+  requests: RequestItem[],
+  activeApplication: RequestItem | undefined,
+  promptText: string,
+) {
+  return buildFallbackResponse({
+    role: "Employee",
+    selectedEmployee: selectedPersona.name,
+    selectedSite: selectedPersona.site,
+    currentSection: "Ask LevyTate AI",
+    userMessage: promptText,
+    conversationHistory: [{ role: "user", content: promptText }],
+    employerContext: "Portakabin",
+    contextData: {
+      selectedPersona,
+      activeApplication: activeApplication ?? null,
+      requests,
+    },
+  }) as ApiLevyTateAiResponse;
+}
+
+function actionSetForEmployee(result: ApiLevyTateAiResponse | null, activeApplication?: RequestItem): EmployeeChatAction[] {
+  if (activeApplication) {
+    return [
+      { label: "Compare with current application", type: "compare", target: activeApplication.pathway },
+      { label: "Save this interest", type: "save", target: result?.employeeGuidance?.primary.programme },
+      { label: "Prepare manager message", type: "manager", target: activeApplication.manager },
+      { label: "View My Application", type: "view_application", target: "My Applications" },
+    ];
+  }
+
+  return [
+    { label: "Compare routes", type: "compare", target: result?.employeeGuidance?.primary.programme },
+    { label: "Save this interest", type: "save", target: result?.employeeGuidance?.primary.programme },
+    { label: "Start application", type: "start_application", target: result?.employeeGuidance?.primary.programme },
+  ];
+}
+
+function handleEmployeeConversation(
+  message: string,
+  state: EmployeeConversationState,
+  selectedPersona: EmployeePersona,
+  requests: RequestItem[],
+  activeApplication?: RequestItem,
+): { state: EmployeeConversationState; assistant: EmployeeChatMessage; result: ApiLevyTateAiResponse | null } {
+  const normalised = message.toLowerCase();
+  const firstName = selectedPersona.name.split(" ")[0];
+  const isDaniel = selectedPersona.name === "Daniel Carter";
+  const nextState: EmployeeConversationState = { ...state, turns: state.turns + 1, hasActiveApplication: Boolean(activeApplication) };
+  const nextIdBase = Date.now();
+
+  const makeAssistant = (
+    content: string,
+    options?: {
+      quickReplies?: string[];
+      actions?: EmployeeChatAction[];
+      result?: ApiLevyTateAiResponse | null;
+    },
+  ): EmployeeChatMessage => ({
+    id: nextIdBase + 1,
+    sender: "assistant",
+    content,
+    quickReplies: options?.quickReplies,
+    actions: options?.actions,
+    result: options?.result ?? null,
+  });
+
+  const wantsDataAutomation =
+    normalised.includes("data") ||
+    normalised.includes("automation") ||
+    normalised.includes("automate") ||
+    normalised.includes("ai");
+  const wantsManagement =
+    normalised.includes("manager") ||
+    normalised.includes("management") ||
+    normalised.includes("leader") ||
+    normalised.includes("supervisor");
+  const choseDataRole = normalised.includes("move into a data role") || normalised.includes("data-focused role");
+  const choseCurrentAutomation = normalised.includes("current role") || normalised.includes("production role") || normalised.includes("use automation");
+  const choseNotSure = normalised.includes("not sure");
+
+  if ((state.inferredIntent === "data_automation" && (choseDataRole || choseCurrentAutomation || choseNotSure)) || wantsDataAutomation) {
+    nextState.inferredIntent = "data_automation";
+    nextState.selectedInterest = "Data and automation";
+
+    if (!state.selectedGoal && !choseDataRole && !choseCurrentAutomation && !choseNotSure) {
+      return {
+        state: nextState,
+        result: null,
+        assistant: makeAssistant(
+          "That's a good area to explore.\n\nDo you mean you'd like to move into a data-focused role in the future, or are you more interested in using data and automation in your current role?",
+          {
+            quickReplies: ["Move into a data role", "Use automation in my current role", "Not sure yet"],
+          },
+        ),
+      };
+    }
+
+    const selectedGoal = choseDataRole ? "data_role" : choseCurrentAutomation ? "current_role_automation" : "not_sure";
+    nextState.selectedGoal = selectedGoal;
+    const promptForResult = selectedGoal === "data_role"
+      ? "I want to move into a data role"
+      : selectedGoal === "current_role_automation"
+        ? "I want to use automation in my current role"
+        : "I am interested in data and automation but not sure yet";
+    const result = employeeChatFallback(selectedPersona, requests, activeApplication, promptForResult);
+    nextState.suggestedPathway = result.employeeGuidance?.primary.programme ?? null;
+    nextState.nextRecommendedAction = activeApplication ? "compare_current_application" : "compare_or_apply";
+
+    const content = selectedGoal === "data_role"
+      ? isDaniel
+        ? "That makes sense. Because your current route is already data-focused, I'd treat your Level 4 Data Analyst application as the main route and use the conversation with your manager to shape it toward data leadership, reporting ownership and automation work."
+        : "That makes sense. If the goal is a future data role, we can look at data routes as a future interest. For now, it would be worth checking whether your current role can give you enough data evidence before you move toward a formal data pathway."
+      : selectedGoal === "current_role_automation"
+        ? "That makes sense. In that case, we'd probably look at routes that support process improvement, digital confidence and better use of data in production rather than jumping straight to a full data analyst route.\n\nYou've already got an application in progress, so we wouldn't start another one right now, but we can compare this interest with your current application or prepare a note for your manager."
+        : "That's completely fine. We can keep this as an exploration thread for now. A useful next step would be to decide whether this is about a future data role, or about using better data and digital tools in the work you already do.";
+
+    return {
+      state: nextState,
+      result,
+      assistant: makeAssistant(content, {
+        result,
+        actions: actionSetForEmployee(result, activeApplication),
+        quickReplies: selectedGoal === "not_sure" ? ["Move into a data role", "Use automation in my current role", "Prepare a manager question"] : undefined,
+      }),
+    };
+  }
+
+  if (wantsManagement) {
+    nextState.inferredIntent = "management";
+    nextState.selectedInterest = "Leadership progression";
+    nextState.selectedGoal = "management";
+    const result = employeeChatFallback(selectedPersona, requests, activeApplication, "I want to become a manager");
+    nextState.suggestedPathway = result.employeeGuidance?.primary.programme ?? null;
+    nextState.nextRecommendedAction = activeApplication ? "compare_current_application" : "compare_or_apply";
+
+    return {
+      state: nextState,
+      result,
+      assistant: makeAssistant(
+        isDaniel
+          ? "That makes sense. Your current Level 4 Data Analyst application could still support a management route if your future role is data leadership rather than general people management.\n\nIf you want broader people or operational management, we'd compare that with a leadership route and prepare a clear manager conversation."
+          : `That makes sense, ${firstName}. Are you thinking about leading people day to day, building technical confidence first, or using your current role as a step toward production supervision?`,
+        {
+          result,
+          actions: actionSetForEmployee(result, activeApplication),
+          quickReplies: isDaniel ? ["Compare routes", "Prepare manager conversation", "View current application"] : ["Lead people day to day", "Build technical confidence first", "Move toward production supervisor"],
+        },
+      ),
+    };
+  }
+
+  if (normalised.includes("apply") || normalised.includes("application")) {
+    nextState.inferredIntent = "application";
+    nextState.selectedInterest = "Application support";
+    const result = employeeChatFallback(selectedPersona, requests, activeApplication, message);
+    nextState.suggestedPathway = result.employeeGuidance?.primary.programme ?? null;
+    nextState.nextRecommendedAction = activeApplication ? "view_current_application" : "start_application";
+
+    return {
+      state: nextState,
+      result,
+      assistant: makeAssistant(
+        activeApplication
+          ? "I can help you think it through, but I can't start a second application while your current one is active.\n\nWhat we can do is review the current application, compare this interest with it, or prepare a short note for your manager."
+          : "Yes. Before starting an application, let's make sure the route fits your goal and the support you need. Would you like to compare the route first, or start a draft application?",
+        {
+          result,
+          actions: actionSetForEmployee(result, activeApplication),
+          quickReplies: activeApplication ? ["View My Application", "Compare with current application", "Prepare manager message"] : ["Compare routes first", "Start application", "Ask another question"],
+        },
+      ),
+    };
+  }
+
+  nextState.inferredIntent = "general";
+  return {
+    state: nextState,
+    result: null,
+    assistant: makeAssistant(
+      `Let's work through it, ${firstName}. Is this mainly about a new role, getting better in your current role, or understanding what options exist at Portakabin?`,
+      {
+        quickReplies: ["A new role", "Develop in my current role", "Understand my options"],
+      },
+    ),
+  };
+}
+
+function EmployeeInlineResult({ result }: { result: ApiLevyTateAiResponse }) {
+  const guidance = result.employeeGuidance;
+  if (!guidance) return null;
+
+  return (
+    <div className="mt-4 grid gap-3">
+      {guidance.availableNow?.length ? (
+        <div className="rounded-xl border border-[#102c3d]/[0.055] bg-white p-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">Available now</p>
+          <div className="mt-2 grid gap-2">
+            {guidance.availableNow.slice(0, 2).map((item) => (
+              <div key={item.programme} className="rounded-lg bg-[#f8fbfa] px-3 py-2">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-sm font-semibold text-[#102c3d]">{item.programme}</p>
+                  <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-[#0b6f63]">{item.fit}%</span>
+                </div>
+                <p className="mt-1 text-xs leading-5 text-[#102c3d]/58">{item.why}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      {guidance.futureInterests?.length ? (
+        <div className="rounded-xl border border-[#102c3d]/[0.055] bg-white p-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">Worth discussing later</p>
+          <div className="mt-2 grid gap-2">
+            {guidance.futureInterests.slice(0, 3).map((item) => (
+              <div key={item.programme} className="rounded-lg bg-[#fff9dc] px-3 py-2">
+                <p className="text-sm font-semibold text-[#102c3d]">{item.programme}</p>
+                <p className="mt-1 text-xs leading-5 text-[#102c3d]/58">{item.why}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -3824,39 +4076,64 @@ function EmployeeAIPage({
   onCreateApplication: (draft: ApplicationDraft) => RequestItem | null;
 }) {
   const examples = ["I want to become a team leader.", "I work in production. What apprenticeships suit me?", "I'm interested in data and automation.", "Which pathway would help me progress at Portakabin?", "Can you help me apply?"];
+  const firstName = selectedPersona.name.split(" ")[0];
   const [query, setQuery] = useState("");
-  const [result, setResult] = useState<ApiLevyTateAiResponse | null>(null);
-  const [history, setHistory] = useState<LevyTateConversationMessage[]>([]);
+  const [conversationState, setConversationState] = useState<EmployeeConversationState>(() => createEmployeeConversationState(Boolean(activeApplication)));
+  const [messages, setMessages] = useState<EmployeeChatMessage[]>(() => [
+    {
+      id: 1,
+      sender: "assistant",
+      content: `Hi ${firstName}. What would you like to explore today?`,
+      quickReplies: ["I'm interested in data and automation.", "I want to become a manager.", "Can you help me apply?"],
+    },
+  ]);
+  const [latestResult, setLatestResult] = useState<ApiLevyTateAiResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [savedMessage, setSavedMessage] = useState("");
   const [compareOpen, setCompareOpen] = useState(false);
   const [applicationOpen, setApplicationOpen] = useState(false);
   const [confirmation, setConfirmation] = useState<RequestItem | null>(null);
   const employeeApplications = requests.filter((request) => request.name === selectedPersona.name);
-  const response = result?.employeeGuidance ?? null;
-  const aiPathways = result?.recommendedPathways ?? [];
-  const firstName = selectedPersona.name.split(" ")[0];
-  const employeeStep = confirmation || applicationOpen ? "Act" : compareOpen || savedMessage ? "Plan" : response ? "Explore" : "Ask";
+  const response = latestResult?.employeeGuidance ?? null;
+  const employeeStep = confirmation || applicationOpen ? "Act" : latestResult || compareOpen || savedMessage ? "Plan" : messages.length > 1 ? "Explore" : "Ask";
 
-  function handleRecommendedAction(action: ApiLevyTateAiResponse["recommendedActions"][number]) {
-    if (action.type === "open_my_applications") {
+  useEffect(() => {
+    setConversationState(createEmployeeConversationState(Boolean(activeApplication)));
+    setMessages([
+      {
+        id: 1,
+        sender: "assistant",
+        content: `Hi ${firstName}. What would you like to explore today?`,
+        quickReplies: ["I'm interested in data and automation.", "I want to become a manager.", "Can you help me apply?"],
+      },
+    ]);
+    setLatestResult(null);
+    setSavedMessage("");
+    setCompareOpen(false);
+    setApplicationOpen(false);
+    setConfirmation(null);
+    setQuery("");
+  }, [activeApplication, firstName, selectedPersona.name]);
+
+  function handleChatAction(action: EmployeeChatAction) {
+    if (action.type === "view_application") {
       onNavigate("My Applications");
       return;
     }
 
-    if (action.type === "compare_routes") {
+    if (action.type === "compare") {
       setCompareOpen(true);
-      setSavedMessage("I've opened a route comparison below.");
+      setSavedMessage("Route comparison noted in this conversation.");
       return;
     }
 
-    if (action.type === "save_interest") {
+    if (action.type === "save") {
       setSavedMessage(`${action.target ?? "This interest"} saved for later.`);
       return;
     }
 
-    if (action.type === "prepare_manager_message") {
-      setSavedMessage("Manager conversation note prepared below.");
+    if (action.type === "manager") {
+      setSavedMessage("Manager conversation note prepared in the chat.");
       return;
     }
 
@@ -3864,49 +4141,38 @@ function EmployeeAIPage({
       if (!activeApplication) {
         setApplicationOpen(true);
       }
-      return;
-    }
-
-    if (action.type === "open_pathway") {
-      setCompareOpen(true);
-      setSavedMessage(`Exploring ${action.target ?? "this route"} below.`);
     }
   }
 
-  async function runEmployeeQuery(promptText: string) {
+  function runEmployeeQuery(promptText: string) {
     if (!promptText.trim()) return;
 
     setLoading(true);
-    const nextHistory: LevyTateConversationMessage[] = [...history, { role: "user", content: promptText }];
-    const aiResult = await requestLevyTateAI({
-      role: "Employee",
-      selectedEmployee: selectedPersona.name,
-      selectedSite: selectedPersona.site,
-      currentSection: "Ask LevyTate AI",
-      userMessage: promptText,
-      conversationHistory: nextHistory,
-      employerContext: "Portakabin",
-      contextData: {
-        selectedPersona,
-        activeApplication: activeApplication ?? null,
-        requests,
-      },
-    });
-    setResult(aiResult);
-    setHistory([...nextHistory, { role: "assistant", content: aiResult.assistantMessage }]);
+    const userMessage: EmployeeChatMessage = {
+      id: Date.now(),
+      sender: "user",
+      content: promptText,
+    };
+    const turn = handleEmployeeConversation(promptText, conversationState, selectedPersona, requests, activeApplication);
+    setConversationState(turn.state);
+    setMessages((current) => [...current, userMessage, turn.assistant]);
+    if (turn.result) {
+      setLatestResult(turn.result);
+    }
+    setQuery("");
     setApplicationOpen(false);
     setConfirmation(null);
     setLoading(false);
   }
 
-  async function askQuestion(event: FormEvent<HTMLFormElement>) {
+  function askQuestion(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    await runEmployeeQuery(query);
+    runEmployeeQuery(query);
   }
 
-  async function applyPrompt(prompt: string) {
+  function applyPrompt(prompt: string) {
     setQuery(prompt);
-    await runEmployeeQuery(prompt);
+    runEmployeeQuery(prompt);
   }
 
   function submitAIApplication(event: FormEvent<HTMLFormElement>) {
@@ -3935,167 +4201,92 @@ function EmployeeAIPage({
     <div className="grid gap-5">
       <PlatformPanel eyebrow="AI pathway assistant" title="Ask LevyTate AI">
         <EmployeeAIStepper current={employeeStep} />
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
-          <form onSubmit={askQuestion} className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-[#f8fbfa] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
-            <p className="max-w-2xl text-sm leading-6 text-[#102c3d]/62">Tell LevyTate what you&apos;re curious about. We can explore future options, compare routes, save ideas or help you prepare a manager conversation.</p>
-            <label className="mt-4 grid gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#102c3d]/42">
-              Your question
-              <textarea
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                rows={4}
-                placeholder="I want to become a team leader"
-                className="min-h-[112px] rounded-xl border border-[#102c3d]/[0.09] bg-white px-4 py-3 text-base font-medium normal-case leading-7 tracking-normal text-[#102c3d] outline-none transition placeholder:text-[#102c3d]/32 focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10"
-              />
-            </label>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <PlatformButton>{loading ? "Thinking it through..." : "Ask LevyTate AI"}</PlatformButton>
-              <button type="button" onClick={() => void applyPrompt("Can you help me apply?")} className="h-10 rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.06] transition hover:text-[#102c3d]">Help me apply</button>
-            </div>
-          </form>
-
-          <div className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-white p-4 shadow-[0_10px_26px_rgba(16,44,61,0.045)]">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#c95568]">Example prompts</p>
-            <div className="mt-3 grid gap-2">
-              {examples.map((prompt) => (
-                <button key={prompt} type="button" onClick={() => void applyPrompt(prompt)} className="rounded-xl border border-[#102c3d]/[0.055] bg-[#f8fbfa] px-3.5 py-2.5 text-left text-sm font-semibold text-[#102c3d]/70 transition hover:border-[#159b8f]/25 hover:bg-white hover:text-[#102c3d]">
-                  {prompt}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </PlatformPanel>
-
-      {response ? (
-      <PlatformPanel eyebrow="Assistant response" title={employeeConversationTitle(result, firstName)}>
-        {result ? <div className="mb-4"><AIGuidanceCallout result={result} /></div> : null}
-        {result?.recommendedActions.length ? (
-          <div className="mb-4 flex flex-wrap gap-2">
-            {result.recommendedActions.map((action) => (
-              <PlatformButton
-                key={`${action.type}-${action.label}`}
-                variant={action.type === "start_application" ? "amber" : "soft"}
-                onClick={() => handleRecommendedAction(action)}
-              >
-                {action.label}
-              </PlatformButton>
-            ))}
-          </div>
-        ) : null}
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
-          <article className="rounded-[1rem] border border-[#159b8f]/[0.18] bg-[#f8fbfa] p-5 shadow-[0_12px_28px_rgba(16,44,61,0.045)]">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold text-[#102c3d]/44">Route to explore</p>
-                <h3 className="mt-1 text-2xl font-semibold tracking-[-0.025em] text-[#102c3d]">{response.primary.programme}</h3>
-                <p className="mt-2 text-sm font-semibold text-[#159b8f]">{response.primary.pathway}</p>
-              </div>
-              <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#0b6f63] ring-1 ring-[#159b8f]/[0.14]">{response.primary.fit}% fit</span>
-            </div>
-            <p className="mt-4 text-sm leading-6 text-[#102c3d]/64">{response.primary.why}</p>
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              <InfoBox label="Current role" value={selectedPersona.role} />
-              <InfoBox label="Career goal" value={selectedPersona.careerGoal} />
-              <InfoBox label="Approved delivery partner" value={response.primary.provider} />
-            </div>
-            <div className="mt-5 flex flex-wrap gap-2">
-              <PlatformButton onClick={() => { setSavedMessage(`${response.primary.programme} saved for later.`); }}>Save pathway</PlatformButton>
-              <PlatformButton variant="soft" onClick={() => setCompareOpen((current) => !current)}>Compare pathways</PlatformButton>
-              {activeApplication ? (
-                <button disabled className="inline-flex h-10 cursor-not-allowed items-center justify-center rounded-full bg-[#f2f5f3] px-4 text-xs font-semibold text-[#102c3d]/38 ring-1 ring-[#102c3d]/[0.06]">Start application</button>
-              ) : (
-                <PlatformButton variant="amber" onClick={() => setApplicationOpen(true)}>Start application</PlatformButton>
-              )}
-              <button type="button" onClick={() => void applyPrompt("What else should I consider before applying?")} className="h-10 rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.06] transition hover:text-[#102c3d]">Ask follow-up</button>
-            </div>
-            {savedMessage ? <p className="mt-3 rounded-xl bg-white px-3 py-2 text-xs font-semibold text-[#0b6f63] ring-1 ring-[#102c3d]/[0.05]">{savedMessage}</p> : null}
-            {activeApplication ? <div className="mt-3"><CurrentApplicationReminder application={activeApplication} onView={() => onNavigate("My Applications")} /></div> : null}
-          </article>
-
-          <div className="grid gap-3">
-            {response.availableNow?.length ? (
-              <div className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-white p-4 shadow-[0_8px_20px_rgba(16,44,61,0.035)]">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">Available now</p>
-                <div className="mt-3 grid gap-3">
-                  {response.availableNow.map((item) => (
-                    <div key={item.programme} className="rounded-xl bg-[#f8fbfa] px-3 py-2.5">
-                      <div className="flex items-start justify-between gap-3">
-                        <p className="text-sm font-semibold text-[#102c3d]">{item.programme}</p>
-                        <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-[#0b6f63]">{item.fit}%</span>
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <section className="flex min-h-[520px] flex-col overflow-hidden rounded-[1rem] border border-[#102c3d]/[0.06] bg-[#f8fbfa] shadow-[inset_0_1px_0_rgba(255,255,255,0.76)]">
+            <div className="flex-1 space-y-4 overflow-y-auto p-4">
+              {messages.map((message) => (
+                <article key={message.id} className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"}`}>
+                  <div className={`max-w-[86%] rounded-[1rem] px-4 py-3 shadow-[0_8px_20px_rgba(16,44,61,0.04)] ${message.sender === "user" ? "bg-[#102c3d] text-white" : "bg-white text-[#102c3d] ring-1 ring-[#102c3d]/[0.055]"}`}>
+                    <p className={`whitespace-pre-line text-sm leading-6 ${message.sender === "user" ? "text-white/92" : "text-[#102c3d]/68"}`}>{message.content}</p>
+                    {message.sender === "assistant" && message.quickReplies?.length ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {message.quickReplies.map((reply) => (
+                          <button key={reply} type="button" onClick={() => applyPrompt(reply)} className="rounded-full bg-[#f8fbfa] px-3 py-1.5 text-xs font-semibold text-[#102c3d]/64 ring-1 ring-[#102c3d]/[0.06] transition hover:bg-white hover:text-[#102c3d]">
+                            {reply}
+                          </button>
+                        ))}
                       </div>
-                      <p className="mt-1 text-xs leading-5 text-[#102c3d]/58">{item.why}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-            {response.futureInterests?.length ? (
-              <div className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-white p-4 shadow-[0_8px_20px_rgba(16,44,61,0.035)]">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">Worth discussing later</p>
-                <div className="mt-3 grid gap-3">
-                  {response.futureInterests.map((item) => (
-                    <div key={item.programme} className="rounded-xl bg-[#fff9dc] px-3 py-2.5">
-                      <p className="text-sm font-semibold text-[#102c3d]">{item.programme}</p>
-                      <p className="mt-1 text-xs leading-5 text-[#102c3d]/58">{item.why}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-            {aiPathways
-              .filter((item) =>
-                item.title !== response.primary.programme &&
-                !response.alternatives.some((alternative) => alternative.programme === item.title) &&
-                !response.availableNow?.some((available) => available.programme === item.title) &&
-                !response.futureInterests?.some((future) => future.programme === item.title)
-              )
-              .slice(0, 3)
-              .map((item) => (
-                <article key={item.title} className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-white p-4 shadow-[0_8px_20px_rgba(16,44,61,0.035)]">
-                  <div className="flex items-start justify-between gap-3">
-                    <h3 className="text-sm font-semibold leading-5 text-[#102c3d]">{item.title}</h3>
-                    {item.fit ? <span className="rounded-full bg-[#f8fbfa] px-2.5 py-1 text-xs font-semibold text-[#102c3d]/56">{item.fit}%</span> : null}
+                    ) : null}
+                    {message.sender === "assistant" && message.actions?.length ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {message.actions.map((action) => (
+                          <button key={`${message.id}-${action.type}-${action.label}`} type="button" onClick={() => handleChatAction(action)} className="rounded-full bg-[#102c3d] px-3 py-1.5 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#17394d]">
+                            {action.label}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                    {message.sender === "assistant" && message.result ? <EmployeeInlineResult result={message.result} /> : null}
                   </div>
-                  <p className="mt-2 text-xs leading-5 text-[#102c3d]/58">{item.reason}</p>
                 </article>
               ))}
-            {response.alternatives.map((item) => (
-              <article key={item.programme} className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-white p-4 shadow-[0_8px_20px_rgba(16,44,61,0.035)]">
-                <div className="flex items-start justify-between gap-3">
-                  <h3 className="text-sm font-semibold leading-5 text-[#102c3d]">{item.programme}</h3>
-                  <span className="rounded-full bg-[#f8fbfa] px-2.5 py-1 text-xs font-semibold text-[#102c3d]/56">{item.fit}%</span>
-                </div>
-                <p className="mt-2 text-xs leading-5 text-[#102c3d]/58">{item.why}</p>
-              </article>
-            ))}
-          </div>
-        </div>
+            </div>
+            <form onSubmit={askQuestion} className="border-t border-[#102c3d]/[0.055] bg-white p-3">
+              <label className="sr-only" htmlFor="employee-ai-message">Message Ask LevyTate AI</label>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                  id="employee-ai-message"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Ask about a role, interest or next step"
+                  className="min-h-11 flex-1 rounded-full border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-4 text-sm font-medium text-[#102c3d] outline-none transition placeholder:text-[#102c3d]/34 focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10"
+                />
+                <PlatformButton>{loading ? "Thinking..." : "Send"}</PlatformButton>
+              </div>
+            </form>
+          </section>
 
-        {compareOpen ? (
-          <div className="mt-5 grid gap-3 rounded-[1rem] border border-[#102c3d]/[0.055] bg-white p-4 md:grid-cols-3">
-            <InfoBox label="Best immediate fit" value={response.primary.programme} />
-            <InfoBox label="Alternative route" value={response.alternatives[0]?.programme ?? "No alternative"} />
-            <InfoBox label="Recommendation logic" value="Uses role, site, career goal, provider mappings and application history." />
-          </div>
-        ) : null}
+          <aside className="grid content-start gap-3">
+            <div className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-white p-4 shadow-[0_10px_26px_rgba(16,44,61,0.045)]">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#c95568]">Try asking</p>
+              <div className="mt-3 grid gap-2">
+                {examples.map((prompt) => (
+                  <button key={prompt} type="button" onClick={() => applyPrompt(prompt)} className="rounded-xl border border-[#102c3d]/[0.055] bg-[#f8fbfa] px-3.5 py-2.5 text-left text-sm font-semibold text-[#102c3d]/70 transition hover:border-[#159b8f]/25 hover:bg-white hover:text-[#102c3d]">
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-white p-4 shadow-[0_10px_26px_rgba(16,44,61,0.045)]">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#0b6f63]">Conversation state</p>
+              <div className="mt-3 grid gap-2 text-sm leading-6 text-[#102c3d]/62">
+                <p><span className="font-semibold text-[#102c3d]">Intent:</span> {conversationState.inferredIntent ?? "Exploring"}</p>
+                <p><span className="font-semibold text-[#102c3d]">Interest:</span> {conversationState.selectedInterest ?? "Not selected yet"}</p>
+                <p><span className="font-semibold text-[#102c3d]">Goal:</span> {conversationState.selectedGoal ?? "Not selected yet"}</p>
+                <p><span className="font-semibold text-[#102c3d]">Active application:</span> {conversationState.hasActiveApplication ? "Yes" : "No"}</p>
+                <p><span className="font-semibold text-[#102c3d]">Next step:</span> {conversationState.nextRecommendedAction ?? "Ask a follow-up"}</p>
+              </div>
+              {activeApplication ? <div className="mt-3"><CurrentApplicationReminder application={activeApplication} onView={() => onNavigate("My Applications")} /></div> : null}
+              {savedMessage ? <p className="mt-3 rounded-xl bg-[#edf8f5] px-3 py-2 text-xs font-semibold text-[#0b6f63] ring-1 ring-[#159b8f]/[0.08]">{savedMessage}</p> : null}
+            </div>
+          </aside>
+        </div>
       </PlatformPanel>
-      ) : null}
 
       {applicationOpen && response && !activeApplication ? (
         <PlatformPanel eyebrow="AI prepared application" title="Review and submit to line manager">
           <form onSubmit={submitAIApplication} className="grid gap-4 md:grid-cols-2">
-            <Field name="pathway" label="Selected apprenticeship" defaultValue={result?.applicationPrefill?.selectedApprenticeship ?? response.primary.programme} />
-            <Field name="careerGoal" label="Career goal" defaultValue={result?.applicationPrefill?.careerGoal ?? selectedPersona.careerGoal} />
+            <Field name="pathway" label="Selected apprenticeship" defaultValue={latestResult?.applicationPrefill?.selectedApprenticeship ?? response.primary.programme} />
+            <Field name="careerGoal" label="Career goal" defaultValue={latestResult?.applicationPrefill?.careerGoal ?? selectedPersona.careerGoal} />
             <Field name="role" label="Role" defaultValue={selectedPersona.role} />
             <Field name="manager" label="Line manager" defaultValue={selectedPersona.manager} />
             <label className="grid gap-1.5 text-xs font-medium text-[#102c3d]/62 md:col-span-2">
               Reason for interest
-              <textarea name="reason" rows={4} className="min-w-0 rounded-xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3.5 py-3 text-sm leading-6 outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10" defaultValue={result?.applicationPrefill?.reasonForInterest ?? response.primary.draftReason} />
+              <textarea name="reason" rows={4} className="min-w-0 rounded-xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3.5 py-3 text-sm leading-6 outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10" defaultValue={latestResult?.applicationPrefill?.reasonForInterest ?? response.primary.draftReason} />
             </label>
             <label className="grid gap-1.5 text-xs font-medium text-[#102c3d]/62 md:col-span-2">
               Any support required
-              <textarea name="supportRequired" rows={3} className="min-w-0 rounded-xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3.5 py-3 text-sm leading-6 outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10" defaultValue={result?.applicationPrefill?.supportRequired ?? response.supportRequired} />
+              <textarea name="supportRequired" rows={3} className="min-w-0 rounded-xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3.5 py-3 text-sm leading-6 outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10" defaultValue={latestResult?.applicationPrefill?.supportRequired ?? response.supportRequired} />
             </label>
             <label className="flex items-start gap-3 rounded-xl border border-[#102c3d]/[0.045] bg-[#f8fbfa] p-3.5 text-sm leading-6 text-[#102c3d]/62 md:col-span-2">
               <input type="checkbox" required className="mt-1 h-4 w-4 accent-[#159b8f]" />
