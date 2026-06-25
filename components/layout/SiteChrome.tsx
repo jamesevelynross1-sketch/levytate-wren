@@ -7,7 +7,7 @@ import { Header } from "@/components/layout/Header";
 export function SiteChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isStockDashboard = pathname.startsWith("/stocks");
-  const isStandaloneDemo = pathname.startsWith("/portakabin-apprenticeship-hub") || pathname.startsWith("/future-talent-portal");
+  const isStandaloneDemo = pathname.startsWith("/portakabin-apprenticeship-hub") || pathname.startsWith("/future-talent-portal") || pathname.startsWith("/levytate");
 
   if (isStockDashboard || isStandaloneDemo) {
     return <main>{children}</main>;
@@ -21,3 +21,4 @@ export function SiteChrome({ children }: { children: React.ReactNode }) {
     </>
   );
 }
+
