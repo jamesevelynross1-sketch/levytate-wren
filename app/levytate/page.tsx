@@ -3,31 +3,12 @@ import Link from "next/link";
 import { LevyTateLogo } from "@/components/levytate-demo/PlatformShell";
 
 export const metadata: Metadata = {
-  title: "The Apprenticeship Operating System",
-  description: "LevyTate gives employers one workspace to manage employees, roles, applications, providers and apprenticeship decisions.",
+  title: "LevyTate | Apprenticeship Operating System for Employers",
+  description: "LevyTate is the apprenticeship operating system for modern employers, bringing employee management, applications, provider matching and AI-supported guidance into one workspace.",
 };
 
-const credibility = [
-  "Built for apprenticeship leads, HR and L&D teams",
-  "Designed around real employer workflows",
-  "Provider matching led by LevyTate",
-  "Beta access now open",
-];
+const credibility = ["HR", "L&D", "Apprenticeship Leads", "Operations", "Senior Leadership Teams"];
 
-const problems = [
-  {
-    title: "Employee data sits in spreadsheets",
-    copy: "Teams rely on scattered lists, static trackers and duplicated records to understand development demand.",
-  },
-  {
-    title: "Applications move through emails",
-    copy: "Requests lose context as they pass between employees, managers and apprenticeship leads.",
-  },
-  {
-    title: "Provider decisions are hard to compare",
-    copy: "Programme fit, delivery model, location and quality evidence are often discussed too late.",
-  },
-];
 
 const pillars = [
   {
@@ -48,26 +29,16 @@ const pillars = [
   },
 ];
 
-const workflow = ["Add employees", "Map roles", "Open applications", "Approve requests", "Match providers", "Track enrolments"];
-const prompts = ["Which apprenticeship suits this role?", "What pathway supports progression into data?", "Can you help me prepare an application?", "Which providers could deliver this programme?"];
-const providerAreas = ["Data & AI", "Digital & IT", "Procurement", "Marketing", "Business Support", "Customer Service", "Project Management", "Technical & Specialist"];
-const employerJourneyBullets = [
-  "Manage employees and apprenticeship applications",
-  "Map job roles to suitable apprenticeship pathways",
-  "Improve workforce planning",
-  "Reduce administration",
-  "Request independent provider matching",
-  "Access AI-supported apprenticeship guidance",
+const workflow = ["Import Employees", "Assign Roles", "AI identifies suitable pathways", "Employee applies", "Manager approves", "LevyTate matches provider", "Enrolment complete"];
+const providerAreas = ["QA", "Baltic", "Learning Curve Group", "HBTC", "Staffordshire University", "Learning Skills Partnership", "Apprentify", "AiCore", "The Marketing Trainer", "RHG Consult", "SRSCC", "and more..."];
+const galleryItems = [
+  ["Dashboard", "Workforce readiness, approvals and provider coverage in one executive view.", "82%", "Readiness"],
+  ["Employees", "Search, filter and maintain clean employee records ready for pathway mapping.", "824", "Employees"],
+  ["Applications", "A controlled route from employee interest to final approval and enrolment readiness.", "14", "Active"],
+  ["AI Assistant", "Role-aware guidance that explains suitable pathways and next actions in plain English.", "AI", "Guided"],
+  ["Provider Matching", "Structured requests with programme, delivery model, geography and rationale captured upfront.", "6", "Matches"],
+  ["Reporting", "Board-ready participation, levy, skills and provider insight for workforce planning.", "+18%", "Growth"],
 ];
-const providerJourneyBullets = [
-  "Employer introductions",
-  "Qualified provider matching opportunities",
-  "Premium partner visibility",
-  "Participation in AI-supported recommendations",
-  "Future marketplace opportunities",
-  "Strategic partnership packages",
-];
-
 export default function LevyTateLandingPage() {
   return (
     <main className="min-h-screen overflow-hidden bg-[#f6fbf8] text-[#102c3d]">
@@ -77,9 +48,9 @@ export default function LevyTateLandingPage() {
       <ProblemSection />
       <ProductPillars />
       <WorkflowSection />
+      <ProductGallery />
       <AiSection />
       <ProviderCatalogueSection />
-      <BetaAccessSection />
       <AudienceJourneySection />
       <FinalCta />
     </main>
@@ -111,19 +82,27 @@ function SiteHeader() {
 function HeroSection() {
   return (
     <section className="relative isolate">
-      <div className="absolute inset-x-0 top-0 -z-10 h-[680px] bg-[radial-gradient(circle_at_28%_12%,rgba(199,240,228,0.72),transparent_34rem),radial-gradient(circle_at_80%_8%,rgba(255,142,149,0.22),transparent_30rem)]" />
-      <div className="mx-auto grid max-w-7xl gap-12 px-5 pb-16 pt-12 sm:px-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(420px,0.95fr)] lg:items-center lg:pb-24 lg:pt-20">
+      <div className="absolute inset-x-0 top-0 -z-10 h-[760px] bg-[radial-gradient(circle_at_18%_12%,rgba(199,240,228,0.9),transparent_34rem),radial-gradient(circle_at_84%_5%,rgba(255,128,144,0.24),transparent_30rem),linear-gradient(180deg,#f6fbf8_0%,#eef7f3_100%)]" />
+      <div className="mx-auto grid max-w-7xl gap-12 px-5 pb-20 pt-12 sm:px-8 lg:grid-cols-[minmax(0,0.95fr)_minmax(480px,1.05fr)] lg:items-center lg:pb-28 lg:pt-20">
         <div>
-          <p className="inline-flex rounded-full bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#0b6f63] ring-1 ring-[#159b8f]/[0.12] shadow-[0_14px_34px_rgba(16,44,61,0.06)]">LevyTate is the apprenticeship operating system for employers</p>
-          <h1 className="mt-6 max-w-5xl text-5xl font-semibold leading-[0.98] tracking-[-0.055em] text-[#102c3d] sm:text-6xl lg:text-7xl">
-            The apprenticeship operating system for workforce development and provider matching.
+          <p className="inline-flex rounded-full bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#0b6f63] ring-1 ring-[#159b8f]/[0.12] shadow-[0_14px_34px_rgba(16,44,61,0.06)]">Built for employer apprenticeship teams</p>
+          <h1 className="mt-6 max-w-5xl text-5xl font-semibold leading-[0.96] tracking-[-0.06em] text-[#102c3d] sm:text-6xl lg:text-7xl">
+            The apprenticeship operating system for modern employers.
           </h1>
-          <p className="mt-6 max-w-3xl text-lg leading-8 text-[#102c3d]/64">
-            LevyTate gives employers one clear workspace to manage employees, roles, applications, providers and apprenticeship decisions without relying on spreadsheets, inboxes and disconnected provider conversations.
+          <p className="mt-6 max-w-2xl text-lg leading-8 text-[#102c3d]/66">
+            Replace spreadsheets, disconnected provider conversations and manual apprenticeship administration with one intelligent workspace.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <a href="#beta" className="rounded-full bg-[#102c3d] px-6 py-3 text-sm font-semibold text-white shadow-[0_18px_38px_rgba(16,44,61,0.18)] transition hover:-translate-y-0.5">Request Beta Access</a>
             <Link href="/login" className="rounded-full bg-white px-6 py-3 text-sm font-semibold text-[#102c3d] ring-1 ring-[#102c3d]/[0.09] transition hover:-translate-y-0.5 hover:ring-[#159b8f]/25">Beta Login</Link>
+          </div>
+          <div className="mt-8 grid max-w-xl gap-3 sm:grid-cols-3">
+            {[["1", "controlled workspace"], ["5", "stakeholder views"], ["0", "marketplace noise"]].map(([value, label]) => (
+              <div key={label} className="rounded-2xl bg-white/76 px-4 py-3 ring-1 ring-[#102c3d]/[0.06] shadow-[0_12px_34px_rgba(16,44,61,0.05)]">
+                <p className="text-2xl font-semibold tracking-[-0.04em]">{value}</p>
+                <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#102c3d]/44">{label}</p>
+              </div>
+            ))}
           </div>
         </div>
         <ProductPreview />
@@ -131,104 +110,156 @@ function HeroSection() {
     </section>
   );
 }
-
 function ProductPreview() {
-  const rows = [
-    ["Employees", "0 records", "Clean start"],
-    ["Roles", "0 mapped", "Ready to build"],
-    ["Applications", "0 active", "Workflow prepared"],
-    ["Providers", "11 seeded", "Catalogue live"],
-    ["Provider Matching", "Controlled", "LevyTate-led"],
-  ];
-
   return (
-    <aside className="rounded-[2rem] border border-[#102c3d]/[0.08] bg-white/86 p-4 shadow-[0_34px_90px_rgba(16,44,61,0.13)] backdrop-blur-xl">
-      <div className="rounded-[1.5rem] bg-[#102c3d] p-4 text-white">
-        <div className="flex items-center justify-between gap-4">
+    <aside className="relative rounded-[2.25rem] border border-[#102c3d]/[0.08] bg-white/90 p-4 shadow-[0_38px_110px_rgba(16,44,61,0.16)] backdrop-blur-xl">
+      <div className="overflow-hidden rounded-[1.75rem] border border-[#102c3d]/[0.06] bg-[#f8fbfa]">
+        <div className="flex items-center justify-between border-b border-[#102c3d]/[0.06] bg-white px-5 py-4">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c7f0e4]">Workspace</p>
-            <p className="mt-1 text-lg font-semibold">Apprenticeship operations</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">Live workspace</p>
+            <p className="mt-1 text-lg font-semibold tracking-[-0.02em]">Apprenticeship command centre</p>
           </div>
-          <span className="rounded-full bg-white/12 px-3 py-1.5 text-xs font-semibold text-white/74">Beta</span>
+          <span className="rounded-full bg-[#eaf7f2] px-3 py-1.5 text-xs font-semibold text-[#0b6f63] ring-1 ring-[#159b8f]/[0.14]">Beta</span>
         </div>
-        <div className="mt-5 grid grid-cols-3 gap-2">
-          {["Employee", "Manager", "Lead"].map((item, index) => (
-            <div key={item} className={`rounded-2xl px-3 py-3 ${index === 0 ? "bg-white text-[#102c3d]" : "bg-white/8 text-white/66"}`}>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.12em]">{item}</p>
-              <p className="mt-2 text-xl font-semibold">{index === 0 ? "1" : "0"}</p>
+        <div className="grid gap-3 p-4 lg:grid-cols-[1fr_0.86fr]">
+          <div className="rounded-[1.4rem] bg-[#102c3d] p-4 text-white shadow-[0_20px_60px_rgba(16,44,61,0.18)]">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c7f0e4]">Employee dashboard</p>
+                <h2 className="mt-3 text-2xl font-semibold tracking-[-0.04em]">Workforce readiness</h2>
+              </div>
+              <span className="text-4xl font-semibold tracking-[-0.06em]">82%</span>
             </div>
-          ))}
-        </div>
-      </div>
-      <div className="mt-4 overflow-hidden rounded-[1.5rem] border border-[#102c3d]/[0.06] bg-[#f8fbfa]">
-        {rows.map((row) => (
-          <div key={row[0]} className="grid grid-cols-[1fr_auto] gap-4 border-b border-[#102c3d]/[0.055] px-4 py-3 last:border-b-0">
-            <div>
-              <p className="text-sm font-semibold text-[#102c3d]">{row[0]}</p>
-              <p className="mt-1 text-xs text-[#102c3d]/52">{row[2]}</p>
+            <div className="mt-5 h-2 rounded-full bg-white/12"><div className="h-2 w-[82%] rounded-full bg-[#c7f0e4]" /></div>
+            <div className="mt-5 grid gap-2 sm:grid-cols-3">
+              {[["48", "active learners"], ["14", "applications"], ["6", "providers"]].map(([value, label]) => (
+                <div key={label} className="rounded-2xl bg-white/[0.08] px-3 py-3 ring-1 ring-white/10">
+                  <p className="text-xl font-semibold">{value}</p>
+                  <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/48">{label}</p>
+                </div>
+              ))}
             </div>
-            <span className="self-center rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#0b6f63] ring-1 ring-[#159b8f]/[0.12]">{row[1]}</span>
           </div>
-        ))}
+          <div className="grid gap-3">
+            <PreviewCard eyebrow="Approval queue" title="Applications awaiting approval" value="4" tone="coral" />
+            <PreviewCard eyebrow="Provider match" title="Data Analyst pathway ready for review" value="New" tone="mint" />
+          </div>
+        </div>
+        <div className="grid gap-3 border-t border-[#102c3d]/[0.06] p-4 lg:grid-cols-[0.95fr_1.05fr]">
+          <div className="rounded-[1.4rem] bg-white p-4 shadow-[0_16px_44px_rgba(16,44,61,0.06)] ring-1 ring-[#102c3d]/[0.06]">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">AI recommendation</p>
+            <p className="mt-3 text-sm leading-6 text-[#102c3d]/70">Maintenance Manager maps strongly to Level 5 Operations Manager with Improvement Practitioner as an alternative.</p>
+          </div>
+          <div className="rounded-[1.4rem] bg-white p-4 shadow-[0_16px_44px_rgba(16,44,61,0.06)] ring-1 ring-[#102c3d]/[0.06]">
+            <div className="flex items-center justify-between"><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#0b6f63]">Reporting widget</p><span className="text-xs font-semibold text-[#102c3d]/44">Q2</span></div>
+            <div className="mt-5 flex h-24 items-end gap-2">
+              {[36, 48, 42, 64, 72, 82].map((height, index) => (
+                <div key={height} className="flex-1 rounded-t-xl bg-[#dfeee8]"><div className={`rounded-t-xl ${index > 3 ? "bg-[#18a89a]" : "bg-[#8bd7c5]"}`} style={{ height }} /></div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     </aside>
   );
 }
 
+function PreviewCard({ eyebrow, title, value, tone }: { eyebrow: string; title: string; value: string; tone: "coral" | "mint" }) {
+  return (
+    <div className="rounded-[1.4rem] bg-white p-4 shadow-[0_16px_44px_rgba(16,44,61,0.06)] ring-1 ring-[#102c3d]/[0.06]">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className={`text-[10px] font-semibold uppercase tracking-[0.16em] ${tone === "coral" ? "text-[#c95568]" : "text-[#0b6f63]"}`}>{eyebrow}</p>
+          <p className="mt-2 text-sm font-semibold leading-5">{title}</p>
+        </div>
+        <span className={`rounded-full px-3 py-1.5 text-xs font-semibold ${tone === "coral" ? "bg-[#fff0f2] text-[#c95568]" : "bg-[#eaf7f2] text-[#0b6f63]"}`}>{value}</span>
+      </div>
+    </div>
+  );
+}
 function CredibilityStrip() {
   return (
-    <section className="border-y border-[#102c3d]/[0.07] bg-white/62">
-      <div className="mx-auto grid max-w-7xl gap-3 px-5 py-5 sm:px-8 md:grid-cols-2 lg:grid-cols-4">
-        {credibility.map((item) => (
-          <div key={item} className="flex items-center gap-3 text-sm font-semibold text-[#102c3d]/68">
-            <span className="h-2.5 w-2.5 rounded-full bg-[#159b8f]" />
-            {item}
-          </div>
-        ))}
+    <section className="border-y border-[#102c3d]/[0.07] bg-white/72">
+      <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-5 sm:px-8 lg:flex-row lg:items-center lg:justify-between">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#102c3d]/42">Built for</p>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          {credibility.map((item, index) => (
+            <div key={item} className="flex items-center gap-3 rounded-full bg-[#f8fbfa] px-4 py-2.5 text-sm font-semibold text-[#102c3d]/70 ring-1 ring-[#102c3d]/[0.06]">
+              <span className={`grid h-7 w-7 place-items-center rounded-full text-xs ${index % 2 === 0 ? "bg-[#eaf7f2] text-[#0b6f63]" : "bg-[#fff0f2] text-[#c95568]"}`}>{item.charAt(0)}</span>
+              {item}
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   );
 }
-
 function ProblemSection() {
+  const current = ["Spreadsheets", "Email approvals", "Provider emails", "Inconsistent reporting"];
+  const better = ["One workspace", "Structured workflow", "Provider matching", "Executive reporting"];
+
   return (
     <section id="product" className="mx-auto max-w-7xl px-5 py-16 sm:px-8 lg:py-24">
-      <div className="max-w-3xl">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c95568]">The problem</p>
-        <h2 className="mt-3 text-4xl font-semibold tracking-[-0.04em] text-[#102c3d] sm:text-5xl">Apprenticeship management is still too fragmented.</h2>
+      <div className="grid gap-10 lg:grid-cols-[0.82fr_1.18fr] lg:items-end">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c95568]">The problem</p>
+          <h2 className="mt-3 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">Managing apprenticeships should not require five different systems.</h2>
+        </div>
+        <p className="text-base leading-8 text-[#102c3d]/62">LevyTate replaces scattered admin with one operating layer for the decisions employers need to make before training delivery starts.</p>
       </div>
-      <div className="mt-8 grid gap-4 lg:grid-cols-3">
-        {problems.map((problem) => (
-          <article key={problem.title} className="rounded-[1.5rem] border border-[#102c3d]/[0.07] bg-white p-6 shadow-[0_18px_48px_rgba(16,44,61,0.055)]">
-            <h3 className="text-xl font-semibold tracking-[-0.02em]">{problem.title}</h3>
-            <p className="mt-3 text-sm leading-6 text-[#102c3d]/60">{problem.copy}</p>
-          </article>
-        ))}
-      </div>
-      <div className="mt-6 rounded-[1.5rem] bg-[#102c3d] px-6 py-5 text-lg font-semibold text-white shadow-[0_20px_52px_rgba(16,44,61,0.16)]">
-        LevyTate brings the process into one structured workspace.
+      <div className="mt-10 grid gap-5 lg:grid-cols-[1fr_1fr_0.9fr]">
+        <ComparisonCard title="Current approach" items={current} mood="negative" />
+        <ComparisonCard title="LevyTate" items={better} mood="positive" />
+        <div className="rounded-[2rem] bg-[#102c3d] p-6 text-white shadow-[0_26px_80px_rgba(16,44,61,0.18)]">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c7f0e4]">Outcome</p>
+          <p className="mt-5 text-3xl font-semibold tracking-[-0.04em]">One clear route from workforce demand to approved delivery.</p>
+          <div className="mt-8 grid gap-3">
+            {[["Admin", "reduced"], ["Approvals", "visible"], ["Provider fit", "structured"]].map(([label, value]) => (
+              <div key={label} className="flex items-center justify-between rounded-2xl bg-white/[0.08] px-4 py-3 ring-1 ring-white/10">
+                <span className="text-sm text-white/64">{label}</span>
+                <span className="text-sm font-semibold">{value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </section>
   );
 }
 
+function ComparisonCard({ title, items, mood }: { title: string; items: string[]; mood: "negative" | "positive" }) {
+  return (
+    <article className="rounded-[2rem] border border-[#102c3d]/[0.07] bg-white p-6 shadow-[0_22px_64px_rgba(16,44,61,0.07)]">
+      <h3 className="text-2xl font-semibold tracking-[-0.035em]">{title}</h3>
+      <div className="mt-6 grid gap-3">
+        {items.map((item) => (
+          <div key={item} className="flex items-center gap-3 rounded-2xl bg-[#f8fbfa] px-4 py-3 ring-1 ring-[#102c3d]/[0.055]">
+            <span className={`grid h-7 w-7 place-items-center rounded-full text-xs font-bold ${mood === "positive" ? "bg-[#eaf7f2] text-[#0b6f63]" : "bg-[#fff0f2] text-[#c95568]"}`}>{mood === "positive" ? "+" : "x"}</span>
+            <span className="text-sm font-semibold text-[#102c3d]/72">{item}</span>
+          </div>
+        ))}
+      </div>
+    </article>
+  );
+}
 function ProductPillars() {
   return (
-    <section className="bg-white/64 py-16 lg:py-24">
+    <section className="bg-white/66 py-16 lg:py-24">
       <div className="mx-auto max-w-7xl px-5 sm:px-8">
-        <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:items-end">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c95568]">Product pillars</p>
-            <h2 className="mt-3 text-4xl font-semibold tracking-[-0.04em] sm:text-5xl">Everything needed to run apprenticeship decisions.</h2>
-          </div>
-          <p className="max-w-2xl text-base leading-7 text-[#102c3d]/62 lg:justify-self-end">A focused MVP for the operational work employers need to control first: people data, role mapping, application workflow and provider matching.</p>
+        <div className="max-w-3xl">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c95568]">Product pillars</p>
+          <h2 className="mt-3 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">The operating layer employers need before delivery begins.</h2>
         </div>
-        <div className="mt-9 grid gap-4 md:grid-cols-2">
+        <div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
           {pillars.map((pillar, index) => (
-            <article key={pillar.title} className="group rounded-[1.5rem] border border-[#102c3d]/[0.07] bg-white p-6 shadow-[0_18px_48px_rgba(16,44,61,0.055)] transition hover:-translate-y-1 hover:shadow-[0_26px_70px_rgba(16,44,61,0.09)]">
-              <span className="grid h-10 w-10 place-items-center rounded-2xl bg-[#edf7f3] text-sm font-semibold text-[#0b6f63] ring-1 ring-[#159b8f]/[0.12]">{index + 1}</span>
-              <h3 className="mt-5 text-2xl font-semibold tracking-[-0.03em]">{pillar.title}</h3>
-              <p className="mt-3 text-sm leading-6 text-[#102c3d]/60">{pillar.copy}</p>
+            <article key={pillar.title} className="group flex min-h-[300px] flex-col rounded-[2rem] border border-[#102c3d]/[0.07] bg-white p-6 shadow-[0_22px_64px_rgba(16,44,61,0.065)] transition hover:-translate-y-1 hover:shadow-[0_30px_86px_rgba(16,44,61,0.1)]">
+              <div className="flex items-center justify-between">
+                <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#eaf7f2] text-sm font-semibold text-[#0b6f63] ring-1 ring-[#159b8f]/[0.12]">0{index + 1}</span>
+                <span className="rounded-full bg-[#fff5d7] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8b6500]">Decision ready</span>
+              </div>
+              <h3 className="mt-8 text-2xl font-semibold tracking-[-0.035em]">{pillar.title}</h3>
+              <p className="mt-4 text-sm leading-7 text-[#102c3d]/62">{pillar.copy}</p>
+              <div className="mt-auto pt-7"><div className="h-2 rounded-full bg-[#edf4f1]"><div className="h-2 rounded-full bg-[#18a89a]" style={{ width: `${62 + index * 9}%` }} /></div></div>
             </article>
           ))}
         </div>
@@ -239,18 +270,60 @@ function ProductPillars() {
 
 function WorkflowSection() {
   return (
-    <section id="how-it-works" className="mx-auto max-w-7xl px-5 py-16 sm:px-8 lg:py-24">
-      <div className="max-w-3xl">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c95568]">How it works</p>
-        <h2 className="mt-3 text-4xl font-semibold tracking-[-0.04em] sm:text-5xl">A clearer route from workforce demand to enrolment.</h2>
+    <section id="workflow" className="mx-auto max-w-7xl px-5 py-16 sm:px-8 lg:py-24">
+      <div className="grid gap-8 lg:grid-cols-[0.75fr_1.25fr] lg:items-center">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c95568]">How it works</p>
+          <h2 className="mt-3 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">A visual route from role data to enrolment.</h2>
+          <p className="mt-5 text-base leading-8 text-[#102c3d]/62">The workflow stays structured, but each stakeholder only sees the step they can influence.</p>
+        </div>
+        <div className="rounded-[2rem] border border-[#102c3d]/[0.07] bg-white p-4 shadow-[0_26px_80px_rgba(16,44,61,0.08)]">
+          <div className="grid gap-3 md:grid-cols-7">
+            {workflow.map((step, index) => (
+              <div key={step} className="relative rounded-[1.35rem] bg-[#f8fbfa] p-4 ring-1 ring-[#102c3d]/[0.055]">
+                <span className={`grid h-9 w-9 place-items-center rounded-2xl text-xs font-semibold ${index === 2 ? "bg-[#102c3d] text-white" : "bg-white text-[#0b6f63] ring-1 ring-[#159b8f]/[0.12]"}`}>{index + 1}</span>
+                <p className="mt-5 text-sm font-semibold leading-5 tracking-[-0.01em]">{step}</p>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
-      <div className="mt-10 overflow-hidden rounded-[2rem] border border-[#102c3d]/[0.07] bg-white p-4 shadow-[0_24px_70px_rgba(16,44,61,0.075)]">
-        <div className="grid gap-3 lg:grid-cols-6">
-          {workflow.map((step, index) => (
-            <div key={step} className="relative rounded-[1.25rem] bg-[#f8fbfa] p-4 ring-1 ring-[#102c3d]/[0.055]">
-              <span className="text-xs font-semibold text-[#0b6f63]">0{index + 1}</span>
-              <p className="mt-8 min-h-12 text-lg font-semibold leading-6 tracking-[-0.02em]">{step}</p>
-            </div>
+    </section>
+  );
+}
+
+function ProductGallery() {
+  return (
+    <section className="bg-[#102c3d] py-16 text-white lg:py-24">
+      <div className="mx-auto max-w-7xl px-5 sm:px-8">
+        <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:items-end">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c7f0e4]">Product gallery</p>
+            <h2 className="mt-3 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">A real operating system, not another static tracker.</h2>
+          </div>
+          <p className="max-w-2xl text-base leading-8 text-white/64 lg:justify-self-end">LevyTate brings daily apprenticeship operations and executive readiness insight into the same product language.</p>
+        </div>
+        <div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+          {galleryItems.map(([title, copy, metric, label], index) => (
+            <article key={title} className="rounded-[2rem] bg-white/[0.07] p-4 shadow-[0_24px_76px_rgba(0,0,0,0.18)] ring-1 ring-white/10">
+              <div className="rounded-[1.45rem] bg-white p-4 text-[#102c3d]">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">{title}</p>
+                    <p className="mt-3 text-sm leading-6 text-[#102c3d]/62">{copy}</p>
+                  </div>
+                  <div className="grid h-20 w-20 shrink-0 place-items-center rounded-3xl bg-[#f3faf6] text-center ring-1 ring-[#159b8f]/[0.12]">
+                    <span className="block text-xl font-semibold tracking-[-0.04em] text-[#0b6f63]">{metric}</span>
+                    <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/42">{label}</span>
+                  </div>
+                </div>
+                <div className="mt-5 flex h-20 items-end gap-2">
+                  {[34, 52, 46, 68, 58, 82].map((height, barIndex) => (
+                    <div key={`${title}-${height}-${barIndex}`} className="flex-1 rounded-t-xl bg-[#e8f3ee]"><div className={`rounded-t-xl ${barIndex + index > 4 ? "bg-[#ff8090]" : "bg-[#18a89a]"}`} style={{ height: Math.max(22, height - index * 3) }} /></div>
+                  ))}
+                </div>
+              </div>
+            </article>
           ))}
         </div>
       </div>
@@ -260,38 +333,58 @@ function WorkflowSection() {
 
 function AiSection() {
   return (
-    <section className="bg-[#102c3d] py-16 text-white lg:py-24">
-      <div className="mx-auto grid max-w-7xl gap-10 px-5 sm:px-8 lg:grid-cols-[minmax(0,0.9fr)_minmax(420px,1.1fr)] lg:items-center">
+    <section id="ai" className="relative px-5 py-16 sm:px-8 lg:py-24">
+      <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c7f0e4]">Ask LevyTate AI</p>
-          <h2 className="mt-3 text-4xl font-semibold tracking-[-0.04em] sm:text-5xl">AI-supported apprenticeship guidance, built around your workflow.</h2>
-          <p className="mt-5 text-base leading-8 text-white/68">Ask LevyTate AI helps employees understand suitable pathways and helps apprenticeship leads explore role-to-standard options, specialist routes and provider matching opportunities.</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c95568]">Ask LevyTate AI</p>
+          <h2 className="mt-3 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">Guidance that understands roles, rules and provider matching.</h2>
+          <p className="mt-5 text-base leading-8 text-[#102c3d]/62">Ask LevyTate AI helps teams move from uncertainty to a structured next step. Recommendations stay grounded in approved pathways, permissions and the one-active-application rule.</p>
+          <a href="#providers" className="mt-8 inline-flex rounded-full bg-[#102c3d] px-6 py-3 text-sm font-semibold text-white shadow-[0_18px_38px_rgba(16,44,61,0.16)] transition hover:-translate-y-0.5">Request Provider Matching</a>
         </div>
-        <div className="grid gap-3">
-          {prompts.map((prompt) => (
-            <div key={prompt} className="rounded-[1.25rem] border border-white/10 bg-white/[0.07] px-5 py-4 shadow-[0_18px_48px_rgba(0,0,0,0.12)]">
-              <p className="text-sm font-semibold text-white">{prompt}</p>
+        <div className="rounded-[2rem] border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_30px_90px_rgba(16,44,61,0.1)]">
+          <div className="rounded-[1.5rem] bg-[#f8fbfa] p-4 ring-1 ring-[#102c3d]/[0.055]">
+            <div className="flex items-center gap-3">
+              <span className="grid h-10 w-10 place-items-center rounded-2xl bg-[#102c3d] text-sm font-semibold text-white">AI</span>
+              <div><p className="text-sm font-semibold">Ask LevyTate AI</p><p className="text-xs text-[#102c3d]/48">Role-aware apprenticeship guidance</p></div>
             </div>
-          ))}
+            <ChatBubble speaker="User" message="We have created a Maintenance Manager role. Which apprenticeship would you recommend?" />
+            <ChatBubble speaker="LevyTate" highlighted message="I would recommend Level 5 Operations Manager as the primary route. It fits leadership responsibility, operational planning and team performance. Alternative options include Improvement Practitioner for process-led roles and Engineering Manufacturing Technician for deeper technical progression. Funding may be potentially levy-funded depending on eligibility. Would you like LevyTate to match suitable providers?" />
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              {["Recommended", "Alternatives", "Provider match"].map((item) => (
+                <div key={item} className="rounded-2xl bg-white px-4 py-3 text-xs font-semibold text-[#102c3d]/70 ring-1 ring-[#102c3d]/[0.06]">{item}</div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </section>
   );
 }
 
+function ChatBubble({ speaker, message, highlighted = false }: { speaker: string; message: string; highlighted?: boolean }) {
+  return (
+    <div className={`mt-4 rounded-[1.25rem] p-4 ${highlighted ? "bg-[#102c3d] text-white" : "bg-white text-[#102c3d] ring-1 ring-[#102c3d]/[0.06]"}`}>
+      <p className={`text-[10px] font-semibold uppercase tracking-[0.16em] ${highlighted ? "text-[#c7f0e4]" : "text-[#c95568]"}`}>{speaker}</p>
+      <p className={`mt-2 text-sm leading-7 ${highlighted ? "text-white/76" : "text-[#102c3d]/68"}`}>{message}</p>
+    </div>
+  );
+}
 function ProviderCatalogueSection() {
   return (
-    <section id="providers" className="mx-auto max-w-7xl px-5 py-16 sm:px-8 lg:py-24">
-      <div className="grid gap-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c95568]">Provider catalogue</p>
-          <h2 className="mt-3 text-4xl font-semibold tracking-[-0.04em] sm:text-5xl">Provider intelligence built in.</h2>
-          <p className="mt-5 text-base leading-8 text-[#102c3d]/62">LevyTate includes a structured provider catalogue to support better matching decisions across digital, data, procurement, marketing, business, customer service and specialist apprenticeship routes.</p>
+    <section id="providers" className="bg-white/66 py-16 lg:py-24">
+      <div className="mx-auto max-w-7xl px-5 sm:px-8">
+        <div className="grid gap-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-end">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c95568]">Provider network</p>
+            <h2 className="mt-3 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">Built around trusted provider intelligence.</h2>
+          </div>
+          <p className="max-w-2xl text-base leading-8 text-[#102c3d]/62 lg:justify-self-end">LevyTate is not an open marketplace. Provider matching is a structured LevyTate-led workflow based on employer need, programme fit and delivery context.</p>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {providerAreas.map((area) => (
-            <div key={area} className="rounded-[1.25rem] bg-white px-5 py-4 text-sm font-semibold text-[#102c3d] shadow-[0_16px_42px_rgba(16,44,61,0.055)] ring-1 ring-[#102c3d]/[0.07]">
-              {area}
+        <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {providerAreas.map((provider, index) => (
+            <div key={provider} className="rounded-[1.4rem] bg-white px-5 py-5 text-sm font-semibold text-[#102c3d] shadow-[0_18px_54px_rgba(16,44,61,0.06)] ring-1 ring-[#102c3d]/[0.07]">
+              <span className={`mb-4 block h-2 w-12 rounded-full ${index % 3 === 0 ? "bg-[#18a89a]" : index % 3 === 1 ? "bg-[#ff8090]" : "bg-[#ffde59]"}`} />
+              {provider}
             </div>
           ))}
         </div>
@@ -299,65 +392,33 @@ function ProviderCatalogueSection() {
     </section>
   );
 }
-
-function BetaAccessSection() {
-  return (
-    <section id="beta" className="bg-white/70 py-16 lg:py-24">
-      <div className="mx-auto grid max-w-7xl gap-10 px-5 sm:px-8 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c95568]">Beta access</p>
-          <h2 className="mt-3 text-4xl font-semibold tracking-[-0.04em] sm:text-5xl">Join the LevyTate beta.</h2>
-          <p className="mt-5 text-base leading-8 text-[#102c3d]/62">We are opening beta access to employers who want a clearer way to manage apprenticeship activity, provider relationships and workforce development decisions.</p>
-        </div>
-        <form action="/login" className="rounded-[2rem] border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_26px_80px_rgba(16,44,61,0.085)]">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Input label="Name" name="name" placeholder="Your name" />
-            <Input label="Work email" name="email" placeholder="you@organisation.co.uk" />
-            <Input label="Organisation" name="organisation" placeholder="Organisation name" />
-            <Input label="Message" name="message" placeholder="What would you like to manage?" />
-          </div>
-          <button className="mt-5 w-full rounded-full bg-[#102c3d] px-6 py-3 text-sm font-semibold text-white shadow-[0_16px_34px_rgba(16,44,61,0.16)] transition hover:-translate-y-0.5">Request Beta Access</button>
-          <p className="mt-3 text-center text-xs leading-5 text-[#102c3d]/48">The beta is invite-only. Login details are issued separately.</p>
-        </form>
-      </div>
-    </section>
-  );
-}
-
 function AudienceJourneySection() {
   return (
     <section className="px-5 py-16 sm:px-8 lg:py-24">
       <div className="mx-auto max-w-7xl">
         <div className="max-w-3xl">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c95568]">Choose your LevyTate journey</p>
-          <h2 className="mt-3 text-4xl font-semibold tracking-[-0.04em] sm:text-5xl">Who are you?</h2>
-          <p className="mt-5 text-base leading-8 text-[#102c3d]/62">
-            LevyTate supports both employers looking to improve apprenticeship management and training providers looking to become trusted delivery partners.
-          </p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c95568]">Who is LevyTate for?</p>
+          <h2 className="mt-3 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">Two commercial routes. One controlled platform.</h2>
+          <p className="mt-5 text-base leading-8 text-[#102c3d]/62">LevyTate supports employers looking to modernise apprenticeship management and training providers looking to become trusted delivery partners.</p>
         </div>
         <div className="mt-10 grid gap-5 lg:grid-cols-2">
           <JourneyCard
             variant="employer"
-            label="For employers"
-            title="Looking to transform how your organisation manages apprenticeships?"
-            intro="Discover how LevyTate can help you:"
-            bullets={employerJourneyBullets}
+            label="Employers"
+            title="Looking to modernise apprenticeship management?"
+            intro="Give teams one place to manage people, pathways, approvals and provider matching without losing strategic visibility."
+            bullets={["Employee management", "Applications", "Workforce planning", "AI guidance", "Provider matching"]}
             primaryCta="Request Employer Beta Access"
-            secondaryCta="Book a discovery conversation"
             primaryHref="#beta"
-            secondaryHref="#beta"
           />
           <JourneyCard
             variant="provider"
-            label="For training providers"
+            label="Training providers"
             title="Interested in becoming a LevyTate Partner?"
-            intro="LevyTate is building a carefully selected network of trusted apprenticeship providers."
-            supportingIntro="Partner organisations can benefit from:"
-            bullets={providerJourneyBullets}
+            intro="Join a carefully selected network that supports qualified employer demand and strategic provider matching opportunities."
+            bullets={["Employer introductions", "Qualified opportunities", "Premium visibility", "AI-supported recommendations", "Strategic partnership packages"]}
             primaryCta="Discuss Partner Packages"
-            secondaryCta="Become a LevyTate Partner"
             primaryHref="#providers"
-            secondaryHref="#providers"
           />
         </div>
       </div>
@@ -370,15 +431,12 @@ type JourneyCardProps = {
   label: string;
   title: string;
   intro: string;
-  supportingIntro?: string;
   bullets: string[];
   primaryCta: string;
-  secondaryCta: string;
   primaryHref: string;
-  secondaryHref: string;
 };
 
-function JourneyCard({ variant, label, title, intro, supportingIntro, bullets, primaryCta, secondaryCta, primaryHref, secondaryHref }: JourneyCardProps) {
+function JourneyCard({ variant, label, title, intro, bullets, primaryCta, primaryHref }: JourneyCardProps) {
   const isProvider = variant === "provider";
 
   return (
@@ -389,7 +447,6 @@ function JourneyCard({ variant, label, title, intro, supportingIntro, bullets, p
           <p className={`text-[11px] font-semibold uppercase tracking-[0.18em] ${isProvider ? "text-[#ffde59]" : "text-[#c95568]"}`}>{label}</p>
           <h3 className="mt-3 text-2xl font-semibold tracking-[-0.035em] sm:text-3xl">{title}</h3>
           <p className={`mt-4 text-sm leading-7 ${isProvider ? "text-white/72" : "text-[#102c3d]/62"}`}>{intro}</p>
-          {supportingIntro ? <p className={`mt-2 text-sm leading-7 ${isProvider ? "text-white/72" : "text-[#102c3d]/62"}`}>{supportingIntro}</p> : null}
           <ul className="mt-5 grid gap-2 text-sm leading-6">
             {bullets.map((bullet) => (
               <li key={bullet} className="flex gap-3">
@@ -398,16 +455,12 @@ function JourneyCard({ variant, label, title, intro, supportingIntro, bullets, p
               </li>
             ))}
           </ul>
-          <div className="mt-7 flex flex-wrap items-center gap-3">
-            <a href={primaryHref} className={`rounded-full px-5 py-3 text-sm font-semibold transition hover:-translate-y-0.5 ${isProvider ? "bg-white text-[#102c3d] shadow-[0_16px_34px_rgba(0,0,0,0.22)]" : "bg-[#102c3d] text-white shadow-[0_16px_34px_rgba(16,44,61,0.16)]"}`}>{primaryCta}</a>
-            <a href={secondaryHref} className={`rounded-full px-5 py-3 text-sm font-semibold ring-1 transition hover:-translate-y-0.5 ${isProvider ? "text-white ring-white/18 hover:bg-white/8" : "text-[#102c3d] ring-[#102c3d]/10 hover:bg-[#102c3d]/[0.03]"}`}>{secondaryCta}</a>
-          </div>
+          <a href={primaryHref} className={`mt-7 inline-flex rounded-full px-5 py-3 text-sm font-semibold transition hover:-translate-y-0.5 ${isProvider ? "bg-white text-[#102c3d] shadow-[0_16px_34px_rgba(0,0,0,0.22)]" : "bg-[#102c3d] text-white shadow-[0_16px_34px_rgba(16,44,61,0.16)]"}`}>{primaryCta}</a>
         </div>
       </div>
     </article>
   );
 }
-
 function JourneyIllustration({ variant }: { variant: "employer" | "provider" }) {
   if (variant === "provider") {
     return (
@@ -449,11 +502,15 @@ function JourneyIllustration({ variant }: { variant: "employer" | "provider" }) 
 
 function FinalCta() {
   return (
-    <section className="px-5 py-16 sm:px-8 lg:py-20">
-      <div className="mx-auto max-w-7xl rounded-[2rem] bg-[#102c3d] px-6 py-10 text-center text-white shadow-[0_30px_90px_rgba(16,44,61,0.18)] sm:px-10 lg:py-14">
-        <h2 className="mx-auto max-w-4xl text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">Replace scattered apprenticeship admin with one clear operating system.</h2>
-        <div className="mt-8 flex flex-wrap justify-center gap-3">
-          <a href="#beta" className="rounded-full bg-white px-6 py-3 text-sm font-semibold text-[#102c3d] transition hover:-translate-y-0.5">Request Beta Access</a>
+    <section id="beta" className="px-5 pb-16 pt-4 sm:px-8 lg:pb-24">
+      <div className="mx-auto grid max-w-7xl gap-8 rounded-[2.4rem] bg-[#102c3d] p-6 text-white shadow-[0_34px_100px_rgba(16,44,61,0.2)] sm:p-10 lg:grid-cols-[1fr_auto] lg:items-center">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c7f0e4]">Start using LevyTate</p>
+          <h2 className="mt-4 max-w-4xl text-4xl font-semibold tracking-[-0.05em] sm:text-5xl">Stop managing apprenticeships across spreadsheets, emails and disconnected systems.</h2>
+          <p className="mt-5 max-w-2xl text-base leading-8 text-white/66">Start using LevyTate as the operating system for apprenticeship decisions, workforce readiness and provider matching.</p>
+        </div>
+        <div className="flex flex-wrap gap-3 lg:justify-end">
+          <a href="mailto:hello@levytate.co.uk?subject=Employer beta access" className="rounded-full bg-white px-6 py-3 text-sm font-semibold text-[#102c3d] transition hover:-translate-y-0.5">Request Beta Access</a>
           <Link href="/login" className="rounded-full bg-white/10 px-6 py-3 text-sm font-semibold text-white ring-1 ring-white/15 transition hover:-translate-y-0.5 hover:bg-white/14">Beta Login</Link>
         </div>
       </div>
@@ -461,12 +518,8 @@ function FinalCta() {
   );
 }
 
-function Input({ label, name, placeholder }: { label: string; name: string; placeholder: string }) {
-  return (
-    <label className="grid gap-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-[#102c3d]/42">
-      {label}
-      <input name={name} placeholder={placeholder} className="h-12 rounded-2xl border border-[#102c3d]/[0.08] bg-[#f8fbfa] px-4 text-sm font-medium normal-case tracking-normal text-[#102c3d] outline-none transition placeholder:text-[#102c3d]/32 focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10" />
-    </label>
-  );
-}
+
+
+
+
 
