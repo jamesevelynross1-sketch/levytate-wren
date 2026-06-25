@@ -39,7 +39,7 @@ LevyTate is a role-based apprenticeship and workforce development platform.
 
 LevyTate demo routes and strategic modules, including `/portakabin-apprenticeship-hub` and `/future-talent-portal`, must render as standalone LevyTate application environments. They must not inherit the public MPR Consulting website header, footer, navigation, logo, or marketing calls to action.
 
-The real LevyTate MVP must live as a standalone beta product on levytate.co.uk. Public LevyTate pages, beta login and /app must not inherit or appear inside the MPR Consulting public website. MVP routes must start clean with no employer demo records; demo routes such as /portakabin-apprenticeship-hub remain demo-only.
+The real LevyTate MVP must live as a standalone beta product on levytate.co.uk. Public LevyTate pages, beta login and /app must not inherit or appear inside the MPR Consulting public website. LevyTate domain requests must bypass the MPR `SiteChrome` at the root layout level and must never render the MPR Consulting header, footer, logo, public navigation or Book a Conversation CTA. MVP routes must start clean with no employer demo records; demo routes such as /portakabin-apprenticeship-hub remain demo-only.
 
 Approval flow:
 
@@ -137,4 +137,5 @@ Every task must:
 7. Provide a concise summary of changes
 
 Work is not complete until a working deployment URL is provided.
+
 

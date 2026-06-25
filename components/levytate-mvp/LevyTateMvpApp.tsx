@@ -95,7 +95,7 @@ function ModuleHeader({ activeModule }: { activeModule: ModuleName }) {
     <section className="mb-5 rounded-[1.25rem] border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_18px_46px_rgba(16,44,61,0.045)]">
       <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">LevyTate MVP</p>
       <h1 className="mt-1 text-3xl font-semibold tracking-[-0.035em] text-[#102c3d]">{activeModule}</h1>
-      <p className="mt-2 max-w-3xl text-sm leading-6 text-[#102c3d]/58">Standalone beta product environment. No MPR Consulting layout, no Portakabin branding and no preloaded employer records.</p>
+      <p className="mt-2 max-w-3xl text-sm leading-6 text-[#102c3d]/58">Standalone beta product environment with a LevyTate-only shell and no preloaded employer records.</p>
     </section>
   );
 }
@@ -193,4 +193,5 @@ function ChecklistItem({ children }: { children: React.ReactNode }) { return <di
 function Badge({ children }: { children: React.ReactNode }) { return <span className="inline-flex rounded-full bg-[#edf7f3] px-3 py-1.5 text-xs font-semibold text-[#0b6f63] ring-1 ring-[#159b8f]/[0.12]">{children}</span>; }
 function Setting({ label, value }: { label: string; value: string }) { return <div className="rounded-2xl bg-[#f8fbfa] p-4 ring-1 ring-[#102c3d]/[0.055]"><p className="text-xs font-semibold uppercase tracking-[0.13em] text-[#102c3d]/42">{label}</p><p className="mt-2 text-sm leading-6 text-[#102c3d]/62">{value}</p></div>; }
 function initials(item: string) { return item.split(" ").map((word) => word[0]).join("").slice(0, 2); }
+
 

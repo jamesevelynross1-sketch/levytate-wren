@@ -178,3 +178,22 @@ The current MVP uses local domain constants and clean empty arrays for employer 
 - audit events
 
 The current domain structure should make those records replaceable without rewriting the UI.
+
+## Layout Isolation Rule
+
+LevyTate must never inherit the MPR Consulting marketing layout.
+
+Domain requests for `levytate.co.uk` and `www.levytate.co.uk` must bypass the MPR `SiteChrome` at the root layout level. The LevyTate public site, `/login` and `/app` must not render:
+
+- MPR Consulting logo
+- MPR Consulting public navigation
+- Book a Conversation
+- Home
+- Framework
+- Levy Health Check
+- Provider Matching
+- NEET On Our Watch
+- Insights
+- Contact
+
+MPR Consulting routes should continue to use the MPR marketing shell on the MPR domain.
