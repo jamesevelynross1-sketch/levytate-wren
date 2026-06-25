@@ -15,8 +15,11 @@ import {
   navSectionsByRole,
   publicStages,
   readinessScore,
+  recommendationCountForRoleTitle,
   requestStages,
+  roleByTitle,
   roles,
+  pathwaysForRole,
   sidebarStateKey,
 } from "@/lib/levytate/domain";
 import {
@@ -24,11 +27,12 @@ import {
   allSitesLabel,
   employeePersonas,
   employeeRoleOptions,
-  employeeRolePathwayMap,
   initialMappings,
   initialProviderMatchingRequests,
   initialRequests,
   pathways,
+  portakabinPathwayStandards,
+  portakabinRoleLibrary,
   portakabinLearners,
   portakabinSites,
   scenarioSeeds,
@@ -103,6 +107,10 @@ export default function PortakabinApprenticeshipHub() {
   }
 
   function openSection(section: SectionKey) {
+    if (section === "Role Management") {
+      window.location.href = "/portakabin-apprenticeship-hub/role-library";
+      return;
+    }
     setActiveSection(section);
   }
 
@@ -729,6 +737,7 @@ function operatingSnapshotMetrics({
   const leadQueue = requests.filter((request) => request.status === "Submitted to Apprenticeship Lead" || request.status === "Awaiting Final Approval" || request.status === "Approved by Line Manager");
   const readiness = readinessScore(learners, requests);
   const employeeProgress = activeApplication ? Math.round(((publicStages.indexOf(activeApplication.status) + 1) / publicStages.length) * 100) : 14;
+  const recommendedPathwayCount = recommendationCountForRoleTitle(selectedPersona.role, portakabinRoleLibrary);
   const teamHighPotential = managerLearners.filter((learner) => learner.progress >= 70 || learner.programme === "Leadership & Management").length || 3;
   const departmentParticipation = `${Math.max(12, Math.min(28, Math.round((liveLearners.length / Math.max(learners.length || 1, 8)) * 100)))}%`;
   const providerCoverage = `${Math.max(68, Math.min(96, Math.round((mappings.filter((mapping) => mapping.status === "Live").length / Math.max(mappings.length, 1)) * 100)))}%`;
@@ -749,13 +758,13 @@ function operatingSnapshotMetrics({
       },
       {
         label: "Recommended pathways",
-        value: selectedPersona.recommendedPathways,
+        value: recommendedPathwayCount,
         copy: "Approved pathways matched to your role and progression goal.",
         trend: selectedPersona.careerGoal,
         tooltip: `Shows approved pathways matched to ${selectedPersona.name}'s role, site and stated progression goal.`,
         actionLabel: "Explore",
         target: "Recommended Pathways",
-        progress: Math.min(100, selectedPersona.recommendedPathways * 30),
+        progress: Math.min(100, recommendedPathwayCount * 30),
         series: [20, 24, 30, 36, 42, 48, 54],
       },
       {
@@ -1200,8 +1209,8 @@ function EmployeeDashboard({ employeeRequest, savedPathways, onNavigate }: { emp
       </PlatformPanel>
       <PlatformPanel eyebrow="Salary and career potential" title="Progression outlook">
         <div className="grid gap-3 md:grid-cols-3">
-          <MetricCard label="Current range" value="£28k" copy="Role benchmark" />
-          <MetricCard label="Next role range" value="£36k" copy="Estimated internal benchmark" />
+          <MetricCard label="Current range" value="Â£28k" copy="Role benchmark" />
+          <MetricCard label="Next role range" value="Â£36k" copy="Estimated internal benchmark" />
           <MetricCard label="Future opportunity" value="High" copy="Based on skills trajectory" />
         </div>
       </PlatformPanel>
@@ -1431,28 +1440,34 @@ function LaunchCard({ title, value, copy, action, section, onNavigate }: LaunchC
 }
 
 function matchedPathwaysForRole(roleName: string): Pathway[] {
-  const matches = employeeRolePathwayMap[roleName] ?? [];
+  const roleRecord = roleByTitle(portakabinRoleLibrary, roleName);
+  const recommendations = pathwaysForRole(roleRecord, portakabinPathwayStandards);
 
-  return matches.flatMap((match) => {
-    const basePathway = pathways.find((pathway) => pathway.title === match.pathwayTitle);
-    if (!basePathway) return [];
+  return recommendations.map((recommendation) => {
+    const basePathway = pathways.find((pathway) => pathway.title === recommendation.family) ?? pathways.find((pathway) => recommendation.family.toLowerCase().includes(pathway.title.split(" ")[0].toLowerCase())) ?? pathways[0];
+    const displayStandard = recommendation.level === "Internal" ? recommendation.standard : `${recommendation.level} ${recommendation.standard}`;
 
-    return [{
+    return {
       ...basePathway,
-      title: match.standard.replace(/^Level \d+\s/, ""),
-      standard: match.standard,
-      audience: `${roleName}: ${match.summary}`,
-      learnerBenefit: match.summary,
-    }];
+      title: recommendation.title.replace(/^Level \d+\s/, ""),
+      standard: displayStandard,
+      audience: `${roleName}: ${recommendation.summary}`,
+      businessBenefit: recommendation.mapping.businessRationale,
+      learnerBenefit: recommendation.mapping.businessRationale,
+      duration: recommendation.typicalDuration,
+      commitment: recommendation.mapping.deliveryPreference,
+      status: recommendation.mapping.recommendationType === "Primary" ? "Live" : basePathway.status,
+    };
   });
 }
 
 function roleSummaryFor(roleName: string) {
-  const matches = employeeRolePathwayMap[roleName] ?? [];
-  if (!matches.length) return "No approved apprenticeship mapping is currently available for this role.";
+  const roleRecord = roleByTitle(portakabinRoleLibrary, roleName);
+  const recommendations = pathwaysForRole(roleRecord, portakabinPathwayStandards);
+  if (!recommendations.length) return "No approved apprenticeship mapping is currently available for this role.";
 
-  const areas = Array.from(new Set(matches.map((match) => match.pathwayTitle.toLowerCase()))).join(", ");
-  return `${roleName} is currently mapped to ${matches.length} approved development route${matches.length === 1 ? "" : "s"} across ${areas}.`;
+  const areas = Array.from(new Set(recommendations.map((recommendation) => recommendation.family.toLowerCase()))).join(", ");
+  return `${roleName} is currently mapped to ${recommendations.length} approved development route${recommendations.length === 1 ? "" : "s"} across ${areas}.`;
 }
 
 function DetailSection({

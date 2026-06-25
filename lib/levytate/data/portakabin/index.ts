@@ -7,3 +7,4 @@ export * from './providers';
 export * from './provider-matching';
 
 export * from './employee-management';
+export * from './role-library';

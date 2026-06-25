@@ -20,14 +20,10 @@ export const navSectionsByRole: Record<Role, NavSection[]> = {
     { title: "Department", items: ["Dashboard", "Department Analytics", "Reporting", "Ask LevyTate AI"] },
   ],
   "Apprenticeship Lead": [
-    { title: "Operations", items: ["Dashboard", "Applications for Final Approval", "Approved for Enrolment", "Providers", "Reporting", "Ask LevyTate AI"] },
+    { title: "Operations", items: ["Dashboard", "Applications for Final Approval", "Approved for Enrolment", "Providers", "Role Management", "Reporting", "Ask LevyTate AI"] },
   ],
   "Admin Console": [
     { title: "Admin Console", items: ["Dashboard", "User Management", "Role Management", "Permission Management", "Provider Management", "Programme Catalogue"] },
     { title: "Configuration", items: ["Employer Configuration", "Site Configuration", "Audit Logs", "Platform Analytics", "System Settings"] },
   ],
 };
-
-
-
-

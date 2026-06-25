@@ -17,6 +17,61 @@ export type Pathway = {
   cohort: string;
   departments: string[];
 };
+export type RoleRecordStatus = "Active" | "Archived";
+export type CareerLevel = "Entry" | "Experienced" | "Supervisor" | "Manager" | "Senior Manager";
+export type PathwayRecommendationType = "Primary" | "Alternative";
+export type FundingRoute = "Potentially levy-funded" | "Potentially funded through levy/co-investment" | "Commercial training budget";
+export type DeliveryPreference = "Blended" | "Site based" | "Remote workshops" | "Hybrid" | "Online + coaching";
+export type RoleCapabilityTag =
+  | "Leadership"
+  | "Technical"
+  | "Digital"
+  | "AI"
+  | "Compliance"
+  | "People management"
+  | "Customer facing"
+  | "Operational"
+  | "Commercial"
+  | "Procurement";
+
+export type ApprenticeshipPathway = {
+  id: string;
+  title: string;
+  standard: string;
+  level: string;
+  family: string;
+  summary: string;
+  typicalDuration: string;
+};
+
+export type RolePathwayMapping = {
+  id: string;
+  pathwayId: string;
+  recommendationType: PathwayRecommendationType;
+  priority: number;
+  businessRationale: string;
+  fundingRoute: FundingRoute;
+  deliveryPreference: DeliveryPreference;
+  internalNotes: string;
+};
+
+export type RoleLibraryRole = {
+  id: string;
+  roleTitle: string;
+  department: string;
+  businessArea: string;
+  siteApplicability: string[];
+  careerLevel: CareerLevel;
+  typicalProgression: string[];
+  futureProgressionRoleIds: string[];
+  skillsTags: string[];
+  aiTags: RoleCapabilityTag[];
+  businessOutcomes: string[];
+  overview: string;
+  recommendations: RolePathwayMapping[];
+  status: RoleRecordStatus;
+  lastUpdated: string;
+};
 
 export type RequestItem = {
   id: number;
@@ -95,6 +150,7 @@ export type EmployeeRecord = {
   name: string;
   email: string;
   role: string;
+  assignedRoleId: string;
   platformRole: Role;
   manager: string;
   department: string;

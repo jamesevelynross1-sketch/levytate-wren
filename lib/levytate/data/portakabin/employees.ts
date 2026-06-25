@@ -33,8 +33,8 @@ export const employeePersonas: EmployeePersona[] = [
     recommendedPathways: 2,
     savedOpportunities: 1,
     passportActivities: 7,
-    currentRange: "£28k",
-    nextRange: "£36k",
+    currentRange: "Â£28k",
+    nextRange: "Â£36k",
     futureOpportunity: "High",
     progression: ["Production Team Member", "Senior Operator", "Team Leader", "Production Supervisor"],
     skills: [["Manufacturing confidence", 74], ["Leadership readiness", 58], ["Technical evidence", 68], ["Shift coordination", 61]],
@@ -49,85 +49,13 @@ export const employeePersonas: EmployeePersona[] = [
     recommendedPathways: 5,
     savedOpportunities: 3,
     passportActivities: 4,
-    currentRange: "£34k",
-    nextRange: "£52k",
+    currentRange: "Â£34k",
+    nextRange: "Â£52k",
     futureOpportunity: "Very high",
     progression: ["Data & Reporting Analyst", "Data Analyst", "Senior Data Analyst", "Head of Data & Automation"],
     skills: [["Data analysis", 72], ["Automation", 54], ["Business intelligence", 78], ["AI readiness", 48]],
   },
 ];
-
-export const employeeRolePathwayMap: Record<string, Array<{ pathwayTitle: string; standard: string; summary: string }>> = {
-  "Production Team Member": [
-    { pathwayTitle: "Manufacturing & Production", standard: "Level 3 Engineering Technician", summary: "Build technical production, maintenance and engineering confidence." },
-    { pathwayTitle: "Leadership & Management", standard: "Level 3 Team Leader", summary: "Prepare for shift handovers, team coordination and improvement work." },
-  ],
-  "Data & Reporting Analyst": [
-    { pathwayTitle: "Digital, Data & AI", standard: "Level 3 Data Technician", summary: "Build practical data handling, dashboards and reporting confidence." },
-    { pathwayTitle: "Digital, Data & AI", standard: "Level 4 Data Analyst", summary: "Develop analysis, insight generation and data storytelling capability." },
-    { pathwayTitle: "Digital, Data & AI", standard: "Level 4 Business Analyst", summary: "Connect business needs, systems improvement and data-led change." },
-    { pathwayTitle: "Digital, Data & AI", standard: "Level 6 Data Scientist", summary: "Progress toward advanced modelling, experimentation and strategic analytics." },
-    { pathwayTitle: "Digital, Data & AI", standard: "AI & Automation Workforce Programme", summary: "Build automation confidence for reporting, workflows and internal productivity." },
-  ],
-  "Assembly Operative": [
-    { pathwayTitle: "Manufacturing & Production", standard: "Level 3 Engineering Technician", summary: "Develop practical manufacturing and assembly capability." },
-    { pathwayTitle: "Health, Safety & Compliance", standard: "Level 3 Safety, Health and Environment Technician", summary: "Strengthen safe working, quality routines and evidence." },
-  ],
-  "Manufacturing Operative": [
-    { pathwayTitle: "Manufacturing & Production", standard: "Level 3 Engineering Technician", summary: "Formalise manufacturing skills and workplace evidence." },
-    { pathwayTitle: "Leadership & Management", standard: "Level 3 Team Leader", summary: "Support progression into production leadership." },
-  ],
-  "Maintenance Technician": [
-    { pathwayTitle: "Manufacturing & Production", standard: "Level 3 Engineering Maintenance Technician", summary: "Deepen maintenance, fault finding and technical engineering skills." },
-  ],
-  "Project Coordinator": [
-    { pathwayTitle: "Installation & Site Operations", standard: "Level 4 Associate Project Manager", summary: "Build project planning, stakeholder and delivery control skills." },
-    { pathwayTitle: "Leadership & Management", standard: "Level 5 Operations Manager", summary: "Prepare for wider operational ownership and team leadership." },
-  ],
-  "Technical Design Assistant": [
-    { pathwayTitle: "Design & Technical", standard: "Level 3 Design & Draughting", summary: "Develop technical drawing, documentation and design evidence." },
-    { pathwayTitle: "Design & Technical", standard: "Level 4 Construction Design", summary: "Build construction design capability and project coordination." },
-  ],
-  Estimator: [
-    { pathwayTitle: "Design & Technical", standard: "Level 4 Construction Design", summary: "Strengthen technical interpretation, commercial accuracy and specification work." },
-  ],
-  "Site Supervisor": [
-    { pathwayTitle: "Installation & Site Operations", standard: "Level 3 Construction Site Supervisor", summary: "Develop site coordination, readiness and handover confidence." },
-    { pathwayTitle: "Installation & Site Operations", standard: "Level 4 Construction Site Manager", summary: "Prepare for broader site management and delivery accountability." },
-  ],
-  "Sales Executive": [
-    { pathwayTitle: "Hire, Sales & Customer Experience", standard: "Level 4 Sales Executive", summary: "Improve consultative selling, account growth and customer outcomes." },
-  ],
-  "Procurement Administrator": [
-    { pathwayTitle: "Procurement & Supply Chain", standard: "Level 3 Supply Chain Practitioner", summary: "Build supplier coordination, purchasing support and planning skills." },
-  ],
-  "Procurement Officer": [
-    { pathwayTitle: "Procurement & Supply Chain", standard: "Level 4 Commercial Procurement & Supply", summary: "Develop sourcing, supplier management and commercial procurement capability." },
-  ],
-  Buyer: [
-    { pathwayTitle: "Procurement & Supply Chain", standard: "Level 4 Commercial Procurement & Supply", summary: "Build procurement practice, commercial judgement and supplier confidence." },
-    { pathwayTitle: "Procurement & Supply Chain", standard: "Level 6 Senior Procurement & Supply Chain Professional", summary: "Prepare for strategic procurement and supply chain leadership." },
-  ],
-  "Senior Buyer": [
-    { pathwayTitle: "Procurement & Supply Chain", standard: "Level 6 Senior Procurement & Supply Chain Professional", summary: "Support progression into strategic procurement leadership." },
-    { pathwayTitle: "Leadership & Management", standard: "Level 5 Operations Manager", summary: "Strengthen cross-functional leadership and operating discipline." },
-  ],
-  "Office Administrator": [
-    { pathwayTitle: "Digital, Data & AI", standard: "Level 3 Business Administrator", summary: "Develop administration, systems and process improvement capability." },
-  ],
-  "Customer Service Advisor": [
-    { pathwayTitle: "Hire, Sales & Customer Experience", standard: "Level 3 Customer Service Specialist", summary: "Improve customer conversations, service confidence and issue resolution." },
-  ],
-  "HR Administrator": [
-    { pathwayTitle: "Leadership & Management", standard: "Level 3 HR Support", summary: "Build HR administration, employee support and people process knowledge." },
-  ],
-  "Finance Assistant": [
-    { pathwayTitle: "Digital, Data & AI", standard: "Level 3 Assistant Accountant", summary: "Develop finance operations, controls and reporting confidence." },
-  ],
-  "Health & Safety Coordinator": [
-    { pathwayTitle: "Health, Safety & Compliance", standard: "Level 3 Safety, Health and Environment Technician", summary: "Strengthen safety practice, compliance evidence and risk awareness." },
-  ],
-};
 
 export const advisoryPromptExamples = [
   {
@@ -202,5 +130,3 @@ export const portakabinLearners: Learner[] = [
   { name: "Chloe Watson", role: "Logistics Assistant", department: "Supply Chain", site: "Trafford Park Manchester Visitor Centre", programme: "Procurement & Supply Chain", status: "Manager review", progress: 22, lineManager: "Helen Ward", startDate: "2026-03-13" },
   { name: "Owen Brooks", role: "Accommodation Coordinator", department: "Site Operations", site: "Witham Site Accommodation Visitor Centre", programme: "Installation & Site Operations", status: "Live learner", progress: 59, lineManager: "Sam Ellis", startDate: "2025-09-05" },
 ];
-
-

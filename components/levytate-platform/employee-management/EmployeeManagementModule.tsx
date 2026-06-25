@@ -4,14 +4,17 @@ import { FormEvent, useMemo, useState } from "react";
 import { LevyTateLogo, PlatformButton, PlatformTopBar } from "@/components/levytate-demo/PlatformShell";
 import {
   employeeManagementRecords,
-  employeeRoleOptions,
+  portakabinPathwayStandards,
+  portakabinRoleLibrary,
   portakabinSites,
 } from "@/lib/levytate/data/portakabin";
 import {
   filterEmployeeRecords,
   nextEmployeeNumber,
   noActiveApplicationLabel,
+  pathwaysForRole,
   requestStages,
+  roleById,
   roles,
   uniqueEmployeeValues,
 } from "@/lib/levytate/domain";
@@ -20,6 +23,7 @@ import type { EmployeeManagementFilters, EmployeeRecord, EmployeeRecordStatus, R
 const allOption = "All" as const;
 const employeeStatuses: EmployeeRecordStatus[] = ["Active", "Archived"];
 const applicationStatusOptions: EmployeeRecord["applicationStatus"][] = [noActiveApplicationLabel, ...requestStages];
+const roleTitleOptions = portakabinRoleLibrary.map((role) => role.roleTitle);
 const defaultFilters: EmployeeManagementFilters = {
   search: "",
   status: "Active",
@@ -63,7 +67,8 @@ export function EmployeeManagementModule() {
       employeeNumber: nextNumber,
       name: "",
       email: "",
-      role: employeeRoleOptions[0],
+      role: portakabinRoleLibrary[0]?.roleTitle ?? "Production Team Member",
+      assignedRoleId: portakabinRoleLibrary[0]?.id ?? "role-001",
       platformRole: "Employee",
       manager: managers[0] ?? "",
       department: departments[0] ?? "Manufacturing",
@@ -288,7 +293,7 @@ function EmployeeTable({
               <td className="px-4 py-3 align-top">
                 <button type="button" onClick={(event) => { event.stopPropagation(); onOpenProfile(employee); }} className="text-left">
                   <span className="block font-semibold text-[#102c3d]">{employee.name}</span>
-                  <span className="mt-0.5 block text-xs text-[#102c3d]/48">{employee.employeeNumber} ï¿½ {employee.email}</span>
+                  <span className="mt-0.5 block text-xs text-[#102c3d]/48">{employee.employeeNumber}  -  {employee.email}</span>
                   <span className="mt-1 block text-xs text-[#102c3d]/58">{employee.role}</span>
                 </button>
               </td>
@@ -338,6 +343,8 @@ function EmployeeProfilePage({
   onInlineUpdate: (updates: Partial<EmployeeRecord>) => void;
 }) {
   const directReports = employees.filter((item) => item.manager === employee.name && item.status === "Active");
+  const assignedRole = roleById(portakabinRoleLibrary, employee.assignedRoleId) ?? portakabinRoleLibrary.find((role) => role.roleTitle === employee.role);
+  const recommendedPathways = pathwaysForRole(assignedRole, portakabinPathwayStandards);
 
   return (
     <section className="grid gap-5">
@@ -347,7 +354,7 @@ function EmployeeProfilePage({
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">Employee profile</p>
             <h1 className="mt-1 text-3xl font-semibold tracking-[-0.03em] text-[#102c3d]">{employee.name}</h1>
-            <p className="mt-1 text-sm font-medium text-[#102c3d]/62">{employee.role} ï¿½ {employee.department}</p>
+            <p className="mt-1 text-sm font-medium text-[#102c3d]/62">{employee.role}  -  {employee.department}</p>
             <p className="mt-1 text-sm text-[#102c3d]/48">{employee.email}</p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -369,7 +376,8 @@ function EmployeeProfilePage({
             <p className="text-xs text-[#102c3d]/42">Updated {employee.lastUpdated}</p>
           </div>
           <div className="mt-5 grid gap-4 md:grid-cols-2">
-            <ProfileSelect label="Role assignment" value={employee.platformRole} options={roles} onChange={(value) => onInlineUpdate({ platformRole: value as Role })} />
+            <ProfileSelect label="Assigned role" value={employee.role} options={roleTitleOptions} onChange={(value) => { const nextRole = portakabinRoleLibrary.find((role) => role.roleTitle === value); onInlineUpdate({ role: value, assignedRoleId: nextRole?.id ?? employee.assignedRoleId }); }} />
+            <ProfileSelect label="Platform access" value={employee.platformRole} options={roles} onChange={(value) => onInlineUpdate({ platformRole: value as Role })} />
             <ProfileSelect label="Manager assignment" value={employee.manager} options={managers} onChange={(value) => onInlineUpdate({ manager: value })} />
             <ProfileSelect label="Department assignment" value={employee.department} options={departments} onChange={(value) => onInlineUpdate({ department: value })} />
             <ProfileSelect label="Site assignment" value={employee.site} options={sites} onChange={(value) => onInlineUpdate({ site: value })} />
@@ -377,7 +385,29 @@ function EmployeeProfilePage({
             <ProfileSelect label="Record status" value={employee.status} options={employeeStatuses} onChange={(value) => onInlineUpdate({ status: value as EmployeeRecordStatus })} />
           </div>
         </section>
-
+        <section className="rounded-[1rem] border border-[#102c3d]/[0.065] bg-white p-4 shadow-[0_10px_28px_rgba(16,44,61,0.045)]">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">Role library recommendations</p>
+              <h2 className="mt-1 text-lg font-semibold text-[#102c3d]">Pathways from assigned role</h2>
+            </div>
+            <span className="rounded-full bg-[#f8fbfa] px-3 py-1.5 text-xs font-semibold text-[#102c3d]/54 ring-1 ring-[#102c3d]/[0.06]">{recommendedPathways.length} mapped</span>
+          </div>
+          <div className="mt-4 grid gap-3">
+            {recommendedPathways.length ? recommendedPathways.map((pathway) => (
+              <article key={pathway.mapping.id} className="rounded-2xl bg-[#f8fbfa] px-4 py-3 ring-1 ring-[#102c3d]/[0.055]">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-[#102c3d]">{pathway.title}</p>
+                    <p className="mt-1 text-xs text-[#102c3d]/52">{pathway.level} {pathway.standard}</p>
+                  </div>
+                  <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#102c3d]/60 ring-1 ring-[#102c3d]/[0.06]">{pathway.mapping.recommendationType}</span>
+                </div>
+                <p className="mt-2 text-sm leading-5 text-[#102c3d]/58">{pathway.mapping.businessRationale}</p>
+              </article>
+            )) : <p className="rounded-2xl bg-[#f8fbfa] px-4 py-3 text-sm text-[#102c3d]/52">No recommendations are mapped for this role yet.</p>}
+          </div>
+        </section>
         <aside className="rounded-[1rem] border border-[#102c3d]/[0.065] bg-white p-4 shadow-[0_10px_28px_rgba(16,44,61,0.045)]">
           <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">Record detail</p>
           <dl className="mt-4 grid gap-3 text-sm">
@@ -445,7 +475,7 @@ function EmployeeFormModal({
           <FormField label="Employee number" value={draft.employeeNumber} onChange={(value) => onDraft({ ...draft, employeeNumber: value })} />
           <FormField label="Name" value={draft.name} onChange={(value) => onDraft({ ...draft, name: value })} required />
           <FormField label="Email" value={draft.email} onChange={(value) => onDraft({ ...draft, email: value })} required type="email" error={emailExists ? "Email already exists" : undefined} />
-          <FormSelect label="Role" value={draft.role} options={employeeRoleOptions} onChange={(value) => onDraft({ ...draft, role: value })} />
+          <FormSelect label="Assigned role" value={draft.role} options={roleTitleOptions} onChange={(value) => { const nextRole = portakabinRoleLibrary.find((role) => role.roleTitle === value); onDraft({ ...draft, role: value, assignedRoleId: nextRole?.id ?? draft.assignedRoleId }); }} />
           <FormSelect label="Role assignment" value={draft.platformRole} options={roles} onChange={(value) => onDraft({ ...draft, platformRole: value as Role })} />
           <FormSelect label="Manager assignment" value={draft.manager} options={editableManagers} onChange={(value) => onDraft({ ...draft, manager: value })} />
           <FormSelect label="Department assignment" value={draft.department} options={editableDepartments} onChange={(value) => onDraft({ ...draft, department: value })} />
