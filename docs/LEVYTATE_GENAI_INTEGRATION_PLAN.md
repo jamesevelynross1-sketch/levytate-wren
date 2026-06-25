@@ -296,25 +296,25 @@ Recommended route:
 
 ```json
 {
-  "assistantMessage": "Based on your current role and goal, the strongest approved pathway is Level 3 Team Leader.",
+  "assistantMessage": "Based on your current role and goal, the strongest approved pathway is Level 3 Engineering Technician.",
   "recommendedActions": [
     {
       "label": "View pathway",
       "type": "open_pathway",
-      "target": "Level 3 Team Leader"
+      "target": "Level 3 Engineering Technician"
     }
   ],
   "recommendedPathways": [
     {
-      "title": "Level 3 Team Leader",
-      "reason": "Matches current production progression route and supervisory goal.",
+      "title": "Level 3 Engineering Technician",
+      "reason": "Matches current production role and manufacturing progression goal.",
       "availability": "approved"
     }
   ],
   "applicationPrefill": {
-    "selectedApprenticeship": "Level 3 Team Leader",
-    "reasonForInterest": "Supports progression into first-line leadership.",
-    "careerGoal": "Production Supervisor / Team Leader"
+    "selectedApprenticeship": "Level 3 Engineering Technician",
+    "reasonForInterest": "Supports progression through technical manufacturing evidence and production capability.",
+    "careerGoal": "Production Supervisor through stronger manufacturing capability"
   },
   "providerMatchDraft": null,
   "nextStep": "start_application",

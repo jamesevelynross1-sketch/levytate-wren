@@ -28,6 +28,8 @@ export function filterRoleLibraryRoles(roles: RoleLibraryRole[], filters: RoleLi
       role.businessArea,
       role.careerLevel,
       role.overview,
+      role.specialistPathwayRationale ?? "",
+      role.managementContext?.join(" ") ?? "",
       role.skillsTags.join(" "),
       role.aiTags.join(" "),
       role.typicalProgression.join(" "),
@@ -68,16 +70,20 @@ export function orderedRoleRecommendations(role: RoleLibraryRole) {
   });
 }
 
-export function pathwaysForRole(role: RoleLibraryRole | undefined, pathways: ApprenticeshipPathway[]) {
+export function pathwaysForRole(role: RoleLibraryRole | undefined, pathways: ApprenticeshipPathway[], options: { includeUnavailable?: boolean } = {}) {
   if (!role) return [];
   return orderedRoleRecommendations(role).flatMap((mapping) => {
     const pathway = pathways.find((item) => item.id === mapping.pathwayId);
-    return pathway ? [{ ...pathway, mapping }] : [];
+    if (!pathway) return [];
+    if (!options.includeUnavailable && pathway.availableForNewApplications === false) return [];
+    return [{ ...pathway, mapping }];
   });
 }
 
-export function recommendationCountForRoleTitle(roleTitle: string, roles: RoleLibraryRole[]) {
-  return roleByTitle(roles, roleTitle)?.recommendations.length ?? 0;
+export function recommendationCountForRoleTitle(roleTitle: string, roles: RoleLibraryRole[], pathways?: ApprenticeshipPathway[]) {
+  const role = roleByTitle(roles, roleTitle);
+  if (!role) return 0;
+  return pathways ? pathwaysForRole(role, pathways).length : role.recommendations.length;
 }
 
 export function nextRoleId(roles: RoleLibraryRole[]) {
@@ -91,4 +97,8 @@ export function nextRoleId(roles: RoleLibraryRole[]) {
 
 export function syncRoleTitleFromId(roleId: string, roles: RoleLibraryRole[], fallback: string) {
   return roleById(roles, roleId)?.roleTitle ?? fallback;
+}
+
+export function isPathwayAvailableForNewApplications(pathway: ApprenticeshipPathway | undefined) {
+  return pathway !== undefined && pathway.availableForNewApplications !== false;
 }

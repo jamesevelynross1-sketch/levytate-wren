@@ -8,7 +8,7 @@ const approvedPathways = [
   { title: "Procurement & Supply Chain", standard: "L3 Supply Chain Practitioner", deliveryPartner: "SR Apprenticeships", status: "Ready" },
   { title: "Digital, Data & AI", standard: "L3 Data Technician or L4 Business Analyst", deliveryPartner: "QA", status: "Ready" },
   { title: "Health, Safety & Compliance", standard: "L3 Safety, Health and Environment Technician", deliveryPartner: "Learning Skills Partnership", status: "Ready" },
-  { title: "Leadership & Management", standard: "L3 Team Leader or L5 Operations Manager", deliveryPartner: "Babington", status: "Live" },
+  { title: "Operational Improvement & Capability", standard: "L4 Improvement Practitioner", deliveryPartner: "Babington", status: "Ready" },
 ];
 
 const providerMappings = [
@@ -18,7 +18,7 @@ const providerMappings = [
   { pathway: "Hire, Sales & Customer Experience", standard: "L3 Customer Service Specialist", partner: "Babington", alternativePartner: "Remit Training", deliveryModel: "Online + workshops", status: "Live" },
   { pathway: "Procurement & Supply Chain", standard: "L3 Supply Chain Practitioner", partner: "SR Apprenticeships", alternativePartner: "Apprenticeship College", deliveryModel: "Hybrid", status: "Ready" },
   { pathway: "Digital, Data & AI", standard: "L3 Data Technician", partner: "QA", alternativePartner: "Apprentify", deliveryModel: "Remote + workshops", status: "Ready" },
-  { pathway: "Leadership & Management", standard: "L3 Team Leader / L5 Operations Manager", partner: "Babington", alternativePartner: "SR Apprenticeships", deliveryModel: "Blended", status: "Live" },
+  { pathway: "Operational Improvement & Capability", standard: "L4 Improvement Practitioner", partner: "Babington", alternativePartner: "SR Apprenticeships", deliveryModel: "Blended", status: "Ready" },
 ];
 
 const productRules = [
@@ -29,6 +29,8 @@ const productRules = [
   "If an employee has an active application, they may still ask LevyTate AI questions but may not start or submit a second application.",
   "Approved delivery partners are shown as internal mapped providers, not as an open marketplace for employees.",
   "Do not say fully funded. Use potentially levy-funded or potentially funded through levy/co-investment.",
+  "Generic management apprenticeships are being withdrawn from government funding for new starts. Do not recommend Level 3 Team Leader or Level 5 Operations Manager for new applications.",
+  "If a user asks for management, ask what type of management they mean: people, operations, technical, project, commercial, data or customer management. Then recommend specialist role-led pathways.",
 ];
 
 export function buildLevyTateAiContext(request: LevyTateAiRequest) {

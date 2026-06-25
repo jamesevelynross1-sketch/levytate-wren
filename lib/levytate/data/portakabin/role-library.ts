@@ -8,8 +8,8 @@ const remote = "Remote workshops" as const;
 const online = "Online + coaching" as const;
 
 export const portakabinPathwayStandards: ApprenticeshipPathway[] = [
-  { id: "path-l3-team-leader", title: "Level 3 Team Leader", standard: "Team Leader", level: "L3", family: "Leadership & Management", summary: "Builds first-line leadership, planning, communication and performance management capability.", typicalDuration: "15 to 18 months" },
-  { id: "path-l5-operations-manager", title: "Level 5 Operations Manager", standard: "Operations Manager", level: "L5", family: "Leadership & Management", summary: "Supports managers responsible for teams, performance, change and operational planning.", typicalDuration: "24 to 30 months" },
+  { id: "path-l3-team-leader", title: "Level 3 Team Leader", standard: "Team Leader", level: "L3", family: "Leadership & Management", summary: "Historic generic management route retained for records only. LevyTate now recommends specialist role-led pathways for new applications.", typicalDuration: "15 to 18 months", fundingStatus: "defunded_for_new_starts", availableForNewApplications: false, fundingNote: "Not available for new government-funded starts from 1 September 2026." },
+  { id: "path-l5-operations-manager", title: "Level 5 Operations Manager", standard: "Operations Manager", level: "L5", family: "Leadership & Management", summary: "Historic generic management route retained for records only. LevyTate now recommends specialist role-led pathways for new applications.", typicalDuration: "24 to 30 months", fundingStatus: "defunded_for_new_starts", availableForNewApplications: false, fundingNote: "Not available for new government-funded starts from 1 September 2026." },
   { id: "path-l3-engineering-technician", title: "Level 3 Engineering Technician", standard: "Engineering Technician", level: "L3", family: "Manufacturing & Engineering", summary: "Develops applied engineering knowledge, technical evidence and production confidence.", typicalDuration: "36 to 42 months" },
   { id: "path-l3-maintenance-technician", title: "Level 3 Engineering Maintenance Technician", standard: "Engineering Maintenance Technician", level: "L3", family: "Manufacturing & Engineering", summary: "Develops planned maintenance, fault finding, safety routines and equipment reliability capability.", typicalDuration: "36 to 42 months" },
   { id: "path-l3-engineering-design", title: "Level 3 Engineering Design Technician", standard: "Engineering Design Technician", level: "L3", family: "Design & Technical", summary: "Builds technical drawing, specification, design documentation and design to delivery handoff skills.", typicalDuration: "24 to 30 months" },
@@ -22,10 +22,15 @@ export const portakabinPathwayStandards: ApprenticeshipPathway[] = [
   { id: "path-l3-supply-chain", title: "Level 3 Supply Chain Practitioner", standard: "Supply Chain Practitioner", level: "L3", family: "Procurement & Supply Chain", summary: "Develops material planning, supplier coordination, stock movement and operational supply chain confidence.", typicalDuration: "18 to 24 months" },
   { id: "path-l3-data-technician", title: "Level 3 Data Technician", standard: "Data Technician", level: "L3", family: "Digital, Data & AI", summary: "Builds data handling, dashboards, quality checks and insight foundations.", typicalDuration: "18 to 24 months" },
   { id: "path-l4-data-analyst", title: "Level 4 Data Analyst", standard: "Data Analyst", level: "L4", family: "Digital, Data & AI", summary: "Develops analysis, reporting, data storytelling and evidence-led decision support.", typicalDuration: "24 months" },
+  { id: "path-l4-improvement-practitioner", title: "Level 4 Improvement Practitioner", standard: "Improvement Practitioner", level: "L4", family: "Operational Improvement", summary: "Builds process improvement, productivity, problem solving and change delivery capability in the employee's actual work area.", typicalDuration: "14 to 18 months" },
+  { id: "path-l4-business-analyst", title: "Level 4 Business Analyst", standard: "Business Analyst", level: "L4", family: "Digital, Data & AI", summary: "Supports process analysis, systems improvement, requirements discovery and customer or operational change.", typicalDuration: "18 to 24 months" },
+  { id: "path-l6-data-scientist", title: "Level 6 Data Scientist", standard: "Data Scientist", level: "L6", family: "Digital, Data & AI", summary: "Supports advanced analytics, modelling, experimentation and strategic data leadership.", typicalDuration: "36 months" },
+  { id: "path-l6-senior-procurement", title: "Level 6 Senior Procurement and Supply Chain Professional", standard: "Senior Procurement and Supply Chain Professional", level: "L6", family: "Procurement & Supply Chain", summary: "Develops strategic procurement, supply chain leadership, supplier governance and commercial decision making.", typicalDuration: "36 to 42 months" },
+  { id: "path-l3-business-administrator", title: "Level 3 Business Administrator", standard: "Business Administrator", level: "L3", family: "Business Support", summary: "Builds process ownership, administration, communication and service improvement capability.", typicalDuration: "15 to 18 months" },
   { id: "path-ai-automation", title: "AI and Automation Workforce Programme", standard: "AI and Automation Workforce Programme", level: "Internal", family: "Digital, Data & AI", summary: "Builds practical AI literacy, workflow automation confidence and responsible adoption habits.", typicalDuration: "12 to 16 weeks" },
 ];
 
-function map(id: string, pathwayId: string, recommendationType: "Primary" | "Alternative", priority: number, businessRationale: string, tags: { funding?: RolePathwayMapping["fundingRoute"]; delivery?: RolePathwayMapping["deliveryPreference"]; notes?: string } = {}): RolePathwayMapping {
+function map(id: string, pathwayId: string, recommendationType: "Primary" | "Alternative", priority: number, businessRationale: string, tags: { funding?: RolePathwayMapping["fundingRoute"]; delivery?: RolePathwayMapping["deliveryPreference"]; notes?: string; management?: RolePathwayMapping["managementCapabilitySupported"] } = {}): RolePathwayMapping {
   return {
     id,
     pathwayId,
@@ -35,11 +40,19 @@ function map(id: string, pathwayId: string, recommendationType: "Primary" | "Alt
     fundingRoute: tags.funding ?? levy,
     deliveryPreference: tags.delivery ?? blended,
     internalNotes: tags.notes ?? "Review cohort timing and manager support before launch.",
+    specialistPathwayRationale: businessRationale,
+    managementCapabilitySupported: tags.management,
   };
 }
 
 function role(input: Omit<RoleLibraryRole, "status" | "lastUpdated"> & { status?: RoleLibraryRole["status"] }): RoleLibraryRole {
-  return { ...input, status: input.status ?? "Active", lastUpdated: "2026-06-25" };
+  return {
+    managementContext: [],
+    specialistPathwayRationale: "Generic management apprenticeships are being withdrawn from government funding for new starts. LevyTate now recommends specialist pathways that support management-level progression through the employee's actual role.",
+    ...input,
+    status: input.status ?? "Active",
+    lastUpdated: "2026-06-25",
+  };
 }
 
 export const portakabinRoleLibrary: RoleLibraryRole[] = [
@@ -55,10 +68,11 @@ export const portakabinRoleLibrary: RoleLibraryRole[] = [
     skillsTags: ["assembly", "quality routines", "shift handover", "continuous improvement"],
     aiTags: ["Technical", "Operational", "Leadership"],
     businessOutcomes: ["Improves production confidence", "Creates first-line leadership pipeline", "Supports quality and throughput routines"],
+    managementContext: ["technical_management", "operational_management"],
     overview: "Production colleagues building technical manufacturing confidence and preparing for future team leadership.",
     recommendations: [
-      map("rpm-001", "path-l3-team-leader", "Primary", 1, "Best route for Amelia-style progression into team leadership and production supervision.", { delivery: blended }),
-      map("rpm-002", "path-l3-engineering-technician", "Alternative", 2, "Strong technical option for colleagues who need deeper production and engineering evidence.", { delivery: siteBased }),
+      map("rpm-001", "path-l3-engineering-technician", "Primary", 1, "Best route for Amelia-style production progression because it builds technical manufacturing evidence, quality confidence and credible supervisor capability through real production work.", { delivery: siteBased, notes: "Specialist route replacing generic management for new starts. Management context: technical and operational supervision.", management: "technical_management" }),
+      map("rpm-002", "path-l4-improvement-practitioner", "Alternative", 2, "Good alternative where the progression goal is process improvement, handover quality and production flow rather than a purely technical engineering route.", { delivery: blended, notes: "Supports management-level progression through improvement projects in the production environment.", management: "operational_management" }),
     ],
   }),
   role({
@@ -73,10 +87,11 @@ export const portakabinRoleLibrary: RoleLibraryRole[] = [
     skillsTags: ["shift planning", "performance management", "quality", "team coordination"],
     aiTags: ["Leadership", "People management", "Operational"],
     businessOutcomes: ["More consistent supervision", "Improved workforce planning", "Stronger shopfloor performance routines"],
+    managementContext: ["people_management", "operational_management"],
     overview: "Supervisor role focused on coordinating teams, production flow, quality routines and line performance.",
     recommendations: [
-      map("rpm-003", "path-l5-operations-manager", "Primary", 1, "Supports broader ownership of teams, planning, change and operating discipline."),
-      map("rpm-004", "path-l3-team-leader", "Alternative", 2, "Useful where the colleague is new to formal people management."),
+      map("rpm-003", "path-l4-improvement-practitioner", "Primary", 1, "Supports production supervision through process improvement, performance routines, problem solving and operational change in the manufacturing environment.", { management: "operational_management" }),
+      map("rpm-004", "path-l3-engineering-technician", "Alternative", 2, "Useful where the supervisor needs stronger technical manufacturing credibility alongside people coordination.", { delivery: siteBased }),
     ],
   }),
   role({
@@ -109,10 +124,11 @@ export const portakabinRoleLibrary: RoleLibraryRole[] = [
     skillsTags: ["asset reliability", "team leadership", "maintenance planning", "risk control"],
     aiTags: ["Leadership", "Technical", "People management", "Operational"],
     businessOutcomes: ["Improves maintenance planning", "Builds technical leadership", "Supports safer production continuity"],
+    managementContext: ["technical_management", "project_management"],
     overview: "Manager role accountable for maintenance teams, reliability planning and technical performance.",
     recommendations: [
-      map("rpm-007", "path-l5-operations-manager", "Primary", 1, "Supports planning, team leadership, risk management and operational accountability."),
-      map("rpm-008", "path-l3-maintenance-technician", "Alternative", 2, "Useful for technical refresh or new manager development around maintenance evidence.", { delivery: siteBased }),
+      map("rpm-007", "path-l3-maintenance-technician", "Primary", 1, "Supports technical management through maintenance planning, reliability routines, safety evidence and stronger engineering judgement.", { delivery: siteBased }),
+      map("rpm-008", "path-l4-associate-project-manager", "Alternative", 2, "Useful where the maintenance manager owns planning, resource coordination and delivery of technical work packages.", { delivery: hybrid }),
     ],
   }),
   role({
@@ -127,10 +143,11 @@ export const portakabinRoleLibrary: RoleLibraryRole[] = [
     skillsTags: ["supplier strategy", "commercial governance", "negotiation", "risk"],
     aiTags: ["Procurement", "Commercial", "Leadership"],
     businessOutcomes: ["Improves supplier decisions", "Builds commercial discipline", "Supports cost and risk governance"],
+    managementContext: ["commercial_management"],
     overview: "Procurement leadership role focused on supplier performance, sourcing decisions and commercial governance.",
     recommendations: [
-      map("rpm-009", "path-l4-procurement-supply", "Primary", 1, "Best fit for commercial procurement capability and supplier management."),
-      map("rpm-010", "path-l5-operations-manager", "Alternative", 2, "Alternative for leads taking wider cross-functional ownership."),
+      map("rpm-009", "path-l4-procurement-supply", "Primary", 1, "Best fit for commercial procurement capability and supplier management.", { management: "commercial_management" }),
+      map("rpm-010", "path-l6-senior-procurement", "Alternative", 2, "Progression route for strategic supplier governance, senior commercial decision making and supply chain leadership."),
     ],
   }),
   role({
@@ -182,10 +199,11 @@ export const portakabinRoleLibrary: RoleLibraryRole[] = [
     skillsTags: ["data governance", "analytics leadership", "automation", "stakeholder insight"],
     aiTags: ["Digital", "AI", "Leadership", "People management"],
     businessOutcomes: ["Improves data governance", "Builds automation strategy", "Connects reporting to operational planning"],
+    managementContext: ["data_management"],
     overview: "Manager role accountable for data quality, analytics priorities and adoption of digital insight.",
     recommendations: [
-      map("rpm-016", "path-l5-operations-manager", "Primary", 1, "Supports stakeholder leadership, planning and cross-functional delivery."),
-      map("rpm-017", "path-ai-automation", "Alternative", 2, "Builds responsible AI adoption and automation leadership habits.", { funding: "Commercial training budget", delivery: online }),
+      map("rpm-016", "path-l4-data-analyst", "Primary", 1, "Supports data management through stronger insight generation, reporting ownership, stakeholder evidence and analytics leadership.", { delivery: remote, management: "data_management" }),
+      map("rpm-017", "path-l6-data-scientist", "Alternative", 2, "Progression option for advanced analytics leadership, experimentation and strategic data capability.", { delivery: remote }),
     ],
   }),
   role({
@@ -218,10 +236,11 @@ export const portakabinRoleLibrary: RoleLibraryRole[] = [
     skillsTags: ["team leadership", "customer experience", "coaching", "quality"],
     aiTags: ["Leadership", "People management", "Customer facing"],
     businessOutcomes: ["Improves coaching", "Strengthens service consistency", "Builds customer operations pipeline"],
+    managementContext: ["customer_management", "people_management"],
     overview: "Team leadership role supporting service quality, colleague coaching and customer issue escalation.",
     recommendations: [
-      map("rpm-020", "path-l3-team-leader", "Primary", 1, "Direct fit for first-line people leadership and performance routines."),
-      map("rpm-021", "path-l3-customer-service", "Alternative", 2, "Useful where customer service technical practice remains the priority."),
+      map("rpm-020", "path-l3-customer-service", "Primary", 1, "Supports customer management through service ownership, coaching conversations, issue resolution and customer experience quality.", { management: "customer_management" }),
+      map("rpm-021", "path-l4-business-analyst", "Alternative", 2, "Useful where the team leader role includes customer insight, workflow improvement and service process change.", { delivery: remote }),
     ],
   }),
   role({
@@ -236,10 +255,11 @@ export const portakabinRoleLibrary: RoleLibraryRole[] = [
     skillsTags: ["planning", "stakeholders", "risk", "delivery coordination"],
     aiTags: ["Operational", "Leadership", "Customer facing"],
     businessOutcomes: ["Improves project control", "Strengthens handovers", "Builds delivery confidence"],
+    managementContext: ["project_management"],
     overview: "Project support role coordinating actions, risks, stakeholders and delivery milestones.",
     recommendations: [
-      map("rpm-022", "path-l4-associate-project-manager", "Primary", 1, "Best fit for project planning, control, stakeholder and risk skills."),
-      map("rpm-023", "path-l3-team-leader", "Alternative", 2, "Supports people coordination and delivery ownership."),
+      map("rpm-022", "path-l4-associate-project-manager", "Primary", 1, "Best fit for project planning, control, stakeholder and risk skills.", { management: "project_management" }),
+      map("rpm-023", "path-l4-business-analyst", "Alternative", 2, "Supports project coordinators who need stronger process analysis, stakeholder discovery and delivery improvement capability.", { delivery: remote }),
     ],
   }),
   role({
@@ -254,9 +274,10 @@ export const portakabinRoleLibrary: RoleLibraryRole[] = [
     skillsTags: ["site coordination", "handover", "quality checks", "field leadership"],
     aiTags: ["Operational", "Leadership", "Compliance", "Customer facing"],
     businessOutcomes: ["Improves site readiness", "Strengthens handover quality", "Reduces delivery risk"],
+    managementContext: ["operational_management", "project_management"],
     overview: "Field supervisory role managing site readiness, handover routines and installation coordination.",
     recommendations: [
-      map("rpm-024", "path-l3-construction-site-supervisor", "Primary", 1, "Direct fit for site supervision, quality checks and field coordination.", { delivery: siteBased }),
+      map("rpm-024", "path-l3-construction-site-supervisor", "Primary", 1, "Direct fit for site supervision, quality checks and field coordination.", { delivery: siteBased, management: "operational_management" }),
       map("rpm-025", "path-l4-associate-project-manager", "Alternative", 2, "Good progression option for wider project delivery accountability."),
     ],
   }),

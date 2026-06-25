@@ -63,8 +63,8 @@ export function readinessScore(learners: Learner[], requests: RequestItem[]) {
   const participation = Math.min(100, Math.round((learners.filter((learner) => learner.status === "Live learner" || learner.status === "Enrolment").length / learners.length) * 100));
   const completion = Math.round(learners.reduce((sum, learner) => sum + learner.progress, 0) / learners.length);
   const demandAlignment = Math.min(100, 58 + requests.length * 4);
-  const leadershipPipeline = learners.filter((learner) => learner.programme === "Leadership & Management").length * 7 + 55;
-  return Math.min(96, Math.max(42, Math.round((participation + completion + demandAlignment + leadershipPipeline) / 4)));
+  const specialistManagementPipeline = learners.filter((learner) => learner.programme === "Operational Improvement & Capability" || learner.programme === "Manufacturing & Production" || learner.programme === "Installation & Site Operations").length * 4 + 55;
+  return Math.min(96, Math.max(42, Math.round((participation + completion + demandAlignment + specialistManagementPipeline) / 4)));
 }
 
 export function countBy<T, K extends keyof T>(items: T[], key: K) {

@@ -209,15 +209,15 @@ Line Manager:
 Ryan Booth
 
 Career Goal:
-Production Supervisor / Team Leader
+Production Supervisor through stronger manufacturing capability
 
 Recommended Pathways:
 
-- Level 3 Team Leader
 - Level 3 Engineering Technician
+- Level 4 Improvement Practitioner
 
 Current Application:
-Level 3 Team Leader
+Level 3 Engineering Technician
 
 Status:
 Awaiting Manager Review
@@ -425,3 +425,9 @@ Apprenticeship Lead reports:
 - Starts vs completions
 - Programme portfolio
 - Workforce readiness report
+
+## Generic Management Apprenticeship Funding Rule
+
+Generic management apprenticeships are being withdrawn from government funding for new starts. LevyTate must not recommend Level 3 Team Leader or Level 5 Operations Manager as active funded pathways for new applications.
+
+Historic records may remain, but new recommendations should be specialist and role-led. For management progression, LevyTate should identify the type of management involved and recommend a specialist pathway that builds management-level capability through the employee's actual role.

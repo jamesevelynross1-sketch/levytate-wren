@@ -25,7 +25,7 @@ Scope: Existing Portakabin Apprenticeship Hub only. Future Talent Portal was not
   - Development Passport.
   - One active application blocking.
 - The one-active-application rule is implemented in application creation logic and blocks second applications for employees with active statuses.
-- Amelia Hart has an active `Level 3 Team Leader` application with status `Awaiting Manager Review` and reviewer `Ryan Booth`.
+- Amelia Hart has an active `Level 3 Engineering Technician` application with status `Awaiting Manager Review` and reviewer `Ryan Booth`.
 - Daniel Carter has an active `Level 4 Data Analyst` application with status `Awaiting Manager Review` and reviewer `Sarah Mitchell`.
 - Line Manager view includes manager-focused dashboard cards, team view, application review cards, team skills, team development and reports.
 - Department Head view is mostly analytics-focused and does not show individual approve or decline buttons.

@@ -50,10 +50,10 @@ const advisoryMappings: Record<string, LeadGuidance> = {
     workforceNeed: "Technical leadership, maintenance planning, compliance, team supervision and operational improvement.",
     recommendedStandards: [
       { name: "Engineering Technician", level: "Level 3", suitability: 88, why: "Strong fit for technical maintenance capability and engineering competence.", bestFor: "Maintenance capability and engineering evidence.", delivery: "Site evidence, technical workshops and workplace projects." },
-      { name: "Operations Manager", level: "Level 5", suitability: 82, why: "Strong fit where the role includes people management, planning and operational accountability.", bestFor: "Maintenance leaders with wider operational ownership.", delivery: "Blended management workshops and business improvement activity." },
+      { name: "Associate Project Manager", level: "Level 4", suitability: 82, why: "Strong fit where the role includes technical planning, work packages and delivery coordination.", bestFor: "Maintenance leaders with project and reliability ownership.", delivery: "Hybrid project planning workshops and workplace delivery evidence." },
       { name: "Improvement Practitioner", level: "Level 4", suitability: 76, why: "Useful where the business wants process improvement and productivity gains.", bestFor: "Maintenance process, downtime and productivity projects.", delivery: "Project-based improvement coaching." },
     ],
-    alternativeStandards: ["Level 3 Team Leader", "Level 4 Associate Project Manager"],
+    alternativeStandards: ["Level 4 Improvement Practitioner", "Level 4 Associate Project Manager"],
     businessRationale: "For a Maintenance Manager, the strongest route depends on whether the priority is technical depth, leadership capability or operational improvement. If the individual already has strong technical skills, a management or improvement pathway may create greater business value.",
     fundingRoute: "Potentially funded through apprenticeship levy or co-investment, subject to eligibility and programme suitability.",
     providerMatchingPrompt: "Review provider fit for engineering delivery, site evidence, leadership coaching and operational improvement priorities.",
@@ -64,7 +64,7 @@ const advisoryMappings: Record<string, LeadGuidance> = {
     recommendedStandards: [
       { name: "Commercial Procurement and Supply", level: "Level 4", suitability: 92, why: "Direct fit for procurement practice, supplier management and commercial decision making.", bestFor: "Procurement leads and emerging category owners.", delivery: "Blended commercial workshops with live procurement evidence." },
       { name: "Senior Procurement and Supply Chain Professional", level: "Level 6", suitability: 84, why: "Suitable for senior progression where strategic procurement ownership is expected.", bestFor: "Succession planning for senior procurement roles.", delivery: "Longer strategic programme with work-based commercial projects." },
-      { name: "Operations Manager", level: "Level 5", suitability: 78, why: "Useful where procurement leadership is linked to wider operational accountability.", bestFor: "Procurement leads moving into broader business leadership.", delivery: "Blended leadership and operational planning." },
+      { name: "Business Analyst", level: "Level 4", suitability: 78, why: "Useful where procurement leadership is linked to process change, stakeholder insight and systems improvement.", bestFor: "Procurement leads improving commercial processes and supplier workflows.", delivery: "Applied business analysis projects with stakeholder evidence." },
     ],
     alternativeStandards: ["Level 3 Procurement and Supply Assistant", "Level 4 Business Analyst"],
     businessRationale: "For procurement succession, LevyTate would usually separate technical procurement capability from broader leadership readiness. The strongest match depends on whether the priority is category expertise, contract discipline or progression into senior operational leadership.",
@@ -80,7 +80,7 @@ const advisoryMappings: Record<string, LeadGuidance> = {
       { name: "Business Analyst", level: "Level 4", suitability: 80, why: "Useful where the team needs to redesign processes and improve systems adoption.", bestFor: "Service improvement and systems change.", delivery: "Workshops, stakeholder discovery and change documentation." },
       { name: "AI and Automation Workforce Programme", level: "Workforce programme", suitability: 78, why: "Helps teams understand AI use cases and automation opportunities before formal apprenticeship demand is confirmed.", bestFor: "Early-stage AI capability building.", delivery: "Short strategic capability sprint and opportunity mapping." },
     ],
-    alternativeStandards: ["Level 3 Team Leader", "Level 4 Improvement Practitioner"],
+    alternativeStandards: ["Level 3 Business Administrator", "Level 4 Improvement Practitioner"],
     businessRationale: "For customer service AI capability, the best route depends on whether the immediate priority is data literacy, workflow automation or service process redesign. A staged approach may create stronger adoption before committing to a single cohort.",
     fundingRoute: "Apprenticeship elements may be potentially levy-funded or co-invested, subject to eligibility. Non-apprenticeship workforce programmes would need separate commercial review.",
     providerMatchingPrompt: "Review providers with data, business analysis and AI readiness capability, with delivery suited to customer operations.",
@@ -89,9 +89,9 @@ const advisoryMappings: Record<string, LeadGuidance> = {
     interpretedRole: "Site Supervisor",
     workforceNeed: "Team leadership, site coordination, construction supervision, operational accountability and project handover discipline.",
     recommendedStandards: [
-      { name: "Team Leader", level: "Level 3", suitability: 90, why: "Strong fit for first-line people leadership, performance routines and team coordination.", bestFor: "New or emerging site supervisors.", delivery: "Blended workshops with live team improvement activity." },
-      { name: "Construction Site Supervisor", level: "Level 4", suitability: 86, why: "Direct fit where site compliance, supervision and handover control are key.", bestFor: "Supervisors in construction or installation environments.", delivery: "Site evidence, technical supervision and compliance activity." },
-      { name: "Operations Manager", level: "Level 5", suitability: 79, why: "Appropriate where the role includes wider planning, resource control and operational ownership.", bestFor: "Experienced supervisors progressing into operations management.", delivery: "Leadership coaching and operational improvement projects." },
+      { name: "Construction Site Supervisor", level: "Level 3", suitability: 90, why: "Direct fit for first-line site coordination, quality checks and handover control.", bestFor: "New or emerging site supervisors.", delivery: "Field evidence, site supervision tasks and compliance activity." },
+      { name: "Associate Project Manager", level: "Level 4", suitability: 86, why: "Strong fit where site supervision includes planning, stakeholder coordination and delivery control.", bestFor: "Supervisors moving into project delivery responsibility.", delivery: "Project evidence, risk planning and stakeholder coordination." },
+      { name: "Improvement Practitioner", level: "Level 4", suitability: 79, why: "Appropriate where the role includes improving site routines, productivity and operational handovers.", bestFor: "Experienced supervisors progressing through operational improvement.", delivery: "Improvement coaching and workplace projects." },
     ],
     alternativeStandards: ["Level 4 Associate Project Manager", "Level 4 Improvement Practitioner"],
     businessRationale: "For Site Supervisors, the right pathway depends on whether the gap is first-line leadership, construction supervision or wider operational control. A mixed cohort may be useful if supervisor experience levels vary.",
@@ -106,7 +106,7 @@ const advisoryMappings: Record<string, LeadGuidance> = {
       { name: "Data Analyst", level: "Level 4", suitability: 84, why: "Supports deeper insight, operational trend analysis and performance reporting.", bestFor: "Analysts and coordinators supporting capacity planning.", delivery: "Applied analytics with workplace projects." },
       { name: "Business Analyst", level: "Level 4", suitability: 78, why: "Useful when data skills need to translate into systems improvement and process change.", bestFor: "Operations improvement and workflow redesign.", delivery: "Stakeholder discovery and process mapping evidence." },
     ],
-    alternativeStandards: ["Level 4 Improvement Practitioner", "Level 5 Operations Manager"],
+    alternativeStandards: ["Level 4 Improvement Practitioner", "Level 4 Business Analyst"],
     businessRationale: "For operations data capability, LevyTate would normally separate foundational data skills from process improvement and operating model change. The recommendation depends on whether the immediate need is reporting accuracy, insight capability or workflow redesign.",
     fundingRoute: "Potentially levy-funded or co-invested where apprenticeship eligibility and role relevance are confirmed.",
     providerMatchingPrompt: "Shortlist providers with data delivery strength, operational project experience and flexible workshop models.",
@@ -115,9 +115,9 @@ const advisoryMappings: Record<string, LeadGuidance> = {
     interpretedRole: "Workforce Capability Need",
     workforceNeed: "Role capability, future skills, progression planning and programme fit review.",
     recommendedStandards: [
-      { name: "Team Leader", level: "Level 3", suitability: 78, why: "Relevant where the requirement includes first-line leadership or progression readiness.", bestFor: "Emerging managers and supervisors.", delivery: "Blended workshops with workplace leadership evidence." },
+      { name: "Improvement Practitioner", level: "Level 4", suitability: 78, why: "Relevant where the requirement includes practical supervision, problem solving and operational change.", bestFor: "Emerging supervisors building management-level capability through real work.", delivery: "Blended improvement workshops with workplace project evidence." },
       { name: "Business Analyst", level: "Level 4", suitability: 74, why: "Useful where the need includes systems, process or change analysis.", bestFor: "Operational change and service improvement roles.", delivery: "Applied business analysis projects." },
-      { name: "Operations Manager", level: "Level 5", suitability: 72, why: "Suitable where the requirement includes accountability for teams, planning or delivery outcomes.", bestFor: "Experienced leaders with wider operational ownership.", delivery: "Leadership coaching and strategic improvement work." },
+      { name: "Associate Project Manager", level: "Level 4", suitability: 72, why: "Suitable where the requirement includes planning, stakeholders and delivery accountability.", bestFor: "Experienced colleagues moving into coordinated delivery ownership.", delivery: "Project planning, risk and stakeholder evidence." },
     ],
     alternativeStandards: ["Level 3 Data Technician", "Level 4 Improvement Practitioner"],
     businessRationale: "The requirement needs a programme fit review to confirm whether the priority is leadership, technical capability, data confidence or operational improvement. LevyTate can qualify the need before provider matching.",
@@ -176,8 +176,8 @@ function getEmployeeGuidance(prompt: string, persona: PersonaSummary): EmployeeG
         draftReason: "I am interested in the Level 4 Data Analyst pathway because I want to build the data leadership, insight and automation confidence needed for a future management role.",
       },
       alternatives: [
-        { programme: "Level 3 Team Leader", fit: 83, why: "Better if Daniel wants broader first-line people management." },
-        { programme: "Level 5 Operations Manager", fit: 79, why: "Better if Daniel wants wider operational accountability in the future." },
+        { programme: "Level 4 Business Analyst", fit: 83, why: "Better if Daniel wants to manage process change, stakeholder needs and systems improvement." },
+        { programme: "Level 6 Data Scientist", fit: 79, why: "Better if Daniel wants a future data management route with deeper analytics leadership." },
         { programme: "Level 4 Business Analyst", fit: 78, why: "Useful if the management route is linked to systems, process and change work." },
       ],
       supportRequired: "Protected time for portfolio evidence, leadership conversations and internal reporting projects.",
@@ -185,8 +185,8 @@ function getEmployeeGuidance(prompt: string, persona: PersonaSummary): EmployeeG
         { programme: "Level 4 Data Analyst", fit: 91, why: "Best if the goal is data leadership, reporting ownership or automation improvement." },
       ],
       futureInterests: [
-        { programme: "Level 3 Team Leader", fit: 83, why: "Worth discussing if Daniel wants a broader people management route." },
-        { programme: "Level 5 Operations Manager", fit: 79, why: "Worth discussing later if Daniel moves toward wider operational leadership." },
+        { programme: "Level 4 Business Analyst", fit: 83, why: "Worth discussing if Daniel wants a process, systems or stakeholder management route." },
+        { programme: "Level 6 Data Scientist", fit: 79, why: "Worth discussing later if Daniel moves toward senior data leadership." },
       ],
     };
   }
@@ -222,9 +222,9 @@ function getEmployeeGuidance(prompt: string, persona: PersonaSummary): EmployeeG
     return {
       intent,
       primary: {
-        programme: "Level 3 Team Leader",
-        pathway: "Leadership & Management",
-        provider: "Babington",
+        programme: "Level 3 Engineering Technician",
+        pathway: "Manufacturing & Production",
+        provider: "TEC Partnership",
         fit: 88,
         why: "Data and automation could still be relevant to Amelia's production role, especially if the goal is using better information to improve shift decisions, quality routines and team coordination.",
         draftReason: "I am interested in building confidence with data and automation because I want to understand how digital tools and better information can support production planning, improvement and future team leadership.",
@@ -236,7 +236,7 @@ function getEmployeeGuidance(prompt: string, persona: PersonaSummary): EmployeeG
       ],
       supportRequired: "Support with study time, evidence collection and a manager conversation about digital improvement opportunities in production.",
       availableNow: [
-        { programme: "Level 3 Team Leader", fit: 88, why: "Available now if Amelia wants to use data to lead better shift decisions." },
+        { programme: "Level 3 Engineering Technician", fit: 88, why: "Available now if Amelia wants to use better production evidence to support future supervision." },
         { programme: "Level 3 Engineering Technician", fit: 86, why: "Available now if Amelia wants more technical improvement and process understanding." },
       ],
       futureInterests: [
@@ -250,12 +250,12 @@ function getEmployeeGuidance(prompt: string, persona: PersonaSummary): EmployeeG
   return {
     intent,
     primary: {
-      programme: "Level 3 Team Leader",
-      pathway: "Leadership & Management",
-      provider: "Babington",
+      programme: "Level 3 Engineering Technician",
+      pathway: "Manufacturing & Production",
+      provider: "TEC Partnership",
       fit: 93,
-      why: "This pathway supports Amelia's progression into team leadership, shift coordination and production supervision.",
-      draftReason: "I am interested in the Level 3 Team Leader pathway because I would like to progress from Production Team Member into a Production Supervisor or Team Leader role. I want to build confidence in leadership, communication and coordinating work across the team.",
+      why: "This pathway supports Amelia's progression into production supervision through stronger technical manufacturing evidence, quality routines and improvement confidence.",
+      draftReason: "I am interested in the Level 3 Engineering Technician pathway because I would like to progress from Production Team Member into production supervision through stronger manufacturing knowledge, technical evidence, quality routines and improvement confidence.",
     },
     alternatives: [
       { programme: "Level 3 Engineering Technician", fit: 88, why: "This supports stronger technical capability in a manufacturing environment." },
@@ -263,7 +263,7 @@ function getEmployeeGuidance(prompt: string, persona: PersonaSummary): EmployeeG
     ],
     supportRequired: "Support with study time and evidence collection.",
     availableNow: [
-      { programme: "Level 3 Team Leader", fit: 93, why: "Available now and aligned to Amelia's production leadership goal." },
+      { programme: "Level 3 Engineering Technician", fit: 93, why: "Available now and aligned to Amelia's production supervision goal." },
       { programme: "Level 3 Engineering Technician", fit: 88, why: "Available now if Amelia wants stronger technical manufacturing capability." },
     ],
     futureInterests: [
@@ -280,7 +280,7 @@ function getManagerGuidance(prompt: string, requests: RequestSummary[]): Manager
   if (normalised.includes("skills gap")) {
     return {
       title: "Team skills gap summary",
-      summary: "The clearest team development priorities are leadership readiness, technical evidence quality and data confidence. LevyTate recommends using Level 3 Team Leader for emerging supervisors and Level 3 Engineering Technician for technical manufacturing progression.",
+      summary: "The clearest team development priorities are leadership readiness, technical evidence quality and data confidence. LevyTate now recommends specialist routes such as Level 3 Engineering Technician and Level 4 Improvement Practitioner for emerging supervisors.",
       signals: [["Priority gap", "Leadership readiness"], ["Suggested cohort", "Production leadership"], ["Business benefit", "Better handovers and quality routines"]],
     };
   }
@@ -345,10 +345,10 @@ function employeeAssistantMessage(persona: PersonaSummary, guidance: EmployeeGui
 
   if (guidance.intent === "management_interest") {
     if (persona.name === "Daniel Carter") {
-      return `That makes sense, ${firstName}. Your current Level 4 Data Analyst application could still support a management route if your future role is data leadership rather than general people management. If you want broader people or operational management, Level 3 Team Leader or Level 5 Operations Manager would be better routes to discuss with ${persona.manager}.${activeBoundary}`;
+      return `That makes sense, ${firstName}. Your current Level 4 Data Analyst application could still support a management route if your future role is data leadership rather than generic people management. Because generic management apprenticeships are being withdrawn from funding for new starts, LevyTate would first ask what type of management you mean: people, operations, technical, project, commercial or data.${activeBoundary}`;
     }
 
-    return `That makes sense, ${firstName}. A management route can grow from your production experience, especially if you want to build confidence in shift decisions, handovers and team coordination.${activeBoundary}`;
+    return `That makes sense, ${firstName}. A management route can grow from your production experience, but LevyTate now starts with the type of management you are moving into. For production supervision, a specialist manufacturing or improvement pathway is usually a better funded route than a generic management standard.${activeBoundary}`;
   }
 
   if (guidance.intent === "change_of_mind") {
@@ -400,7 +400,7 @@ function employeeManagerMessageDraft(persona: PersonaSummary, guidance: Employee
   }
 
   if (guidance.intent === "management_interest") {
-    return `Hi ${persona.manager}, I am interested in developing toward management. Could we talk about whether my current route supports that goal or whether a leadership pathway would be better later?`;
+    return `Hi ${persona.manager}, I am interested in developing toward management. Could we talk about the type of management I am aiming for and whether my current specialist pathway supports that goal?`;
   }
 
   if (activeApplication) {

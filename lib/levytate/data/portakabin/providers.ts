@@ -80,17 +80,17 @@ export const initialMappings: ProviderMapping[] = [
     whyRecommended: "Strong national data and digital apprenticeship delivery.",
   },
   {
-    roleFamily: "Leadership",
-    pathway: "Leadership & Management",
-    standard: "L3 Team Leader / L5 Operations Manager",
+    roleFamily: "Operational Improvement",
+    pathway: "Operational Improvement & Capability",
+    standard: "L4 Improvement Practitioner",
     partner: "Babington",
     alternativePartner: "SR Apprenticeships",
     providerEmail: "portakabin-enrolments@babington.co.uk",
     deliveryModel: "Blended",
     fit: 90,
-    status: "Live",
-    nextAction: "Submit approved learners for enrolment",
-    whyRecommended: "Strong national leadership and management apprenticeship delivery.",
+    status: "Ready",
+    nextAction: "Confirm improvement project sponsors",
+    whyRecommended: "Supports specialist management-level capability through improvement projects in real operational contexts.",
   },
 ];
 

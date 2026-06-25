@@ -69,7 +69,7 @@ export default function PortakabinApprenticeshipHub() {
   const [mappings, setMappings] = useState<ProviderMapping[]>(initialMappings);
   const [enrolmentSubmissions, setEnrolmentSubmissions] = useState<Record<number, EnrolmentSubmission>>({});
   const [selectedPathway, setSelectedPathway] = useState<Pathway | null>(null);
-  const [savedPathways, setSavedPathways] = useState<string[]>(["Manufacturing & Production", "Digital, Data & AI", "Leadership & Management"]);
+  const [savedPathways, setSavedPathways] = useState<string[]>(["Manufacturing & Production", "Digital, Data & AI", "Operational Improvement & Capability"]);
   const [scenario, setScenario] = useState<DemandScenario>("Medium");
   const [selectedSite, setSelectedSite] = useState(allSitesLabel);
   const [learnerSearch, setLearnerSearch] = useState("");
@@ -158,7 +158,7 @@ export default function PortakabinApprenticeshipHub() {
       department: String(data.get("department") || "Manufacturing"),
       team: String(data.get("team") || "Internal team"),
       site: String(data.get("site") || (selectedSite === allSitesLabel ? "York Head Office, Visitor Centre and UK Factory" : selectedSite)),
-      pathway: String(data.get("pathway") || pathways[0].title),
+      pathway: normaliseNewApplicationPathway(String(data.get("pathway") || pathways[0].title)),
       manager: String(data.get("manager") || "Line manager"),
       reason: String(data.get("reason") || "New development request."),
       careerGoal: String(data.get("careerGoal") || "Progress into a future role."),
@@ -737,8 +737,8 @@ function operatingSnapshotMetrics({
   const leadQueue = requests.filter((request) => request.status === "Submitted to Apprenticeship Lead" || request.status === "Awaiting Final Approval" || request.status === "Approved by Line Manager");
   const readiness = readinessScore(learners, requests);
   const employeeProgress = activeApplication ? Math.round(((publicStages.indexOf(activeApplication.status) + 1) / publicStages.length) * 100) : 14;
-  const recommendedPathwayCount = recommendationCountForRoleTitle(selectedPersona.role, portakabinRoleLibrary);
-  const teamHighPotential = managerLearners.filter((learner) => learner.progress >= 70 || learner.programme === "Leadership & Management").length || 3;
+  const recommendedPathwayCount = recommendationCountForRoleTitle(selectedPersona.role, portakabinRoleLibrary, portakabinPathwayStandards);
+  const teamHighPotential = managerLearners.filter((learner) => learner.progress >= 70 || learner.programme === "Operational Improvement & Capability").length || 3;
   const departmentParticipation = `${Math.max(12, Math.min(28, Math.round((liveLearners.length / Math.max(learners.length || 1, 8)) * 100)))}%`;
   const providerCoverage = `${Math.max(68, Math.min(96, Math.round((mappings.filter((mapping) => mapping.status === "Live").length / Math.max(mappings.length, 1)) * 100)))}%`;
 
@@ -1183,7 +1183,7 @@ function EmployeeDashboard({ employeeRequest, savedPathways, onNavigate }: { emp
           <ProfileRow label="Career aspiration" value="Move into project and operational leadership." />
         </div>
         <div className="mt-5 grid gap-4 md:grid-cols-3">
-          <RecommendationCard title="Team Leader L3" score="94%" />
+          <RecommendationCard title="Engineering Technician L3" score="94%" />
           <RecommendationCard title="Data Technician L3" score="87%" />
           <RecommendationCard title="Business Administrator L3" score="83%" />
         </div>
@@ -1209,8 +1209,8 @@ function EmployeeDashboard({ employeeRequest, savedPathways, onNavigate }: { emp
       </PlatformPanel>
       <PlatformPanel eyebrow="Salary and career potential" title="Progression outlook">
         <div className="grid gap-3 md:grid-cols-3">
-          <MetricCard label="Current range" value="Â£28k" copy="Role benchmark" />
-          <MetricCard label="Next role range" value="Â£36k" copy="Estimated internal benchmark" />
+          <MetricCard label="Current range" value="£28k" copy="Role benchmark" />
+          <MetricCard label="Next role range" value="£36k" copy="Estimated internal benchmark" />
           <MetricCard label="Future opportunity" value="High" copy="Based on skills trajectory" />
         </div>
       </PlatformPanel>
@@ -1439,6 +1439,13 @@ function LaunchCard({ title, value, copy, action, section, onNavigate }: LaunchC
   );
 }
 
+function isDefundedGenericManagementPathway(pathway: string) {
+  return /team leader|operations manager|operations \/ departmental manager|departmental manager/i.test(pathway);
+}
+
+function normaliseNewApplicationPathway(pathway: string) {
+  return isDefundedGenericManagementPathway(pathway) ? "Level 3 Engineering Technician" : pathway;
+}
 function matchedPathwaysForRole(roleName: string): Pathway[] {
   const roleRecord = roleByTitle(portakabinRoleLibrary, roleName);
   const recommendations = pathwaysForRole(roleRecord, portakabinPathwayStandards);
@@ -2082,7 +2089,7 @@ function ExpandablePathwayCard({ pathway, saved, onOpen, onSave }: { pathway: Pa
 
 function RequestForm({ onSubmit, selectedPersona, activeApplication, onViewApplication }: { onSubmit: (event: FormEvent<HTMLFormElement>) => void; selectedPersona: EmployeePersona; activeApplication?: RequestItem; onViewApplication: () => void }) {
   const matchedOptions = matchedPathwaysForRole(selectedPersona.role);
-  const defaultPathway = selectedPersona.name === "Daniel Carter" ? "Level 4 Data Analyst" : "Level 3 Team Leader";
+  const defaultPathway = selectedPersona.name === "Daniel Carter" ? "Level 4 Data Analyst" : "Level 3 Engineering Technician";
   const defaultReason = selectedPersona.name === "Daniel Carter"
     ? "I want to deepen my data analysis, automation and AI confidence so I can improve reporting workflows."
     : "I want to build stronger manufacturing, team coordination and delivery confidence.";
@@ -3688,7 +3695,7 @@ function EmployeeAIPage({
 }
 
 function LineManagerAIPage({ requests, selectedSite, onStatus, onNavigate }: { requests: RequestItem[]; selectedSite: string; onStatus: (id: number, status: RequestStatus) => void; onNavigate: (section: SectionKey) => void }) {
-  const examples = ["Should I approve Amelia's Team Leader application?", "Which members of my team could benefit from leadership development?", "Where are the biggest skills gaps in my team?", "What apprenticeship pathways suit my production team?"];
+  const examples = ["Should I approve Amelia's Engineering Technician application?", "Which members of my team could benefit from leadership development?", "Where are the biggest skills gaps in my team?", "What apprenticeship pathways suit my production team?"];
   const [query, setQuery] = useState("");
   const [result, setResult] = useState<ApiLevyTateAiResponse | null>(null);
   const [history, setHistory] = useState<LevyTateConversationMessage[]>([]);
@@ -3736,7 +3743,7 @@ function LineManagerAIPage({ requests, selectedSite, onStatus, onNavigate }: { r
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
           <form onSubmit={askQuestion} className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-[#f8fbfa] p-4">
             <p className="text-sm leading-6 text-[#102c3d]/62">Get support developing your team and reviewing apprenticeship requests.</p>
-            <textarea value={query} onChange={(event) => setQuery(event.target.value)} rows={4} placeholder="Should I approve Amelia's Team Leader application?" className="mt-4 min-h-[112px] w-full rounded-xl border border-[#102c3d]/[0.09] bg-white px-4 py-3 text-base font-medium leading-7 text-[#102c3d] outline-none transition placeholder:text-[#102c3d]/32 focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10" />
+            <textarea value={query} onChange={(event) => setQuery(event.target.value)} rows={4} placeholder="Should I approve Amelia's Engineering Technician application?" className="mt-4 min-h-[112px] w-full rounded-xl border border-[#102c3d]/[0.09] bg-white px-4 py-3 text-base font-medium leading-7 text-[#102c3d] outline-none transition placeholder:text-[#102c3d]/32 focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10" />
             <PlatformButton className="mt-4">{loading ? "Generating guidance..." : "Generate manager guidance"}</PlatformButton>
           </form>
           <div className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-white p-4 shadow-[0_10px_26px_rgba(16,44,61,0.045)]">
@@ -3769,7 +3776,7 @@ function LineManagerAIPage({ requests, selectedSite, onStatus, onNavigate }: { r
           </div>
           <div className="grid gap-3">
             <MetricTile label="Applications awaiting review" value={pending.length} copy="Direct reports requiring manager approval." />
-            <MetricTile label="Recommended team pathway" value="Level 3 Team Leader" copy="Best current fit for production progression." />
+            <MetricTile label="Recommended team pathway" value="Level 3 Engineering Technician" copy="Specialist route for production progression." />
             <MetricTile label="Business benefit" value="Strong" copy="Leadership, handover and quality confidence." />
           </div>
         </div>

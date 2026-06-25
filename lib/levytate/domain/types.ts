@@ -22,6 +22,15 @@ export type CareerLevel = "Entry" | "Experienced" | "Supervisor" | "Manager" | "
 export type PathwayRecommendationType = "Primary" | "Alternative";
 export type FundingRoute = "Potentially levy-funded" | "Potentially funded through levy/co-investment" | "Commercial training budget";
 export type DeliveryPreference = "Blended" | "Site based" | "Remote workshops" | "Hybrid" | "Online + coaching";
+export type PathwayFundingStatus = "funded" | "defunded_for_new_starts";
+export type ManagementContext =
+  | "people_management"
+  | "operational_management"
+  | "technical_management"
+  | "project_management"
+  | "commercial_management"
+  | "data_management"
+  | "customer_management";
 export type RoleCapabilityTag =
   | "Leadership"
   | "Technical"
@@ -42,6 +51,9 @@ export type ApprenticeshipPathway = {
   family: string;
   summary: string;
   typicalDuration: string;
+  fundingStatus?: PathwayFundingStatus;
+  availableForNewApplications?: boolean;
+  fundingNote?: string;
 };
 
 export type RolePathwayMapping = {
@@ -53,6 +65,8 @@ export type RolePathwayMapping = {
   fundingRoute: FundingRoute;
   deliveryPreference: DeliveryPreference;
   internalNotes: string;
+  managementCapabilitySupported?: ManagementContext;
+  specialistPathwayRationale?: string;
 };
 
 export type RoleLibraryRole = {
@@ -68,6 +82,8 @@ export type RoleLibraryRole = {
   aiTags: RoleCapabilityTag[];
   businessOutcomes: string[];
   overview: string;
+  managementContext?: ManagementContext[];
+  specialistPathwayRationale?: string;
   recommendations: RolePathwayMapping[];
   status: RoleRecordStatus;
   lastUpdated: string;
