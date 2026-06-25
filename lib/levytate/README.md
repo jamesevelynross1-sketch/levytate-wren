@@ -1,33 +1,63 @@
 # LevyTate MVP Structure
 
-This folder is the first production-oriented boundary around the Portakabin LevyTate demo.
+This folder contains the production-oriented LevyTate domain, data and platform boundaries.
 
 ## Domain
 
-`lib/levytate/domain` contains reusable product concepts and rules that should apply across employers:
+`lib/levytate/domain` contains reusable product concepts and rules that apply across employers:
 
 - roles and navigation permissions
 - application status rules
 - active application checks
-- provider mapping lookup helpers
+- provider catalogue filtering and shortlisting
+- provider matching support logic
 - learner and request utility functions
 - shared TypeScript types
 
-These files should stay employer-neutral wherever possible.
+These files should stay employer-neutral.
 
-## Employer Data
+## MVP Data
 
-`lib/levytate/data/portakabin` contains Portakabin-specific demo data:
+`lib/levytate/data/mvp` contains the clean MVP starting state.
 
-- employer and site records
-- employee personas and learner records
-- pathway catalogue and role-to-pathway mappings
-- application seed data and demand scenarios
-- provider mappings
-- provider matching request seeds
+The MVP must not preload employer mock data. It starts with empty arrays for:
 
-This remains mock data for now, but it is isolated so the next MVP phase can replace it with API-backed data without rewriting the UI.
+- employers
+- sites
+- departments
+- employees
+- roles
+- applications
+- provider matching requests
+
+The MVP may preload LevyTate-owned platform assets, including the provider catalogue.
+
+## Provider Catalogue
+
+`lib/levytate/data/mvp/provider-catalogue.ts` contains real provider records and starter programme records.
+
+Each provider and programme includes:
+
+- verification status
+- source URL
+- delivery model
+- regions
+- sectors
+- funding status
+- editable contact and notes fields
+
+Programme data should be treated as either `verified` or `needs_verification`. Category-level entries should usually be marked `needs_verification` until a LevyTate admin confirms the exact public programme page.
+
+Generic Level 3 Team Leader and Level 5 Operations Manager routes must not be active recommendations for new starts. If historic or provider-site references exist, they should be marked `defunded_for_new_starts` and unavailable for new recommendations.
+
+## Demo Data
+
+`lib/levytate/data/demo` marks employer demo data as demo-only.
+
+The current Portakabin demo data remains available for the standalone `/portakabin-apprenticeship-hub` demo route, but MVP routes must import from `lib/levytate/data/mvp` instead of employer demo files.
 
 ## UI
 
-The Portakabin route still owns the screen composition and interaction state. Shared UI components should continue to move toward `components/levytate-demo` or a future `components/levytate-platform` package when reused by more than one employer environment.
+Shared MVP UI belongs in `components/levytate-platform` or `components/levytate-demo` where appropriate.
+
+Demo routes may compose these components with demo data. MVP routes should compose the same components with neutral MVP data and empty employer records.

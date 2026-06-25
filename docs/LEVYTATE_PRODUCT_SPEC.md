@@ -431,3 +431,28 @@ Apprenticeship Lead reports:
 Generic management apprenticeships are being withdrawn from government funding for new starts. LevyTate must not recommend Level 3 Team Leader or Level 5 Operations Manager as active funded pathways for new applications.
 
 Historic records may remain, but new recommendations should be specialist and role-led. For management progression, LevyTate should identify the type of management involved and recommend a specialist pathway that builds management-level capability through the employee's actual role.
+## MVP Data Boundary
+
+The LevyTate MVP must start as a clean client workspace. It must not preload Portakabin, Wren or other employer demo employees, sites, departments, applications, role mappings or personas.
+
+Employer demo records are isolated under demo-only data namespaces and may be used by standalone demo routes such as `/portakabin-apprenticeship-hub`.
+
+MVP routes should import from `lib/levytate/data/mvp` and start with empty employer records for:
+
+- employers
+- sites
+- departments
+- employees
+- roles
+- applications
+- provider matching requests
+
+The MVP may preload LevyTate-owned assets such as the provider catalogue because these are platform assets, not employer records.
+
+## Provider Catalogue
+
+LevyTate maintains a seeded provider catalogue for LevyTate-led provider matching. Provider and programme records include verification status and should be editable by LevyTate admins.
+
+Provider matching remains a LevyTate-led service. Employers submit needs and LevyTate prepares a controlled shortlist using programme fit, sector fit, delivery model, region, employer need and provider status. It must not be positioned as an open public provider marketplace.
+
+Provider funding language must use `potentially levy-funded` or `potentially funded through levy/co-investment`. Generic Level 3 Team Leader and Level 5 Operations Manager routes must not be active recommendations for new starts.

@@ -195,6 +195,55 @@ export type ApprenticeshipAdvice = {
   providerMatchingPrompt: string;
 };
 
+
+export type ProviderVerificationStatus = "verified" | "needs_verification";
+export type ProviderRecordStatus = "Active" | "Archived";
+export type ProviderType = "Independent training provider" | "University" | "College" | "Specialist consultancy" | "Employer programme partner";
+export type ProviderProgrammeFundingStatus = "potentially_levy_funded" | "potentially_levy_or_co_investment" | "commercial" | "defunded_for_new_starts";
+
+export type ProviderProgramme = {
+  programmeId: string;
+  programmeName: string;
+  level: string;
+  standardName: string;
+  sector: string;
+  deliveryMode: string;
+  typicalDuration: string;
+  fundingStatus: ProviderProgrammeFundingStatus;
+  availableForNewRecommendations: boolean;
+  suitableRoles: string[];
+  tags: string[];
+  sourceUrl: string;
+  verificationStatus: ProviderVerificationStatus;
+};
+
+export type ProviderCatalogueRecord = {
+  providerId: string;
+  providerName: string;
+  website: string;
+  providerType: ProviderType;
+  sectors: string[];
+  programmes: ProviderProgramme[];
+  deliveryModel: string[];
+  regions: string[];
+  contactName: string;
+  contactEmail: string;
+  ofstedRating: string;
+  status: ProviderRecordStatus;
+  sourceUrls: string[];
+  notes: string;
+  lastVerified: string;
+  verificationStatus: ProviderVerificationStatus;
+};
+
+export type ProviderCatalogueFilters = {
+  search: string;
+  sector: string;
+  programme: string;
+  deliveryModel: string;
+  region: string;
+  status: ProviderRecordStatus | "All";
+};
 export type ProviderMatchingRequest = {
   id: number;
   date: string;

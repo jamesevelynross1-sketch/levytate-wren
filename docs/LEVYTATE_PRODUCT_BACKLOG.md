@@ -14,6 +14,18 @@ Drives engagement and pathway adoption.
 
 ---
 
+### Provider Catalogue
+
+Status: In Development
+
+Purpose:
+Maintain a real, editable provider and programme catalogue for LevyTate-led provider matching.
+
+Business Value:
+Creates a reusable commercial asset for provider matching, consultancy and provider relationship workflows.
+
+---
+
 ### Provider Matching Requests
 
 Status: Planned
@@ -113,6 +125,8 @@ Help employers understand school reach, pupil interest, challenge completion and
 
 ### Provider Performance Dashboard
 
+### Provider Catalogue Verification Workflow
+
 ### Provider Shortlisting
 
 ### Provider Comparison
@@ -130,6 +144,15 @@ Help employers understand school reach, pupil interest, challenge completion and
 ### Finance System Integrations
 
 ### Single Sign-On
+
+---
+
+## MVP Foundation Rules
+
+- MVP routes start with no employer mock data.
+- Demo employer data remains isolated from MVP routes.
+- Provider catalogue data is a LevyTate platform asset and may be preloaded.
+- Programme verification status must be visible and editable by LevyTate admins.
 
 ---
 
