@@ -30,7 +30,19 @@ const pillars = [
 ];
 
 const workflow = ["Import Employees", "Assign Roles", "AI identifies suitable pathways", "Employee applies", "Manager approves", "LevyTate matches provider", "Enrolment complete"];
-const providerAreas = ["QA", "Baltic", "Learning Curve Group", "HBTC", "Staffordshire University", "Learning Skills Partnership", "Apprentify", "AiCore", "The Marketing Trainer", "RHG Consult", "SRSCC", "and more..."];
+const providerAreas = [
+  ["Digital & AI Apprenticeships", "Data, AI, Cyber Security & Software"],
+  ["Leadership & Management", "People Leadership, Operations & Strategic Management"],
+  ["Engineering & Manufacturing", "Engineering, Production & Maintenance"],
+  ["Construction & Built Environment", "Construction, Surveying & Property"],
+  ["Data & Analytics", "Business Intelligence & Data Science"],
+  ["Procurement & Supply Chain", "Commercial, Logistics & Procurement"],
+  ["Marketing & Creative", "Digital Marketing, Content & Creative"],
+  ["Business & Professional Services", "HR, Finance, Customer Service & Administration"],
+  ["Health & Social Care", "Adult Care, Healthcare & Wellbeing"],
+  ["Education & Learning", "Teaching, Coaching & Learning & Development"],
+  ["Growing Provider Network", "Additional specialist partners joining soon."],
+];
 const galleryItems = [
   ["Dashboard", "Workforce readiness, approvals and provider coverage in one executive view.", "82%", "Readiness"],
   ["Employees", "Search, filter and maintain clean employee records ready for pathway mapping.", "824", "Employees"],
@@ -370,23 +382,55 @@ function ChatBubble({ speaker, message, highlighted = false }: { speaker: string
   );
 }
 function ProviderCatalogueSection() {
+  const partnerBenefits = [
+    "Qualified employer introductions",
+    "AI-supported provider matching",
+    "Featured sector expertise",
+    "Strategic employer partnerships",
+    "Early access to new platform capabilities",
+  ];
+
   return (
     <section id="providers" className="bg-white/66 py-16 lg:py-24">
       <div className="mx-auto max-w-7xl px-5 sm:px-8">
         <div className="grid gap-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-end">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c95568]">Provider network</p>
-            <h2 className="mt-3 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">Built around trusted provider intelligence.</h2>
+            <h2 className="mt-3 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">Built around specialist apprenticeship expertise.</h2>
           </div>
-          <p className="max-w-2xl text-base leading-8 text-[#102c3d]/62 lg:justify-self-end">LevyTate is not an open marketplace. Provider matching is a structured LevyTate-led workflow based on employer need, programme fit and delivery context.</p>
+          <div className="space-y-4 text-base leading-8 text-[#102c3d]/62 lg:justify-self-end">
+            <p>LevyTate maintains an independently curated network of apprenticeship providers covering specialist sectors, standards and delivery models across England.</p>
+            <p>Provider recommendations are based on employer requirements, occupational fit, sector expertise, learner needs and delivery capability. LevyTate is not an open marketplace and providers cannot pay to influence recommendations.</p>
+          </div>
         </div>
         <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {providerAreas.map((provider, index) => (
-            <div key={provider} className="rounded-[1.4rem] bg-white px-5 py-5 text-sm font-semibold text-[#102c3d] shadow-[0_18px_54px_rgba(16,44,61,0.06)] ring-1 ring-[#102c3d]/[0.07]">
+          {providerAreas.map(([title, descriptor], index) => (
+            <div key={title} className={`rounded-[1.4rem] bg-white px-5 py-5 shadow-[0_18px_54px_rgba(16,44,61,0.06)] ring-1 ring-[#102c3d]/[0.07] ${title === "Growing Provider Network" ? "lg:col-span-2" : ""}`}>
               <span className={`mb-4 block h-2 w-12 rounded-full ${index % 3 === 0 ? "bg-[#18a89a]" : index % 3 === 1 ? "bg-[#ff8090]" : "bg-[#ffde59]"}`} />
-              {provider}
+              <h3 className="text-sm font-semibold tracking-[-0.01em] text-[#102c3d]">{title}</h3>
+              <p className="mt-2 text-xs leading-5 text-[#102c3d]/56">{descriptor}</p>
             </div>
           ))}
+        </div>
+        <div className="mt-8 grid gap-6 rounded-[2rem] bg-[#102c3d] p-6 text-white shadow-[0_28px_90px_rgba(16,44,61,0.16)] sm:p-8 lg:grid-cols-[0.86fr_1.14fr] lg:items-center">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#ffde59]">Partner opportunity</p>
+            <h3 className="mt-3 text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">Become a LevyTate Partner</h3>
+            <p className="mt-5 text-sm leading-7 text-white/72">We are building a carefully selected national network of high-quality apprenticeship providers with recognised expertise across specialist sectors.</p>
+            <p className="mt-3 text-sm leading-7 text-white/72">Partnerships focus on employer outcomes, delivery quality and long-term collaboration rather than marketplace advertising.</p>
+          </div>
+          <div className="rounded-[1.5rem] bg-white/[0.07] p-5 ring-1 ring-white/10">
+            <p className="text-sm font-semibold text-white">Partner organisations may benefit from:</p>
+            <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+              {partnerBenefits.map((benefit) => (
+                <li key={benefit} className="flex gap-3 text-sm leading-6 text-white/78">
+                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#ffde59]" />
+                  <span>{benefit}</span>
+                </li>
+              ))}
+            </ul>
+            <a href="mailto:hello@levytate.co.uk?subject=LevyTate partner packages" className="mt-6 inline-flex rounded-full bg-white px-5 py-3 text-sm font-semibold text-[#102c3d] shadow-[0_16px_34px_rgba(0,0,0,0.22)] transition hover:-translate-y-0.5">Discuss Partner Packages</a>
+          </div>
         </div>
       </div>
     </section>
@@ -517,6 +561,8 @@ function FinalCta() {
     </section>
   );
 }
+
+
 
 
 
