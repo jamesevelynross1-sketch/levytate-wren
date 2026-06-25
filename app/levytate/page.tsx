@@ -51,6 +51,22 @@ const pillars = [
 const workflow = ["Add employees", "Map roles", "Open applications", "Approve requests", "Match providers", "Track enrolments"];
 const prompts = ["Which apprenticeship suits this role?", "What pathway supports progression into data?", "Can you help me prepare an application?", "Which providers could deliver this programme?"];
 const providerAreas = ["Data & AI", "Digital & IT", "Procurement", "Marketing", "Business Support", "Customer Service", "Project Management", "Technical & Specialist"];
+const employerJourneyBullets = [
+  "Manage employees and apprenticeship applications",
+  "Map job roles to suitable apprenticeship pathways",
+  "Improve workforce planning",
+  "Reduce administration",
+  "Request independent provider matching",
+  "Access AI-supported apprenticeship guidance",
+];
+const providerJourneyBullets = [
+  "Employer introductions",
+  "Qualified provider matching opportunities",
+  "Premium partner visibility",
+  "Participation in AI-supported recommendations",
+  "Future marketplace opportunities",
+  "Strategic partnership packages",
+];
 
 export default function LevyTateLandingPage() {
   return (
@@ -64,6 +80,7 @@ export default function LevyTateLandingPage() {
       <AiSection />
       <ProviderCatalogueSection />
       <BetaAccessSection />
+      <AudienceJourneySection />
       <FinalCta />
     </main>
   );
@@ -307,6 +324,129 @@ function BetaAccessSection() {
   );
 }
 
+function AudienceJourneySection() {
+  return (
+    <section className="px-5 py-16 sm:px-8 lg:py-24">
+      <div className="mx-auto max-w-7xl">
+        <div className="max-w-3xl">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c95568]">Choose your LevyTate journey</p>
+          <h2 className="mt-3 text-4xl font-semibold tracking-[-0.04em] sm:text-5xl">Who are you?</h2>
+          <p className="mt-5 text-base leading-8 text-[#102c3d]/62">
+            LevyTate supports both employers looking to improve apprenticeship management and training providers looking to become trusted delivery partners.
+          </p>
+        </div>
+        <div className="mt-10 grid gap-5 lg:grid-cols-2">
+          <JourneyCard
+            variant="employer"
+            label="For employers"
+            title="Looking to transform how your organisation manages apprenticeships?"
+            intro="Discover how LevyTate can help you:"
+            bullets={employerJourneyBullets}
+            primaryCta="Request Employer Beta Access"
+            secondaryCta="Book a discovery conversation"
+            primaryHref="#beta"
+            secondaryHref="#beta"
+          />
+          <JourneyCard
+            variant="provider"
+            label="For training providers"
+            title="Interested in becoming a LevyTate Partner?"
+            intro="LevyTate is building a carefully selected network of trusted apprenticeship providers."
+            supportingIntro="Partner organisations can benefit from:"
+            bullets={providerJourneyBullets}
+            primaryCta="Discuss Partner Packages"
+            secondaryCta="Become a LevyTate Partner"
+            primaryHref="#providers"
+            secondaryHref="#providers"
+          />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+type JourneyCardProps = {
+  variant: "employer" | "provider";
+  label: string;
+  title: string;
+  intro: string;
+  supportingIntro?: string;
+  bullets: string[];
+  primaryCta: string;
+  secondaryCta: string;
+  primaryHref: string;
+  secondaryHref: string;
+};
+
+function JourneyCard({ variant, label, title, intro, supportingIntro, bullets, primaryCta, secondaryCta, primaryHref, secondaryHref }: JourneyCardProps) {
+  const isProvider = variant === "provider";
+
+  return (
+    <article className={`relative overflow-hidden rounded-[2rem] p-6 shadow-[0_28px_90px_rgba(16,44,61,0.1)] ring-1 sm:p-8 ${isProvider ? "bg-[#102c3d] text-white ring-white/10" : "bg-white text-[#102c3d] ring-[#102c3d]/[0.07]"}`}>
+      <div className="relative z-10 grid min-h-full gap-8 lg:grid-cols-[0.92fr_1.08fr] lg:items-start">
+        <JourneyIllustration variant={variant} />
+        <div>
+          <p className={`text-[11px] font-semibold uppercase tracking-[0.18em] ${isProvider ? "text-[#ffde59]" : "text-[#c95568]"}`}>{label}</p>
+          <h3 className="mt-3 text-2xl font-semibold tracking-[-0.035em] sm:text-3xl">{title}</h3>
+          <p className={`mt-4 text-sm leading-7 ${isProvider ? "text-white/72" : "text-[#102c3d]/62"}`}>{intro}</p>
+          {supportingIntro ? <p className={`mt-2 text-sm leading-7 ${isProvider ? "text-white/72" : "text-[#102c3d]/62"}`}>{supportingIntro}</p> : null}
+          <ul className="mt-5 grid gap-2 text-sm leading-6">
+            {bullets.map((bullet) => (
+              <li key={bullet} className="flex gap-3">
+                <span className={`mt-2 h-1.5 w-1.5 shrink-0 rounded-full ${isProvider ? "bg-[#ffde59]" : "bg-[#18a89a]"}`} />
+                <span className={isProvider ? "text-white/82" : "text-[#102c3d]/72"}>{bullet}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-7 flex flex-wrap items-center gap-3">
+            <a href={primaryHref} className={`rounded-full px-5 py-3 text-sm font-semibold transition hover:-translate-y-0.5 ${isProvider ? "bg-white text-[#102c3d] shadow-[0_16px_34px_rgba(0,0,0,0.22)]" : "bg-[#102c3d] text-white shadow-[0_16px_34px_rgba(16,44,61,0.16)]"}`}>{primaryCta}</a>
+            <a href={secondaryHref} className={`rounded-full px-5 py-3 text-sm font-semibold ring-1 transition hover:-translate-y-0.5 ${isProvider ? "text-white ring-white/18 hover:bg-white/8" : "text-[#102c3d] ring-[#102c3d]/10 hover:bg-[#102c3d]/[0.03]"}`}>{secondaryCta}</a>
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function JourneyIllustration({ variant }: { variant: "employer" | "provider" }) {
+  if (variant === "provider") {
+    return (
+      <div className="relative min-h-[220px] rounded-[1.5rem] bg-white/[0.06] p-6 ring-1 ring-white/10">
+        <div className="absolute left-8 top-8 h-14 w-14 rounded-2xl bg-[#ffde59] shadow-[0_18px_44px_rgba(255,222,89,0.22)]" />
+        <div className="absolute right-10 top-12 h-10 w-10 rounded-full bg-white/16 ring-1 ring-white/20" />
+        <div className="absolute bottom-10 left-10 h-10 w-10 rounded-full bg-[#18a89a]" />
+        <div className="absolute bottom-9 right-8 h-16 w-16 rounded-3xl bg-white/12 ring-1 ring-white/16" />
+        <div className="absolute left-[4.8rem] top-[4.8rem] h-px w-32 rotate-[18deg] bg-white/24" />
+        <div className="absolute bottom-[4.2rem] left-[4.8rem] h-px w-40 -rotate-[9deg] bg-white/24" />
+        <div className="absolute bottom-[5.5rem] right-[4.8rem] h-px w-28 rotate-[34deg] bg-white/24" />
+        <div className="absolute bottom-6 left-6 right-6 rounded-2xl bg-[#ffde59]/12 px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-[#ffde59]">
+          Partner network
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative min-h-[220px] rounded-[1.5rem] bg-[#eef8f4] p-6 ring-1 ring-[#102c3d]/[0.06]">
+      <div className="absolute bottom-6 left-6 right-6 grid grid-cols-4 items-end gap-3">
+        {[70, 104, 86, 124].map((height, index) => (
+          <div key={height} className="rounded-t-2xl bg-white shadow-[0_14px_38px_rgba(16,44,61,0.08)] ring-1 ring-[#102c3d]/[0.06]" style={{ height }}>
+            <div className={`mx-auto mt-3 h-2 w-8 rounded-full ${index % 2 === 0 ? "bg-[#18a89a]" : "bg-[#ff8090]"}`} />
+          </div>
+        ))}
+      </div>
+      <div className="absolute left-8 top-8 rounded-2xl bg-white px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-[#102c3d] shadow-[0_14px_38px_rgba(16,44,61,0.08)] ring-1 ring-[#102c3d]/[0.06]">
+        Workforce plan
+      </div>
+      <div className="absolute right-8 top-10 flex -space-x-2">
+        {["bg-[#18a89a]", "bg-[#ff8090]", "bg-[#102c3d]"].map((colour) => (
+          <span key={colour} className={`h-10 w-10 rounded-full border-4 border-[#eef8f4] ${colour}`} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function FinalCta() {
   return (
     <section className="px-5 py-16 sm:px-8 lg:py-20">
@@ -329,3 +469,4 @@ function Input({ label, name, placeholder }: { label: string; name: string; plac
     </label>
   );
 }
+
