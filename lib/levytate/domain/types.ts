@@ -87,6 +87,23 @@ export type EmployeePersona = {
   skills: Array<[string, number]>;
 };
 
+export type EmployeeRecordStatus = "Active" | "Archived";
+
+export type EmployeeRecord = {
+  id: string;
+  employeeNumber: string;
+  name: string;
+  email: string;
+  role: string;
+  platformRole: Role;
+  manager: string;
+  department: string;
+  site: string;
+  applicationStatus: RequestStatus | "No active application";
+  status: EmployeeRecordStatus;
+  startDate: string;
+  lastUpdated: string;
+};
 export type AdviceStandard = {
   name: string;
   level: string;
