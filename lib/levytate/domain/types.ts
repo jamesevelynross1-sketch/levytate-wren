@@ -32,7 +32,7 @@ export type ManagementContext =
   | "data_management"
   | "customer_management";
 export type RoleCapabilityTag =
-  | "Leadership"
+  | "People coordination"
   | "Technical"
   | "Digital"
   | "AI"
@@ -336,3 +336,5 @@ export type SnapshotMetric = {
   series: number[];
   accent?: string;
 };
+
+

@@ -50,7 +50,7 @@ export function RoleLibraryModule() {
       aiTags: ["Operational"],
       businessOutcomes: [],
       overview: "",
-      recommendations: [createMapping(portakabinPathwayStandards[0]?.id ?? "path-l3-team-leader", "Primary", 1)],
+      recommendations: [createMapping(portakabinPathwayStandards[0]?.id ?? "path-l3-engineering-technician", "Primary", 1)],
       status: "Active",
       lastUpdated: todayStamp(),
     });
@@ -121,7 +121,7 @@ export function RoleLibraryModule() {
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">Single source of truth</p>
                   <h1 className="mt-1 text-2xl font-semibold tracking-[-0.025em] text-[#102c3d]">Role Library & Pathway Mapping</h1>
-                  <p className="mt-1 max-w-3xl text-sm leading-6 text-[#102c3d]/58">Manage role records and the approved apprenticeship recommendations used by employee profiles, pathway discovery and future AI guidance. Generic management routes are retained only as historic records.</p>
+                  <p className="mt-1 max-w-3xl text-sm leading-6 text-[#102c3d]/58">Manage role records and the approved apprenticeship recommendations used by employee profiles, pathway discovery and future AI guidance. Recommendations should use current specialist, role-led standards only.</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 text-xs text-[#102c3d]/52">
                   <span className="rounded-full bg-[#f8fbfa] px-3 py-1.5 ring-1 ring-[#102c3d]/[0.06]">{visibleRoles.length} visible</span>
@@ -336,3 +336,4 @@ function pathwayLabelMap(pathways: ApprenticeshipPathway[]) {
 function todayStamp() {
   return new Date().toISOString().slice(0, 10);
 }
+

@@ -67,7 +67,7 @@ const advisoryMappings: Record<string, LeadGuidance> = {
       { name: "Business Analyst", level: "Level 4", suitability: 78, why: "Useful where procurement leadership is linked to process change, stakeholder insight and systems improvement.", bestFor: "Procurement leads improving commercial processes and supplier workflows.", delivery: "Applied business analysis projects with stakeholder evidence." },
     ],
     alternativeStandards: ["Level 3 Procurement and Supply Assistant", "Level 4 Business Analyst"],
-    businessRationale: "For procurement succession, LevyTate would usually separate technical procurement capability from broader leadership readiness. The strongest match depends on whether the priority is category expertise, contract discipline or progression into senior operational leadership.",
+    businessRationale: "For procurement succession, LevyTate would usually separate technical procurement capability from broader supervisory readiness. The strongest match depends on whether the priority is category expertise, contract discipline or progression into senior operational leadership.",
     fundingRoute: "Potentially levy-funded or supported through co-investment, subject to learner eligibility and the selected standard.",
     providerMatchingPrompt: "Identify providers with procurement depth, commercial tutor strength and delivery models suited to Portakabin locations.",
   },
@@ -87,7 +87,7 @@ const advisoryMappings: Record<string, LeadGuidance> = {
   },
   site: {
     interpretedRole: "Site Supervisor",
-    workforceNeed: "Team leadership, site coordination, construction supervision, operational accountability and project handover discipline.",
+    workforceNeed: "Colleague coordination, site readiness, construction supervision, operational accountability and project handover discipline.",
     recommendedStandards: [
       { name: "Construction Site Supervisor", level: "Level 3", suitability: 90, why: "Direct fit for first-line site coordination, quality checks and handover control.", bestFor: "New or emerging site supervisors.", delivery: "Field evidence, site supervision tasks and compliance activity." },
       { name: "Associate Project Manager", level: "Level 4", suitability: 86, why: "Strong fit where site supervision includes planning, stakeholder coordination and delivery control.", bestFor: "Supervisors moving into project delivery responsibility.", delivery: "Project evidence, risk planning and stakeholder coordination." },
@@ -227,7 +227,7 @@ function getEmployeeGuidance(prompt: string, persona: PersonaSummary): EmployeeG
         provider: "TEC Partnership",
         fit: 88,
         why: "Data and automation could still be relevant to Amelia's production role, especially if the goal is using better information to improve shift decisions, quality routines and team coordination.",
-        draftReason: "I am interested in building confidence with data and automation because I want to understand how digital tools and better information can support production planning, improvement and future team leadership.",
+        draftReason: "I am interested in building confidence with data and automation because I want to understand how digital tools and better information can support production planning, improvement and future production supervision.",
       },
       alternatives: [
         { programme: "Level 3 Engineering Technician", fit: 86, why: "Available now if Amelia wants a more technical improvement and process understanding route." },
@@ -280,8 +280,8 @@ function getManagerGuidance(prompt: string, requests: RequestSummary[]): Manager
   if (normalised.includes("skills gap")) {
     return {
       title: "Team skills gap summary",
-      summary: "The clearest team development priorities are leadership readiness, technical evidence quality and data confidence. LevyTate now recommends specialist routes such as Level 3 Engineering Technician and Level 4 Improvement Practitioner for emerging supervisors.",
-      signals: [["Priority gap", "Leadership readiness"], ["Suggested cohort", "Production leadership"], ["Business benefit", "Better handovers and quality routines"]],
+      summary: "The clearest team development priorities are supervisory readiness, technical evidence quality and data confidence. LevyTate now recommends specialist routes such as Level 3 Engineering Technician and Level 4 Improvement Practitioner for emerging supervisors.",
+      signals: [["Priority gap", "Supervisory readiness"], ["Suggested cohort", "Production supervision"], ["Business benefit", "Better handovers and quality routines"]],
     };
   }
 
@@ -307,8 +307,8 @@ function getDepartmentGuidance(prompt: string, requests: RequestSummary[]): Depa
   if (normalised.includes("future") || normalised.includes("risk")) {
     return {
       title: "Future skills risk summary",
-      summary: "The main future skills risks are leadership pipeline, data confidence, technical manufacturing evidence and site supervision. Apprenticeship demand should be planned by department and site before the next intake window.",
-      signals: [["Skills risks", "4"], ["Highest priority", "Leadership pipeline"], ["Planning horizon", "Next quarter"]],
+      summary: "The main future skills risks are supervision pipeline, data confidence, technical manufacturing evidence and site supervision. Apprenticeship demand should be planned by department and site before the next intake window.",
+      signals: [["Skills risks", "4"], ["Highest priority", "Supervision pipeline"], ["Planning horizon", "Next quarter"]],
     };
   }
 
@@ -340,15 +340,15 @@ function employeeAssistantMessage(persona: PersonaSummary, guidance: EmployeeGui
       return `Good question, ${firstName}. Data and automation is very close to your current direction. Your Level 4 Data Analyst route can support deeper reporting, insight and automation leadership, while an AI and automation interest is still worth saving for a future development conversation.${activeBoundary}`;
     }
 
-    return `Good question, ${firstName}. Data and automation could still be relevant to your production role at Portakabin. It could mean using data to improve production planning, spotting automation opportunities on the shop floor, building confidence with digital tools, or moving toward a future improvement, team leader or data-focused role.${activeBoundary}`;
+    return `Good question, ${firstName}. Data and automation could still be relevant to your production role at Portakabin. It could mean using data to improve production planning, spotting automation opportunities on the shop floor, building confidence with digital tools, or moving toward a future improvement, improvement lead or data-focused role.${activeBoundary}`;
   }
 
   if (guidance.intent === "management_interest") {
     if (persona.name === "Daniel Carter") {
-      return `That makes sense, ${firstName}. Your current Level 4 Data Analyst application could still support a management route if your future role is data leadership rather than generic people management. Because generic management apprenticeships are being withdrawn from funding for new starts, LevyTate would first ask what type of management you mean: people, operations, technical, project, commercial or data.${activeBoundary}`;
+      return `That makes sense, ${firstName}. Your current Level 4 Data Analyst application could still support a management route if your future role is data leadership rather than broad people management. Because LevyTate starts by clarifying the specialist management context: people, operations, technical, project, commercial or data: people, operations, technical, project, commercial or data.${activeBoundary}`;
     }
 
-    return `That makes sense, ${firstName}. A management route can grow from your production experience, but LevyTate now starts with the type of management you are moving into. For production supervision, a specialist manufacturing or improvement pathway is usually a better funded route than a generic management standard.${activeBoundary}`;
+    return `That makes sense, ${firstName}. A management route can grow from your production experience, but LevyTate now starts with the type of management you are moving into. For production supervision, a specialist manufacturing or improvement pathway is usually a better funded route than a broad management route.${activeBoundary}`;
   }
 
   if (guidance.intent === "change_of_mind") {
@@ -590,3 +590,5 @@ export function buildFallbackResponse(request: LevyTateAiRequest): LevyTateAiRes
     leadGuidance: guidance,
   };
 }
+
+

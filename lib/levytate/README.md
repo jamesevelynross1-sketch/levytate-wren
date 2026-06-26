@@ -48,7 +48,7 @@ Each provider and programme includes:
 
 Programme data should be treated as either `verified` or `needs_verification`. Category-level entries should usually be marked `needs_verification` until a LevyTate admin confirms the exact public programme page.
 
-Generic Level 3 Team Leader and Level 5 Operations Manager routes must not be active recommendations for new starts. If historic or provider-site references exist, they should be marked `defunded_for_new_starts` and unavailable for new recommendations.
+Withdrawn standards must not be active recommendations for new starts. If historic provider-site references exist, replace them with current specialist, role-led standards before use.
 
 ## Demo Data
 
@@ -61,3 +61,4 @@ The current Portakabin demo data remains available for the standalone `/portakab
 Shared MVP UI belongs in `components/levytate-platform` or `components/levytate-demo` where appropriate.
 
 Demo routes may compose these components with demo data. MVP routes should compose the same components with neutral MVP data and empty employer records.
+

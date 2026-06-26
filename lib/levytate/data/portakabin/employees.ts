@@ -29,15 +29,15 @@ export const employeePersonas: EmployeePersona[] = [
     department: "Manufacturing",
     site: "York Head Office, Visitor Centre and UK Factory",
     manager: "Ryan Booth",
-    careerGoal: "Production Supervisor / Team Leader",
+    careerGoal: "Production Supervisor / Improvement Lead",
     recommendedPathways: 2,
     savedOpportunities: 1,
     passportActivities: 7,
     currentRange: "£28k",
     nextRange: "£36k",
     futureOpportunity: "High",
-    progression: ["Production Team Member", "Senior Operator", "Team Leader", "Production Supervisor"],
-    skills: [["Manufacturing confidence", 74], ["Leadership readiness", 58], ["Technical evidence", 68], ["Shift coordination", 61]],
+    progression: ["Production Team Member", "Senior Operator", "Improvement Lead", "Production Supervisor"],
+    skills: [["Manufacturing confidence", 74], ["Supervisory readiness", 58], ["Technical evidence", 68], ["Shift coordination", 61]],
   },
   {
     name: "Daniel Carter",
@@ -75,8 +75,8 @@ export const advisoryPromptExamples = [
     prompt: "What apprenticeships would build data skills in our operations teams?",
   },
   {
-    label: "Leadership pipeline for Site Supervisors",
-    prompt: "Which apprenticeship standards support a leadership pipeline for Site Supervisors?",
+    label: "Supervision pipeline for Site Supervisors",
+    prompt: "Which apprenticeship standards support a supervision pipeline for Site Supervisors?",
   },
 ];
 
@@ -124,9 +124,11 @@ export const portakabinLearners: Learner[] = [
   { name: "Imogen Russell", role: "Site Support Coordinator", department: "Site Operations", site: "Sittingbourne Site Accommodation Visitor Centre", programme: "Installation & Site Operations", status: "Enrolment", progress: 44, lineManager: "Sam Ellis", startDate: "2025-11-03" },
   { name: "Lucas Price", role: "Hire Controller", department: "Hire & Customer", site: "Smethwick Visitor Centre", programme: "Hire, Sales & Customer Experience", status: "Live learner", progress: 68, lineManager: "Helen Ward", startDate: "2025-07-29" },
   { name: "Alice Bennett", role: "Customer Support Advisor", department: "Hire & Customer", site: "Southampton Visitor Centre", programme: "Hire, Sales & Customer Experience", status: "Manager review", progress: 23, lineManager: "Helen Ward", startDate: "2026-02-16" },
-  { name: "Sam Roberts", role: "Operations Team Leader", department: "Operations", site: "St Albans Visitor Centre", programme: "Operational Improvement & Capability", status: "Lead review", progress: 30, lineManager: "Ryan Booth", startDate: "2026-01-22" },
+  { name: "Sam Roberts", role: "Operational Improvement Lead", department: "Operations", site: "St Albans Visitor Centre", programme: "Operational Improvement & Capability", status: "Lead review", progress: 30, lineManager: "Ryan Booth", startDate: "2026-01-22" },
   { name: "Harriet James", role: "Hire Coordinator", department: "Hire & Customer", site: "Stockton Visitor Centre", programme: "Hire, Sales & Customer Experience", status: "Live learner", progress: 63, lineManager: "Helen Ward", startDate: "2025-08-21" },
   { name: "Nathan Wood", role: "Yard Supervisor", department: "Operations", site: "Stoke Visitor Centre", programme: "Operational Improvement & Capability", status: "Provider introduction", progress: 36, lineManager: "Ryan Booth", startDate: "2025-12-05" },
   { name: "Chloe Watson", role: "Logistics Assistant", department: "Supply Chain", site: "Trafford Park Manchester Visitor Centre", programme: "Procurement & Supply Chain", status: "Manager review", progress: 22, lineManager: "Helen Ward", startDate: "2026-03-13" },
   { name: "Owen Brooks", role: "Accommodation Coordinator", department: "Site Operations", site: "Witham Site Accommodation Visitor Centre", programme: "Installation & Site Operations", status: "Live learner", progress: 59, lineManager: "Sam Ellis", startDate: "2025-09-05" },
 ];
+
+

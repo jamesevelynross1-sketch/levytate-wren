@@ -38,15 +38,15 @@ const employers: EmployerProfile[] = [
     location: "York and UK visitor centres",
     strengths: ["Manufacturing", "Engineering", "Customer experience", "Project delivery"],
     pathways: [
-      { title: "Production to Team Leader", from: "Production Operative", to: "Production Supervisor", apprenticeship: "Level 3 Team Leader", progression: "Manufacturing leadership" },
+      { title: "Production to Improvement Lead", from: "Production Operative", to: "Production Supervisor", apprenticeship: "Level 4 Improvement Practitioner", progression: "Manufacturing leadership" },
       { title: "Technical Design Route", from: "Design Assistant", to: "Engineering Design Technician", apprenticeship: "Level 3 Engineering Design Technician", progression: "Design and technical careers" },
       { title: "Customer Hire Route", from: "Customer Advisor", to: "Account Support Lead", apprenticeship: "Level 3 Customer Service Specialist", progression: "Customer and commercial careers" },
     ],
     stories: [
-      { name: "Amelia Hart", role: "Production Team Member", route: "Team Leader pathway", quote: "The route helped me understand how improvement work connects to everyday production decisions." },
+      { name: "Amelia Hart", role: "Production Team Member", route: "Improvement Practitioner pathway", quote: "The route helped me understand how improvement work connects to everyday production decisions." },
       { name: "Tom Harrison", role: "Maintenance Technician", route: "Engineering pathway", quote: "I use technical evidence from real equipment, so the learning feels connected to the job." },
     ],
-    apprenticeships: ["Engineering Technician", "Team Leader", "Customer Service Specialist", "Supply Chain Practitioner"],
+    apprenticeships: ["Engineering Technician", "Improvement Practitioner", "Customer Service Specialist", "Supply Chain Practitioner"],
     challenges: [
       { title: "Design a modular classroom layout", type: "Challenge", skill: "Planning", minutes: 25 },
       { title: "Spot the production quality issue", type: "Quiz", skill: "Attention to detail", minutes: 12 },
@@ -69,7 +69,7 @@ const employers: EmployerProfile[] = [
       { name: "Mia Clarke", role: "Kitchen Designer", route: "Retail design route", quote: "I learned how customer conversations, design software and confidence all connect." },
       { name: "Jordan Ellis", role: "Manufacturing Technician", route: "Engineering route", quote: "The work is practical, fast moving and full of problem solving." },
     ],
-    apprenticeships: ["Customer Service Specialist", "Sales Executive", "Engineering Technician", "Team Leader"],
+    apprenticeships: ["Customer Service Specialist", "Sales Executive", "Engineering Technician", "Improvement Practitioner"],
     challenges: [
       { title: "Create a customer kitchen brief", type: "Activity", skill: "Communication", minutes: 20 },
       { title: "Match materials to customer needs", type: "Quiz", skill: "Problem solving", minutes: 10 },
@@ -655,9 +655,10 @@ function buildPupilRecommendation(question: string, pupil: PupilPersona) {
   return {
     industry: "Manufacturing, engineering and project delivery",
     employer: "Portakabin",
-    route: "Team Leader or Engineering Technician",
+    route: "Improvement Practitioner or Engineering Technician",
     reason: "Your profile suggests practical problem solving, organisation and curiosity about how things are made.",
     employerReason: "Portakabin gives pupils a clear view of manufacturing, technical design, customer delivery and site operations careers.",
-    nextStep: "Complete the modular classroom challenge, then explore the Production to Team Leader pathway.",
+    nextStep: "Complete the modular classroom challenge, then explore the Production to Improvement Lead pathway.",
   };
 }
+

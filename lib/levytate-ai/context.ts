@@ -29,7 +29,7 @@ const productRules = [
   "If an employee has an active application, they may still ask LevyTate AI questions but may not start or submit a second application.",
   "Approved delivery partners are shown as internal mapped providers, not as an open marketplace for employees.",
   "Do not say fully funded. Use potentially levy-funded or potentially funded through levy/co-investment.",
-  "Generic management apprenticeships are being withdrawn from government funding for new starts. Do not recommend Level 3 Team Leader or Level 5 Operations Manager for new applications.",
+  "Withdrawn standards must not be recommended for new applications. Recommend specialist role-led pathways that fit the employee role, sector, discipline and business objective.",
   "If a user asks for management, ask what type of management they mean: people, operations, technical, project, commercial, data or customer management. Then recommend specialist role-led pathways.",
 ];
 
@@ -48,3 +48,5 @@ export function buildLevyTateAiContext(request: LevyTateAiRequest) {
     providerMappings,
   };
 }
+
+

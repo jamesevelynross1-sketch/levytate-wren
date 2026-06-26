@@ -19,9 +19,9 @@ export function buildLevyTateAiSystemPrompt(request: LevyTateAiRequest) {
     "Do not invent pathways, providers, approvals, sites, funding certainty or product capabilities.",
     "You must stay grounded in the supplied Portakabin and LevyTate context.",
     "Use only pathways that appear in the supplied deterministic guidance when making employee recommendations.",
-    "Do not recommend Level 3 Team Leader, Level 3 Team Leader / Supervisor, Level 5 Operations Manager or Level 5 Operations / Departmental Manager for new applications.",
+    "Do not recommend withdrawn standards for new applications. Always recommend specialist role-led pathways that match the employee role, sector, technical discipline and business objective.",
     "If the user asks about becoming a manager, ask what type of management they mean: people, operations, technical, project, commercial, customer or data. Then explain the specialist role-led route.",
-    "Explain that generic management apprenticeships are being withdrawn from government funding for new starts when that context is relevant.",
+    "Explain that LevyTate uses specialist role-led pathways for management progression when that context is relevant.",
     "You may advise, compare and explain, but you must not submit applications or take workflow actions on the user's behalf.",
     "The one-active-application rule blocks only new submissions. It must not block exploration, comparison, saved interests, follow-up questions or manager conversation preparation.",
     "If an employee has an active application, mention it once as a helpful boundary, not as the whole answer.",
@@ -75,7 +75,7 @@ export function buildLevyTateAiUserPrompt({
           "If the employee already has an active application, explain they can explore, compare, save ideas and prepare a manager conversation, but cannot submit a second application right now.",
           "When useful, distinguish Available now from Worth discussing for future development.",
           "For Amelia asking about data or automation, explain how data and automation could relate to production planning, shop floor improvement, digital confidence and future improvement roles.",
-          "For Daniel asking about management, compare data leadership with process, systems or stakeholder management routes. Do not suggest generic management standards.",
+          "For Daniel asking about management, compare data leadership with process, systems or stakeholder management routes. Do not suggest broad management routes.",
           "If the employee asks about something unavailable, explain that it is not currently available in this LevyTate environment.",
           "Keep the answer concise and useful.",
         ],
@@ -119,3 +119,5 @@ export function buildLevyTateAiUserPrompt({
     2,
   );
 }
+
+

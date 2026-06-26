@@ -426,9 +426,9 @@ Apprenticeship Lead reports:
 - Programme portfolio
 - Workforce readiness report
 
-## Generic Management Apprenticeship Funding Rule
+## Specialist Pathway Funding Rule
 
-Generic management apprenticeships are being withdrawn from government funding for new starts. LevyTate must not recommend Level 3 Team Leader or Level 5 Operations Manager as active funded pathways for new applications.
+Withdrawn standards must not be recommended as active funded pathways for new applications.
 
 Historic records may remain, but new recommendations should be specialist and role-led. For management progression, LevyTate should identify the type of management involved and recommend a specialist pathway that builds management-level capability through the employee's actual role.
 ## MVP Data Boundary
@@ -455,4 +455,6 @@ LevyTate maintains a seeded provider catalogue for LevyTate-led provider matchin
 
 Provider matching remains a LevyTate-led service. Employers submit needs and LevyTate prepares a controlled shortlist using programme fit, sector fit, delivery model, region, employer need and provider status. It must not be positioned as an open public provider marketplace.
 
-Provider funding language must use `potentially levy-funded` or `potentially funded through levy/co-investment`. Generic Level 3 Team Leader and Level 5 Operations Manager routes must not be active recommendations for new starts.
+Provider funding language must use `potentially levy-funded` or `potentially funded through levy/co-investment`. Withdrawn standards must not be active recommendations for new starts.
+
+

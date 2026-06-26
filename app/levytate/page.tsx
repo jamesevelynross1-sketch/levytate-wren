@@ -32,7 +32,7 @@ const pillars = [
 const workflow = ["Import Employees", "Assign Roles", "AI identifies suitable pathways", "Employee applies", "Manager approves", "LevyTate matches provider", "Enrolment complete"];
 const providerAreas = [
   ["Digital & AI Apprenticeships", "Data, AI, Cyber Security & Software"],
-  ["Leadership & Management", "People Leadership, Operations & Strategic Management"],
+  ["People & Operational Development", "Supervision, Coaching & Operational Improvement"],
   ["Engineering & Manufacturing", "Engineering, Production & Maintenance"],
   ["Construction & Built Environment", "Construction, Surveying & Property"],
   ["Data & Analytics", "Business Intelligence & Data Science"],
@@ -160,7 +160,7 @@ function ProductPreview() {
         <div className="grid gap-3 border-t border-[#102c3d]/[0.06] p-4 lg:grid-cols-[0.95fr_1.05fr]">
           <div className="rounded-[1.4rem] bg-white p-4 shadow-[0_16px_44px_rgba(16,44,61,0.06)] ring-1 ring-[#102c3d]/[0.06]">
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">AI recommendation</p>
-            <p className="mt-3 text-sm leading-6 text-[#102c3d]/70">Maintenance Manager maps strongly to Level 5 Operations Manager with Improvement Practitioner as an alternative.</p>
+            <div className="mt-3 space-y-2 text-sm leading-6 text-[#102c3d]/70"><p className="font-semibold text-[#102c3d]">Maintenance Manager</p><p><span className="font-semibold text-[#102c3d]">Primary recommendation:</span> Level 4 Improvement Practitioner</p><p><span className="font-semibold text-[#102c3d]">Alternative pathways:</span> Engineering Manufacturing Technician, Engineering Maintenance Technician and Lean Manufacturing Operative.</p><p>Improvement Practitioner develops continuous improvement, operational performance, process optimisation and cross-functional supervision.</p></div>
           </div>
           <div className="rounded-[1.4rem] bg-white p-4 shadow-[0_16px_44px_rgba(16,44,61,0.06)] ring-1 ring-[#102c3d]/[0.06]">
             <div className="flex items-center justify-between"><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#0b6f63]">Reporting widget</p><span className="text-xs font-semibold text-[#102c3d]/44">Q2</span></div>
@@ -360,7 +360,7 @@ function AiSection() {
               <div><p className="text-sm font-semibold">Ask LevyTate AI</p><p className="text-xs text-[#102c3d]/48">Role-aware apprenticeship guidance</p></div>
             </div>
             <ChatBubble speaker="User" message="We have created a Maintenance Manager role. Which apprenticeship would you recommend?" />
-            <ChatBubble speaker="LevyTate" highlighted message="I would recommend Level 5 Operations Manager as the primary route. It fits leadership responsibility, operational planning and team performance. Alternative options include Improvement Practitioner for process-led roles and Engineering Manufacturing Technician for deeper technical progression. Funding may be potentially levy-funded depending on eligibility. Would you like LevyTate to match suitable providers?" />
+            <ChatBubble speaker="LevyTate" highlighted message="I would recommend Level 4 Improvement Practitioner as the primary route. It fits continuous improvement, operational performance, process optimisation and cross-functional supervision for a Maintenance Manager. Alternative pathways include Engineering Manufacturing Technician, Engineering Maintenance Technician and Lean Manufacturing Operative. Funding may be potentially levy-funded depending on eligibility. Would you like LevyTate to match suitable providers?" />
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
               {["Recommended", "Alternatives", "Provider match"].map((item) => (
                 <div key={item} className="rounded-2xl bg-white px-4 py-3 text-xs font-semibold text-[#102c3d]/70 ring-1 ring-[#102c3d]/[0.06]">{item}</div>
@@ -561,6 +561,7 @@ function FinalCta() {
     </section>
   );
 }
+
 
 
 

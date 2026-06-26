@@ -97,7 +97,7 @@ export const pathways: Pathway[] = [
     standard: "L4 Improvement Practitioner",
     audience: "Supervisors, coordinators and colleagues building management-level capability through operational improvement.",
     businessBenefit: "Develop practical management confidence through productivity, process and improvement work in the employee's actual role.",
-    learnerBenefit: "Structured problem solving, stakeholder confidence and improvement delivery without relying on generic management routes.",
+    learnerBenefit: "Structured problem solving, stakeholder confidence and improvement delivery without relying on broad management routes.",
     status: "Ready",
     deliveryPartner: "Babington",
     duration: "14 to 18 months",
@@ -106,5 +106,6 @@ export const pathways: Pathway[] = [
     departments: ["Operations", "Manufacturing", "Support"],
   },
 ];
+
 
 

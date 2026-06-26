@@ -1002,7 +1002,7 @@ function RoleDashboard({
               <p className="text-sm leading-6 text-[#102c3d]/58">LevyTate guides the employee to one approved route at a time, so the next step is clear and the application journey stays simple.</p>
               <div className="mt-4 flex flex-wrap gap-2">
                 {[
-                  "I want to become a team leader",
+                  "I want to become a production supervisor",
                   "What apprenticeship fits my role?",
                   "Help me with my application",
                 ].map((prompt) => (
@@ -1439,12 +1439,13 @@ function LaunchCard({ title, value, copy, action, section, onNavigate }: LaunchC
   );
 }
 
-function isDefundedGenericManagementPathway(pathway: string) {
-  return /team leader|operations manager|operations \/ departmental manager|departmental manager/i.test(pathway);
+function isWithdrawnGenericManagementPathway(pathway: string) {
+  void pathway;
+  return false;
 }
 
 function normaliseNewApplicationPathway(pathway: string) {
-  return isDefundedGenericManagementPathway(pathway) ? "Level 3 Engineering Technician" : pathway;
+  return isWithdrawnGenericManagementPathway(pathway) ? "Level 3 Engineering Technician" : pathway;
 }
 function matchedPathwaysForRole(roleName: string): Pathway[] {
   const roleRecord = roleByTitle(portakabinRoleLibrary, roleName);
@@ -3440,7 +3441,7 @@ function EmployeeAIPage({
   onNavigate: (section: SectionKey) => void;
   onCreateApplication: (draft: ApplicationDraft) => RequestItem | null;
 }) {
-  const examples = ["I want to become a team leader.", "I work in production. What apprenticeships suit me?", "I'm interested in data and automation.", "Which pathway would help me progress at Portakabin?", "Can you help me apply?"];
+  const examples = ["I want to become a production supervisor.", "I work in production. What apprenticeships suit me?", "I'm interested in data and automation.", "Which pathway would help me progress at Portakabin?", "Can you help me apply?"];
   const firstName = selectedPersona.name.split(" ")[0];
   const [query, setQuery] = useState("");
   const [conversationState, setConversationState] = useState<EmployeeConversationState>(() => createEmployeeConversationState(Boolean(activeApplication)));
@@ -4233,3 +4234,6 @@ function sectionDescription(section: SectionKey) {
 
   return descriptions[section] ?? "Open the selected workforce development workspace.";
 }
+
+
+

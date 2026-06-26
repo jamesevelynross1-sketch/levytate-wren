@@ -45,7 +45,7 @@ export function findProviderMappingForRequest(request: RequestItem, mappings: Pr
     const standard = normaliseMatchText(mapping.standard);
 
     if (source.includes(pathway) || source.includes(family) || standard.includes(source)) return true;
-    if ((source.includes("team leader") || source.includes("operations manager") || source.includes("leadership")) && pathway.includes("leadership")) return true;
+    if ((source.includes("supervisor") || source.includes("coaching") || source.includes("people")) && (pathway.includes("improvement") || pathway.includes("customer"))) return true;
     if ((source.includes("data") || source.includes("digital") || source.includes("analyst")) && pathway.includes("digital")) return true;
     if ((source.includes("customer") || source.includes("hire") || source.includes("sales")) && pathway.includes("customer")) return true;
     if ((source.includes("site") || source.includes("installation") || source.includes("construction")) && pathway.includes("installation")) return true;
@@ -74,5 +74,6 @@ export function countBy<T, K extends keyof T>(items: T[], key: K) {
     return acc;
   }, {});
 }
+
 
 

@@ -281,11 +281,11 @@ Recommended route:
   "selectedEmployee": "Amelia Hart",
   "selectedSite": "York Head Office, Visitor Centre and UK Factory",
   "currentSection": "Ask LevyTate AI",
-  "userMessage": "I want to become a team leader",
+  "userMessage": "I want to become a production supervisor",
   "conversationHistory": [
     {
       "role": "user",
-      "content": "I want to become a team leader"
+      "content": "I want to become a production supervisor"
     }
   ],
   "employerContext": "Portakabin"
@@ -505,7 +505,7 @@ Show:
 
 Examples:
 
-- "I want to become a team leader"
+- "I want to become a production supervisor"
 - "What apprenticeship is right for me?"
 - "Help me apply"
 - "What progression options do I have?"
@@ -817,4 +817,5 @@ The best Phase 1 approach is:
 - strong role and workflow enforcement
 
 That gives LevyTate a credible real AI layer while protecting the product story, the workflow model, and the commercial value of Provider Matching.
+
 
