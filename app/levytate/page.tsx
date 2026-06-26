@@ -108,11 +108,11 @@ function HeroSection() {
             <a href="#beta" className="rounded-full bg-[#102c3d] px-6 py-3 text-sm font-semibold text-white shadow-[0_18px_38px_rgba(16,44,61,0.18)] transition hover:-translate-y-0.5">Request Beta Access</a>
             <Link href="/login" className="rounded-full bg-white px-6 py-3 text-sm font-semibold text-[#102c3d] ring-1 ring-[#102c3d]/[0.09] transition hover:-translate-y-0.5 hover:ring-[#159b8f]/25">Beta Login</Link>
           </div>
-          <div className="mt-8 grid max-w-xl gap-3 sm:grid-cols-3">
-            {[["1", "controlled workspace"], ["5", "stakeholder views"], ["0", "marketplace noise"]].map(([value, label]) => (
-              <div key={label} className="rounded-2xl bg-white/76 px-4 py-3 ring-1 ring-[#102c3d]/[0.06] shadow-[0_12px_34px_rgba(16,44,61,0.05)]">
-                <p className="text-2xl font-semibold tracking-[-0.04em]">{value}</p>
-                <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#102c3d]/44">{label}</p>
+          <div className="mt-8 flex max-w-2xl flex-wrap gap-3">
+            {["One workspace", "Clear approvals", "Provider matching"].map((label, index) => (
+              <div key={label} className="inline-flex items-center gap-3 rounded-full bg-white/82 px-4 py-3 text-sm font-semibold text-[#102c3d]/76 ring-1 ring-[#102c3d]/[0.07] shadow-[0_14px_34px_rgba(16,44,61,0.06)] backdrop-blur">
+                <span className={`h-2.5 w-2.5 rounded-full ${index === 0 ? "bg-[#18a89a]" : index === 1 ? "bg-[#c95568]" : "bg-[#ffde59]"}`} />
+                {label}
               </div>
             ))}
           </div>
@@ -157,18 +157,35 @@ function ProductPreview() {
             <PreviewCard eyebrow="Provider match" title="Data Analyst pathway ready for review" value="New" tone="mint" />
           </div>
         </div>
-        <div className="grid gap-3 border-t border-[#102c3d]/[0.06] p-4 lg:grid-cols-[0.95fr_1.05fr]">
-          <div className="rounded-[1.4rem] bg-white p-4 shadow-[0_16px_44px_rgba(16,44,61,0.06)] ring-1 ring-[#102c3d]/[0.06]">
+        <div className="grid gap-3 border-t border-[#102c3d]/[0.06] p-4 lg:grid-cols-2">
+          <div className="flex min-h-[230px] flex-col rounded-[1.4rem] bg-white p-4 shadow-[0_16px_44px_rgba(16,44,61,0.06)] ring-1 ring-[#102c3d]/[0.06]">
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">AI recommendation</p>
-            <div className="mt-3 space-y-2 text-sm leading-6 text-[#102c3d]/70"><p className="font-semibold text-[#102c3d]">Maintenance Manager</p><p><span className="font-semibold text-[#102c3d]">Primary recommendation:</span> Level 4 Improvement Practitioner</p><p><span className="font-semibold text-[#102c3d]">Alternative pathways:</span> Engineering Manufacturing Technician, Engineering Maintenance Technician and Lean Manufacturing Operative.</p><p>Improvement Practitioner develops continuous improvement, operational performance, process optimisation and cross-functional supervision.</p></div>
+            <div className="mt-3 space-y-3 text-sm leading-6 text-[#102c3d]/70">
+              <p className="text-base font-semibold tracking-[-0.02em] text-[#102c3d]">Admin Assistant</p>
+              <div className="grid gap-2">
+                <p><span className="font-semibold text-[#102c3d]">Best fit:</span> Level 3 Data Technician</p>
+                <p><span className="font-semibold text-[#102c3d]">Also explore:</span> AI support pathway</p>
+              </div>
+              <p><span className="font-semibold text-[#102c3d]">Why:</span> Strong fit where the role involves spreadsheets, reporting, CRM updates or process admin.</p>
+            </div>
           </div>
-          <div className="rounded-[1.4rem] bg-white p-4 shadow-[0_16px_44px_rgba(16,44,61,0.06)] ring-1 ring-[#102c3d]/[0.06]">
-            <div className="flex items-center justify-between"><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#0b6f63]">Reporting widget</p><span className="text-xs font-semibold text-[#102c3d]/44">Q2</span></div>
-            <div className="mt-5 flex h-24 items-end gap-2">
-              {[36, 48, 42, 64, 72, 82].map((height, index) => (
-                <div key={height} className="flex-1 rounded-t-xl bg-[#dfeee8]"><div className={`rounded-t-xl ${index > 3 ? "bg-[#18a89a]" : "bg-[#8bd7c5]"}`} style={{ height }} /></div>
+          <div className="flex min-h-[230px] flex-col rounded-[1.4rem] bg-white p-4 shadow-[0_16px_44px_rgba(16,44,61,0.06)] ring-1 ring-[#102c3d]/[0.06]">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#0b6f63]">Reporting widget</p>
+                <p className="mt-1 text-sm font-semibold text-[#102c3d]">Applications by stage</p>
+              </div>
+              <span className="rounded-full bg-[#eaf7f2] px-3 py-1 text-xs font-semibold text-[#0b6f63]">Q2</span>
+            </div>
+            <div className="mt-4 grid flex-1 gap-3">
+              {[["Submitted", "14", "w-[88%]", "bg-[#18a89a]"], ["Manager review", "8", "w-[58%]", "bg-[#c95568]"], ["Provider match", "5", "w-[42%]", "bg-[#ffde59]"], ["Enrolled", "31", "w-[78%]", "bg-[#102c3d]"]].map(([label, value, width, colour]) => (
+                <div key={label}>
+                  <div className="mb-1.5 flex items-center justify-between text-xs font-semibold text-[#102c3d]/62"><span>{label}</span><span>{value}</span></div>
+                  <div className="h-2 rounded-full bg-[#e8f1ed]"><div className={`h-2 rounded-full ${width} ${colour}`} /></div>
+                </div>
               ))}
             </div>
+            <p className="mt-4 text-xs leading-5 text-[#102c3d]/50">Live visibility from interest through enrolment.</p>
           </div>
         </div>
       </div>
@@ -358,8 +375,8 @@ function AiSection() {
               <span className="grid h-10 w-10 place-items-center rounded-2xl bg-[#102c3d] text-sm font-semibold text-white">AI</span>
               <div><p className="text-sm font-semibold">Ask LevyTate AI</p><p className="text-xs text-[#102c3d]/48">Role-aware apprenticeship guidance</p></div>
             </div>
-            <ChatBubble speaker="User" message="We have created a Maintenance Manager role. Which apprenticeship would you recommend?" />
-            <ChatBubble speaker="LevyTate" highlighted message="I would recommend Level 4 Improvement Practitioner as the primary route. It fits continuous improvement, operational performance, process optimisation and cross-functional supervision for a Maintenance Manager. Alternative pathways include Engineering Manufacturing Technician, Engineering Maintenance Technician and Lean Manufacturing Operative. Funding may be potentially levy-funded depending on eligibility. Would you like LevyTate to match suitable providers?" />
+            <ChatBubble speaker="User" message="We have an Admin Assistant who wants to build reporting and digital confidence. What fits?" />
+            <ChatBubble speaker="LevyTate" highlighted message="I would start with Level 3 Data Technician. It fits admin-heavy work involving spreadsheets, CRM updates, reporting and process improvement. I would also explore an AI support pathway where the goal is digital confidence and productivity. Funding may be potentially levy-funded depending on eligibility. Would you like LevyTate to prepare a provider matching request?" />
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
               {["Recommended", "Alternatives", "Provider match"].map((item) => (
                 <div key={item} className="rounded-2xl bg-white px-4 py-3 text-xs font-semibold text-[#102c3d]/70 ring-1 ring-[#102c3d]/[0.06]">{item}</div>
@@ -597,6 +614,7 @@ function FinalCta() {
     </section>
   );
 }
+
 
 
 
