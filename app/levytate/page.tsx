@@ -194,10 +194,9 @@ function CredibilityStrip() {
     <section className="border-y border-[#102c3d]/[0.07] bg-white/72">
       <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-5 sm:px-8 lg:flex-row lg:items-center lg:justify-between">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#102c3d]/42">Built for</p>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          {credibility.map((item, index) => (
-            <div key={item} className="flex items-center gap-3 rounded-full bg-[#f8fbfa] px-4 py-2.5 text-sm font-semibold text-[#102c3d]/70 ring-1 ring-[#102c3d]/[0.06]">
-              <span className={`grid h-7 w-7 place-items-center rounded-full text-xs ${index % 2 === 0 ? "bg-[#eaf7f2] text-[#0b6f63]" : "bg-[#fff0f2] text-[#c95568]"}`}>{item.charAt(0)}</span>
+        <div className="flex flex-wrap gap-3">
+          {credibility.map((item) => (
+            <div key={item} className="rounded-full bg-[#f8fbfa] px-4 py-2.5 text-sm font-semibold text-[#102c3d]/70 ring-1 ring-[#102c3d]/[0.06] shadow-[0_10px_28px_rgba(16,44,61,0.04)]">
               {item}
             </div>
           ))}
@@ -507,38 +506,75 @@ function JourneyCard({ variant, label, title, intro, bullets, primaryCta, primar
 }
 function JourneyIllustration({ variant }: { variant: "employer" | "provider" }) {
   if (variant === "provider") {
+    const providerRows = [
+      ["Partner Profile", "Verified sector expertise", "Live"],
+      ["Matching Request", "8 learners, multi-site", "Qualified"],
+      ["Employer Opportunity", "Manufacturing client", "Ready"],
+      ["Programme Fit", "Engineering, data, supply chain", "94%"],
+      ["Partner Package", "Strategic visibility", "Review"],
+    ];
+
     return (
-      <div className="relative min-h-[220px] rounded-[1.5rem] bg-white/[0.06] p-6 ring-1 ring-white/10">
-        <div className="absolute left-8 top-8 h-14 w-14 rounded-2xl bg-[#ffde59] shadow-[0_18px_44px_rgba(255,222,89,0.22)]" />
-        <div className="absolute right-10 top-12 h-10 w-10 rounded-full bg-white/16 ring-1 ring-white/20" />
-        <div className="absolute bottom-10 left-10 h-10 w-10 rounded-full bg-[#18a89a]" />
-        <div className="absolute bottom-9 right-8 h-16 w-16 rounded-3xl bg-white/12 ring-1 ring-white/16" />
-        <div className="absolute left-[4.8rem] top-[4.8rem] h-px w-32 rotate-[18deg] bg-white/24" />
-        <div className="absolute bottom-[4.2rem] left-[4.8rem] h-px w-40 -rotate-[9deg] bg-white/24" />
-        <div className="absolute bottom-[5.5rem] right-[4.8rem] h-px w-28 rotate-[34deg] bg-white/24" />
-        <div className="absolute bottom-6 left-6 right-6 rounded-2xl bg-[#ffde59]/12 px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-[#ffde59]">
-          Partner network
+      <div className="min-h-[260px] rounded-[1.5rem] bg-white/[0.06] p-4 ring-1 ring-white/10">
+        <div className="rounded-[1.2rem] bg-white p-4 text-[#102c3d] shadow-[0_18px_46px_rgba(0,0,0,0.18)]">
+          <div className="flex items-center justify-between gap-3 border-b border-[#102c3d]/[0.07] pb-3">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#0b6f63]">Provider network</p>
+              <p className="mt-1 text-sm font-semibold">Partner opportunity flow</p>
+            </div>
+            <span className="rounded-full bg-[#fff4bd] px-3 py-1 text-xs font-semibold text-[#102c3d]">Curated</span>
+          </div>
+          <div className="mt-4 space-y-2.5">
+            {providerRows.map(([title, detail, status], index) => (
+              <div key={title} className="grid grid-cols-[1fr_auto] gap-3 rounded-2xl bg-[#f8fbfa] px-3 py-2.5 ring-1 ring-[#102c3d]/[0.05]">
+                <div className="flex items-center gap-3">
+                  <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${index === 1 ? "bg-[#c95568]" : index === 3 ? "bg-[#ffde59]" : "bg-[#18a89a]"}`} />
+                  <div>
+                    <p className="text-xs font-semibold">{title}</p>
+                    <p className="mt-0.5 text-[11px] text-[#102c3d]/48">{detail}</p>
+                  </div>
+                </div>
+                <span className="self-center rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold text-[#102c3d]/58 ring-1 ring-[#102c3d]/[0.06]">{status}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
   }
 
+  const employerRows = [
+    ["Employee Management", "824 employee records", "Synced"],
+    ["Applications", "12 active requests", "Open"],
+    ["Approvals", "4 manager decisions", "Due"],
+    ["Provider Matching", "3 requests prepared", "Ready"],
+    ["Workforce View", "Readiness by site", "Live"],
+  ];
+
   return (
-    <div className="relative min-h-[220px] rounded-[1.5rem] bg-[#eef8f4] p-6 ring-1 ring-[#102c3d]/[0.06]">
-      <div className="absolute bottom-6 left-6 right-6 grid grid-cols-4 items-end gap-3">
-        {[70, 104, 86, 124].map((height, index) => (
-          <div key={height} className="rounded-t-2xl bg-white shadow-[0_14px_38px_rgba(16,44,61,0.08)] ring-1 ring-[#102c3d]/[0.06]" style={{ height }}>
-            <div className={`mx-auto mt-3 h-2 w-8 rounded-full ${index % 2 === 0 ? "bg-[#18a89a]" : "bg-[#ff8090]"}`} />
+    <div className="min-h-[260px] rounded-[1.5rem] bg-[#eef8f4] p-4 ring-1 ring-[#102c3d]/[0.06]">
+      <div className="rounded-[1.2rem] bg-white p-4 shadow-[0_18px_46px_rgba(16,44,61,0.09)] ring-1 ring-[#102c3d]/[0.06]">
+        <div className="flex items-center justify-between gap-3 border-b border-[#102c3d]/[0.07] pb-3">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">Employer workspace</p>
+            <p className="mt-1 text-sm font-semibold">Apprenticeship operations</p>
           </div>
-        ))}
-      </div>
-      <div className="absolute left-8 top-8 rounded-2xl bg-white px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-[#102c3d] shadow-[0_14px_38px_rgba(16,44,61,0.08)] ring-1 ring-[#102c3d]/[0.06]">
-        Workforce plan
-      </div>
-      <div className="absolute right-8 top-10 flex -space-x-2">
-        {["bg-[#18a89a]", "bg-[#ff8090]", "bg-[#102c3d]"].map((colour) => (
-          <span key={colour} className={`h-10 w-10 rounded-full border-4 border-[#eef8f4] ${colour}`} />
-        ))}
+          <span className="rounded-full bg-[#eaf7f2] px-3 py-1 text-xs font-semibold text-[#0b6f63]">Visible</span>
+        </div>
+        <div className="mt-4 space-y-2.5">
+          {employerRows.map(([title, detail, status], index) => (
+            <div key={title} className="grid grid-cols-[1fr_auto] gap-3 rounded-2xl bg-[#f8fbfa] px-3 py-2.5 ring-1 ring-[#102c3d]/[0.05]">
+              <div className="flex items-center gap-3">
+                <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${index === 2 ? "bg-[#c95568]" : index === 3 ? "bg-[#ffde59]" : "bg-[#18a89a]"}`} />
+                <div>
+                  <p className="text-xs font-semibold">{title}</p>
+                  <p className="mt-0.5 text-[11px] text-[#102c3d]/48">{detail}</p>
+                </div>
+              </div>
+              <span className="self-center rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold text-[#102c3d]/58 ring-1 ring-[#102c3d]/[0.06]">{status}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -561,6 +597,7 @@ function FinalCta() {
     </section>
   );
 }
+
 
 
 
