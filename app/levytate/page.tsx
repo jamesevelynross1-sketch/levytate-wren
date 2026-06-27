@@ -7,7 +7,38 @@ export const metadata: Metadata = {
   description: "LevyTate is the apprenticeship operating system for modern employers, bringing employee management, applications, provider matching and AI-supported guidance into one workspace.",
 };
 
-const credibility = ["HR", "L&D", "Apprenticeship Leads", "Operations", "Senior Leadership Teams"];
+const stakeholders = [
+  {
+    title: "HR",
+    copy: "Manage employee development, workforce planning and career progression from one place.",
+    icon: "people",
+  },
+  {
+    title: "Learning & Development",
+    copy: "Identify skills gaps, map apprenticeship pathways and support organisational capability.",
+    icon: "learning",
+  },
+  {
+    title: "Apprenticeship Leads",
+    copy: "Manage applications, provider matching, approvals and compliance with complete visibility.",
+    icon: "workflow",
+  },
+  {
+    title: "Operations",
+    copy: "Build capability within operational teams and support succession planning through role-based development.",
+    icon: "operations",
+  },
+  {
+    title: "Department Heads",
+    copy: "Understand team capability, monitor application demand and track workforce progression.",
+    icon: "departments",
+  },
+  {
+    title: "Senior Leadership",
+    copy: "Board-ready reporting, workforce insights and strategic oversight across the organisation.",
+    icon: "leadership",
+  },
+] as const;
 
 
 const pillars = [
@@ -208,18 +239,61 @@ function PreviewCard({ eyebrow, title, value, tone }: { eyebrow: string; title: 
 }
 function CredibilityStrip() {
   return (
-    <section className="border-y border-[#102c3d]/[0.07] bg-white/72">
-      <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-5 sm:px-8 lg:flex-row lg:items-center lg:justify-between">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#102c3d]/42">Built for</p>
-        <div className="flex flex-wrap gap-3">
-          {credibility.map((item) => (
-            <div key={item} className="rounded-full bg-[#f8fbfa] px-4 py-2.5 text-sm font-semibold text-[#102c3d]/70 ring-1 ring-[#102c3d]/[0.06] shadow-[0_10px_28px_rgba(16,44,61,0.04)]">
-              {item}
-            </div>
+    <section className="relative border-y border-[#102c3d]/[0.07] bg-[linear-gradient(180deg,rgba(255,255,255,0.92)_0%,rgba(239,248,244,0.78)_100%)]">
+      <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:py-24">
+        <div className="max-w-3xl">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c95568]">Built for your organisation</p>
+          <h2 className="mt-3 text-4xl font-semibold leading-tight text-[#102c3d] sm:text-5xl">
+            Built for every stakeholder responsible for workforce development
+          </h2>
+          <p className="mt-5 max-w-2xl text-base leading-8 text-[#102c3d]/62 sm:text-lg">
+            Whether you&apos;re managing people, approving apprenticeships or setting organisational strategy, LevyTate gives every stakeholder the visibility and tools they need.
+          </p>
+        </div>
+
+        <div className="mt-10 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+          {stakeholders.map((stakeholder) => (
+            <article
+              key={stakeholder.title}
+              tabIndex={0}
+              className="group flex min-h-[220px] cursor-pointer flex-col rounded-[1.6rem] border border-[#102c3d]/[0.07] bg-white/88 p-6 shadow-[0_18px_50px_rgba(16,44,61,0.055)] backdrop-blur-sm transition duration-300 hover:-translate-y-1 hover:border-[#159b8f]/20 hover:shadow-[0_26px_66px_rgba(16,44,61,0.11)] focus-visible:-translate-y-1 focus-visible:border-[#159b8f]/30 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/10 sm:p-7"
+            >
+              <StakeholderIcon type={stakeholder.icon} />
+              <div className="mt-auto pt-8">
+                <h3 className="text-xl font-semibold text-[#102c3d]">{stakeholder.title}</h3>
+                <p className="mt-3 text-sm leading-6 text-[#102c3d]/60 sm:text-[15px]">{stakeholder.copy}</p>
+              </div>
+            </article>
           ))}
         </div>
       </div>
     </section>
+  );
+}
+
+function StakeholderIcon({ type }: { type: (typeof stakeholders)[number]["icon"] }) {
+  const paths = {
+    people: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></>,
+    learning: <><path d="m3 11 9-5 9 5-9 5-9-5Z" /><path d="m7 13.2v4.3c2.8 2 7.2 2 10 0v-4.3M21 11v6" /></>,
+    workflow: <><rect x="3" y="3" width="7" height="7" rx="2" /><rect x="14" y="14" width="7" height="7" rx="2" /><path d="M10 6.5h4a3.5 3.5 0 0 1 3.5 3.5v4M14 17.5h-4A3.5 3.5 0 0 1 6.5 14v-4" /></>,
+    operations: <><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" /><circle cx="12" cy="12" r="4" /></>,
+    departments: <><path d="M3 21h18M5 21V8l7-4 7 4v13" /><path d="M9 12h.01M15 12h.01M9 16h.01M15 16h.01" /></>,
+    leadership: <><path d="M3 3v18h18" /><path d="m7 16 4-4 3 2 5-7" /><path d="M15 7h4v4" /></>,
+  };
+
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-9 w-9 text-[#0b6f63] transition-colors duration-300 group-hover:text-[#c95568] group-focus-visible:text-[#c95568]"
+    >
+      {paths[type]}
+    </svg>
   );
 }
 function ProblemSection() {
