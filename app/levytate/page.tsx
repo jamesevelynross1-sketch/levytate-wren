@@ -103,19 +103,19 @@ export default function LevyTateLandingPage() {
 function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-[#102c3d]/[0.07] bg-[#f6fbf8]/88 backdrop-blur-xl">
-      <div className="mx-auto flex min-h-[76px] max-w-7xl items-center justify-between gap-5 px-5 sm:px-8">
+      <div className="mx-auto flex min-h-[72px] max-w-7xl items-center justify-between gap-3 px-5 sm:gap-5 sm:px-8">
         <Link href="/" aria-label="LevyTate home" className="shrink-0">
-          <LevyTateLogo className="[--levytate-logo-size:2.6rem]" />
+          <LevyTateLogo className="[--levytate-logo-size:2.15rem] sm:[--levytate-logo-size:2.6rem]" />
         </Link>
-        <nav className="hidden items-center gap-6 text-sm font-semibold text-[#102c3d]/62 lg:flex">
+        <nav className="hidden items-center gap-5 text-sm font-semibold text-[#102c3d]/62 lg:flex">
           <a href="#product" className="transition hover:text-[#102c3d]">Product</a>
           <a href="#how-it-works" className="transition hover:text-[#102c3d]">How it works</a>
           <a href="#providers" className="transition hover:text-[#102c3d]">Providers</a>
           <a href="#beta" className="transition hover:text-[#102c3d]">Beta</a>
         </nav>
         <div className="flex items-center gap-2 sm:gap-3">
-          <Link href="/login" className="hidden rounded-full bg-white px-4 py-2.5 text-sm font-semibold text-[#102c3d] ring-1 ring-[#102c3d]/[0.09] transition hover:-translate-y-0.5 hover:ring-[#159b8f]/25 sm:inline-flex">Beta Login</Link>
-          <a href="#beta" className="rounded-full bg-[#102c3d] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(16,44,61,0.14)] transition hover:-translate-y-0.5 sm:px-5">Request Beta Access</a>
+          <Link href="/login" className="hidden min-h-11 items-center whitespace-nowrap rounded-full bg-white px-4 py-2.5 text-sm font-semibold text-[#102c3d] ring-1 ring-[#102c3d]/[0.09] transition hover:-translate-y-0.5 hover:ring-[#159b8f]/25 sm:inline-flex">Beta Login</Link>
+          <a href="#beta" className="inline-flex min-h-11 items-center whitespace-nowrap rounded-full bg-[#102c3d] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(16,44,61,0.14)] transition hover:-translate-y-0.5 sm:px-5"><span className="sm:hidden">Beta Access</span><span className="hidden sm:inline">Request Beta Access</span></a>
         </div>
       </div>
     </header>
@@ -126,10 +126,10 @@ function HeroSection() {
   return (
     <section className="relative isolate">
       <div className="absolute inset-x-0 top-0 -z-10 h-[760px] bg-[radial-gradient(circle_at_18%_12%,rgba(199,240,228,0.9),transparent_34rem),radial-gradient(circle_at_84%_5%,rgba(255,128,144,0.24),transparent_30rem),linear-gradient(180deg,#f6fbf8_0%,#eef7f3_100%)]" />
-      <div className="mx-auto grid max-w-7xl gap-12 px-5 pb-20 pt-12 sm:px-8 lg:grid-cols-[minmax(0,0.95fr)_minmax(480px,1.05fr)] lg:items-center lg:pb-28 lg:pt-20">
+      <div className="mx-auto grid max-w-7xl gap-10 px-5 pb-20 pt-12 sm:px-8 lg:pb-28 lg:pt-20 xl:grid-cols-[minmax(0,0.95fr)_minmax(480px,1.05fr)] xl:items-center xl:gap-14">
         <div>
           <p className="inline-flex rounded-full bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#0b6f63] ring-1 ring-[#159b8f]/[0.12] shadow-[0_14px_34px_rgba(16,44,61,0.06)]">Built for employer apprenticeship teams</p>
-          <h1 className="mt-6 max-w-5xl text-5xl font-semibold leading-[0.96] tracking-[-0.06em] text-[#102c3d] sm:text-6xl lg:text-7xl">
+          <h1 className="mt-6 max-w-5xl break-words text-[2.65rem] font-semibold leading-[1.02] text-[#102c3d] sm:text-6xl lg:text-[4rem] xl:text-7xl">
             The apprenticeship operating system for modern employers.
           </h1>
           <p className="mt-6 max-w-2xl text-lg leading-8 text-[#102c3d]/66">
@@ -155,30 +155,30 @@ function HeroSection() {
 }
 function ProductPreview() {
   return (
-    <aside className="relative rounded-[2.25rem] border border-[#102c3d]/[0.08] bg-white/90 p-4 shadow-[0_38px_110px_rgba(16,44,61,0.16)] backdrop-blur-xl">
+    <aside className="relative min-w-0 rounded-[2.25rem] border border-[#102c3d]/[0.08] bg-white/90 p-3 shadow-[0_38px_110px_rgba(16,44,61,0.16)] backdrop-blur-xl sm:p-4">
       <div className="overflow-hidden rounded-[1.75rem] border border-[#102c3d]/[0.06] bg-[#f8fbfa]">
         <div className="flex items-center justify-between border-b border-[#102c3d]/[0.06] bg-white px-5 py-4">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">Live workspace</p>
-            <p className="mt-1 text-lg font-semibold tracking-[-0.02em]">Apprenticeship command centre</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">Live workspace</p>
+            <p className="mt-1 text-lg font-semibold">Apprenticeship command centre</p>
           </div>
           <span className="rounded-full bg-[#eaf7f2] px-3 py-1.5 text-xs font-semibold text-[#0b6f63] ring-1 ring-[#159b8f]/[0.14]">Beta</span>
         </div>
-        <div className="grid gap-3 p-4 lg:grid-cols-[1fr_0.86fr]">
-          <div className="rounded-[1.4rem] bg-[#102c3d] p-4 text-white shadow-[0_20px_60px_rgba(16,44,61,0.18)]">
+        <div className="grid gap-3 p-3 sm:p-4 lg:grid-cols-[minmax(0,1.08fr)_minmax(170px,0.92fr)]">
+          <div className="min-w-0 rounded-[1.4rem] bg-[#102c3d] p-5 text-white shadow-[0_20px_60px_rgba(16,44,61,0.18)]">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c7f0e4]">Employee dashboard</p>
-                <h2 className="mt-3 text-2xl font-semibold tracking-[-0.04em]">Workforce readiness</h2>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#c7f0e4]">Employee dashboard</p>
+                <h2 className="mt-3 text-2xl font-semibold leading-tight">Workforce readiness</h2>
               </div>
-              <span className="text-4xl font-semibold tracking-[-0.06em]">82%</span>
+              <span className="text-4xl font-semibold">82%</span>
             </div>
             <div className="mt-5 h-2 rounded-full bg-white/12"><div className="h-2 w-[82%] rounded-full bg-[#c7f0e4]" /></div>
-            <div className="mt-5 grid gap-2 sm:grid-cols-3">
-              {[["48", "active learners"], ["14", "applications"], ["6", "providers"]].map(([value, label]) => (
-                <div key={label} className="rounded-2xl bg-white/[0.08] px-3 py-3 ring-1 ring-white/10">
-                  <p className="text-xl font-semibold">{value}</p>
-                  <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/48">{label}</p>
+            <div className="mt-5 grid grid-cols-3 gap-2.5">
+              {[["48", "Active learners"], ["14", "Applications"], ["6", "Providers"]].map(([value, label]) => (
+                <div key={label} className="flex min-h-[86px] min-w-0 flex-col justify-between rounded-2xl bg-white/[0.08] px-3 py-3.5 ring-1 ring-white/10">
+                  <p className="text-2xl font-semibold leading-none">{value}</p>
+                  <p className="mt-3 break-words text-[11px] font-medium leading-4 text-white/58">{label}</p>
                 </div>
               ))}
             </div>
@@ -188,11 +188,11 @@ function ProductPreview() {
             <PreviewCard eyebrow="Provider match" title="Data Analyst pathway ready for review" value="New" tone="mint" />
           </div>
         </div>
-        <div className="grid gap-3 border-t border-[#102c3d]/[0.06] p-4 lg:grid-cols-2">
+        <div className="grid gap-3 border-t border-[#102c3d]/[0.06] p-3 sm:p-4 md:grid-cols-2">
           <div className="flex min-h-[230px] flex-col rounded-[1.4rem] bg-white p-4 shadow-[0_16px_44px_rgba(16,44,61,0.06)] ring-1 ring-[#102c3d]/[0.06]">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">AI recommendation</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">AI recommendation</p>
             <div className="mt-3 space-y-3 text-sm leading-6 text-[#102c3d]/70">
-              <p className="text-base font-semibold tracking-[-0.02em] text-[#102c3d]">Admin Assistant</p>
+              <p className="text-base font-semibold text-[#102c3d]">Admin Assistant</p>
               <div className="grid gap-2">
                 <p><span className="font-semibold text-[#102c3d]">Best fit:</span> Level 3 Data Technician</p>
                 <p><span className="font-semibold text-[#102c3d]">Also explore:</span> AI support pathway</p>
@@ -203,7 +203,7 @@ function ProductPreview() {
           <div className="flex min-h-[230px] flex-col rounded-[1.4rem] bg-white p-4 shadow-[0_16px_44px_rgba(16,44,61,0.06)] ring-1 ring-[#102c3d]/[0.06]">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#0b6f63]">Reporting widget</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0b6f63]">Reporting widget</p>
                 <p className="mt-1 text-sm font-semibold text-[#102c3d]">Applications by stage</p>
               </div>
               <span className="rounded-full bg-[#eaf7f2] px-3 py-1 text-xs font-semibold text-[#0b6f63]">Q2</span>
@@ -229,7 +229,7 @@ function PreviewCard({ eyebrow, title, value, tone }: { eyebrow: string; title: 
     <div className="rounded-[1.4rem] bg-white p-4 shadow-[0_16px_44px_rgba(16,44,61,0.06)] ring-1 ring-[#102c3d]/[0.06]">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className={`text-[10px] font-semibold uppercase tracking-[0.16em] ${tone === "coral" ? "text-[#c95568]" : "text-[#0b6f63]"}`}>{eyebrow}</p>
+          <p className={`text-[11px] font-semibold uppercase tracking-[0.16em] ${tone === "coral" ? "text-[#c95568]" : "text-[#0b6f63]"}`}>{eyebrow}</p>
           <p className="mt-2 text-sm font-semibold leading-5">{title}</p>
         </div>
         <span className={`rounded-full px-3 py-1.5 text-xs font-semibold ${tone === "coral" ? "bg-[#fff0f2] text-[#c95568]" : "bg-[#eaf7f2] text-[#0b6f63]"}`}>{value}</span>
@@ -305,7 +305,7 @@ function ProblemSection() {
       <div className="grid gap-10 lg:grid-cols-[0.82fr_1.18fr] lg:items-end">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c95568]">The problem</p>
-          <h2 className="mt-3 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">Managing apprenticeships should not require five different systems.</h2>
+          <h2 className="mt-3 text-4xl font-semibold sm:text-5xl">Managing apprenticeships should not require five different systems.</h2>
         </div>
         <p className="text-base leading-8 text-[#102c3d]/62">LevyTate replaces scattered admin with one operating layer for the decisions employers need to make before training delivery starts.</p>
       </div>
@@ -314,7 +314,7 @@ function ProblemSection() {
         <ComparisonCard title="LevyTate" items={better} mood="positive" />
         <div className="rounded-[2rem] bg-[#102c3d] p-6 text-white shadow-[0_26px_80px_rgba(16,44,61,0.18)]">
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c7f0e4]">Outcome</p>
-          <p className="mt-5 text-3xl font-semibold tracking-[-0.04em]">One clear route from workforce demand to approved delivery.</p>
+          <p className="mt-5 text-3xl font-semibold">One clear route from workforce demand to approved delivery.</p>
           <div className="mt-8 grid gap-3">
             {[["Admin", "reduced"], ["Approvals", "visible"], ["Provider fit", "structured"]].map(([label, value]) => (
               <div key={label} className="flex items-center justify-between rounded-2xl bg-white/[0.08] px-4 py-3 ring-1 ring-white/10">
@@ -332,7 +332,7 @@ function ProblemSection() {
 function ComparisonCard({ title, items, mood }: { title: string; items: string[]; mood: "negative" | "positive" }) {
   return (
     <article className="rounded-[2rem] border border-[#102c3d]/[0.07] bg-white p-6 shadow-[0_22px_64px_rgba(16,44,61,0.07)]">
-      <h3 className="text-2xl font-semibold tracking-[-0.035em]">{title}</h3>
+      <h3 className="text-2xl font-semibold">{title}</h3>
       <div className="mt-6 grid gap-3">
         {items.map((item) => (
           <div key={item} className="flex items-center gap-3 rounded-2xl bg-[#f8fbfa] px-4 py-3 ring-1 ring-[#102c3d]/[0.055]">
@@ -350,16 +350,16 @@ function ProductPillars() {
       <div className="mx-auto max-w-7xl px-5 sm:px-8">
         <div className="max-w-3xl">
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c95568]">Product pillars</p>
-          <h2 className="mt-3 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">The operating layer employers need before delivery begins.</h2>
+          <h2 className="mt-3 text-4xl font-semibold sm:text-5xl">The operating layer employers need before delivery begins.</h2>
         </div>
         <div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
           {pillars.map((pillar, index) => (
-            <article key={pillar.title} className="group flex min-h-[300px] flex-col rounded-[2rem] border border-[#102c3d]/[0.07] bg-white p-6 shadow-[0_22px_64px_rgba(16,44,61,0.065)] transition hover:-translate-y-1 hover:shadow-[0_30px_86px_rgba(16,44,61,0.1)]">
+            <article key={pillar.title} className="group flex h-full min-h-[280px] flex-col rounded-[2rem] border border-[#102c3d]/[0.07] bg-white p-6 shadow-[0_22px_64px_rgba(16,44,61,0.065)] transition hover:-translate-y-1 hover:shadow-[0_30px_86px_rgba(16,44,61,0.1)]">
               <div className="flex items-center justify-between">
                 <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#eaf7f2] text-sm font-semibold text-[#0b6f63] ring-1 ring-[#159b8f]/[0.12]">0{index + 1}</span>
-                <span className="rounded-full bg-[#fff5d7] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8b6500]">Decision ready</span>
+                <span className="rounded-full bg-[#fff5d7] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8b6500]">Decision ready</span>
               </div>
-              <h3 className="mt-8 text-2xl font-semibold tracking-[-0.035em]">{pillar.title}</h3>
+              <h3 className="mt-8 text-2xl font-semibold">{pillar.title}</h3>
               <p className="mt-4 text-sm leading-7 text-[#102c3d]/62">{pillar.copy}</p>
               <div className="mt-auto pt-7"><div className="h-2 rounded-full bg-[#edf4f1]"><div className="h-2 rounded-full bg-[#18a89a]" style={{ width: `${62 + index * 9}%` }} /></div></div>
             </article>
@@ -376,15 +376,15 @@ function WorkflowSection() {
       <div className="grid gap-8 lg:grid-cols-[0.75fr_1.25fr] lg:items-center">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c95568]">How it works</p>
-          <h2 className="mt-3 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">A visual route from role data to enrolment.</h2>
+          <h2 className="mt-3 text-4xl font-semibold sm:text-5xl">A visual route from role data to enrolment.</h2>
           <p className="mt-5 text-base leading-8 text-[#102c3d]/62">The workflow stays structured, but each stakeholder only sees the step they can influence.</p>
         </div>
         <div className="rounded-[2rem] border border-[#102c3d]/[0.07] bg-white p-4 shadow-[0_26px_80px_rgba(16,44,61,0.08)]">
-          <div className="grid gap-3 md:grid-cols-7">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {workflow.map((step, index) => (
-              <div key={step} className="relative rounded-[1.35rem] bg-[#f8fbfa] p-4 ring-1 ring-[#102c3d]/[0.055]">
+              <div key={step} className="relative min-h-[132px] rounded-[1.35rem] bg-[#f8fbfa] p-4 ring-1 ring-[#102c3d]/[0.055]">
                 <span className={`grid h-9 w-9 place-items-center rounded-2xl text-xs font-semibold ${index === 2 ? "bg-[#102c3d] text-white" : "bg-white text-[#0b6f63] ring-1 ring-[#159b8f]/[0.12]"}`}>{index + 1}</span>
-                <p className="mt-5 text-sm font-semibold leading-5 tracking-[-0.01em]">{step}</p>
+                <p className="mt-5 text-sm font-semibold leading-5">{step}</p>
               </div>
             ))}
           </div>
@@ -401,25 +401,25 @@ function ProductGallery() {
         <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:items-end">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c7f0e4]">Product gallery</p>
-            <h2 className="mt-3 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">A real operating system, not another static tracker.</h2>
+            <h2 className="mt-3 text-4xl font-semibold sm:text-5xl">A real operating system, not another static tracker.</h2>
           </div>
           <p className="max-w-2xl text-base leading-8 text-white/64 lg:justify-self-end">LevyTate brings daily apprenticeship operations and executive readiness insight into the same product language.</p>
         </div>
         <div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
           {galleryItems.map(([title, copy, metric, label], index) => (
-            <article key={title} className="rounded-[2rem] bg-white/[0.07] p-4 shadow-[0_24px_76px_rgba(0,0,0,0.18)] ring-1 ring-white/10">
-              <div className="rounded-[1.45rem] bg-white p-4 text-[#102c3d]">
-                <div className="flex items-center justify-between gap-4">
+            <article key={title} className="h-full rounded-[2rem] bg-white/[0.07] p-4 shadow-[0_24px_76px_rgba(0,0,0,0.18)] ring-1 ring-white/10">
+              <div className="flex h-full flex-col rounded-[1.45rem] bg-white p-4 text-[#102c3d]">
+                <div className="grid min-h-[132px] grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
                   <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">{title}</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">{title}</p>
                     <p className="mt-3 text-sm leading-6 text-[#102c3d]/62">{copy}</p>
                   </div>
-                  <div className="grid h-20 w-20 shrink-0 place-items-center rounded-3xl bg-[#f3faf6] text-center ring-1 ring-[#159b8f]/[0.12]">
-                    <span className="block text-xl font-semibold tracking-[-0.04em] text-[#0b6f63]">{metric}</span>
-                    <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/42">{label}</span>
+                  <div className="flex h-20 w-20 shrink-0 flex-col items-center justify-center gap-1 rounded-3xl bg-[#f3faf6] text-center ring-1 ring-[#159b8f]/[0.12]">
+                    <span className="block text-xl font-semibold text-[#0b6f63]">{metric}</span>
+                    <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/42">{label}</span>
                   </div>
                 </div>
-                <div className="mt-5 flex h-20 items-end gap-2">
+                <div className="mt-auto flex h-20 items-end gap-2 pt-5">
                   {[34, 52, 46, 68, 58, 82].map((height, barIndex) => (
                     <div key={`${title}-${height}-${barIndex}`} className="flex-1 rounded-t-xl bg-[#e8f3ee]"><div className={`rounded-t-xl ${barIndex + index > 4 ? "bg-[#ff8090]" : "bg-[#18a89a]"}`} style={{ height: Math.max(22, height - index * 3) }} /></div>
                   ))}
@@ -439,13 +439,13 @@ function AiSection() {
       <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c95568]">Ask LevyTate AI</p>
-          <h2 className="mt-3 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">Guidance that understands roles, rules and provider matching.</h2>
+          <h2 className="mt-3 text-4xl font-semibold sm:text-5xl">Guidance that understands roles, rules and provider matching.</h2>
           <p className="mt-5 text-base leading-8 text-[#102c3d]/62">Ask LevyTate AI helps teams move from uncertainty to a structured next step. Recommendations stay grounded in approved pathways, permissions and the one-active-application rule.</p>
           <a href="#providers" className="mt-8 inline-flex rounded-full bg-[#102c3d] px-6 py-3 text-sm font-semibold text-white shadow-[0_18px_38px_rgba(16,44,61,0.16)] transition hover:-translate-y-0.5">Request Provider Matching</a>
         </div>
         <div className="rounded-[2rem] border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_30px_90px_rgba(16,44,61,0.1)]">
           <div className="rounded-[1.5rem] bg-[#f8fbfa] p-4 ring-1 ring-[#102c3d]/[0.055]">
-            <div className="flex items-center gap-3">
+            <div className="flex min-w-0 items-center gap-3">
               <span className="grid h-10 w-10 place-items-center rounded-2xl bg-[#102c3d] text-sm font-semibold text-white">AI</span>
               <div><p className="text-sm font-semibold">Ask LevyTate AI</p><p className="text-xs text-[#102c3d]/48">Role-aware apprenticeship guidance</p></div>
             </div>
@@ -466,7 +466,7 @@ function AiSection() {
 function ChatBubble({ speaker, message, highlighted = false }: { speaker: string; message: string; highlighted?: boolean }) {
   return (
     <div className={`mt-4 rounded-[1.25rem] p-4 ${highlighted ? "bg-[#102c3d] text-white" : "bg-white text-[#102c3d] ring-1 ring-[#102c3d]/[0.06]"}`}>
-      <p className={`text-[10px] font-semibold uppercase tracking-[0.16em] ${highlighted ? "text-[#c7f0e4]" : "text-[#c95568]"}`}>{speaker}</p>
+      <p className={`text-[11px] font-semibold uppercase tracking-[0.16em] ${highlighted ? "text-[#c7f0e4]" : "text-[#c95568]"}`}>{speaker}</p>
       <p className={`mt-2 text-sm leading-7 ${highlighted ? "text-white/76" : "text-[#102c3d]/68"}`}>{message}</p>
     </div>
   );
@@ -486,7 +486,7 @@ function ProviderCatalogueSection() {
         <div className="grid gap-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-end">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c95568]">Provider network</p>
-            <h2 className="mt-3 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">Built around specialist apprenticeship expertise.</h2>
+            <h2 className="mt-3 text-4xl font-semibold sm:text-5xl">Built around specialist apprenticeship expertise.</h2>
           </div>
           <div className="space-y-4 text-base leading-8 text-[#102c3d]/62 lg:justify-self-end">
             <p>LevyTate maintains an independently curated network of apprenticeship providers covering specialist sectors, standards and delivery models across England.</p>
@@ -495,17 +495,17 @@ function ProviderCatalogueSection() {
         </div>
         <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {providerAreas.map(([title, descriptor], index) => (
-            <div key={title} className={`rounded-[1.4rem] bg-white px-5 py-5 shadow-[0_18px_54px_rgba(16,44,61,0.06)] ring-1 ring-[#102c3d]/[0.07] ${title === "Growing Provider Network" ? "lg:col-span-2" : ""}`}>
+            <div key={title} className={`flex min-h-[150px] flex-col rounded-[1.4rem] bg-white px-5 py-5 shadow-[0_18px_54px_rgba(16,44,61,0.06)] ring-1 ring-[#102c3d]/[0.07] ${title === "Growing Provider Network" ? "lg:col-span-2" : ""}`}>
               <span className={`mb-4 block h-2 w-12 rounded-full ${index % 3 === 0 ? "bg-[#18a89a]" : index % 3 === 1 ? "bg-[#ff8090]" : "bg-[#ffde59]"}`} />
-              <h3 className="text-sm font-semibold tracking-[-0.01em] text-[#102c3d]">{title}</h3>
-              <p className="mt-2 text-xs leading-5 text-[#102c3d]/56">{descriptor}</p>
+              <h3 className="text-sm font-semibold text-[#102c3d]">{title}</h3>
+              <p className="mt-2 text-[13px] leading-5 text-[#102c3d]/56">{descriptor}</p>
             </div>
           ))}
         </div>
         <div className="mt-8 grid gap-6 rounded-[2rem] bg-[#102c3d] p-6 text-white shadow-[0_28px_90px_rgba(16,44,61,0.16)] sm:p-8 lg:grid-cols-[0.86fr_1.14fr] lg:items-center">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#ffde59]">Partner opportunity</p>
-            <h3 className="mt-3 text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">Become a LevyTate Partner</h3>
+            <h3 className="mt-3 text-3xl font-semibold sm:text-4xl">Become a LevyTate Partner</h3>
             <p className="mt-5 text-sm leading-7 text-white/72">We are building a carefully selected national network of high-quality apprenticeship providers with recognised expertise across specialist sectors.</p>
             <p className="mt-3 text-sm leading-7 text-white/72">Partnerships focus on employer outcomes, delivery quality and long-term collaboration rather than marketplace advertising.</p>
           </div>
@@ -532,10 +532,10 @@ function AudienceJourneySection() {
       <div className="mx-auto max-w-7xl">
         <div className="max-w-3xl">
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c95568]">Who is LevyTate for?</p>
-          <h2 className="mt-3 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">Two commercial routes. One controlled platform.</h2>
+          <h2 className="mt-3 text-4xl font-semibold sm:text-5xl">Two commercial routes. One controlled platform.</h2>
           <p className="mt-5 text-base leading-8 text-[#102c3d]/62">LevyTate supports employers looking to modernise apprenticeship management and training providers looking to become trusted delivery partners.</p>
         </div>
-        <div className="mt-10 grid gap-5 lg:grid-cols-2">
+        <div className="mt-10 grid gap-5 xl:grid-cols-2">
           <JourneyCard
             variant="employer"
             label="Employers"
@@ -579,7 +579,7 @@ function JourneyCard({ variant, label, title, intro, bullets, primaryCta, primar
         <JourneyIllustration variant={variant} />
         <div>
           <p className={`text-[11px] font-semibold uppercase tracking-[0.18em] ${isProvider ? "text-[#ffde59]" : "text-[#c95568]"}`}>{label}</p>
-          <h3 className="mt-3 text-2xl font-semibold tracking-[-0.035em] sm:text-3xl">{title}</h3>
+          <h3 className="mt-3 text-2xl font-semibold sm:text-3xl">{title}</h3>
           <p className={`mt-4 text-sm leading-7 ${isProvider ? "text-white/72" : "text-[#102c3d]/62"}`}>{intro}</p>
           <ul className="mt-5 grid gap-2 text-sm leading-6">
             {bullets.map((bullet) => (
@@ -610,22 +610,22 @@ function JourneyIllustration({ variant }: { variant: "employer" | "provider" }) 
         <div className="rounded-[1.2rem] bg-white p-4 text-[#102c3d] shadow-[0_18px_46px_rgba(0,0,0,0.18)]">
           <div className="flex items-center justify-between gap-3 border-b border-[#102c3d]/[0.07] pb-3">
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#0b6f63]">Provider network</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0b6f63]">Provider network</p>
               <p className="mt-1 text-sm font-semibold">Partner opportunity flow</p>
             </div>
             <span className="rounded-full bg-[#fff4bd] px-3 py-1 text-xs font-semibold text-[#102c3d]">Curated</span>
           </div>
           <div className="mt-4 space-y-2.5">
             {providerRows.map(([title, detail, status], index) => (
-              <div key={title} className="grid grid-cols-[1fr_auto] gap-3 rounded-2xl bg-[#f8fbfa] px-3 py-2.5 ring-1 ring-[#102c3d]/[0.05]">
-                <div className="flex items-center gap-3">
+              <div key={title} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 rounded-2xl bg-[#f8fbfa] px-3 py-2.5 ring-1 ring-[#102c3d]/[0.05]">
+                <div className="flex min-w-0 items-center gap-3">
                   <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${index === 1 ? "bg-[#c95568]" : index === 3 ? "bg-[#ffde59]" : "bg-[#18a89a]"}`} />
-                  <div>
-                    <p className="text-xs font-semibold">{title}</p>
-                    <p className="mt-0.5 text-[11px] text-[#102c3d]/48">{detail}</p>
+                  <div className="min-w-0">
+                    <p className="break-words text-xs font-semibold leading-4">{title}</p>
+                    <p className="mt-0.5 break-words text-[11px] leading-4 text-[#102c3d]/48">{detail}</p>
                   </div>
                 </div>
-                <span className="self-center rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold text-[#102c3d]/58 ring-1 ring-[#102c3d]/[0.06]">{status}</span>
+                <span className="shrink-0 self-center whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-[#102c3d]/58 ring-1 ring-[#102c3d]/[0.06]">{status}</span>
               </div>
             ))}
           </div>
@@ -647,22 +647,22 @@ function JourneyIllustration({ variant }: { variant: "employer" | "provider" }) 
       <div className="rounded-[1.2rem] bg-white p-4 shadow-[0_18px_46px_rgba(16,44,61,0.09)] ring-1 ring-[#102c3d]/[0.06]">
         <div className="flex items-center justify-between gap-3 border-b border-[#102c3d]/[0.07] pb-3">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">Employer workspace</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">Employer workspace</p>
             <p className="mt-1 text-sm font-semibold">Apprenticeship operations</p>
           </div>
           <span className="rounded-full bg-[#eaf7f2] px-3 py-1 text-xs font-semibold text-[#0b6f63]">Visible</span>
         </div>
         <div className="mt-4 space-y-2.5">
           {employerRows.map(([title, detail, status], index) => (
-            <div key={title} className="grid grid-cols-[1fr_auto] gap-3 rounded-2xl bg-[#f8fbfa] px-3 py-2.5 ring-1 ring-[#102c3d]/[0.05]">
-              <div className="flex items-center gap-3">
+            <div key={title} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 rounded-2xl bg-[#f8fbfa] px-3 py-2.5 ring-1 ring-[#102c3d]/[0.05]">
+              <div className="flex min-w-0 items-center gap-3">
                 <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${index === 2 ? "bg-[#c95568]" : index === 3 ? "bg-[#ffde59]" : "bg-[#18a89a]"}`} />
-                <div>
-                  <p className="text-xs font-semibold">{title}</p>
-                  <p className="mt-0.5 text-[11px] text-[#102c3d]/48">{detail}</p>
-                </div>
+                <div className="min-w-0">
+                    <p className="break-words text-xs font-semibold leading-4">{title}</p>
+                    <p className="mt-0.5 break-words text-[11px] leading-4 text-[#102c3d]/48">{detail}</p>
+                  </div>
               </div>
-              <span className="self-center rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold text-[#102c3d]/58 ring-1 ring-[#102c3d]/[0.06]">{status}</span>
+              <span className="shrink-0 self-center whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-[#102c3d]/58 ring-1 ring-[#102c3d]/[0.06]">{status}</span>
             </div>
           ))}
         </div>
@@ -677,12 +677,12 @@ function FinalCta() {
       <div className="mx-auto grid max-w-7xl gap-8 rounded-[2.4rem] bg-[#102c3d] p-6 text-white shadow-[0_34px_100px_rgba(16,44,61,0.2)] sm:p-10 lg:grid-cols-[1fr_auto] lg:items-center">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#c7f0e4]">Start using LevyTate</p>
-          <h2 className="mt-4 max-w-4xl text-4xl font-semibold tracking-[-0.05em] sm:text-5xl">Stop managing apprenticeships across spreadsheets, emails and disconnected systems.</h2>
+          <h2 className="mt-4 max-w-4xl text-4xl font-semibold sm:text-5xl">Stop managing apprenticeships across spreadsheets, emails and disconnected systems.</h2>
           <p className="mt-5 max-w-2xl text-base leading-8 text-white/66">Start using LevyTate as the operating system for apprenticeship decisions, workforce readiness and provider matching.</p>
         </div>
         <div className="flex flex-wrap gap-3 lg:justify-end">
-          <a href="mailto:hello@levytate.co.uk?subject=Employer beta access" className="rounded-full bg-white px-6 py-3 text-sm font-semibold text-[#102c3d] transition hover:-translate-y-0.5">Request Beta Access</a>
-          <Link href="/login" className="rounded-full bg-white/10 px-6 py-3 text-sm font-semibold text-white ring-1 ring-white/15 transition hover:-translate-y-0.5 hover:bg-white/14">Beta Login</Link>
+          <a href="mailto:hello@levytate.co.uk?subject=Employer beta access" className="inline-flex min-h-11 items-center justify-center rounded-full bg-white px-6 py-3 text-sm font-semibold text-[#102c3d] transition hover:-translate-y-0.5">Request Beta Access</a>
+          <Link href="/login" className="inline-flex min-h-11 items-center justify-center rounded-full bg-white/10 px-6 py-3 text-sm font-semibold text-white ring-1 ring-white/15 transition hover:-translate-y-0.5 hover:bg-white/14">Beta Login</Link>
         </div>
       </div>
     </section>
