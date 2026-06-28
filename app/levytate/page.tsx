@@ -113,7 +113,7 @@ function ProductPreview() {
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#c7f0e4]">Employee record</p>
                 <p className="mt-2 text-xl font-semibold">Business Support Coordinator</p>
-                <p className="mt-2 text-sm text-white/58">Operations Â· Leeds Â· Manager assigned</p>
+                <p className="mt-2 text-sm text-white/58">Operations - Leeds - Manager assigned</p>
               </div>
               <span className="inline-flex w-fit rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold ring-1 ring-white/12">Role mapped</span>
             </div>
@@ -190,13 +190,22 @@ function AudienceSection() {
               <p className="mt-3 text-sm leading-7 text-[#102c3d]/60">{audience.copy}</p>
               <span className="mt-auto flex items-center gap-2 pt-7 text-sm font-semibold text-[#0b6f63]">
                 {audience.cta}
-                <span aria-hidden="true" className="transition group-hover:translate-x-1">â†’</span>
+                <ArrowRightIcon />
               </span>
             </Link>
           ))}
         </div>
       </div>
     </section>
+  );
+}
+
+function ArrowRightIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 transition group-hover:translate-x-1">
+      <path d="M4 10h11" />
+      <path d="m11 6 4 4-4 4" />
+    </svg>
   );
 }
 
