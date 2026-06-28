@@ -92,8 +92,8 @@ function ProductPreview() {
   const modules = [
     ["Application status", "Awaiting manager review", "In progress"],
     ["AI recommendation", "Level 3 Data Technician", "Strong fit"],
-    ["Provider match", "Prepared by LevyTate", "Ready"],
-    ["Reporting snapshot", "82% workforce readiness", "+6%"],
+    ["Provider match", "98% Provider Match", "Best-fit provider identified"],
+    ["Reporting snapshot", "91%", "Workforce development coverage"],
   ];
 
   return (
@@ -113,7 +113,7 @@ function ProductPreview() {
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#c7f0e4]">Employee record</p>
                 <p className="mt-2 text-xl font-semibold">Business Support Coordinator</p>
-                <p className="mt-2 text-sm text-white/58">Operations - Leeds - Manager assigned</p>
+                <p className="mt-2 text-sm text-white/58">Operations &bull; Manchester &bull; Manager assigned</p>
               </div>
               <span className="inline-flex w-fit rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold ring-1 ring-white/12">Role mapped</span>
             </div>
@@ -121,13 +121,15 @@ function ProductPreview() {
 
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             {modules.map(([label, value, status], index) => (
-              <div key={label} className="flex min-h-[126px] flex-col rounded-[1.25rem] bg-white p-4 shadow-[0_14px_38px_rgba(16,44,61,0.045)] ring-1 ring-[#102c3d]/[0.06]">
-                <div className="flex items-start justify-between gap-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/44">{label}</p>
+              <div key={label} className="min-h-[116px] rounded-[1.25rem] bg-white p-4 shadow-[0_14px_38px_rgba(16,44,61,0.045)] ring-1 ring-[#102c3d]/[0.06]">
+                <div className="flex min-h-[18px] items-start justify-between gap-3">
+                  <p className="text-[11px] font-semibold uppercase leading-[18px] tracking-[0.12em] text-[#102c3d]/44">{label}</p>
                   <span className={"mt-1 h-2 w-2 shrink-0 rounded-full " + (index === 0 ? "bg-[#c95568]" : index === 2 ? "bg-[#ffde59]" : "bg-[#18a89a]")} />
                 </div>
-                <p className="mt-auto pt-4 text-sm font-semibold leading-5">{value}</p>
-                <p className="mt-1 text-xs text-[#0b6f63]">{status}</p>
+                <div className="mt-3">
+                  <p className="text-base font-semibold leading-5">{value}</p>
+                  <p className="mt-1.5 text-xs leading-5 text-[#0b6f63]">{status}</p>
+                </div>
               </div>
             ))}
           </div>
