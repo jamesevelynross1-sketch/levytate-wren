@@ -93,7 +93,7 @@ function ProductPreview() {
     ["Application status", "Awaiting manager review", "In progress"],
     ["AI recommendation", "Level 3 Data Technician", "Strong fit"],
     ["Provider match", "98% Provider Match", "Best-fit provider identified"],
-    ["Reporting snapshot", "91%", "Workforce development coverage"],
+    ["Apprenticeship utilisation", "+18% YoY", "Compared with previous year"],
   ];
 
   return (
@@ -127,7 +127,15 @@ function ProductPreview() {
                   <span className={"mt-1 h-2 w-2 shrink-0 rounded-full " + (index === 0 ? "bg-[#c95568]" : index === 2 ? "bg-[#ffde59]" : "bg-[#18a89a]")} />
                 </div>
                 <div className="mt-3">
-                  <p className="text-base font-semibold leading-5">{value}</p>
+                  <p className="flex items-center gap-1.5 text-base font-semibold leading-5">
+                    {index === 3 ? (
+                      <svg aria-hidden="true" viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5 shrink-0 text-[#0b6f63]">
+                        <path d="M3 11 7 7l2.5 2.5L13 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d="M9.5 6H13v3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    ) : null}
+                    {value}
+                  </p>
                   <p className="mt-1.5 text-xs leading-5 text-[#0b6f63]">{status}</p>
                 </div>
               </div>
