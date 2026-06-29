@@ -69,6 +69,12 @@ export function enforceLevyTateAiActions(request: LevyTateAiRequest, response: L
 
   if (request.role === "Employee" && activeApplication) {
     actions = actions.filter((action) => action.type !== "start_application");
+    if (!actions.some((action) => action.type === "open_my_applications")) {
+      actions = [
+        { label: "View current application", type: "open_my_applications" as const, target: "My Applications", requiresConfirmation: false },
+        ...actions,
+      ].slice(0, 4);
+    }
   }
 
   return {
@@ -77,5 +83,9 @@ export function enforceLevyTateAiActions(request: LevyTateAiRequest, response: L
     suggestedActions: actions,
     applicationPrefill: activeApplication ? null : response.applicationPrefill,
     applicationDraft: activeApplication ? null : (response.applicationDraft ?? response.applicationPrefill),
+    nextStep: activeApplication && request.role === "Employee" ? "open_my_applications" : response.nextStep,
+    applicationWarning: activeApplication && request.role === "Employee"
+      ? response.applicationWarning ?? "You already have an active apprenticeship application in progress. You can track this in My Applications."
+      : response.applicationWarning,
   };
 }
