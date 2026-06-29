@@ -24,6 +24,12 @@ export function applyLevyTateAiSafety(
   const managerMessageDraft = response.managerMessageDraft
     ? sanitiseMarketplaceLanguage(sanitiseFundingLanguage(response.managerMessageDraft))
     : null;
+  const followUpQuestion = response.followUpQuestion
+    ? sanitiseMarketplaceLanguage(sanitiseFundingLanguage(response.followUpQuestion))
+    : null;
+  const quickReplies = response.quickReplies?.map((reply) =>
+    sanitiseMarketplaceLanguage(sanitiseFundingLanguage(reply)),
+  );
 
   const restrictedActions =
     request.role === "Department Head"
@@ -36,6 +42,8 @@ export function applyLevyTateAiSafety(
     safetyNotes,
     applicationWarning,
     managerMessageDraft,
+    followUpQuestion,
+    quickReplies,
     recommendedActions: restrictedActions,
   };
 }

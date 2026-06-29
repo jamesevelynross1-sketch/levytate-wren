@@ -1,307 +1,115 @@
 import { NextResponse } from "next/server";
 
-import { buildLevyTateAiContext } from "@/lib/levytate-ai/context";
-import { buildFallbackResponse } from "@/lib/levytate-ai/fallback";
-import { buildLevyTateAiSystemPrompt, buildLevyTateAiUserPrompt } from "@/lib/levytate-ai/prompts";
-import { applyLevyTateAiSafety } from "@/lib/levytate-ai/safety";
+import { enforceLevyTateAiActions } from "@/lib/levytate/ai/actions";
+import { buildLevyTateAiContext } from "@/lib/levytate/ai/context";
+import { buildLevyTateAiFallbackResponse } from "@/lib/levytate/ai/fallbackResponses";
+import { levyTateAiEnabled, requestLevyTateOpenAI, type LevyTateGeneratedGuidance } from "@/lib/levytate/ai/openai";
+import { buildLevyTateAiSystemPrompt, buildLevyTateAiUserPrompt } from "@/lib/levytate/ai/prompts";
 import {
   parseLevyTateAiRequest,
   type LevyTateAiRequest,
   type LevyTateAiResponse,
   type LevyTateRecommendedPathway,
-} from "@/lib/levytate-ai/response-schema";
+} from "@/lib/levytate/ai/types";
+import { applyLevyTateAiSafety } from "@/lib/levytate-ai/safety";
 
-type RewritePayload = {
-  assistantMessage: string | null;
-  safetyNotes: string[];
-};
+const requestWindowMs = 5 * 60 * 1000;
+const duplicateWindowMs = 1_500;
+const maxRequestsPerWindow = 24;
+const requestBuckets = new Map<string, { count: number; startedAt: number; lastMessage: string; lastRequestAt: number }>();
 
-type EmployeePayload = RewritePayload & {
-  managerMessageDraft: string | null;
-  recommendedPathwayTitles: string[];
-};
-
-function aiEnabled() {
-  if (process.env.LEVYTATE_AI_ENABLED === "true") return true;
-  if (process.env.LEVYTATE_AI_ENABLED === "false") return false;
-  return Boolean(process.env.OPENAI_API_KEY);
+function rateLimitKey(request: Request) {
+  return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "unknown";
 }
 
-function aiModel() {
-  return process.env.LEVYTATE_AI_MODEL || "gpt-4.1-mini";
-}
+function isRateLimited(key: string, message: string) {
+  const now = Date.now();
+  const normalisedMessage = message.trim().toLowerCase().slice(0, 240);
+  const existing = requestBuckets.get(key);
 
-function extractOutputText(payload: unknown) {
-  if (!payload || typeof payload !== "object") return "";
-  const candidate = payload as {
-    output_text?: string;
-    output?: Array<{
-      content?: Array<{
-        type?: string;
-        text?: string;
-      }>;
-    }>;
-  };
-
-  if (typeof candidate.output_text === "string" && candidate.output_text.trim()) {
-    return candidate.output_text.trim();
+  if (!existing || now - existing.startedAt >= requestWindowMs) {
+    requestBuckets.set(key, { count: 1, startedAt: now, lastMessage: normalisedMessage, lastRequestAt: now });
+    return false;
   }
 
-  const text = candidate.output
-    ?.flatMap((item) => item.content ?? [])
-    .find((item) => item.type === "output_text" && typeof item.text === "string")
-    ?.text;
+  if (existing.lastMessage === normalisedMessage && now - existing.lastRequestAt < duplicateWindowMs) return true;
 
-  return typeof text === "string" ? text.trim() : "";
-}
-
-function parseRewritePayload(raw: string): RewritePayload {
-  try {
-    const parsed = JSON.parse(raw) as {
-      assistantMessage?: string;
-      safetyNotes?: string[];
-    };
-
-    return {
-      assistantMessage:
-        typeof parsed.assistantMessage === "string" && parsed.assistantMessage.trim()
-          ? parsed.assistantMessage.trim()
-          : null,
-      safetyNotes: Array.isArray(parsed.safetyNotes)
-        ? parsed.safetyNotes.filter((item): item is string => typeof item === "string" && Boolean(item.trim()))
-        : [],
-    };
-  } catch {
-    return {
-      assistantMessage: null,
-      safetyNotes: [],
-    };
-  }
-}
-
-function parseEmployeePayload(raw: string): EmployeePayload {
-  try {
-    const parsed = JSON.parse(raw) as {
-      assistantMessage?: string;
-      safetyNotes?: string[];
-      recommendedPathwayTitles?: string[];
-      managerMessageDraft?: string | null;
-    };
-
-    return {
-      assistantMessage:
-        typeof parsed.assistantMessage === "string" && parsed.assistantMessage.trim()
-          ? parsed.assistantMessage.trim()
-          : null,
-      safetyNotes: Array.isArray(parsed.safetyNotes)
-        ? parsed.safetyNotes.filter((item): item is string => typeof item === "string" && Boolean(item.trim()))
-        : [],
-      recommendedPathwayTitles: Array.isArray(parsed.recommendedPathwayTitles)
-        ? parsed.recommendedPathwayTitles.filter((item): item is string => typeof item === "string" && Boolean(item.trim()))
-        : [],
-      managerMessageDraft:
-        typeof parsed.managerMessageDraft === "string" && parsed.managerMessageDraft.trim()
-          ? parsed.managerMessageDraft.trim()
-          : null,
-    };
-  } catch {
-    return {
-      assistantMessage: null,
-      safetyNotes: [],
-      recommendedPathwayTitles: [],
-      managerMessageDraft: null,
-    };
-  }
-}
-
-function outputSchemaFor(role: LevyTateAiRequest["role"]) {
-  if (role === "Employee") {
-    return {
-      type: "object",
-      additionalProperties: false,
-      properties: {
-        assistantMessage: { type: "string" },
-        recommendedPathwayTitles: {
-          type: "array",
-          items: { type: "string" },
-        },
-        safetyNotes: {
-          type: "array",
-          items: { type: "string" },
-        },
-        managerMessageDraft: { type: "string" },
-      },
-      required: ["assistantMessage", "recommendedPathwayTitles", "safetyNotes", "managerMessageDraft"],
-    };
-  }
-
-  return {
-    type: "object",
-    additionalProperties: false,
-    properties: {
-      assistantMessage: { type: "string" },
-      safetyNotes: {
-        type: "array",
-        items: { type: "string" },
-      },
-    },
-    required: ["assistantMessage", "safetyNotes"],
-  };
-}
-
-async function requestOpenAI(request: LevyTateAiRequest, systemPrompt: string, userPrompt: string) {
-  const apiKey = process.env.OPENAI_API_KEY;
-
-  if (!apiKey) {
-    throw new Error("OPENAI_API_KEY is not configured.");
-  }
-
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: aiModel(),
-      input: [
-        {
-          role: "system",
-          content: [{ type: "input_text", text: systemPrompt }],
-        },
-        {
-          role: "user",
-          content: [{ type: "input_text", text: userPrompt }],
-        },
-      ],
-      text: {
-        format: {
-          type: "json_schema",
-          name: "levytate_ai_guidance",
-          schema: outputSchemaFor(request.role),
-          strict: true,
-        },
-      },
-      max_output_tokens: request.role === "Employee" ? 640 : 320,
-    }),
-  });
-
-  if (!response.ok) {
-    const detail = await response.text().catch(() => "");
-    throw new Error(`OpenAI Responses API failed with status ${response.status}. ${detail.slice(0, 300)}`);
-  }
-
-  const payload = await response.json();
-  const outputText = extractOutputText(payload);
-
-  if (!outputText) {
-    throw new Error("OpenAI Responses API returned empty output.");
-  }
-
-  return request.role === "Employee" ? parseEmployeePayload(outputText) : parseRewritePayload(outputText);
+  existing.count += 1;
+  existing.lastMessage = normalisedMessage;
+  existing.lastRequestAt = now;
+  requestBuckets.set(key, existing);
+  return existing.count > maxRequestsPerWindow;
 }
 
 function mergeSafetyNotes(fallback: string[], generated: string[]) {
-  const ordered = [...generated, ...fallback];
   const seen = new Set<string>();
-  return ordered.filter((item) => {
+  return [...generated, ...fallback].filter((item) => {
     const key = item.trim().toLowerCase();
     if (!key || seen.has(key)) return false;
     seen.add(key);
     return true;
-  });
+  }).slice(0, 6);
 }
 
-function mergeEmployeePathways(
-  fallbackPathways: LevyTateRecommendedPathway[],
-  recommendedTitles: string[],
-) {
-  const fallbackByTitle = new Map(
-    fallbackPathways.map((item) => [item.title.trim().toLowerCase(), item] as const),
-  );
-
-  const prioritised = recommendedTitles
-    .map((title) => fallbackByTitle.get(title.trim().toLowerCase()))
+function mergePathways(fallback: LevyTateRecommendedPathway[], titles: string[]) {
+  const byTitle = new Map(fallback.map((item) => [item.title.trim().toLowerCase(), item] as const));
+  const prioritised = titles
+    .map((title) => byTitle.get(title.trim().toLowerCase()))
     .filter((item): item is LevyTateRecommendedPathway => Boolean(item));
-
   const seen = new Set(prioritised.map((item) => item.title.trim().toLowerCase()));
-  const remaining = fallbackPathways.filter((item) => !seen.has(item.title.trim().toLowerCase()));
-
-  return prioritised.length ? [...prioritised, ...remaining] : fallbackPathways;
+  return [...prioritised, ...fallback.filter((item) => !seen.has(item.title.trim().toLowerCase()))];
 }
 
-function mergeEmployeeResponse(
-  request: LevyTateAiRequest,
-  fallback: LevyTateAiResponse,
-  generated: EmployeePayload,
-): LevyTateAiResponse {
-  const activeApplication = request.contextData?.activeApplication ?? null;
-
+function mergeGeneratedGuidance(fallback: LevyTateAiResponse, generated: LevyTateGeneratedGuidance): LevyTateAiResponse {
   return {
     ...fallback,
     source: generated.assistantMessage ? "openai" : "mock",
     assistantMessage: generated.assistantMessage ?? fallback.assistantMessage,
-    recommendedPathways: mergeEmployeePathways(fallback.recommendedPathways, generated.recommendedPathwayTitles),
+    followUpQuestion: generated.followUpQuestion ?? fallback.followUpQuestion ?? null,
+    quickReplies: generated.quickReplies.length ? generated.quickReplies : fallback.quickReplies,
+    recommendedPathways: mergePathways(fallback.recommendedPathways, generated.recommendedPathwayTitles),
     safetyNotes: mergeSafetyNotes(fallback.safetyNotes, generated.safetyNotes),
-    applicationWarning: activeApplication
-      ? "You have one active application in progress, so new submissions are paused. Exploration, comparison and manager conversations are still open."
-      : fallback.applicationWarning,
     managerMessageDraft: generated.managerMessageDraft ?? fallback.managerMessageDraft,
   };
 }
 
-function mergeRewriteResponse(fallback: LevyTateAiResponse, generated: RewritePayload): LevyTateAiResponse {
-  return {
-    ...fallback,
-    source: generated.assistantMessage ? "openai" : "mock",
-    assistantMessage: generated.assistantMessage ?? fallback.assistantMessage,
-    safetyNotes: mergeSafetyNotes(fallback.safetyNotes, generated.safetyNotes),
-  };
+function finaliseResponse(request: LevyTateAiRequest, response: LevyTateAiResponse) {
+  return enforceLevyTateAiActions(request, applyLevyTateAiSafety(request, response));
 }
 
 export async function POST(request: Request) {
-  let parsedRequest = null;
+  let parsedRequest: LevyTateAiRequest | null = null;
 
   try {
-    const body = await request.json();
-    const parsed = parseLevyTateAiRequest(body);
-    parsedRequest = parsed;
-
-    if (!parsed) {
+    parsedRequest = parseLevyTateAiRequest(await request.json());
+    if (!parsedRequest) {
       return NextResponse.json({ message: "Invalid LevyTate AI request payload." }, { status: 400 });
     }
 
-    const fallback = buildFallbackResponse(parsed);
-
-    if (!aiEnabled()) {
-      return NextResponse.json(applyLevyTateAiSafety(parsed, fallback));
+    if (isRateLimited(rateLimitKey(request), parsedRequest.userMessage)) {
+      return NextResponse.json({ message: "Please wait a moment before asking another question." }, { status: 429 });
     }
 
-    const groundedContext = buildLevyTateAiContext(parsed);
-    const generated = await requestOpenAI(
-      parsed,
-      buildLevyTateAiSystemPrompt(parsed),
-      buildLevyTateAiUserPrompt({ request: parsed, groundedContext, fallback }),
-    );
+    const fallback = buildLevyTateAiFallbackResponse(parsedRequest);
+    if (!levyTateAiEnabled()) {
+      return NextResponse.json(finaliseResponse(parsedRequest, fallback));
+    }
 
-    const merged =
-      parsed.role === "Employee"
-        ? mergeEmployeeResponse(parsed, fallback, generated as EmployeePayload)
-        : mergeRewriteResponse(fallback, generated as RewritePayload);
+    const groundedContext = buildLevyTateAiContext(parsedRequest);
+    const generated = await requestLevyTateOpenAI({
+      request: parsedRequest,
+      systemPrompt: buildLevyTateAiSystemPrompt(parsedRequest),
+      userPrompt: buildLevyTateAiUserPrompt({ request: parsedRequest, groundedContext, fallback }),
+    });
 
-    return NextResponse.json(applyLevyTateAiSafety(parsed, merged));
+    return NextResponse.json(finaliseResponse(parsedRequest, mergeGeneratedGuidance(fallback, generated)));
   } catch (error) {
     console.error("LevyTate AI request failed", { error });
 
     if (parsedRequest) {
-      return NextResponse.json(applyLevyTateAiSafety(parsedRequest, buildFallbackResponse(parsedRequest)));
+      return NextResponse.json(finaliseResponse(parsedRequest, buildLevyTateAiFallbackResponse(parsedRequest)));
     }
 
-    return NextResponse.json(
-      {
-        message: error instanceof Error ? error.message : "LevyTate AI request failed.",
-      },
-      { status: 500 },
-    );
+    return NextResponse.json({ message: "LevyTate AI could not process this request." }, { status: 500 });
   }
 }

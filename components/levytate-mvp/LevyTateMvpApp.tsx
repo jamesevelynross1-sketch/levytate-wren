@@ -2,11 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { LevyTateLogo } from "@/components/levytate-demo/PlatformShell";
+import { AskLevyTateAiWorkspace } from "@/components/levytate-mvp/AskLevyTateAiWorkspace";
 import { mvpApplications, mvpEmployees, mvpEmployers, mvpProviderCatalogue, mvpRoles } from "@/lib/levytate/data/mvp";
 import { filterProviderCatalogue, fundingLabel, shortlistProvidersForNeed } from "@/lib/levytate/domain";
 import type { ProviderCatalogueFilters } from "@/lib/levytate/domain";
 
-const modules = ["Dashboard", "Employees", "Roles", "Applications", "Providers", "Provider Matching", "Enrolments", "Settings"] as const;
+const modules = ["Ask LevyTate AI", "Dashboard", "Employees", "Roles", "Applications", "Providers", "Provider Matching", "Enrolments", "Settings"] as const;
 type ModuleName = (typeof modules)[number];
 
 const emptyCounts = [
@@ -26,7 +27,7 @@ const defaultFilters: ProviderCatalogueFilters = {
 };
 
 export function LevyTateMvpApp() {
-  const [activeModule, setActiveModule] = useState<ModuleName>("Dashboard");
+  const [activeModule, setActiveModule] = useState<ModuleName>("Ask LevyTate AI");
   const [providerSearch, setProviderSearch] = useState("");
 
   async function logout() {
@@ -75,6 +76,7 @@ export function LevyTateMvpApp() {
 
           <div className="mx-auto max-w-[1500px] px-4 py-5 sm:px-6 lg:px-8">
             <ModuleHeader activeModule={activeModule} />
+            {activeModule === "Ask LevyTate AI" ? <AskLevyTateAiWorkspace /> : null}
             {activeModule === "Dashboard" ? <DashboardModule /> : null}
             {activeModule === "Employees" ? <EmptyModule title="Employees" copy="Create employee records, assign managers, departments, sites and application status once a beta employer is onboarded." /> : null}
             {activeModule === "Roles" ? <EmptyModule title="Roles" copy="Build the role library and pathway mappings that will power recommendations and Ask LevyTate AI." /> : null}

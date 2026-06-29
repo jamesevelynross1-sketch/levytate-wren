@@ -2,7 +2,8 @@ export type LevyTateRole =
   | "Employee"
   | "Line Manager"
   | "Department Head"
-  | "Apprenticeship Lead";
+  | "Apprenticeship Lead"
+  | "LevyTate Admin";
 
 export type LevyTateRequestStatus =
   | "Draft"
@@ -137,8 +138,12 @@ export type LevyTateAiAction = {
     | "compare_routes"
     | "save_interest"
     | "prepare_manager_message"
+    | "prepare_approval_rationale"
+    | "draft_application_reason"
+    | "create_admin_follow_up_task"
     | "ask_follow_up";
   target?: string;
+  requiresConfirmation?: boolean;
 };
 
 export type LevyTateRecommendedPathway = {
@@ -166,14 +171,47 @@ export type LevyTateProviderMatchDraft = {
   notes: string;
 };
 
+export type LevyTateAiWorkspaceContext = {
+  employerName?: string;
+  selectedSite?: string;
+  activeModule?: string;
+};
+
+export type LevyTateAiRoleMappingContext = {
+  roleTitle: string;
+  primaryPathway: string;
+  alternativePathways?: string[];
+  businessRationale?: string;
+};
+
+export type LevyTateAiProviderContext = {
+  providerName: string;
+  sectors?: string[];
+  deliveryModel?: string[];
+  verificationStatus?: string;
+};
+
+export type LevyTateAiPathwayContext = {
+  title: string;
+  standard?: string;
+  status?: string;
+  deliveryModel?: string;
+};
+
 export type LevyTateAiRequest = {
   role: LevyTateRole;
+  userRole?: LevyTateRole;
   selectedEmployee?: string;
   selectedSite: string;
   currentSection: string;
   userMessage: string;
   conversationHistory: LevyTateConversationMessage[];
   employerContext: string;
+  currentWorkspace?: LevyTateAiWorkspaceContext;
+  currentApplication?: RequestSummary | null;
+  roleMappings?: LevyTateAiRoleMappingContext[];
+  providerCatalogue?: LevyTateAiProviderContext[];
+  availablePathways?: LevyTateAiPathwayContext[];
   contextData?: {
     selectedPersona?: PersonaSummary;
     activeApplication?: RequestSummary | null;
@@ -184,9 +222,13 @@ export type LevyTateAiRequest = {
 export type LevyTateAiResponse = {
   source: "openai" | "mock";
   assistantMessage: string;
+  followUpQuestion?: string | null;
+  quickReplies?: string[];
   recommendedActions: LevyTateAiAction[];
+  suggestedActions?: LevyTateAiAction[];
   recommendedPathways: LevyTateRecommendedPathway[];
   applicationPrefill: LevyTateApplicationPrefill | null;
+  applicationDraft?: LevyTateApplicationPrefill | null;
   providerMatchDraft: LevyTateProviderMatchDraft | null;
   nextStep: string | null;
   safetyNotes: string[];
@@ -219,6 +261,68 @@ function isRequestStatus(value: unknown): value is LevyTateRequestStatus {
     "Completed",
     "Cancelled",
   ].includes(value);
+}
+
+function isRole(value: unknown): value is LevyTateRole {
+  return value === "Employee" ||
+    value === "Line Manager" ||
+    value === "Department Head" ||
+    value === "Apprenticeship Lead" ||
+    value === "LevyTate Admin";
+}
+
+function cleanStringArray(value: unknown, limit = 8) {
+  return Array.isArray(value)
+    ? value
+        .filter((item): item is string => typeof item === "string" && Boolean(item.trim()))
+        .slice(0, limit)
+        .map((item) => item.trim().slice(0, 180))
+    : undefined;
+}
+
+function parseRoleMappings(value: unknown): LevyTateAiRoleMappingContext[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value.slice(0, 20).flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const candidate = item as Partial<LevyTateAiRoleMappingContext>;
+    if (typeof candidate.roleTitle !== "string" || typeof candidate.primaryPathway !== "string") return [];
+    return [{
+      roleTitle: candidate.roleTitle.trim().slice(0, 160),
+      primaryPathway: candidate.primaryPathway.trim().slice(0, 180),
+      alternativePathways: cleanStringArray(candidate.alternativePathways),
+      businessRationale: typeof candidate.businessRationale === "string" ? candidate.businessRationale.trim().slice(0, 500) : undefined,
+    }];
+  });
+}
+
+function parseProviderCatalogue(value: unknown): LevyTateAiProviderContext[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value.slice(0, 30).flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const candidate = item as Partial<LevyTateAiProviderContext>;
+    if (typeof candidate.providerName !== "string") return [];
+    return [{
+      providerName: candidate.providerName.trim().slice(0, 160),
+      sectors: cleanStringArray(candidate.sectors),
+      deliveryModel: cleanStringArray(candidate.deliveryModel),
+      verificationStatus: typeof candidate.verificationStatus === "string" ? candidate.verificationStatus.trim().slice(0, 80) : undefined,
+    }];
+  });
+}
+
+function parseAvailablePathways(value: unknown): LevyTateAiPathwayContext[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value.slice(0, 30).flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const candidate = item as Partial<LevyTateAiPathwayContext>;
+    if (typeof candidate.title !== "string") return [];
+    return [{
+      title: candidate.title.trim().slice(0, 180),
+      standard: typeof candidate.standard === "string" ? candidate.standard.trim().slice(0, 180) : undefined,
+      status: typeof candidate.status === "string" ? candidate.status.trim().slice(0, 80) : undefined,
+      deliveryModel: typeof candidate.deliveryModel === "string" ? candidate.deliveryModel.trim().slice(0, 120) : undefined,
+    }];
+  });
 }
 
 function isPersonaSummary(value: unknown): value is PersonaSummary {
@@ -258,15 +362,14 @@ export function parseLevyTateAiRequest(payload: unknown): LevyTateAiRequest | nu
   if (!payload || typeof payload !== "object") return null;
 
   const candidate = payload as Partial<LevyTateAiRequest>;
+  const role = isRole(candidate.userRole) ? candidate.userRole : candidate.role;
 
   if (
-    (candidate.role !== "Employee" &&
-      candidate.role !== "Line Manager" &&
-      candidate.role !== "Department Head" &&
-      candidate.role !== "Apprenticeship Lead") ||
+    !isRole(role) ||
     typeof candidate.selectedSite !== "string" ||
     typeof candidate.currentSection !== "string" ||
     typeof candidate.userMessage !== "string" ||
+    !candidate.userMessage.trim() ||
     typeof candidate.employerContext !== "string" ||
     !Array.isArray(candidate.conversationHistory) ||
     !candidate.conversationHistory.every(isConversationMessage)
@@ -284,19 +387,39 @@ export function parseLevyTateAiRequest(payload: unknown): LevyTateAiRequest | nu
               ? candidate.contextData.activeApplication
               : undefined,
         requests: Array.isArray(candidate.contextData.requests)
-          ? candidate.contextData.requests.filter(isRequestSummary)
+          ? candidate.contextData.requests.filter(isRequestSummary).slice(0, 30)
           : undefined,
       }
     : undefined;
 
   return {
-    role: candidate.role,
-    selectedEmployee: typeof candidate.selectedEmployee === "string" ? candidate.selectedEmployee : undefined,
-    selectedSite: candidate.selectedSite,
-    currentSection: candidate.currentSection,
-    userMessage: candidate.userMessage,
-    conversationHistory: candidate.conversationHistory,
-    employerContext: candidate.employerContext,
+    role,
+    userRole: role,
+    selectedEmployee: typeof candidate.selectedEmployee === "string" ? candidate.selectedEmployee.trim().slice(0, 160) : undefined,
+    selectedSite: candidate.selectedSite.trim().slice(0, 180),
+    currentSection: candidate.currentSection.trim().slice(0, 120),
+    userMessage: candidate.userMessage.trim().slice(0, 2000),
+    conversationHistory: candidate.conversationHistory.slice(-12).map((message) => ({
+      role: message.role,
+      content: message.content.trim().slice(0, 2000),
+    })),
+    employerContext: candidate.employerContext.trim().slice(0, 200),
+    currentWorkspace: candidate.currentWorkspace && typeof candidate.currentWorkspace === "object"
+      ? {
+          employerName: typeof candidate.currentWorkspace.employerName === "string" ? candidate.currentWorkspace.employerName.trim().slice(0, 160) : undefined,
+          selectedSite: typeof candidate.currentWorkspace.selectedSite === "string" ? candidate.currentWorkspace.selectedSite.trim().slice(0, 180) : undefined,
+          activeModule: typeof candidate.currentWorkspace.activeModule === "string" ? candidate.currentWorkspace.activeModule.trim().slice(0, 120) : undefined,
+        }
+      : undefined,
+    currentApplication:
+      candidate.currentApplication === null
+        ? null
+        : isRequestSummary(candidate.currentApplication)
+          ? candidate.currentApplication
+          : undefined,
+    roleMappings: parseRoleMappings(candidate.roleMappings),
+    providerCatalogue: parseProviderCatalogue(candidate.providerCatalogue),
+    availablePathways: parseAvailablePathways(candidate.availablePathways),
     contextData,
   };
 }
