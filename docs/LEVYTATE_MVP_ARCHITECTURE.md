@@ -41,22 +41,28 @@ Internal route:
 
 Temporary beta access uses:
 
-- email address
-- beta access code
-- server-side validation through `/api/levytate-beta-login`
-- HTTP-only beta session cookie
+- the approved email allowlist in `lib/levytate/config/beta-access.ts`
+- beta access code validation through `/api/levytate-beta-login`
+- a signed, expiring HTTP-only session cookie
+- the `beta_admin` access level
+
+The current approved beta account is:
+
+- `hello@levytate.co.uk`
 
 Default beta code:
 
 - `LEVYTATE-BETA`
 
-Future deployments can override the default with:
+Deployments can override the default code with:
 
 - `LEVYTATE_BETA_CODE`
 
-If login fails, the user sees:
+Production must configure the cookie signing secret:
 
-`Beta access is currently invite-only. Please check your access code or request access.`
+- `LEVYTATE_BETA_SESSION_SECRET`
+
+The app validates the signed session in middleware and again in the server-rendered app page. Invalid or expired cookies are cleared before redirecting to `/login`.
 
 ## Protected App
 

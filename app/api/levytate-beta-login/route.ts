@@ -1,5 +1,12 @@
 import { NextResponse } from "next/server";
-import { getLevyTateBetaAccessCode, isAllowedBetaEmail, levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
+import {
+  createLevyTateBetaSession,
+  getLevyTateBetaAccessCode,
+  isAllowedBetaEmail,
+  levytateBetaAccessLevel,
+  levytateBetaSessionCookie,
+  levytateBetaSessionMaxAge,
+} from "@/lib/levytate/config/beta-access";
 
 export async function POST(request: Request) {
   try {
@@ -7,16 +14,24 @@ export async function POST(request: Request) {
     const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
     const code = typeof body.code === "string" ? body.code.trim() : "";
 
-    if (!isAllowedBetaEmail(email) || code !== getLevyTateBetaAccessCode()) {
-      return NextResponse.json({ ok: false, message: "Beta access is currently invite-only. Please check your access code or request access." }, { status: 401 });
+    if (!isAllowedBetaEmail(email)) {
+      return NextResponse.json(
+        { ok: false, message: "Beta access is currently invite-only. Please use the approved LevyTate beta email or request access." },
+        { status: 403 },
+      );
     }
 
-    const response = NextResponse.json({ ok: true });
-    response.cookies.set(levytateBetaSessionCookie, Buffer.from(JSON.stringify({ email, issuedAt: Date.now() })).toString("base64url"), {
+    if (code !== getLevyTateBetaAccessCode().trim()) {
+      return NextResponse.json({ ok: false, message: "Invalid beta access code." }, { status: 401 });
+    }
+
+    const sessionToken = await createLevyTateBetaSession(email);
+    const response = NextResponse.json({ ok: true, user: { email, accessLevel: levytateBetaAccessLevel } });
+    response.cookies.set(levytateBetaSessionCookie, sessionToken, {
       httpOnly: true,
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
-      maxAge: 60 * 60 * 8,
+      maxAge: levytateBetaSessionMaxAge,
       path: "/",
     });
     return response;
@@ -24,4 +39,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, message: "We could not check beta access. Please try again." }, { status: 400 });
   }
 }
-

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
+import { levytateBetaSessionCookie, readLevyTateBetaSession } from "@/lib/levytate/config/beta-access";
 
 const levytateHosts = new Set(["levytate.co.uk", "www.levytate.co.uk"]);
 
@@ -8,7 +8,12 @@ function isLevyTateHost(request: NextRequest) {
   return levytateHosts.has(host);
 }
 
-export function middleware(request: NextRequest) {
+function clearInvalidBetaSession(response: NextResponse) {
+  response.cookies.delete(levytateBetaSessionCookie);
+  return response;
+}
+
+export async function middleware(request: NextRequest) {
   if (!isLevyTateHost(request)) {
     return NextResponse.next();
   }
@@ -20,15 +25,17 @@ export function middleware(request: NextRequest) {
   }
 
   if (pathname === "/login") {
-    if (request.cookies.has(levytateBetaSessionCookie)) {
+    const session = await readLevyTateBetaSession(request.cookies.get(levytateBetaSessionCookie)?.value);
+    if (session) {
       return NextResponse.redirect(new URL("/app", request.url));
     }
-    return NextResponse.rewrite(new URL("/levytate/login", request.url));
+    return clearInvalidBetaSession(NextResponse.rewrite(new URL("/levytate/login", request.url)));
   }
 
   if (pathname === "/app" || pathname.startsWith("/app/")) {
-    if (!request.cookies.has(levytateBetaSessionCookie)) {
-      return NextResponse.redirect(new URL("/login", request.url));
+    const session = await readLevyTateBetaSession(request.cookies.get(levytateBetaSessionCookie)?.value);
+    if (!session) {
+      return clearInvalidBetaSession(NextResponse.redirect(new URL("/login", request.url)));
     }
     return NextResponse.rewrite(new URL(`/levytate${pathname}`, request.url));
   }
