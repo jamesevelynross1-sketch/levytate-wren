@@ -1,3 +1,4 @@
+export * from './apprenticeship-standards';
 export * from './provider-catalogue';
 export const mvpEmployers = [];
 export const mvpSites = [];

@@ -5,7 +5,18 @@ import type {
   LevyTateAiResponse,
   LevyTateRecommendedPathway,
 } from "@/lib/levytate/ai/types";
+import { getApprenticeshipStandard } from "@/lib/levytate/domain";
 
+function standardPathway(standardId: string, reason: string): LevyTateRecommendedPathway {
+  const standard = getApprenticeshipStandard(standardId);
+  if (!standard) throw new Error("Unknown apprenticeship standard: " + standardId);
+  return {
+    title: "Level " + standard.level + " " + standard.title,
+    reason,
+    availability: "alternative",
+    standard: standard.title,
+  };
+}
 function activeApplication(request: LevyTateAiRequest) {
   return request.currentApplication ?? request.contextData?.activeApplication ?? null;
 }
@@ -13,19 +24,8 @@ function activeApplication(request: LevyTateAiRequest) {
 function adminRoleEmployeeFallback(request: LevyTateAiRequest): LevyTateAiResponse {
   const application = activeApplication(request);
   const pathways: LevyTateRecommendedPathway[] = [
-    {
-      title: "Level 3 Data Technician",
-      reason: "A strong route to explore where the role includes spreadsheets, reporting, CRM updates, data quality and recurring process administration.",
-      availability: "alternative",
-      standard: "Data Technician",
-    },
-    {
-      title: "Level 3 AI Enablement",
-      reason: "Worth exploring where the development goal is safe AI use, workflow automation and stronger digital confidence rather than deeper analytics.",
-      availability: "alternative",
-      standard: "AI Enablement",
-    },
-  ];
+    standardPathway("ST0795", "A strong route to explore where the role includes spreadsheets, reporting, CRM updates, data quality and recurring process administration."),
+    standardPathway("ST0192", "Worth exploring where the development goal is workflow automation, process improvement and measurable workplace change."),  ];
   const actions: LevyTateAiAction[] = application
     ? [
         { label: "Compare these routes", type: "compare_routes", target: pathways[0].title },
@@ -42,7 +42,7 @@ function adminRoleEmployeeFallback(request: LevyTateAiRequest): LevyTateAiRespon
   const applicationDraft = application
     ? null
     : {
-        selectedApprenticeship: "Level 3 Data Technician",
+        selectedApprenticeship: pathways[0].title,
         reasonForInterest: "I want to move from manual administration into stronger reporting, data quality and workflow improvement while building confidence with automation.",
         careerGoal: "Develop stronger data, reporting and digital workflow capability",
         supportRequired: "Access to relevant reporting tasks, protected learning time and opportunities to improve a real administrative process.",
@@ -50,7 +50,7 @@ function adminRoleEmployeeFallback(request: LevyTateAiRequest): LevyTateAiRespon
 
   return {
     source: "mock",
-    assistantMessage: "That sounds like a role moving beyond routine administration into data and workflow improvement. Level 3 Data Technician is the clearest route to explore if reporting, spreadsheets and data quality are becoming a bigger part of the job. An AI enablement route may also be useful if the priority is automation and confident day-to-day AI use.",
+    assistantMessage: "That sounds like a role moving beyond routine administration into data and workflow improvement. Level 3 Data Technician is the clearest route to explore if reporting, spreadsheets and data quality are becoming a bigger part of the job. Improvement Practitioner may also be useful if the priority is automation, process improvement and measurable workplace change.",
     followUpQuestion: "Is the bigger goal better reporting and analysis, or reducing manual work through automation?",
     quickReplies: ["Better reporting", "Reduce manual work", "Compare both routes", "Prepare a manager message"],
     recommendedActions: actions,
@@ -66,7 +66,7 @@ function adminRoleEmployeeFallback(request: LevyTateAiRequest): LevyTateAiRespon
     applicationWarning: application
       ? "You already have an active apprenticeship application. You can compare and save these routes, but you cannot start a second application yet."
       : null,
-    managerMessageDraft: "I would like to discuss how my role is changing through reporting, CRM work and automation. Could we review whether a Data Technician or AI enablement route would support the team as well as my development?",
+    managerMessageDraft: "I would like to discuss how my role is changing through reporting, CRM work and automation. Could we review whether a Data Technician or Improvement Practitioner route would support the team as well as my development?",
   };
 }
 

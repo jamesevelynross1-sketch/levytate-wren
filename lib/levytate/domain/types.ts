@@ -196,25 +196,41 @@ export type ApprenticeshipAdvice = {
 };
 
 
+export type ApprenticeshipStandardStatus = "Live" | "Retired" | "Defunded";
+
+export type ApprenticeshipStandard = {
+  id: string;
+  title: string;
+  referenceCode: string;
+  level: number;
+  occupationalRoute: string;
+  fundingBand: number | null;
+  typicalDuration: string;
+  status: ApprenticeshipStandardStatus;
+  officialUrl: string;
+  version: string;
+  lastVerified: string;
+};
+
 export type ProviderVerificationStatus = "verified" | "needs_verification";
 export type ProviderRecordStatus = "Active" | "Archived";
 export type ProviderType = "Independent training provider" | "University" | "College" | "Specialist consultancy" | "Employer programme partner";
-export type ProviderProgrammeFundingStatus = "potentially_levy_funded" | "potentially_levy_or_co_investment" | "commercial" | "defunded_for_new_starts";
+export type ProviderProgrammeStatus = "Active" | "Needs verification" | "Paused" | "Not available" | "Defunded / unavailable for new starts";
+export type ProviderProgrammeVerificationStatus = "Verified from provider website" | "Needs manual verification" | "Provider confirmed" | "LevyTate reviewed";
 
 export type ProviderProgramme = {
-  programmeId: string;
-  programmeName: string;
-  level: string;
-  standardName: string;
-  sector: string;
+  id: string;
+  providerId: string;
+  apprenticeshipStandardId: string;
   deliveryMode: string;
-  typicalDuration: string;
-  fundingStatus: ProviderProgrammeFundingStatus;
-  availableForNewRecommendations: boolean;
-  suitableRoles: string[];
-  tags: string[];
+  regions: string[];
+  status: ProviderProgrammeStatus;
+  verificationStatus: ProviderProgrammeVerificationStatus;
   sourceUrl: string;
-  verificationStatus: ProviderVerificationStatus;
+  notes: string;
+  recordStatus: ProviderRecordStatus;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type ProviderCatalogueRecord = {
@@ -223,7 +239,6 @@ export type ProviderCatalogueRecord = {
   website: string;
   providerType: ProviderType;
   sectors: string[];
-  programmes: ProviderProgramme[];
   deliveryModel: string[];
   regions: string[];
   contactName: string;

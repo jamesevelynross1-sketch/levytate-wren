@@ -3,9 +3,10 @@ import type {
   DeliveryPreference,
   FundingRoute,
   ProviderCatalogueRecord,
+  ProviderProgramme,
   RequestStatus,
 } from "@/lib/levytate/domain";
-import { mvpProviderCatalogue } from "@/lib/levytate/data/mvp";
+import { mvpProviderCatalogue, mvpProviderProgrammes } from "@/lib/levytate/data/mvp";
 
 export type MvpRecordStatus = "Active" | "Archived";
 
@@ -37,7 +38,7 @@ export type MvpEmployee = {
 
 export type MvpPathwayMapping = {
   id: string;
-  pathwayTitle: string;
+  apprenticeshipStandardId: string;
   recommendationType: "Primary" | "Alternative";
   priority: number;
   businessRationale: string;
@@ -62,7 +63,7 @@ export type MvpRole = {
 export type MvpApplication = {
   id: string;
   employeeId: string;
-  pathwayTitle: string;
+  apprenticeshipStandardId: string;
   status: RequestStatus;
   reason: string;
   careerGoal: string;
@@ -76,7 +77,7 @@ export type MvpMatchingStatus = "Submitted" | "Under Review" | "Provider Shortli
 export type MvpMatchingRequest = {
   id: string;
   roleNeed: string;
-  programme: string;
+  apprenticeshipStandardId: string;
   learnerCount: number;
   sites: string[];
   deliveryPreference: string;
@@ -96,7 +97,7 @@ export type MvpEnrolment = {
   applicationId: string;
   employeeId: string;
   providerId: string;
-  programme: string;
+  apprenticeshipStandardId: string;
   status: MvpEnrolmentStatus;
   startDate: string;
   notes: string;
@@ -105,21 +106,23 @@ export type MvpEnrolment = {
 };
 
 export type MvpWorkspaceData = {
-  version: 1;
+  version: 2;
   profile: MvpWorkspaceProfile;
   employees: MvpEmployee[];
   roles: MvpRole[];
   applications: MvpApplication[];
   providers: ProviderCatalogueRecord[];
+  providerProgrammes: ProviderProgramme[];
   matchingRequests: MvpMatchingRequest[];
   enrolments: MvpEnrolment[];
 };
 
-export const mvpWorkspaceStorageKey = "levytate:mvp:workspace:v1";
+export const mvpWorkspaceStorageKey = "levytate:mvp:workspace:v2";
+export const legacyMvpWorkspaceStorageKey = "levytate:mvp:workspace:v1";
 
 export function createEmptyMvpWorkspace(): MvpWorkspaceData {
   return {
-    version: 1,
+    version: 2,
     profile: {
       employerName: "",
       workspaceName: "LevyTate beta workspace",
@@ -133,6 +136,7 @@ export function createEmptyMvpWorkspace(): MvpWorkspaceData {
     roles: [],
     applications: [],
     providers: structuredClone(mvpProviderCatalogue),
+    providerProgrammes: structuredClone(mvpProviderProgrammes),
     matchingRequests: [],
     enrolments: [],
   };

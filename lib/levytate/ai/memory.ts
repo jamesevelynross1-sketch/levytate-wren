@@ -6,6 +6,7 @@ import type {
   LevyTateMessageClassification,
   LevyTateRecommendedPathway,
 } from "@/lib/levytate/ai/types";
+import { getApprenticeshipStandard } from "@/lib/levytate/domain";
 
 const interestSignals: Array<[RegExp, string]> = [
   [/\b(ai|artificial intelligence|chatgpt|copilot)\b/i, "AI"],
@@ -249,27 +250,27 @@ export function withConversationMemory(request: LevyTateAiRequest): LevyTateAiRe
   return { ...request, conversationProfile: profile };
 }
 
-function dataPathway(): LevyTateRecommendedPathway {
+function standardPathway(standardId: string, reason: string): LevyTateRecommendedPathway {
+  const standard = getApprenticeshipStandard(standardId);
+  if (!standard) throw new Error("Unknown apprenticeship standard: " + standardId);
   return {
-    title: "Level 3 Data Technician",
-    reason: "Useful where administration includes spreadsheets, reporting, CRM data and improving information quality.",
+    title: "Level " + standard.level + " " + standard.title,
+    reason,
     availability: "alternative",
-    standard: "Data Technician",
+    standard: standard.title,
   };
+}
+
+function dataPathway(): LevyTateRecommendedPathway {
+  return standardPathway("ST0795", "Useful where administration includes spreadsheets, reporting, CRM data and improving information quality.");
 }
 
 function aiPathway(): LevyTateRecommendedPathway {
-  return {
-    title: "Level 3 AI Enablement",
-    reason: "Worth exploring where the goal is practical AI adoption, workflow automation and measurable business improvement.",
-    availability: "alternative",
-    standard: "AI Enablement",
-  };
+  return standardPathway("ST0192", "Worth exploring where the goal is workflow automation, process improvement and measurable business change.");
 }
-
 function directAiProgrammeQuestion(message: string) {
   return /\bhow (?:do|can) i (?:get|apply|start|join)|\bget onto\b|\bapply for\b/i.test(message) &&
-    /\bai enablement\b/i.test(message);
+    /\bimprovement practitioner\b/i.test(message);
 }
 
 function pickFallbackVariant(profile: LevyTateConversationProfile, variants: string[]) {
@@ -317,12 +318,12 @@ function employeeMemoryFallback(request: LevyTateAiRequest, response: LevyTateAi
     followUpQuestion = "Is your role mainly reporting and spreadsheets, process administration, customer support, or something else?";
     quickReplies = ["Reporting and spreadsheets", "Process administration", "Customer support", "Something else"];
   } else if (reportingAndAutomation) {
-    assistantMessage = "That gives us two useful threads. Reporting could point towards a data pathway, while automation may be closer to AI enablement or process improvement. I would not choose between them until we know what you want to be doing, not just what tasks are appearing in the role.";
+    assistantMessage = "That gives us two useful threads. Reporting could point towards a data pathway, while automation may be closer to Improvement Practitioner or process improvement. I would not choose between them until we know what you want to be doing, not just what tasks are appearing in the role.";
     followUpQuestion = "Which matters more to you: analysing information, building automations, or improving the wider process?";
     quickReplies = ["Analysing information", "Building automations", "Improving the process"];
     pathways = [data, ai];
   } else if (aiProjectShift) {
-    assistantMessage = "That is a slightly different angle, and it is useful. You are not just talking about improving reporting. You are interested in using AI to change how the business works, which makes an AI enablement route more relevant than a purely data-led route.";
+    assistantMessage = "That is a slightly different angle, and it is useful. You are not just talking about improving reporting. You are interested in using AI to change how the business works, which makes an Improvement Practitioner route more relevant than a purely data-led route.";
     followUpQuestion = "Are you imagining yourself identifying AI opportunities, building automations, or helping colleagues use AI tools better?";
     quickReplies = ["Identifying AI opportunities", "Building automations", "Helping colleagues use AI"];
     pathways = [ai, data];
@@ -332,7 +333,7 @@ function employeeMemoryFallback(request: LevyTateAiRequest, response: LevyTateAi
     quickReplies = ["Customer onboarding", "Reporting workflow", "CRM updates", "Another process"];
     pathways = [ai, data];
   } else if (asksToCompare) {
-    assistantMessage = "The clearest distinction is the work outcome. Data Technician is stronger when the role needs better data handling, reporting and insight. AI Enablement is stronger when the employee will identify use cases, improve workflows and help the organisation adopt AI responsibly.";
+    assistantMessage = "The clearest distinction is the work outcome. Data Technician is stronger when the role needs better data handling, reporting and insight. Improvement Practitioner is stronger when the employee will identify use cases, improve workflows and help the organisation adopt AI responsibly.";
     followUpQuestion = "Which of those outcomes is closer to the work you want to own?";
     quickReplies = ["Data and reporting", "AI and automation", "I am still unsure"];
     pathways = [data, ai];

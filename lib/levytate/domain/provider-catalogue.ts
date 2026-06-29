@@ -1,4 +1,9 @@
-import type { ProviderCatalogueFilters, ProviderCatalogueRecord, ProviderProgramme } from "./types";
+import type {
+  ApprenticeshipStandard,
+  ProviderCatalogueFilters,
+  ProviderCatalogueRecord,
+  ProviderProgramme,
+} from "./types";
 
 export const defaultProviderCatalogueFilters: ProviderCatalogueFilters = {
   search: "",
@@ -9,22 +14,44 @@ export const defaultProviderCatalogueFilters: ProviderCatalogueFilters = {
   status: "Active",
 };
 
-export function allProviderProgrammes(providers: ProviderCatalogueRecord[]) {
-  return providers.flatMap((provider) => provider.programmes.map((programme) => ({ ...programme, providerId: provider.providerId, providerName: provider.providerName })));
+export function providerProgrammesFor(providerId: string, programmes: ProviderProgramme[]) {
+  return programmes.filter((programme) => programme.providerId === providerId);
+}
+
+export function allProviderProgrammes(
+  providers: ProviderCatalogueRecord[],
+  programmes: ProviderProgramme[],
+  standards: ApprenticeshipStandard[],
+) {
+  return programmes.map((programme) => ({
+    programme,
+    provider: providers.find((provider) => provider.providerId === programme.providerId),
+    standard: standards.find((standard) => standard.id === programme.apprenticeshipStandardId),
+  }));
 }
 
 export function uniqueProviderValues(providers: ProviderCatalogueRecord[], field: "sectors" | "deliveryModel" | "regions") {
   return Array.from(new Set(providers.flatMap((provider) => provider[field]))).sort((a, b) => a.localeCompare(b));
 }
 
-export function uniqueProgrammeNames(providers: ProviderCatalogueRecord[]) {
-  return Array.from(new Set(providers.flatMap((provider) => provider.programmes.map((programme) => programme.programmeName)))).sort((a, b) => a.localeCompare(b));
+export function uniqueProgrammeNames(programmes: ProviderProgramme[], standards: ApprenticeshipStandard[]) {
+  const ids = new Set(programmes.map((programme) => programme.apprenticeshipStandardId));
+  return standards.filter((standard) => ids.has(standard.id)).map((standard) => standard.title).sort((a, b) => a.localeCompare(b));
 }
 
-export function filterProviderCatalogue(providers: ProviderCatalogueRecord[], filters: ProviderCatalogueFilters) {
+export function filterProviderCatalogue(
+  providers: ProviderCatalogueRecord[],
+  programmes: ProviderProgramme[],
+  standards: ApprenticeshipStandard[],
+  filters: ProviderCatalogueFilters,
+) {
   const query = filters.search.trim().toLowerCase();
 
   return providers.filter((provider) => {
+    const deliveries = providerProgrammesFor(provider.providerId, programmes);
+    const linkedStandards = deliveries
+      .map((programme) => standards.find((standard) => standard.id === programme.apprenticeshipStandardId))
+      .filter((standard): standard is ApprenticeshipStandard => Boolean(standard));
     const searchable = [
       provider.providerName,
       provider.providerType,
@@ -35,60 +62,78 @@ export function filterProviderCatalogue(providers: ProviderCatalogueRecord[], fi
       provider.sectors.join(" "),
       provider.deliveryModel.join(" "),
       provider.regions.join(" "),
-      provider.programmes.map((programme) => `${programme.programmeName} ${programme.standardName} ${programme.sector} ${programme.tags.join(" ")}`).join(" "),
+      linkedStandards.map((standard) => `${standard.title} ${standard.referenceCode} ${standard.occupationalRoute}`).join(" "),
     ].join(" ").toLowerCase();
 
-    const matchesSearch = !query || searchable.includes(query);
-    const matchesSector = filters.sector === "All" || provider.sectors.includes(filters.sector) || provider.programmes.some((programme) => programme.sector === filters.sector);
-    const matchesProgramme = filters.programme === "All" || provider.programmes.some((programme) => programme.programmeName === filters.programme || programme.standardName === filters.programme);
-    const matchesDelivery = filters.deliveryModel === "All" || provider.deliveryModel.includes(filters.deliveryModel) || provider.programmes.some((programme) => programme.deliveryMode.includes(filters.deliveryModel));
-    const matchesRegion = filters.region === "All" || provider.regions.includes(filters.region);
-    const matchesStatus = filters.status === "All" || provider.status === filters.status;
-
-    return matchesSearch && matchesSector && matchesProgramme && matchesDelivery && matchesRegion && matchesStatus;
+    return (!query || searchable.includes(query))
+      && (filters.sector === "All" || provider.sectors.includes(filters.sector) || linkedStandards.some((standard) => standard.occupationalRoute === filters.sector))
+      && (filters.programme === "All" || linkedStandards.some((standard) => standard.title === filters.programme))
+      && (filters.deliveryModel === "All" || provider.deliveryModel.includes(filters.deliveryModel) || deliveries.some((programme) => programme.deliveryMode.includes(filters.deliveryModel)))
+      && (filters.region === "All" || provider.regions.includes(filters.region) || deliveries.some((programme) => programme.regions.includes(filters.region)))
+      && (filters.status === "All" || provider.status === filters.status);
   });
 }
 
-export function shortlistProvidersForNeed(providers: ProviderCatalogueRecord[], need: { programme?: string; sector?: string; deliveryModel?: string; region?: string; query?: string }) {
-  const query = [need.programme, need.sector, need.query].filter((value): value is string => Boolean(value)).join(" ").toLowerCase();
-  const requestedSector = need.sector;
-  const requestedDeliveryModel = need.deliveryModel;
-  const requestedRegion = need.region;
+export type ProviderMatchNeed = {
+  apprenticeshipStandardId: string;
+  deliveryModel?: string;
+  region?: string;
+};
+
+export function isVerifiedProviderProgramme(programme: ProviderProgramme) {
+  return programme.verificationStatus !== "Needs manual verification";
+}
+
+export function shortlistProvidersForNeed(
+  providers: ProviderCatalogueRecord[],
+  programmes: ProviderProgramme[],
+  standards: ApprenticeshipStandard[],
+  need: ProviderMatchNeed,
+) {
+  const standard = standards.find((item) => item.id === need.apprenticeshipStandardId);
+  if (!standard || standard.status !== "Live") return [];
 
   return providers
     .filter((provider) => provider.status === "Active")
-    .map((provider) => {
-      const activeProgrammes = provider.programmes.filter((programme) => programme.availableForNewRecommendations !== false && programme.fundingStatus !== "defunded_for_new_starts");
-      const programmeMatches = activeProgrammes.filter((programme) => {
-        const haystack = `${programme.programmeName} ${programme.standardName} ${programme.sector} ${programme.tags.join(" ")}`.toLowerCase();
-        return !query || haystack.includes(query) || query.split(" ").some((word) => word.length > 3 && haystack.includes(word));
-      });
-      const sectorFit = !requestedSector || provider.sectors.includes(requestedSector) || activeProgrammes.some((programme) => programme.sector === requestedSector);
-      const deliveryFit = !requestedDeliveryModel || provider.deliveryModel.includes(requestedDeliveryModel) || activeProgrammes.some((programme) => programme.deliveryMode.includes(requestedDeliveryModel));
-      const regionFit = !requestedRegion || provider.regions.includes(requestedRegion);
-      const verificationBoost = provider.verificationStatus === "verified" ? 8 : 0;
-      const score = Math.min(100, 42 + programmeMatches.length * 14 + (sectorFit ? 16 : 0) + (deliveryFit ? 10 : 0) + (regionFit ? 10 : 0) + verificationBoost);
+    .flatMap((provider) => {
+      const exactDeliveries = programmes.filter((programme) =>
+        programme.providerId === provider.providerId
+        && programme.apprenticeshipStandardId === standard.id
+        && programme.recordStatus === "Active"
+        && programme.status === "Active"
+      );
 
-      return {
-        provider,
-        score,
-        matchedProgrammes: programmeMatches.slice(0, 5),
-        reasons: [
-          sectorFit ? "Sector fit" : null,
-          deliveryFit ? "Delivery model fit" : null,
-          regionFit ? "Region fit" : null,
-          programmeMatches.length ? `${programmeMatches.length} programme match${programmeMatches.length === 1 ? "" : "es"}` : null,
-        ].filter(Boolean) as string[],
-      };
+      return exactDeliveries.map((programme) => {
+        const deliveryFit = !need.deliveryModel
+          || provider.deliveryModel.some((model) => model.toLowerCase().includes(need.deliveryModel!.toLowerCase()))
+          || programme.deliveryMode.toLowerCase().includes(need.deliveryModel.toLowerCase());
+        const regionFit = !need.region
+          || provider.regions.includes(need.region)
+          || programme.regions.includes(need.region)
+          || programme.regions.includes("England");
+        const verified = isVerifiedProviderProgramme(programme);
+        const score = Math.min(100, 65 + (deliveryFit ? 12 : 0) + (regionFit ? 10 : 0) + (verified ? 13 : 0));
+
+        return {
+          provider,
+          programme,
+          standard,
+          score,
+          verified,
+          reasons: [
+            `Delivers ${standard.referenceCode}`,
+            deliveryFit ? "Delivery model fit" : null,
+            regionFit ? "Geographic fit" : null,
+            verified ? programme.verificationStatus : "Delivery requires verification",
+          ].filter(Boolean) as string[],
+        };
+      });
     })
-    .filter((item) => item.score >= 52)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 6);
+    .sort((a, b) => Number(b.verified) - Number(a.verified) || b.score - a.score || a.provider.providerName.localeCompare(b.provider.providerName));
 }
 
-export function fundingLabel(programme: Pick<ProviderProgramme, "fundingStatus">) {
-  if (programme.fundingStatus === "commercial") return "Commercial training budget";
-  if (programme.fundingStatus === "defunded_for_new_starts") return "Defunded for new starts";
-  if (programme.fundingStatus === "potentially_levy_funded") return "Potentially levy-funded";
-  return "Potentially funded through levy/co-investment";
+export function fundingLabel(standard: ApprenticeshipStandard) {
+  return standard.fundingBand === null
+    ? "Funding band requires confirmation"
+    : `Maximum funding band £${standard.fundingBand.toLocaleString("en-GB")}`;
 }

@@ -1,5 +1,5 @@
-import { ProviderManagementModule } from "@/components/levytate-platform/provider-management/ProviderManagementModule";
+import { redirect } from "next/navigation";
 
-export default function LevyTateMvpProvidersPage() {
-  return <ProviderManagementModule />;
+export default function LevyTateMvpPage() {
+  redirect("/app");
 }

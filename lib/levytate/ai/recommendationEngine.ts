@@ -6,6 +6,7 @@ import type {
   LevyTateRecommendationResult,
   LevyTateRecommendedPathway,
 } from "@/lib/levytate/ai/types";
+import { getApprenticeshipStandard } from "@/lib/levytate/domain";
 
 type PathwaySignal = {
   id: string;
@@ -26,131 +27,73 @@ type PathwayDefinition = {
 const recommendationEngineVersion = "1";
 const revealThreshold = 74;
 
-const pathwayCatalogue: PathwayDefinition[] = [
-  {
-    pathwayId: "level-3-ai-enablement",
-    title: "Level 3 AI Enablement",
-    standard: "AI Enablement",
-    baseScore: 42,
-    rationale: "Develops practical AI adoption, responsible use, workflow automation and measurable workplace improvement.",
-    signals: [
-      { id: "ai-interest", label: "Interested in practical AI", weight: 15, pattern: /\b(ai|artificial intelligence|chatgpt|copilot|generative ai)\b/i },
-      { id: "automation-interest", label: "Wants to improve workflow automation", weight: 18, pattern: /\b(automation|automate|automating|workflow)\b/i },
-      { id: "business-improvement", label: "Wants measurable business improvement", weight: 10, pattern: /\b(help the business|business improvement|improve how|business grow|productivity)\b/i },
-      { id: "ai-project", label: "Role can support an applied AI project", weight: 8, pattern: /\b(ai project|automation project|use case|pilot)\b/i },
-      { id: "ai-adoption", label: "Interested in helping colleagues adopt AI", weight: 7, pattern: /\b(help(?:ing)? colleagues|adoption|train colleagues|support colleagues)\b/i },
-      { id: "admin-role", label: "Administrative work offers workflow use cases", weight: 5, pattern: /\b(admin|administration|administrative)\b/i },
-    ],
-  },
-  {
-    pathwayId: "level-3-data-technician",
-    title: "Level 3 Data Technician",
-    standard: "Data Technician",
-    baseScore: 44,
-    rationale: "Builds practical data handling, reporting, data quality and insight capability for operational roles.",
-    signals: [
-      { id: "reporting-work", label: "Already works with reporting", weight: 18, pattern: /\b(reporting|reports|report)\b/i },
-      { id: "spreadsheet-work", label: "Uses spreadsheets in current work", weight: 14, pattern: /\b(spreadsheet|spreadsheets|excel)\b/i },
-      { id: "data-interest", label: "Interested in data-led work", weight: 12, pattern: /\b(data|data-focused|data role)\b/i },
-      { id: "data-quality", label: "Role includes CRM or data quality", weight: 10, pattern: /\b(crm|data quality|records|information quality)\b/i },
-      { id: "analysis-interest", label: "Wants stronger analysis and insight", weight: 8, pattern: /\b(analysis|analytics|dashboard|insight)\b/i },
-      { id: "automation-adjacent", label: "Automation requires reliable operational data", weight: 6, pattern: /\b(automation|automate|workflow)\b/i },
-      { id: "admin-role", label: "Administrative work provides relevant data tasks", weight: 6, pattern: /\b(admin|administration|administrative)\b/i },
-    ],
-  },
-  {
-    pathwayId: "level-4-data-analyst",
-    title: "Level 4 Data Analyst",
-    standard: "Data Analyst",
-    baseScore: 38,
-    rationale: "Supports deeper analysis, insight generation, data storytelling and ownership of business reporting.",
-    signals: [
-      { id: "advanced-analysis", label: "Wants deeper analytical responsibility", weight: 20, pattern: /\b(data analyst|advanced analysis|statistical|data science)\b/i },
-      { id: "insight-ownership", label: "Wants to own dashboards or business insight", weight: 16, pattern: /\b(own reporting|reporting ownership|business insight|dashboards)\b/i },
-      { id: "data-career", label: "Career goal is a data-focused role", weight: 15, pattern: /\b(move into (?:a )?data|data career|data-focused role)\b/i },
-    ],
-  },
-  {
-    pathwayId: "level-4-business-analyst",
-    title: "Level 4 Business Analyst",
-    standard: "Business Analyst",
-    baseScore: 38,
-    rationale: "Develops requirements discovery, process analysis, stakeholder engagement and systems improvement.",
-    signals: [
-      { id: "process-analysis", label: "Interested in analysing and redesigning processes", weight: 18, pattern: /\b(process mapping|process analysis|redesign process|requirements)\b/i },
-      { id: "systems-change", label: "Work involves systems or organisational change", weight: 16, pattern: /\b(system change|systems improvement|change project|stakeholder)\b/i },
-      { id: "business-analysis", label: "Explicit interest in business analysis", weight: 22, pattern: /\b(business analyst|business analysis)\b/i },
-    ],
-  },
-  {
-    pathwayId: "level-4-improvement-practitioner",
-    title: "Level 4 Improvement Practitioner",
-    standard: "Improvement Practitioner",
-    baseScore: 40,
-    rationale: "Builds continuous improvement, operational performance, process optimisation and cross-functional change capability.",
-    signals: [
-      { id: "continuous-improvement", label: "Focuses on continuous improvement", weight: 22, pattern: /\b(continuous improvement|process improvement|lean|six sigma)\b/i },
-      { id: "operational-performance", label: "Wants to improve operational performance", weight: 17, pattern: /\b(operational performance|productivity|reduce waste|downtime|efficiency)\b/i },
-      { id: "production-context", label: "Role operates in production or manufacturing", weight: 10, pattern: /\b(production|manufacturing|maintenance manager)\b/i },
-    ],
-  },
-  {
-    pathwayId: "level-4-associate-project-manager",
-    title: "Level 4 Associate Project Manager",
-    standard: "Associate Project Manager",
-    baseScore: 38,
-    rationale: "Develops planning, risk, stakeholder coordination and accountable project delivery.",
-    signals: [
-      { id: "project-goal", label: "Wants responsibility for project delivery", weight: 22, pattern: /\b(project manager|project management|manage projects|project delivery)\b/i },
-      { id: "delivery-coordination", label: "Role includes planning and coordination", weight: 14, pattern: /\b(planning|coordination|work packages|risk management)\b/i },
-    ],
-  },
-  {
-    pathwayId: "level-4-commercial-procurement-supply",
-    title: "Level 4 Commercial Procurement and Supply",
-    standard: "Commercial Procurement and Supply",
-    baseScore: 42,
-    rationale: "Directly develops sourcing, supplier management, commercial judgement and procurement practice.",
-    signals: [
-      { id: "procurement-role", label: "Role is in procurement or buying", weight: 30, pattern: /\b(procurement|buyer|buying|sourcing)\b/i },
-      { id: "supplier-work", label: "Work includes supplier or commercial decisions", weight: 18, pattern: /\b(supplier|commercial|contract management)\b/i },
-    ],
-  },
-  {
-    pathwayId: "level-3-customer-service-specialist",
-    title: "Level 3 Customer Service Specialist",
-    standard: "Customer Service Specialist",
-    baseScore: 40,
-    rationale: "Develops complex customer handling, service improvement and ownership of customer outcomes.",
-    signals: [
-      { id: "customer-role", label: "Role is customer-facing", weight: 24, pattern: /\b(customer service|customer support|customer experience|client service)\b/i },
-      { id: "service-improvement", label: "Wants to improve service outcomes", weight: 16, pattern: /\b(service improvement|customer outcomes|complaints)\b/i },
-    ],
-  },
-  {
-    pathwayId: "level-3-engineering-technician",
-    title: "Level 3 Engineering Technician",
-    standard: "Engineering Technician",
-    baseScore: 41,
-    rationale: "Builds technical engineering competence through applied manufacturing, maintenance and workplace evidence.",
-    signals: [
-      { id: "engineering-role", label: "Role has an engineering or maintenance focus", weight: 28, pattern: /\b(engineer|engineering|maintenance|technical maintenance)\b/i },
-      { id: "manufacturing-context", label: "Work is based in manufacturing or production", weight: 14, pattern: /\b(manufacturing|production|factory)\b/i },
-    ],
-  },
-  {
-    pathwayId: "level-3-construction-site-supervisor",
-    title: "Level 3 Construction Site Supervisor",
-    standard: "Construction Site Supervisor",
-    baseScore: 41,
-    rationale: "Develops site coordination, safety, quality control and supervised construction delivery.",
-    signals: [
-      { id: "site-supervision", label: "Role includes construction site supervision", weight: 30, pattern: /\b(site supervisor|construction site|site supervision)\b/i },
-      { id: "construction-delivery", label: "Work includes construction delivery or handover", weight: 16, pattern: /\b(construction|site delivery|handover|quality checks)\b/i },
-    ],
-  },
-];
+function pathway(
+  standardId: string,
+  baseScore: number,
+  rationale: string,
+  signals: PathwaySignal[],
+): PathwayDefinition {
+  const standard = getApprenticeshipStandard(standardId);
+  if (!standard) throw new Error("Unknown apprenticeship standard: " + standardId);
+  return {
+    pathwayId: standard.id,
+    title: "Level " + standard.level + " " + standard.title,
+    standard: standard.title,
+    baseScore,
+    rationale,
+    signals,
+  };
+}
 
+const pathwayCatalogue: PathwayDefinition[] = [
+  pathway("ST0192", 40, "Builds continuous improvement, operational performance, process optimisation and cross-functional change capability.", [
+    { id: "ai-interest", label: "Interested in practical AI-enabled improvement", weight: 12, pattern: /\b(ai|artificial intelligence|chatgpt|copilot|generative ai)\b/i },
+    { id: "automation-interest", label: "Wants to improve workflow automation", weight: 18, pattern: /\b(automation|automate|automating|workflow)\b/i },
+    { id: "continuous-improvement", label: "Focuses on continuous improvement", weight: 22, pattern: /\b(continuous improvement|process improvement|lean|six sigma)\b/i },
+    { id: "operational-performance", label: "Wants to improve operational performance", weight: 17, pattern: /\b(operational performance|productivity|reduce waste|downtime|efficiency)\b/i },
+    { id: "production-context", label: "Role operates in production or manufacturing", weight: 10, pattern: /\b(production|manufacturing|maintenance manager)\b/i },
+    { id: "business-improvement", label: "Wants measurable business improvement", weight: 10, pattern: /\b(help the business|business improvement|improve how|business grow|productivity)\b/i },
+  ]),
+  pathway("ST0795", 44, "Builds practical data handling, reporting, data quality and insight capability for operational roles.", [
+    { id: "reporting-work", label: "Already works with reporting", weight: 18, pattern: /\b(reporting|reports|report)\b/i },
+    { id: "spreadsheet-work", label: "Uses spreadsheets in current work", weight: 14, pattern: /\b(spreadsheet|spreadsheets|excel)\b/i },
+    { id: "data-interest", label: "Interested in data-led work", weight: 12, pattern: /\b(data|data-focused|data role)\b/i },
+    { id: "data-quality", label: "Role includes CRM or data quality", weight: 10, pattern: /\b(crm|data quality|records|information quality)\b/i },
+    { id: "analysis-interest", label: "Wants stronger analysis and insight", weight: 8, pattern: /\b(analysis|analytics|dashboard|insight)\b/i },
+    { id: "automation-adjacent", label: "Automation requires reliable operational data", weight: 6, pattern: /\b(automation|automate|workflow)\b/i },
+    { id: "admin-role", label: "Administrative work provides relevant data tasks", weight: 6, pattern: /\b(admin|administration|administrative)\b/i },
+  ]),
+  pathway("ST0118", 38, "Supports deeper analysis, insight generation, data storytelling and ownership of business reporting.", [
+    { id: "advanced-analysis", label: "Wants deeper analytical responsibility", weight: 20, pattern: /\b(data analyst|advanced analysis|statistical|data science)\b/i },
+    { id: "insight-ownership", label: "Wants to own dashboards or business insight", weight: 16, pattern: /\b(own reporting|reporting ownership|business insight|dashboards)\b/i },
+    { id: "data-career", label: "Career goal is a data-focused role", weight: 15, pattern: /\b(move into (?:a )?data|data career|data-focused role)\b/i },
+  ]),
+  pathway("ST0117", 38, "Develops requirements discovery, process analysis, stakeholder engagement and systems improvement.", [
+    { id: "process-analysis", label: "Interested in analysing and redesigning processes", weight: 18, pattern: /\b(process mapping|process analysis|redesign process|requirements)\b/i },
+    { id: "systems-change", label: "Work involves systems or organisational change", weight: 16, pattern: /\b(system change|systems improvement|change project|stakeholder)\b/i },
+    { id: "business-analysis", label: "Explicit interest in business analysis", weight: 22, pattern: /\b(business analyst|business analysis)\b/i },
+  ]),
+  pathway("ST0310", 38, "Develops planning, risk, stakeholder coordination and accountable project delivery.", [
+    { id: "project-goal", label: "Wants responsibility for project delivery", weight: 22, pattern: /\b(project manager|project management|manage projects|project delivery)\b/i },
+    { id: "delivery-coordination", label: "Role includes planning and coordination", weight: 14, pattern: /\b(planning|coordination|work packages|risk management)\b/i },
+  ]),
+  pathway("ST0313", 42, "Directly develops sourcing, supplier management, commercial judgement and procurement practice.", [
+    { id: "procurement-role", label: "Role is in procurement or buying", weight: 30, pattern: /\b(procurement|buyer|buying|sourcing)\b/i },
+    { id: "supplier-work", label: "Work includes supplier or commercial decisions", weight: 18, pattern: /\b(supplier|commercial|contract management)\b/i },
+  ]),
+  pathway("ST0071", 40, "Develops complex customer handling, service improvement and ownership of customer outcomes.", [
+    { id: "customer-role", label: "Role is customer-facing", weight: 24, pattern: /\b(customer service|customer support|customer experience|client service)\b/i },
+    { id: "service-improvement", label: "Wants to improve service outcomes", weight: 16, pattern: /\b(service improvement|customer outcomes|complaints)\b/i },
+  ]),
+  pathway("ST0457", 41, "Builds technical engineering competence through applied manufacturing, maintenance and workplace evidence.", [
+    { id: "engineering-role", label: "Role has an engineering or maintenance focus", weight: 28, pattern: /\b(engineer|engineering|maintenance|technical maintenance)\b/i },
+    { id: "manufacturing-context", label: "Work is based in manufacturing or production", weight: 14, pattern: /\b(manufacturing|production|factory)\b/i },
+  ]),
+  pathway("ST0048", 41, "Develops site coordination, safety, quality control and supervised construction delivery.", [
+    { id: "site-supervision", label: "Role includes construction site supervision", weight: 30, pattern: /\b(site supervisor|construction site|site supervision)\b/i },
+    { id: "construction-delivery", label: "Work includes construction delivery or handover", weight: 16, pattern: /\b(construction|site delivery|handover|quality checks)\b/i },
+  ]),
+];
 function clamp(value: number) {
   return Math.max(0, Math.min(99, Math.round(value)));
 }
