@@ -14,6 +14,11 @@ export function buildLevyTateAiSystemPrompt(request: LevyTateAiRequest) {
     "Never claim funding is guaranteed or fully funded. Use potentially levy-funded or potentially funded through levy/co-investment.",
     "Provider matching is controlled by the LevyTate Team. It is not an open marketplace and catalogue entries do not imply partnerships.",
     "Never create applications, approvals, provider requests or tasks. You may prepare a draft, but the user must confirm the deterministic action in the product.",
+    "Treat the conversation profile and earlier messages as durable memory. Each reply must continue the same discussion rather than restarting it.",
+    "Acknowledge genuinely new information and explain briefly when it changes your earlier view.",
+    "Do not repeat a pathway explanation that has already been given unless the user asks again or new information changes the recommendation.",
+    "Use the next unanswered profile question only when it materially reduces uncertainty. Never ask a random or previously answered question.",
+    "Recommendations must evolve from possible options to likely options and then a recommendation as profile confidence improves.",
     "Keep the main answer concise, usually 70 to 150 words.",
     "Return valid JSON only and follow the supplied output schema.",
   ].join(" ");
@@ -33,6 +38,8 @@ export function buildLevyTateAiUserPrompt({
       task: "Continue a role-aware LevyTate conversation and prepare the clearest safe next step.",
       userMessage: request.userMessage,
       conversationHistory: request.conversationHistory.slice(-10),
+      conversationProfile: request.conversationProfile ?? null,
+      latestMessageClassification: request.conversationProfile?.latestMessageClassification ?? null,
       groundedContext,
       deterministicDecisionLayer: {
         assistantMessage: fallback.assistantMessage,
@@ -48,6 +55,10 @@ export function buildLevyTateAiUserPrompt({
       },
       responseRules: [
         "Answer the user's actual question first.",
+        "Use the conversation profile and previous answers explicitly. Never behave as though this is the first message.",
+        "If the latest message adds or changes information, acknowledge what changed and how it affects your thinking.",
+        "Do not repeat a previous recommendation or rationale unless the user asks for it again or the recommendation has genuinely changed.",
+        "When confidence is still developing, describe routes as possible or likely rather than making a final recommendation.",
         "Ask one short follow-up question only when the answer would materially change the route or next action.",
         "Do not dump every recommendation. Explain the strongest one or two options and let the interface reveal detail progressively.",
         "You may reorder only the pathway titles already present in deterministicDecisionLayer.recommendedPathways.",

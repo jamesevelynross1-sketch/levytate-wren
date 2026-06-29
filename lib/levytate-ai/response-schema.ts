@@ -122,6 +122,50 @@ export type LevyTateConversationMessage = {
   content: string;
 };
 
+export type LevyTateMessageClassification =
+  | "new_information"
+  | "answer_to_previous_question"
+  | "clarification"
+  | "change_of_direction"
+  | "new_question"
+  | "platform_assistance_request";
+
+export type LevyTateConversationRecommendation = {
+  title: string;
+  confidence: number;
+  stage: "possible" | "likely" | "recommended";
+  firstDiscussedAt: number;
+  lastDiscussedAt: number;
+};
+
+export type LevyTateConversationProfile = {
+  currentRole: string | null;
+  currentDepartment: string | null;
+  currentEmployer: string | null;
+  careerGoal: string | null;
+  reasonForDevelopment: string | null;
+  currentSkills: string[];
+  aiConfidence: number | null;
+  digitalConfidence: number | null;
+  interestAreas: string[];
+  preferredLearningStyle: string | null;
+  managementAspirations: string | null;
+  currentApplicationStatus: string | null;
+  recommendedPathways: LevyTateConversationRecommendation[];
+  confidence: {
+    role: number;
+    careerGoal: number;
+    technicalConfidence: number;
+    managementAmbition: number;
+    overall: number;
+  };
+  questionsAlreadyAsked: string[];
+  questionsStillToAsk: string[];
+  conversationSummary: string;
+  exchangeCount: number;
+  latestMessageClassification: LevyTateMessageClassification;
+};
+
 export type LevyTateAiAction = {
   label: string;
   type:
@@ -206,6 +250,7 @@ export type LevyTateAiRequest = {
   currentSection: string;
   userMessage: string;
   conversationHistory: LevyTateConversationMessage[];
+  conversationProfile?: LevyTateConversationProfile;
   employerContext: string;
   currentWorkspace?: LevyTateAiWorkspaceContext;
   currentApplication?: RequestSummary | null;
@@ -238,6 +283,8 @@ export type LevyTateAiResponse = {
   managerGuidance?: ManagerGuidance;
   departmentGuidance?: DepartmentGuidance;
   leadGuidance?: LeadGuidance;
+  conversationProfile?: LevyTateConversationProfile;
+  messageClassification?: LevyTateMessageClassification;
 };
 
 function isConversationMessage(value: unknown): value is LevyTateConversationMessage {
@@ -278,6 +325,66 @@ function cleanStringArray(value: unknown, limit = 8) {
         .slice(0, limit)
         .map((item) => item.trim().slice(0, 180))
     : undefined;
+}
+
+function parseConversationProfile(value: unknown): LevyTateConversationProfile | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const candidate = value as Partial<LevyTateConversationProfile>;
+  const confidence = candidate.confidence;
+  const classification = candidate.latestMessageClassification;
+  const validClassification = classification === "new_information" ||
+    classification === "answer_to_previous_question" ||
+    classification === "clarification" ||
+    classification === "change_of_direction" ||
+    classification === "new_question" ||
+    classification === "platform_assistance_request";
+  if (!confidence || typeof confidence !== "object" || !validClassification) return undefined;
+
+  const nullableString = (item: unknown) => typeof item === "string" && item.trim() ? item.trim().slice(0, 300) : null;
+  const score = (item: unknown) => typeof item === "number" && Number.isFinite(item) ? Math.max(0, Math.min(100, Math.round(item))) : 0;
+  const recommendations = Array.isArray(candidate.recommendedPathways)
+    ? candidate.recommendedPathways.slice(0, 8).flatMap((item) => {
+        if (!item || typeof item !== "object") return [];
+        const recommendation = item as Partial<LevyTateConversationRecommendation>;
+        if (typeof recommendation.title !== "string" || !recommendation.title.trim()) return [];
+        const stage: LevyTateConversationRecommendation["stage"] = recommendation.stage === "likely" || recommendation.stage === "recommended" ? recommendation.stage : "possible";
+        return [{
+          title: recommendation.title.trim().slice(0, 180),
+          confidence: score(recommendation.confidence),
+          stage,
+          firstDiscussedAt: typeof recommendation.firstDiscussedAt === "number" ? Math.max(1, Math.round(recommendation.firstDiscussedAt)) : 1,
+          lastDiscussedAt: typeof recommendation.lastDiscussedAt === "number" ? Math.max(1, Math.round(recommendation.lastDiscussedAt)) : 1,
+        }];
+      })
+    : [];
+
+  return {
+    currentRole: nullableString(candidate.currentRole),
+    currentDepartment: nullableString(candidate.currentDepartment),
+    currentEmployer: nullableString(candidate.currentEmployer),
+    careerGoal: nullableString(candidate.careerGoal),
+    reasonForDevelopment: nullableString(candidate.reasonForDevelopment),
+    currentSkills: cleanStringArray(candidate.currentSkills, 12) ?? [],
+    aiConfidence: candidate.aiConfidence === null ? null : score(candidate.aiConfidence),
+    digitalConfidence: candidate.digitalConfidence === null ? null : score(candidate.digitalConfidence),
+    interestAreas: cleanStringArray(candidate.interestAreas, 12) ?? [],
+    preferredLearningStyle: nullableString(candidate.preferredLearningStyle),
+    managementAspirations: nullableString(candidate.managementAspirations),
+    currentApplicationStatus: nullableString(candidate.currentApplicationStatus),
+    recommendedPathways: recommendations,
+    confidence: {
+      role: score(confidence.role),
+      careerGoal: score(confidence.careerGoal),
+      technicalConfidence: score(confidence.technicalConfidence),
+      managementAmbition: score(confidence.managementAmbition),
+      overall: score(confidence.overall),
+    },
+    questionsAlreadyAsked: cleanStringArray(candidate.questionsAlreadyAsked, 16) ?? [],
+    questionsStillToAsk: cleanStringArray(candidate.questionsStillToAsk, 12) ?? [],
+    conversationSummary: nullableString(candidate.conversationSummary) ?? "No profile details captured yet.",
+    exchangeCount: typeof candidate.exchangeCount === "number" ? Math.max(0, Math.min(50, Math.round(candidate.exchangeCount))) : 0,
+    latestMessageClassification: classification,
+  };
 }
 
 function parseRoleMappings(value: unknown): LevyTateAiRoleMappingContext[] | undefined {
@@ -403,6 +510,7 @@ export function parseLevyTateAiRequest(payload: unknown): LevyTateAiRequest | nu
       role: message.role,
       content: message.content.trim().slice(0, 2000),
     })),
+    conversationProfile: parseConversationProfile(candidate.conversationProfile),
     employerContext: candidate.employerContext.trim().slice(0, 200),
     currentWorkspace: candidate.currentWorkspace && typeof candidate.currentWorkspace === "object"
       ? {

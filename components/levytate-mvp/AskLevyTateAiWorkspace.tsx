@@ -6,6 +6,7 @@ import type {
   LevyTateAiRequest,
   LevyTateAiResponse,
   LevyTateConversationMessage,
+  LevyTateConversationProfile,
   LevyTateRole,
 } from "@/lib/levytate/ai/types";
 
@@ -74,6 +75,10 @@ function initialConversations() {
   return Object.fromEntries(assistantRoles.map((role) => [role, initialMessages(role)])) as Record<AssistantRole, ChatMessage[]>;
 }
 
+function initialProfiles() {
+  return Object.fromEntries(assistantRoles.map((role) => [role, null])) as Record<AssistantRole, LevyTateConversationProfile | null>;
+}
+
 function responseActions(response: LevyTateAiResponse) {
   return response.suggestedActions ?? response.recommendedActions;
 }
@@ -81,6 +86,7 @@ function responseActions(response: LevyTateAiResponse) {
 export function AskLevyTateAiWorkspace() {
   const [role, setRole] = useState<AssistantRole>("Employee");
   const [conversations, setConversations] = useState<Record<AssistantRole, ChatMessage[]>>(initialConversations);
+  const [profiles, setProfiles] = useState<Record<AssistantRole, LevyTateConversationProfile | null>>(initialProfiles);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -107,19 +113,22 @@ export function AskLevyTateAiWorkspace() {
     const trimmed = message.trim();
     if (!trimmed || loading) return;
 
+    const activeRole = role;
+    const roleMessages = conversations[activeRole];
     const userMessage: ChatMessage = { id: messageId(), role: "user", content: trimmed };
-    const nextMessages = [...messages, userMessage];
-    const conversationHistory: LevyTateConversationMessage[] = nextMessages
+    const nextMessages = [...roleMessages, userMessage];
+    const conversationHistory: LevyTateConversationMessage[] = roleMessages
       .filter((item) => !item.id.startsWith("welcome-"))
       .map(({ role: messageRole, content }) => ({ role: messageRole, content }));
     const payload: LevyTateAiRequest = {
-      role,
-      userRole: role,
-      selectedEmployee: role === "Employee" ? "Current beta user" : undefined,
+      role: activeRole,
+      userRole: activeRole,
+      selectedEmployee: activeRole === "Employee" ? "Current beta user" : undefined,
       selectedSite: "All sites",
       currentSection: "Ask LevyTate AI",
       userMessage: trimmed,
       conversationHistory,
+      conversationProfile: profiles[activeRole] ?? undefined,
       employerContext: "LevyTate beta workspace",
       currentWorkspace: {
         employerName: "Beta employer not yet configured",
@@ -131,7 +140,7 @@ export function AskLevyTateAiWorkspace() {
       availablePathways: [],
     };
 
-    setConversations((current) => ({ ...current, [role]: nextMessages }));
+    setConversations((current) => ({ ...current, [activeRole]: nextMessages }));
     setInput("");
     setError("");
     setLoading(true);
@@ -150,7 +159,10 @@ export function AskLevyTateAiWorkspace() {
 
       const content = [result.assistantMessage, result.followUpQuestion].filter(Boolean).join("\n\n");
       const assistantMessage: ChatMessage = { id: messageId(), role: "assistant", content, response: result };
-      setConversations((current) => ({ ...current, [role]: [...current[role], assistantMessage] }));
+      setConversations((current) => ({ ...current, [activeRole]: [...current[activeRole], assistantMessage] }));
+      if (result.conversationProfile) {
+        setProfiles((current) => ({ ...current, [activeRole]: result.conversationProfile ?? null }));
+      }
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Ask LevyTate AI could not respond.");
     } finally {

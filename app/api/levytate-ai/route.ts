@@ -3,6 +3,11 @@ import { NextResponse } from "next/server";
 import { enforceLevyTateAiActions } from "@/lib/levytate/ai/actions";
 import { buildLevyTateAiContext } from "@/lib/levytate/ai/context";
 import { buildLevyTateAiFallbackResponse } from "@/lib/levytate/ai/fallbackResponses";
+import {
+  applyConversationMemoryToFallback,
+  finaliseConversationProfile,
+  withConversationMemory,
+} from "@/lib/levytate/ai/memory";
 import { levyTateAiEnabled, requestLevyTateOpenAI, type LevyTateGeneratedGuidance } from "@/lib/levytate/ai/openai";
 import { buildLevyTateAiSystemPrompt, buildLevyTateAiUserPrompt } from "@/lib/levytate/ai/prompts";
 import {
@@ -74,7 +79,8 @@ function mergeGeneratedGuidance(fallback: LevyTateAiResponse, generated: LevyTat
 }
 
 function finaliseResponse(request: LevyTateAiRequest, response: LevyTateAiResponse) {
-  return enforceLevyTateAiActions(request, applyLevyTateAiSafety(request, response));
+  const withProfile = finaliseConversationProfile(request, response);
+  return enforceLevyTateAiActions(request, applyLevyTateAiSafety(request, withProfile));
 }
 
 export async function POST(request: Request) {
@@ -86,11 +92,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Invalid LevyTate AI request payload." }, { status: 400 });
     }
 
+    parsedRequest = withConversationMemory(parsedRequest);
+
     if (isRateLimited(rateLimitKey(request), parsedRequest.userMessage)) {
       return NextResponse.json({ message: "Please wait a moment before asking another question." }, { status: 429 });
     }
 
-    const fallback = buildLevyTateAiFallbackResponse(parsedRequest);
+    const fallback = applyConversationMemoryToFallback(
+      parsedRequest,
+      buildLevyTateAiFallbackResponse(parsedRequest),
+    );
     if (!levyTateAiEnabled()) {
       return NextResponse.json(finaliseResponse(parsedRequest, fallback));
     }
@@ -107,7 +118,11 @@ export async function POST(request: Request) {
     console.error("LevyTate AI request failed", { error });
 
     if (parsedRequest) {
-      return NextResponse.json(finaliseResponse(parsedRequest, buildLevyTateAiFallbackResponse(parsedRequest)));
+      const fallback = applyConversationMemoryToFallback(
+        parsedRequest,
+        buildLevyTateAiFallbackResponse(parsedRequest),
+      );
+      return NextResponse.json(finaliseResponse(parsedRequest, fallback));
     }
 
     return NextResponse.json({ message: "LevyTate AI could not process this request." }, { status: 500 });

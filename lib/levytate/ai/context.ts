@@ -60,6 +60,7 @@ export function buildLevyTateAiContext(request: LevyTateAiRequest) {
       activeModule: request.currentSection,
     },
     role: request.role,
+    conversationProfile: request.conversationProfile ?? null,
     selectedEmployee: request.selectedEmployee ?? request.contextData?.selectedPersona?.name ?? null,
     employeePersona: request.contextData?.selectedPersona ?? null,
     currentApplication: request.currentApplication ?? request.contextData?.activeApplication ?? null,
