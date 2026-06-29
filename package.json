@@ -12,6 +12,7 @@
     "lint": "node --max-old-space-size=4096 node_modules/eslint/bin/eslint.js app/layout.tsx app/page.tsx app/stocks app/api/stocks components/stocks components/layout/SiteChrome.tsx components/ui/SectionEyebrow.tsx components/brand/Logo.tsx components/sections/TrustBandLocal.tsx lib/stocks next.config.ts tailwind.config.ts"
   },
   "dependencies": {
+    "lucide-react": "^0.468.0",
     "next": "^15.5.18",
     "react": "^19.2.6",
     "react-dom": "^19.2.6"

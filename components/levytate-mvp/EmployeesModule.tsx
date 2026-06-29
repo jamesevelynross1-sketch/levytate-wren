@@ -1,0 +1,31 @@
+"use client";
+
+import { useState, type FormEvent } from "react";
+import { EmptyState, FormActions, FormField, FormGrid, FormSelect, MvpModal, MvpPanel, MvpToolbar, StatusBadge, TableAction, TableBody, TableHead, TableShell } from "@/components/levytate-mvp/MvpUi";
+import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
+import { includesSearch, statusTone } from "@/components/levytate-mvp/module-utils";
+import { activeApplicationStatuses, createMvpId, nowIso, todayIso, type MvpEmployee } from "@/lib/levytate/mvp/workspace";
+
+export function EmployeesModule() {
+  const { data, saveEmployee, archiveEmployee } = useMvpWorkspace();
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("Active");
+  const [draft, setDraft] = useState<MvpEmployee | null>(null);
+  const [error, setError] = useState("");
+  const visible = data.employees.filter((employee) => (status === "All" || employee.status === status) && includesSearch([employee.name, employee.email, employee.employeeNumber, employee.department, employee.site], search));
+
+  function blankEmployee(): MvpEmployee {
+    const now = nowIso();
+    return { id: createMvpId("employee"), employeeNumber: `EMP-${String(data.employees.length + 1).padStart(4, "0")}`, name: "", email: "", roleId: data.roles.find((role) => role.status === "Active")?.id ?? "", managerId: "", department: "", site: "", platformRole: "Employee", status: "Active", startDate: todayIso(), createdAt: now, updatedAt: now };
+  }
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!draft) return;
+    if (!draft.name.trim() || !draft.email.trim() || !draft.roleId) { setError("Name, email and assigned role are required. Create a role first if none are available."); return; }
+    saveEmployee({ ...draft, name: draft.name.trim(), email: draft.email.trim(), updatedAt: nowIso() });
+    setDraft(null); setError("");
+  }
+
+  return <MvpPanel title="Employees" eyebrow="Workforce records"><MvpToolbar search={search} onSearch={setSearch} placeholder="Search name, email, department or site" actionLabel="Add employee" onAction={() => setDraft(blankEmployee())} filters={<select value={status} onChange={(event) => setStatus(event.target.value)} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-sm font-semibold text-[#102c3d]/66"><option>Active</option><option>Archived</option><option>All</option></select>} />{visible.length ? <TableShell><TableHead><tr><th className="px-4 py-3">Employee</th><th className="px-4 py-3">Role</th><th className="px-4 py-3">Department</th><th className="px-4 py-3">Site</th><th className="px-4 py-3">Application</th><th className="px-4 py-3 text-right">Actions</th></tr></TableHead><TableBody>{visible.map((employee) => { const role = data.roles.find((item) => item.id === employee.roleId); const application = data.applications.find((item) => item.employeeId === employee.id && activeApplicationStatuses().includes(item.status)); return <tr key={employee.id}><td className="px-4 py-3"><p className="font-semibold">{employee.name}</p><p className="mt-0.5 text-xs text-[#102c3d]/48">{employee.email} · {employee.employeeNumber}</p></td><td className="px-4 py-3 text-[#102c3d]/62">{role?.title ?? "Unassigned"}</td><td className="px-4 py-3 text-[#102c3d]/62">{employee.department || "Not set"}</td><td className="px-4 py-3 text-[#102c3d]/62">{employee.site || "Not set"}</td><td className="px-4 py-3"><StatusBadge tone={application ? statusTone(application.status) : "neutral"}>{application?.status ?? "No active application"}</StatusBadge></td><td className="px-4 py-3"><div className="flex justify-end gap-2"><TableAction onClick={() => setDraft({ ...employee })}>Edit</TableAction><TableAction onClick={() => archiveEmployee(employee.id)} danger={employee.status === "Active"}>{employee.status === "Archived" ? "Restore" : "Archive"}</TableAction></div></td></tr>; })}</TableBody></TableShell> : <EmptyState title="No employees yet" copy="Add your first employee, then assign their role, manager, department and site." actionLabel="Add employee" onAction={() => setDraft(blankEmployee())} />}{draft ? <MvpModal title={data.employees.some((item) => item.id === draft.id) ? "Edit employee" : "Add employee"} onClose={() => setDraft(null)}><form onSubmit={submit}><FormGrid><FormField label="Employee name" value={draft.name} onChange={(value) => setDraft({ ...draft, name: value })} required /><FormField label="Email" type="email" value={draft.email} onChange={(value) => setDraft({ ...draft, email: value })} required /><FormField label="Employee number" value={draft.employeeNumber} onChange={(value) => setDraft({ ...draft, employeeNumber: value })} required /><FormSelect label="Assigned role" value={draft.roleId} onChange={(value) => setDraft({ ...draft, roleId: value })} required options={[{ value: "", label: "Select a role" }, ...data.roles.filter((role) => role.status === "Active").map((role) => ({ value: role.id, label: role.title }))]} /><FormSelect label="Manager" value={draft.managerId} onChange={(value) => setDraft({ ...draft, managerId: value })} options={[{ value: "", label: "No manager assigned" }, ...data.employees.filter((employee) => employee.id !== draft.id && employee.status === "Active").map((employee) => ({ value: employee.id, label: employee.name }))]} /><FormSelect label="Platform role" value={draft.platformRole} onChange={(value) => setDraft({ ...draft, platformRole: value as MvpEmployee["platformRole"] })} options={["Employee", "Line Manager", "Department Head", "Apprenticeship Lead"]} /><FormField label="Department" value={draft.department} onChange={(value) => setDraft({ ...draft, department: value })} /><FormField label="Site" value={draft.site} onChange={(value) => setDraft({ ...draft, site: value })} /><FormField label="Start date" type="date" value={draft.startDate} onChange={(value) => setDraft({ ...draft, startDate: value })} /></FormGrid><FormActions onCancel={() => setDraft(null)} label="Save employee" error={error} /></form></MvpModal> : null}</MvpPanel>;
+}
