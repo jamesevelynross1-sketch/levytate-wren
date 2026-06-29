@@ -68,7 +68,7 @@ export function enforceLevyTateAiActions(request: LevyTateAiRequest, response: L
   const activeApplication = request.currentApplication ?? request.contextData?.activeApplication ?? null;
 
   if (request.role === "Employee" && activeApplication) {
-    actions = actions.filter((action) => action.type !== "start_application");
+    actions = actions.filter((action) => action.type !== "start_application" && action.type !== "draft_application_reason");
     if (!actions.some((action) => action.type === "open_my_applications")) {
       actions = [
         { label: "View current application", type: "open_my_applications" as const, target: "My Applications", requiresConfirmation: false },

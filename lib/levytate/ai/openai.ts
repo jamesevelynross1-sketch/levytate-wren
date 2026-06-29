@@ -1,10 +1,13 @@
-import type { LevyTateAiRequest } from "@/lib/levytate/ai/types";
+import type { LevyTateAiAction, LevyTateAiRequest } from "@/lib/levytate/ai/types";
 
 export type LevyTateGeneratedGuidance = {
   assistantMessage: string | null;
   followUpQuestion: string | null;
   quickReplies: string[];
   recommendedPathwayTitles: string[];
+  suggestedActionTypes: LevyTateAiAction["type"][];
+  shouldShowPathways: boolean;
+  shouldShowActions: boolean;
   safetyNotes: string[];
   managerMessageDraft: string | null;
 };
@@ -19,6 +22,26 @@ export function levyTateAiModel() {
   return process.env.LEVYTATE_AI_MODEL?.trim() || "gpt-5.4-mini";
 }
 
+const actionTypes: LevyTateAiAction["type"][] = [
+  "open_pathway",
+  "start_application",
+  "open_my_applications",
+  "open_review_queue",
+  "open_team_development",
+  "open_department_analytics",
+  "open_site_breakdown",
+  "open_reporting",
+  "open_final_approvals",
+  "request_provider_matching",
+  "compare_routes",
+  "save_interest",
+  "prepare_manager_message",
+  "prepare_approval_rationale",
+  "draft_application_reason",
+  "create_admin_follow_up_task",
+  "ask_follow_up",
+];
+
 function outputSchema() {
   return {
     type: "object",
@@ -28,6 +51,9 @@ function outputSchema() {
       followUpQuestion: { type: "string" },
       quickReplies: { type: "array", items: { type: "string" } },
       recommendedPathwayTitles: { type: "array", items: { type: "string" } },
+      suggestedActionTypes: { type: "array", items: { type: "string", enum: actionTypes } },
+      shouldShowPathways: { type: "boolean" },
+      shouldShowActions: { type: "boolean" },
       safetyNotes: { type: "array", items: { type: "string" } },
       managerMessageDraft: { type: "string" },
     },
@@ -36,6 +62,9 @@ function outputSchema() {
       "followUpQuestion",
       "quickReplies",
       "recommendedPathwayTitles",
+      "suggestedActionTypes",
+      "shouldShowPathways",
+      "shouldShowActions",
       "safetyNotes",
       "managerMessageDraft",
     ],
@@ -68,6 +97,11 @@ function cleanStringArray(value: unknown, limit: number) {
     : [];
 }
 
+function cleanActionTypes(value: unknown) {
+  const allowed = new Set<string>(actionTypes);
+  return cleanStringArray(value, 4).filter((item): item is LevyTateAiAction["type"] => allowed.has(item));
+}
+
 function parseGeneratedGuidance(raw: string): LevyTateGeneratedGuidance {
   const parsed = JSON.parse(raw) as Record<string, unknown>;
   return {
@@ -75,6 +109,9 @@ function parseGeneratedGuidance(raw: string): LevyTateGeneratedGuidance {
     followUpQuestion: typeof parsed.followUpQuestion === "string" && parsed.followUpQuestion.trim() ? parsed.followUpQuestion.trim() : null,
     quickReplies: cleanStringArray(parsed.quickReplies, 4),
     recommendedPathwayTitles: cleanStringArray(parsed.recommendedPathwayTitles, 5),
+    suggestedActionTypes: cleanActionTypes(parsed.suggestedActionTypes),
+    shouldShowPathways: parsed.shouldShowPathways === true,
+    shouldShowActions: parsed.shouldShowActions === true,
     safetyNotes: cleanStringArray(parsed.safetyNotes, 5),
     managerMessageDraft: typeof parsed.managerMessageDraft === "string" && parsed.managerMessageDraft.trim() ? parsed.managerMessageDraft.trim() : null,
   };
@@ -83,14 +120,19 @@ function parseGeneratedGuidance(raw: string): LevyTateGeneratedGuidance {
 export async function requestLevyTateOpenAI({
   request,
   systemPrompt,
-  userPrompt,
+  contextPrompt,
 }: {
   request: LevyTateAiRequest;
   systemPrompt: string;
-  userPrompt: string;
+  contextPrompt: string;
 }) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY is not configured.");
+
+  const conversation = request.conversationHistory.slice(-10).map((message) => ({
+    role: message.role,
+    content: message.content,
+  }));
 
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
@@ -101,13 +143,14 @@ export async function requestLevyTateOpenAI({
     body: JSON.stringify({
       model: levyTateAiModel(),
       input: [
-        { role: "system", content: [{ type: "input_text", text: systemPrompt }] },
-        { role: "user", content: [{ type: "input_text", text: userPrompt }] },
+        { role: "system", content: `${systemPrompt}\n\nGrounded turn context:\n${contextPrompt}` },
+        ...conversation,
+        { role: "user", content: request.userMessage },
       ],
       text: {
         format: {
           type: "json_schema",
-          name: "levytate_role_aware_guidance",
+          name: "levytate_conversation_turn",
           schema: outputSchema(),
           strict: true,
         },

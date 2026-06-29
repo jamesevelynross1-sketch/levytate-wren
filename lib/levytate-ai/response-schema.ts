@@ -269,6 +269,8 @@ export type LevyTateAiResponse = {
   assistantMessage: string;
   followUpQuestion?: string | null;
   quickReplies?: string[];
+  shouldShowPathways?: boolean;
+  shouldShowActions?: boolean;
   recommendedActions: LevyTateAiAction[];
   suggestedActions?: LevyTateAiAction[];
   recommendedPathways: LevyTateRecommendedPathway[];

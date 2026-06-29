@@ -305,10 +305,17 @@ export function AskLevyTateAiWorkspace() {
 
 function InlineResponse({ response, onAction, onQuickReply, loading }: { response: LevyTateAiResponse; onAction: (action: LevyTateAiAction) => void; onQuickReply: (reply: string) => void; loading: boolean }) {
   const actions = responseActions(response);
+  const showPathways = (response.shouldShowPathways ?? true) && response.recommendedPathways.length > 0;
+  const showActions = (response.shouldShowActions ?? true) && actions.length > 0;
+  const showQuickReplies = Boolean(response.quickReplies?.length);
+  const showWarning = Boolean(response.applicationWarning);
+
+  if (!showPathways && !showActions && !showQuickReplies && !showWarning) return null;
+
   return (
     <div className="mt-4 grid gap-3 border-t border-[#102c3d]/[0.07] pt-4">
-      {response.applicationWarning ? <p className="rounded-xl bg-[#fff9dc] px-3 py-2 text-xs leading-5 text-[#765f00]">{response.applicationWarning}</p> : null}
-      {response.recommendedPathways.length ? (
+      {showWarning ? <p className="rounded-xl bg-[#fff9dc] px-3 py-2 text-xs leading-5 text-[#765f00]">{response.applicationWarning}</p> : null}
+      {showPathways ? (
         <div className="grid gap-2">
           {response.recommendedPathways.slice(0, 3).map((pathway) => (
             <div key={pathway.title} className="rounded-xl bg-[#f8fbfa] px-3 py-2.5 ring-1 ring-[#102c3d]/[0.055]">
@@ -321,7 +328,7 @@ function InlineResponse({ response, onAction, onQuickReply, loading }: { respons
           ))}
         </div>
       ) : null}
-      {actions.length ? (
+      {showActions ? (
         <div className="flex flex-wrap gap-2">
           {actions.map((action) => (
             <button key={`${action.type}-${action.target ?? ""}`} type="button" onClick={() => onAction(action)} className="rounded-full bg-[#102c3d] px-3 py-1.5 text-xs font-semibold text-white transition hover:-translate-y-0.5">
@@ -330,9 +337,9 @@ function InlineResponse({ response, onAction, onQuickReply, loading }: { respons
           ))}
         </div>
       ) : null}
-      {response.quickReplies?.length ? (
+      {showQuickReplies ? (
         <div className="flex flex-wrap gap-2">
-          {response.quickReplies.map((reply) => (
+          {response.quickReplies?.map((reply) => (
             <button key={reply} type="button" onClick={() => onQuickReply(reply)} disabled={loading} className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#0b6f63] ring-1 ring-[#159b8f]/[0.16] transition hover:bg-[#edf7f3] disabled:opacity-50">
               {reply}
             </button>

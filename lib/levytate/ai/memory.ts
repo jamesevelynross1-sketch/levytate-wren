@@ -270,94 +270,100 @@ function aiPathway(): LevyTateRecommendedPathway {
   };
 }
 
-function nextQuestion(profile: LevyTateConversationProfile) {
-  if (profile.questionsStillToAsk[0]) return profile.questionsStillToAsk[0];
-  if (profile.confidence.overall >= 75) return "Would you like me to prepare application answers or a manager discussion summary?";
-  return "Would you like to compare the likely routes or continue refining the goal?";
+function directAiProgrammeQuestion(message: string) {
+  return /\bhow (?:do|can) i (?:get|apply|start|join)|\bget onto\b|\bapply for\b/i.test(message) &&
+    /\bai enablement\b/i.test(message);
 }
 
-function conversationSummaryText(profile: LevyTateConversationProfile) {
-  if (profile.exchangeCount < 5 || profile.exchangeCount % 5 !== 0) return "";
-  const points = [
-    profile.currentRole ? `you're currently working in ${profile.currentRole}` : null,
-    profile.interestAreas.length ? `your strongest interests are ${profile.interestAreas.slice(0, 3).join(", ")}` : null,
-    profile.careerGoal ? `you'd like to ${profile.careerGoal}` : null,
-    profile.currentSkills.length ? `you've already used ${profile.currentSkills.slice(0, 3).join(", ")}` : null,
-  ].filter(Boolean);
-  const closing = profile.confidence.overall >= 75
-    ? "We now have a confident basis for the next step."
-    : "We're getting close to a confident recommendation.";
-  return points.length ? `\n\nSo far I've understood that:\n- ${points.join("\n- ")}\n\n${closing}` : "";
+function pickFallbackVariant(profile: LevyTateConversationProfile, variants: string[]) {
+  return variants[Math.max(0, profile.exchangeCount - 1) % variants.length];
 }
 
 function employeeMemoryFallback(request: LevyTateAiRequest, response: LevyTateAiResponse): LevyTateAiResponse {
   const profile = request.conversationProfile;
   if (!profile) return response;
 
-  const previousPrimary = profile.recommendedPathways[0]?.title ?? null;
-  const asksForRecommendation = /\b(recommend|recommendation|which pathway|what apprenticeship|best fit|compare)\b/i.test(request.userMessage);
-  const aiDirection = profile.interestAreas.includes("AI") && (
-    profile.interestAreas.includes("Automation") ||
-    profile.interestAreas.includes("Business improvement") ||
-    /\b(ai automation|automation project|help the business|business grow)\b/i.test(request.userMessage)
-  );
-  const adminContext = /admin/i.test(profile.currentRole ?? "") ||
-    profile.currentSkills.some((skill) => ["Spreadsheets", "Reporting", "CRM"].includes(skill)) ||
-    /\badmin|spreadsheet|reporting|crm\b/i.test(request.userMessage);
-
-  if (!adminContext && !aiDirection) {
-    return { ...response, conversationProfile: profile, messageClassification: profile.latestMessageClassification };
-  }
-
+  const message = request.userMessage;
+  const activeApplication = request.currentApplication ?? request.contextData?.activeApplication ?? null;
   const data = dataPathway();
   const ai = aiPathway();
-  const primary = aiDirection ? ai : data;
-  const changedDirection = Boolean(previousPrimary && previousPrimary !== primary.title);
-  const currentStage = recommendationStage(profile.confidence.overall);
-  const maturedRecommendation = previousPrimary === primary.title &&
-    profile.recommendedPathways[0]?.stage !== currentStage &&
-    currentStage === "recommended";
-  const repeatedRecommendation = previousPrimary === primary.title && !asksForRecommendation && !maturedRecommendation;
-  const earlyRoleOnly = profile.exchangeCount === 1 && Boolean(profile.currentRole) && !profile.currentSkills.length && !profile.careerGoal;
+  const roleOnly = profile.exchangeCount === 1 && /\badmin(?:istration|istrative)?\b/i.test(profile.currentRole ?? message);
+  const reportingAndAutomation = /\breporting\b/i.test(message) && /\bautomation|automate\b/i.test(message);
+  const aiProjectShift = /\bai automation project|ai project|ai opportunities|help the business grow|improve how the business/i.test(message);
+  const experienceAnswer = /\bchatgpt|copilot|used ai|built.*automation|no automation|haven't built/i.test(message);
+  const asksToCompare = /\bcompare|difference between|versus| vs \b/i.test(message);
+  const asksForApplicationHelp = /\bhelp me apply|application reason|application answer|draft my application/i.test(message);
 
-  let assistantMessage: string;
-  if (earlyRoleOnly) {
-    assistantMessage = "Administration gives us a useful starting point, but it is too early to settle on a pathway. Data Technician is one possible direction if your work centres on spreadsheets and reporting. An AI enablement route may fit better if you are drawn to automation and process improvement.";
-  } else if (changedDirection) {
-    assistantMessage = `That new detail changes my thinking. Earlier I was leaning towards ${previousPrimary} because administration often includes reporting and data quality. You are more interested in using AI automation to improve the business, so ${primary.title} is becoming the stronger route to explore.`;
-  } else if (maturedRecommendation) {
-    assistantMessage = `That gives me a firmer view. You have some practical exposure through ${profile.currentSkills.join(", ") || "digital tools"}, and your goal is clearly about automation-led business improvement. ${primary.title} is now the strongest route to explore, provided your employer can support a real workplace project.`;
-  } else if (repeatedRecommendation && /hands-on|practical|customer onboarding|process/i.test(request.userMessage)) {
-    assistantMessage = "Good, that makes the development need much more concrete. A hands-on learning preference and a real customer onboarding process give you the kind of workplace project that could test value quickly. The next useful step is to define the manual steps, data involved and outcome you would want to improve.";
-  } else if (repeatedRecommendation && /chatgpt|copilot|no automation|haven't built/i.test(request.userMessage)) {
-    assistantMessage = "That is useful context. You have moved beyond complete beginner level through ChatGPT, but you have not yet tested workflow automation. A practical, project-led route is therefore more relevant than a purely theoretical or analytical one.";
-  } else if (repeatedRecommendation) {
-    assistantMessage = profile.questionsStillToAsk[0]
-      ? `That adds useful detail to the profile I am building. I am keeping the earlier pathway in view without repeating the case for it. The remaining question is ${profile.questionsStillToAsk[0].replace(/\?$/, "").toLowerCase()}.`
-      : "That completes another useful part of the picture. I am keeping the earlier recommendation in view without repeating the case for it. We now have enough context to move into application preparation or a focused manager conversation.";
-  } else if (aiDirection) {
-    assistantMessage = "Your interest is moving beyond routine administration into practical AI adoption and workflow improvement. That makes an AI enablement route more relevant than a purely reporting-led option, although the exact fit still depends on your current experience and the projects available at work.";
+  let assistantMessage = "";
+  let followUpQuestion: string | null = null;
+  let quickReplies: string[] = [];
+  let shouldShowPathways = false;
+  let shouldShowActions = false;
+  let pathways: LevyTateRecommendedPathway[] = [data, ai];
+  let actions: LevyTateAiAction[] = [];
+
+  if (directAiProgrammeQuestion(message)) {
+    assistantMessage = "Good question. In LevyTate, you would normally get there in three steps. First, we check that your role gives you genuine opportunities to use AI at work. Then we prepare an application around the business problem you want to solve. Finally, your line manager reviews the role fit and business priority before it moves to the Apprenticeship Lead.";
+    if (activeApplication) {
+      assistantMessage += " You already have an active application, so we can prepare the thinking and manager conversation, but not start another application yet.";
+    }
+    followUpQuestion = "Would you like help with the application reason or the manager conversation?";
+    pathways = [ai, data];
+    actions = [
+      { label: "Prepare application reason", type: "draft_application_reason", target: ai.title },
+      { label: "Prepare manager conversation", type: "prepare_manager_message", target: ai.title },
+      { label: "Compare with Data Technician", type: "compare_routes", target: data.title },
+    ];
+    shouldShowActions = true;
+  } else if (roleOnly) {
+    assistantMessage = "Admin can mean quite different things, so I would not jump to a programme yet. The useful starting point is what fills most of your week and which work you would like to spend less or more time doing.";
+    followUpQuestion = "Is your role mainly reporting and spreadsheets, process administration, customer support, or something else?";
+    quickReplies = ["Reporting and spreadsheets", "Process administration", "Customer support", "Something else"];
+  } else if (reportingAndAutomation) {
+    assistantMessage = "That gives us two useful threads. Reporting could point towards a data pathway, while automation may be closer to AI enablement or process improvement. I would not choose between them until we know what you want to be doing, not just what tasks are appearing in the role.";
+    followUpQuestion = "Which matters more to you: analysing information, building automations, or improving the wider process?";
+    quickReplies = ["Analysing information", "Building automations", "Improving the process"];
+    pathways = [data, ai];
+  } else if (aiProjectShift) {
+    assistantMessage = "That is a slightly different angle, and it is useful. You are not just talking about improving reporting. You are interested in using AI to change how the business works, which makes an AI enablement route more relevant than a purely data-led route.";
+    followUpQuestion = "Are you imagining yourself identifying AI opportunities, building automations, or helping colleagues use AI tools better?";
+    quickReplies = ["Identifying AI opportunities", "Building automations", "Helping colleagues use AI"];
+    pathways = [ai, data];
+  } else if (experienceAnswer) {
+    assistantMessage = "That helps place your starting point. You have enough exposure to understand what generative AI can do, but the development need is still practical: turning a useful idea into a safe, repeatable workplace process.";
+    followUpQuestion = "What is one manual process you would most like to improve?";
+    quickReplies = ["Customer onboarding", "Reporting workflow", "CRM updates", "Another process"];
+    pathways = [ai, data];
+  } else if (asksToCompare) {
+    assistantMessage = "The clearest distinction is the work outcome. Data Technician is stronger when the role needs better data handling, reporting and insight. AI Enablement is stronger when the employee will identify use cases, improve workflows and help the organisation adopt AI responsibly.";
+    followUpQuestion = "Which of those outcomes is closer to the work you want to own?";
+    quickReplies = ["Data and reporting", "AI and automation", "I am still unsure"];
+    pathways = [data, ai];
+    shouldShowPathways = true;
+  } else if (asksForApplicationHelp) {
+    assistantMessage = "Yes. A strong application reason should connect three things: the work you do now, the business problem you want to solve, and the capability the programme would help you build. I can prepare that from what you have already told me.";
+    actions = [
+      { label: "Prepare application reason", type: "draft_application_reason", target: profile.recommendedPathways[0]?.title ?? ai.title },
+      { label: "Prepare manager conversation", type: "prepare_manager_message", target: profile.recommendedPathways[0]?.title ?? ai.title },
+    ];
+    shouldShowActions = true;
+    pathways = [ai, data];
   } else {
-    assistantMessage = "Your administration background points towards a data route only if reporting, spreadsheets or information quality are a meaningful part of the job. I would treat Data Technician as a possible option for now, not a final recommendation.";
-  }
-  assistantMessage += conversationSummaryText(profile);
-
-  const recommendedPathways = repeatedRecommendation ? [] : maturedRecommendation ? [primary] : aiDirection ? [ai, data] : [data, ai];
-  const actions: LevyTateAiAction[] = [
-    { label: "Compare likely routes", type: "compare_routes", target: primary.title },
-    { label: "Prepare manager conversation", type: "prepare_manager_message", target: primary.title },
-    { label: "Save this interest", type: "save_interest", target: primary.title },
-  ];
-  const activeApplication = request.currentApplication ?? request.contextData?.activeApplication ?? null;
-  if (!activeApplication && profile.confidence.overall >= 75) {
-    actions.push({ label: "Prepare application answers", type: "draft_application_reason", target: primary.title });
+    assistantMessage = pickFallbackVariant(profile, [
+      "That adds something useful. I am keeping the earlier context in mind, but I do not think another pathway explanation would help yet.",
+      "There is enough here to keep moving without repeating the recommendation. The next useful step is to make the workplace outcome more concrete.",
+      "I have taken that on board. Rather than show the same options again, let us focus on the decision that would change the advice.",
+    ]);
+    followUpQuestion = profile.questionsStillToAsk[0] ?? null;
+    quickReplies = followUpQuestion ? ["Share an example", "Explain my goal", "Talk through the options"] : [];
+    pathways = profile.interestAreas.includes("AI") ? [ai, data] : [data, ai];
   }
 
-  const applicationDraft = !activeApplication && profile.confidence.overall >= 75
+  const applicationDraft = !activeApplication && (directAiProgrammeQuestion(message) || asksForApplicationHelp)
     ? {
-        selectedApprenticeship: primary.title,
-        reasonForInterest: `I want to build practical capability in ${profile.interestAreas.slice(0, 3).join(", ").toLowerCase()} so I can ${profile.careerGoal ?? "improve how work is completed"}.`,
-        careerGoal: profile.careerGoal ?? "Build practical digital and improvement capability",
+        selectedApprenticeship: ai.title,
+        reasonForInterest: `I want to use AI and automation to improve ${profile.careerGoal ?? "a real business process"} and build practical confidence through a workplace project.`,
+        careerGoal: profile.careerGoal ?? "Build practical AI and workflow improvement capability",
         supportRequired: "Access to a relevant workplace project, protected learning time and manager feedback.",
       }
     : null;
@@ -365,29 +371,44 @@ function employeeMemoryFallback(request: LevyTateAiRequest, response: LevyTateAi
   return {
     ...response,
     assistantMessage,
-    followUpQuestion: nextQuestion(profile),
-    quickReplies: profile.questionsStillToAsk.length
-      ? ["Share an example", "Explain my experience", "Compare both routes", "Prepare a manager message"]
-      : ["Compare both routes", "Prepare application answers", "Prepare a manager message"],
-    recommendedPathways,
+    followUpQuestion,
+    quickReplies,
+    shouldShowPathways,
+    shouldShowActions,
+    recommendedPathways: pathways,
     recommendedActions: actions,
     suggestedActions: actions,
     applicationPrefill: applicationDraft,
     applicationDraft,
-    nextStep: profile.confidence.overall >= 75 ? "draft_application_reason" : "ask_follow_up",
-    managerMessageDraft: `I would like to discuss how my role is developing beyond routine administration. I am particularly interested in ${profile.interestAreas.slice(0, 3).join(", ").toLowerCase() || "digital improvement"} and would value your view on a suitable workplace project and development route.`,
+    nextStep: shouldShowActions ? actions[0]?.type ?? null : null,
+    managerMessageDraft: `I would like to discuss how my role is changing and whether a practical AI or automation project could support ${profile.careerGoal ?? "a useful business improvement"}.`,
     conversationProfile: profile,
     messageClassification: profile.latestMessageClassification,
   };
 }
 
-export function applyConversationMemoryToFallback(request: LevyTateAiRequest, response: LevyTateAiResponse) {
-  if (request.role === "Employee") return employeeMemoryFallback(request, response);
+function applyRoleVisibility(request: LevyTateAiRequest, response: LevyTateAiResponse): LevyTateAiResponse {
+  const message = request.userMessage.toLowerCase();
+  const asksForPathways = /\b(map|mapping|pathway|standard|recommend|compare)\b/.test(message);
+  const asksForAction = request.role === "Line Manager"
+    ? /\b(review|decision|rationale|approve|decline)\b/.test(message)
+    : request.role === "Department Head"
+      ? /\b(open|show|view|report)\b/.test(message)
+      : /\b(provider matching|shortlist|prepare|request|final approval|follow-up task)\b/.test(message);
+
   return {
     ...response,
+    shouldShowPathways: asksForPathways && response.recommendedPathways.length > 0,
+    shouldShowActions: asksForAction && response.recommendedActions.length > 0,
+    quickReplies: response.quickReplies?.slice(0, 3),
     conversationProfile: request.conversationProfile,
     messageClassification: request.conversationProfile?.latestMessageClassification,
   };
+}
+
+export function applyConversationMemoryToFallback(request: LevyTateAiRequest, response: LevyTateAiResponse) {
+  if (request.role === "Employee") return employeeMemoryFallback(request, response);
+  return applyRoleVisibility(request, response);
 }
 
 function recommendationStage(confidence: number): LevyTateConversationRecommendation["stage"] {

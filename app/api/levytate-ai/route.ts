@@ -66,13 +66,24 @@ function mergePathways(fallback: LevyTateRecommendedPathway[], titles: string[])
 }
 
 function mergeGeneratedGuidance(fallback: LevyTateAiResponse, generated: LevyTateGeneratedGuidance): LevyTateAiResponse {
+  const actionsByType = new Map(fallback.recommendedActions.map((action) => [action.type, action] as const));
+  const selectedActions = generated.suggestedActionTypes
+    .map((type) => actionsByType.get(type))
+    .filter((action): action is NonNullable<typeof action> => Boolean(action));
+
   return {
     ...fallback,
     source: generated.assistantMessage ? "openai" : "mock",
     assistantMessage: generated.assistantMessage ?? fallback.assistantMessage,
-    followUpQuestion: generated.followUpQuestion ?? fallback.followUpQuestion ?? null,
-    quickReplies: generated.quickReplies.length ? generated.quickReplies : fallback.quickReplies,
-    recommendedPathways: mergePathways(fallback.recommendedPathways, generated.recommendedPathwayTitles),
+    followUpQuestion: generated.followUpQuestion,
+    quickReplies: generated.quickReplies,
+    shouldShowPathways: generated.shouldShowPathways,
+    shouldShowActions: generated.shouldShowActions && selectedActions.length > 0,
+    recommendedActions: selectedActions,
+    suggestedActions: selectedActions,
+    recommendedPathways: generated.shouldShowPathways
+      ? mergePathways(fallback.recommendedPathways, generated.recommendedPathwayTitles)
+      : fallback.recommendedPathways,
     safetyNotes: mergeSafetyNotes(fallback.safetyNotes, generated.safetyNotes),
     managerMessageDraft: generated.managerMessageDraft ?? fallback.managerMessageDraft,
   };
@@ -80,7 +91,18 @@ function mergeGeneratedGuidance(fallback: LevyTateAiResponse, generated: LevyTat
 
 function finaliseResponse(request: LevyTateAiRequest, response: LevyTateAiResponse) {
   const withProfile = finaliseConversationProfile(request, response);
-  return enforceLevyTateAiActions(request, applyLevyTateAiSafety(request, withProfile));
+  const enforced = enforceLevyTateAiActions(request, applyLevyTateAiSafety(request, withProfile));
+  const shouldShowActions = Boolean(enforced.applicationWarning) || enforced.shouldShowActions !== false;
+  const shouldShowPathways = enforced.shouldShowPathways !== false;
+
+  return {
+    ...enforced,
+    shouldShowActions,
+    shouldShowPathways,
+    recommendedActions: shouldShowActions ? enforced.recommendedActions : [],
+    suggestedActions: shouldShowActions ? enforced.suggestedActions : [],
+    recommendedPathways: shouldShowPathways ? enforced.recommendedPathways : [],
+  };
 }
 
 export async function POST(request: Request) {
@@ -110,7 +132,7 @@ export async function POST(request: Request) {
     const generated = await requestLevyTateOpenAI({
       request: parsedRequest,
       systemPrompt: buildLevyTateAiSystemPrompt(parsedRequest),
-      userPrompt: buildLevyTateAiUserPrompt({ request: parsedRequest, groundedContext, fallback }),
+      contextPrompt: buildLevyTateAiUserPrompt({ request: parsedRequest, groundedContext, fallback }),
     });
 
     return NextResponse.json(finaliseResponse(parsedRequest, mergeGeneratedGuidance(fallback, generated)));
