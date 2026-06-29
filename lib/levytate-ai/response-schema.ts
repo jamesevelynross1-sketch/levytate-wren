@@ -195,9 +195,42 @@ export type LevyTateRecommendedPathway = {
   reason: string;
   availability: "approved" | "not_available" | "alternative";
   fit?: number;
+  scoreDelta?: number;
+  confidence?: number;
+  evidence?: string[];
   provider?: string;
   pathway?: string;
   standard?: string;
+};
+
+export type LevyTateRecommendationEvidence = {
+  id: string;
+  label: string;
+  source: "profile" | "conversation" | "role_mapping" | "platform_rule";
+  weight: number;
+};
+
+export type LevyTatePlatformRecommendation = {
+  pathwayId: string;
+  title: string;
+  fitScore: number;
+  scoreDelta: number;
+  confidence: number;
+  rationale: string;
+  evidence: LevyTateRecommendationEvidence[];
+  availability: "approved" | "role_fit_review" | "not_available";
+  eligibility: "eligible" | "requires_review" | "ineligible";
+  providerAvailability: "mapped" | "matching_available" | "unconfirmed";
+};
+
+export type LevyTateRecommendationResult = {
+  recommendations: LevyTatePlatformRecommendation[];
+  topRecommendation: LevyTatePlatformRecommendation | null;
+  recommendationVersion: string;
+  confidence: number;
+  revealThreshold: number;
+  shouldRevealRecommendations: boolean;
+  evidenceChanged: boolean;
 };
 
 export type LevyTateApplicationPrefill = {
@@ -251,6 +284,7 @@ export type LevyTateAiRequest = {
   userMessage: string;
   conversationHistory: LevyTateConversationMessage[];
   conversationProfile?: LevyTateConversationProfile;
+  previousRecommendationResult?: LevyTateRecommendationResult | null;
   employerContext: string;
   currentWorkspace?: LevyTateAiWorkspaceContext;
   currentApplication?: RequestSummary | null;
@@ -287,6 +321,7 @@ export type LevyTateAiResponse = {
   leadGuidance?: LeadGuidance;
   conversationProfile?: LevyTateConversationProfile;
   messageClassification?: LevyTateMessageClassification;
+  recommendationResult?: LevyTateRecommendationResult;
 };
 
 function isConversationMessage(value: unknown): value is LevyTateConversationMessage {
@@ -434,6 +469,68 @@ function parseAvailablePathways(value: unknown): LevyTateAiPathwayContext[] | un
   });
 }
 
+function parseRecommendationResult(value: unknown): LevyTateRecommendationResult | null | undefined {
+  if (value === null) return null;
+  if (!value || typeof value !== "object") return undefined;
+  const candidate = value as Partial<LevyTateRecommendationResult>;
+  const score = (item: unknown) => typeof item === "number" && Number.isFinite(item)
+    ? Math.max(-100, Math.min(100, Math.round(item)))
+    : 0;
+  const recommendations: LevyTatePlatformRecommendation[] = Array.isArray(candidate.recommendations)
+    ? candidate.recommendations.slice(0, 8).flatMap((item) => {
+        if (!item || typeof item !== "object") return [];
+        const recommendation = item as Partial<LevyTatePlatformRecommendation>;
+        if (typeof recommendation.pathwayId !== "string" || typeof recommendation.title !== "string") return [];
+        const evidence = Array.isArray(recommendation.evidence)
+          ? recommendation.evidence.slice(0, 12).flatMap((entry) => {
+              if (!entry || typeof entry !== "object") return [];
+              const evidenceItem = entry as Partial<LevyTateRecommendationEvidence>;
+              if (typeof evidenceItem.id !== "string" || typeof evidenceItem.label !== "string") return [];
+              const source: LevyTateRecommendationEvidence["source"] = evidenceItem.source === "profile" || evidenceItem.source === "role_mapping" || evidenceItem.source === "platform_rule"
+                ? evidenceItem.source
+                : "conversation";
+              return [{
+                id: evidenceItem.id.trim().slice(0, 120),
+                label: evidenceItem.label.trim().slice(0, 220),
+                source,
+                weight: score(evidenceItem.weight),
+              }];
+            })
+          : [];
+        const availability = recommendation.availability === "approved" || recommendation.availability === "not_available"
+          ? recommendation.availability
+          : "role_fit_review";
+        const eligibility = recommendation.eligibility === "eligible" || recommendation.eligibility === "ineligible"
+          ? recommendation.eligibility
+          : "requires_review";
+        const providerAvailability = recommendation.providerAvailability === "mapped" || recommendation.providerAvailability === "unconfirmed"
+          ? recommendation.providerAvailability
+          : "matching_available";
+        return [{
+          pathwayId: recommendation.pathwayId.trim().slice(0, 120),
+          title: recommendation.title.trim().slice(0, 180),
+          fitScore: Math.max(0, score(recommendation.fitScore)),
+          scoreDelta: score(recommendation.scoreDelta),
+          confidence: Math.max(0, score(recommendation.confidence)),
+          rationale: typeof recommendation.rationale === "string" ? recommendation.rationale.trim().slice(0, 600) : "",
+          evidence,
+          availability,
+          eligibility,
+          providerAvailability,
+        }];
+      })
+    : [];
+  const topRecommendation = recommendations.find((item) => item.pathwayId === candidate.topRecommendation?.pathwayId) ?? recommendations[0] ?? null;
+  return {
+    recommendations,
+    topRecommendation,
+    recommendationVersion: typeof candidate.recommendationVersion === "string" ? candidate.recommendationVersion.trim().slice(0, 120) : "unknown",
+    confidence: Math.max(0, score(candidate.confidence)),
+    revealThreshold: Math.max(0, score(candidate.revealThreshold)),
+    shouldRevealRecommendations: candidate.shouldRevealRecommendations === true,
+    evidenceChanged: candidate.evidenceChanged === true,
+  };
+}
 function isPersonaSummary(value: unknown): value is PersonaSummary {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<PersonaSummary>;
@@ -513,6 +610,7 @@ export function parseLevyTateAiRequest(payload: unknown): LevyTateAiRequest | nu
       content: message.content.trim().slice(0, 2000),
     })),
     conversationProfile: parseConversationProfile(candidate.conversationProfile),
+    previousRecommendationResult: parseRecommendationResult(candidate.previousRecommendationResult),
     employerContext: candidate.employerContext.trim().slice(0, 200),
     currentWorkspace: candidate.currentWorkspace && typeof candidate.currentWorkspace === "object"
       ? {

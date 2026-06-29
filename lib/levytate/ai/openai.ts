@@ -4,9 +4,7 @@ export type LevyTateGeneratedGuidance = {
   assistantMessage: string | null;
   followUpQuestion: string | null;
   quickReplies: string[];
-  recommendedPathwayTitles: string[];
   suggestedActionTypes: LevyTateAiAction["type"][];
-  shouldShowPathways: boolean;
   shouldShowActions: boolean;
   safetyNotes: string[];
   managerMessageDraft: string | null;
@@ -50,9 +48,7 @@ function outputSchema() {
       assistantMessage: { type: "string" },
       followUpQuestion: { type: "string" },
       quickReplies: { type: "array", items: { type: "string" } },
-      recommendedPathwayTitles: { type: "array", items: { type: "string" } },
       suggestedActionTypes: { type: "array", items: { type: "string", enum: actionTypes } },
-      shouldShowPathways: { type: "boolean" },
       shouldShowActions: { type: "boolean" },
       safetyNotes: { type: "array", items: { type: "string" } },
       managerMessageDraft: { type: "string" },
@@ -61,9 +57,7 @@ function outputSchema() {
       "assistantMessage",
       "followUpQuestion",
       "quickReplies",
-      "recommendedPathwayTitles",
       "suggestedActionTypes",
-      "shouldShowPathways",
       "shouldShowActions",
       "safetyNotes",
       "managerMessageDraft",
@@ -108,9 +102,7 @@ function parseGeneratedGuidance(raw: string): LevyTateGeneratedGuidance {
     assistantMessage: typeof parsed.assistantMessage === "string" && parsed.assistantMessage.trim() ? parsed.assistantMessage.trim() : null,
     followUpQuestion: typeof parsed.followUpQuestion === "string" && parsed.followUpQuestion.trim() ? parsed.followUpQuestion.trim() : null,
     quickReplies: cleanStringArray(parsed.quickReplies, 4),
-    recommendedPathwayTitles: cleanStringArray(parsed.recommendedPathwayTitles, 5),
     suggestedActionTypes: cleanActionTypes(parsed.suggestedActionTypes),
-    shouldShowPathways: parsed.shouldShowPathways === true,
     shouldShowActions: parsed.shouldShowActions === true,
     safetyNotes: cleanStringArray(parsed.safetyNotes, 5),
     managerMessageDraft: typeof parsed.managerMessageDraft === "string" && parsed.managerMessageDraft.trim() ? parsed.managerMessageDraft.trim() : null,

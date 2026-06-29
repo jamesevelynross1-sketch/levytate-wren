@@ -17,14 +17,12 @@ function adminRoleEmployeeFallback(request: LevyTateAiRequest): LevyTateAiRespon
       title: "Level 3 Data Technician",
       reason: "A strong route to explore where the role includes spreadsheets, reporting, CRM updates, data quality and recurring process administration.",
       availability: "alternative",
-      fit: 91,
       standard: "Data Technician",
     },
     {
       title: "Level 3 AI Enablement",
       reason: "Worth exploring where the development goal is safe AI use, workflow automation and stronger digital confidence rather than deeper analytics.",
       availability: "alternative",
-      fit: 82,
       standard: "AI Enablement",
     },
   ];

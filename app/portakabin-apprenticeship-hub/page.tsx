@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState, type ReactNode } from "react";
 import { LevyTateLogo, PlatformButton, PlatformMetric, PlatformPanel, PlatformTopBar } from "@/components/levytate-demo/PlatformShell";
 import { buildFallbackResponse } from "@/lib/levytate-ai/fallback";
+import { applyPlatformRecommendations, buildLevyTateRecommendations } from "@/lib/levytate/ai/recommendationEngine";
 import {
   activeApplicationFor,
   countBy,
@@ -2871,7 +2872,9 @@ async function requestLevyTateAI(payload: ApiLevyTateAiRequest): Promise<ApiLevy
     return (await response.json()) as ApiLevyTateAiResponse;
   } catch (error) {
     console.error("Falling back to deterministic LevyTate AI guidance.", error);
-    return buildFallbackResponse(payload);
+    const fallback = buildFallbackResponse(payload);
+    const recommendationResult = buildLevyTateRecommendations(payload);
+    return applyPlatformRecommendations(payload, fallback, recommendationResult);
   }
 }
 
@@ -2892,12 +2895,17 @@ function AIGuidanceCallout({ result }: { result: ApiLevyTateAiResponse }) {
         {!result.employeeGuidance && result.safetyNotes[0] ? <span className="rounded-full bg-white px-3 py-1 text-[10px] font-semibold text-[#102c3d]/52 ring-1 ring-[#102c3d]/[0.06]">{result.safetyNotes[0]}</span> : null}
       </div>
       <p className="mt-2 text-sm leading-6 text-[#102c3d]/66">{result.assistantMessage}</p>
-      {showEmployeeExtras && result.recommendedPathways.length ? (
-        <div className="mt-3 flex flex-wrap gap-2">
+      {showEmployeeExtras && result.shouldShowPathways && result.recommendedPathways.length ? (
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
           {result.recommendedPathways.slice(0, 3).map((pathway) => (
-            <span key={pathway.title} className="rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-[#102c3d]/60 ring-1 ring-[#102c3d]/[0.06]">
-              {pathway.title}
-            </span>
+            <div key={pathway.title} className="rounded-xl bg-white px-3 py-2.5 ring-1 ring-[#102c3d]/[0.06] transition-all duration-300">
+              <div className="flex items-start justify-between gap-3">
+                <span className="text-[11px] font-semibold leading-5 text-[#102c3d]/68">{pathway.title}</span>
+                <span className="shrink-0 text-[11px] font-semibold text-[#0b6f63]">{pathway.fit}%</span>
+              </div>
+              {pathway.scoreDelta ? <p className="mt-1 text-[10px] font-semibold text-[#0b6f63]">{pathway.scoreDelta > 0 ? "↑" : "↓"} {pathway.scoreDelta > 0 ? "+" : ""}{pathway.scoreDelta}% from new evidence</p> : null}
+              {pathway.evidence?.length ? <p className="mt-1 text-[10px] leading-4 text-[#102c3d]/48">Why: {pathway.evidence.slice(0, 2).join(" · ")}</p> : null}
+            </div>
           ))}
         </div>
       ) : null}
@@ -2998,256 +3006,45 @@ type EmployeeChatMessage = {
   result?: ApiLevyTateAiResponse | null;
 };
 
-type EmployeeConversationState = {
-  turns: number;
-  inferredIntent: "data_automation" | "management" | "application" | "general" | null;
-  selectedInterest: string | null;
-  selectedGoal: "data_role" | "current_role_automation" | "not_sure" | "management" | null;
-  suggestedPathway: string | null;
-  hasActiveApplication: boolean;
-  nextRecommendedAction: string | null;
-};
-
-function createEmployeeConversationState(hasActiveApplication = false): EmployeeConversationState {
-  return {
-    turns: 0,
-    inferredIntent: null,
-    selectedInterest: null,
-    selectedGoal: null,
-    suggestedPathway: null,
-    hasActiveApplication,
-    nextRecommendedAction: null,
-  };
+function employeeActionFromApi(action: ApiLevyTateAiResponse["recommendedActions"][number]): EmployeeChatAction | null {
+  if (action.type === "compare_routes" || action.type === "open_pathway") return { label: action.label, type: "compare", target: action.target };
+  if (action.type === "save_interest") return { label: action.label, type: "save", target: action.target };
+  if (action.type === "prepare_manager_message") return { label: action.label, type: "manager", target: action.target };
+  if (action.type === "open_my_applications") return { label: action.label, type: "view_application", target: action.target };
+  if (action.type === "start_application" || action.type === "draft_application_reason") return { label: action.label, type: "start_application", target: action.target };
+  return null;
 }
-
-function employeeChatFallback(
-  selectedPersona: EmployeePersona,
-  requests: RequestItem[],
-  activeApplication: RequestItem | undefined,
-  promptText: string,
-) {
-  return buildFallbackResponse({
-    role: "Employee",
-    selectedEmployee: selectedPersona.name,
-    selectedSite: selectedPersona.site,
-    currentSection: "Ask LevyTate AI",
-    userMessage: promptText,
-    conversationHistory: [{ role: "user", content: promptText }],
-    employerContext: "Portakabin",
-    contextData: {
-      selectedPersona,
-      activeApplication: activeApplication ?? null,
-      requests,
-    },
-  }) as ApiLevyTateAiResponse;
-}
-
-function actionSetForEmployee(result: ApiLevyTateAiResponse | null, activeApplication?: RequestItem): EmployeeChatAction[] {
-  if (activeApplication) {
-    return [
-      { label: "Compare with current application", type: "compare", target: activeApplication.pathway },
-      { label: "Save this interest", type: "save", target: result?.employeeGuidance?.primary.programme },
-      { label: "Prepare manager message", type: "manager", target: activeApplication.manager },
-      { label: "View My Application", type: "view_application", target: "My Applications" },
-    ];
-  }
-
-  return [
-    { label: "Compare routes", type: "compare", target: result?.employeeGuidance?.primary.programme },
-    { label: "Save this interest", type: "save", target: result?.employeeGuidance?.primary.programme },
-    { label: "Start application", type: "start_application", target: result?.employeeGuidance?.primary.programme },
-  ];
-}
-
-function handleEmployeeConversation(
-  message: string,
-  state: EmployeeConversationState,
-  selectedPersona: EmployeePersona,
-  requests: RequestItem[],
-  activeApplication?: RequestItem,
-): { state: EmployeeConversationState; assistant: EmployeeChatMessage; result: ApiLevyTateAiResponse | null } {
-  const normalised = message.toLowerCase();
-  const firstName = selectedPersona.name.split(" ")[0];
-  const isDaniel = selectedPersona.name === "Daniel Carter";
-  const nextState: EmployeeConversationState = { ...state, turns: state.turns + 1, hasActiveApplication: Boolean(activeApplication) };
-  const nextIdBase = Date.now();
-
-  const makeAssistant = (
-    content: string,
-    options?: {
-      quickReplies?: string[];
-      actions?: EmployeeChatAction[];
-      result?: ApiLevyTateAiResponse | null;
-    },
-  ): EmployeeChatMessage => ({
-    id: nextIdBase + 1,
-    sender: "assistant",
-    content,
-    quickReplies: options?.quickReplies,
-    actions: options?.actions,
-    result: options?.result ?? null,
-  });
-
-  const wantsDataAutomation =
-    normalised.includes("data") ||
-    normalised.includes("automation") ||
-    normalised.includes("automate") ||
-    normalised.includes("ai");
-  const wantsManagement =
-    normalised.includes("manager") ||
-    normalised.includes("management") ||
-    normalised.includes("leader") ||
-    normalised.includes("supervisor");
-  const choseDataRole = normalised.includes("move into a data role") || normalised.includes("data-focused role");
-  const choseCurrentAutomation = normalised.includes("current role") || normalised.includes("production role") || normalised.includes("use automation");
-  const choseNotSure = normalised.includes("not sure");
-
-  if ((state.inferredIntent === "data_automation" && (choseDataRole || choseCurrentAutomation || choseNotSure)) || wantsDataAutomation) {
-    nextState.inferredIntent = "data_automation";
-    nextState.selectedInterest = "Data and automation";
-
-    if (!state.selectedGoal && !choseDataRole && !choseCurrentAutomation && !choseNotSure) {
-      return {
-        state: nextState,
-        result: null,
-        assistant: makeAssistant(
-          "That's a good area to explore.\n\nDo you mean you'd like to move into a data-focused role in the future, or are you more interested in using data and automation in your current role?",
-          {
-            quickReplies: ["Move into a data role", "Use automation in my current role", "Not sure yet"],
-          },
-        ),
-      };
-    }
-
-    const selectedGoal = choseDataRole ? "data_role" : choseCurrentAutomation ? "current_role_automation" : "not_sure";
-    nextState.selectedGoal = selectedGoal;
-    const promptForResult = selectedGoal === "data_role"
-      ? "I want to move into a data role"
-      : selectedGoal === "current_role_automation"
-        ? "I want to use automation in my current role"
-        : "I am interested in data and automation but not sure yet";
-    const result = employeeChatFallback(selectedPersona, requests, activeApplication, promptForResult);
-    nextState.suggestedPathway = result.employeeGuidance?.primary.programme ?? null;
-    nextState.nextRecommendedAction = activeApplication ? "compare_current_application" : "compare_or_apply";
-
-    const content = selectedGoal === "data_role"
-      ? isDaniel
-        ? "That makes sense. Because your current route is already data-focused, I'd treat your Level 4 Data Analyst application as the main route and use the conversation with your manager to shape it toward data leadership, reporting ownership and automation work."
-        : "That makes sense. If the goal is a future data role, we can look at data routes as a future interest. For now, it would be worth checking whether your current role can give you enough data evidence before you move toward a formal data pathway."
-      : selectedGoal === "current_role_automation"
-        ? "That makes sense. In that case, we'd probably look at routes that support process improvement, digital confidence and better use of data in production rather than jumping straight to a full data analyst route.\n\nYou've already got an application in progress, so we wouldn't start another one right now, but we can compare this interest with your current application or prepare a note for your manager."
-        : "That's completely fine. We can keep this as an exploration thread for now. A useful next step would be to decide whether this is about a future data role, or about using better data and digital tools in the work you already do.";
-
-    return {
-      state: nextState,
-      result,
-      assistant: makeAssistant(content, {
-        result,
-        actions: actionSetForEmployee(result, activeApplication),
-        quickReplies: selectedGoal === "not_sure" ? ["Move into a data role", "Use automation in my current role", "Prepare a manager question"] : undefined,
-      }),
-    };
-  }
-
-  if (wantsManagement) {
-    nextState.inferredIntent = "management";
-    nextState.selectedInterest = "Leadership progression";
-    nextState.selectedGoal = "management";
-    const result = employeeChatFallback(selectedPersona, requests, activeApplication, "I want to become a manager");
-    nextState.suggestedPathway = result.employeeGuidance?.primary.programme ?? null;
-    nextState.nextRecommendedAction = activeApplication ? "compare_current_application" : "compare_or_apply";
-
-    return {
-      state: nextState,
-      result,
-      assistant: makeAssistant(
-        isDaniel
-          ? "That makes sense. Your current Level 4 Data Analyst application could still support a management route if your future role is data leadership rather than general people management.\n\nIf you want broader people or operational management, we'd compare that with a leadership route and prepare a clear manager conversation."
-          : `That makes sense, ${firstName}. Are you thinking about leading people day to day, building technical confidence first, or using your current role as a step toward production supervision?`,
-        {
-          result,
-          actions: actionSetForEmployee(result, activeApplication),
-          quickReplies: isDaniel ? ["Compare routes", "Prepare manager conversation", "View current application"] : ["Lead people day to day", "Build technical confidence first", "Move toward production supervisor"],
-        },
-      ),
-    };
-  }
-
-  if (normalised.includes("apply") || normalised.includes("application")) {
-    nextState.inferredIntent = "application";
-    nextState.selectedInterest = "Application support";
-    const result = employeeChatFallback(selectedPersona, requests, activeApplication, message);
-    nextState.suggestedPathway = result.employeeGuidance?.primary.programme ?? null;
-    nextState.nextRecommendedAction = activeApplication ? "view_current_application" : "start_application";
-
-    return {
-      state: nextState,
-      result,
-      assistant: makeAssistant(
-        activeApplication
-          ? "I can help you think it through, but I can't start a second application while your current one is active.\n\nWhat we can do is review the current application, compare this interest with it, or prepare a short note for your manager."
-          : "Yes. Before starting an application, let's make sure the route fits your goal and the support you need. Would you like to compare the route first, or start a draft application?",
-        {
-          result,
-          actions: actionSetForEmployee(result, activeApplication),
-          quickReplies: activeApplication ? ["View My Application", "Compare with current application", "Prepare manager message"] : ["Compare routes first", "Start application", "Ask another question"],
-        },
-      ),
-    };
-  }
-
-  nextState.inferredIntent = "general";
-  return {
-    state: nextState,
-    result: null,
-    assistant: makeAssistant(
-      `Let's work through it, ${firstName}. Is this mainly about a new role, getting better in your current role, or understanding what options exist at Portakabin?`,
-      {
-        quickReplies: ["A new role", "Develop in my current role", "Understand my options"],
-      },
-    ),
-  };
-}
-
 function EmployeeInlineResult({ result }: { result: ApiLevyTateAiResponse }) {
-  const guidance = result.employeeGuidance;
-  if (!guidance) return null;
+  if (!result.shouldShowPathways || !result.recommendedPathways.length) return null;
 
   return (
-    <div className="mt-4 grid gap-3">
-      {guidance.availableNow?.length ? (
-        <div className="rounded-xl border border-[#102c3d]/[0.055] bg-white p-3">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">Available now</p>
-          <div className="mt-2 grid gap-2">
-            {guidance.availableNow.slice(0, 2).map((item) => (
-              <div key={item.programme} className="rounded-lg bg-[#f8fbfa] px-3 py-2">
-                <div className="flex items-start justify-between gap-3">
-                  <p className="text-sm font-semibold text-[#102c3d]">{item.programme}</p>
-                  <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-[#0b6f63]">{item.fit}%</span>
-                </div>
-                <p className="mt-1 text-xs leading-5 text-[#102c3d]/58">{item.why}</p>
-              </div>
-            ))}
+    <div className="mt-4 grid gap-2">
+      {result.recommendedPathways.slice(0, 3).map((pathway, index) => (
+        <div key={pathway.title} className={`rounded-xl border p-3 transition-all duration-300 ${index === 0 ? "border-[#159b8f]/20 bg-[#edf8f5]" : "border-[#102c3d]/[0.055] bg-white"}`}>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#0b6f63]">{index === 0 ? "Top platform match" : "Alternative"}</p>
+              <p className="mt-1 text-sm font-semibold text-[#102c3d]">{pathway.title}</p>
+            </div>
+            <div className="flex shrink-0 items-center gap-1.5">
+              {pathway.scoreDelta ? <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-[#0b6f63]">{pathway.scoreDelta > 0 ? "↑" : "↓"} {pathway.scoreDelta > 0 ? "+" : ""}{pathway.scoreDelta}%</span> : null}
+              <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-[#0b6f63]">{pathway.fit}%</span>
+            </div>
           </div>
+          <p className="mt-2 text-xs leading-5 text-[#102c3d]/58">{pathway.reason}</p>
+          {pathway.evidence?.length ? (
+            <details className="mt-2 text-xs text-[#102c3d]/58">
+              <summary className="cursor-pointer font-semibold text-[#0b6f63]">Why this score?</summary>
+              <ul className="mt-2 grid gap-1">
+                {pathway.evidence.slice(0, 4).map((item) => <li key={item}>✓ {item}</li>)}
+              </ul>
+            </details>
+          ) : null}
         </div>
-      ) : null}
-      {guidance.futureInterests?.length ? (
-        <div className="rounded-xl border border-[#102c3d]/[0.055] bg-white p-3">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">Worth discussing later</p>
-          <div className="mt-2 grid gap-2">
-            {guidance.futureInterests.slice(0, 3).map((item) => (
-              <div key={item.programme} className="rounded-lg bg-[#fff9dc] px-3 py-2">
-                <p className="text-sm font-semibold text-[#102c3d]">{item.programme}</p>
-                <p className="mt-1 text-xs leading-5 text-[#102c3d]/58">{item.why}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : null}
+      ))}
     </div>
   );
 }
-
 function ApprenticeshipLeadAIPage({ selectedSite }: { selectedSite: string }) {
   const [query, setQuery] = useState("");
   const [result, setResult] = useState<ApiLevyTateAiResponse | null>(null);
@@ -3269,6 +3066,8 @@ function ApprenticeshipLeadAIPage({ selectedSite }: { selectedSite: string }) {
       currentSection: "Ask LevyTate AI",
       userMessage: promptText,
       conversationHistory: nextHistory,
+      conversationProfile: result?.conversationProfile,
+      previousRecommendationResult: result?.recommendationResult ?? null,
       employerContext: "Portakabin",
     });
     setResult(aiResult);
@@ -3444,7 +3243,6 @@ function EmployeeAIPage({
   const examples = ["I want to become a production supervisor.", "I work in production. What apprenticeships suit me?", "I'm interested in data and automation.", "Which pathway would help me progress at Portakabin?", "Can you help me apply?"];
   const firstName = selectedPersona.name.split(" ")[0];
   const [query, setQuery] = useState("");
-  const [conversationState, setConversationState] = useState<EmployeeConversationState>(() => createEmployeeConversationState(Boolean(activeApplication)));
   const [messages, setMessages] = useState<EmployeeChatMessage[]>(() => [
     {
       id: 1,
@@ -3464,7 +3262,6 @@ function EmployeeAIPage({
   const employeeStep = confirmation || applicationOpen ? "Act" : latestResult || compareOpen || savedMessage ? "Plan" : messages.length > 1 ? "Explore" : "Ask";
 
   useEffect(() => {
-    setConversationState(createEmployeeConversationState(Boolean(activeApplication)));
     setMessages([
       {
         id: 1,
@@ -3510,21 +3307,62 @@ function EmployeeAIPage({
     }
   }
 
-  function runEmployeeQuery(promptText: string) {
+  async function runEmployeeQuery(promptText: string) {
     if (!promptText.trim()) return;
 
     setLoading(true);
-    const userMessage: EmployeeChatMessage = {
-      id: Date.now(),
-      sender: "user",
-      content: promptText,
+    const now = Date.now();
+    const userMessage: EmployeeChatMessage = { id: now, sender: "user", content: promptText };
+    const history: LevyTateConversationMessage[] = messages
+      .filter((message) => message.id !== 1)
+      .map((message) => ({ role: message.sender === "assistant" ? "assistant" : "user", content: message.content }));
+    const assignedRole = roleByTitle(portakabinRoleLibrary, selectedPersona.role);
+    const mappedPathways = pathwaysForRole(assignedRole, portakabinPathwayStandards);
+    const primary = mappedPathways.find((item) => item.mapping.recommendationType === "Primary");
+    const alternatives = mappedPathways.filter((item) => item.mapping.recommendationType === "Alternative");
+    const aiResult = await requestLevyTateAI({
+      role: "Employee",
+      selectedEmployee: selectedPersona.name,
+      selectedSite: selectedPersona.site,
+      currentSection: "Ask LevyTate AI",
+      userMessage: promptText,
+      conversationHistory: history,
+      conversationProfile: latestResult?.conversationProfile,
+      previousRecommendationResult: latestResult?.recommendationResult ?? null,
+      employerContext: "Portakabin",
+      currentApplication: activeApplication ?? null,
+      roleMappings: assignedRole && primary
+        ? [{
+            roleTitle: assignedRole.roleTitle,
+            primaryPathway: primary.title,
+            alternativePathways: alternatives.map((item) => item.title),
+            businessRationale: primary.mapping.businessRationale,
+          }]
+        : [],
+      availablePathways: portakabinPathwayStandards.map((pathway) => ({
+        title: pathway.title,
+        standard: pathway.standard,
+        status: pathway.availableForNewApplications === false ? "Not available" : "Available for role-fit review",
+      })),
+      contextData: {
+        selectedPersona,
+        activeApplication: activeApplication ?? null,
+        requests,
+      },
+    });
+    const assistant: EmployeeChatMessage = {
+      id: now + 1,
+      sender: "assistant",
+      content: [aiResult.assistantMessage, aiResult.followUpQuestion].filter(Boolean).join("\n\n"),
+      quickReplies: aiResult.quickReplies,
+      actions: aiResult.recommendedActions.flatMap((action) => {
+        const mapped = employeeActionFromApi(action);
+        return mapped ? [mapped] : [];
+      }),
+      result: aiResult,
     };
-    const turn = handleEmployeeConversation(promptText, conversationState, selectedPersona, requests, activeApplication);
-    setConversationState(turn.state);
-    setMessages((current) => [...current, userMessage, turn.assistant]);
-    if (turn.result) {
-      setLatestResult(turn.result);
-    }
+    setMessages((current) => [...current, userMessage, assistant]);
+    setLatestResult(aiResult);
     setQuery("");
     setApplicationOpen(false);
     setConfirmation(null);
@@ -3533,12 +3371,12 @@ function EmployeeAIPage({
 
   function askQuestion(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    runEmployeeQuery(query);
+    void runEmployeeQuery(query);
   }
 
   function applyPrompt(prompt: string) {
     setQuery(prompt);
-    runEmployeeQuery(prompt);
+    void runEmployeeQuery(prompt);
   }
 
   function submitAIApplication(event: FormEvent<HTMLFormElement>) {
@@ -3626,11 +3464,11 @@ function EmployeeAIPage({
             <div className="rounded-[1rem] border border-[#102c3d]/[0.06] bg-white p-4 shadow-[0_10px_26px_rgba(16,44,61,0.045)]">
               <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#0b6f63]">Conversation state</p>
               <div className="mt-3 grid gap-2 text-sm leading-6 text-[#102c3d]/62">
-                <p><span className="font-semibold text-[#102c3d]">Intent:</span> {conversationState.inferredIntent ?? "Exploring"}</p>
-                <p><span className="font-semibold text-[#102c3d]">Interest:</span> {conversationState.selectedInterest ?? "Not selected yet"}</p>
-                <p><span className="font-semibold text-[#102c3d]">Goal:</span> {conversationState.selectedGoal ?? "Not selected yet"}</p>
-                <p><span className="font-semibold text-[#102c3d]">Active application:</span> {conversationState.hasActiveApplication ? "Yes" : "No"}</p>
-                <p><span className="font-semibold text-[#102c3d]">Next step:</span> {conversationState.nextRecommendedAction ?? "Ask a follow-up"}</p>
+                <p><span className="font-semibold text-[#102c3d]">Role:</span> {latestResult?.conversationProfile?.currentRole ?? selectedPersona.role}</p>
+                <p><span className="font-semibold text-[#102c3d]">Interests:</span> {latestResult?.conversationProfile?.interestAreas.join(", ") || "Still exploring"}</p>
+                <p><span className="font-semibold text-[#102c3d]">Goal:</span> {latestResult?.conversationProfile?.careerGoal ?? selectedPersona.careerGoal}</p>
+                <p><span className="font-semibold text-[#102c3d]">Active application:</span> {activeApplication ? "Yes" : "No"}</p>
+                <p><span className="font-semibold text-[#102c3d]">Recommendation confidence:</span> {latestResult?.recommendationResult ? `${latestResult.recommendationResult.confidence}%` : "Gathering evidence"}</p>
               </div>
               {activeApplication ? <div className="mt-3"><CurrentApplicationReminder application={activeApplication} onView={() => onNavigate("My Applications")} /></div> : null}
               {savedMessage ? <p className="mt-3 rounded-xl bg-[#edf8f5] px-3 py-2 text-xs font-semibold text-[#0b6f63] ring-1 ring-[#159b8f]/[0.08]">{savedMessage}</p> : null}
@@ -3717,6 +3555,8 @@ function LineManagerAIPage({ requests, selectedSite, onStatus, onNavigate }: { r
       currentSection: "Ask LevyTate AI",
       userMessage: promptText,
       conversationHistory: nextHistory,
+      conversationProfile: result?.conversationProfile,
+      previousRecommendationResult: result?.recommendationResult ?? null,
       employerContext: "Portakabin",
       contextData: {
         requests,
@@ -3807,6 +3647,8 @@ function DepartmentHeadAIPage({ requests, selectedSite, onNavigate }: { requests
       currentSection: "Ask LevyTate AI",
       userMessage: promptText,
       conversationHistory: nextHistory,
+      conversationProfile: result?.conversationProfile,
+      previousRecommendationResult: result?.recommendationResult ?? null,
       employerContext: "Portakabin",
       contextData: {
         requests,

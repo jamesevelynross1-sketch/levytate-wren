@@ -11,10 +11,15 @@ import {
 import { levyTateAiEnabled, requestLevyTateOpenAI, type LevyTateGeneratedGuidance } from "@/lib/levytate/ai/openai";
 import { buildLevyTateAiSystemPrompt, buildLevyTateAiUserPrompt } from "@/lib/levytate/ai/prompts";
 import {
+  applyPlatformRecommendations,
+  buildLevyTateRecommendations,
+  buildPlatformRecommendationExplanation,
+  recommendationNarrativeIsAligned,
+} from "@/lib/levytate/ai/recommendationEngine";
+import {
   parseLevyTateAiRequest,
   type LevyTateAiRequest,
   type LevyTateAiResponse,
-  type LevyTateRecommendedPathway,
 } from "@/lib/levytate/ai/types";
 import { applyLevyTateAiSafety } from "@/lib/levytate-ai/safety";
 
@@ -56,44 +61,54 @@ function mergeSafetyNotes(fallback: string[], generated: string[]) {
   }).slice(0, 6);
 }
 
-function mergePathways(fallback: LevyTateRecommendedPathway[], titles: string[]) {
-  const byTitle = new Map(fallback.map((item) => [item.title.trim().toLowerCase(), item] as const));
-  const prioritised = titles
-    .map((title) => byTitle.get(title.trim().toLowerCase()))
-    .filter((item): item is LevyTateRecommendedPathway => Boolean(item));
-  const seen = new Set(prioritised.map((item) => item.title.trim().toLowerCase()));
-  return [...prioritised, ...fallback.filter((item) => !seen.has(item.title.trim().toLowerCase()))];
-}
-
 function mergeGeneratedGuidance(fallback: LevyTateAiResponse, generated: LevyTateGeneratedGuidance): LevyTateAiResponse {
   const actionsByType = new Map(fallback.recommendedActions.map((action) => [action.type, action] as const));
   const selectedActions = generated.suggestedActionTypes
     .map((type) => actionsByType.get(type))
     .filter((action): action is NonNullable<typeof action> => Boolean(action));
+  const recommendationResult = fallback.recommendationResult;
+  const generatedMessage = generated.assistantMessage ?? fallback.assistantMessage;
+  const aligned = !recommendationResult || recommendationNarrativeIsAligned(generatedMessage, recommendationResult);
 
   return {
     ...fallback,
-    source: generated.assistantMessage ? "openai" : "mock",
-    assistantMessage: generated.assistantMessage ?? fallback.assistantMessage,
+    source: generated.assistantMessage && aligned ? "openai" : "mock",
+    assistantMessage: aligned
+      ? generatedMessage
+      : recommendationResult
+        ? buildPlatformRecommendationExplanation(recommendationResult)
+        : fallback.assistantMessage,
     followUpQuestion: generated.followUpQuestion,
     quickReplies: generated.quickReplies,
-    shouldShowPathways: generated.shouldShowPathways,
     shouldShowActions: generated.shouldShowActions && selectedActions.length > 0,
     recommendedActions: selectedActions,
     suggestedActions: selectedActions,
-    recommendedPathways: generated.shouldShowPathways
-      ? mergePathways(fallback.recommendedPathways, generated.recommendedPathwayTitles)
-      : fallback.recommendedPathways,
-    safetyNotes: mergeSafetyNotes(fallback.safetyNotes, generated.safetyNotes),
+    safetyNotes: mergeSafetyNotes(
+      fallback.safetyNotes,
+      aligned ? generated.safetyNotes : ["Generated recommendation language did not match the platform ranking and was replaced."],
+    ),
     managerMessageDraft: generated.managerMessageDraft ?? fallback.managerMessageDraft,
   };
+}
+
+function buildGroundedFallback(request: LevyTateAiRequest) {
+  const recommendationResult = buildLevyTateRecommendations(request);
+  const conversationalFallback = applyConversationMemoryToFallback(
+    request,
+    buildLevyTateAiFallbackResponse(request),
+  );
+  const grounded = applyPlatformRecommendations(request, conversationalFallback, recommendationResult);
+  if (recommendationResult.shouldRevealRecommendations && !recommendationNarrativeIsAligned(grounded.assistantMessage, recommendationResult)) {
+    return { ...grounded, assistantMessage: buildPlatformRecommendationExplanation(recommendationResult) };
+  }
+  return grounded;
 }
 
 function finaliseResponse(request: LevyTateAiRequest, response: LevyTateAiResponse) {
   const withProfile = finaliseConversationProfile(request, response);
   const enforced = enforceLevyTateAiActions(request, applyLevyTateAiSafety(request, withProfile));
   const shouldShowActions = Boolean(enforced.applicationWarning) || enforced.shouldShowActions !== false;
-  const shouldShowPathways = enforced.shouldShowPathways !== false;
+  const shouldShowPathways = enforced.recommendationResult?.shouldRevealRecommendations === true;
 
   return {
     ...enforced,
@@ -120,10 +135,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Please wait a moment before asking another question." }, { status: 429 });
     }
 
-    const fallback = applyConversationMemoryToFallback(
-      parsedRequest,
-      buildLevyTateAiFallbackResponse(parsedRequest),
-    );
+    const fallback = buildGroundedFallback(parsedRequest);
     if (!levyTateAiEnabled()) {
       return NextResponse.json(finaliseResponse(parsedRequest, fallback));
     }
@@ -140,11 +152,7 @@ export async function POST(request: Request) {
     console.error("LevyTate AI request failed", { error });
 
     if (parsedRequest) {
-      const fallback = applyConversationMemoryToFallback(
-        parsedRequest,
-        buildLevyTateAiFallbackResponse(parsedRequest),
-      );
-      return NextResponse.json(finaliseResponse(parsedRequest, fallback));
+      return NextResponse.json(finaliseResponse(parsedRequest, buildGroundedFallback(parsedRequest)));
     }
 
     return NextResponse.json({ message: "LevyTate AI could not process this request." }, { status: 500 });

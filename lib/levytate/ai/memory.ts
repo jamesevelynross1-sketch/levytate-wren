@@ -3,7 +3,6 @@ import type {
   LevyTateAiRequest,
   LevyTateAiResponse,
   LevyTateConversationProfile,
-  LevyTateConversationRecommendation,
   LevyTateMessageClassification,
   LevyTateRecommendedPathway,
 } from "@/lib/levytate/ai/types";
@@ -255,7 +254,6 @@ function dataPathway(): LevyTateRecommendedPathway {
     title: "Level 3 Data Technician",
     reason: "Useful where administration includes spreadsheets, reporting, CRM data and improving information quality.",
     availability: "alternative",
-    fit: 86,
     standard: "Data Technician",
   };
 }
@@ -265,7 +263,6 @@ function aiPathway(): LevyTateRecommendedPathway {
     title: "Level 3 AI Enablement",
     reason: "Worth exploring where the goal is practical AI adoption, workflow automation and measurable business improvement.",
     availability: "alternative",
-    fit: 90,
     standard: "AI Enablement",
   };
 }
@@ -411,33 +408,23 @@ export function applyConversationMemoryToFallback(request: LevyTateAiRequest, re
   return applyRoleVisibility(request, response);
 }
 
-function recommendationStage(confidence: number): LevyTateConversationRecommendation["stage"] {
-  if (confidence >= 75) return "recommended";
-  if (confidence >= 50) return "likely";
-  return "possible";
-}
-
 export function finaliseConversationProfile(request: LevyTateAiRequest, response: LevyTateAiResponse): LevyTateAiResponse {
   const profile = request.conversationProfile;
   if (!profile) return response;
 
   const exchange = profile.exchangeCount;
   const existing = new Map(profile.recommendedPathways.map((item) => [item.title.toLowerCase(), item] as const));
-  const discussed = response.recommendedPathways.map((pathway, index) => {
-    const previous = existing.get(pathway.title.toLowerCase());
-    const recommendationConfidence = score(profile.confidence.overall - index * 8);
+  const platformRecommendations = response.recommendationResult?.recommendations ?? [];
+  const recommendedPathways = platformRecommendations.map((recommendation) => {
+    const previous = existing.get(recommendation.title.toLowerCase());
     return {
-      title: pathway.title,
-      confidence: recommendationConfidence,
-      stage: recommendationStage(recommendationConfidence),
+      title: recommendation.title,
+      confidence: recommendation.confidence,
+      stage: recommendation.confidence >= 75 ? "recommended" as const : recommendation.confidence >= 50 ? "likely" as const : "possible" as const,
       firstDiscussedAt: previous?.firstDiscussedAt ?? exchange,
       lastDiscussedAt: exchange,
-    } satisfies LevyTateConversationRecommendation;
+    };
   });
-  const discussedTitles = new Set(discussed.map((item) => item.title.toLowerCase()));
-  const recommendedPathways = discussed.length
-    ? [...discussed, ...profile.recommendedPathways.filter((item) => !discussedTitles.has(item.title.toLowerCase()))].slice(0, 8)
-    : profile.recommendedPathways;
   const followUp = response.followUpQuestion?.trim();
   const questionsAlreadyAsked = followUp
     ? unique([...profile.questionsAlreadyAsked, followUp])

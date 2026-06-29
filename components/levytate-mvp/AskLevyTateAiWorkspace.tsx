@@ -7,6 +7,7 @@ import type {
   LevyTateAiResponse,
   LevyTateConversationMessage,
   LevyTateConversationProfile,
+  LevyTateRecommendationResult,
   LevyTateRole,
 } from "@/lib/levytate/ai/types";
 
@@ -78,6 +79,9 @@ function initialConversations() {
 function initialProfiles() {
   return Object.fromEntries(assistantRoles.map((role) => [role, null])) as Record<AssistantRole, LevyTateConversationProfile | null>;
 }
+function initialRecommendationResults() {
+  return Object.fromEntries(assistantRoles.map((role) => [role, null])) as Record<AssistantRole, LevyTateRecommendationResult | null>;
+}
 
 function responseActions(response: LevyTateAiResponse) {
   return response.suggestedActions ?? response.recommendedActions;
@@ -87,6 +91,7 @@ export function AskLevyTateAiWorkspace() {
   const [role, setRole] = useState<AssistantRole>("Employee");
   const [conversations, setConversations] = useState<Record<AssistantRole, ChatMessage[]>>(initialConversations);
   const [profiles, setProfiles] = useState<Record<AssistantRole, LevyTateConversationProfile | null>>(initialProfiles);
+  const [recommendationResults, setRecommendationResults] = useState<Record<AssistantRole, LevyTateRecommendationResult | null>>(initialRecommendationResults);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -129,6 +134,7 @@ export function AskLevyTateAiWorkspace() {
       userMessage: trimmed,
       conversationHistory,
       conversationProfile: profiles[activeRole] ?? undefined,
+      previousRecommendationResult: recommendationResults[activeRole],
       employerContext: "LevyTate beta workspace",
       currentWorkspace: {
         employerName: "Beta employer not yet configured",
@@ -162,6 +168,9 @@ export function AskLevyTateAiWorkspace() {
       setConversations((current) => ({ ...current, [activeRole]: [...current[activeRole], assistantMessage] }));
       if (result.conversationProfile) {
         setProfiles((current) => ({ ...current, [activeRole]: result.conversationProfile ?? null }));
+      }
+      if (result.recommendationResult) {
+        setRecommendationResults((current) => ({ ...current, [activeRole]: result.recommendationResult ?? null }));
       }
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Ask LevyTate AI could not respond.");
@@ -318,12 +327,23 @@ function InlineResponse({ response, onAction, onQuickReply, loading }: { respons
       {showPathways ? (
         <div className="grid gap-2">
           {response.recommendedPathways.slice(0, 3).map((pathway) => (
-            <div key={pathway.title} className="rounded-xl bg-[#f8fbfa] px-3 py-2.5 ring-1 ring-[#102c3d]/[0.055]">
+            <div key={pathway.title} className="rounded-xl bg-[#f8fbfa] px-3 py-2.5 ring-1 ring-[#102c3d]/[0.055] transition-all duration-300">
               <div className="flex items-start justify-between gap-3">
                 <p className="font-semibold text-[#102c3d]">{pathway.title}</p>
-                {pathway.fit ? <span className="shrink-0 text-xs font-semibold text-[#0b6f63]">{pathway.fit}% fit</span> : null}
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {pathway.scoreDelta ? <span className="rounded-full bg-[#edf7f3] px-1.5 py-0.5 text-[10px] font-semibold text-[#0b6f63]">{pathway.scoreDelta > 0 ? "↑" : "↓"} {pathway.scoreDelta > 0 ? "+" : ""}{pathway.scoreDelta}%</span> : null}
+                  {pathway.fit ? <span className="text-xs font-semibold text-[#0b6f63]">{pathway.fit}% fit</span> : null}
+                </div>
               </div>
               <p className="mt-1 text-xs leading-5 text-[#102c3d]/54">{pathway.reason}</p>
+              {pathway.evidence?.length ? (
+                <details className="mt-2 text-xs text-[#102c3d]/58">
+                  <summary className="cursor-pointer font-semibold text-[#0b6f63]">Why this score?</summary>
+                  <ul className="mt-2 grid gap-1">
+                    {pathway.evidence.slice(0, 4).map((item) => <li key={item}>✓ {item}</li>)}
+                  </ul>
+                </details>
+              ) : null}
             </div>
           ))}
         </div>
