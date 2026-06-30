@@ -50,7 +50,11 @@ export async function POST(request: Request) {
       consent: body.consent === true,
     });
 
-    await syncPersistentEarlyAccessState(created.email, created.status);
+    try {
+      await syncPersistentEarlyAccessState(created.email, created.status);
+    } catch {
+      // Allow the Early Access flow to continue when no shared store is configured.
+    }
 
     return NextResponse.json({
       ok: true,

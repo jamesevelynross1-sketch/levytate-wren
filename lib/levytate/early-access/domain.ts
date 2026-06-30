@@ -44,6 +44,7 @@ export const earlyAccessEmployeeBands = [
 ] as const;
 
 export const earlyAccessStorageKey = "levytate_early_access_requests";
+export const earlyAccessApprovalTokenStorageKey = "levytate_early_access_approval_tokens";
 
 export function isEarlyAccessStatus(value: unknown): value is EarlyAccessStatus {
   return typeof value === "string" && earlyAccessStatuses.includes(value as EarlyAccessStatus);

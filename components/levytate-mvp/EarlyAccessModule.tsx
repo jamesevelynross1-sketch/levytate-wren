@@ -4,6 +4,7 @@ import { Building2, Mail, Search, UserRound } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { MvpPanel } from "@/components/levytate-mvp/MvpUi";
 import {
+  earlyAccessApprovalTokenStorageKey,
   earlyAccessStatuses,
   earlyAccessStorageKey,
   type EarlyAccessRequest,
@@ -85,22 +86,26 @@ export function EarlyAccessModule() {
     setError("");
 
     try {
+      const currentLead = leads.find((lead) => lead.id === id) ?? null;
       const response = await fetch(`/api/levytate-early-access/${id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ status, lead: leads.find((lead) => lead.id === id) }),
+        body: JSON.stringify({ status, lead: currentLead }),
       });
 
       const payload = (await response.json()) as {
         lead?: EarlyAccessRequest;
+        approvalToken?: string | null;
         message?: string;
       };
 
       if (!response.ok || !payload.lead) {
         throw new Error(payload.message || "Lead status could not be updated.");
       }
+
+      persistApprovalToken(payload.lead.email, payload.approvalToken ?? null, payload.lead.status);
 
       const next = leads.map((lead) => lead.id === id ? payload.lead! : lead);
       setLeads(next);
@@ -299,3 +304,28 @@ function persistLocalLeads(leads: EarlyAccessRequest[]) {
   window.localStorage.setItem(earlyAccessStorageKey, JSON.stringify(leads));
 }
 
+function persistApprovalToken(email: string, approvalToken: string | null, status: EarlyAccessStatus) {
+  if (typeof window === "undefined") return;
+
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(earlyAccessApprovalTokenStorageKey) ?? "{}") as Record<string, string>;
+    const next = { ...parsed };
+
+    if (approvalToken && (status === "Approved" || status === "Onboarded")) {
+      next[email.toLowerCase()] = approvalToken;
+    } else {
+      delete next[email.toLowerCase()];
+    }
+
+    window.localStorage.setItem(earlyAccessApprovalTokenStorageKey, JSON.stringify(next));
+  } catch {
+    if (approvalToken && (status === "Approved" || status === "Onboarded")) {
+      window.localStorage.setItem(
+        earlyAccessApprovalTokenStorageKey,
+        JSON.stringify({ [email.toLowerCase()]: approvalToken }),
+      );
+    } else {
+      window.localStorage.removeItem(earlyAccessApprovalTokenStorageKey);
+    }
+  }
+}

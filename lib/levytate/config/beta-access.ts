@@ -2,12 +2,21 @@ export const levytateBetaSessionCookie = "levytate_beta_session";
 
 export const levytateBetaAdminEmails = ["hello@levytate.co.uk"] as const;
 export const levytateBetaSessionMaxAge = 60 * 60 * 8;
+export const levytateEarlyAccessApprovalTokenMaxAge = 60 * 60 * 24 * 30;
 
 export type LevyTateBetaAccessLevel = "beta_admin" | "beta_user";
+export type LevyTateApprovalStatus = "Approved" | "Onboarded";
 
 export type LevyTateBetaSession = {
   email: string;
   accessLevel: LevyTateBetaAccessLevel;
+  issuedAt: number;
+  expiresAt: number;
+};
+
+export type LevyTateApprovalToken = {
+  email: string;
+  status: LevyTateApprovalStatus;
   issuedAt: number;
   expiresAt: number;
 };
@@ -30,6 +39,10 @@ export function isAdminBetaEmail(email: string) {
 
 export function isLevyTateBetaAccessLevel(value: unknown): value is LevyTateBetaAccessLevel {
   return value === "beta_admin" || value === "beta_user";
+}
+
+export function isLevyTateApprovalStatus(value: unknown): value is LevyTateApprovalStatus {
+  return value === "Approved" || value === "Onboarded";
 }
 
 function getLevyTateBetaSessionSecret() {
@@ -66,6 +79,32 @@ async function getSessionSigningKey(usage: KeyUsage) {
   );
 }
 
+async function signPayload<T extends object>(payloadData: T) {
+  const payload = bytesToBase64Url(encoder.encode(JSON.stringify(payloadData)));
+  const key = await getSessionSigningKey("sign");
+  const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(payload));
+  return `${payload}.${bytesToBase64Url(new Uint8Array(signature))}`;
+}
+
+async function readSignedPayload(token: string | undefined | null) {
+  if (!token) return null;
+
+  const parts = token.split(".");
+  if (parts.length !== 2) return null;
+
+  const [payload, signature] = parts;
+  const key = await getSessionSigningKey("verify");
+  const validSignature = await crypto.subtle.verify(
+    "HMAC",
+    key,
+    base64UrlToBytes(signature),
+    encoder.encode(payload),
+  );
+  if (!validSignature) return null;
+
+  return JSON.parse(decoder.decode(base64UrlToBytes(payload))) as Record<string, unknown>;
+}
+
 export async function createLevyTateBetaSession(email: string, accessLevel: LevyTateBetaAccessLevel) {
   const normalisedEmail = normaliseBetaEmail(email);
 
@@ -80,31 +119,27 @@ export async function createLevyTateBetaSession(email: string, accessLevel: Levy
     issuedAt,
     expiresAt: issuedAt + levytateBetaSessionMaxAge * 1000,
   };
-  const payload = bytesToBase64Url(encoder.encode(JSON.stringify(session)));
-  const key = await getSessionSigningKey("sign");
-  const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(payload));
 
-  return `${payload}.${bytesToBase64Url(new Uint8Array(signature))}`;
+  return signPayload(session);
+}
+
+export async function createLevyTateApprovalToken(email: string, status: LevyTateApprovalStatus) {
+  const issuedAt = Date.now();
+  const token: LevyTateApprovalToken = {
+    email: normaliseBetaEmail(email),
+    status,
+    issuedAt,
+    expiresAt: issuedAt + levytateEarlyAccessApprovalTokenMaxAge * 1000,
+  };
+
+  return signPayload(token);
 }
 
 export async function readLevyTateBetaSession(token: string | undefined | null) {
-  if (!token) return null;
-
   try {
-    const parts = token.split(".");
-    if (parts.length !== 2) return null;
+    const session = (await readSignedPayload(token)) as Partial<LevyTateBetaSession> | null;
+    if (!session) return null;
 
-    const [payload, signature] = parts;
-    const key = await getSessionSigningKey("verify");
-    const validSignature = await crypto.subtle.verify(
-      "HMAC",
-      key,
-      base64UrlToBytes(signature),
-      encoder.encode(payload),
-    );
-    if (!validSignature) return null;
-
-    const session = JSON.parse(decoder.decode(base64UrlToBytes(payload))) as Partial<LevyTateBetaSession>;
     if (
       typeof session.email !== "string" ||
       !isLevyTateBetaAccessLevel(session.accessLevel) ||
@@ -123,6 +158,30 @@ export async function readLevyTateBetaSession(token: string | undefined | null) 
       ...session,
       email: normaliseBetaEmail(session.email),
     } as LevyTateBetaSession;
+  } catch {
+    return null;
+  }
+}
+
+export async function readLevyTateApprovalToken(token: string | undefined | null) {
+  try {
+    const approval = (await readSignedPayload(token)) as Partial<LevyTateApprovalToken> | null;
+    if (!approval) return null;
+
+    if (
+      typeof approval.email !== "string" ||
+      !isLevyTateApprovalStatus(approval.status) ||
+      typeof approval.issuedAt !== "number" ||
+      typeof approval.expiresAt !== "number" ||
+      approval.expiresAt <= Date.now()
+    ) {
+      return null;
+    }
+
+    return {
+      ...approval,
+      email: normaliseBetaEmail(approval.email),
+    } as LevyTateApprovalToken;
   } catch {
     return null;
   }

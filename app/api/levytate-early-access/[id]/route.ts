@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { levytateBetaSessionCookie, readLevyTateBetaSession } from "@/lib/levytate/config/beta-access";
+import { createLevyTateApprovalToken, isLevyTateApprovalStatus, levytateBetaSessionCookie, readLevyTateBetaSession } from "@/lib/levytate/config/beta-access";
 import { isEarlyAccessStatus, type EarlyAccessRequest, type EarlyAccessStatus } from "@/lib/levytate/early-access/domain";
 import { syncPersistentEarlyAccessState } from "@/lib/server/levytate-beta-access-grants";
 import { EarlyAccessStoreError, updateEarlyAccessStatus } from "@/lib/server/levytate-early-access";
@@ -47,9 +47,17 @@ export async function PATCH(
       throw new EarlyAccessStoreError("Lead could not be found.");
     }
 
-    await syncPersistentEarlyAccessState(leadForAccess.email, body.status);
+    try {
+      await syncPersistentEarlyAccessState(leadForAccess.email, body.status);
+    } catch {
+      // The demo can still issue a signed approval token when server-side persistence is unavailable.
+    }
 
-    return NextResponse.json({ ok: true, lead: leadForAccess });
+    const approvalToken = isLevyTateApprovalStatus(body.status)
+      ? await createLevyTateApprovalToken(leadForAccess.email, body.status)
+      : null;
+
+    return NextResponse.json({ ok: true, lead: leadForAccess, approvalToken });
   } catch (error) {
     const status = error instanceof EarlyAccessStoreError ? 400 : 500;
     return NextResponse.json(

@@ -4,6 +4,11 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { LevyTateLogo } from "@/components/levytate-demo/PlatformShell";
+import {
+  earlyAccessApprovalTokenStorageKey,
+  earlyAccessStorageKey,
+  type EarlyAccessRequest,
+} from "@/lib/levytate/early-access/domain";
 
 export function LevyTateLoginClient() {
   const router = useRouter();
@@ -17,15 +22,29 @@ export function LevyTateLoginClient() {
     setLoading(true);
     setError("");
 
+    const normalisedEmail = email.trim().toLowerCase();
+    const localLead = readLocalLead(normalisedEmail);
+    const approvalToken = readApprovalToken(normalisedEmail);
+
     const response = await fetch("/api/levytate-beta-login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, code }),
+      body: JSON.stringify({ email, code, approvalToken }),
     });
 
     if (!response.ok) {
       const body = await response.json().catch(() => null);
-      setError(body?.message ?? "Beta access is currently invite-only. Please request Early Access first.");
+      const shouldUseLocalPendingMessage =
+        body?.message === "Beta access is currently invite-only. Please request Early Access first." &&
+        localLead &&
+        localLead.status !== "Approved" &&
+        localLead.status !== "Onboarded";
+
+      setError(
+        shouldUseLocalPendingMessage
+          ? "Your Early Access request has been received and is currently under review."
+          : body?.message ?? "Beta access is currently invite-only. Please request Early Access first.",
+      );
       setLoading(false);
       return;
     }
@@ -64,5 +83,27 @@ export function LevyTateLoginClient() {
       </section>
     </main>
   );
+}
+
+function readLocalLead(email: string) {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(earlyAccessStorageKey) ?? "[]") as EarlyAccessRequest[];
+    return parsed.find((lead) => lead.email.toLowerCase() === email) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function readApprovalToken(email: string) {
+  if (typeof window === "undefined") return "";
+
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(earlyAccessApprovalTokenStorageKey) ?? "{}") as Record<string, string>;
+    return parsed[email] ?? "";
+  } catch {
+    return "";
+  }
 }
 

@@ -4,6 +4,7 @@ import {
   getLevyTateBetaAccessCode,
   isAdminBetaEmail,
   normaliseBetaEmail,
+  readLevyTateApprovalToken,
   type LevyTateBetaAccessLevel,
   levytateBetaSessionCookie,
   levytateBetaSessionMaxAge,
@@ -17,6 +18,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const email = typeof body.email === "string" ? normaliseBetaEmail(body.email) : "";
     const code = typeof body.code === "string" ? body.code.trim() : "";
+    const approvalToken = typeof body.approvalToken === "string" ? body.approvalToken : "";
 
     if (code !== getLevyTateBetaAccessCode().trim()) {
       return NextResponse.json({ ok: false, message: "Invalid beta access code." }, { status: 401 });
@@ -27,12 +29,15 @@ export async function POST(request: Request) {
     if (isAdminBetaEmail(email)) {
       accessLevel = "beta_admin";
     } else {
-      const [lead, persistentState] = await Promise.all([
+      const [lead, persistentState, localApproval] = await Promise.all([
         getEarlyAccessRequestByEmail(email),
         getPersistentEarlyAccessState(email),
+        readLevyTateApprovalToken(approvalToken),
       ]);
 
-      if (persistentState === "approved" || (lead && isBetaApprovedEarlyAccessStatus(lead.status))) {
+      const hasLocalApproval = Boolean(localApproval && localApproval.email === email);
+
+      if (hasLocalApproval || persistentState === "approved" || (lead && isBetaApprovedEarlyAccessStatus(lead.status))) {
         accessLevel = "beta_user";
       } else if (lead || persistentState === "pending" || persistentState === "declined") {
         return NextResponse.json(
