@@ -1,12 +1,13 @@
 export const levytateBetaSessionCookie = "levytate_beta_session";
 
-export const levytateBetaAllowedEmails = ["hello@levytate.co.uk"] as const;
-export const levytateBetaAccessLevel = "beta_admin" as const;
+export const levytateBetaAdminEmails = ["hello@levytate.co.uk"] as const;
 export const levytateBetaSessionMaxAge = 60 * 60 * 8;
 
+export type LevyTateBetaAccessLevel = "beta_admin" | "beta_user";
+
 export type LevyTateBetaSession = {
-  email: (typeof levytateBetaAllowedEmails)[number];
-  accessLevel: typeof levytateBetaAccessLevel;
+  email: string;
+  accessLevel: LevyTateBetaAccessLevel;
   issuedAt: number;
   expiresAt: number;
 };
@@ -18,9 +19,17 @@ export function getLevyTateBetaAccessCode() {
   return process.env.LEVYTATE_BETA_CODE ?? "LEVYTATE-BETA";
 }
 
-export function isAllowedBetaEmail(email: string) {
-  const normalised = email.trim().toLowerCase();
-  return levytateBetaAllowedEmails.some((allowedEmail) => allowedEmail.toLowerCase() === normalised);
+export function normaliseBetaEmail(email: string) {
+  return email.trim().toLowerCase();
+}
+
+export function isAdminBetaEmail(email: string) {
+  const normalised = normaliseBetaEmail(email);
+  return levytateBetaAdminEmails.some((allowedEmail) => allowedEmail.toLowerCase() === normalised);
+}
+
+export function isLevyTateBetaAccessLevel(value: unknown): value is LevyTateBetaAccessLevel {
+  return value === "beta_admin" || value === "beta_user";
 }
 
 function getLevyTateBetaSessionSecret() {
@@ -57,14 +66,17 @@ async function getSessionSigningKey(usage: KeyUsage) {
   );
 }
 
-export async function createLevyTateBetaSession(email: string) {
-  const normalisedEmail = email.trim().toLowerCase();
-  if (!isAllowedBetaEmail(normalisedEmail)) throw new Error("Email is not approved for beta access.");
+export async function createLevyTateBetaSession(email: string, accessLevel: LevyTateBetaAccessLevel) {
+  const normalisedEmail = normaliseBetaEmail(email);
+
+  if (accessLevel === "beta_admin" && !isAdminBetaEmail(normalisedEmail)) {
+    throw new Error("Email is not approved for beta admin access.");
+  }
 
   const issuedAt = Date.now();
   const session: LevyTateBetaSession = {
-    email: normalisedEmail as LevyTateBetaSession["email"],
-    accessLevel: levytateBetaAccessLevel,
+    email: normalisedEmail,
+    accessLevel,
     issuedAt,
     expiresAt: issuedAt + levytateBetaSessionMaxAge * 1000,
   };
@@ -95,16 +107,22 @@ export async function readLevyTateBetaSession(token: string | undefined | null) 
     const session = JSON.parse(decoder.decode(base64UrlToBytes(payload))) as Partial<LevyTateBetaSession>;
     if (
       typeof session.email !== "string" ||
-      session.accessLevel !== levytateBetaAccessLevel ||
+      !isLevyTateBetaAccessLevel(session.accessLevel) ||
       typeof session.issuedAt !== "number" ||
       typeof session.expiresAt !== "number" ||
-      session.expiresAt <= Date.now() ||
-      !isAllowedBetaEmail(session.email)
+      session.expiresAt <= Date.now()
     ) {
       return null;
     }
 
-    return session as LevyTateBetaSession;
+    if (session.accessLevel === "beta_admin" && !isAdminBetaEmail(session.email)) {
+      return null;
+    }
+
+    return {
+      ...session,
+      email: normaliseBetaEmail(session.email),
+    } as LevyTateBetaSession;
   } catch {
     return null;
   }

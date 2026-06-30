@@ -15,7 +15,6 @@ type FormState = {
   contactName: string;
   email: string;
   employeeCount: string;
-  currentProvider: string;
   biggestChallenge: string;
   consent: boolean;
 };
@@ -25,7 +24,6 @@ const initialState: FormState = {
   contactName: "",
   email: "",
   employeeCount: "",
-  currentProvider: "",
   biggestChallenge: "",
   consent: false,
 };
@@ -155,7 +153,7 @@ export function EarlyAccessRequestPage() {
                             value={form.organisation}
                             onChange={(event) => setForm((current) => ({ ...current, organisation: event.target.value }))}
                             className="h-12 rounded-2xl border border-[#102c3d]/[0.08] bg-white px-4 text-sm font-medium text-[#102c3d] outline-none transition focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10"
-                            placeholder="Portakabin"
+                            placeholder="Your organisation"
                           />
                         </Field>
                         <Field label="Name">
@@ -164,7 +162,7 @@ export function EarlyAccessRequestPage() {
                             value={form.contactName}
                             onChange={(event) => setForm((current) => ({ ...current, contactName: event.target.value }))}
                             className="h-12 rounded-2xl border border-[#102c3d]/[0.08] bg-white px-4 text-sm font-medium text-[#102c3d] outline-none transition focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10"
-                            placeholder="Amelia Hart"
+                            placeholder="Your name"
                           />
                         </Field>
                       </div>
@@ -177,7 +175,7 @@ export function EarlyAccessRequestPage() {
                             value={form.email}
                             onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
                             className="h-12 rounded-2xl border border-[#102c3d]/[0.08] bg-white px-4 text-sm font-medium text-[#102c3d] outline-none transition focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10"
-                            placeholder="you@organisation.co.uk"
+                            placeholder="your.name@company.co.uk"
                           />
                         </Field>
                         <Field label="Number of Employees">
@@ -195,24 +193,14 @@ export function EarlyAccessRequestPage() {
                         </Field>
                       </div>
 
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <Field label="Current apprenticeship provider">
-                          <input
-                            value={form.currentProvider}
-                            onChange={(event) => setForm((current) => ({ ...current, currentProvider: event.target.value }))}
-                            className="h-12 rounded-2xl border border-[#102c3d]/[0.08] bg-white px-4 text-sm font-medium text-[#102c3d] outline-none transition focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10"
-                            placeholder="Optional"
-                          />
-                        </Field>
-                        <Field label="Biggest apprenticeship challenge">
-                          <input
-                            value={form.biggestChallenge}
-                            onChange={(event) => setForm((current) => ({ ...current, biggestChallenge: event.target.value }))}
-                            className="h-12 rounded-2xl border border-[#102c3d]/[0.08] bg-white px-4 text-sm font-medium text-[#102c3d] outline-none transition focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10"
-                            placeholder="Optional"
-                          />
-                        </Field>
-                      </div>
+                      <Field label="Biggest apprenticeship challenge">
+                        <input
+                          value={form.biggestChallenge}
+                          onChange={(event) => setForm((current) => ({ ...current, biggestChallenge: event.target.value }))}
+                          className="h-12 rounded-2xl border border-[#102c3d]/[0.08] bg-white px-4 text-sm font-medium text-[#102c3d] outline-none transition focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10"
+                          placeholder="Optional"
+                        />
+                      </Field>
 
                       <label className="flex items-start gap-3 rounded-[1.15rem] border border-[#102c3d]/[0.06] bg-[#f8fbfa] px-4 py-3">
                         <input
@@ -301,3 +289,5 @@ function persistSubmittedLead(lead: EarlyAccessRequest) {
     window.localStorage.setItem(earlyAccessStorageKey, JSON.stringify([lead]));
   }
 }
+
+

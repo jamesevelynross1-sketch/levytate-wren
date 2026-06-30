@@ -45,7 +45,6 @@ export async function POST(request: Request) {
       contactName: typeof body.contactName === "string" ? body.contactName : "",
       email,
       employeeCount: typeof body.employeeCount === "string" ? body.employeeCount : "",
-      currentProvider: typeof body.currentProvider === "string" ? body.currentProvider : "",
       biggestChallenge: typeof body.biggestChallenge === "string" ? body.biggestChallenge : "",
       consent: body.consent === true,
     });

@@ -66,7 +66,7 @@ export function EarlyAccessModule() {
         lead.contactName,
         lead.email,
         lead.employeeCount,
-        lead.currentProvider,
+        lead.biggestChallenge,
       ].some((value) => value.toLowerCase().includes(query));
 
       return matchesStatus && matchesSearch;
@@ -186,11 +186,6 @@ export function EarlyAccessModule() {
                     <p className="mt-2 line-clamp-2 text-xs leading-5 text-[#102c3d]/58">
                       {lead.biggestChallenge || "No challenge note supplied yet."}
                     </p>
-                    {lead.currentProvider ? (
-                      <p className="mt-2 text-[11px] font-medium uppercase tracking-[0.12em] text-[#0b6f63]">
-                        Provider: {lead.currentProvider}
-                      </p>
-                    ) : null}
                   </div>
 
                   <div>

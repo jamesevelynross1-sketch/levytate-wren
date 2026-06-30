@@ -25,7 +25,7 @@ export function LevyTateLoginClient() {
 
     if (!response.ok) {
       const body = await response.json().catch(() => null);
-      setError(body?.message ?? "Beta access is currently invite-only. Please use the approved LevyTate beta email or request access.");
+      setError(body?.message ?? "Beta access is currently invite-only. Please request Early Access first.");
       setLoading(false);
       return;
     }
@@ -65,3 +65,4 @@ export function LevyTateLoginClient() {
     </main>
   );
 }
+

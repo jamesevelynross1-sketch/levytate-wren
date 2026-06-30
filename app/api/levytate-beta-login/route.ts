@@ -2,31 +2,51 @@ import { NextResponse } from "next/server";
 import {
   createLevyTateBetaSession,
   getLevyTateBetaAccessCode,
-  isAllowedBetaEmail,
-  levytateBetaAccessLevel,
+  isAdminBetaEmail,
+  normaliseBetaEmail,
+  type LevyTateBetaAccessLevel,
   levytateBetaSessionCookie,
   levytateBetaSessionMaxAge,
 } from "@/lib/levytate/config/beta-access";
+import { isBetaApprovedEarlyAccessStatus } from "@/lib/levytate/early-access/domain";
+import { getEarlyAccessRequestByEmail } from "@/lib/server/levytate-early-access";
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+    const email = typeof body.email === "string" ? normaliseBetaEmail(body.email) : "";
     const code = typeof body.code === "string" ? body.code.trim() : "";
-
-    if (!isAllowedBetaEmail(email)) {
-      return NextResponse.json(
-        { ok: false, message: "Beta access is currently invite-only. Please use the approved LevyTate beta email or request access." },
-        { status: 403 },
-      );
-    }
 
     if (code !== getLevyTateBetaAccessCode().trim()) {
       return NextResponse.json({ ok: false, message: "Invalid beta access code." }, { status: 401 });
     }
 
-    const sessionToken = await createLevyTateBetaSession(email);
-    const response = NextResponse.json({ ok: true, user: { email, accessLevel: levytateBetaAccessLevel } });
+    let accessLevel: LevyTateBetaAccessLevel;
+
+    if (isAdminBetaEmail(email)) {
+      accessLevel = "beta_admin";
+    } else {
+      const lead = await getEarlyAccessRequestByEmail(email);
+
+      if (!lead) {
+        return NextResponse.json(
+          { ok: false, message: "Beta access is currently invite-only. Please request Early Access first." },
+          { status: 403 },
+        );
+      }
+
+      if (!isBetaApprovedEarlyAccessStatus(lead.status)) {
+        return NextResponse.json(
+          { ok: false, message: "Your Early Access request has been received and is currently under review." },
+          { status: 403 },
+        );
+      }
+
+      accessLevel = "beta_user";
+    }
+
+    const sessionToken = await createLevyTateBetaSession(email, accessLevel);
+    const response = NextResponse.json({ ok: true, user: { email, accessLevel } });
     response.cookies.set(levytateBetaSessionCookie, sessionToken, {
       httpOnly: true,
       sameSite: "lax",

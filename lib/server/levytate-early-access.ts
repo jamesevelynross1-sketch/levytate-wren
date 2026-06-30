@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
-  earlyAccessStatuses,
+  isBetaApprovedEarlyAccessStatus,
+  isEarlyAccessStatus,
   type EarlyAccessCreateInput,
   type EarlyAccessRequest,
   type EarlyAccessStatus,
@@ -12,7 +13,6 @@ type SupabaseEarlyAccessRow = {
   contact_name: string;
   email: string;
   employee_count: string;
-  current_provider?: string | null;
   biggest_challenge?: string | null;
   consent?: boolean | null;
   submitted_at?: string | null;
@@ -35,10 +35,6 @@ export function normaliseEarlyAccessEmail(value: unknown) {
 
 export function isValidEarlyAccessEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-}
-
-export function isEarlyAccessStatus(value: unknown): value is EarlyAccessStatus {
-  return typeof value === "string" && earlyAccessStatuses.includes(value as EarlyAccessStatus);
 }
 
 export function validateEarlyAccessInput(input: EarlyAccessCreateInput) {
@@ -73,7 +69,6 @@ export async function createEarlyAccessRequest(input: EarlyAccessCreateInput) {
     contactName: input.contactName.trim(),
     email: normaliseEarlyAccessEmail(input.email),
     employeeCount: input.employeeCount.trim(),
-    currentProvider: input.currentProvider?.trim() ?? "",
     biggestChallenge: input.biggestChallenge?.trim() ?? "",
     consent: Boolean(input.consent),
     submittedAt: new Date().toISOString(),
@@ -100,6 +95,24 @@ export async function listEarlyAccessRequests() {
   return Array.from(fallbackRequests.values()).sort((left, right) =>
     right.submittedAt.localeCompare(left.submittedAt),
   );
+}
+
+export async function getEarlyAccessRequestByEmail(email: string) {
+  const normalisedEmail = normaliseEarlyAccessEmail(email);
+  if (!normalisedEmail) return null;
+
+  const config = getSupabaseConfig();
+  if (config) {
+    const row = await tryGetByEmailFromSupabase(config, normalisedEmail);
+    if (row) return row;
+  }
+
+  return Array.from(fallbackRequests.values()).find((request) => request.email === normalisedEmail) ?? null;
+}
+
+export async function hasApprovedEarlyAccess(email: string) {
+  const request = await getEarlyAccessRequestByEmail(email);
+  return Boolean(request && isBetaApprovedEarlyAccessStatus(request.status));
 }
 
 export async function updateEarlyAccessStatus(id: string, status: EarlyAccessStatus) {
@@ -155,7 +168,6 @@ async function trySaveToSupabase(
         contact_name: request.contactName,
         email: request.email,
         employee_count: request.employeeCount,
-        current_provider: request.currentProvider || null,
         biggest_challenge: request.biggestChallenge || null,
         consent: request.consent,
         submitted_at: request.submittedAt,
@@ -176,7 +188,7 @@ async function trySaveToSupabase(
 
 async function tryListFromSupabase(config: { url: string; serviceRoleKey: string }) {
   const query = new URLSearchParams({
-    select: "id,organisation,contact_name,email,employee_count,current_provider,biggest_challenge,consent,submitted_at,status",
+    select: "id,organisation,contact_name,email,employee_count,biggest_challenge,consent,submitted_at,status",
     order: "submitted_at.desc",
   });
 
@@ -195,13 +207,35 @@ async function tryListFromSupabase(config: { url: string; serviceRoleKey: string
   return rows.map(mapSupabaseRow).filter(Boolean) as EarlyAccessRequest[];
 }
 
+async function tryGetByEmailFromSupabase(config: { url: string; serviceRoleKey: string }, email: string) {
+  const query = new URLSearchParams({
+    select: "id,organisation,contact_name,email,employee_count,biggest_challenge,consent,submitted_at,status",
+    email: `eq.${email}`,
+    limit: "1",
+  });
+
+  const response = await tryFetchSupabase(`${config.url}/rest/v1/${supabaseTableName}?${query.toString()}`, {
+    headers: getSupabaseHeaders(config.serviceRoleKey),
+    cache: "no-store",
+  });
+
+  if (!response) return null;
+  if (!response.ok) {
+    if (await shouldFallback(response)) return null;
+    throw new EarlyAccessStoreError("Early access lead could not be checked.");
+  }
+
+  const rows = (await response.json()) as SupabaseEarlyAccessRow[];
+  return mapSupabaseRow(rows[0]);
+}
+
 async function tryUpdateSupabaseStatus(
   config: { url: string; serviceRoleKey: string },
   id: string,
   status: EarlyAccessStatus,
 ) {
   const response = await tryFetchSupabase(
-    `${config.url}/rest/v1/${supabaseTableName}?id=eq.${encodeURIComponent(id)}&select=id,organisation,contact_name,email,employee_count,current_provider,biggest_challenge,consent,submitted_at,status`,
+    `${config.url}/rest/v1/${supabaseTableName}?id=eq.${encodeURIComponent(id)}&select=id,organisation,contact_name,email,employee_count,biggest_challenge,consent,submitted_at,status`,
     {
       method: "PATCH",
       headers: getSupabaseHeaders(config.serviceRoleKey, {
@@ -232,7 +266,6 @@ function mapSupabaseRow(row: SupabaseEarlyAccessRow | undefined | null) {
     contactName: row.contact_name,
     email: row.email,
     employeeCount: row.employee_count,
-    currentProvider: row.current_provider ?? "",
     biggestChallenge: row.biggest_challenge ?? "",
     consent: row.consent ?? true,
     submittedAt: row.submitted_at ?? new Date().toISOString(),

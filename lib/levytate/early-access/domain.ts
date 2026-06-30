@@ -6,6 +6,8 @@ export const earlyAccessStatuses = [
   "Onboarded",
 ] as const;
 
+export const betaApprovedEarlyAccessStatuses = ["Approved", "Onboarded"] as const;
+
 export type EarlyAccessStatus = (typeof earlyAccessStatuses)[number];
 
 export type EarlyAccessRequest = {
@@ -14,7 +16,6 @@ export type EarlyAccessRequest = {
   contactName: string;
   email: string;
   employeeCount: string;
-  currentProvider: string;
   biggestChallenge: string;
   consent: boolean;
   submittedAt: string;
@@ -26,7 +27,6 @@ export type EarlyAccessCreateInput = {
   contactName: string;
   email: string;
   employeeCount: string;
-  currentProvider?: string;
   biggestChallenge?: string;
   consent: boolean;
 };
@@ -47,4 +47,8 @@ export const earlyAccessStorageKey = "levytate_early_access_requests";
 
 export function isEarlyAccessStatus(value: unknown): value is EarlyAccessStatus {
   return typeof value === "string" && earlyAccessStatuses.includes(value as EarlyAccessStatus);
+}
+
+export function isBetaApprovedEarlyAccessStatus(value: unknown): value is EarlyAccessStatus {
+  return typeof value === "string" && betaApprovedEarlyAccessStatuses.includes(value as (typeof betaApprovedEarlyAccessStatuses)[number]);
 }
