@@ -65,7 +65,7 @@ function HeroSection() {
       <div className="mx-auto grid max-w-7xl gap-10 px-5 py-14 sm:px-8 lg:py-20 xl:grid-cols-[0.92fr_1.08fr] xl:items-center xl:gap-14">
         <div>
           <p className="inline-flex rounded-full bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#0b6f63] ring-1 ring-[#159b8f]/[0.12] shadow-[0_12px_30px_rgba(16,44,61,0.05)]">
-            Apprenticeship operations, made clearer
+            Limited employer beta
           </p>
           <h1 className="mt-6 max-w-4xl break-words text-[2.7rem] font-semibold leading-[1.03] sm:text-6xl lg:text-[4rem] xl:text-7xl">
             The apprenticeship operating system for modern employers.
@@ -74,11 +74,11 @@ function HeroSection() {
             Replace spreadsheets, email chains and disconnected provider conversations with one intelligent workspace for employees, applications and provider matching.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <a href="#beta" className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#102c3d] px-6 text-sm font-semibold text-white shadow-[0_18px_38px_rgba(16,44,61,0.18)] transition hover:-translate-y-0.5">
-              Request Beta Access
-            </a>
+            <Link href="/early-access" className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#102c3d] px-6 text-sm font-semibold text-white shadow-[0_18px_38px_rgba(16,44,61,0.18)] transition hover:-translate-y-0.5">
+              Request Early Access
+            </Link>
             <Link href="/login" className="inline-flex min-h-12 items-center justify-center rounded-full bg-white px-6 text-sm font-semibold text-[#102c3d] ring-1 ring-[#102c3d]/[0.09] transition hover:-translate-y-0.5 hover:ring-[#159b8f]/25">
-              Beta Login
+              Login to Beta
             </Link>
           </div>
         </div>
@@ -104,7 +104,7 @@ function ProductPreview() {
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">Live workspace</p>
             <p className="mt-1 truncate text-lg font-semibold">Employer operating view</p>
           </div>
-          <span className="shrink-0 rounded-full bg-[#eaf7f2] px-3 py-1.5 text-xs font-semibold text-[#0b6f63]">Beta</span>
+          <span className="shrink-0 rounded-full bg-[#eaf7f2] px-3 py-1.5 text-xs font-semibold text-[#0b6f63]">Limited beta</span>
         </div>
 
         <div className="p-3 sm:p-4">
@@ -271,7 +271,7 @@ function AiSection() {
           <ChatBubble speaker="LevyTate AI" message="A Level 3 Data Technician route could be a strong fit if the role involves spreadsheets, reporting, CRM updates or process admin. An AI support pathway could also be explored if the goal is automation and digital confidence." highlighted />
           <div className="mt-4 grid gap-2 sm:grid-cols-3">
             <Link href="/solutions/employees" className="rounded-xl bg-[#eef8f4] px-4 py-3 text-center text-xs font-semibold text-[#0b6f63]">Compare pathways</Link>
-            <Link href="/solutions/training-providers" className="rounded-xl bg-[#fff0f2] px-4 py-3 text-center text-xs font-semibold text-[#c95568]">Request provider matching</Link>
+            <Link href="/early-access" className="rounded-xl bg-[#fff0f2] px-4 py-3 text-center text-xs font-semibold text-[#c95568]">Request Early Access</Link>
             <Link href="/login" className="rounded-xl bg-[#f6f8f7] px-4 py-3 text-center text-xs font-semibold text-[#102c3d]/68">Save for beta workspace</Link>
           </div>
         </div>
@@ -291,15 +291,23 @@ function ChatBubble({ speaker, message, highlighted = false }: { speaker: string
 
 function FinalCta() {
   return (
-    <section id="beta" className="px-5 py-16 sm:px-8 lg:py-20">
+    <section id="early-access" className="px-5 py-16 sm:px-8 lg:py-20">
       <div className="mx-auto grid max-w-7xl gap-8 rounded-[2rem] bg-white p-7 shadow-[0_26px_80px_rgba(16,44,61,0.09)] ring-1 ring-[#102c3d]/[0.07] sm:p-10 lg:grid-cols-[1fr_auto] lg:items-center">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">LevyTate public beta</p>
-          <h2 className="mt-3 max-w-4xl text-4xl font-semibold leading-tight sm:text-5xl">Start building a clearer apprenticeship operating system.</h2>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">Founding employer intake</p>
+          <h2 className="mt-3 max-w-4xl text-4xl font-semibold leading-tight sm:text-5xl">Ready to transform apprenticeship management?</h2>
+          <p className="mt-4 max-w-3xl text-base leading-7 text-[#102c3d]/60">
+            Join a limited number of employers helping shape LevyTate before public launch.
+          </p>
+          <div className="mt-6 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#0b6f63]">
+            <span className="rounded-full bg-[#eef8f4] px-3 py-2 ring-1 ring-[#159b8f]/[0.12]">Early Access</span>
+            <span className="rounded-full bg-[#f6f8f7] px-3 py-2 ring-1 ring-[#102c3d]/[0.08]">Founding employers</span>
+            <span className="rounded-full bg-[#f6f8f7] px-3 py-2 ring-1 ring-[#102c3d]/[0.08]">Product feedback loop</span>
+          </div>
         </div>
         <div className="flex flex-wrap gap-3 lg:justify-end">
-          <a href="mailto:hello@levytate.co.uk?subject=Employer beta access" className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#102c3d] px-6 text-sm font-semibold text-white">Request Beta Access</a>
-          <Link href="/login" className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#eef8f4] px-6 text-sm font-semibold text-[#0b6f63] ring-1 ring-[#159b8f]/[0.12]">Beta Login</Link>
+          <Link href="/early-access" className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#102c3d] px-6 text-sm font-semibold text-white">Request Early Access</Link>
+          <Link href="/login" className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#eef8f4] px-6 text-sm font-semibold text-[#0b6f63] ring-1 ring-[#159b8f]/[0.12]">Login to Beta</Link>
         </div>
       </div>
     </section>

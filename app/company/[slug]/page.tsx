@@ -6,8 +6,8 @@ const pages = {
   about: {
     title: "About LevyTate",
     description: "LevyTate exists to make apprenticeship and workforce development decisions clearer for employers, employees and trusted delivery partners.",
-    ctaLabel: "Request Beta Access",
-    ctaHref: "/#beta",
+    ctaLabel: "Request Early Access",
+    ctaHref: "/early-access",
     items: [
       { title: "One operating layer", copy: "Bring workforce records, role-led pathways, applications, provider matching and reporting into one consistent product." },
       { title: "Independent by design", copy: "LevyTate is not a training provider or an open marketplace. Recommendations are based on employer and learner fit." },
@@ -17,11 +17,11 @@ const pages = {
   },
   contact: {
     title: "Contact LevyTate",
-    description: "Speak with the LevyTate team about employer beta access, provider partnerships or the future product roadmap.",
+    description: "Speak with the LevyTate team about early access, provider partnerships or the future product roadmap.",
     ctaLabel: "Email LevyTate",
     ctaHref: "mailto:hello@levytate.co.uk?subject=LevyTate enquiry",
     items: [
-      { title: "Employer beta", copy: "Discuss your current apprenticeship operating model, workforce priorities and requirements for a beta workspace." },
+      { title: "Early access", copy: "Discuss your current apprenticeship operating model, workforce priorities and requirements for a LevyTate early access workspace." },
       { title: "Provider partnerships", copy: "Explore curated network expectations, capability verification and strategic partner packages." },
       { title: "Product feedback", copy: "Share a workflow, reporting or workforce-planning challenge that should inform the LevyTate roadmap." },
       { title: "Strategic advisory", copy: "Discuss provider matching, workforce planning and apprenticeship strategy support." },

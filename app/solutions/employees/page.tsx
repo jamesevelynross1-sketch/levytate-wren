@@ -12,9 +12,9 @@ export default function EmployeesSolutionPage() {
       eyebrow="LevyTate for employees"
       title="Find a development route that makes sense for your role and goals."
       description="LevyTate gives employees supportive, role-aware guidance so they can understand suitable pathways, prepare for a manager conversation and track one clear application."
-      primaryCta="Request Beta Access"
-      primaryHref="mailto:hello@levytate.co.uk?subject=LevyTate employee experience"
-      secondaryCta="Beta Login"
+      primaryCta="Request Early Access"
+      primaryHref="/early-access"
+      secondaryCta="Login to Beta"
       secondaryHref="/login"
       painsTitle="Employees should not need apprenticeship expertise to understand their options."
       pains={[
@@ -58,7 +58,7 @@ export default function EmployeesSolutionPage() {
         },
       ]}
       closingTitle="Development guidance should feel supportive, not confusing."
-      closingCopy="Join the LevyTate beta to explore a clearer employee experience for apprenticeship discovery and applications."
+      closingCopy="Join a limited employer beta to explore a clearer employee experience for apprenticeship discovery and applications."
     />
   );
 }

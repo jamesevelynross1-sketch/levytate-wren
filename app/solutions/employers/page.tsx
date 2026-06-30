@@ -12,9 +12,9 @@ export default function EmployersSolutionPage() {
       eyebrow="LevyTate for employers"
       title="Manage apprenticeship operations from one clear workspace."
       description="Give HR, L&D, managers and apprenticeship leads a shared operating system for employees, pathways, approvals, provider matching and workforce insight."
-      primaryCta="Request Employer Beta Access"
-      primaryHref="mailto:hello@levytate.co.uk?subject=Employer beta access"
-      secondaryCta="Beta Login"
+      primaryCta="Request Early Access"
+      primaryHref="/early-access"
+      secondaryCta="Login to Beta"
       secondaryHref="/login"
       painsTitle="Employer apprenticeship activity is often spread across disconnected systems."
       pains={[
@@ -70,7 +70,7 @@ export default function EmployersSolutionPage() {
         },
       ]}
       closingTitle="Replace fragmented apprenticeship admin with one operating model."
-      closingCopy="Join the LevyTate employer beta and shape a clearer way to manage workforce development and provider decisions."
+      closingCopy="Join a limited group of employers shaping a clearer way to manage workforce development and provider decisions before public launch."
     />
   );
 }

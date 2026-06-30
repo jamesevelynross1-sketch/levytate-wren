@@ -6,6 +6,7 @@ import {
   BriefcaseBusiness,
   Building2,
   ClipboardList,
+  ClipboardPlus,
   FolderKanban,
   GraduationCap,
   LayoutDashboard,
@@ -20,6 +21,7 @@ import { LevyTateLogo } from "@/components/levytate-demo/PlatformShell";
 import { ApplicationsModule } from "@/components/levytate-mvp/ApplicationsModule";
 import { AskLevyTateAiWorkspace } from "@/components/levytate-mvp/AskLevyTateAiWorkspace";
 import { DashboardModule, SettingsModule } from "@/components/levytate-mvp/DashboardSettingsModules";
+import { EarlyAccessModule } from "@/components/levytate-mvp/EarlyAccessModule";
 import { EmployeesModule } from "@/components/levytate-mvp/EmployeesModule";
 import { EnrolmentsModule } from "@/components/levytate-mvp/EnrolmentsModule";
 import { MvpWorkspaceProvider, useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
@@ -38,6 +40,7 @@ const modules = [
   { name: "Enrolments", icon: GraduationCap, section: "Workflow" },
   { name: "Provider Partners", icon: Building2, section: "Partners" },
   { name: "Provider Relationships", icon: FolderKanban, section: "Partners" },
+  { name: "Early Access", icon: ClipboardPlus, section: "Oversight" },
   { name: "Reports", icon: BellRing, section: "Oversight" },
   { name: "Settings", icon: Settings, section: "Oversight" },
 ] as const satisfies ReadonlyArray<{ name: string; icon: LucideIcon; section: string }>;
@@ -53,6 +56,7 @@ const moduleCopy: Record<ModuleName, string> = {
   Enrolments: "Move final-approved applications into provider handoff, start dates and live learner tracking.",
   "Provider Partners": "Maintain the controlled provider catalogue and programme delivery records.",
   "Provider Relationships": "Set preferred partners by category and raise sourcing exceptions only when needed.",
+  "Early Access": "Capture, qualify and progress employer beta demand inside LevyTate's first commercial workspace.",
   Reports: "Operational reporting generated from real workspace data instead of static demo metrics.",
   Settings: "Configure organisation, sites, departments and business priorities for the workspace.",
 };
@@ -170,6 +174,7 @@ function MvpAppShell() {
             {activeModule === "Enrolments" ? <EnrolmentsModule /> : null}
             {activeModule === "Provider Partners" ? <ProvidersModule /> : null}
             {activeModule === "Provider Relationships" ? <ProviderMatchingModule /> : null}
+            {activeModule === "Early Access" ? <EarlyAccessModule /> : null}
             {activeModule === "Reports" ? <ReportsModule /> : null}
             {activeModule === "Settings" ? <SettingsModule /> : null}
           </div>

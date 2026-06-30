@@ -6,8 +6,8 @@ export function PublicInfoPage({
   title,
   description,
   items,
-  ctaLabel = "Request Beta Access",
-  ctaHref = "/#beta",
+  ctaLabel = "Request Early Access",
+  ctaHref = "/early-access",
 }: {
   eyebrow: string;
   title: string;
@@ -42,7 +42,7 @@ export function PublicInfoPage({
           </div>
           <div className="mt-10 rounded-[1.7rem] bg-[#102c3d] p-7 text-white sm:flex sm:items-center sm:justify-between sm:gap-8">
             <div>
-              <p className="text-sm font-semibold">LevyTate public beta</p>
+              <p className="text-sm font-semibold">LevyTate Early Access</p>
               <p className="mt-2 max-w-xl text-sm leading-6 text-white/66">Speak with the LevyTate team about early access, employer requirements or provider partnership opportunities.</p>
             </div>
             {isMailLink ? (

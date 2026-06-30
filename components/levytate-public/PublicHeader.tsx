@@ -68,7 +68,7 @@ const resourceItems: NavItem[] = [
   { title: "FAQs", href: "/resources/faqs" },
   { title: "Apprenticeship Insights", href: "/resources/apprenticeship-insights" },
   { title: "Provider Partner Guide", href: "/resources/provider-partner-guide" },
-  { title: "Beta Access Guide", href: "/resources/beta-access-guide" },
+  { title: "Early Access Guide", href: "/resources/beta-access-guide" },
 ];
 
 const companyItems: NavItem[] = [
@@ -148,10 +148,10 @@ export function PublicHeader() {
 
         <div className="ml-auto hidden items-center gap-2 sm:flex lg:ml-4">
           <Link href="/login" onClick={closeMenus} className="inline-flex min-h-11 items-center whitespace-nowrap rounded-full bg-white px-4 text-sm font-semibold text-[#102c3d] ring-1 ring-[#102c3d]/[0.09] transition hover:-translate-y-0.5 hover:ring-[#159b8f]/25">
-            Beta Login
+            Login to Beta
           </Link>
-          <Link href="/#beta" onClick={closeMenus} className="inline-flex min-h-11 items-center whitespace-nowrap rounded-full bg-[#102c3d] px-5 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(16,44,61,0.14)] transition hover:-translate-y-0.5">
-            Request Beta Access
+          <Link href="/early-access" onClick={closeMenus} className="inline-flex min-h-11 items-center whitespace-nowrap rounded-full bg-[#102c3d] px-5 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(16,44,61,0.14)] transition hover:-translate-y-0.5">
+            Request Early Access
           </Link>
         </div>
 
@@ -263,8 +263,8 @@ function MobileNavigation({ open, onToggle, onNavigate }: { open: boolean; onTog
             ))}
           </div>
           <div className="mt-5 grid grid-cols-2 gap-2 border-t border-[#102c3d]/[0.07] pt-4 sm:hidden">
-            <Link href="/login" onClick={onNavigate} className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#f6fbf8] px-3 text-sm font-semibold text-[#102c3d]">Beta Login</Link>
-            <Link href="/#beta" onClick={onNavigate} className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#102c3d] px-3 text-center text-sm font-semibold text-white">Request Access</Link>
+            <Link href="/login" onClick={onNavigate} className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#f6fbf8] px-3 text-sm font-semibold text-[#102c3d]">Login to Beta</Link>
+            <Link href="/early-access" onClick={onNavigate} className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#102c3d] px-3 text-center text-sm font-semibold text-white">Request Early Access</Link>
           </div>
         </div>
       ) : null}

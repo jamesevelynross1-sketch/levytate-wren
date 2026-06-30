@@ -24,6 +24,10 @@ export async function middleware(request: NextRequest) {
     return NextResponse.rewrite(new URL("/levytate", request.url));
   }
 
+  if (pathname === "/early-access") {
+    return NextResponse.rewrite(new URL("/levytate/early-access", request.url));
+  }
+
   if (pathname === "/login") {
     const session = await readLevyTateBetaSession(request.cookies.get(levytateBetaSessionCookie)?.value);
     if (session) {
