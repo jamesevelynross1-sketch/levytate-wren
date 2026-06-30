@@ -9,6 +9,7 @@ import {
   levytateBetaSessionMaxAge,
 } from "@/lib/levytate/config/beta-access";
 import { isBetaApprovedEarlyAccessStatus } from "@/lib/levytate/early-access/domain";
+import { hasPersistentBetaAccessGrant } from "@/lib/server/levytate-beta-access-grants";
 import { getEarlyAccessRequestByEmail } from "@/lib/server/levytate-early-access";
 
 export async function POST(request: Request) {
@@ -26,23 +27,24 @@ export async function POST(request: Request) {
     if (isAdminBetaEmail(email)) {
       accessLevel = "beta_admin";
     } else {
-      const lead = await getEarlyAccessRequestByEmail(email);
+      const [lead, hasGrant] = await Promise.all([
+        getEarlyAccessRequestByEmail(email),
+        hasPersistentBetaAccessGrant(email),
+      ]);
 
-      if (!lead) {
+      if (hasGrant || (lead && isBetaApprovedEarlyAccessStatus(lead.status))) {
+        accessLevel = "beta_user";
+      } else if (lead) {
+        return NextResponse.json(
+          { ok: false, message: "Your Early Access request has been received and is currently under review." },
+          { status: 403 },
+        );
+      } else {
         return NextResponse.json(
           { ok: false, message: "Beta access is currently invite-only. Please request Early Access first." },
           { status: 403 },
         );
       }
-
-      if (!isBetaApprovedEarlyAccessStatus(lead.status)) {
-        return NextResponse.json(
-          { ok: false, message: "Your Early Access request has been received and is currently under review." },
-          { status: 403 },
-        );
-      }
-
-      accessLevel = "beta_user";
     }
 
     const sessionToken = await createLevyTateBetaSession(email, accessLevel);

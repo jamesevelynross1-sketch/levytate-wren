@@ -90,7 +90,7 @@ export function EarlyAccessModule() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status, lead: leads.find((lead) => lead.id === id) }),
       });
 
       const payload = (await response.json()) as {
@@ -298,3 +298,4 @@ function persistLocalLeads(leads: EarlyAccessRequest[]) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(earlyAccessStorageKey, JSON.stringify(leads));
 }
+
