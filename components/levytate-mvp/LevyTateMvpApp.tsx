@@ -29,6 +29,7 @@ import { ProviderMatchingModule } from "@/components/levytate-mvp/ProviderMatchi
 import { ProvidersModule } from "@/components/levytate-mvp/ProvidersModule";
 import { ReportsModule } from "@/components/levytate-mvp/ReportsModule";
 import { RolesModule } from "@/components/levytate-mvp/RolesModule";
+import type { LevyTateWorkspaceBootstrap } from "@/lib/levytate/mvp/api";
 import { buildNotifications } from "@/lib/levytate/mvp/workspace-insights";
 
 const modules = [
@@ -61,12 +62,12 @@ const moduleCopy: Record<ModuleName, string> = {
   Settings: "Configure organisation, sites, departments and business priorities for the workspace.",
 };
 
-export function LevyTateMvpApp() {
-  return <MvpWorkspaceProvider><MvpAppShell /></MvpWorkspaceProvider>;
+export function LevyTateMvpApp({ initialWorkspace }: { initialWorkspace?: LevyTateWorkspaceBootstrap | null }) {
+  return <MvpWorkspaceProvider initialWorkspace={initialWorkspace}><MvpAppShell /></MvpWorkspaceProvider>;
 }
 
 function MvpAppShell() {
-  const { data, hydrated } = useMvpWorkspace();
+  const { data, meta, hydrated } = useMvpWorkspace();
   const [activeModule, setActiveModule] = useState<ModuleName>("Home");
   const [aiEmployeeId, setAiEmployeeId] = useState<string | null>(null);
 
@@ -129,8 +130,8 @@ function MvpAppShell() {
             <div className="flex items-center gap-3 px-2">
               <div className="grid h-9 w-9 place-items-center rounded-full bg-[#102c3d] text-white"><UserRound size={17} strokeWidth={1.8} aria-hidden="true" /></div>
               <div>
-                <p className="text-xs font-semibold">Beta administrator</p>
-                <p className="mt-0.5 text-[11px] text-[#102c3d]/44">Operational workspace mode</p>
+                <p className="text-xs font-semibold">{meta?.userRole ?? "Workspace user"}</p>
+                <p className="mt-0.5 text-[11px] text-[#102c3d]/44">{meta?.storageMode === "supabase" ? "Supabase-backed workspace" : "Local fallback workspace"}</p>
               </div>
             </div>
           </div>
