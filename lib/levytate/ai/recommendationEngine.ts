@@ -115,6 +115,18 @@ function conversationText(request: LevyTateAiRequest) {
     request.contextData?.selectedPersona?.role,
     request.contextData?.selectedPersona?.department,
     request.contextData?.selectedPersona?.careerGoal,
+    request.employeeDiscovery?.roleTitle,
+    request.employeeDiscovery?.department,
+    ...(request.employeeDiscovery?.responsibilities ?? []),
+    ...(request.employeeDiscovery?.currentSkills ?? []),
+    ...(request.employeeDiscovery?.businessFunctions ?? []),
+    ...(request.employeeDiscovery?.currentCapabilities ?? []),
+    ...(request.employeeDiscovery?.apprenticeshipIndicators ?? []),
+    ...(request.employeeDiscovery?.aiOpportunities ?? []),
+    ...(request.employeeDiscovery?.dataOpportunities ?? []),
+    ...(request.employeeDiscovery?.automationOpportunities ?? []),
+    ...(request.employeeDiscovery?.futureCapabilities ?? []),
+    ...(request.employerPriorities?.map((priority) => priority.name) ?? []),
   ]);
 }
 
@@ -150,7 +162,7 @@ function availableDefinitions(request: LevyTateAiRequest) {
 }
 
 function roleMappingEvidence(request: LevyTateAiRequest, definition: PathwayDefinition) {
-  const role = request.conversationProfile?.currentRole ?? request.contextData?.selectedPersona?.role ?? "";
+  const role = request.conversationProfile?.currentRole ?? request.employeeDiscovery?.roleTitle ?? request.contextData?.selectedPersona?.role ?? "";
   const mapping = request.roleMappings?.find((item) => item.roleTitle.toLowerCase() === role.toLowerCase());
   if (!mapping) return [];
   const primaryMatch = mapping.primaryPathway.toLowerCase().includes(definition.standard.toLowerCase()) || definition.title.toLowerCase().includes(mapping.primaryPathway.toLowerCase());
@@ -165,10 +177,36 @@ function roleMappingEvidence(request: LevyTateAiRequest, definition: PathwayDefi
 }
 
 function evidenceFor(request: LevyTateAiRequest, definition: PathwayDefinition, text: string) {
+  const discoveryText = uniqueText([
+    request.employeeDiscovery?.roleTitle,
+    request.employeeDiscovery?.department,
+    ...(request.employeeDiscovery?.responsibilities ?? []),
+    ...(request.employeeDiscovery?.currentSkills ?? []),
+    ...(request.employeeDiscovery?.businessFunctions ?? []),
+    ...(request.employeeDiscovery?.currentCapabilities ?? []),
+    ...(request.employeeDiscovery?.apprenticeshipIndicators ?? []),
+    ...(request.employeeDiscovery?.aiOpportunities ?? []),
+    ...(request.employeeDiscovery?.dataOpportunities ?? []),
+    ...(request.employeeDiscovery?.automationOpportunities ?? []),
+    ...(request.employeeDiscovery?.futureCapabilities ?? []),
+  ]);
+  const profileEvidence: LevyTateRecommendationEvidence[] = definition.signals
+    .filter((signal) => signal.pattern.test(discoveryText))
+    .map((signal) => ({ id: `profile-${signal.id}`, label: signal.label, source: "profile", weight: signal.weight }));
+  const matchedSignalIds = new Set(profileEvidence.map((item) => item.id.replace(/^profile-/, "")));
   const conversationEvidence: LevyTateRecommendationEvidence[] = definition.signals
-    .filter((signal) => signal.pattern.test(text))
+    .filter((signal) => !matchedSignalIds.has(signal.id) && signal.pattern.test(text))
     .map((signal) => ({ id: signal.id, label: signal.label, source: "conversation", weight: signal.weight }));
-  return [...roleMappingEvidence(request, definition), ...conversationEvidence];
+  const priorityEvidence: LevyTateRecommendationEvidence[] = (request.employerPriorities ?? []).flatMap((priority) => {
+    const matchingSignals = definition.signals.filter((signal) => signal.pattern.test(priority.name));
+    return matchingSignals.slice(0, 1).map((signal) => ({
+      id: `priority-${slugify(priority.name)}-${signal.id}`,
+      label: `Employer priority: ${priority.name}`,
+      source: "platform_rule" as const,
+      weight: priority.importance === "Critical" ? 8 : priority.importance === "High" ? 6 : 4,
+    }));
+  });
+  return [...roleMappingEvidence(request, definition), ...profileEvidence, ...conversationEvidence, ...priorityEvidence];
 }
 
 function stableHash(value: string) {

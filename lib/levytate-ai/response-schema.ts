@@ -275,6 +275,26 @@ export type LevyTateAiPathwayContext = {
   deliveryModel?: string;
 };
 
+export type LevyTateEmployerPriorityContext = {
+  name: string;
+  importance: "Critical" | "High" | "Medium";
+};
+
+export type LevyTateEmployeeDiscoveryContext = {
+  roleTitle?: string;
+  department?: string;
+  responsibilities: string[];
+  currentSkills: string[];
+  businessFunctions: string[];
+  currentCapabilities: string[];
+  apprenticeshipIndicators: string[];
+  aiOpportunities: string[];
+  dataOpportunities: string[];
+  automationOpportunities: string[];
+  futureCapabilities: string[];
+  stage: "role_context" | "future_capability" | "recommendation_ready";
+};
+
 export type LevyTateAiRequest = {
   role: LevyTateRole;
   userRole?: LevyTateRole;
@@ -291,6 +311,9 @@ export type LevyTateAiRequest = {
   roleMappings?: LevyTateAiRoleMappingContext[];
   providerCatalogue?: LevyTateAiProviderContext[];
   availablePathways?: LevyTateAiPathwayContext[];
+  employerPriorities?: LevyTateEmployerPriorityContext[];
+  employeeDiscovery?: LevyTateEmployeeDiscoveryContext;
+  preferredStandardId?: string;
   contextData?: {
     selectedPersona?: PersonaSummary;
     activeApplication?: RequestSummary | null;
@@ -469,6 +492,39 @@ function parseAvailablePathways(value: unknown): LevyTateAiPathwayContext[] | un
   });
 }
 
+function parseEmployerPriorities(value: unknown): LevyTateEmployerPriorityContext[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value.slice(0, 3).flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const candidate = item as Partial<LevyTateEmployerPriorityContext>;
+    if (typeof candidate.name !== "string") return [];
+    const importance: LevyTateEmployerPriorityContext["importance"] =
+      candidate.importance === "Critical" || candidate.importance === "Medium" ? candidate.importance : "High";
+    return [{ name: candidate.name.trim().slice(0, 160), importance }];
+  });
+}
+
+function parseEmployeeDiscovery(value: unknown): LevyTateEmployeeDiscoveryContext | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const candidate = value as Partial<LevyTateEmployeeDiscoveryContext>;
+  const stage: LevyTateEmployeeDiscoveryContext["stage"] =
+    candidate.stage === "future_capability" || candidate.stage === "recommendation_ready" ? candidate.stage : "role_context";
+  return {
+    roleTitle: typeof candidate.roleTitle === "string" && candidate.roleTitle.trim() ? candidate.roleTitle.trim().slice(0, 160) : undefined,
+    department: typeof candidate.department === "string" && candidate.department.trim() ? candidate.department.trim().slice(0, 160) : undefined,
+    responsibilities: cleanStringArray(candidate.responsibilities, 12) ?? [],
+    currentSkills: cleanStringArray(candidate.currentSkills, 12) ?? [],
+    businessFunctions: cleanStringArray(candidate.businessFunctions, 12) ?? [],
+    currentCapabilities: cleanStringArray(candidate.currentCapabilities, 12) ?? [],
+    apprenticeshipIndicators: cleanStringArray(candidate.apprenticeshipIndicators, 12) ?? [],
+    aiOpportunities: cleanStringArray(candidate.aiOpportunities, 12) ?? [],
+    dataOpportunities: cleanStringArray(candidate.dataOpportunities, 12) ?? [],
+    automationOpportunities: cleanStringArray(candidate.automationOpportunities, 12) ?? [],
+    futureCapabilities: cleanStringArray(candidate.futureCapabilities, 12) ?? [],
+    stage,
+  };
+}
+
 function parseRecommendationResult(value: unknown): LevyTateRecommendationResult | null | undefined {
   if (value === null) return null;
   if (!value || typeof value !== "object") return undefined;
@@ -628,6 +684,9 @@ export function parseLevyTateAiRequest(payload: unknown): LevyTateAiRequest | nu
     roleMappings: parseRoleMappings(candidate.roleMappings),
     providerCatalogue: parseProviderCatalogue(candidate.providerCatalogue),
     availablePathways: parseAvailablePathways(candidate.availablePathways),
+    employerPriorities: parseEmployerPriorities(candidate.employerPriorities),
+    employeeDiscovery: parseEmployeeDiscovery(candidate.employeeDiscovery),
+    preferredStandardId: typeof candidate.preferredStandardId === "string" ? candidate.preferredStandardId.trim().slice(0, 120) : undefined,
     contextData,
   };
 }

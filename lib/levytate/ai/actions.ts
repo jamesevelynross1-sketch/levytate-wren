@@ -67,6 +67,10 @@ export function enforceLevyTateAiActions(request: LevyTateAiRequest, response: L
   let actions = normaliseActions(request.role, response.recommendedActions);
   const activeApplication = request.currentApplication ?? request.contextData?.activeApplication ?? null;
 
+  if (!request.preferredStandardId) {
+    actions = actions.filter((action) => action.type !== "request_provider_matching" && action.type !== "start_application");
+  }
+
   if (request.role === "Employee" && activeApplication) {
     actions = actions.filter((action) => action.type !== "start_application" && action.type !== "draft_application_reason");
     if (!actions.some((action) => action.type === "open_my_applications")) {

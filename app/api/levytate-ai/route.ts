@@ -91,6 +91,14 @@ function mergeGeneratedGuidance(fallback: LevyTateAiResponse, generated: LevyTat
   };
 }
 
+function progressiveEmployeeFollowUp(request: LevyTateAiRequest) {
+  if (request.role !== "Employee" || !request.selectedEmployee || !request.employeeDiscovery) return null;
+  if (request.employeeDiscovery.stage === "future_capability" && request.employeeDiscovery.futureCapabilities.length === 0) {
+    const name = request.selectedEmployee.trim().split(/\s+/)[0] || request.selectedEmployee;
+    return `What would you like ${name} to be able to do over the next 12 months that they cannot do confidently today?`;
+  }
+  return null;
+}
 function buildGroundedFallback(request: LevyTateAiRequest) {
   const recommendationResult = buildLevyTateRecommendations(request);
   const conversationalFallback = applyConversationMemoryToFallback(
@@ -109,9 +117,11 @@ function finaliseResponse(request: LevyTateAiRequest, response: LevyTateAiRespon
   const enforced = enforceLevyTateAiActions(request, applyLevyTateAiSafety(request, withProfile));
   const shouldShowActions = Boolean(enforced.applicationWarning) || enforced.shouldShowActions !== false;
   const shouldShowPathways = enforced.recommendationResult?.shouldRevealRecommendations === true;
+  const progressiveFollowUp = progressiveEmployeeFollowUp(request);
 
   return {
     ...enforced,
+    followUpQuestion: progressiveFollowUp ?? enforced.followUpQuestion,
     shouldShowActions,
     shouldShowPathways,
     recommendedActions: shouldShowActions ? enforced.recommendedActions : [],

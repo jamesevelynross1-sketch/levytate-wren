@@ -47,6 +47,7 @@ export function LevyTateMvpApp() {
 function MvpAppShell() {
   const { data, hydrated } = useMvpWorkspace();
   const [activeModule, setActiveModule] = useState<ModuleName>("Ask LevyTate AI");
+  const [aiEmployeeId, setAiEmployeeId] = useState<string | null>(null);
 
   async function logout() {
     await fetch("/api/levytate-beta-logout", { method: "POST" });
@@ -89,9 +90,9 @@ function MvpAppShell() {
               <h1 className="mt-1 text-2xl font-semibold tracking-[-0.025em]">{activeModule}</h1>
               <p className="mt-1.5 max-w-3xl text-sm leading-6 text-[#102c3d]/56">{moduleCopy[activeModule]}</p>
             </section>
-            {activeModule === "Ask LevyTate AI" ? <AskLevyTateAiWorkspace /> : null}
+            {activeModule === "Ask LevyTate AI" ? <AskLevyTateAiWorkspace initialEmployeeId={aiEmployeeId} /> : null}
             {activeModule === "Dashboard" ? <DashboardModule onNavigate={(module) => setActiveModule(module as ModuleName)} /> : null}
-            {activeModule === "Employees" ? <EmployeesModule /> : null}
+            {activeModule === "Employees" ? <EmployeesModule onStartDiscovery={(employeeId) => { setAiEmployeeId(employeeId); setActiveModule("Ask LevyTate AI"); }} /> : null}
             {activeModule === "Roles" ? <RolesModule /> : null}
             {activeModule === "Applications" ? <ApplicationsModule /> : null}
             {activeModule === "Providers" ? <ProvidersModule /> : null}

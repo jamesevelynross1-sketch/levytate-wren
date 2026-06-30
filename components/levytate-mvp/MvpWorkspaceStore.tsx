@@ -7,9 +7,11 @@ import {
   createEmptyMvpWorkspace,
   legacyMvpWorkspaceStorageKey,
   mvpWorkspaceStorageKey,
+  previousMvpWorkspaceStorageKey,
   nowIso,
   type MvpApplication,
   type MvpEmployee,
+  type MvpEmployeeDevelopmentProfile,
   type MvpEnrolment,
   type MvpEnrolmentStatus,
   type MvpMatchingRequest,
@@ -26,6 +28,7 @@ type MvpWorkspaceStore = {
   saveProfile: (profile: MvpWorkspaceProfile) => void;
   saveEmployee: (employee: MvpEmployee) => void;
   archiveEmployee: (id: string) => void;
+  saveEmployeeDevelopmentProfile: (profile: MvpEmployeeDevelopmentProfile) => void;
   saveRole: (role: MvpRole) => void;
   archiveRole: (id: string) => void;
   saveApplication: (application: MvpApplication) => void;
@@ -118,10 +121,22 @@ function migrateLegacyWorkspace(parsed: LegacyWorkspace): MvpWorkspaceData {
     return apprenticeshipStandardId ? [{ ...enrolment, apprenticeshipStandardId } as MvpEnrolment] : [];
   });
 
+  const employees = Array.isArray(parsed.employees)
+    ? parsed.employees.map((employee) => ({
+        ...employee,
+        jobTitle: employee.jobTitle ?? roles.find((role) => role.id === employee.roleId)?.title ?? "",
+      }))
+    : [];
+
   return {
     ...empty,
-    profile: { ...empty.profile, ...(parsed.profile ?? {}) },
-    employees: Array.isArray(parsed.employees) ? parsed.employees : [],
+    profile: {
+      ...empty.profile,
+      ...(parsed.profile ?? {}),
+      priorities: Array.isArray(parsed.profile?.priorities) ? parsed.profile.priorities : [],
+    },
+    employees,
+    employeeDevelopmentProfiles: Array.isArray(parsed.employeeDevelopmentProfiles) ? parsed.employeeDevelopmentProfiles : [],
     roles,
     applications,
     providers: legacyProviders.length
@@ -137,20 +152,25 @@ function migrateLegacyWorkspace(parsed: LegacyWorkspace): MvpWorkspaceData {
   };
 }
 
-function parseStoredWorkspace(raw: string | null, legacyRaw: string | null) {
-  const source = raw ?? legacyRaw;
+function parseStoredWorkspace(raw: string | null, previousRaw: string | null, legacyRaw: string | null) {
+  const source = raw ?? previousRaw ?? legacyRaw;
   if (!source) return createEmptyMvpWorkspace();
   try {
     const parsed = JSON.parse(source) as LegacyWorkspace;
     const empty = createEmptyMvpWorkspace();
-    if (parsed.version !== 2) return migrateLegacyWorkspace(parsed);
+    if (parsed.version !== 3) return migrateLegacyWorkspace(parsed);
     const current = parsed as unknown as Partial<MvpWorkspaceData>;
     return {
       ...empty,
       ...current,
-      version: 2,
-      profile: { ...empty.profile, ...(current.profile ?? {}) },
+      version: 3,
+      profile: {
+        ...empty.profile,
+        ...(current.profile ?? {}),
+        priorities: Array.isArray(current.profile?.priorities) ? current.profile.priorities : [],
+      },
       employees: Array.isArray(current.employees) ? current.employees : [],
+      employeeDevelopmentProfiles: Array.isArray(current.employeeDevelopmentProfiles) ? current.employeeDevelopmentProfiles : [],
       roles: Array.isArray(current.roles) ? current.roles : [],
       applications: Array.isArray(current.applications) ? current.applications : [],
       providers: Array.isArray(current.providers) ? current.providers : empty.providers,
@@ -176,6 +196,7 @@ export function MvpWorkspaceProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setData(parseStoredWorkspace(
       window.localStorage.getItem(mvpWorkspaceStorageKey),
+      window.localStorage.getItem(previousMvpWorkspaceStorageKey),
       window.localStorage.getItem(legacyMvpWorkspaceStorageKey),
     ));
     setHydrated(true);
@@ -194,6 +215,10 @@ export function MvpWorkspaceProvider({ children }: { children: ReactNode }) {
     archiveEmployee: (id) => setData((current) => ({
       ...current,
       employees: current.employees.map((employee) => employee.id === id ? { ...employee, status: employee.status === "Archived" ? "Active" : "Archived", updatedAt: nowIso() } : employee),
+    })),
+    saveEmployeeDevelopmentProfile: (profile) => setData((current) => ({
+      ...current,
+      employeeDevelopmentProfiles: upsert(current.employeeDevelopmentProfiles, profile, "employeeId"),
     })),
     saveRole: (role) => setData((current) => ({ ...current, roles: upsert(current.roles, role, "id") })),
     archiveRole: (id) => setData((current) => ({
