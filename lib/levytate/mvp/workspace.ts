@@ -112,16 +112,53 @@ export type MvpRole = {
   updatedAt: string;
 };
 
+export type MvpApplicationOwner = "Employee" | "Line Manager" | "Apprenticeship Lead" | "Provider Partner" | "Completed";
+
+export type MvpApplicationHistoryEntry = {
+  id: string;
+  status: RequestStatus;
+  owner: MvpApplicationOwner;
+  note: string;
+  createdAt: string;
+};
+
 export type MvpApplication = {
   id: string;
   employeeId: string;
   apprenticeshipStandardId: string;
   status: RequestStatus;
+  currentOwner: MvpApplicationOwner;
   reason: string;
   careerGoal: string;
+  supportRequired: string;
   managerNote: string;
   submittedAt: string;
   updatedAt: string;
+  history: MvpApplicationHistoryEntry[];
+};
+
+export type MvpProviderRelationshipCategory =
+  | "Digital"
+  | "Engineering"
+  | "Business Improvement"
+  | "Marketing"
+  | "Leadership"
+  | "Data"
+  | "Customer"
+  | "Procurement";
+
+export type MvpProviderRelationshipStatus = "Preferred" | "Review due" | "Alternative required";
+
+export type MvpProviderRelationship = {
+  id: string;
+  category: MvpProviderRelationshipCategory;
+  preferredProviderId: string;
+  backupProviderIds: string[];
+  apprenticeshipStandardIds: string[];
+  status: MvpProviderRelationshipStatus;
+  notes: string;
+  reviewDate: string;
+  lastUsedDate: string;
 };
 
 export type MvpMatchingStatus = "Submitted" | "Under Review" | "Provider Shortlist Being Prepared" | "Shortlist Ready";
@@ -158,7 +195,7 @@ export type MvpEnrolment = {
 };
 
 export type MvpWorkspaceData = {
-  version: 3;
+  version: 4;
   profile: MvpWorkspaceProfile;
   employees: MvpEmployee[];
   employeeDevelopmentProfiles: MvpEmployeeDevelopmentProfile[];
@@ -166,20 +203,22 @@ export type MvpWorkspaceData = {
   applications: MvpApplication[];
   providers: ProviderCatalogueRecord[];
   providerProgrammes: ProviderProgramme[];
+  providerRelationships: MvpProviderRelationship[];
   matchingRequests: MvpMatchingRequest[];
   enrolments: MvpEnrolment[];
 };
 
-export const mvpWorkspaceStorageKey = "levytate:mvp:workspace:v3";
-export const previousMvpWorkspaceStorageKey = "levytate:mvp:workspace:v2";
-export const legacyMvpWorkspaceStorageKey = "levytate:mvp:workspace:v1";
+export const mvpWorkspaceStorageKey = "levytate:mvp:workspace:v4";
+export const previousMvpWorkspaceStorageKey = "levytate:mvp:workspace:v3";
+export const legacyMvpWorkspaceStorageKey = "levytate:mvp:workspace:v2";
+export const oldestMvpWorkspaceStorageKey = "levytate:mvp:workspace:v1";
 
 export function createEmptyMvpWorkspace(): MvpWorkspaceData {
   return {
-    version: 3,
+    version: 4,
     profile: {
       employerName: "",
-      workspaceName: "LevyTate beta workspace",
+      workspaceName: "LevyTate employer workspace",
       primaryContact: "",
       contactEmail: "hello@levytate.co.uk",
       defaultSite: "",
@@ -193,6 +232,7 @@ export function createEmptyMvpWorkspace(): MvpWorkspaceData {
     applications: [],
     providers: structuredClone(mvpProviderCatalogue),
     providerProgrammes: structuredClone(mvpProviderProgrammes),
+    providerRelationships: [],
     matchingRequests: [],
     enrolments: [],
   };
@@ -248,4 +288,34 @@ export function activeApplicationStatuses(): RequestStatus[] {
     "Awaiting Final Approval",
     "Approved for Enrolment",
   ];
+}
+
+export function applicationOwnerForStatus(status: RequestStatus): MvpApplicationOwner {
+  if (status === "Approved for Enrolment") return "Provider Partner";
+  if (status === "Approved by Line Manager" || status === "Submitted to Apprenticeship Lead" || status === "Awaiting Final Approval") return "Apprenticeship Lead";
+  if (status === "Submitted to Line Manager" || status === "Awaiting Manager Review") return "Line Manager";
+  if (status === "Completed" || status === "Cancelled") return "Completed";
+  return "Employee";
+}
+
+export function buildApplicationHistoryEntry(status: RequestStatus, note: string, createdAt = nowIso()): MvpApplicationHistoryEntry {
+  return {
+    id: createMvpId("history"),
+    status,
+    owner: applicationOwnerForStatus(status),
+    note,
+    createdAt,
+  };
+}
+
+export function normaliseApplication(application: MvpApplication): MvpApplication {
+  const history = application.history?.length
+    ? application.history
+    : [buildApplicationHistoryEntry(application.status, application.reason || "Application record created.", application.submittedAt || nowIso())];
+  return {
+    ...application,
+    currentOwner: application.currentOwner ?? applicationOwnerForStatus(application.status),
+    supportRequired: application.supportRequired ?? "",
+    history,
+  };
 }

@@ -305,7 +305,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null }: { initialEm
             const standard = getApprenticeshipStandard(mapping.apprenticeshipStandardId);
             return standard ? [{
               title: standard.title,
-              standard: `${standard.referenceCode} Â· Level ${standard.level}`,
+              standard: `${standard.referenceCode} - Level ${standard.level}`,
               status: standard.status,
               deliveryModel: mapping.deliveryPreference,
             }] : [];
@@ -489,7 +489,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null }: { initialEm
                 >
                   {!employees.length ? <option value="">Create an employee first</option> : null}
                   {employees.map((employee) => (
-                    <option key={employee.id} value={employee.id}>{employee.name} Â· {employee.jobTitle || "Role to confirm"}</option>
+                    <option key={employee.id} value={employee.id}>{employee.name} - {employee.jobTitle || "Role to confirm"}</option>
                   ))}
                 </select>
               </label>
@@ -516,7 +516,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null }: { initialEm
             <div>
               <p className="font-semibold">Ask LevyTate AI</p>
               <p className="mt-1 text-xs text-[#102c3d]/48">
-                {role === "Employee" && selectedEmployee ? `${selectedEmployee.name} Â· ${selectedEmployee.department}` : `${role} mode`}
+                {role === "Employee" && selectedEmployee ? `${selectedEmployee.name} - ${selectedEmployee.department}` : `${role} mode`}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -591,7 +591,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null }: { initialEm
             <div className="mt-5 rounded-2xl bg-[#f8fbfa] p-4 ring-1 ring-[#102c3d]/[0.055]">
               <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#0b6f63]">Employee context</p>
               <p className="mt-2 text-sm font-semibold text-[#102c3d]">{selectedEmployee.name}</p>
-              <p className="mt-1 text-xs leading-5 text-[#102c3d]/56">{selectedEmployee.jobTitle || selectedRoleRecord?.title || "Role to confirm"} Â· {selectedEmployee.department} Â· {selectedEmployee.site || "Site to confirm"}</p>
+              <p className="mt-1 text-xs leading-5 text-[#102c3d]/56">{selectedEmployee.jobTitle || selectedRoleRecord?.title || "Role to confirm"} - {selectedEmployee.department} - {selectedEmployee.site || "Site to confirm"}</p>
               <p className="mt-2 text-xs leading-5 text-[#102c3d]/56">Manager: {selectedManagerName}</p>
               <p className="mt-2 text-xs leading-5 text-[#102c3d]/56">Discovery stage: {selectedDevelopmentProfile?.stage === "future_capability" ? "Future capability" : selectedDevelopmentProfile?.stage === "recommendation_ready" ? "Recommendation ready" : "Role context"}</p>
               {selectedApplication ? <p className="mt-2 text-xs font-semibold leading-5 text-[#0b6f63]">Current application: {getApprenticeshipStandard(selectedApplication.apprenticeshipStandardId)?.title ?? selectedApplication.apprenticeshipStandardId}</p> : null}
