@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { levytateBetaSessionCookie, readLevyTateBetaSession } from "@/lib/levytate/config/beta-access";
 import { isEarlyAccessStatus, type EarlyAccessRequest, type EarlyAccessStatus } from "@/lib/levytate/early-access/domain";
-import { syncPersistentBetaAccessGrant } from "@/lib/server/levytate-beta-access-grants";
+import { syncPersistentEarlyAccessState } from "@/lib/server/levytate-beta-access-grants";
 import { EarlyAccessStoreError, updateEarlyAccessStatus } from "@/lib/server/levytate-early-access";
 
 type PatchBody = {
@@ -47,10 +47,7 @@ export async function PATCH(
       throw new EarlyAccessStoreError("Lead could not be found.");
     }
 
-    await syncPersistentBetaAccessGrant(
-      leadForAccess.email,
-      body.status === "Approved" || body.status === "Onboarded",
-    );
+    await syncPersistentEarlyAccessState(leadForAccess.email, body.status);
 
     return NextResponse.json({ ok: true, lead: leadForAccess });
   } catch (error) {

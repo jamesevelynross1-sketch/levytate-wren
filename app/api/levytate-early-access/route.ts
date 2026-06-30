@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { levytateBetaSessionCookie, readLevyTateBetaSession } from "@/lib/levytate/config/beta-access";
+import { syncPersistentEarlyAccessState } from "@/lib/server/levytate-beta-access-grants";
 import {
   createEarlyAccessRequest,
   EarlyAccessStoreError,
@@ -48,6 +49,8 @@ export async function POST(request: Request) {
       biggestChallenge: typeof body.biggestChallenge === "string" ? body.biggestChallenge : "",
       consent: body.consent === true,
     });
+
+    await syncPersistentEarlyAccessState(created.email, created.status);
 
     return NextResponse.json({
       ok: true,

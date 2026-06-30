@@ -9,7 +9,7 @@ import {
   levytateBetaSessionMaxAge,
 } from "@/lib/levytate/config/beta-access";
 import { isBetaApprovedEarlyAccessStatus } from "@/lib/levytate/early-access/domain";
-import { hasPersistentBetaAccessGrant } from "@/lib/server/levytate-beta-access-grants";
+import { getPersistentEarlyAccessState } from "@/lib/server/levytate-beta-access-grants";
 import { getEarlyAccessRequestByEmail } from "@/lib/server/levytate-early-access";
 
 export async function POST(request: Request) {
@@ -27,14 +27,14 @@ export async function POST(request: Request) {
     if (isAdminBetaEmail(email)) {
       accessLevel = "beta_admin";
     } else {
-      const [lead, hasGrant] = await Promise.all([
+      const [lead, persistentState] = await Promise.all([
         getEarlyAccessRequestByEmail(email),
-        hasPersistentBetaAccessGrant(email),
+        getPersistentEarlyAccessState(email),
       ]);
 
-      if (hasGrant || (lead && isBetaApprovedEarlyAccessStatus(lead.status))) {
+      if (persistentState === "approved" || (lead && isBetaApprovedEarlyAccessStatus(lead.status))) {
         accessLevel = "beta_user";
-      } else if (lead) {
+      } else if (lead || persistentState === "pending" || persistentState === "declined") {
         return NextResponse.json(
           { ok: false, message: "Your Early Access request has been received and is currently under review." },
           { status: 403 },

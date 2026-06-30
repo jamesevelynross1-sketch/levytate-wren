@@ -1,7 +1,11 @@
 import { randomUUID } from "node:crypto";
+import type { EarlyAccessStatus } from "@/lib/levytate/early-access/domain";
 
-const betaAccessSegment = "levytate_beta_access";
 const subscribersTableName = "subscribers";
+const pendingSegment = "levytate_early_access_pending";
+const approvedSegment = "levytate_beta_access";
+const declinedSegment = "levytate_early_access_declined";
+const managedSegments = [pendingSegment, approvedSegment, declinedSegment] as const;
 
 type SubscriberGrantRow = {
   email: string;
@@ -11,22 +15,29 @@ type SubscriberGrantRow = {
   segments?: string[] | null;
 };
 
+export type PersistentEarlyAccessState = "none" | "pending" | "approved" | "declined";
+
 export function normaliseBetaGrantEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
-export async function hasPersistentBetaAccessGrant(email: string) {
+export async function getPersistentEarlyAccessState(email: string): Promise<PersistentEarlyAccessState> {
   const normalisedEmail = normaliseBetaGrantEmail(email);
-  if (!normalisedEmail) return false;
+  if (!normalisedEmail) return "none";
 
   const config = getSupabaseConfig();
-  if (!config) return false;
+  if (!config) return "none";
 
   const existing = await getSubscriberGrantByEmail(config, normalisedEmail);
-  return Boolean(existing?.segments?.includes(betaAccessSegment));
+  const segments = Array.isArray(existing?.segments) ? existing.segments : [];
+
+  if (segments.includes(approvedSegment)) return "approved";
+  if (segments.includes(declinedSegment)) return "declined";
+  if (segments.includes(pendingSegment)) return "pending";
+  return "none";
 }
 
-export async function syncPersistentBetaAccessGrant(email: string, approved: boolean) {
+export async function syncPersistentEarlyAccessState(email: string, status: EarlyAccessStatus) {
   const normalisedEmail = normaliseBetaGrantEmail(email);
   if (!normalisedEmail) {
     throw new Error("Beta access email is required.");
@@ -38,26 +49,25 @@ export async function syncPersistentBetaAccessGrant(email: string, approved: boo
   }
 
   const existing = await getSubscriberGrantByEmail(config, normalisedEmail);
-  const existingSegments = Array.isArray(existing?.segments) ? existing!.segments.filter((segment): segment is string => typeof segment === "string" && segment.trim().length > 0) : [];
+  const existingSegments = Array.isArray(existing?.segments)
+    ? existing.segments.filter((segment): segment is string => typeof segment === "string" && segment.trim().length > 0)
+    : [];
 
-  if (approved) {
-    const nextSegments = Array.from(new Set([...existingSegments, betaAccessSegment]));
+  const retainedSegments = existingSegments.filter((segment) => !managedSegments.includes(segment as (typeof managedSegments)[number]));
+  const nextSegments = [...retainedSegments, getStateSegment(status)];
 
-    if (existing) {
-      await updateSubscriberGrant(config, normalisedEmail, nextSegments);
-      return;
-    }
-
-    await createSubscriberGrant(config, normalisedEmail, nextSegments);
+  if (existing) {
+    await updateSubscriberGrant(config, normalisedEmail, nextSegments);
     return;
   }
 
-  if (!existing || !existingSegments.includes(betaAccessSegment)) {
-    return;
-  }
+  await createSubscriberGrant(config, normalisedEmail, nextSegments);
+}
 
-  const nextSegments = existingSegments.filter((segment) => segment !== betaAccessSegment);
-  await updateSubscriberGrant(config, normalisedEmail, nextSegments);
+function getStateSegment(status: EarlyAccessStatus) {
+  if (status === "Approved" || status === "Onboarded") return approvedSegment;
+  if (status === "Declined") return declinedSegment;
+  return pendingSegment;
 }
 
 function getSupabaseConfig() {
