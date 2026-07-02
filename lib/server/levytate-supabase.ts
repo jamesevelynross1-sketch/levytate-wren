@@ -95,7 +95,13 @@ export async function supabaseFetchJson<T>(
   if (!response.ok) {
     throw new LevyTateSupabaseError(await formatSupabaseError(response));
   }
-  return (await response.json()) as T;
+
+  const text = await response.text();
+  if (!text.trim()) {
+    return [] as T;
+  }
+
+  return JSON.parse(text) as T;
 }
 
 export async function supabaseFetchRaw(
@@ -145,3 +151,4 @@ export function normaliseSupabaseUrl(value: string) {
     .replace(/\/rest\/v1\/?$/i, "")
     .replace(/\/$/, "");
 }
+

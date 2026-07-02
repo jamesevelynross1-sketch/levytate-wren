@@ -14,18 +14,19 @@ const fallbackOutputPath = path.join(cwd, "lib", "levytate", "data", "mvp", "app
 const existingCataloguePath = fallbackOutputPath;
 const csvPath = path.resolve(cwd, csvPathArg);
 
-function parseCsvLine(line) {
-  const cells = [];
-  let current = "";
+function parseCsvTable(text) {
+  const rows = [];
+  let currentCell = "";
+  let currentRow = [];
   let inQuotes = false;
 
-  for (let index = 0; index < line.length; index += 1) {
-    const character = line[index];
-    const next = line[index + 1];
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+    const next = text[index + 1];
 
     if (character === '"') {
       if (inQuotes && next === '"') {
-        current += '"';
+        currentCell += '"';
         index += 1;
       } else {
         inQuotes = !inQuotes;
@@ -34,16 +35,61 @@ function parseCsvLine(line) {
     }
 
     if (character === "," && !inQuotes) {
-      cells.push(current);
-      current = "";
+      currentRow.push(currentCell.trim());
+      currentCell = "";
       continue;
     }
 
-    current += character;
+    if ((character === "\n" || character === "\r") && !inQuotes) {
+      if (character === "\r" && next === "\n") {
+        index += 1;
+      }
+
+      currentRow.push(currentCell.trim());
+      if (currentRow.some((value) => value.length > 0)) {
+        rows.push(currentRow);
+      }
+      currentCell = "";
+      currentRow = [];
+      continue;
+    }
+
+    currentCell += character;
   }
 
-  cells.push(current);
-  return cells.map((value) => value.trim());
+  currentRow.push(currentCell.trim());
+  if (currentRow.some((value) => value.length > 0)) {
+    rows.push(currentRow);
+  }
+
+  return rows;
+}
+
+async function loadEnvFile(filePath) {
+  try {
+    const text = await fs.readFile(filePath, "utf8");
+    for (const rawLine of text.split(/\r?\n/)) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith("#")) continue;
+
+      const separatorIndex = line.indexOf("=");
+      if (separatorIndex === -1) continue;
+
+      const key = line.slice(0, separatorIndex).trim();
+      const rawValue = line.slice(separatorIndex + 1).trim();
+      if (!key || process.env[key]) continue;
+
+      process.env[key] = normaliseEnv(rawValue);
+    }
+  } catch {
+    // Optional local env files are ignored when absent.
+  }
+}
+
+async function loadRuntimeEnv() {
+  await loadEnvFile(path.join(cwd, ".env.vercel.local"));
+  await loadEnvFile(path.join(cwd, ".env.local"));
+  await loadEnvFile(path.join(cwd, ".env"));
 }
 
 function normaliseText(value) {
@@ -51,7 +97,7 @@ function normaliseText(value) {
 }
 
 function normaliseEnv(value) {
-  const cleaned = String(value ?? "").trim().replace(/^["'']|["'']$/g, "");
+  const cleaned = String(value ?? "").trim().replace(/^["']|["']$/g, "");
   if (!cleaned || cleaned === "\"\"" || cleaned === "''") return "";
   return cleaned;
 }
@@ -83,6 +129,15 @@ function splitJobTitles(value) {
 
 function officialUrl(referenceCode) {
   return `https://skillsengland.education.gov.uk/apprenticeships/${referenceCode.toLowerCase()}`;
+}
+
+function headerValue(row, ...keys) {
+  for (const key of keys) {
+    if (key in row) {
+      return row[key];
+    }
+  }
+  return "";
 }
 
 function sourceStatusLabel(value) {
@@ -123,17 +178,16 @@ function domainStatus(sourceStatus) {
   }
 }
 
+await loadRuntimeEnv();
+
 const csvText = await fs.readFile(csvPath, "utf8");
-const rawLines = csvText.split(/\r?\n/).filter((line) => line.trim().length > 0);
-if (rawLines.length < 2) {
+const rawRows = parseCsvTable(csvText.replace(/^\uFEFF/, ""));
+if (rawRows.length < 2) {
   throw new Error("CSV does not contain a title row and header row.");
 }
 
-const headers = parseCsvLine(rawLines[1]);
-const rows = rawLines.slice(2).map((line) => {
-  const values = parseCsvLine(line);
-  return Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ""]));
-});
+const headers = rawRows[1];
+const rows = rawRows.slice(2).map((values) => Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ""])));
 
 const existingCatalogue = JSON.parse(await fs.readFile(existingCataloguePath, "utf8"));
 const existingByReference = new Map(existingCatalogue.standards.map((record) => [record.referenceCode, record]));
@@ -150,21 +204,21 @@ const importedRows = rows.map((row) => {
 
   return {
     id: referenceCode,
-    title: normaliseText(row.Name),
+    title: normaliseText(headerValue(row, "Name")),
     reference_code: referenceCode,
-    version: normaliseText(row["Version Number"]) || normaliseText(enrichment.version) || "Current",
+    version: normaliseText(headerValue(row, "Version Number")) || normaliseText(enrichment.version) || "Current",
     status: rawStatus,
-    route: normaliseText(row.Route) || normaliseText(enrichment.occupationalRoute),
-    level: (parseNumber(row.Level) ?? Number.parseInt(String(enrichment.level ?? 0), 10) ?? 0),
-    funding_band: parseNumber(row["Maximum Funding (£)"]) ?? enrichment.fundingBand ?? null,
-    typical_duration: normaliseText(row["Typical Duration"]) || normaliseText(enrichment.typicalDuration) || "Duration to confirm",
-    official_url: normaliseText(row.Link) || normaliseText(enrichment.officialUrl) || officialUrl(referenceCode),
+    route: normaliseText(headerValue(row, "Route")) || normaliseText(enrichment.occupationalRoute),
+    level: (parseNumber(headerValue(row, "Level")) ?? Number.parseInt(String(enrichment.level ?? 0), 10) ?? 0),
+    funding_band: parseNumber(headerValue(row, "Maximum Funding (�)", "Maximum Funding (£)", ...Object.keys(row).filter((key) => key.startsWith("Maximum Funding")))) ?? enrichment.fundingBand ?? null,
+    typical_duration: normaliseText(headerValue(row, "Typical Duration")) || normaliseText(enrichment.typicalDuration) || "Duration to confirm",
+    official_url: normaliseText(headerValue(row, "Link")) || normaliseText(enrichment.officialUrl) || officialUrl(referenceCode),
     last_updated: lastUpdated,
-    job_titles: splitJobTitles(row["Job Titles"] || enrichment.jobTitles?.join(";")),
-    overview: normaliseText(row["Overview of role"]) || normaliseText(enrichment.overview),
+    job_titles: splitJobTitles(headerValue(row, "Job Titles") || enrichment.jobTitles?.join(";")),
+    overview: normaliseText(headerValue(row, "Overview of role")) || normaliseText(enrichment.overview),
     programme_type: programmeType,
-    integrated_degree: normaliseText(row["Integrated Degree"]),
-    professional_recognition: normaliseText(row["Professional recognition"]),
+    integrated_degree: normaliseText(headerValue(row, "Integrated Degree")),
+    professional_recognition: normaliseText(headerValue(row, "Professional recognition")),
   };
 });
 
@@ -218,6 +272,8 @@ if (writeFallback) {
 }
 
 let importedCount = 0;
+let remoteCounts = null;
+const errors = [];
 if (importSupabase) {
   const url = normaliseSupabaseUrl(process.env.NEXT_PUBLIC_SUPABASE_URL);
   const key = normaliseEnv(process.env.SUPABASE_SERVICE_ROLE_KEY);
@@ -247,13 +303,50 @@ if (importSupabase) {
 
     importedCount += chunk.length;
   }
+
+  const [allResponse, selectableResponse] = await Promise.all([
+    fetch(`${url}/rest/v1/levytate_apprenticeship_standards?select=id`, {
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+      },
+      cache: "no-store",
+    }),
+    fetch(`${url}/rest/v1/levytate_apprenticeship_standards?select=id&programme_type=eq.Apprenticeship%20standard&status=eq.Approved%20for%20delivery`, {
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+      },
+      cache: "no-store",
+    }),
+  ]);
+
+  if (!allResponse.ok) {
+    errors.push(`Unable to verify total standard count: ${allResponse.status}`);
+  }
+  if (!selectableResponse.ok) {
+    errors.push(`Unable to verify selectable approved standards: ${selectableResponse.status}`);
+  }
+
+  const allRows = allResponse.ok ? await allResponse.json() : [];
+  const selectableRows = selectableResponse.ok ? await selectableResponse.json() : [];
+
+  remoteCounts = {
+    totalRecords: Array.isArray(allRows) ? allRows.length : 0,
+    selectableApprovedStandards: Array.isArray(selectableRows) ? selectableRows.length : 0,
+  };
 }
 
 console.log(JSON.stringify({
   counts,
+  totalParsed: rows.length,
   importedCount,
+  selectableApprovedStandards: remoteCounts?.selectableApprovedStandards ?? counts.approvedForDelivery,
+  remoteCounts,
   validations,
+  errors,
   fallbackWritten: writeFallback,
   supabaseImported: importSupabase,
 }, null, 2));
+
 

@@ -198,6 +198,7 @@ type ProviderProgrammeRow = {
   duration: string;
   cohort_options: unknown;
   commercial_notes: string;
+  apprenticeship_standard_id: string;
   linked_standard_id?: string | null;
   linked_standard_ids: unknown;
   linked_standard_name: string;
@@ -663,6 +664,7 @@ async function seedOrganisationProviders(organisationId: string) {
     duration: programme.duration,
     cohort_options: programme.cohortOptions,
     commercial_notes: programme.commercialNotes,
+    apprenticeship_standard_id: programme.linkedStandardId || programme.linkedStandardIds[0] || '',
     linked_standard_id: programme.linkedStandardId || programme.linkedStandardIds[0] || null,
     linked_standard_ids: programme.linkedStandardIds,
     linked_standard_name: programme.linkedStandardName,
@@ -715,7 +717,7 @@ async function loadWorkspaceData(organisationId: string): Promise<MvpWorkspaceDa
     selectMany<ApplicationRow>(applicationsTable, organisationId, "id,employee_id,apprenticeship_standard_id,status,current_owner,reason,career_goal,support_required,manager_note,submitted_at,updated_at", "submitted_at.desc"),
     selectMany<ApplicationHistoryRow>(applicationHistoryTable, organisationId, "id,application_id,status,owner,note,created_at", "created_at.asc"),
     selectMany<ProviderRow>(providersTable, organisationId, "provider_id,provider_name,website,provider_type,sectors,industries,technologies,delivery_models,regions,employer_types,specialisms,contact_name,contact_email,ofsted_rating,status,source_urls,notes,last_verified,verification_status", "provider_name.asc"),
-    selectMany<ProviderProgrammeRow>(providerProgrammesTable, organisationId, "id,provider_id,programme_name,short_description,full_description,status,verification_status,target_organisations,target_industries,target_job_roles,seniority,employer_size,business_problems_solved,skills_developed,technologies_covered,expected_outcomes,delivery_models,regions,duration,cohort_options,commercial_notes,linked_standard_id,linked_standard_ids,linked_standard_name,level,route,funding_band,official_url,source_url,notes,funding_route,record_status,created_at,updated_at", "created_at.asc"),
+    selectMany<ProviderProgrammeRow>(providerProgrammesTable, organisationId, "id,provider_id,programme_name,short_description,full_description,status,verification_status,target_organisations,target_industries,target_job_roles,seniority,employer_size,business_problems_solved,skills_developed,technologies_covered,expected_outcomes,delivery_models,regions,duration,cohort_options,commercial_notes,apprenticeship_standard_id,linked_standard_id,linked_standard_ids,linked_standard_name,level,route,funding_band,official_url,source_url,notes,funding_route,record_status,created_at,updated_at", "created_at.asc"),
     selectMany<ProviderRelationshipRow>(providerRelationshipsTable, organisationId, "id,category,preferred_provider_id,backup_provider_ids,apprenticeship_standard_ids,programme_ids,status,notes,review_date,last_used_date", "review_date.asc"),
     selectMany<MatchingRequestRow>(matchingRequestsTable, organisationId, "id,role_need,department,future_capability,employer_size,programme_id,linked_standard_id,learner_count,sites,delivery_preference,funding_position,urgency,notes,business_problems,target_roles,technologies,industries,status,shortlist_provider_ids,created_at,updated_at", "created_at.desc"),
     selectMany<EnrolmentRow>(enrolmentsTable, organisationId, "id,application_id,employee_id,provider_id,apprenticeship_standard_id,status,start_date,notes,created_at,updated_at", "created_at.desc"),
@@ -978,6 +980,7 @@ async function saveProviderProgramme(organisationId: string, programme: Provider
     duration: normalised.duration,
     cohort_options: normalised.cohortOptions,
     commercial_notes: normalised.commercialNotes,
+    apprenticeship_standard_id: normalised.linkedStandardId || normalised.linkedStandardIds[0] || '',
     linked_standard_id: normalised.linkedStandardId || normalised.linkedStandardIds[0] || null,
     linked_standard_ids: normalised.linkedStandardIds,
     linked_standard_name: normalised.linkedStandardName,
@@ -1379,8 +1382,10 @@ function providerProgrammeRowToRecord(row: ProviderProgrammeRow): ProviderProgra
     cohortOptions: stringArray(row.cohort_options),
     commercialNotes: row.commercial_notes,
     fundingRoute: row.funding_route,
-    linkedStandardId: row.linked_standard_id ?? undefined,
-    linkedStandardIds: stringArray(row.linked_standard_ids),
+    linkedStandardId: row.linked_standard_id ?? row.apprenticeship_standard_id ?? undefined,
+    linkedStandardIds: stringArray(row.linked_standard_ids).length
+      ? stringArray(row.linked_standard_ids)
+      : (row.apprenticeship_standard_id ? [row.apprenticeship_standard_id] : []),
     linkedStandardName: row.linked_standard_name,
     level: row.level ?? null,
     route: row.route,
