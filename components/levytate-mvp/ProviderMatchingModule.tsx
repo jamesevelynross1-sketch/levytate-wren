@@ -2,7 +2,7 @@
 
 
 import { useMemo, useState, type FormEvent } from "react";
-import { getApprenticeshipStandard, getSelectableApprenticeshipStandards, shortlistProvidersForNeed } from "@/lib/levytate/domain";
+import { getApprenticeshipStandard, shortlistProvidersForNeed } from "@/lib/levytate/domain";
 import {
   EmptyState,
   FormActions,
@@ -21,6 +21,7 @@ import {
   TableHead,
   TableShell,
 } from "@/components/levytate-mvp/MvpUi";
+import { useLevyTateStandards } from "@/components/levytate-mvp/LevyTateStandardsProvider";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { includesSearch, statusTone } from "@/components/levytate-mvp/module-utils";
 import {
@@ -60,7 +61,7 @@ export function ProviderMatchingModule() {
   const [selectedRelationshipProgrammes, setSelectedRelationshipProgrammes] = useState<string[]>([]);
   const [error, setError] = useState("");
 
-  const selectableStandards = useMemo(() => getSelectableApprenticeshipStandards(), []);
+  const { selectableStandards } = useLevyTateStandards();
 
   const activeProviders = useMemo(
     () => data.providers.filter((provider) => provider.status === "Active").sort((a, b) => a.providerName.localeCompare(b.providerName)),
@@ -451,4 +452,5 @@ function SummaryCard({ label, value, copy, tone }: { label: string; value: strin
     </article>
   );
 }
+
 

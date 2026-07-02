@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
-import { getApprenticeshipStandard, getLiveApprenticeshipStandards } from "@/lib/levytate/domain";
+import { useMemo, useState, type FormEvent } from "react";
+import { getApprenticeshipStandard } from "@/lib/levytate/domain";
 import { EmptyState, FormActions, FormField, FormGrid, FormSelect, FormTextArea, MvpModal, MvpPanel, MvpToolbar, StatusBadge, TableAction, TableBody, TableHead, TableShell } from "@/components/levytate-mvp/MvpUi";
+import { useLevyTateStandards } from "@/components/levytate-mvp/LevyTateStandardsProvider";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { includesSearch } from "@/components/levytate-mvp/module-utils";
 import { createMvpId, nowIso, splitMvpList, type MvpRole } from "@/lib/levytate/mvp/workspace";
@@ -11,6 +12,7 @@ const careerLevels = ["Entry", "Experienced", "Supervisor", "Manager", "Senior M
 
 export function RolesModule() {
   const { data, saveRole, archiveRole } = useMvpWorkspace();
+  const { liveStandards } = useLevyTateStandards();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("Active");
   const [draft, setDraft] = useState<MvpRole | null>(null);
@@ -19,7 +21,7 @@ export function RolesModule() {
   const [rationale, setRationale] = useState("");
   const [error, setError] = useState("");
   const visible = data.roles.filter((role) => (status === "All" || role.status === status) && includesSearch([role.title, role.department, role.businessArea, role.skillsTags.join(" ")], search));
-  const standardOptions = getLiveApprenticeshipStandards().map((standard) => ({ value: standard.id, label: `Level ${standard.level} · ${standard.title} · ${standard.referenceCode}` }));
+  const standardOptions = useMemo(() => liveStandards.map((standard) => ({ value: standard.id, label: `Level ${standard.level} · ${standard.title} · ${standard.referenceCode}` })), [liveStandards]);
 
   function open(role?: MvpRole) {
     const now = nowIso();

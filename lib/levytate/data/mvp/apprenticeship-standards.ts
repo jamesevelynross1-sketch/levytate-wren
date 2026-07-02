@@ -13,6 +13,13 @@ type RawStandard = {
   officialUrl: string;
   version: string;
   lastVerified: string;
+  programmeType?: string;
+  sourceStatus?: string;
+  integratedDegree?: string;
+  professionalRecognition?: string;
+  lastUpdated?: string;
+  jobTitles?: string[];
+  overview?: string;
 };
 
 type RawMetadata = {
@@ -22,6 +29,8 @@ type RawMetadata = {
   importVersion: number;
   totalStandards: number;
   activeStandards: number;
+  totalRecords?: number;
+  approvedForDelivery?: number;
 };
 
 const catalogue = rawCatalogue as unknown as { metadata: RawMetadata; standards: RawStandard[] };
@@ -42,6 +51,11 @@ const historicalStandards: ApprenticeshipStandard[] = [
     version: "1.4",
     lastVerified: verified,
     lastSyncedAt: verified,
+    programmeType: "Apprenticeship standard",
+    sourceStatus: "Withdrawn",
+    lastUpdated: verified,
+    jobTitles: [],
+    overview: "",
   },
   {
     id: "ST0385",
@@ -56,6 +70,11 @@ const historicalStandards: ApprenticeshipStandard[] = [
     version: "Historical",
     lastVerified: verified,
     lastSyncedAt: verified,
+    programmeType: "Apprenticeship standard",
+    sourceStatus: "Withdrawn",
+    lastUpdated: verified,
+    jobTitles: [],
+    overview: "",
   },
 ];
 
@@ -72,7 +91,14 @@ export const apprenticeshipStandards: ApprenticeshipStandard[] = [
     officialUrl: standard.officialUrl,
     version: standard.version,
     lastVerified: standard.lastVerified,
-    lastSyncedAt: standard.lastVerified,
+    lastSyncedAt: standard.lastUpdated ?? standard.lastVerified,
+    programmeType: standard.programmeType ?? "Apprenticeship standard",
+    sourceStatus: standard.sourceStatus,
+    integratedDegree: standard.integratedDegree,
+    professionalRecognition: standard.professionalRecognition,
+    lastUpdated: standard.lastUpdated ?? standard.lastVerified,
+    jobTitles: Array.isArray(standard.jobTitles) ? standard.jobTitles : [],
+    overview: standard.overview ?? "",
   })),
   ...historicalStandards.filter((historical) => !catalogue.standards.some((standard) => standard.id === historical.id)),
 ];
@@ -84,5 +110,6 @@ export const skillsEnglandLibraryMetadata = {
   importVersion: catalogue.metadata.importVersion,
   totalStandards: catalogue.metadata.totalStandards,
   activeStandards: catalogue.metadata.activeStandards,
+  totalRecords: catalogue.metadata.totalRecords ?? catalogue.metadata.totalStandards,
+  approvedForDelivery: catalogue.metadata.approvedForDelivery ?? catalogue.metadata.activeStandards,
 } as const;
-

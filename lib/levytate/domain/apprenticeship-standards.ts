@@ -8,7 +8,7 @@ export type ApprenticeshipStandardsImport = {
 
 const aliases: Record<string, string> = {
   "data essentials": "ST0795",
-  "ict": "ST0973",
+  ict: "ST0973",
   "it support technician": "ST0973",
   "software engineer": "ST0116",
   "junior developer": "ST0128",
@@ -22,33 +22,108 @@ const aliases: Record<string, string> = {
   "operations departmental manager": "ST0385",
 };
 
+let runtimeStandards = structuredClone(apprenticeshipStandards);
+
 function normalise(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function sourceStatusToDomainStatus(sourceStatus?: string) {
+  switch ((sourceStatus ?? "").trim().toLowerCase()) {
+    case "approved for delivery":
+      return "Live" as const;
+    case "approved for delivery - paused":
+    case "approved for delivery paused":
+      return "Paused" as const;
+    case "withdrawn":
+      return "Defunded" as const;
+    case "retired":
+      return "Retired" as const;
+    case "proposal in development":
+      return "Proposed" as const;
+    case "in development":
+      return "In development" as const;
+    default:
+      return undefined;
+  }
+}
+
+function isApprovedSourceStatus(sourceStatus?: string) {
+  return (sourceStatus ?? "").trim().toLowerCase() === "approved for delivery";
+}
+
+function isLiveStandard(standard: ApprenticeshipStandard) {
+  if (standard.programmeType && standard.sourceStatus) {
+    return standard.programmeType === "Apprenticeship standard" && isApprovedSourceStatus(standard.sourceStatus);
+  }
+  return standard.status === "Live";
+}
+
+function isSelectableStandard(standard: ApprenticeshipStandard) {
+  if (standard.programmeType && standard.sourceStatus) {
+    return standard.programmeType === "Apprenticeship standard" && isApprovedSourceStatus(standard.sourceStatus);
+  }
+  return standard.status === "Live" || standard.status === "Paused";
+}
+
+function searchableHaystack(standard: ApprenticeshipStandard) {
+  return normalise([
+    standard.title,
+    standard.referenceCode,
+    `level ${standard.level}`,
+    standard.occupationalRoute,
+    standard.programmeType ?? "",
+    standard.jobTitles?.join(" ") ?? "",
+    standard.overview ?? "",
+  ].join(" "));
+}
+
+export function hydrateApprenticeshipStandards(standards: ApprenticeshipStandard[]) {
+  runtimeStandards = standards.map((standard) => ({
+    ...standard,
+    status: sourceStatusToDomainStatus(standard.sourceStatus) ?? standard.status,
+  }));
+}
+
+export function resetApprenticeshipStandards() {
+  runtimeStandards = structuredClone(apprenticeshipStandards);
 }
 
 export function getApprenticeshipStandardsImport(): ApprenticeshipStandardsImport {
   return {
     source: skillsEnglandLibraryMetadata,
-    standards: structuredClone(apprenticeshipStandards),
+    standards: structuredClone(runtimeStandards),
   };
 }
 
 export function getApprenticeshipStandard(id: string) {
-  return apprenticeshipStandards.find((standard) => standard.id === id);
+  return runtimeStandards.find((standard) => standard.id === id);
 }
 
 export function getLiveApprenticeshipStandards() {
-  return apprenticeshipStandards.filter((standard) => standard.status === "Live");
+  return runtimeStandards.filter(isLiveStandard);
+}
+
+export function getSelectableApprenticeshipStandards() {
+  return runtimeStandards.filter(isSelectableStandard);
 }
 
 export function searchApprenticeshipStandards(query: string, filters?: { level?: string; route?: string; status?: string }) {
   const search = normalise(query);
-  return apprenticeshipStandards.filter((standard) => {
-    const haystack = normalise(`${standard.title} ${standard.referenceCode} level ${standard.level} ${standard.occupationalRoute}`);
-    return (!search || haystack.includes(search))
+  return runtimeStandards.filter((standard) => {
+    const requestedStatus = filters?.status?.trim().toLowerCase();
+    const standardSourceStatus = (standard.sourceStatus ?? "").trim().toLowerCase();
+    const standardDomainStatus = standard.status.trim().toLowerCase();
+
+    const statusMatches = !requestedStatus || requestedStatus === "all"
+      || requestedStatus === standardDomainStatus
+      || requestedStatus === standardSourceStatus
+      || (requestedStatus === "live" && isApprovedSourceStatus(standard.sourceStatus));
+
+    return (!search || searchableHaystack(standard).includes(search))
       && (!filters?.level || filters.level === "All" || String(standard.level) === filters.level)
       && (!filters?.route || filters.route === "All" || standard.occupationalRoute === filters.route)
-      && (!filters?.status || filters.status === "All" || standard.status === filters.status);
+      && statusMatches;
   });
 }
 
@@ -57,14 +132,15 @@ export function resolveApprenticeshipStandardId(value: string) {
   if (!search) return undefined;
   const alias = aliases[search];
   if (alias) return alias;
-  return apprenticeshipStandards.find((standard) => {
+  return runtimeStandards.find((standard) => {
     const title = normalise(standard.title);
     return normalise(standard.id) === search || title === search || search.includes(title) || title.includes(search);
   })?.id;
 }
 
 export function isAvailableForNewStarts(standardId: string) {
-  return getApprenticeshipStandard(standardId)?.status === "Live";
+  const standard = getApprenticeshipStandard(standardId);
+  return standard ? isSelectableStandard(standard) : false;
 }
 
 export function formatFundingBand(standard: ApprenticeshipStandard) {

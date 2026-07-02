@@ -210,6 +210,13 @@ export type ApprenticeshipStandard = {
   version: string;
   lastVerified: string;
   lastSyncedAt: string;
+  programmeType?: string;
+  sourceStatus?: string;
+  integratedDegree?: string;
+  professionalRecognition?: string;
+  lastUpdated?: string;
+  jobTitles?: string[];
+  overview?: string;
 };
 
 export type ProviderVerificationStatus = "verified" | "needs_verification";
@@ -379,4 +386,5 @@ export type SnapshotMetric = {
   series: number[];
   accent?: string;
 };
+
 

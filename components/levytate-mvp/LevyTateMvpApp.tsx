@@ -24,6 +24,7 @@ import { DashboardModule, SettingsModule } from "@/components/levytate-mvp/Dashb
 import { EarlyAccessModule } from "@/components/levytate-mvp/EarlyAccessModule";
 import { EmployeesModule } from "@/components/levytate-mvp/EmployeesModule";
 import { EnrolmentsModule } from "@/components/levytate-mvp/EnrolmentsModule";
+import { LevyTateStandardsProvider } from "@/components/levytate-mvp/LevyTateStandardsProvider";
 import { MvpWorkspaceProvider, useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { ProviderMatchingModule } from "@/components/levytate-mvp/ProviderMatchingModule";
 import { ProvidersModule } from "@/components/levytate-mvp/ProvidersModule";
@@ -63,7 +64,7 @@ const moduleCopy: Record<ModuleName, string> = {
 };
 
 export function LevyTateMvpApp({ initialWorkspace }: { initialWorkspace?: LevyTateWorkspaceBootstrap | null }) {
-  return <MvpWorkspaceProvider initialWorkspace={initialWorkspace}><MvpAppShell /></MvpWorkspaceProvider>;
+  return <LevyTateStandardsProvider><MvpWorkspaceProvider initialWorkspace={initialWorkspace}><MvpAppShell /></MvpWorkspaceProvider></LevyTateStandardsProvider>;
 }
 
 function MvpAppShell() {
@@ -184,3 +185,4 @@ function MvpAppShell() {
     </main>
   );
 }
+

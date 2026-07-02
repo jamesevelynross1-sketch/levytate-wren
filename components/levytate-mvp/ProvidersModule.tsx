@@ -15,10 +15,8 @@ import type {
 import {
   formatFundingBand,
   getApprenticeshipStandard,
-  getSelectableApprenticeshipStandards,
-  programmePrimaryStandard,
-  searchApprenticeshipStandards,
-} from "@/lib/levytate/domain";
+    programmePrimaryStandard,
+  } from "@/lib/levytate/domain";
 import {
   EmptyState,
   FormActions,
@@ -37,6 +35,7 @@ import {
   TableHead,
   TableShell,
 } from "@/components/levytate-mvp/MvpUi";
+import { useLevyTateStandards } from "@/components/levytate-mvp/LevyTateStandardsProvider";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { includesSearch, statusTone } from "@/components/levytate-mvp/module-utils";
 import { createMvpId, normaliseProviderProgramme, normaliseProviderRecord, nowIso, todayIso } from "@/lib/levytate/mvp/workspace";
@@ -82,7 +81,7 @@ export function ProvidersModule() {
   const [programmeStatusFilter, setProgrammeStatusFilter] = useState("All");
   const [error, setError] = useState("");
 
-  const selectableStandards = useMemo(() => getSelectableApprenticeshipStandards(), []);
+  const { selectableStandards } = useLevyTateStandards();
 
   const visible = data.providers.filter((provider) => {
     const programmes = data.providerProgrammes.filter((item) => item.providerId === provider.providerId);
@@ -387,8 +386,9 @@ function ProgrammeEditor({
   onCancel: () => void;
   error: string;
 }) {
+  const { search: searchStandards } = useLevyTateStandards();
   const selectedStandard = getApprenticeshipStandard(draft.linkedStandardIds[0] ?? "");
-  const options = searchApprenticeshipStandards(standardSearch, { status: "Live" }).slice(0, 16);
+  const options = searchStandards(standardSearch, { status: "Approved for delivery" }).slice(0, 16);
 
   function selectStandard(standardId: string) {
     onDraft(normaliseProviderProgramme({ ...draft, linkedStandardIds: [standardId] }));
@@ -499,6 +499,12 @@ function IconAction({ icon: Icon, label, onClick, danger = false }: { icon: type
     </button>
   );
 }
+
+
+
+
+
+
 
 
 
