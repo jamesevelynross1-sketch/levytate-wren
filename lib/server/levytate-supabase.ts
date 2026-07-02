@@ -11,13 +11,13 @@ export class LevyTateSupabaseError extends Error {
 }
 
 export function getLevyTateSupabaseConfig(): SupabaseServiceConfig | null {
-  const url = readRuntimeEnv("NEXT_PUBLIC_SUPABASE_URL");
+  const url = normaliseSupabaseUrl(readRuntimeEnv("NEXT_PUBLIC_SUPABASE_URL"));
   const serviceRoleKey = readRuntimeEnv("SUPABASE_SERVICE_ROLE_KEY");
 
   if (!url || !serviceRoleKey) return null;
 
   return {
-    url: url.replace(/\/$/, ""),
+    url,
     serviceRoleKey,
   };
 }
@@ -136,6 +136,12 @@ export async function formatSupabaseError(response: Response) {
 
 export function readRuntimeEnv(name: string) {
   const value = process.env[name]?.trim();
-  if (!value || value === "\"\"" || value === "''") return "";
+  if (!value || value === '""' || value === "''") return "";
   return value.replace(/^["']|["']$/g, "").trim();
+}
+
+export function normaliseSupabaseUrl(value: string) {
+  return value
+    .replace(/\/rest\/v1\/?$/i, "")
+    .replace(/\/$/, "");
 }

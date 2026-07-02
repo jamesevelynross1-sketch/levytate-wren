@@ -6,6 +6,7 @@ import {
   type EarlyAccessRequest,
   type EarlyAccessStatus,
 } from "@/lib/levytate/early-access/domain";
+import { normaliseSupabaseUrl, readRuntimeEnv } from "@/lib/server/levytate-supabase";
 
 type SupabaseEarlyAccessRow = {
   id: string;
@@ -141,13 +142,13 @@ export async function updateEarlyAccessStatus(id: string, status: EarlyAccessSta
 }
 
 function getSupabaseConfig() {
-  const url = readRuntimeEnv("NEXT_PUBLIC_SUPABASE_URL");
+  const url = normaliseSupabaseUrl(readRuntimeEnv("NEXT_PUBLIC_SUPABASE_URL"));
   const serviceRoleKey = readRuntimeEnv("SUPABASE_SERVICE_ROLE_KEY");
 
   if (!url || !serviceRoleKey) return null;
 
   return {
-    url: url.replace(/\/$/, ""),
+    url,
     serviceRoleKey,
   };
 }
@@ -309,11 +310,6 @@ async function readSupabaseError(response: Response) {
   }
 }
 
-function readRuntimeEnv(name: string) {
-  const value = process.env[name]?.trim();
-  if (!value || value === "\"\"" || value === "''") return "";
-  return value.replace(/^["']|["']$/g, "").trim();
-}
 
 function getSupabaseHeaders(serviceRoleKey: string, extraHeaders: Record<string, string> = {}) {
   return {

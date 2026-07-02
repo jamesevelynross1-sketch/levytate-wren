@@ -1,4 +1,5 @@
 import type { NewsItem, StockSignal } from "./types";
+import { normaliseSupabaseUrl, readRuntimeEnv } from "@/lib/server/levytate-supabase";
 
 export async function persistDailyScan(signals: StockSignal[]) {
   const config = getSupabaseConfig();
@@ -53,8 +54,8 @@ function mapNews(item: NewsItem) {
 }
 
 function getSupabaseConfig() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "");
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = normaliseSupabaseUrl(readRuntimeEnv("NEXT_PUBLIC_SUPABASE_URL"));
+  const key = readRuntimeEnv("SUPABASE_SERVICE_ROLE_KEY");
   return url && key ? { url, key } : null;
 }
 

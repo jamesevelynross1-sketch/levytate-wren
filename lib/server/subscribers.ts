@@ -4,6 +4,7 @@ import {
   type IntelligenceSegment,
   normaliseSegments,
 } from "@/lib/segments";
+import { normaliseSupabaseUrl, readRuntimeEnv } from "@/lib/server/levytate-supabase";
 
 export type Subscriber = {
   id: string;
@@ -272,8 +273,8 @@ export async function getSubscribersForAdmin(search = "", segment = ""): Promise
 }
 
 function getSupabaseConfig() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = normaliseSupabaseUrl(readRuntimeEnv("NEXT_PUBLIC_SUPABASE_URL"));
+  const serviceRoleKey = readRuntimeEnv("SUPABASE_SERVICE_ROLE_KEY");
   const missingEnv = [
     { name: "NEXT_PUBLIC_SUPABASE_URL", value: url },
     { name: "SUPABASE_SERVICE_ROLE_KEY", value: serviceRoleKey },
@@ -289,8 +290,8 @@ function getSupabaseConfig() {
   }
 
   return {
-    url: url!.replace(/\/$/, ""),
-    serviceRoleKey: serviceRoleKey!,
+    url,
+    serviceRoleKey,
   };
 }
 
@@ -300,10 +301,14 @@ async function fetchSupabase(url: string, init: RequestInit) {
   } catch (error) {
     throw new SubscriberStoreError("Supabase request could not be completed.", {
       code: "supabase_request_failed",
-      details: error instanceof Error ? error.message : undefined,
+      details:
+        error instanceof Error
+          ? `Network request failed: ${error.name}`
+          : "Network request failed.",
     });
   }
 }
+
 
 function getSupabaseHeaders(
   serviceRoleKey: string,

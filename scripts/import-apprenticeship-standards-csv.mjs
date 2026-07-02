@@ -50,6 +50,18 @@ function normaliseText(value) {
   return String(value ?? "").trim();
 }
 
+function normaliseEnv(value) {
+  const cleaned = String(value ?? "").trim().replace(/^["'']|["'']$/g, "");
+  if (!cleaned || cleaned === "\"\"" || cleaned === "''") return "";
+  return cleaned;
+}
+
+function normaliseSupabaseUrl(value) {
+  return normaliseEnv(value)
+    .replace(/\/rest\/v1\/?$/i, "")
+    .replace(/\/$/, "");
+}
+
 function parseNumber(value) {
   const cleaned = normaliseText(value).replace(/,/g, "");
   if (!cleaned || cleaned.toUpperCase() === "TBC") return null;
@@ -207,8 +219,8 @@ if (writeFallback) {
 
 let importedCount = 0;
 if (importSupabase) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "");
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = normaliseSupabaseUrl(process.env.NEXT_PUBLIC_SUPABASE_URL);
+  const key = normaliseEnv(process.env.SUPABASE_SERVICE_ROLE_KEY);
 
   if (!url || !key) {
     throw new Error("Supabase environment variables are not configured.");

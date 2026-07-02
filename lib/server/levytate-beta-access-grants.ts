@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { EarlyAccessStatus } from "@/lib/levytate/early-access/domain";
+import { normaliseSupabaseUrl, readRuntimeEnv } from "@/lib/server/levytate-supabase";
 
 const subscribersTableName = "subscribers";
 const pendingSegment = "levytate_early_access_pending";
@@ -71,13 +72,13 @@ function getStateSegment(status: EarlyAccessStatus) {
 }
 
 function getSupabaseConfig() {
-  const url = readRuntimeEnv("NEXT_PUBLIC_SUPABASE_URL");
+  const url = normaliseSupabaseUrl(readRuntimeEnv("NEXT_PUBLIC_SUPABASE_URL"));
   const serviceRoleKey = readRuntimeEnv("SUPABASE_SERVICE_ROLE_KEY");
 
   if (!url || !serviceRoleKey) return null;
 
   return {
-    url: url.replace(/\/$/, ""),
+    url,
     serviceRoleKey,
   };
 }
@@ -154,11 +155,6 @@ async function updateSubscriberGrant(
   }
 }
 
-function readRuntimeEnv(name: string) {
-  const value = process.env[name]?.trim();
-  if (!value || value === '""' || value === "''") return "";
-  return value.replace(/^["']|["']$/g, "").trim();
-}
 
 function getSupabaseHeaders(serviceRoleKey: string, extraHeaders: Record<string, string> = {}) {
   return {
