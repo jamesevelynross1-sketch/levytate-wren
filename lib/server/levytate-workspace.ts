@@ -11,6 +11,9 @@ import {
   applicationOwnerForStatus,
   buildApplicationHistoryEntry,
   createEmptyMvpWorkspace,
+  normaliseMatchingRequest,
+  normaliseProviderProgramme,
+  normaliseProviderRelationship,
   nowIso,
   type MvpApplication,
   type MvpApplicationHistoryEntry,
@@ -157,8 +160,12 @@ type ProviderRow = {
   website: string;
   provider_type: ProviderCatalogueRecord["providerType"];
   sectors: unknown;
-  delivery_model: unknown;
+  industries: unknown;
+  technologies: unknown;
+  delivery_models: unknown;
   regions: unknown;
+  employer_types: unknown;
+  specialisms: unknown;
   contact_name: string;
   contact_email: string;
   ofsted_rating: string;
@@ -168,30 +175,51 @@ type ProviderRow = {
   last_verified: string;
   verification_status: ProviderCatalogueRecord["verificationStatus"];
 };
-
 type ProviderProgrammeRow = {
   organisation_id: string;
   id: string;
   provider_id: string;
-  apprenticeship_standard_id: string;
-  delivery_mode: string;
-  regions: unknown;
+  programme_name: string;
+  short_description: string;
+  full_description: string;
   status: ProviderProgramme["status"];
   verification_status: ProviderProgramme["verificationStatus"];
+  target_organisations: unknown;
+  target_industries: unknown;
+  target_job_roles: unknown;
+  seniority: ProviderProgramme["seniority"];
+  employer_size: ProviderProgramme["employerSize"];
+  business_problems_solved: unknown;
+  skills_developed: unknown;
+  technologies_covered: unknown;
+  expected_outcomes: unknown;
+  delivery_models: unknown;
+  regions: unknown;
+  duration: string;
+  cohort_options: unknown;
+  commercial_notes: string;
+  linked_standard_id?: string | null;
+  linked_standard_ids: unknown;
+  linked_standard_name: string;
+  level?: number | null;
+  route: string;
+  funding_band?: number | null;
+  official_url: string;
   source_url: string;
   notes: string;
+  funding_route: ProviderProgramme["fundingRoute"];
   record_status: ProviderProgramme["recordStatus"];
   created_at: string;
   updated_at: string;
 };
-
 type ProviderRelationshipRow = {
   organisation_id: string;
   id: string;
   category: MvpProviderRelationship["category"];
   preferred_provider_id: string;
   backup_provider_ids: unknown;
-  apprenticeship_standard_ids: unknown;
+  apprenticeship_standard_ids?: unknown;
+  programme_ids: unknown;
   status: MvpProviderRelationship["status"];
   notes: string;
   review_date: string;
@@ -202,19 +230,26 @@ type MatchingRequestRow = {
   organisation_id: string;
   id: string;
   role_need: string;
-  apprenticeship_standard_id: string;
+  department: string;
+  future_capability: string;
+  employer_size: string;
+  programme_id: string;
+  linked_standard_id: string;
   learner_count: number;
   sites: unknown;
   delivery_preference: string;
   funding_position: string;
   urgency: string;
   notes: string;
+  business_problems: unknown;
+  target_roles: unknown;
+  technologies: unknown;
+  industries: unknown;
   status: MvpMatchingRequest["status"];
   shortlist_provider_ids: unknown;
   created_at: string;
   updated_at: string;
 };
-
 type EnrolmentRow = {
   organisation_id: string;
   id: string;
@@ -589,8 +624,12 @@ async function seedOrganisationProviders(organisationId: string) {
     website: provider.website,
     provider_type: provider.providerType,
     sectors: provider.sectors,
-    delivery_model: provider.deliveryModel,
+    industries: provider.industries,
+    technologies: provider.technologies,
+    delivery_models: provider.deliveryModels,
     regions: provider.regions,
+    employer_types: provider.employerTypes,
+    specialisms: provider.specialisms,
     contact_name: provider.contactName,
     contact_email: provider.contactEmail,
     ofsted_rating: provider.ofstedRating,
@@ -605,13 +644,35 @@ async function seedOrganisationProviders(organisationId: string) {
     organisation_id: organisationId,
     id: programme.id,
     provider_id: programme.providerId,
-    apprenticeship_standard_id: programme.apprenticeshipStandardId,
-    delivery_mode: programme.deliveryMode,
-    regions: programme.regions,
+    programme_name: programme.programmeName,
+    short_description: programme.shortDescription,
+    full_description: programme.fullDescription,
     status: programme.status,
     verification_status: programme.verificationStatus,
+    target_organisations: programme.targetOrganisations,
+    target_industries: programme.targetIndustries,
+    target_job_roles: programme.targetJobRoles,
+    seniority: programme.seniority,
+    employer_size: programme.employerSize,
+    business_problems_solved: programme.businessProblemsSolved,
+    skills_developed: programme.skillsDeveloped,
+    technologies_covered: programme.technologiesCovered,
+    expected_outcomes: programme.expectedOutcomes,
+    delivery_models: programme.deliveryModels,
+    regions: programme.regions,
+    duration: programme.duration,
+    cohort_options: programme.cohortOptions,
+    commercial_notes: programme.commercialNotes,
+    linked_standard_id: programme.linkedStandardId || programme.linkedStandardIds[0] || null,
+    linked_standard_ids: programme.linkedStandardIds,
+    linked_standard_name: programme.linkedStandardName,
+    level: programme.level,
+    route: programme.route,
+    funding_band: programme.fundingBand,
+    official_url: programme.officialUrl,
     source_url: programme.sourceUrl,
     notes: programme.notes,
+    funding_route: programme.fundingRoute,
     record_status: programme.recordStatus,
     created_at: programme.createdAt,
     updated_at: programme.updatedAt,
@@ -653,10 +714,10 @@ async function loadWorkspaceData(organisationId: string): Promise<MvpWorkspaceDa
     selectMany<RoleMappingRow>(roleMappingsTable, organisationId, "id,role_id,apprenticeship_standard_id,recommendation_type,priority,business_rationale,funding_route,delivery_preference", "priority.asc"),
     selectMany<ApplicationRow>(applicationsTable, organisationId, "id,employee_id,apprenticeship_standard_id,status,current_owner,reason,career_goal,support_required,manager_note,submitted_at,updated_at", "submitted_at.desc"),
     selectMany<ApplicationHistoryRow>(applicationHistoryTable, organisationId, "id,application_id,status,owner,note,created_at", "created_at.asc"),
-    selectMany<ProviderRow>(providersTable, organisationId, "provider_id,provider_name,website,provider_type,sectors,delivery_model,regions,contact_name,contact_email,ofsted_rating,status,source_urls,notes,last_verified,verification_status", "provider_name.asc"),
-    selectMany<ProviderProgrammeRow>(providerProgrammesTable, organisationId, "id,provider_id,apprenticeship_standard_id,delivery_mode,regions,status,verification_status,source_url,notes,record_status,created_at,updated_at", "created_at.asc"),
-    selectMany<ProviderRelationshipRow>(providerRelationshipsTable, organisationId, "id,category,preferred_provider_id,backup_provider_ids,apprenticeship_standard_ids,status,notes,review_date,last_used_date", "review_date.asc"),
-    selectMany<MatchingRequestRow>(matchingRequestsTable, organisationId, "id,role_need,apprenticeship_standard_id,learner_count,sites,delivery_preference,funding_position,urgency,notes,status,shortlist_provider_ids,created_at,updated_at", "created_at.desc"),
+    selectMany<ProviderRow>(providersTable, organisationId, "provider_id,provider_name,website,provider_type,sectors,industries,technologies,delivery_models,regions,employer_types,specialisms,contact_name,contact_email,ofsted_rating,status,source_urls,notes,last_verified,verification_status", "provider_name.asc"),
+    selectMany<ProviderProgrammeRow>(providerProgrammesTable, organisationId, "id,provider_id,programme_name,short_description,full_description,status,verification_status,target_organisations,target_industries,target_job_roles,seniority,employer_size,business_problems_solved,skills_developed,technologies_covered,expected_outcomes,delivery_models,regions,duration,cohort_options,commercial_notes,linked_standard_id,linked_standard_ids,linked_standard_name,level,route,funding_band,official_url,source_url,notes,funding_route,record_status,created_at,updated_at", "created_at.asc"),
+    selectMany<ProviderRelationshipRow>(providerRelationshipsTable, organisationId, "id,category,preferred_provider_id,backup_provider_ids,apprenticeship_standard_ids,programme_ids,status,notes,review_date,last_used_date", "review_date.asc"),
+    selectMany<MatchingRequestRow>(matchingRequestsTable, organisationId, "id,role_need,department,future_capability,employer_size,programme_id,linked_standard_id,learner_count,sites,delivery_preference,funding_position,urgency,notes,business_problems,target_roles,technologies,industries,status,shortlist_provider_ids,created_at,updated_at", "created_at.desc"),
     selectMany<EnrolmentRow>(enrolmentsTable, organisationId, "id,application_id,employee_id,provider_id,apprenticeship_standard_id,status,start_date,notes,created_at,updated_at", "created_at.desc"),
   ]);
 
@@ -871,8 +932,12 @@ async function saveProvider(organisationId: string, provider: ProviderCatalogueR
     website: provider.website,
     provider_type: provider.providerType,
     sectors: provider.sectors,
-    delivery_model: provider.deliveryModel,
+    industries: provider.industries,
+    technologies: provider.technologies,
+    delivery_models: provider.deliveryModels,
     regions: provider.regions,
+    employer_types: provider.employerTypes,
+    specialisms: provider.specialisms,
     contact_name: provider.contactName,
     contact_email: provider.contactEmail,
     ofsted_rating: provider.ofstedRating,
@@ -888,22 +953,44 @@ async function saveProvider(organisationId: string, provider: ProviderCatalogueR
     prefer: "resolution=merge-duplicates,return=minimal",
   });
 }
-
 async function saveProviderProgramme(organisationId: string, programme: ProviderProgramme) {
+  const normalised = normaliseProviderProgramme(programme);
   const row: ProviderProgrammeRow = {
     organisation_id: organisationId,
-    id: programme.id,
-    provider_id: programme.providerId,
-    apprenticeship_standard_id: programme.apprenticeshipStandardId,
-    delivery_mode: programme.deliveryMode,
-    regions: programme.regions,
-    status: programme.status,
-    verification_status: programme.verificationStatus,
-    source_url: programme.sourceUrl,
-    notes: programme.notes,
-    record_status: programme.recordStatus,
-    created_at: programme.createdAt,
-    updated_at: programme.updatedAt,
+    id: normalised.id,
+    provider_id: normalised.providerId,
+    programme_name: normalised.programmeName,
+    short_description: normalised.shortDescription,
+    full_description: normalised.fullDescription,
+    status: normalised.status,
+    verification_status: normalised.verificationStatus,
+    target_organisations: normalised.targetOrganisations,
+    target_industries: normalised.targetIndustries,
+    target_job_roles: normalised.targetJobRoles,
+    seniority: normalised.seniority,
+    employer_size: normalised.employerSize,
+    business_problems_solved: normalised.businessProblemsSolved,
+    skills_developed: normalised.skillsDeveloped,
+    technologies_covered: normalised.technologiesCovered,
+    expected_outcomes: normalised.expectedOutcomes,
+    delivery_models: normalised.deliveryModels,
+    regions: normalised.regions,
+    duration: normalised.duration,
+    cohort_options: normalised.cohortOptions,
+    commercial_notes: normalised.commercialNotes,
+    linked_standard_id: normalised.linkedStandardId || normalised.linkedStandardIds[0] || null,
+    linked_standard_ids: normalised.linkedStandardIds,
+    linked_standard_name: normalised.linkedStandardName,
+    level: normalised.level,
+    route: normalised.route,
+    funding_band: normalised.fundingBand,
+    official_url: normalised.officialUrl,
+    source_url: normalised.sourceUrl,
+    notes: normalised.notes,
+    funding_route: normalised.fundingRoute,
+    record_status: normalised.recordStatus,
+    created_at: normalised.createdAt,
+    updated_at: normalised.updatedAt,
   };
 
   await supabaseInsert<ProviderProgrammeRow>(assertSupabase(), providerProgrammesTable, [row], {
@@ -911,19 +998,19 @@ async function saveProviderProgramme(organisationId: string, programme: Provider
     prefer: "resolution=merge-duplicates,return=minimal",
   });
 }
-
 async function saveProviderRelationship(organisationId: string, relationship: MvpProviderRelationship) {
+  const normalised = normaliseProviderRelationship(relationship);
   const row: ProviderRelationshipRow = {
     organisation_id: organisationId,
-    id: relationship.id,
-    category: relationship.category,
-    preferred_provider_id: relationship.preferredProviderId,
-    backup_provider_ids: relationship.backupProviderIds,
-    apprenticeship_standard_ids: relationship.apprenticeshipStandardIds,
-    status: relationship.status,
-    notes: relationship.notes,
-    review_date: relationship.reviewDate,
-    last_used_date: relationship.lastUsedDate,
+    id: normalised.id,
+    category: normalised.category,
+    preferred_provider_id: normalised.preferredProviderId,
+    backup_provider_ids: normalised.backupProviderIds,
+    programme_ids: normalised.programmeIds,
+    status: normalised.status,
+    notes: normalised.notes,
+    review_date: normalised.reviewDate,
+    last_used_date: normalised.lastUsedDate,
   };
 
   await supabaseInsert<ProviderRelationshipRow>(assertSupabase(), providerRelationshipsTable, [row], {
@@ -933,21 +1020,30 @@ async function saveProviderRelationship(organisationId: string, relationship: Mv
 }
 
 async function saveMatchingRequest(organisationId: string, request: MvpMatchingRequest) {
+  const normalised = normaliseMatchingRequest(request);
   const row: MatchingRequestRow = {
     organisation_id: organisationId,
-    id: request.id,
-    role_need: request.roleNeed,
-    apprenticeship_standard_id: request.apprenticeshipStandardId,
-    learner_count: request.learnerCount,
-    sites: request.sites,
-    delivery_preference: request.deliveryPreference,
-    funding_position: request.fundingPosition,
-    urgency: request.urgency,
-    notes: request.notes,
-    status: request.status,
-    shortlist_provider_ids: request.shortlistProviderIds,
-    created_at: request.createdAt,
-    updated_at: request.updatedAt,
+    id: normalised.id,
+    role_need: normalised.roleNeed,
+    department: normalised.department,
+    future_capability: normalised.futureCapability,
+    employer_size: normalised.employerSize,
+    programme_id: normalised.programmeId,
+    linked_standard_id: normalised.linkedStandardId,
+    learner_count: normalised.learnerCount,
+    sites: normalised.sites,
+    delivery_preference: normalised.deliveryPreference,
+    funding_position: normalised.fundingPosition,
+    urgency: normalised.urgency,
+    notes: normalised.notes,
+    business_problems: normalised.businessProblems,
+    target_roles: normalised.targetRoles,
+    technologies: normalised.technologies,
+    industries: normalised.industries,
+    status: normalised.status,
+    shortlist_provider_ids: normalised.shortlistProviderIds,
+    created_at: normalised.createdAt,
+    updated_at: normalised.updatedAt,
   };
 
   await supabaseInsert<MatchingRequestRow>(assertSupabase(), matchingRequestsTable, [row], {
@@ -955,7 +1051,6 @@ async function saveMatchingRequest(organisationId: string, request: MvpMatchingR
     prefer: "resolution=merge-duplicates,return=minimal",
   });
 }
-
 async function saveEnrolment(organisationId: string, enrolment: MvpEnrolment) {
   const row: EnrolmentRow = {
     organisation_id: organisationId,
@@ -1244,8 +1339,12 @@ function providerRowToRecord(row: ProviderRow): ProviderCatalogueRecord {
     website: row.website,
     providerType: row.provider_type,
     sectors: stringArray(row.sectors),
-    deliveryModel: stringArray(row.delivery_model),
+    industries: stringArray(row.industries),
+    technologies: stringArray(row.technologies),
+    deliveryModels: stringArray(row.delivery_models),
     regions: stringArray(row.regions),
+    employerTypes: stringArray(row.employer_types),
+    specialisms: stringArray(row.specialisms),
     contactName: row.contact_name,
     contactEmail: row.contact_email,
     ofstedRating: row.ofsted_rating,
@@ -1256,56 +1355,84 @@ function providerRowToRecord(row: ProviderRow): ProviderCatalogueRecord {
     verificationStatus: row.verification_status,
   };
 }
-
 function providerProgrammeRowToRecord(row: ProviderProgrammeRow): ProviderProgramme {
-  return {
+  return normaliseProviderProgramme({
     id: row.id,
     providerId: row.provider_id,
-    apprenticeshipStandardId: row.apprenticeship_standard_id,
-    deliveryMode: row.delivery_mode,
-    regions: stringArray(row.regions),
+    programmeName: row.programme_name,
+    shortDescription: row.short_description,
+    fullDescription: row.full_description,
     status: row.status,
     verificationStatus: row.verification_status,
+    targetOrganisations: stringArray(row.target_organisations),
+    targetIndustries: stringArray(row.target_industries),
+    targetJobRoles: stringArray(row.target_job_roles),
+    seniority: row.seniority,
+    employerSize: row.employer_size,
+    businessProblemsSolved: stringArray(row.business_problems_solved),
+    skillsDeveloped: stringArray(row.skills_developed),
+    technologiesCovered: stringArray(row.technologies_covered),
+    expectedOutcomes: stringArray(row.expected_outcomes),
+    deliveryModels: stringArray(row.delivery_models),
+    regions: stringArray(row.regions),
+    duration: row.duration,
+    cohortOptions: stringArray(row.cohort_options),
+    commercialNotes: row.commercial_notes,
+    fundingRoute: row.funding_route,
+    linkedStandardId: row.linked_standard_id ?? undefined,
+    linkedStandardIds: stringArray(row.linked_standard_ids),
+    linkedStandardName: row.linked_standard_name,
+    level: row.level ?? null,
+    route: row.route,
+    fundingBand: row.funding_band ?? null,
+    officialUrl: row.official_url,
     sourceUrl: row.source_url,
     notes: row.notes,
     recordStatus: row.record_status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-  };
+  });
 }
-
 function providerRelationshipRowToRecord(row: ProviderRelationshipRow): MvpProviderRelationship {
-  return {
+  return normaliseProviderRelationship({
     id: row.id,
     category: row.category,
     preferredProviderId: row.preferred_provider_id,
     backupProviderIds: stringArray(row.backup_provider_ids),
+    programmeIds: stringArray(row.programme_ids),
     apprenticeshipStandardIds: stringArray(row.apprenticeship_standard_ids),
     status: row.status,
     notes: row.notes,
     reviewDate: row.review_date,
     lastUsedDate: row.last_used_date,
-  };
+  });
 }
 
 function matchingRequestRowToRecord(row: MatchingRequestRow): MvpMatchingRequest {
-  return {
+  return normaliseMatchingRequest({
     id: row.id,
     roleNeed: row.role_need,
-    apprenticeshipStandardId: row.apprenticeship_standard_id,
+    department: row.department,
+    futureCapability: row.future_capability,
+    employerSize: row.employer_size as MvpMatchingRequest["employerSize"],
+    programmeId: row.programme_id,
+    linkedStandardId: row.linked_standard_id,
     learnerCount: row.learner_count,
     sites: stringArray(row.sites),
     deliveryPreference: row.delivery_preference,
     fundingPosition: row.funding_position,
     urgency: row.urgency,
     notes: row.notes,
+    businessProblems: stringArray(row.business_problems),
+    targetRoles: stringArray(row.target_roles),
+    technologies: stringArray(row.technologies),
+    industries: stringArray(row.industries),
     status: row.status,
     shortlistProviderIds: stringArray(row.shortlist_provider_ids),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-  };
+  });
 }
-
 function enrolmentRowToRecord(row: EnrolmentRow): MvpEnrolment {
   return {
     id: row.id,
@@ -1363,7 +1490,4 @@ function assertSupabase() {
   }
   return config;
 }
-
-
-
 

@@ -195,8 +195,7 @@ export type ApprenticeshipAdvice = {
   providerMatchingPrompt: string;
 };
 
-
-export type ApprenticeshipStandardStatus = "Live" | "Retired" | "Defunded";
+export type ApprenticeshipStandardStatus = "Live" | "Paused" | "In development" | "Proposed" | "Retired" | "Defunded";
 
 export type ApprenticeshipStandard = {
   id: string;
@@ -210,6 +209,7 @@ export type ApprenticeshipStandard = {
   officialUrl: string;
   version: string;
   lastVerified: string;
+  lastSyncedAt: string;
 };
 
 export type ProviderVerificationStatus = "verified" | "needs_verification";
@@ -217,15 +217,39 @@ export type ProviderRecordStatus = "Active" | "Archived";
 export type ProviderType = "Independent training provider" | "University" | "College" | "Specialist consultancy" | "Employer programme partner";
 export type ProviderProgrammeStatus = "Active" | "Needs verification" | "Paused" | "Not available" | "Defunded / unavailable for new starts";
 export type ProviderProgrammeVerificationStatus = "Verified from provider website" | "Needs manual verification" | "Provider confirmed" | "LevyTate reviewed";
+export type ProviderProgrammeSeniority = "Entry" | "Early career" | "Experienced" | "Supervisor" | "Manager" | "Mixed";
+export type ProviderEmployerSize = "SME" | "Mid-market" | "Large enterprise" | "Mixed employer base";
 
 export type ProviderProgramme = {
   id: string;
   providerId: string;
-  apprenticeshipStandardId: string;
-  deliveryMode: string;
-  regions: string[];
+  programmeName: string;
+  shortDescription: string;
+  fullDescription: string;
   status: ProviderProgrammeStatus;
   verificationStatus: ProviderProgrammeVerificationStatus;
+  targetOrganisations: string[];
+  targetIndustries: string[];
+  targetJobRoles: string[];
+  seniority: ProviderProgrammeSeniority;
+  employerSize: ProviderEmployerSize;
+  businessProblemsSolved: string[];
+  skillsDeveloped: string[];
+  technologiesCovered: string[];
+  expectedOutcomes: string[];
+  deliveryModels: string[];
+  regions: string[];
+  duration: string;
+  cohortOptions: string[];
+  commercialNotes: string;
+  fundingRoute: FundingRoute;
+  linkedStandardId: string;
+  linkedStandardIds: string[];
+  linkedStandardName: string;
+  level: number | null;
+  route: string;
+  fundingBand: number | null;
+  officialUrl: string;
   sourceUrl: string;
   notes: string;
   recordStatus: ProviderRecordStatus;
@@ -239,8 +263,12 @@ export type ProviderCatalogueRecord = {
   website: string;
   providerType: ProviderType;
   sectors: string[];
-  deliveryModel: string[];
+  industries: string[];
+  technologies: string[];
+  deliveryModels: string[];
   regions: string[];
+  employerTypes: string[];
+  specialisms: string[];
   contactName: string;
   contactEmail: string;
   ofstedRating: string;
@@ -351,5 +379,4 @@ export type SnapshotMetric = {
   series: number[];
   accent?: string;
 };
-
 

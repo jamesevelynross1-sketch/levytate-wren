@@ -57,6 +57,14 @@ const advisoryMappings: Record<string, LeadGuidance> = {
     businessRationale: "For a Maintenance Manager, the strongest route depends on whether the priority is technical depth, leadership capability or operational improvement. If the individual already has strong technical skills, a management or improvement pathway may create greater business value.",
     fundingRoute: "Potentially funded through apprenticeship levy or co-investment, subject to eligibility and programme suitability.",
     providerMatchingPrompt: "Review provider fit for engineering delivery, site evidence, leadership coaching and operational improvement priorities.",
+    programmeMatch: {
+      providerName: "RHG Consult",
+      programmeName: "Operational Improvement and Sustainability",
+      linkedStandard: "Level 4 Improvement Practitioner",
+      matchScore: 91,
+      verificationStatus: "Needs manual verification",
+      whyProgramme: "It frames the need as operational improvement, sustainability and cross-functional delivery rather than a generic engineering course.",
+    },
   },
   procurement: {
     interpretedRole: "Procurement Lead",
@@ -70,6 +78,14 @@ const advisoryMappings: Record<string, LeadGuidance> = {
     businessRationale: "For procurement succession, LevyTate would usually separate technical procurement capability from broader supervisory readiness. The strongest match depends on whether the priority is category expertise, contract discipline or progression into senior operational leadership.",
     fundingRoute: "Potentially levy-funded or supported through co-investment, subject to learner eligibility and the selected standard.",
     providerMatchingPrompt: "Identify providers with procurement depth, commercial tutor strength and delivery models suited to Portakabin locations.",
+    programmeMatch: {
+      providerName: "SRSCC",
+      programmeName: "Commercial Procurement and Supply Excellence",
+      linkedStandard: "Level 4 Commercial procurement and supply",
+      matchScore: 94,
+      verificationStatus: "Needs manual verification",
+      whyProgramme: "It is built around sourcing, supplier governance and commercial confidence for procurement-led workforce needs.",
+    },
   },
   customerai: {
     interpretedRole: "Customer Service AI Capability",
@@ -84,6 +100,14 @@ const advisoryMappings: Record<string, LeadGuidance> = {
     businessRationale: "For customer service AI capability, the best route depends on whether the immediate priority is data literacy, workflow automation or service process redesign. A staged approach may create stronger adoption before committing to a single cohort.",
     fundingRoute: "Apprenticeship elements may be potentially levy-funded or co-invested, subject to eligibility. Non-apprenticeship workforce programmes would need separate commercial review.",
     providerMatchingPrompt: "Review providers with data, business analysis and AI readiness capability, with delivery suited to customer operations.",
+    programmeMatch: {
+      providerName: "AiCore",
+      programmeName: "AI Adoption and Workflow Enablement",
+      linkedStandard: "Level 3 Data Technician",
+      matchScore: 88,
+      verificationStatus: "Needs manual verification",
+      whyProgramme: "It focuses on practical AI adoption, prompting and workflow redesign for customer and service operations.",
+    },
   },
   site: {
     interpretedRole: "Site Supervisor",
@@ -97,6 +121,14 @@ const advisoryMappings: Record<string, LeadGuidance> = {
     businessRationale: "For Site Supervisors, the right pathway depends on whether the gap is first-line leadership, construction supervision or wider operational control. A mixed cohort may be useful if supervisor experience levels vary.",
     fundingRoute: "Potentially funded through apprenticeship levy or co-investment, subject to eligibility and programme suitability.",
     providerMatchingPrompt: "Match providers with site supervision credibility, regional coverage and flexible delivery for operational teams.",
+    programmeMatch: {
+      providerName: "Learning Skills Partnership",
+      programmeName: "Construction Site Operations",
+      linkedStandard: "Level 4 Construction site supervisor",
+      matchScore: 90,
+      verificationStatus: "Needs manual verification",
+      whyProgramme: "It is designed for site supervision, field operations and stronger operational compliance across delivery teams.",
+    },
   },
   operationsdata: {
     interpretedRole: "Operations Data Skills",
@@ -110,6 +142,14 @@ const advisoryMappings: Record<string, LeadGuidance> = {
     businessRationale: "For operations data capability, LevyTate would normally separate foundational data skills from process improvement and operating model change. The recommendation depends on whether the immediate need is reporting accuracy, insight capability or workflow redesign.",
     fundingRoute: "Potentially levy-funded or co-invested where apprenticeship eligibility and role relevance are confirmed.",
     providerMatchingPrompt: "Shortlist providers with data delivery strength, operational project experience and flexible workshop models.",
+    programmeMatch: {
+      providerName: "QA",
+      programmeName: "Data Foundations Accelerator",
+      linkedStandard: "Level 4 Data analyst",
+      matchScore: 92,
+      verificationStatus: "Verified from provider website",
+      whyProgramme: "It directly targets reporting confidence, dashboard fluency and cleaner operational data handling.",
+    },
   },
   default: {
     interpretedRole: "Workforce Capability Need",
@@ -123,6 +163,14 @@ const advisoryMappings: Record<string, LeadGuidance> = {
     businessRationale: "The requirement needs a programme fit review to confirm whether the priority is leadership, technical capability, data confidence or operational improvement. LevyTate can qualify the need before provider matching.",
     fundingRoute: "Potentially funded through apprenticeship levy or co-investment, subject to eligibility and programme suitability.",
     providerMatchingPrompt: "Submit the requirement for LevyTate review so provider fit can be assessed against role, site, delivery model and employer priorities.",
+    programmeMatch: {
+      providerName: "Baltic Apprenticeships",
+      programmeName: "Data, Digital and Automation Pathway",
+      linkedStandard: "Level 3 Data Technician",
+      matchScore: 79,
+      verificationStatus: "Needs manual verification",
+      whyProgramme: "It gives LevyTate a programme-led starting point when the need spans digital capability, automation and modern operations support.",
+    },
   },
 };
 
@@ -380,17 +428,29 @@ function departmentAssistantMessage(guidance: DepartmentGuidance) {
 
 function leadAssistantMessage(guidance: LeadGuidance) {
   const firstStandard = guidance.recommendedStandards[0];
+  const programme = guidance.programmeMatch;
+
+  if (programme) {
+    return `LevyTate has interpreted this as a ${guidance.interpretedRole} capability question. The strongest programme-led fit right now is ${programme.providerName}'s ${programme.programmeName} at ${programme.matchScore}% match. ${programme.whyProgramme} It is mapped to ${programme.linkedStandard} for funding and compliance.`;
+  }
+
   return `LevyTate has interpreted this as a ${guidance.interpretedRole} capability question. The strongest current fit is ${firstStandard.level} ${firstStandard.name}, with provider matching available through the LevyTate Team if you want to progress this into a scoped request.`;
 }
 
 function providerMatchDraftFromLeadGuidance(guidance: LeadGuidance): LevyTateProviderMatchDraft {
   const firstStandard = guidance.recommendedStandards[0];
+  const programme = guidance.programmeMatch;
   return {
     roleFamily: guidance.interpretedRole,
-    recommendedStandard: `${firstStandard.level} ${firstStandard.name}`,
+    recommendedProgramme: programme?.programmeName ?? `${firstStandard.level} ${firstStandard.name}`,
+    providerName: programme?.providerName ?? "LevyTate Team review",
+    linkedStandard: programme?.linkedStandard ?? `${firstStandard.level} ${firstStandard.name}`,
+    matchScore: programme?.matchScore ?? firstStandard.suitability,
+    verificationStatus: programme?.verificationStatus ?? "Needs manual verification",
     rationale: guidance.businessRationale,
     fundingRoute: guidance.fundingRoute,
     notes: guidance.providerMatchingPrompt,
+    recommendedStandard: `${firstStandard.level} ${firstStandard.name}`,
   };
 }
 
@@ -473,6 +533,17 @@ function employeeActions(guidance: EmployeeGuidance, activeApplication?: Request
 }
 
 function leadRecommendedPathways(guidance: LeadGuidance) {
+  if (guidance.programmeMatch) {
+    return [{
+      title: `${guidance.programmeMatch.programmeName} | ${guidance.programmeMatch.providerName}`,
+      reason: `${guidance.programmeMatch.whyProgramme} Linked standard: ${guidance.programmeMatch.linkedStandard}.`,
+      availability: guidance.programmeMatch.verificationStatus === "Verified from provider website" || guidance.programmeMatch.verificationStatus === "Provider confirmed" || guidance.programmeMatch.verificationStatus === "LevyTate reviewed" ? "approved" as const : "alternative" as const,
+      fit: guidance.programmeMatch.matchScore,
+      provider: guidance.programmeMatch.providerName,
+      standard: guidance.programmeMatch.linkedStandard,
+    }];
+  }
+
   return guidance.recommendedStandards.map((standard) => ({
     title: `${standard.level} ${standard.name}`,
     reason: standard.why,
@@ -575,7 +646,7 @@ export function buildFallbackResponse(request: LevyTateAiRequest): LevyTateAiRes
     assistantMessage: leadAssistantMessage(guidance),
     recommendedActions: [
       { label: "Review Final Approvals", type: "open_final_approvals", target: "Applications for Final Approval" },
-      { label: "Request Provider Matching", type: "request_provider_matching", target: guidance.recommendedStandards[0]?.name },
+      { label: "Request Provider Matching", type: "request_provider_matching", target: guidance.programmeMatch?.programmeName ?? guidance.recommendedStandards[0]?.name },
     ],
     recommendedPathways: leadRecommendedPathways(guidance),
     applicationPrefill: null,
@@ -590,5 +661,4 @@ export function buildFallbackResponse(request: LevyTateAiRequest): LevyTateAiRes
     leadGuidance: guidance,
   };
 }
-
 

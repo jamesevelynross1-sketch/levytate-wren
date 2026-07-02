@@ -1,7 +1,7 @@
 "use client";
 
 import { Plus, Search, X } from "lucide-react";
-import type { ReactNode } from "react";
+import { useState, type KeyboardEvent, type ReactNode } from "react";
 
 export function MvpPanel({ title, eyebrow, actions, children }: { title: string; eyebrow?: string; actions?: ReactNode; children: ReactNode }) {
   return (
@@ -53,7 +53,7 @@ export function EmptyState({ title, copy, actionLabel, onAction }: { title: stri
 export function MvpModal({ title, eyebrow, children, onClose, wide = false }: { title: string; eyebrow?: string; children: ReactNode; onClose: () => void; wide?: boolean }) {
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-[#102c3d]/35 px-4 py-6 backdrop-blur-sm">
-      <section role="dialog" aria-modal="true" aria-label={title} className={`mx-auto rounded-xl bg-white shadow-[0_30px_90px_rgba(16,44,61,0.24)] ${wide ? "max-w-5xl" : "max-w-2xl"}`}>
+      <section role="dialog" aria-modal="true" aria-label={title} className={`mx-auto rounded-xl bg-white shadow-[0_30px_90px_rgba(16,44,61,0.24)] ${wide ? "max-w-6xl" : "max-w-2xl"}`}>
         <div className="flex items-start justify-between gap-4 border-b border-[#102c3d]/[0.07] px-5 py-4">
           <div>{eyebrow ? <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">{eyebrow}</p> : null}<h2 className="mt-0.5 text-xl font-semibold text-[#102c3d]">{title}</h2></div>
           <button type="button" onClick={onClose} title="Close" aria-label="Close" className="grid h-9 w-9 place-items-center rounded-lg text-[#102c3d]/52 transition hover:bg-[#f5f8f6] hover:text-[#102c3d]"><X size={18} /></button>
@@ -61,6 +61,18 @@ export function MvpModal({ title, eyebrow, children, onClose, wide = false }: { 
         <div className="p-5">{children}</div>
       </section>
     </div>
+  );
+}
+
+export function FormSection({ title, copy, children }: { title: string; copy?: string; children: ReactNode }) {
+  return (
+    <section className="rounded-xl border border-[#102c3d]/[0.07] bg-[#fbfcfb] p-4">
+      <div className="mb-4">
+        <h3 className="text-sm font-semibold text-[#102c3d]">{title}</h3>
+        {copy ? <p className="mt-1 text-xs leading-5 text-[#102c3d]/52">{copy}</p> : null}
+      </div>
+      {children}
+    </section>
   );
 }
 
@@ -74,8 +86,82 @@ export function FormSelect({ label, value, options, onChange, required = false, 
   return <label className={`grid gap-1.5 text-xs font-semibold text-[#102c3d]/58 ${wide ? "md:col-span-2" : ""}`}>{label}<select required={required} value={value} onChange={(event) => onChange(event.target.value)} className="h-11 min-w-0 rounded-lg border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 text-sm font-medium text-[#102c3d] outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10">{options.map((option) => typeof option === "string" ? <option key={option} value={option}>{option}</option> : <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>;
 }
 
-export function FormTextArea({ label, value, onChange, required = false, wide = false, rows = 3 }: { label: string; value: string; onChange: (value: string) => void; required?: boolean; wide?: boolean; rows?: number }) {
-  return <label className={`grid gap-1.5 text-xs font-semibold text-[#102c3d]/58 ${wide ? "md:col-span-2" : ""}`}>{label}<textarea required={required} rows={rows} value={value} onChange={(event) => onChange(event.target.value)} className="min-w-0 resize-y rounded-lg border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 py-2.5 text-sm font-medium leading-6 text-[#102c3d] outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10" /></label>;
+export function FormTextArea({ label, value, onChange, required = false, wide = false, rows = 3, placeholder }: { label: string; value: string; onChange: (value: string) => void; required?: boolean; wide?: boolean; rows?: number; placeholder?: string }) {
+  return <label className={`grid gap-1.5 text-xs font-semibold text-[#102c3d]/58 ${wide ? "md:col-span-2" : ""}`}>{label}<textarea required={required} rows={rows} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="min-w-0 resize-y rounded-lg border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 py-2.5 text-sm font-medium leading-6 text-[#102c3d] outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10" /></label>;
+}
+
+export function FormTagInput({ label, values, onChange, wide = false, placeholder = "Type and press Enter or comma" }: { label: string; values: string[]; onChange: (value: string[]) => void; wide?: boolean; placeholder?: string }) {
+  const [draft, setDraft] = useState("");
+
+  function commitValue(value: string) {
+    const next = value.trim();
+    if (!next) return;
+    onChange(Array.from(new Set([...values, next])));
+    setDraft("");
+  }
+
+  function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Enter" || event.key === ",") {
+      event.preventDefault();
+      commitValue(draft);
+    }
+    if (event.key === "Backspace" && !draft && values.length) {
+      event.preventDefault();
+      onChange(values.slice(0, -1));
+    }
+  }
+
+  function onPaste(value: string) {
+    const parts = value.split(",").map((item) => item.trim()).filter(Boolean);
+    if (parts.length <= 1) return false;
+    onChange(Array.from(new Set([...values, ...parts])));
+    setDraft("");
+    return true;
+  }
+
+  return (
+    <label className={`grid gap-1.5 text-xs font-semibold text-[#102c3d]/58 ${wide ? "md:col-span-2" : ""}`}>
+      {label}
+      <div className="rounded-lg border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 py-2.5 transition focus-within:border-[#159b8f] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#159b8f]/10">
+        <div className="flex flex-wrap gap-2">
+          {values.map((value) => (
+            <span key={value} className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-[#102c3d] ring-1 ring-[#102c3d]/[0.08]">
+              {value}
+              <button type="button" onClick={() => onChange(values.filter((item) => item !== value))} className="text-[#102c3d]/42 transition hover:text-[#102c3d]" aria-label={`Remove ${value}`}>
+                <X size={12} />
+              </button>
+            </span>
+          ))}
+          <input
+            value={draft}
+            onChange={(event) => {
+              if (event.target.value.includes(",")) {
+                const parts = event.target.value.split(",");
+                const latest = parts.pop() ?? "";
+                const committed = parts.map((item) => item.trim()).filter(Boolean);
+                if (committed.length) {
+                  onChange(Array.from(new Set([...values, ...committed])));
+                }
+                setDraft(latest);
+                return;
+              }
+              setDraft(event.target.value);
+            }}
+            onKeyDown={onKeyDown}
+            onBlur={() => commitValue(draft)}
+            onPaste={(event) => {
+              const pasted = event.clipboardData.getData("text");
+              if (onPaste(pasted)) {
+                event.preventDefault();
+              }
+            }}
+            placeholder={values.length ? "Add another" : placeholder}
+            className="min-w-[8rem] flex-1 bg-transparent py-1 text-sm font-medium text-[#102c3d] outline-none placeholder:text-[#102c3d]/34"
+          />
+        </div>
+      </div>
+    </label>
+  );
 }
 
 export function FormActions({ onCancel, label = "Save changes", error }: { onCancel: () => void; label?: string; error?: string }) {
@@ -91,3 +177,4 @@ export function TableShell({ children }: { children: ReactNode }) { return <div 
 export function TableHead({ children }: { children: ReactNode }) { return <thead className="bg-[#f8fbfa] text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/42">{children}</thead>; }
 export function TableBody({ children }: { children: ReactNode }) { return <tbody className="divide-y divide-[#102c3d]/[0.055] bg-white">{children}</tbody>; }
 export function TableAction({ children, onClick, danger = false }: { children: ReactNode; onClick: () => void; danger?: boolean }) { return <button type="button" onClick={onClick} className={`rounded-full px-3 py-1.5 text-xs font-semibold ring-1 transition ${danger ? "bg-white text-[#b13b51] ring-[#b13b51]/15 hover:bg-[#fff0f2]" : "bg-[#f5f7f3] text-[#102c3d]/68 ring-[#102c3d]/[0.07] hover:text-[#102c3d]"}`}>{children}</button>; }
+

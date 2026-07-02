@@ -363,7 +363,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null }: { initialEm
         .map((provider) => ({
           providerName: provider.providerName,
           sectors: provider.sectors,
-          deliveryModel: provider.deliveryModel,
+          deliveryModels: provider.deliveryModels,
           verificationStatus: provider.verificationStatus,
         })),
       employerPriorities: data.profile.priorities.map((priority) => ({ name: priority.name, importance: priority.importance })),
@@ -754,7 +754,8 @@ function WorkflowDraft({ response, action, status }: { response: LevyTateAiRespo
         {showProvider && response.providerMatchDraft ? (
           <div className="grid gap-2 text-xs leading-5 text-[#102c3d]/60">
             <p className="font-semibold text-[#102c3d]">{response.providerMatchDraft.roleFamily}</p>
-            <p>{response.providerMatchDraft.recommendedStandard}</p>
+            <p>{response.providerMatchDraft.providerName} | {response.providerMatchDraft.recommendedProgramme}</p>
+            <p>{response.providerMatchDraft.matchScore}% match | {response.providerMatchDraft.linkedStandard}</p>
             <p>{response.providerMatchDraft.notes}</p>
           </div>
         ) : null}
@@ -766,3 +767,4 @@ function WorkflowDraft({ response, action, status }: { response: LevyTateAiRespo
     </div>
   );
 }
+

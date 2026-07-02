@@ -59,7 +59,7 @@ export function EnrolmentsModule() {
   function eligibleProviders(standardId: string) {
     const ids = new Set(
       data.providerProgrammes
-        .filter((programme) => programme.apprenticeshipStandardId === standardId && programme.status === "Active" && programme.recordStatus === "Active" && isVerifiedProviderProgramme(programme))
+        .filter((programme) => programme.linkedStandardIds.includes(standardId) && programme.status === "Active" && programme.recordStatus === "Active" && isVerifiedProviderProgramme(programme))
         .map((programme) => programme.providerId),
     );
     return data.providers.filter((provider) => provider.status === "Active" && ids.has(provider.providerId));
@@ -177,7 +177,7 @@ export function EnrolmentsModule() {
                 required
                 options={[{ value: "", label: "Select approved application" }, ...[...approved, ...data.applications.filter((item) => item.id === draft.applicationId)].map((application) => {
                   const standard = getApprenticeshipStandard(application.apprenticeshipStandardId);
-                  return { value: application.id, label: `${displayEmployee(data.employees.find((item) => item.id === application.employeeId))} Â· ${standard?.title ?? application.apprenticeshipStandardId}` };
+                  return { value: application.id, label: `${displayEmployee(data.employees.find((item) => item.id === application.employeeId))} - ${standard?.title ?? application.apprenticeshipStandardId}` };
                 })]}
               />
               <FormSelect label="Verified provider" value={draft.providerId} onChange={(value) => setDraft({ ...draft, providerId: value })} required options={[{ value: "", label: "Select verified provider" }, ...eligibleProviders(draft.apprenticeshipStandardId).map((provider) => ({ value: provider.providerId, label: provider.providerName }))]} />

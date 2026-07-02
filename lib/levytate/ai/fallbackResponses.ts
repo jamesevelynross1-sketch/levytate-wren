@@ -136,14 +136,14 @@ function roleQuickReplies(request: LevyTateAiRequest, response: LevyTateAiRespon
 function adminFallback(request: LevyTateAiRequest) {
   const leadResponse = buildLegacyFallbackResponse({ ...request, role: "Apprenticeship Lead" });
   const actions: LevyTateAiAction[] = [
-    { label: "Review provider matching draft", type: "request_provider_matching", target: leadResponse.providerMatchDraft?.recommendedStandard },
+    { label: "Review provider matching draft", type: "request_provider_matching", target: leadResponse.providerMatchDraft?.recommendedProgramme },
     { label: "Create internal follow-up", type: "create_admin_follow_up_task", target: leadResponse.providerMatchDraft?.roleFamily },
-    { label: "Compare specialist routes", type: "compare_routes", target: leadResponse.providerMatchDraft?.recommendedStandard },
+    { label: "Compare specialist routes", type: "compare_routes", target: leadResponse.providerMatchDraft?.recommendedProgramme },
   ];
 
   return {
     ...leadResponse,
-    assistantMessage: `I have treated this as a controlled provider matching question. ${leadResponse.assistantMessage} Any provider names should be handled as catalogue candidates until programme fit, delivery capability and relationship status have been checked.`,
+    assistantMessage: `I have treated this as a controlled provider matching question. ${leadResponse.assistantMessage} Any provider programmes should be handled as catalogue candidates until programme fit, delivery capability and relationship status have been checked.`,
     followUpQuestion: "What learner volume, locations, delivery preference and target start window should the shortlist use?",
     quickReplies: ["Add learner volume", "Set delivery preference", "Review catalogue candidates", "Create follow-up task"],
     recommendedActions: actions,
@@ -182,3 +182,5 @@ export function buildLevyTateAiFallbackResponse(request: LevyTateAiRequest): Lev
     applicationDraft: response.applicationPrefill,
   };
 }
+
+

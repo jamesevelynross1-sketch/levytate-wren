@@ -78,6 +78,15 @@ export type DepartmentGuidance = {
   signals: InsightSignal[];
 };
 
+export type LeadProgrammeMatch = {
+  providerName: string;
+  programmeName: string;
+  linkedStandard: string;
+  matchScore: number;
+  verificationStatus: string;
+  whyProgramme: string;
+};
+
 export type LeadGuidance = {
   interpretedRole: string;
   workforceNeed: string;
@@ -86,6 +95,7 @@ export type LeadGuidance = {
   businessRationale: string;
   fundingRoute: string;
   providerMatchingPrompt: string;
+  programmeMatch?: LeadProgrammeMatch;
 };
 
 export type PersonaSummary = {
@@ -242,10 +252,15 @@ export type LevyTateApplicationPrefill = {
 
 export type LevyTateProviderMatchDraft = {
   roleFamily: string;
-  recommendedStandard: string;
+  recommendedProgramme: string;
+  providerName: string;
+  linkedStandard: string;
+  matchScore: number;
+  verificationStatus: string;
   rationale: string;
   fundingRoute: string;
   notes: string;
+  recommendedStandard?: string;
 };
 
 export type LevyTateAiWorkspaceContext = {
@@ -264,7 +279,7 @@ export type LevyTateAiRoleMappingContext = {
 export type LevyTateAiProviderContext = {
   providerName: string;
   sectors?: string[];
-  deliveryModel?: string[];
+  deliveryModels?: string[];
   verificationStatus?: string;
 };
 
@@ -466,12 +481,12 @@ function parseProviderCatalogue(value: unknown): LevyTateAiProviderContext[] | u
   if (!Array.isArray(value)) return undefined;
   return value.slice(0, 30).flatMap((item) => {
     if (!item || typeof item !== "object") return [];
-    const candidate = item as Partial<LevyTateAiProviderContext>;
+    const candidate = item as Partial<LevyTateAiProviderContext> & { deliveryModel?: string[] };
     if (typeof candidate.providerName !== "string") return [];
     return [{
       providerName: candidate.providerName.trim().slice(0, 160),
       sectors: cleanStringArray(candidate.sectors),
-      deliveryModel: cleanStringArray(candidate.deliveryModel),
+      deliveryModels: cleanStringArray(candidate.deliveryModels ?? candidate.deliveryModel),
       verificationStatus: typeof candidate.verificationStatus === "string" ? candidate.verificationStatus.trim().slice(0, 80) : undefined,
     }];
   });
@@ -690,3 +705,4 @@ export function parseLevyTateAiRequest(payload: unknown): LevyTateAiRequest | nu
     contextData,
   };
 }
+

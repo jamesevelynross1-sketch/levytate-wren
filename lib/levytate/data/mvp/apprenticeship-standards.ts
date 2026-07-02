@@ -1,44 +1,88 @@
-import type { ApprenticeshipStandard } from "@/lib/levytate/domain/types";
+import rawCatalogue from "./apprenticeship-standards.generated.json";
+import type { ApprenticeshipStandard, ApprenticeshipStandardStatus } from "@/lib/levytate/domain/types";
 
-const verified = "2026-06-29";
-const official = (referenceCode: string, version?: string) =>
-  `https://skillsengland.education.gov.uk/apprenticeships/${referenceCode.toLowerCase()}${version ? `-v${version}` : ""}`;
+type RawStandard = {
+  id: string;
+  title: string;
+  referenceCode: string;
+  level: number;
+  occupationalRoute: string;
+  fundingBand: number | null;
+  typicalDuration: string;
+  status: ApprenticeshipStandardStatus;
+  officialUrl: string;
+  version: string;
+  lastVerified: string;
+};
+
+type RawMetadata = {
+  sourceName: string;
+  sourceUrl: string;
+  snapshotDate: string;
+  importVersion: number;
+  totalStandards: number;
+  activeStandards: number;
+};
+
+const catalogue = rawCatalogue as unknown as { metadata: RawMetadata; standards: RawStandard[] };
+const verified = catalogue.metadata.snapshotDate;
+const official = (referenceCode: string) => `https://skillsengland.education.gov.uk/apprenticeships/${referenceCode.toLowerCase()}`;
+
+const historicalStandards: ApprenticeshipStandard[] = [
+  {
+    id: "ST0384",
+    title: "Team leader or supervisor",
+    referenceCode: "ST0384",
+    level: 3,
+    occupationalRoute: "Business and administration",
+    fundingBand: 5000,
+    typicalDuration: "15 months",
+    status: "Defunded",
+    officialUrl: official("ST0384"),
+    version: "1.4",
+    lastVerified: verified,
+    lastSyncedAt: verified,
+  },
+  {
+    id: "ST0385",
+    title: "Operations or departmental manager",
+    referenceCode: "ST0385",
+    level: 5,
+    occupationalRoute: "Business and administration",
+    fundingBand: 7000,
+    typicalDuration: "30 months",
+    status: "Defunded",
+    officialUrl: official("ST0385"),
+    version: "Historical",
+    lastVerified: verified,
+    lastSyncedAt: verified,
+  },
+];
 
 export const apprenticeshipStandards: ApprenticeshipStandard[] = [
-  { id: "ST0795", title: "Data technician", referenceCode: "ST0795", level: 3, occupationalRoute: "Digital", fundingBand: 13000, typicalDuration: "24 months", status: "Live", officialUrl: official("ST0795", "1-1"), version: "1.1", lastVerified: verified },
-  { id: "ST0118", title: "Data analyst", referenceCode: "ST0118", level: 4, occupationalRoute: "Digital", fundingBand: 15000, typicalDuration: "24 months", status: "Live", officialUrl: official("ST0118", "1-1"), version: "1.1", lastVerified: verified },
-  { id: "ST0117", title: "Business analyst", referenceCode: "ST0117", level: 4, occupationalRoute: "Digital", fundingBand: 18000, typicalDuration: "18 months", status: "Live", officialUrl: official("ST0117", "1-2"), version: "1.2", lastVerified: verified },
-  { id: "ST1386", title: "Data engineer", referenceCode: "ST1386", level: 5, occupationalRoute: "Digital", fundingBand: null, typicalDuration: "24 months", status: "Live", officialUrl: official("ST1386"), version: "1.0", lastVerified: verified },
-  { id: "ST0127", title: "Network engineer", referenceCode: "ST0127", level: 4, occupationalRoute: "Digital", fundingBand: 18000, typicalDuration: "24 months", status: "Live", officialUrl: official("ST0127"), version: "Current", lastVerified: verified },
-  { id: "ST0116", title: "Software developer", referenceCode: "ST0116", level: 4, occupationalRoute: "Digital", fundingBand: 18000, typicalDuration: "24 months", status: "Live", officialUrl: official("ST0116", "1-2"), version: "1.2", lastVerified: verified },
-  { id: "ST0128", title: "Software development technician", referenceCode: "ST0128", level: 3, occupationalRoute: "Digital", fundingBand: 15000, typicalDuration: "18 months", status: "Live", officialUrl: official("ST0128"), version: "Current", lastVerified: verified },
-  { id: "ST0973", title: "Information communications technician", referenceCode: "ST0973", level: 3, occupationalRoute: "Digital", fundingBand: 15000, typicalDuration: "18 months", status: "Live", officialUrl: official("ST0973", "1-2"), version: "1.2", lastVerified: verified },
-  { id: "ST0119", title: "Digital and technology solutions professional", referenceCode: "ST0119", level: 6, occupationalRoute: "Digital", fundingBand: 27000, typicalDuration: "48 months", status: "Live", officialUrl: official("ST0119"), version: "Current", lastVerified: verified },
-  { id: "ST0310", title: "Associate project manager", referenceCode: "ST0310", level: 4, occupationalRoute: "Business and administration", fundingBand: 7000, typicalDuration: "18 months", status: "Live", officialUrl: official("ST0310", "1-5"), version: "1.5", lastVerified: verified },
-  { id: "ST0070", title: "Business administrator", referenceCode: "ST0070", level: 3, occupationalRoute: "Business and administration", fundingBand: 5000, typicalDuration: "12 to 18 months", status: "Live", officialUrl: official("ST0070", "1-0"), version: "1.0", lastVerified: verified },
-  { id: "ST0072", title: "Customer service practitioner", referenceCode: "ST0072", level: 2, occupationalRoute: "Sales, marketing and procurement", fundingBand: 3500, typicalDuration: "12 months", status: "Live", officialUrl: official("ST0072"), version: "Current", lastVerified: verified },
-  { id: "ST0071", title: "Customer service specialist", referenceCode: "ST0071", level: 3, occupationalRoute: "Sales, marketing and procurement", fundingBand: 4000, typicalDuration: "15 months", status: "Live", officialUrl: official("ST0071"), version: "Current", lastVerified: verified },
-  { id: "ST0934", title: "Corporate responsibility and sustainability practitioner", referenceCode: "ST0934", level: 4, occupationalRoute: "Business and administration", fundingBand: 11000, typicalDuration: "24 months", status: "Live", officialUrl: official("ST0934"), version: "Current", lastVerified: verified },
-  { id: "ST0192", title: "Improvement practitioner", referenceCode: "ST0192", level: 4, occupationalRoute: "Business and administration", fundingBand: 6000, typicalDuration: "14 months", status: "Live", officialUrl: official("ST0192"), version: "1.3", lastVerified: verified },
-  { id: "ST0555", title: "Improvement specialist", referenceCode: "ST0555", level: 5, occupationalRoute: "Business and administration", fundingBand: 9000, typicalDuration: "14 months", status: "Live", officialUrl: official("ST0555", "1-1"), version: "1.1", lastVerified: verified },
-  { id: "ST0550", title: "Safety, health and environment technician", referenceCode: "ST0550", level: 3, occupationalRoute: "Engineering and manufacturing", fundingBand: 5000, typicalDuration: "24 months", status: "Live", officialUrl: official("ST0550"), version: "Current", lastVerified: verified },
-  { id: "ST0457", title: "Engineering technician", referenceCode: "ST0457", level: 3, occupationalRoute: "Engineering and manufacturing", fundingBand: 26000, typicalDuration: "42 months", status: "Live", officialUrl: official("ST0457", "1-6"), version: "1.6", lastVerified: verified },
-  { id: "ST0345", title: "Junior management consultant", referenceCode: "ST0345", level: 4, occupationalRoute: "Business and administration", fundingBand: 11000, typicalDuration: "24 months", status: "Live", officialUrl: official("ST0345"), version: "Current", lastVerified: verified },
-  { id: "ST1031", title: "Multi-channel marketer", referenceCode: "ST1031", level: 3, occupationalRoute: "Sales, marketing and procurement", fundingBand: 11000, typicalDuration: "18 months", status: "Live", officialUrl: official("ST1031", "1-1"), version: "1.1", lastVerified: verified },
-  { id: "ST0411", title: "Project manager (integrated degree)", referenceCode: "ST0411", level: 6, occupationalRoute: "Business and administration", fundingBand: 22000, typicalDuration: "48 months", status: "Live", officialUrl: official("ST0411"), version: "Current", lastVerified: verified },
-  { id: "ST0025", title: "Manufacturing engineer (degree)", referenceCode: "ST0025", level: 6, occupationalRoute: "Engineering and manufacturing", fundingBand: 27000, typicalDuration: "42 months", status: "Live", officialUrl: official("ST0025"), version: "Current", lastVerified: verified },
-  { id: "ST0048", title: "Construction site supervisor", referenceCode: "ST0048", level: 4, occupationalRoute: "Construction and the built environment", fundingBand: 9000, typicalDuration: "30 months", status: "Live", officialUrl: official("ST0048"), version: "Current", lastVerified: verified },
-  { id: "ST0313", title: "Commercial procurement and supply", referenceCode: "ST0313", level: 4, occupationalRoute: "Sales, marketing and procurement", fundingBand: 9000, typicalDuration: "24 months", status: "Live", officialUrl: official("ST0313"), version: "Current", lastVerified: verified },
-  { id: "ST0201", title: "Supply chain practitioner (fast moving consumer goods)", referenceCode: "ST0201", level: 3, occupationalRoute: "Transport and logistics", fundingBand: 6000, typicalDuration: "24 months", status: "Live", officialUrl: official("ST0201"), version: "Current", lastVerified: verified },
-  { id: "ST0785", title: "Procurement and supply assistant", referenceCode: "ST0785", level: 3, occupationalRoute: "Sales, marketing and procurement", fundingBand: 6000, typicalDuration: "18 months", status: "Live", officialUrl: official("ST0785"), version: "Current", lastVerified: verified },
-  { id: "ST0719", title: "Senior procurement and supply chain professional", referenceCode: "ST0719", level: 6, occupationalRoute: "Sales, marketing and procurement", fundingBand: 21000, typicalDuration: "30 months", status: "Live", officialUrl: official("ST0719"), version: "Current", lastVerified: verified },
-  { id: "ST0384", title: "Team leader or supervisor", referenceCode: "ST0384", level: 3, occupationalRoute: "Business and administration", fundingBand: 5000, typicalDuration: "15 months", status: "Defunded", officialUrl: official("ST0384", "1-4"), version: "1.4", lastVerified: verified },
-  { id: "ST0385", title: "Operations or departmental manager", referenceCode: "ST0385", level: 5, occupationalRoute: "Business and administration", fundingBand: 7000, typicalDuration: "30 months", status: "Defunded", officialUrl: official("ST0385"), version: "Historical", lastVerified: verified },
+  ...catalogue.standards.map((standard) => ({
+    id: standard.id,
+    title: standard.title,
+    referenceCode: standard.referenceCode,
+    level: standard.level,
+    occupationalRoute: standard.occupationalRoute,
+    fundingBand: standard.fundingBand,
+    typicalDuration: standard.typicalDuration,
+    status: standard.status,
+    officialUrl: standard.officialUrl,
+    version: standard.version,
+    lastVerified: standard.lastVerified,
+    lastSyncedAt: standard.lastVerified,
+  })),
+  ...historicalStandards.filter((historical) => !catalogue.standards.some((standard) => standard.id === historical.id)),
 ];
 
 export const skillsEnglandLibraryMetadata = {
-  sourceName: "Skills England apprenticeship catalogue",
-  sourceUrl: "https://skillsengland.education.gov.uk/apprenticeships/",
-  snapshotDate: verified,
-  importVersion: 1,
+  sourceName: catalogue.metadata.sourceName,
+  sourceUrl: catalogue.metadata.sourceUrl,
+  snapshotDate: catalogue.metadata.snapshotDate,
+  importVersion: catalogue.metadata.importVersion,
+  totalStandards: catalogue.metadata.totalStandards,
+  activeStandards: catalogue.metadata.activeStandards,
 } as const;
+

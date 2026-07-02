@@ -27,7 +27,7 @@ function catalogueContext(request: LevyTateAiRequest) {
     : mvpProviderCatalogue.slice(0, 16).map((provider) => ({
         providerName: provider.providerName,
         sectors: provider.sectors,
-        deliveryModel: provider.deliveryModel,
+        deliveryModels: provider.deliveryModels,
         verificationStatus: provider.verificationStatus,
       }));
 
@@ -65,3 +65,4 @@ export function buildLevyTateAiContext(request: LevyTateAiRequest) {
     productRules,
   };
 }
+
