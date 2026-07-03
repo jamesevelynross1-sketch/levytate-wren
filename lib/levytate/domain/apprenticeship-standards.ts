@@ -6,6 +6,13 @@ export type ApprenticeshipStandardsImport = {
   standards: ApprenticeshipStandard[];
 };
 
+export type ApprenticeshipStandardsSearchFilters = {
+  level?: string;
+  route?: string;
+  status?: string;
+  programmeType?: string;
+};
+
 const aliases: Record<string, string> = {
   "data essentials": "ST0795",
   ict: "ST0973",
@@ -26,6 +33,11 @@ let runtimeStandards = structuredClone(apprenticeshipStandards);
 
 function normalise(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function tokenise(value: string) {
+  const normalised = normalise(value);
+  return normalised ? normalised.split(" ").filter(Boolean) : [];
 }
 
 function sourceStatusToDomainStatus(sourceStatus?: string) {
@@ -66,16 +78,113 @@ function isSelectableStandard(standard: ApprenticeshipStandard) {
   return standard.status === "Live" || standard.status === "Paused";
 }
 
+function searchableParts(standard: ApprenticeshipStandard) {
+  return {
+    title: normalise(standard.title),
+    referenceCode: normalise(standard.referenceCode),
+    route: normalise(standard.occupationalRoute),
+    programmeType: normalise(standard.programmeType ?? ""),
+    overview: normalise(standard.overview ?? ""),
+    jobTitles: (standard.jobTitles ?? []).map(normalise).filter(Boolean),
+  };
+}
+
 function searchableHaystack(standard: ApprenticeshipStandard) {
-  return normalise([
-    standard.title,
-    standard.referenceCode,
+  const parts = searchableParts(standard);
+  return [
+    parts.title,
+    parts.referenceCode,
     `level ${standard.level}`,
-    standard.occupationalRoute,
-    standard.programmeType ?? "",
-    standard.jobTitles?.join(" ") ?? "",
-    standard.overview ?? "",
-  ].join(" "));
+    parts.route,
+    parts.programmeType,
+    parts.jobTitles.join(" "),
+    parts.overview,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+}
+
+function hasPrefixWordMatch(value: string, queryTokens: string[]) {
+  if (!value || !queryTokens.length) return false;
+  const words = value.split(" ").filter(Boolean);
+  return queryTokens.every((token) => words.some((word) => word.startsWith(token)));
+}
+
+function scoreStandard(standard: ApprenticeshipStandard, query: string) {
+  const search = normalise(query);
+  if (!search) return 0;
+
+  const queryTokens = tokenise(search);
+  const parts = searchableParts(standard);
+  const haystack = searchableHaystack(standard);
+  let score = 0;
+
+  if (parts.title === search) score += 1200;
+  else if (parts.title.startsWith(search)) score += 950;
+  else if (hasPrefixWordMatch(parts.title, queryTokens)) score += 900;
+  else if (parts.title.includes(search)) score += 700;
+
+  if (parts.referenceCode === search) score += 900;
+  else if (parts.referenceCode.startsWith(search)) score += 650;
+  else if (parts.referenceCode.includes(search)) score += 450;
+
+  for (const jobTitle of parts.jobTitles) {
+    if (jobTitle === search) {
+      score += 840;
+      break;
+    }
+    if (jobTitle.startsWith(search)) {
+      score += 720;
+      break;
+    }
+  }
+
+  if (score === 0 && hasPrefixWordMatch(parts.jobTitles.join(" "), queryTokens)) {
+    score += 560;
+  }
+
+  if (parts.route.startsWith(search)) score += 320;
+  if (parts.programmeType.startsWith(search)) score += 180;
+
+  for (const token of queryTokens) {
+    if (parts.title.split(" ").some((word) => word.startsWith(token))) score += 90;
+    if (parts.jobTitles.some((jobTitle) => jobTitle.split(" ").some((word) => word.startsWith(token)))) score += 65;
+    if (parts.referenceCode.includes(token)) score += 40;
+    if (parts.route.split(" ").some((word) => word.startsWith(token))) score += 24;
+    if (parts.overview.includes(token)) score += 12;
+  }
+
+  if (haystack.includes(search)) score += 180;
+  if (queryTokens.every((token) => haystack.includes(token))) score += 120;
+
+  return score;
+}
+
+function matchesFilters(standard: ApprenticeshipStandard, filters?: ApprenticeshipStandardsSearchFilters) {
+  const requestedStatus = filters?.status?.trim().toLowerCase();
+  const requestedProgrammeType = filters?.programmeType?.trim().toLowerCase();
+  const standardSourceStatus = (standard.sourceStatus ?? "").trim().toLowerCase();
+  const standardDomainStatus = standard.status.trim().toLowerCase();
+  const standardProgrammeType = (standard.programmeType ?? "").trim().toLowerCase();
+
+  const statusMatches = !requestedStatus || requestedStatus === "all"
+    || requestedStatus === standardDomainStatus
+    || requestedStatus === standardSourceStatus
+    || (requestedStatus === "live" && isApprovedSourceStatus(standard.sourceStatus));
+
+  const programmeTypeMatches = !requestedProgrammeType
+    || requestedProgrammeType === "all"
+    || standardProgrammeType === requestedProgrammeType;
+
+  return (!filters?.level || filters.level === "All" || String(standard.level) === filters.level)
+    && (!filters?.route || filters.route === "All" || standard.occupationalRoute === filters.route)
+    && statusMatches
+    && programmeTypeMatches;
+}
+
+function sortAlphabetically(standards: ApprenticeshipStandard[]) {
+  return [...standards].sort((left, right) => left.title.localeCompare(right.title, undefined, { sensitivity: "base" }));
 }
 
 export function hydrateApprenticeshipStandards(standards: ApprenticeshipStandard[]) {
@@ -108,23 +217,27 @@ export function getSelectableApprenticeshipStandards() {
   return runtimeStandards.filter(isSelectableStandard);
 }
 
-export function searchApprenticeshipStandards(query: string, filters?: { level?: string; route?: string; status?: string }) {
+export function searchApprenticeshipStandardsList(
+  standards: ApprenticeshipStandard[],
+  query: string,
+  filters?: ApprenticeshipStandardsSearchFilters,
+) {
+  const filtered = standards.filter((standard) => matchesFilters(standard, filters));
   const search = normalise(query);
-  return runtimeStandards.filter((standard) => {
-    const requestedStatus = filters?.status?.trim().toLowerCase();
-    const standardSourceStatus = (standard.sourceStatus ?? "").trim().toLowerCase();
-    const standardDomainStatus = standard.status.trim().toLowerCase();
 
-    const statusMatches = !requestedStatus || requestedStatus === "all"
-      || requestedStatus === standardDomainStatus
-      || requestedStatus === standardSourceStatus
-      || (requestedStatus === "live" && isApprovedSourceStatus(standard.sourceStatus));
+  if (!search) {
+    return sortAlphabetically(filtered);
+  }
 
-    return (!search || searchableHaystack(standard).includes(search))
-      && (!filters?.level || filters.level === "All" || String(standard.level) === filters.level)
-      && (!filters?.route || filters.route === "All" || standard.occupationalRoute === filters.route)
-      && statusMatches;
-  });
+  return filtered
+    .map((standard) => ({ standard, score: scoreStandard(standard, search) }))
+    .filter((entry) => entry.score > 0)
+    .sort((left, right) => right.score - left.score || left.standard.title.localeCompare(right.standard.title, undefined, { sensitivity: "base" }))
+    .map((entry) => entry.standard);
+}
+
+export function searchApprenticeshipStandards(query: string, filters?: ApprenticeshipStandardsSearchFilters) {
+  return searchApprenticeshipStandardsList(runtimeStandards, query, filters);
 }
 
 export function resolveApprenticeshipStandardId(value: string) {
@@ -132,7 +245,7 @@ export function resolveApprenticeshipStandardId(value: string) {
   if (!search) return undefined;
   const alias = aliases[search];
   if (alias) return alias;
-  return runtimeStandards.find((standard) => {
+  return searchApprenticeshipStandards(search).find((standard) => {
     const title = normalise(standard.title);
     return normalise(standard.id) === search || title === search || search.includes(title) || title.includes(search);
   })?.id;

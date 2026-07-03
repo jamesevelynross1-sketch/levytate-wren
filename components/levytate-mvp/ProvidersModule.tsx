@@ -388,7 +388,7 @@ function ProgrammeEditor({
 }) {
   const { search: searchStandards } = useLevyTateStandards();
   const selectedStandard = getApprenticeshipStandard(draft.linkedStandardIds[0] ?? "");
-  const options = searchStandards(standardSearch, { status: "Approved for delivery" }).slice(0, 16);
+  const options = searchStandards(standardSearch, { programmeType: "Apprenticeship standard" }).slice(0, 16);
 
   function selectStandard(standardId: string) {
     onDraft(normaliseProviderProgramme({ ...draft, linkedStandardIds: [standardId] }));
@@ -441,8 +441,8 @@ function ProgrammeEditor({
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.78fr)]">
         <FormSection title="Linked apprenticeship standard" copy="Use the official standard as compliance and funding metadata, not the headline offer.">
           <label className="grid gap-1.5 text-xs font-semibold text-[#102c3d]/58">
-            Search active standards
-            <input value={standardSearch} onChange={(event) => onStandardSearch(event.target.value)} placeholder="Search title or reference code" className="h-11 rounded-lg border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 text-sm font-medium outline-none focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10" />
+            Search apprenticeship standards
+            <input value={standardSearch} onChange={(event) => onStandardSearch(event.target.value)} placeholder="Search title, reference code or job title" className="h-11 rounded-lg border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 text-sm font-medium outline-none focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10" />
           </label>
           <div className="mt-2 max-h-72 overflow-y-auto rounded-lg border border-[#102c3d]/[0.08] bg-white">
             {options.map((standard) => <button key={standard.id} type="button" onClick={() => selectStandard(standard.id)} className={`flex w-full items-center justify-between gap-3 border-b border-[#102c3d]/[0.05] px-3 py-2.5 text-left transition last:border-0 hover:bg-[#f7faf8] ${draft.linkedStandardIds.includes(standard.id) ? "bg-[#edf7f3]" : ""}`}><span><span className="block text-sm font-semibold">{standard.title}</span><span className="text-xs text-[#102c3d]/44">{standard.referenceCode} | Level {standard.level}</span></span><StatusBadge tone={standard.status === "Live" ? "green" : standard.status === "Paused" ? "yellow" : "red"}>{standard.status}</StatusBadge></button>)}
@@ -499,6 +499,7 @@ function IconAction({ icon: Icon, label, onClick, danger = false }: { icon: type
     </button>
   );
 }
+
 
 
 

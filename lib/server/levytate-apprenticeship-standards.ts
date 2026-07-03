@@ -1,4 +1,7 @@
-import { getApprenticeshipStandardsImport } from "@/lib/levytate/domain";
+import {
+  getApprenticeshipStandardsImport,
+  searchApprenticeshipStandardsList,
+} from "@/lib/levytate/domain";
 import type { ApprenticeshipStandard } from "@/lib/levytate/domain";
 import { getLevyTateSupabaseConfig, supabaseSelect } from "@/lib/server/levytate-supabase";
 
@@ -31,6 +34,12 @@ export type LevyTateStandardsResponse = {
     approvedForDelivery: number;
   };
   standards: ApprenticeshipStandard[];
+};
+
+export type LevyTateStandardsQuery = {
+  search?: string;
+  status?: string;
+  programmeType?: string;
 };
 
 const standardsTable = "levytate_apprenticeship_standards";
@@ -104,11 +113,11 @@ function rowToDomain(row: ApprenticeshipStandardRow): ApprenticeshipStandard {
   };
 }
 
-export async function loadLevyTateStandards(): Promise<LevyTateStandardsResponse> {
+export async function loadLevyTateStandards(query: LevyTateStandardsQuery = {}): Promise<LevyTateStandardsResponse> {
   const config = getLevyTateSupabaseConfig();
 
   if (!config) {
-    return loadFallbackStandards();
+    return loadFallbackStandards(query);
   }
 
   try {
@@ -118,7 +127,7 @@ export async function loadLevyTateStandards(): Promise<LevyTateStandardsResponse
     }));
 
     if (!rows.length) {
-      return loadFallbackStandards();
+      return loadFallbackStandards(query);
     }
 
     const standards = rows.map(rowToDomain);
@@ -132,14 +141,17 @@ export async function loadLevyTateStandards(): Promise<LevyTateStandardsResponse
         apprenticeshipStandards,
         approvedForDelivery,
       },
-      standards,
+      standards: searchApprenticeshipStandardsList(standards, query.search ?? "", {
+        status: query.status,
+        programmeType: query.programmeType,
+      }),
     };
   } catch {
-    return loadFallbackStandards();
+    return loadFallbackStandards(query);
   }
 }
 
-function loadFallbackStandards(): LevyTateStandardsResponse {
+function loadFallbackStandards(query: LevyTateStandardsQuery = {}): LevyTateStandardsResponse {
   const fallbackImport = getApprenticeshipStandardsImport();
   const fallback = fallbackImport.standards;
 
@@ -150,7 +162,9 @@ function loadFallbackStandards(): LevyTateStandardsResponse {
       apprenticeshipStandards: fallbackImport.source.totalStandards ?? fallback.filter((standard) => standard.programmeType === "Apprenticeship standard").length,
       approvedForDelivery: fallbackImport.source.approvedForDelivery ?? fallbackImport.source.activeStandards ?? fallback.filter((standard) => standard.programmeType === "Apprenticeship standard" && (standard.sourceStatus === "Approved for delivery" || standard.status === "Live")).length,
     },
-    standards: fallback,
+    standards: searchApprenticeshipStandardsList(fallback, query.search ?? "", {
+      status: query.status,
+      programmeType: query.programmeType,
+    }),
   };
 }
-
