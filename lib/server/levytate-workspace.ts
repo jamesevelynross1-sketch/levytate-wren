@@ -318,20 +318,31 @@ export async function getWorkspaceBootstrapForSession(session: LevyTateBetaSessi
     };
   }
 
-  const context = await ensureWorkspaceContext(session);
-  const data = await loadWorkspaceData(context.organisation.id);
+  try {
+    const context = await ensureWorkspaceContext(session);
+    const data = await loadWorkspaceData(context.organisation.id);
 
-  return {
-    data,
-    meta: {
-      organisationId: context.organisation.id,
-      organisationName: context.organisation.name,
-      userEmail: session.email,
-      userRole: context.user.role,
-      storageMode: "supabase",
-      warnings: context.warnings,
-    },
-  };
+    return {
+      data,
+      meta: {
+        organisationId: context.organisation.id,
+        organisationName: context.organisation.name,
+        userEmail: session.email,
+        userRole: context.user.role,
+        storageMode: "supabase",
+        warnings: context.warnings,
+      },
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown Supabase workspace bootstrap error.";
+    return {
+      data: createEmptyMvpWorkspace(),
+      meta: buildFallbackMeta(session, [
+        "Supabase workspace bootstrap failed. LevyTate is running in local fallback mode.",
+        message,
+      ]),
+    };
+  }
 }
 
 export async function applyWorkspaceMutationForSession(
