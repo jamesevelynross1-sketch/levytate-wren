@@ -13,47 +13,35 @@ import { isBetaApprovedEarlyAccessStatus } from "@/lib/levytate/early-access/dom
 import { getPersistentEarlyAccessState } from "@/lib/server/levytate-beta-access-grants";
 import { getEarlyAccessRequestByEmail } from "@/lib/server/levytate-early-access";
 
+type LoginRequestBody = {
+  email?: unknown;
+  code?: unknown;
+  approvalToken?: unknown;
+};
+
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    const body = await parseLoginRequestBody(request);
     const email = typeof body.email === "string" ? normaliseBetaEmail(body.email) : "";
     const code = typeof body.code === "string" ? body.code.trim() : "";
     const approvalToken = typeof body.approvalToken === "string" ? body.approvalToken : "";
 
+    if (!email) {
+      throw new BetaLoginError("Please enter your email address.", 400);
+    }
+
+    if (!code) {
+      throw new BetaLoginError("Please enter your beta access code.", 400);
+    }
+
     if (code !== getLevyTateBetaAccessCode().trim()) {
-      return NextResponse.json({ ok: false, message: "Invalid beta access code." }, { status: 401 });
+      throw new BetaLoginError("Invalid beta access code.", 401);
     }
 
-    let accessLevel: LevyTateBetaAccessLevel;
-
-    if (isAdminBetaEmail(email)) {
-      accessLevel = "beta_admin";
-    } else {
-      const [lead, persistentState, localApproval] = await Promise.all([
-        getEarlyAccessRequestByEmail(email),
-        getPersistentEarlyAccessState(email),
-        readLevyTateApprovalToken(approvalToken),
-      ]);
-
-      const hasLocalApproval = Boolean(localApproval && localApproval.email === email);
-
-      if (hasLocalApproval || persistentState === "approved" || (lead && isBetaApprovedEarlyAccessStatus(lead.status))) {
-        accessLevel = "beta_user";
-      } else if (lead || persistentState === "pending" || persistentState === "declined") {
-        return NextResponse.json(
-          { ok: false, message: "Your Early Access request has been received and is currently under review." },
-          { status: 403 },
-        );
-      } else {
-        return NextResponse.json(
-          { ok: false, message: "Beta access is currently invite-only. Please request Early Access first." },
-          { status: 403 },
-        );
-      }
-    }
-
+    const accessLevel = await resolveAccessLevel(email, approvalToken);
     const sessionToken = await createLevyTateBetaSession(email, accessLevel);
     const response = NextResponse.json({ ok: true, user: { email, accessLevel } });
+
     response.cookies.set(levytateBetaSessionCookie, sessionToken, {
       httpOnly: true,
       sameSite: "lax",
@@ -61,8 +49,74 @@ export async function POST(request: Request) {
       maxAge: levytateBetaSessionMaxAge,
       path: "/",
     });
+
     return response;
-  } catch {
-    return NextResponse.json({ ok: false, message: "We could not check beta access. Please try again." }, { status: 400 });
+  } catch (error) {
+    if (!(error instanceof BetaLoginError)) {
+      console.error("LevyTate beta login failed", error);
+    }
+
+    return NextResponse.json(
+      { ok: false, message: getLoginErrorMessage(error) },
+      { status: getLoginErrorStatus(error) },
+    );
   }
+}
+
+async function parseLoginRequestBody(request: Request): Promise<LoginRequestBody> {
+  try {
+    return (await request.json()) as LoginRequestBody;
+  } catch {
+    throw new BetaLoginError("We could not read your login request. Please try again.", 400);
+  }
+}
+
+async function resolveAccessLevel(email: string, approvalToken: string): Promise<LevyTateBetaAccessLevel> {
+  if (isAdminBetaEmail(email)) {
+    return "beta_admin";
+  }
+
+  const [lead, persistentState, localApproval] = await Promise.all([
+    getEarlyAccessRequestByEmail(email),
+    getPersistentEarlyAccessState(email),
+    readLevyTateApprovalToken(approvalToken),
+  ]);
+
+  const hasLocalApproval = Boolean(localApproval && localApproval.email === email);
+
+  if (hasLocalApproval || persistentState === "approved" || (lead && isBetaApprovedEarlyAccessStatus(lead.status))) {
+    return "beta_user";
+  }
+
+  if (lead || persistentState === "pending" || persistentState === "declined") {
+    throw new BetaLoginError("Your Early Access request has been received and is currently under review.", 403);
+  }
+
+  throw new BetaLoginError("Beta access is currently invite-only. Please request Early Access first.", 403);
+}
+
+class BetaLoginError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "BetaLoginError";
+    this.status = status;
+  }
+}
+
+function getLoginErrorMessage(error: unknown) {
+  if (error instanceof BetaLoginError) {
+    return error.message;
+  }
+
+  return "We could not check beta access. Please try again.";
+}
+
+function getLoginErrorStatus(error: unknown) {
+  if (error instanceof BetaLoginError) {
+    return error.status;
+  }
+
+  return 500;
 }
