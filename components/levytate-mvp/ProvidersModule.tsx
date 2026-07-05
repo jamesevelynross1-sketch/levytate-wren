@@ -4,19 +4,20 @@ import {
   ArrowUpRight,
   Award,
   BadgeCheck,
-  Building2,
-  Globe,
-  ImageIcon,
-  Search,
+  BriefcaseBusiness,
+  CheckCircle2,
+  Download,
+  Layers3,
+  MapPin,
   ShieldCheck,
   Sparkles,
   Star,
-  Trophy,
   Users,
 } from "lucide-react";
 import { useMemo, useState, type FormEvent } from "react";
 import type {
   ApprenticeshipStandard,
+  CommercialLink,
   FundingRoute,
   ProviderCatalogueRecord,
   ProviderEmployerSize,
@@ -28,9 +29,9 @@ import type {
 } from "@/lib/levytate/domain";
 import {
   commercialProfileCompletion,
+  emptyProgrammeCommercialProfile,
   emptyProviderCommercialProfile,
   formatFundingBand,
-  getApprenticeshipStandard,
   programmePrimaryStandard,
   programmeProfileCompletion,
 } from "@/lib/levytate/domain";
@@ -51,11 +52,14 @@ import {
 } from "@/components/levytate-mvp/MvpUi";
 import { useLevyTateStandards } from "@/components/levytate-mvp/LevyTateStandardsProvider";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
-import { includesSearch, statusTone } from "@/components/levytate-mvp/module-utils";
-import { createMvpId, normaliseProviderProgramme, normaliseProviderRecord, nowIso, todayIso } from "@/lib/levytate/mvp/workspace";
-
-const tabs = ["Commercial Profile", "Programmes", "Internal Notes"] as const;
-type ProviderTab = (typeof tabs)[number];
+import { includesSearch } from "@/components/levytate-mvp/module-utils";
+import {
+  createMvpId,
+  normaliseProviderProgramme,
+  normaliseProviderRecord,
+  nowIso,
+  todayIso,
+} from "@/lib/levytate/mvp/workspace";
 
 const providerTypes: ProviderType[] = [
   "Independent training provider",
@@ -68,12 +72,74 @@ const providerTypes: ProviderType[] = [
   "Employer Provider",
 ];
 
-const programmeStatuses: ProviderProgrammeStatus[] = ["Active", "Needs verification", "Paused", "Not available", "Defunded / unavailable for new starts"];
-const verificationStatuses: ProviderProgrammeVerificationStatus[] = ["Verified from provider website", "Needs manual verification", "Provider confirmed", "LevyTate reviewed"];
-const fundingRoutes: FundingRoute[] = ["Potentially levy-funded", "Potentially funded through levy/co-investment", "Commercial training budget"];
+const programmeStatuses: ProviderProgrammeStatus[] = [
+  "Active",
+  "Needs verification",
+  "Paused",
+  "Not available",
+  "Defunded / unavailable for new starts",
+];
+const verificationStatuses: ProviderProgrammeVerificationStatus[] = [
+  "Verified from provider website",
+  "Needs manual verification",
+  "Provider confirmed",
+  "LevyTate reviewed",
+];
+const fundingRoutes: FundingRoute[] = [
+  "Potentially levy-funded",
+  "Potentially funded through levy/co-investment",
+  "Commercial training budget",
+];
 const seniorityOptions: ProviderProgrammeSeniority[] = ["Entry", "Early career", "Experienced", "Supervisor", "Manager", "Mixed"];
 const employerSizeOptions: ProviderEmployerSize[] = ["SME", "Mid-market", "Large enterprise", "Mixed employer base"];
-const confidenceOptions = ["High", "Medium", "Low"] as const;
+const marketplaceFilters = ["Active", "Archived", "All"] as const;
+
+type ProviderView = {
+  providerId: string;
+};
+
+type ProgrammeView = {
+  providerId: string;
+  programmeId: string;
+};
+
+function average(values: number[]) {
+  if (!values.length) return 0;
+  return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
+}
+
+function firstProgramme(programmes: ProviderProgramme[]) {
+  return [...programmes].sort((left, right) => Number(right.verificationStatus !== "Needs manual verification") - Number(left.verificationStatus !== "Needs manual verification") || left.programmeName.localeCompare(right.programmeName))[0];
+}
+
+function providerReachLabel(provider: ProviderCatalogueRecord) {
+  return provider.providerType === "National provider" || provider.regions.includes("England") ? "National delivery" : "Regional delivery";
+}
+
+function providerTheme(providerId: string) {
+  if (providerId.includes("qa")) return "from-[#102c3d] via-[#174761] to-[#1f7b78]";
+  if (providerId.includes("baltic")) return "from-[#0f2f4a] via-[#15537b] to-[#0b8e82]";
+  if (providerId.includes("learning-curve")) return "from-[#243f56] via-[#405e72] to-[#5d7b85]";
+  if (providerId.includes("multiverse")) return "from-[#22163f] via-[#50368d] to-[#0b8e82]";
+  return "from-[#3b2b1e] via-[#5a4838] to-[#0b8e82]";
+}
+
+function providerWordmark(provider: ProviderCatalogueRecord) {
+  const words = provider.providerName.split(/\s+/).slice(0, 2);
+  return words.join(" ");
+}
+
+function fallbackProviderDescription(provider: ProviderCatalogueRecord) {
+  return provider.commercialProfile.organisationDescription || provider.notes || "Commercial summary to confirm.";
+}
+
+function downloadLabels(links: CommercialLink[]) {
+  return links.map((item) => item.label);
+}
+
+function labelsToLinks(labels: string[], kind: CommercialLink["kind"] = "Download") {
+  return labels.map((label) => ({ label, url: "", kind }));
+}
 
 function programmeTone(status: ProviderProgrammeStatus) {
   if (status === "Active") return "green" as const;
@@ -81,117 +147,91 @@ function programmeTone(status: ProviderProgrammeStatus) {
   return "red" as const;
 }
 
-function average(values: number[]) {
-  if (!values.length) return 0;
-  return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
-}
-
-function fallbackProviderDescription(provider: ProviderCatalogueRecord) {
-  return provider.commercialProfile.organisationDescription || provider.notes || "Commercial profile summary to confirm.";
-}
-
-function fallbackProgrammeHighlights(programme: ProviderProgramme) {
-  if (programme.commercialProfile.keyOutcomes.length) return programme.commercialProfile.keyOutcomes;
-  if (programme.expectedOutcomes.length) return programme.expectedOutcomes;
-  return ["Employer outcomes to confirm"];
-}
-
 export function ProvidersModule() {
   const { data, saveProvider, archiveProvider, saveProviderProgramme, archiveProviderProgramme, removeProviderProgramme } = useMvpWorkspace();
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("Active");
-  const [draft, setDraft] = useState<ProviderCatalogueRecord | null>(null);
-  const [activeTab, setActiveTab] = useState<ProviderTab>("Commercial Profile");
-  const [programmeDraft, setProgrammeDraft] = useState<ProviderProgramme | null>(null);
-  const [programmeSearch, setProgrammeSearch] = useState("");
-  const [standardSearch, setStandardSearch] = useState("");
-  const [levelFilter, setLevelFilter] = useState("All");
-  const [routeFilter, setRouteFilter] = useState("All");
-  const [deliveryFilter, setDeliveryFilter] = useState("All");
-  const [programmeStatusFilter, setProgrammeStatusFilter] = useState("All");
-  const [error, setError] = useState("");
   const { selectableStandards } = useLevyTateStandards();
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState<(typeof marketplaceFilters)[number]>("Active");
+  const [compareProviderIds, setCompareProviderIds] = useState<string[]>([]);
+  const [profileView, setProfileView] = useState<ProviderView | null>(null);
+  const [programmeView, setProgrammeView] = useState<ProgrammeView | null>(null);
+  const [providerDraft, setProviderDraft] = useState<ProviderCatalogueRecord | null>(null);
+  const [programmeDraft, setProgrammeDraft] = useState<ProviderProgramme | null>(null);
+  const [standardSearch, setStandardSearch] = useState("");
+  const [error, setError] = useState("");
 
   const providerStats = useMemo(() => {
     const activeProviders = data.providers.filter((provider) => provider.status === "Active");
-    const visibleProgrammes = data.providerProgrammes.filter((programme) => programme.recordStatus === "Active");
-    const verifiedProgrammes = visibleProgrammes.filter((programme) => programme.verificationStatus !== "Needs manual verification");
+    const activeProgrammes = data.providerProgrammes.filter((programme) => programme.recordStatus === "Active");
     return {
       activeProviders: activeProviders.length,
-      programmeCount: visibleProgrammes.length,
+      verifiedProviders: activeProviders.filter((provider) => provider.verificationStatus === "verified").length,
       providerCompletion: average(activeProviders.map((provider) => commercialProfileCompletion(provider.commercialProfile))),
-      programmeCompletion: average(visibleProgrammes.map((programme) => programmeProfileCompletion(programme.commercialProfile))),
-      verifiedProgrammes: verifiedProgrammes.length,
-      verifiedPartnerCount: new Set(verifiedProgrammes.map((programme) => programme.providerId)).size,
+      liveProgrammes: activeProgrammes.length,
+      programmeCompletion: average(activeProgrammes.map((programme) => programmeProfileCompletion(programme.commercialProfile))),
     };
   }, [data.providerProgrammes, data.providers]);
 
-  const visible = useMemo(() => data.providers.filter((provider) => {
-    const programmes = data.providerProgrammes.filter((item) => item.providerId === provider.providerId);
-    const programmeText = programmes.map((programme) => [
-      programme.programmeName,
-      programme.shortDescription,
-      programme.targetJobRoles.join(" "),
-      programme.technologiesCovered.join(" "),
-      programme.businessProblemsSolved.join(" "),
-      programme.commercialProfile.tagline,
-      programme.commercialProfile.idealAudience,
-      programme.commercialProfile.employerBenefits.join(" "),
-      programme.commercialProfile.futureCapabilityImpact.join(" "),
-    ].join(" ")).join(" ");
+  const visibleProviders = useMemo(() => {
+    return data.providers
+      .filter((provider) => {
+        const providerProgrammes = data.providerProgrammes.filter((programme) => programme.providerId === provider.providerId && programme.recordStatus === "Active");
+        const searchableProgrammeText = providerProgrammes
+          .map((programme) => [
+            programme.programmeName,
+            programme.shortDescription,
+            programme.commercialProfile.tagline,
+            programme.targetIndustries.join(" "),
+            programme.targetJobRoles.join(" "),
+            programme.technologiesCovered.join(" "),
+            programme.businessProblemsSolved.join(" "),
+            programme.commercialProfile.employerBenefits.join(" "),
+          ].join(" "))
+          .join(" ");
 
-    return (status === "All" || provider.status === status)
-      && includesSearch([
-        provider.providerName,
-        provider.providerType,
-        provider.sectors.join(" "),
-        provider.industries.join(" "),
-        provider.technologies.join(" "),
-        provider.deliveryModels.join(" "),
-        provider.regions.join(" "),
-        provider.employerTypes.join(" "),
-        provider.specialisms.join(" "),
-        fallbackProviderDescription(provider),
-        provider.commercialProfile.awards.join(" "),
-        provider.commercialProfile.accreditations.join(" "),
-        provider.commercialProfile.caseStudies.join(" "),
-        provider.commercialProfile.testimonials.join(" "),
-        provider.commercialProfile.employerSizesSupported.join(" "),
-        provider.commercialProfile.pricingNotes,
-        provider.commercialProfile.commercialNotes,
-        programmeText,
-      ], search);
-  }).sort((left, right) => commercialProfileCompletion(right.commercialProfile) - commercialProfileCompletion(left.commercialProfile) || left.providerName.localeCompare(right.providerName)), [data.providerProgrammes, data.providers, search, status]);
+        return (status === "All" || provider.status === status)
+          && includesSearch([
+            provider.providerName,
+            provider.providerType,
+            provider.commercialProfile.positioningStatement,
+            fallbackProviderDescription(provider),
+            provider.industries.join(" "),
+            provider.technologies.join(" "),
+            provider.specialisms.join(" "),
+            provider.commercialProfile.accreditations.join(" "),
+            provider.commercialProfile.caseStudies.join(" "),
+            provider.commercialProfile.testimonials.join(" "),
+            provider.commercialProfile.employerSizesSupported.join(" "),
+            provider.commercialProfile.pricingNotes,
+            searchableProgrammeText,
+          ], search);
+      })
+      .sort((left, right) => commercialProfileCompletion(right.commercialProfile) - commercialProfileCompletion(left.commercialProfile) || left.providerName.localeCompare(right.providerName));
+  }, [data.providerProgrammes, data.providers, search, status]);
 
-  const selectedProviderProgrammes = useMemo(() => {
-    if (!draft) return [];
-    return data.providerProgrammes.filter((programme) => {
-      if (programme.providerId !== draft.providerId) return false;
-      const primaryStandard = programmePrimaryStandard(programme, selectableStandards);
-      return includesSearch([
-        programme.programmeName,
-        programme.shortDescription,
-        programme.fullDescription,
-        programme.targetIndustries.join(" "),
-        programme.targetJobRoles.join(" "),
-        programme.technologiesCovered.join(" "),
-        programme.expectedOutcomes.join(" "),
-        programme.commercialProfile.tagline,
-        programme.commercialProfile.idealAudience,
-        programme.commercialProfile.keyOutcomes.join(" "),
-        primaryStandard?.title,
-        primaryStandard?.referenceCode,
-        primaryStandard?.occupationalRoute,
-      ], programmeSearch)
-        && (levelFilter === "All" || String(primaryStandard?.level) === levelFilter)
-        && (routeFilter === "All" || primaryStandard?.occupationalRoute === routeFilter)
-        && (deliveryFilter === "All" || programme.deliveryModels.includes(deliveryFilter))
-        && (programmeStatusFilter === "All" || programme.status === programmeStatusFilter);
-    }).sort((a, b) => a.programmeName.localeCompare(b.programmeName));
-  }, [data.providerProgrammes, deliveryFilter, draft, levelFilter, programmeSearch, programmeStatusFilter, routeFilter, selectableStandards]);
+  const comparisonProviders = useMemo(
+    () => compareProviderIds.map((providerId) => data.providers.find((provider) => provider.providerId === providerId)).filter(Boolean) as ProviderCatalogueRecord[],
+    [compareProviderIds, data.providers],
+  );
 
-  const allRoutes = useMemo(() => Array.from(new Set(selectableStandards.map((standard) => standard.occupationalRoute))).sort(), [selectableStandards]);
-  const allDeliveryModels = useMemo(() => Array.from(new Set(data.providerProgrammes.flatMap((programme) => programme.deliveryModels))).sort(), [data.providerProgrammes]);
+  const profileProvider = profileView ? data.providers.find((provider) => provider.providerId === profileView.providerId) ?? null : null;
+  const profileProgrammes = useMemo(() => {
+    if (!profileProvider) return [] as ProviderProgramme[];
+    return data.providerProgrammes
+      .filter((programme) => programme.providerId === profileProvider.providerId && programme.recordStatus === "Active")
+      .sort((left, right) => left.programmeName.localeCompare(right.programmeName));
+  }, [data.providerProgrammes, profileProvider]);
+
+  const selectedProgramme = programmeView
+    ? data.providerProgrammes.find((programme) => programme.id === programmeView.programmeId && programme.providerId === programmeView.providerId) ?? null
+    : null;
+  const selectedProgrammeProvider = selectedProgramme
+    ? data.providers.find((provider) => provider.providerId === selectedProgramme.providerId) ?? null
+    : null;
+
+  function toggleCompare(providerId: string) {
+    setCompareProviderIds((current) => current.includes(providerId) ? current.filter((item) => item !== providerId) : [...current, providerId].slice(-3));
+  }
 
   function blankProvider(): ProviderCatalogueRecord {
     return normaliseProviderRecord({
@@ -246,27 +286,42 @@ export function ProvidersModule() {
       verificationStatus: "Needs manual verification",
       sourceUrl: data.providers.find((provider) => provider.providerId === providerId)?.website ?? "",
       notes: "",
+      commercialProfile: emptyProgrammeCommercialProfile(),
       recordStatus: "Active",
       createdAt: now,
       updatedAt: now,
     });
   }
-  function openProvider(provider?: ProviderCatalogueRecord, tab: ProviderTab = "Commercial Profile") {
-    setDraft(provider ? structuredClone(provider) : blankProvider());
-    setActiveTab(tab);
+
+  function openProviderEditor(provider?: ProviderCatalogueRecord) {
+    setProviderDraft(provider ? structuredClone(provider) : blankProvider());
     setProgrammeDraft(null);
+    setError("");
+  }
+
+  function openProgrammeEditor(providerId: string, programme?: ProviderProgramme) {
+    setProgrammeDraft(programme ? structuredClone(programme) : blankProgramme(providerId));
+    setProviderDraft(null);
+    setStandardSearch("");
     setError("");
   }
 
   function submitProvider(event: FormEvent) {
     event.preventDefault();
-    if (!draft) return;
-    if (!draft.providerName.trim()) {
+    if (!providerDraft) return;
+    if (!providerDraft.providerName.trim()) {
       setError("Provider name is required.");
       return;
     }
-    saveProvider(normaliseProviderRecord({ ...draft, providerName: draft.providerName.trim(), lastVerified: todayIso() }));
-    setDraft(null);
+
+    saveProvider(
+      normaliseProviderRecord({
+        ...providerDraft,
+        providerName: providerDraft.providerName.trim(),
+        lastVerified: todayIso(),
+      }),
+    );
+    setProviderDraft(null);
     setError("");
   }
 
@@ -281,222 +336,385 @@ export function ProvidersModule() {
       setError("Select at least one linked apprenticeship standard.");
       return;
     }
-    const duplicate = data.providerProgrammes.some((programme) => programme.providerId === programmeDraft.providerId && programme.programmeName.trim().toLowerCase() === programmeDraft.programmeName.trim().toLowerCase() && programme.id !== programmeDraft.id);
+
+    const duplicate = data.providerProgrammes.some(
+      (programme) =>
+        programme.providerId === programmeDraft.providerId
+        && programme.programmeName.trim().toLowerCase() === programmeDraft.programmeName.trim().toLowerCase()
+        && programme.id !== programmeDraft.id,
+    );
     if (duplicate) {
       setError("This provider already has a programme with that name.");
       return;
     }
-    saveProviderProgramme(normaliseProviderProgramme({ ...programmeDraft, programmeName: programmeDraft.programmeName.trim(), updatedAt: nowIso() }));
+
+    saveProviderProgramme(
+      normaliseProviderProgramme({
+        ...programmeDraft,
+        programmeName: programmeDraft.programmeName.trim(),
+        updatedAt: nowIso(),
+      }),
+    );
     setProgrammeDraft(null);
-    setStandardSearch("");
     setError("");
   }
 
   function removeProgramme(programme: ProviderProgramme) {
-    if (window.confirm(`Remove ${programme.programmeName} from the provider catalogue?`)) {
+    if (window.confirm(`Remove ${programme.programmeName} from the marketplace catalogue?`)) {
       removeProviderProgramme(programme.id);
     }
   }
 
-  const providerExists = Boolean(draft && data.providers.some((provider) => provider.providerId === draft.providerId));
-  const selectedProviderCompletion = draft ? commercialProfileCompletion(draft.commercialProfile) : 0;
-  const selectedProgrammeCompletion = selectedProviderProgrammes.length ? average(selectedProviderProgrammes.map((programme) => programmeProfileCompletion(programme.commercialProfile))) : 0;
-
   return (
     <div className="grid gap-5">
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-        <SummaryCard label="Active provider partners" value={providerStats.activeProviders} copy="Organisations currently active in the controlled LevyTate partner catalogue." tone="blue" />
-        <SummaryCard label="Commercial profile completion" value={`${providerStats.providerCompletion}%`} copy="Average partner profile quality across proof points, contacts and buyer signals." tone="green" />
-        <SummaryCard label="Programme catalogue" value={providerStats.programmeCount} copy="Programme-first propositions available for employer matching and consultancy shortlists." tone="blue" />
-        <SummaryCard label="Programme readiness" value={`${providerStats.programmeCompletion}%`} copy="Average programme completeness across outcomes, audience, delivery and compliance metadata." tone="green" />
-        <SummaryCard label="Verified partners" value={providerStats.verifiedPartnerCount} copy={`${providerStats.verifiedProgrammes} programmes already verified for shortlist-ready matching.`} tone="yellow" />
+        <SummaryCard label="Marketplace partners" value={providerStats.activeProviders} copy="Active provider profiles currently visible in the LevyTate marketplace." tone="blue" />
+        <SummaryCard label="Verified providers" value={providerStats.verifiedProviders} copy="Partners already carrying a verified provider signal in the marketplace." tone="green" />
+        <SummaryCard label="Profile quality" value={`${providerStats.providerCompletion}%`} copy="Average provider profile completeness across proof, reach and buyer confidence signals." tone="green" />
+        <SummaryCard label="Live programmes" value={providerStats.liveProgrammes} copy="Programme destinations currently available to support employer discovery and matching." tone="blue" />
+        <SummaryCard label="Programme quality" value={`${providerStats.programmeCompletion}%`} copy="Average programme completeness across audience, outcomes, delivery and compliance content." tone="yellow" />
       </section>
 
-      <MvpPanel title="Provider partners" eyebrow="Commercial provider intelligence">
+      {comparisonProviders.length >= 2 ? (
+        <MvpPanel
+          title="Provider comparison"
+          eyebrow="Marketplace shortlist"
+          actions={<button type="button" onClick={() => setCompareProviderIds([])} className="inline-flex h-9 items-center rounded-full bg-[#f5f7f3] px-3 text-xs font-semibold text-[#102c3d]/64 ring-1 ring-[#102c3d]/[0.07]">Clear comparison</button>}
+        >
+          <ProviderComparison providers={comparisonProviders} programmes={data.providerProgrammes} standards={selectableStandards} onOpenProfile={(providerId) => setProfileView({ providerId })} onOpenProgramme={(providerId, programmeId) => setProgrammeView({ providerId, programmeId })} />
+        </MvpPanel>
+      ) : null}
+
+      <MvpPanel title="Provider marketplace" eyebrow="Commercial provider discovery">
         <MvpToolbar
           search={search}
           onSearch={setSearch}
-          placeholder="Search providers, sectors, technologies, outcomes or buyer signals"
+          placeholder="Search provider profiles, technologies, industries, programmes or outcomes"
           actionLabel="Add provider"
-          onAction={() => openProvider()}
-          filters={<select value={status} onChange={(event) => setStatus(event.target.value)} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-sm font-semibold"><option>Active</option><option>Archived</option><option>All</option></select>}
+          onAction={() => openProviderEditor()}
+          filters={<select value={status} onChange={(event) => setStatus(event.target.value as (typeof marketplaceFilters)[number])} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-sm font-semibold">{marketplaceFilters.map((filter) => <option key={filter}>{filter}</option>)}</select>}
         />
 
-        {visible.length ? (
+        {visibleProviders.length ? (
           <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
-            {visible.map((provider) => {
-              const programmes = data.providerProgrammes.filter((programme) => programme.providerId === provider.providerId && programme.recordStatus === "Active");
-              const verifiedCount = programmes.filter((programme) => programme.verificationStatus !== "Needs manual verification").length;
-              const completeness = commercialProfileCompletion(provider.commercialProfile);
+            {visibleProviders.map((provider) => {
+              const providerProgrammes = data.providerProgrammes.filter((programme) => programme.providerId === provider.providerId && programme.recordStatus === "Active");
+              const featuredProgramme = firstProgramme(providerProgrammes);
+              const completion = commercialProfileCompletion(provider.commercialProfile);
+              const compared = compareProviderIds.includes(provider.providerId);
               return (
-                <article key={provider.providerId} className="group rounded-2xl border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_18px_36px_rgba(16,44,61,0.045)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_42px_rgba(16,44,61,0.075)]">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="truncate text-lg font-semibold text-[#102c3d]">{provider.providerName}</p>
-                        <StatusBadge tone={statusTone(provider.status)}>{provider.status}</StatusBadge>
+                <article key={provider.providerId} className="overflow-hidden rounded-2xl border border-[#102c3d]/[0.07] bg-white shadow-[0_18px_36px_rgba(16,44,61,0.05)] transition hover:-translate-y-0.5 hover:shadow-[0_24px_48px_rgba(16,44,61,0.08)]">
+                  <div className={`bg-gradient-to-br ${providerTheme(provider.providerId)} px-5 py-5 text-white`}>
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <div className="inline-flex rounded-2xl bg-white/12 px-3 py-2 text-sm font-semibold backdrop-blur-sm">{providerWordmark(provider)}</div>
+                        <div className="mt-4 flex flex-wrap items-center gap-2">
+                          <h3 className="text-xl font-semibold">{provider.providerName}</h3>
+                          {provider.verificationStatus === "verified" ? <StatusBadge tone="green">Verified Provider</StatusBadge> : <StatusBadge tone="yellow">Under review</StatusBadge>}
+                          <StatusBadge tone="blue">{providerReachLabel(provider)}</StatusBadge>
+                        </div>
+                        <p className="mt-2 text-sm text-white/76">{provider.providerType}</p>
+                        <p className="mt-3 max-w-xl text-sm leading-6 text-white/86">{provider.commercialProfile.positioningStatement || fallbackProviderDescription(provider)}</p>
                       </div>
-                      <p className="mt-1 text-sm text-[#102c3d]/58">{provider.providerType}</p>
-                    </div>
-                    <StatusBadge tone={completeness >= 70 ? "green" : completeness >= 45 ? "yellow" : "red"}>{completeness}% complete</StatusBadge>
-                  </div>
-
-                  <p className="mt-4 text-sm leading-6 text-[#102c3d]/58">{fallbackProviderDescription(provider)}</p>
-
-                  <div className="mt-4 grid grid-cols-3 gap-2">
-                    <MetricPill icon={Building2} label="Programmes" value={programmes.length} />
-                    <MetricPill icon={BadgeCheck} label="Verified" value={verifiedCount} />
-                    <MetricPill icon={Users} label="Employer fit" value={provider.commercialProfile.employerSizesSupported[0] || provider.employerTypes[0] || "Mixed"} />
-                  </div>
-
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {provider.industries.slice(0, 3).map((item) => <Tag key={item}>{item}</Tag>)}
-                    {provider.commercialProfile.accreditations.slice(0, 2).map((item) => <Tag key={item} tone="accent">{item}</Tag>)}
-                  </div>
-
-                  <div className="mt-4 grid gap-3 rounded-2xl bg-[#f8fbfa] p-4 ring-1 ring-[#102c3d]/[0.06]">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#0b6f63]">Commercial proof</p>
-                      <div className="flex items-center gap-1 text-xs text-[#102c3d]/48"><Globe size={13} /><span>{provider.regions.slice(0, 2).join(" | ") || "Regions to confirm"}</span></div>
-                    </div>
-                    <div className="grid gap-2 text-sm text-[#102c3d]/62">
-                      <ProofRow icon={Trophy} label="Awards" value={provider.commercialProfile.awards[0] || "Awards to confirm"} />
-                      <ProofRow icon={ShieldCheck} label="Delivery" value={provider.deliveryModels.slice(0, 2).join(", ") || "Delivery models to confirm"} />
-                      <ProofRow icon={Star} label="Buyer note" value={provider.commercialProfile.pricingNotes || provider.commercialProfile.commercialNotes || "Commercial notes to confirm"} />
+                      <StatusBadge tone={completion >= 70 ? "green" : completion >= 45 ? "yellow" : "red"}>{completion}% complete</StatusBadge>
                     </div>
                   </div>
 
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <TableAction onClick={() => openProvider(provider)}>Manage profile</TableAction>
-                    <TableAction onClick={() => openProvider(provider, "Programmes")}>Open programmes</TableAction>
-                    <TableAction onClick={() => archiveProvider(provider.providerId)} danger={provider.status === "Active"}>{provider.status === "Archived" ? "Restore" : "Archive"}</TableAction>
+                  <div className="grid gap-4 p-5">
+                    <p className="text-sm leading-6 text-[#102c3d]/58">{fallbackProviderDescription(provider)}</p>
+
+                    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+                      <MetricTile label="Years" value={provider.commercialProfile.yearsEstablished || "To confirm"} />
+                      <MetricTile label="Learners" value={provider.commercialProfile.learnerNumbers || "To confirm"} />
+                      <MetricTile label="Partners" value={provider.commercialProfile.employerPartners || "To confirm"} />
+                      <MetricTile label="Achievement" value={provider.commercialProfile.achievementRate || "To confirm"} />
+                    </div>
+
+                    <div className="grid gap-3 rounded-2xl bg-[#f8fbfa] p-4 ring-1 ring-[#102c3d]/[0.06]">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#c95568]">Featured programme</p>
+                          <p className="mt-1 text-sm font-semibold text-[#102c3d]">{featuredProgramme?.programmeName ?? "Programme to confirm"}</p>
+                        </div>
+                        {featuredProgramme ? <StatusBadge tone={programmeTone(featuredProgramme.status)}>{featuredProgramme.status}</StatusBadge> : null}
+                      </div>
+                      <p className="text-sm leading-6 text-[#102c3d]/58">{featuredProgramme?.commercialProfile.tagline || featuredProgramme?.shortDescription || "Programme proposition to confirm"}</p>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      {provider.industries.slice(0, 3).map((item) => <Tag key={item}>{item}</Tag>)}
+                      {provider.technologies.slice(0, 2).map((item) => <Tag key={item}>{item}</Tag>)}
+                      {provider.commercialProfile.accreditations.slice(0, 2).map((item) => <Tag key={item} tone="accent">{item}</Tag>)}
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <TableAction onClick={() => setProfileView({ providerId: provider.providerId })}>Open profile</TableAction>
+                      <TableAction onClick={() => toggleCompare(provider.providerId)}>{compared ? "Remove from compare" : "Compare provider"}</TableAction>
+                      {featuredProgramme ? <TableAction onClick={() => setProgrammeView({ providerId: provider.providerId, programmeId: featuredProgramme.id })}>View programme</TableAction> : null}
+                      <TableAction onClick={() => openProviderEditor(provider)}>Edit record</TableAction>
+                      <TableAction onClick={() => archiveProvider(provider.providerId)} danger={provider.status === "Active"}>{provider.status === "Archived" ? "Restore" : "Archive"}</TableAction>
+                    </div>
                   </div>
                 </article>
               );
             })}
           </div>
-        ) : <EmptyState title="No providers added yet" copy="Add a provider partner to start building a premium programme-led directory for employer matching." actionLabel="Add provider" onAction={() => openProvider()} />}
+        ) : (
+          <EmptyState title="No provider profiles yet" copy="Add a provider partner to begin building LevyTate's premium employer-facing provider marketplace." actionLabel="Add provider" onAction={() => openProviderEditor()} />
+        )}
       </MvpPanel>
 
-      {draft ? (
-        <MvpModal title={providerExists ? draft.providerName || "Provider profile" : "Add provider partner"} eyebrow="Commercial partner management" onClose={() => setDraft(null)} wide>
-          <div className="flex gap-1 overflow-x-auto border-b border-[#102c3d]/[0.07]" role="tablist" aria-label="Provider editor">
-            {tabs.map((tab) => <button key={tab} type="button" role="tab" aria-selected={activeTab === tab} disabled={!providerExists && tab === "Programmes"} onClick={() => { setActiveTab(tab); setProgrammeDraft(null); setError(""); }} className={`border-b-2 px-4 py-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-35 ${activeTab === tab ? "border-[#159b8f] text-[#102c3d]" : "border-transparent text-[#102c3d]/48 hover:text-[#102c3d]"}`}>{tab}</button>)}
-          </div>
-          {activeTab === "Commercial Profile" ? (
-            <form onSubmit={submitProvider} className="grid gap-5 pt-5 lg:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.85fr)]">
-              <div className="grid gap-4">
-                <FormSection title="Core identity" copy="Capture the provider identity and the commercial details LevyTate carries into matching.">
-                  <FormGrid>
-                    <FormField label="Provider name" value={draft.providerName} onChange={(value) => setDraft({ ...draft, providerName: value })} required />
-                    <FormSelect label="Provider type" value={draft.providerType} onChange={(value) => setDraft({ ...draft, providerType: value as ProviderType })} options={providerTypes} />
-                    <FormField label="Website" value={draft.website} onChange={(value) => setDraft({ ...draft, website: value })} />
-                    <FormField label="Ofsted rating" value={draft.ofstedRating} onChange={(value) => setDraft({ ...draft, ofstedRating: value })} />
-                    <FormField label="Primary contact" value={draft.contactName} onChange={(value) => setDraft({ ...draft, contactName: value })} />
-                    <FormField label="Primary contact email" type="email" value={draft.contactEmail} onChange={(value) => setDraft({ ...draft, contactEmail: value })} />
-                    <FormTextArea label="Organisation description" value={draft.commercialProfile.organisationDescription} onChange={(value) => setDraft({ ...draft, commercialProfile: { ...draft.commercialProfile, organisationDescription: value } })} rows={4} wide />
-                  </FormGrid>
-                </FormSection>
-                <FormSection title="Commercial proof" copy="Use these signals to make provider credibility obvious to employers and internal reviewers.">
-                  <FormGrid>
-                    <FormField label="Years established" value={draft.commercialProfile.yearsEstablished} onChange={(value) => setDraft({ ...draft, commercialProfile: { ...draft.commercialProfile, yearsEstablished: value } })} />
-                    <FormField label="Learner numbers" value={draft.commercialProfile.learnerNumbers} onChange={(value) => setDraft({ ...draft, commercialProfile: { ...draft.commercialProfile, learnerNumbers: value } })} />
-                    <FormField label="Achievement rate" value={draft.commercialProfile.achievementRate} onChange={(value) => setDraft({ ...draft, commercialProfile: { ...draft.commercialProfile, achievementRate: value } })} />
-                    <FormField label="Employer satisfaction" value={draft.commercialProfile.employerSatisfaction} onChange={(value) => setDraft({ ...draft, commercialProfile: { ...draft.commercialProfile, employerSatisfaction: value } })} />
-                    <FormTagInput label="Awards" values={draft.commercialProfile.awards} onChange={(value) => setDraft({ ...draft, commercialProfile: { ...draft.commercialProfile, awards: value } })} wide />
-                    <FormTagInput label="Accreditations" values={draft.commercialProfile.accreditations} onChange={(value) => setDraft({ ...draft, commercialProfile: { ...draft.commercialProfile, accreditations: value } })} wide />
-                    <FormTagInput label="Case studies" values={draft.commercialProfile.caseStudies} onChange={(value) => setDraft({ ...draft, commercialProfile: { ...draft.commercialProfile, caseStudies: value } })} wide />
-                    <FormTagInput label="Testimonials" values={draft.commercialProfile.testimonials} onChange={(value) => setDraft({ ...draft, commercialProfile: { ...draft.commercialProfile, testimonials: value } })} wide />
-                  </FormGrid>
-                </FormSection>
-                <FormSection title="Capability profile" copy="These structured tags drive programme-first search and provider matching.">
-                  <FormGrid>
-                    <FormTagInput label="Sectors" values={draft.sectors} onChange={(value) => setDraft({ ...draft, sectors: value })} wide />
-                    <FormTagInput label="Industries" values={draft.industries} onChange={(value) => setDraft({ ...draft, industries: value })} wide />
-                    <FormTagInput label="Technologies" values={draft.technologies} onChange={(value) => setDraft({ ...draft, technologies: value })} wide />
-                    <FormTagInput label="Delivery models" values={draft.deliveryModels} onChange={(value) => setDraft({ ...draft, deliveryModels: value })} wide />
-                    <FormTagInput label="Regions" values={draft.regions} onChange={(value) => setDraft({ ...draft, regions: value })} wide />
-                    <FormTagInput label="Employer sizes supported" values={draft.commercialProfile.employerSizesSupported} onChange={(value) => setDraft({ ...draft, commercialProfile: { ...draft.commercialProfile, employerSizesSupported: value } })} wide />
-                    <FormTagInput label="Specialisms" values={draft.specialisms} onChange={(value) => setDraft({ ...draft, specialisms: value })} wide />
-                    <FormTextArea label="Pricing notes" value={draft.commercialProfile.pricingNotes} onChange={(value) => setDraft({ ...draft, commercialProfile: { ...draft.commercialProfile, pricingNotes: value } })} rows={3} wide />
-                    <FormTextArea label="Commercial notes" value={draft.commercialProfile.commercialNotes} onChange={(value) => setDraft({ ...draft, commercialProfile: { ...draft.commercialProfile, commercialNotes: value } })} rows={3} wide />
-                  </FormGrid>
-                </FormSection>
-                <FormActions onCancel={() => setDraft(null)} label="Save provider profile" error={error} />
-              </div>
-              <div className="grid gap-4 self-start">
-                <ProviderPreviewCard provider={draft} programmeCount={selectedProviderProgrammes.length} completion={selectedProviderCompletion} />
-                <InsightCard eyebrow="LevyTate view" title="Buyer confidence" copy="Use this profile to explain why the provider belongs in a controlled shortlist." items={[`${selectedProviderProgrammes.length} programme records available`, `${draft.commercialProfile.accreditations.length || draft.specialisms.length} trust signals captured`, draft.commercialProfile.commercialNotes || "No internal commercial note yet"]} />
-              </div>
-            </form>
-          ) : null}
+      {profileProvider ? (
+        <MvpModal title={profileProvider.providerName} eyebrow="Provider marketplace profile" onClose={() => setProfileView(null)} wide>
+          <ProviderProfileModal provider={profileProvider} programmes={profileProgrammes} standards={selectableStandards} onEdit={() => { setProfileView(null); openProviderEditor(profileProvider); }} onEditProgrammes={() => { setProfileView(null); openProgrammeEditor(profileProvider.providerId); }} onOpenProgramme={(programmeId) => setProgrammeView({ providerId: profileProvider.providerId, programmeId })} />
+        </MvpModal>
+      ) : null}
 
-          {activeTab === "Internal Notes" ? (
-            <form onSubmit={submitProvider} className="pt-5">
-              <FormTextArea label="Internal notes" value={draft.notes} onChange={(value) => setDraft({ ...draft, notes: value })} rows={8} wide />
-              <FormActions onCancel={() => setDraft(null)} label="Save notes" error={error} />
-            </form>
-          ) : null}
+      {selectedProgramme && selectedProgrammeProvider ? (
+        <MvpModal title={selectedProgramme.programmeName} eyebrow="Programme destination" onClose={() => setProgrammeView(null)} wide>
+          <ProgrammeDestination programme={selectedProgramme} provider={selectedProgrammeProvider} standard={programmePrimaryStandard(selectedProgramme, selectableStandards)} onEdit={() => { setProgrammeView(null); openProgrammeEditor(selectedProgramme.providerId, selectedProgramme); }} />
+        </MvpModal>
+      ) : null}
 
-          {activeTab === "Programmes" ? (
-            <div className="grid gap-5 pt-5">
-              <section className="grid gap-3 md:grid-cols-3">
-                <SummaryCard label="Programmes" value={selectedProviderProgrammes.length} copy="Active propositions currently linked to this provider partner." tone="blue" />
-                <SummaryCard label="Programme completeness" value={`${selectedProgrammeCompletion}%`} copy="How well the programme pages tell an employer-facing proposition." tone="green" />
-                <SummaryCard label="Verified shortlist-ready" value={selectedProviderProgrammes.filter((programme) => programme.verificationStatus !== "Needs manual verification").length} copy="Programmes already ready to appear in controlled LevyTate matching." tone="yellow" />
-              </section>
-              {programmeDraft ? (
-                <ProgrammeEditor draft={programmeDraft} onDraft={setProgrammeDraft} standardSearch={standardSearch} onStandardSearch={setStandardSearch} onSubmit={submitProgramme} onCancel={() => { setProgrammeDraft(null); setError(""); }} error={error} />
-              ) : (
-                <>
-                  <div className="grid gap-3 xl:grid-cols-[minmax(220px,1fr)_repeat(4,minmax(120px,auto))_auto]">
-                    <label className="flex h-10 min-w-0 items-center gap-2 rounded-lg border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3"><Search size={15} className="text-[#102c3d]/38" /><input value={programmeSearch} onChange={(event) => setProgrammeSearch(event.target.value)} placeholder="Search programmes, roles or outcomes" className="min-w-0 flex-1 bg-transparent text-sm outline-none" /></label>
-                    <select value={levelFilter} onChange={(event) => setLevelFilter(event.target.value)} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-xs font-semibold"><option>All</option>{[2, 3, 4, 5, 6, 7].map((level) => <option key={level} value={String(level)}>Level {level}</option>)}</select>
-                    <select value={routeFilter} onChange={(event) => setRouteFilter(event.target.value)} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-xs font-semibold"><option>All</option>{allRoutes.map((route) => <option key={route}>{route}</option>)}</select>
-                    <select value={deliveryFilter} onChange={(event) => setDeliveryFilter(event.target.value)} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-xs font-semibold"><option>All</option>{allDeliveryModels.map((delivery) => <option key={delivery}>{delivery}</option>)}</select>
-                    <select value={programmeStatusFilter} onChange={(event) => setProgrammeStatusFilter(event.target.value)} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-xs font-semibold"><option>All</option>{programmeStatuses.map((item) => <option key={item}>{item}</option>)}</select>
-                    <button type="button" onClick={() => setProgrammeDraft(blankProgramme(draft.providerId))} className="h-10 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white">Add programme</button>
-                  </div>
-                  {selectedProviderProgrammes.length ? (
-                    <div className="grid gap-4 xl:grid-cols-2">
-                      {selectedProviderProgrammes.map((programme) => {
-                        const standard = programmePrimaryStandard(programme, selectableStandards);
-                        const completion = programmeProfileCompletion(programme.commercialProfile);
-                        return (
-                          <article key={programme.id} className={`rounded-2xl border border-[#102c3d]/[0.07] bg-white p-4 shadow-[0_16px_34px_rgba(16,44,61,0.045)] ${programme.recordStatus === "Archived" ? "opacity-60" : ""}`}>
-                            <div className="flex items-start justify-between gap-4">
-                              <div className="min-w-0">
-                                <div className="flex flex-wrap items-center gap-2"><p className="truncate text-base font-semibold text-[#102c3d]">{programme.programmeName}</p><StatusBadge tone={programmeTone(programme.status)}>{programme.status}</StatusBadge></div>
-                                <p className="mt-1 text-sm text-[#0b6f63]">{programme.commercialProfile.tagline || programme.shortDescription}</p>
-                              </div>
-                              <StatusBadge tone={completion >= 70 ? "green" : completion >= 45 ? "yellow" : "red"}>{completion}% complete</StatusBadge>
-                            </div>
-                            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                              <ProgrammeFact label="Linked standard" value={programme.linkedStandardName || standard?.title || "Not linked"} />
-                              <ProgrammeFact label="Funding route" value={programme.fundingRoute} />
-                              <ProgrammeFact label="Delivery" value={programme.deliveryModels.join(", ") || "To confirm"} />
-                              <ProgrammeFact label="Confidence" value={programme.commercialProfile.confidenceLabel || "High"} />
-                            </div>
-                            <div className="mt-4"><p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#102c3d]/42">Employer benefits</p><div className="mt-2 flex flex-wrap gap-2">{fallbackProgrammeHighlights(programme).slice(0, 4).map((item) => <Tag key={item}>{item}</Tag>)}</div></div>
-                            <div className="mt-4 flex flex-wrap gap-2">
-                              <TableAction onClick={() => { setProgrammeDraft({ ...programme }); setStandardSearch(standard?.title ?? ""); }}>Edit programme</TableAction>
-                              <TableAction onClick={() => archiveProviderProgramme(programme.id)} danger={programme.recordStatus !== "Archived"}>{programme.recordStatus === "Archived" ? "Restore" : "Archive"}</TableAction>
-                              <TableAction onClick={() => removeProgramme(programme)} danger>Remove</TableAction>
-                            </div>
-                          </article>
-                        );
-                      })}
-                    </div>
-                  ) : <EmptyState title="No programmes match these filters" copy="Add a branded programme proposition or widen the current filters." actionLabel="Add programme" onAction={() => setProgrammeDraft(blankProgramme(draft.providerId))} />}
-                </>
-              )}
+      {providerDraft ? (
+        <MvpModal title={providerDraft.providerName || "Add provider partner"} eyebrow="Marketplace record" onClose={() => setProviderDraft(null)} wide>
+          <form onSubmit={submitProvider} className="grid gap-5 lg:grid-cols-[minmax(0,1.3fr)_360px]">
+            <div className="grid gap-4">
+              <FormSection title="Core identity" copy="Capture the provider positioning LevyTate will use in the marketplace.">
+                <FormGrid>
+                  <FormField label="Provider name" value={providerDraft.providerName} onChange={(value) => setProviderDraft({ ...providerDraft, providerName: value })} required />
+                  <FormSelect label="Provider type" value={providerDraft.providerType} onChange={(value) => setProviderDraft({ ...providerDraft, providerType: value as ProviderType })} options={providerTypes} />
+                  <FormField label="Website" value={providerDraft.website} onChange={(value) => setProviderDraft({ ...providerDraft, website: value })} />
+                  <FormField label="Ofsted" value={providerDraft.ofstedRating} onChange={(value) => setProviderDraft({ ...providerDraft, ofstedRating: value })} />
+                  <FormField label="Positioning statement" value={providerDraft.commercialProfile.positioningStatement} onChange={(value) => setProviderDraft({ ...providerDraft, commercialProfile: { ...providerDraft.commercialProfile, positioningStatement: value } })} wide />
+                  <FormTextArea label="Provider summary" value={providerDraft.commercialProfile.organisationDescription} onChange={(value) => setProviderDraft({ ...providerDraft, commercialProfile: { ...providerDraft.commercialProfile, organisationDescription: value } })} rows={4} wide />
+                </FormGrid>
+              </FormSection>
+
+              <FormSection title="Trust and reach" copy="These metrics help employers understand scale, quality and commercial confidence quickly.">
+                <FormGrid>
+                  <FormField label="Years established" value={providerDraft.commercialProfile.yearsEstablished} onChange={(value) => setProviderDraft({ ...providerDraft, commercialProfile: { ...providerDraft.commercialProfile, yearsEstablished: value } })} />
+                  <FormField label="Learner numbers" value={providerDraft.commercialProfile.learnerNumbers} onChange={(value) => setProviderDraft({ ...providerDraft, commercialProfile: { ...providerDraft.commercialProfile, learnerNumbers: value } })} />
+                  <FormField label="Employer partners" value={providerDraft.commercialProfile.employerPartners} onChange={(value) => setProviderDraft({ ...providerDraft, commercialProfile: { ...providerDraft.commercialProfile, employerPartners: value } })} />
+                  <FormField label="Achievement rate" value={providerDraft.commercialProfile.achievementRate} onChange={(value) => setProviderDraft({ ...providerDraft, commercialProfile: { ...providerDraft.commercialProfile, achievementRate: value } })} />
+                  <FormField label="Employer satisfaction" value={providerDraft.commercialProfile.employerSatisfaction} onChange={(value) => setProviderDraft({ ...providerDraft, commercialProfile: { ...providerDraft.commercialProfile, employerSatisfaction: value } })} />
+                  <FormField label="Learner satisfaction" value={providerDraft.commercialProfile.learnerSatisfaction} onChange={(value) => setProviderDraft({ ...providerDraft, commercialProfile: { ...providerDraft.commercialProfile, learnerSatisfaction: value } })} />
+                  <FormTagInput label="Accreditations" values={providerDraft.commercialProfile.accreditations} onChange={(value) => setProviderDraft({ ...providerDraft, commercialProfile: { ...providerDraft.commercialProfile, accreditations: value } })} wide />
+                  <FormTagInput label="Awards" values={providerDraft.commercialProfile.awards} onChange={(value) => setProviderDraft({ ...providerDraft, commercialProfile: { ...providerDraft.commercialProfile, awards: value } })} wide />
+                </FormGrid>
+              </FormSection>
+
+              <FormSection title="Marketplace fit" copy="These tags drive filtering, discovery and buyer relevance.">
+                <FormGrid>
+                  <FormTagInput label="Industries" values={providerDraft.industries} onChange={(value) => setProviderDraft({ ...providerDraft, industries: value })} wide />
+                  <FormTagInput label="Technologies" values={providerDraft.technologies} onChange={(value) => setProviderDraft({ ...providerDraft, technologies: value })} wide />
+                  <FormTagInput label="Specialisms" values={providerDraft.specialisms} onChange={(value) => setProviderDraft({ ...providerDraft, specialisms: value })} wide />
+                  <FormTagInput label="Delivery methods" values={providerDraft.deliveryModels} onChange={(value) => setProviderDraft({ ...providerDraft, deliveryModels: value })} wide />
+                  <FormTagInput label="Regions" values={providerDraft.regions} onChange={(value) => setProviderDraft({ ...providerDraft, regions: value })} wide />
+                  <FormTagInput label="Employer sizes" values={providerDraft.commercialProfile.employerSizesSupported} onChange={(value) => setProviderDraft({ ...providerDraft, commercialProfile: { ...providerDraft.commercialProfile, employerSizesSupported: value } })} wide />
+                  <FormTagInput label="Case studies" values={providerDraft.commercialProfile.caseStudies} onChange={(value) => setProviderDraft({ ...providerDraft, commercialProfile: { ...providerDraft.commercialProfile, caseStudies: value } })} wide />
+                  <FormTagInput label="Testimonials" values={providerDraft.commercialProfile.testimonials} onChange={(value) => setProviderDraft({ ...providerDraft, commercialProfile: { ...providerDraft.commercialProfile, testimonials: value } })} wide />
+                  <FormTagInput label="Downloads" values={downloadLabels(providerDraft.commercialProfile.downloads)} onChange={(value) => setProviderDraft({ ...providerDraft, commercialProfile: { ...providerDraft.commercialProfile, downloads: labelsToLinks(value) } })} wide />
+                  <FormTextArea label="Pricing notes" value={providerDraft.commercialProfile.pricingNotes} onChange={(value) => setProviderDraft({ ...providerDraft, commercialProfile: { ...providerDraft.commercialProfile, pricingNotes: value } })} rows={3} wide />
+                  <FormTextArea label="Commercial notes" value={providerDraft.commercialProfile.commercialNotes} onChange={(value) => setProviderDraft({ ...providerDraft, commercialProfile: { ...providerDraft.commercialProfile, commercialNotes: value } })} rows={3} wide />
+                </FormGrid>
+              </FormSection>
+
+              <FormActions onCancel={() => setProviderDraft(null)} label="Save provider profile" error={error} />
             </div>
-          ) : null}
+
+            <div className="grid gap-4 self-start">
+              <ProviderHeroCard provider={providerDraft} programmeCount={data.providerProgrammes.filter((programme) => programme.providerId === providerDraft.providerId && programme.recordStatus === "Active").length} />
+              <MarketplaceSignalCard title="Buyer confidence" copy="Use this preview to keep the provider record sounding commercial, clear and employer-ready." items={[providerDraft.commercialProfile.positioningStatement || "Add a sharper marketplace positioning statement", providerDraft.commercialProfile.pricingNotes || "Add a brief commercial fit note", `${commercialProfileCompletion(providerDraft.commercialProfile)}% profile completeness`]} />
+            </div>
+          </form>
+        </MvpModal>
+      ) : null}
+
+      {programmeDraft ? (
+        <MvpModal title={programmeDraft.programmeName || "Add programme"} eyebrow="Programme catalogue" onClose={() => setProgrammeDraft(null)} wide>
+          <ProgrammeEditor draft={programmeDraft} onDraft={setProgrammeDraft} standardSearch={standardSearch} onStandardSearch={setStandardSearch} onSubmit={submitProgramme} onCancel={() => setProgrammeDraft(null)} onArchive={() => archiveProviderProgramme(programmeDraft.id)} onRemove={() => removeProgramme(programmeDraft)} error={error} standards={selectableStandards} />
         </MvpModal>
       ) : null}
     </div>
   );
 }
+
+function ProviderProfileModal({
+  provider,
+  programmes,
+  standards,
+  onEdit,
+  onEditProgrammes,
+  onOpenProgramme,
+}: {
+  provider: ProviderCatalogueRecord;
+  programmes: ProviderProgramme[];
+  standards: ApprenticeshipStandard[];
+  onEdit: () => void;
+  onEditProgrammes: () => void;
+  onOpenProgramme: (programmeId: string) => void;
+}) {
+  return (
+    <div className="grid gap-5">
+      <section className={`overflow-hidden rounded-3xl bg-gradient-to-br ${providerTheme(provider.providerId)} text-white shadow-[0_22px_54px_rgba(16,44,61,0.16)]`}>
+        <div className="grid gap-6 px-6 py-6 lg:grid-cols-[minmax(0,1fr)_260px] lg:px-7">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge tone={provider.verificationStatus === "verified" ? "green" : "yellow"}>{provider.verificationStatus === "verified" ? "Verified Provider" : "Profile under review"}</StatusBadge>
+              <StatusBadge tone="blue">{provider.providerType}</StatusBadge>
+              <StatusBadge tone="blue">{providerReachLabel(provider)}</StatusBadge>
+            </div>
+            <div className="mt-5 inline-flex rounded-2xl bg-white/12 px-4 py-3 text-lg font-semibold backdrop-blur-sm">{providerWordmark(provider)}</div>
+            <h3 className="mt-5 text-3xl font-semibold tracking-[-0.03em]">{provider.providerName}</h3>
+            <p className="mt-3 max-w-3xl text-base leading-7 text-white/84">{provider.commercialProfile.positioningStatement || fallbackProviderDescription(provider)}</p>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-white/72">{fallbackProviderDescription(provider)}</p>
+            <div className="mt-5 flex flex-wrap gap-2">
+              {provider.industries.slice(0, 4).map((item) => <Tag key={item}>{item}</Tag>)}
+              {provider.commercialProfile.accreditations.slice(0, 3).map((item) => <Tag key={item} tone="accent">{item}</Tag>)}
+            </div>
+          </div>
+
+          <div className="grid gap-3 self-start rounded-3xl bg-white/10 p-4 backdrop-blur-sm ring-1 ring-white/10">
+            <MetricTile inverse label="Years established" value={provider.commercialProfile.yearsEstablished || "To confirm"} />
+            <MetricTile inverse label="Learner numbers" value={provider.commercialProfile.learnerNumbers || "To confirm"} />
+            <MetricTile inverse label="Employer partners" value={provider.commercialProfile.employerPartners || "To confirm"} />
+            <MetricTile inverse label="Achievement rate" value={provider.commercialProfile.achievementRate || "To confirm"} />
+          </div>
+        </div>
+      </section>
+
+      <div className="flex flex-wrap gap-2">
+        <TableAction onClick={onEdit}>Edit profile</TableAction>
+        <TableAction onClick={onEditProgrammes}>Manage programmes</TableAction>
+      </div>
+
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
+        <div className="grid gap-5">
+          <InfoSection title="Provider summary" copy={fallbackProviderDescription(provider)} />
+          <InfoChips title="Delivery and regions" icon={MapPin} items={[...provider.deliveryModels, ...provider.regions]} />
+          <InfoChips title="Industries and technologies" icon={Layers3} items={[...provider.industries, ...provider.technologies]} />
+          <InfoChips title="Specialisms and employer fit" icon={BriefcaseBusiness} items={[...provider.specialisms, ...provider.commercialProfile.employerSizesSupported]} />
+        </div>
+
+        <div className="grid gap-5">
+          <MarketplaceSignalCard title="Trust signals" copy="Use these proof points when explaining why the provider belongs on a controlled employer shortlist." items={[provider.commercialProfile.employerSatisfaction || "Employer satisfaction to confirm", provider.commercialProfile.learnerSatisfaction || "Learner satisfaction to confirm", provider.ofstedRating || "Ofsted to confirm"]} />
+          <InfoChips title="Accreditations" icon={ShieldCheck} items={provider.commercialProfile.accreditations} />
+          <InfoChips title="Awards" icon={Award} items={provider.commercialProfile.awards} />
+        </div>
+      </section>
+
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
+        <MarketplaceSignalCard title="Case studies and testimonials" copy="These seeded stories help the marketplace feel commercially credible during demonstrations." items={[...provider.commercialProfile.caseStudies, ...provider.commercialProfile.testimonials]} />
+        <MarketplaceSignalCard title="Downloads, video and contact" copy="Keep the marketplace ready for future partner enablement and sales follow-up." items={[
+          ...downloadLabels(provider.commercialProfile.downloads),
+          provider.commercialProfile.videoUrl ? `Video: ${provider.commercialProfile.videoUrl}` : "Video placeholder ready",
+          `${provider.commercialProfile.commercialContactName || provider.contactName || "Primary contact"} | ${provider.commercialProfile.commercialContactTitle || provider.commercialProfile.primaryContactTitle || "Relationship lead"}`,
+          provider.commercialProfile.commercialContactEmail || provider.contactEmail || "Contact email to confirm",
+        ]} />
+      </section>
+
+      <MvpPanel title="Programme catalogue" eyebrow="Employer-facing programme destinations">
+        {programmes.length ? (
+          <div className="grid gap-4 xl:grid-cols-2">
+            {programmes.map((programme) => (
+              <ProgrammeMarketplaceCard key={programme.id} programme={programme} provider={provider} standard={programmePrimaryStandard(programme, standards)} onOpen={() => onOpenProgramme(programme.id)} />
+            ))}
+          </div>
+        ) : (
+          <EmptyState title="No programmes yet" copy="Add programme destinations so employers can understand the real commercial proposition behind this provider." actionLabel="Manage programmes" onAction={onEditProgrammes} />
+        )}
+      </MvpPanel>
+    </div>
+  );
+}
+
+function ProgrammeDestination({
+  programme,
+  provider,
+  standard,
+  onEdit,
+}: {
+  programme: ProviderProgramme;
+  provider: ProviderCatalogueRecord;
+  standard?: ApprenticeshipStandard;
+  onEdit: () => void;
+}) {
+  return (
+    <div className="grid gap-5">
+      <section className="overflow-hidden rounded-3xl border border-[#102c3d]/[0.07] bg-white shadow-[0_18px_40px_rgba(16,44,61,0.06)]">
+        <div className="grid gap-6 px-6 py-6 lg:grid-cols-[minmax(0,1fr)_280px] lg:px-7">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge tone={programmeTone(programme.status)}>{programme.status}</StatusBadge>
+              <StatusBadge tone={programme.verificationStatus === "Needs manual verification" ? "yellow" : "green"}>{programme.verificationStatus === "Needs manual verification" ? "Verification pending" : "Verified for shortlist"}</StatusBadge>
+              <StatusBadge tone="blue">{provider.providerName}</StatusBadge>
+            </div>
+            <h3 className="mt-5 text-3xl font-semibold tracking-[-0.03em] text-[#102c3d]">{programme.programmeName}</h3>
+            <p className="mt-3 text-base font-medium text-[#0b6f63]">{programme.commercialProfile.tagline || "Programme proposition to confirm"}</p>
+            <p className="mt-4 max-w-3xl text-sm leading-7 text-[#102c3d]/60">{programme.fullDescription || programme.shortDescription}</p>
+            <div className="mt-5 flex flex-wrap gap-2">
+              {programme.targetIndustries.slice(0, 3).map((item) => <Tag key={item}>{item}</Tag>)}
+              {programme.technologiesCovered.slice(0, 3).map((item) => <Tag key={item}>{item}</Tag>)}
+              {programme.businessProblemsSolved.slice(0, 2).map((item) => <Tag key={item} tone="accent">{item}</Tag>)}
+            </div>
+          </div>
+          <div className="grid gap-3 self-start rounded-3xl bg-[#f8fbfa] p-4 ring-1 ring-[#102c3d]/[0.06]">
+            <MetricTile label="Delivery" value={programme.deliveryModels.join(", ") || "To confirm"} />
+            <MetricTile label="Duration" value={programme.duration || "To confirm"} />
+            <MetricTile label="Employer fit" value={programme.employerSize} />
+            <MetricTile label="Confidence" value={programme.commercialProfile.confidenceLabel || "High"} />
+          </div>
+        </div>
+      </section>
+
+      <div className="flex flex-wrap gap-2">
+        <TableAction onClick={onEdit}>Edit programme</TableAction>
+      </div>
+
+      <section className="grid gap-5 xl:grid-cols-2">
+        <InfoSection title="Who this programme is for" copy={programme.commercialProfile.idealAudience || "Audience description to confirm."} />
+        <InfoSection title="Business challenges solved" copy={(programme.businessProblemsSolved.length ? programme.businessProblemsSolved : ["Business challenge positioning to confirm"]).join(" / ")} />
+        <InfoChips title="Target roles" icon={Users} items={programme.targetJobRoles} />
+        <InfoChips title="Technologies" icon={Layers3} items={programme.technologiesCovered} />
+        <InfoChips title="Skills developed" icon={Sparkles} items={programme.skillsDeveloped} />
+        <InfoChips title="Expected outcomes" icon={CheckCircle2} items={programme.expectedOutcomes} />
+        <InfoSection title="Employer commitment" copy={programme.commercialProfile.employerCommitment || "Employer commitment to confirm."} />
+        <InfoSection title="Assessment approach" copy={programme.commercialProfile.assessmentApproach || "Assessment approach to confirm."} />
+        <InfoChips title="Progression routes" icon={ArrowUpRight} items={programme.commercialProfile.progressionRoutes} />
+        <InfoChips title="Case studies and FAQs" icon={Star} items={[...programme.commercialProfile.caseStudies, ...programme.commercialProfile.faqs]} />
+      </section>
+
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <MarketplaceSignalCard title="Employer value" copy="This programme should lead with employer outcomes, not the standard." items={programme.commercialProfile.employerBenefits.length ? programme.commercialProfile.employerBenefits : programme.expectedOutcomes} />
+        <div className="rounded-2xl border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_14px_32px_rgba(16,44,61,0.045)]">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">Funding and compliance</p>
+          <h4 className="mt-2 text-base font-semibold text-[#102c3d]">{standard?.title || programme.linkedStandardName || "Linked standard to confirm"}</h4>
+          <p className="mt-1 text-sm text-[#102c3d]/56">{standard ? `${standard.referenceCode} ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ Level ${standard.level}` : "Standard metadata will appear here once linked."}</p>
+          <p className="mt-3 text-sm text-[#102c3d]/60">{standard ? formatFundingBand(standard) : programme.fundingRoute}</p>
+          <div className="mt-4 grid gap-2 text-sm text-[#102c3d]/58">
+            {(programme.commercialProfile.downloads.length ? downloadLabels(programme.commercialProfile.downloads) : ["Download placeholders ready for future provider enablement"]).map((item) => <div key={item} className="flex items-center gap-2"><Download size={14} className="text-[#0b8e82]" />{item}</div>)}
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+
+type ProgrammeEditorProps = {
+  draft: ProviderProgramme;
+  onDraft: (draft: ProviderProgramme) => void;
+  standardSearch: string;
+  onStandardSearch: (value: string) => void;
+  onSubmit: (event: FormEvent) => void;
+  onCancel: () => void;
+  onArchive: () => void;
+  onRemove: () => void;
+  error: string;
+  standards: ApprenticeshipStandard[];
+};
+
 function ProgrammeEditor({
   draft,
   onDraft,
@@ -504,117 +722,407 @@ function ProgrammeEditor({
   onStandardSearch,
   onSubmit,
   onCancel,
+  onArchive,
+  onRemove,
   error,
-}: {
-  draft: ProviderProgramme;
-  onDraft: (draft: ProviderProgramme) => void;
-  standardSearch: string;
-  onStandardSearch: (value: string) => void;
-  onSubmit: (event: FormEvent) => void;
-  onCancel: () => void;
-  error: string;
-}) {
-  const { search: searchStandards } = useLevyTateStandards();
-  const selectedStandard = getApprenticeshipStandard(draft.linkedStandardIds[0] ?? "");
-  const options = searchStandards(standardSearch, { programmeType: "Apprenticeship standard" }).slice(0, 16);
-  const completion = programmeProfileCompletion(draft.commercialProfile);
+  standards,
+}: ProgrammeEditorProps) {
+  const selectedStandards = useMemo(
+    () => draft.linkedStandardIds.map((id) => standards.find((standard) => standard.id === id)).filter(Boolean) as ApprenticeshipStandard[],
+    [draft.linkedStandardIds, standards],
+  );
 
-  function selectStandard(standardId: string) {
-    onDraft(normaliseProviderProgramme({ ...draft, linkedStandardIds: [standardId] }));
-    const standard = getApprenticeshipStandard(standardId);
-    onStandardSearch(standard?.title ?? "");
+  const filteredStandards = useMemo(() => {
+    const query = standardSearch.trim().toLowerCase();
+    return standards
+      .filter((standard) => {
+        if (!query) return true;
+        const jobTitles = (standard.jobTitles ?? []).join(" ").toLowerCase();
+        return [standard.title, standard.referenceCode, standard.occupationalRoute, jobTitles].join(" ").toLowerCase().includes(query);
+      })
+      .slice(0, 14);
+  }, [standardSearch, standards]);
+
+  function applyStandards(nextIds: string[]) {
+    const primary = nextIds[0] ?? "";
+    const primaryStandard = standards.find((standard) => standard.id === primary);
+    onDraft(
+      normaliseProviderProgramme({
+        ...draft,
+        linkedStandardIds: nextIds,
+        linkedStandardId: primary,
+        linkedStandardName: primaryStandard?.title ?? "",
+        level: primaryStandard?.level ?? null,
+        route: primaryStandard?.occupationalRoute ?? "",
+        fundingBand: primaryStandard?.fundingBand ?? null,
+        officialUrl: primaryStandard?.officialUrl ?? "",
+      }),
+    );
   }
 
+  function toggleStandard(standard: ApprenticeshipStandard) {
+    const exists = draft.linkedStandardIds.includes(standard.id);
+    applyStandards(exists ? draft.linkedStandardIds.filter((id) => id !== standard.id) : [...draft.linkedStandardIds, standard.id]);
+  }
+
+  const primaryStandard = selectedStandards[0];
+
   return (
-    <form onSubmit={onSubmit} className="grid gap-5">
-      <section className="grid gap-4 lg:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.85fr)]">
-        <div className="grid gap-4">
-          <FormSection title="Programme proposition" copy="The programme should read like an employer proposition, with the standard sitting underneath as compliance metadata.">
-            <FormGrid>
-              <FormField label="Programme name" value={draft.programmeName} onChange={(value) => onDraft({ ...draft, programmeName: value })} required />
-              <FormField label="Tagline" value={draft.commercialProfile.tagline} onChange={(value) => onDraft({ ...draft, commercialProfile: { ...draft.commercialProfile, tagline: value } })} />
-              <FormTextArea label="Short description" value={draft.shortDescription} onChange={(value) => onDraft({ ...draft, shortDescription: value })} wide rows={3} />
-              <FormTextArea label="Full description" value={draft.fullDescription} onChange={(value) => onDraft({ ...draft, fullDescription: value })} wide rows={4} />
-              <FormField label="Ideal audience" value={draft.commercialProfile.idealAudience} onChange={(value) => onDraft({ ...draft, commercialProfile: { ...draft.commercialProfile, idealAudience: value } })} wide />
-              <FormField label="Duration" value={draft.duration} onChange={(value) => onDraft({ ...draft, duration: value })} required />
-              <FormSelect label="Programme status" value={draft.status} onChange={(value) => onDraft({ ...draft, status: value as ProviderProgrammeStatus })} options={programmeStatuses} />
-              <FormSelect label="Verification status" value={draft.verificationStatus} onChange={(value) => onDraft({ ...draft, verificationStatus: value as ProviderProgrammeVerificationStatus })} options={verificationStatuses} />
-            </FormGrid>
-          </FormSection>
-          <FormSection title="Audience and outcomes" copy="These structured fields drive programme-first matching and shortlist quality.">
-            <FormGrid>
-              <FormTagInput label="Target industries" values={draft.targetIndustries} onChange={(value) => onDraft({ ...draft, targetIndustries: value })} wide />
-              <FormTagInput label="Target job roles" values={draft.targetJobRoles} onChange={(value) => onDraft({ ...draft, targetJobRoles: value })} wide />
-              <FormTagInput label="Business problems solved" values={draft.businessProblemsSolved} onChange={(value) => onDraft({ ...draft, businessProblemsSolved: value })} wide />
-              <FormTagInput label="Skills developed" values={draft.skillsDeveloped} onChange={(value) => onDraft({ ...draft, skillsDeveloped: value })} wide />
-              <FormTagInput label="Technologies covered" values={draft.technologiesCovered} onChange={(value) => onDraft({ ...draft, technologiesCovered: value })} wide />
-              <FormTagInput label="Employer benefits" values={draft.commercialProfile.employerBenefits} onChange={(value) => onDraft({ ...draft, commercialProfile: { ...draft.commercialProfile, employerBenefits: value } })} wide />
-              <FormTagInput label="Future capability impact" values={draft.commercialProfile.futureCapabilityImpact} onChange={(value) => onDraft({ ...draft, commercialProfile: { ...draft.commercialProfile, futureCapabilityImpact: value } })} wide />
-            </FormGrid>
-          </FormSection>
-          <FormSection title="Delivery and commercial fit" copy="Show how this programme lands in the employer environment and what LevyTate should communicate commercially.">
-            <FormGrid>
-              <FormTagInput label="Delivery models" values={draft.deliveryModels} onChange={(value) => onDraft({ ...draft, deliveryModels: value })} />
-              <FormTagInput label="Regions" values={draft.regions} onChange={(value) => onDraft({ ...draft, regions: value })} />
-              <FormTagInput label="Cohort options" values={draft.cohortOptions} onChange={(value) => onDraft({ ...draft, cohortOptions: value })} wide />
-              <FormTagInput label="Progression routes" values={draft.commercialProfile.progressionRoutes} onChange={(value) => onDraft({ ...draft, commercialProfile: { ...draft.commercialProfile, progressionRoutes: value } })} wide />
-              <FormSelect label="Employer size" value={draft.employerSize} onChange={(value) => onDraft({ ...draft, employerSize: value as ProviderEmployerSize })} options={employerSizeOptions} />
-              <FormSelect label="Seniority" value={draft.seniority} onChange={(value) => onDraft({ ...draft, seniority: value as ProviderProgrammeSeniority })} options={seniorityOptions} />
-              <FormSelect label="Funding route" value={draft.fundingRoute} onChange={(value) => onDraft({ ...draft, fundingRoute: value as FundingRoute })} options={fundingRoutes} />
-              <FormSelect label="Confidence" value={draft.commercialProfile.confidenceLabel} onChange={(value) => onDraft({ ...draft, commercialProfile: { ...draft.commercialProfile, confidenceLabel: value as "High" | "Medium" | "Low" } })} options={[...confidenceOptions]} />
-              <FormTextArea label="Commercial notes" value={draft.commercialNotes} onChange={(value) => onDraft({ ...draft, commercialNotes: value })} rows={3} wide />
-            </FormGrid>
-          </FormSection>
-        </div>
-        <div className="grid gap-4 self-start">
-          <ProgrammePreviewCard programme={draft} standard={selectedStandard} completion={completion} />
-          <FormSection title="Linked apprenticeship standard" copy="The standard sits underneath the branded programme proposition as funding and compliance metadata.">
-            <label className="grid gap-1.5 text-xs font-semibold text-[#102c3d]/58">Search apprenticeship standards<input value={standardSearch} onChange={(event) => onStandardSearch(event.target.value)} placeholder="Search title, reference code or job title" className="h-11 rounded-lg border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 text-sm font-medium outline-none focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10" /></label>
-            <div className="mt-2 max-h-72 overflow-y-auto rounded-lg border border-[#102c3d]/[0.08] bg-white">
-              {options.map((standard) => <button key={standard.id} type="button" onClick={() => selectStandard(standard.id)} className={`flex w-full items-center justify-between gap-3 border-b border-[#102c3d]/[0.05] px-3 py-2.5 text-left transition last:border-0 hover:bg-[#f7faf8] ${draft.linkedStandardIds.includes(standard.id) ? "bg-[#edf7f3]" : ""}`}><span><span className="block text-sm font-semibold">{standard.title}</span><span className="text-xs text-[#102c3d]/44">{standard.referenceCode} | Level {standard.level}</span></span><StatusBadge tone={standard.status === "Live" ? "green" : standard.status === "Paused" ? "yellow" : "red"}>{standard.status}</StatusBadge></button>)}
+    <form onSubmit={onSubmit} className="grid gap-5 lg:grid-cols-[minmax(0,1.35fr)_360px]">
+      <div className="grid gap-4">
+        <FormSection title="Programme proposition" copy="Lead with employer value, audience and outcomes before funding metadata.">
+          <FormGrid>
+            <FormField label="Programme name" value={draft.programmeName} onChange={(value) => onDraft({ ...draft, programmeName: value })} required wide />
+            <FormField label="Tagline" value={draft.commercialProfile.tagline} onChange={(value) => onDraft({ ...draft, commercialProfile: { ...draft.commercialProfile, tagline: value } })} wide />
+            <FormTextArea label="Short description" value={draft.shortDescription} onChange={(value) => onDraft({ ...draft, shortDescription: value })} rows={3} wide />
+            <FormTextArea label="Full description" value={draft.fullDescription} onChange={(value) => onDraft({ ...draft, fullDescription: value })} rows={5} wide />
+            <FormField label="Ideal audience" value={draft.commercialProfile.idealAudience} onChange={(value) => onDraft({ ...draft, commercialProfile: { ...draft.commercialProfile, idealAudience: value } })} wide />
+            <FormSelect label="Seniority" value={draft.seniority} onChange={(value) => onDraft({ ...draft, seniority: value as ProviderProgrammeSeniority })} options={seniorityOptions} />
+            <FormSelect label="Employer size" value={draft.employerSize} onChange={(value) => onDraft({ ...draft, employerSize: value as ProviderEmployerSize })} options={employerSizeOptions} />
+          </FormGrid>
+        </FormSection>
+
+        <FormSection title="Audience, outcomes and capability" copy="These fields power discovery, matching and employer comparison.">
+          <FormGrid>
+            <FormTagInput label="Target industries" values={draft.targetIndustries} onChange={(value) => onDraft({ ...draft, targetIndustries: value })} wide />
+            <FormTagInput label="Typical job roles" values={draft.targetJobRoles} onChange={(value) => onDraft({ ...draft, targetJobRoles: value })} wide />
+            <FormTagInput label="Business problems solved" values={draft.businessProblemsSolved} onChange={(value) => onDraft({ ...draft, businessProblemsSolved: value })} wide />
+            <FormTagInput label="Skills developed" values={draft.skillsDeveloped} onChange={(value) => onDraft({ ...draft, skillsDeveloped: value })} wide />
+            <FormTagInput label="Technologies covered" values={draft.technologiesCovered} onChange={(value) => onDraft({ ...draft, technologiesCovered: value })} wide />
+            <FormTagInput label="Expected outcomes" values={draft.expectedOutcomes} onChange={(value) => onDraft({ ...draft, expectedOutcomes: value })} wide />
+            <FormTagInput label="Employer benefits" values={draft.commercialProfile.employerBenefits} onChange={(value) => onDraft({ ...draft, commercialProfile: { ...draft.commercialProfile, employerBenefits: value } })} wide />
+            <FormTagInput label="Future capability impact" values={draft.commercialProfile.futureCapabilityImpact} onChange={(value) => onDraft({ ...draft, commercialProfile: { ...draft.commercialProfile, futureCapabilityImpact: value } })} wide />
+            <FormTagInput label="Typical departments" values={draft.commercialProfile.typicalDepartments} onChange={(value) => onDraft({ ...draft, commercialProfile: { ...draft.commercialProfile, typicalDepartments: value } })} wide />
+            <FormTagInput label="Progression routes" values={draft.commercialProfile.progressionRoutes} onChange={(value) => onDraft({ ...draft, commercialProfile: { ...draft.commercialProfile, progressionRoutes: value } })} wide />
+            <FormTagInput label="Case studies" values={draft.commercialProfile.caseStudies} onChange={(value) => onDraft({ ...draft, commercialProfile: { ...draft.commercialProfile, caseStudies: value } })} wide />
+            <FormTagInput label="FAQs" values={draft.commercialProfile.faqs} onChange={(value) => onDraft({ ...draft, commercialProfile: { ...draft.commercialProfile, faqs: value } })} wide />
+          </FormGrid>
+        </FormSection>
+
+        <FormSection title="Delivery and compliance" copy="The apprenticeship standard supports compliance and funding once the programme proposition is already clear.">
+          <FormGrid>
+            <FormTagInput label="Delivery models" values={draft.deliveryModels} onChange={(value) => onDraft({ ...draft, deliveryModels: value })} wide />
+            <FormTagInput label="Regions" values={draft.regions} onChange={(value) => onDraft({ ...draft, regions: value })} wide />
+            <FormField label="Duration" value={draft.duration} onChange={(value) => onDraft({ ...draft, duration: value })} />
+            <FormSelect label="Funding route" value={draft.fundingRoute} onChange={(value) => onDraft({ ...draft, fundingRoute: value as FundingRoute })} options={fundingRoutes} />
+            <FormSelect label="Status" value={draft.status} onChange={(value) => onDraft({ ...draft, status: value as ProviderProgrammeStatus })} options={programmeStatuses} />
+            <FormSelect label="Verification" value={draft.verificationStatus} onChange={(value) => onDraft({ ...draft, verificationStatus: value as ProviderProgrammeVerificationStatus })} options={verificationStatuses} />
+            <FormField label="Confidence label" value={draft.commercialProfile.confidenceLabel} onChange={(value) => onDraft({ ...draft, commercialProfile: { ...draft.commercialProfile, confidenceLabel: value } })} />
+            <FormField label="Source record" value={draft.sourceUrl} onChange={(value) => onDraft({ ...draft, sourceUrl: value })} />
+            <FormTextArea label="Employer commitment" value={draft.commercialProfile.employerCommitment} onChange={(value) => onDraft({ ...draft, commercialProfile: { ...draft.commercialProfile, employerCommitment: value } })} rows={3} wide />
+            <FormTextArea label="Assessment approach" value={draft.commercialProfile.assessmentApproach} onChange={(value) => onDraft({ ...draft, commercialProfile: { ...draft.commercialProfile, assessmentApproach: value } })} rows={3} wide />
+            <FormTextArea label="Commercial notes" value={draft.commercialNotes} onChange={(value) => onDraft({ ...draft, commercialNotes: value })} rows={3} wide />
+          </FormGrid>
+        </FormSection>
+
+        <FormSection title="Linked apprenticeship standards" copy="Keep standards underneath the programme proposition. The first selected standard becomes the primary funding record.">
+          <div className="grid gap-4">
+            <label className="grid gap-1.5 text-xs font-semibold text-[#102c3d]/58">
+              Search standards
+              <input value={standardSearch} onChange={(event) => onStandardSearch(event.target.value)} placeholder="Search by title, reference or job title" className="h-11 rounded-lg border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 text-sm font-medium text-[#102c3d] outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10" />
+            </label>
+            {selectedStandards.length ? (
+              <div className="flex flex-wrap gap-2">
+                {selectedStandards.map((standard) => (
+                  <button key={standard.id} type="button" onClick={() => toggleStandard(standard)} className="inline-flex items-center gap-2 rounded-full bg-[#edf7f3] px-3 py-1.5 text-xs font-semibold text-[#0b6f63] ring-1 ring-[#159b8f]/12">
+                    {standard.title}
+                    <span className="text-[#0b6f63]/60">Remove</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-[#102c3d]/52">No standards linked yet. Add at least one standard before saving.</p>
+            )}
+            <div className="grid gap-2 rounded-2xl bg-[#f8fbfa] p-3 ring-1 ring-[#102c3d]/[0.06]">
+              {filteredStandards.map((standard) => {
+                const active = draft.linkedStandardIds.includes(standard.id);
+                return (
+                  <button key={standard.id} type="button" onClick={() => toggleStandard(standard)} className={`rounded-xl border px-3 py-3 text-left transition ${active ? "border-[#159b8f]/30 bg-white shadow-[0_10px_18px_rgba(21,155,143,0.08)]" : "border-[#102c3d]/[0.07] bg-white hover:border-[#159b8f]/18"}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-[#102c3d]">{standard.title}</p>
+                        <p className="mt-1 text-xs text-[#102c3d]/48">{standard.referenceCode} | Level {standard.level} | {standard.occupationalRoute}</p>
+                      </div>
+                      <StatusBadge tone={active ? "green" : "neutral"}>{active ? "Selected" : "Add"}</StatusBadge>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
-            <div className="mt-3 flex flex-wrap gap-2">{draft.linkedStandardIds.map((standardId) => { const standard = getApprenticeshipStandard(standardId); return standard ? <span key={standardId} className="inline-flex items-center gap-2 rounded-full bg-[#edf7f3] px-3 py-1 text-xs font-semibold text-[#0b6f63]">{standard.title}<button type="button" onClick={() => onDraft(normaliseProviderProgramme({ ...draft, linkedStandardIds: draft.linkedStandardIds.filter((item) => item !== standardId) }))} className="text-[#0b6f63]/70 hover:text-[#0b6f63]">x</button></span> : null; })}</div>
-          </FormSection>
+          </div>
+        </FormSection>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#102c3d]/[0.07] pt-4">
+          <div className="flex gap-2">
+            <TableAction onClick={onArchive} danger={draft.recordStatus === "Active"}>{draft.recordStatus === "Archived" ? "Restore programme" : "Archive programme"}</TableAction>
+            <TableAction onClick={onRemove} danger>Remove programme</TableAction>
+          </div>
+          <div className="min-w-[220px] text-right text-xs font-semibold text-[#102c3d]/48">{programmeProfileCompletion(draft.commercialProfile)}% programme completeness</div>
         </div>
-      </section>
-      <FormActions onCancel={onCancel} label="Save programme" error={error} />
+
+        <FormActions onCancel={onCancel} label="Save programme" error={error} />
+      </div>
+
+      <div className="grid gap-4 self-start">
+        <MarketplaceSignalCard title="Programme preview" copy="The marketplace should sell the employer value in a few seconds." items={[
+          draft.commercialProfile.tagline || "Add a sharper employer-facing tagline",
+          draft.shortDescription || "Add a short proposition summary",
+          primaryStandard ? `${primaryStandard.title} linked for compliance` : "Select a primary apprenticeship standard",
+        ]} />
+        <ProgrammeMarketplaceCard programme={draft} provider={undefined} standard={primaryStandard} onOpen={() => undefined} preview />
+      </div>
     </form>
   );
 }
 
-function ProviderPreviewCard({ provider, completion, programmeCount }: { provider: ProviderCatalogueRecord; completion: number; programmeCount: number }) {
-  return <div className="overflow-hidden rounded-2xl border border-[#102c3d]/[0.07] bg-white shadow-[0_18px_38px_rgba(16,44,61,0.06)]"><div className="relative bg-[linear-gradient(135deg,#102c3d_0%,#174761_60%,#1f7b78_100%)] px-5 py-5 text-white"><div className="absolute right-4 top-4 rounded-full bg-white/12 px-2.5 py-1 text-[11px] font-semibold backdrop-blur-sm">{completion}% complete</div><div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-white/12 text-white backdrop-blur-sm">{provider.commercialProfile.logoUrl ? <ImageIcon size={18} /> : <Building2 size={18} />}</div><h3 className="mt-4 text-lg font-semibold">{provider.providerName || "Provider partner"}</h3><p className="mt-1 text-sm text-white/72">{provider.providerType}</p></div><div className="grid gap-4 p-5"><p className="text-sm leading-6 text-[#102c3d]/58">{fallbackProviderDescription(provider)}</p><div className="grid grid-cols-2 gap-3"><MiniMetric title="Programme records" value={String(programmeCount)} /><MiniMetric title="Employer fit" value={provider.commercialProfile.employerSizesSupported[0] || provider.employerTypes[0] || "Mixed"} /><MiniMetric title="Achievement" value={provider.commercialProfile.achievementRate || "To confirm"} /><MiniMetric title="Satisfaction" value={provider.commercialProfile.employerSatisfaction || provider.commercialProfile.learnerSatisfaction || "To confirm"} /></div><div className="flex flex-wrap gap-2">{provider.commercialProfile.awards.slice(0, 2).map((item) => <Tag key={item} tone="accent">{item}</Tag>)}{provider.specialisms.slice(0, 3).map((item) => <Tag key={item}>{item}</Tag>)}</div></div></div>;
+function ProviderComparison({
+  providers,
+  programmes,
+  standards,
+  onOpenProfile,
+  onOpenProgramme,
+}: {
+  providers: ProviderCatalogueRecord[];
+  programmes: ProviderProgramme[];
+  standards: ApprenticeshipStandard[];
+  onOpenProfile: (providerId: string) => void;
+  onOpenProgramme: (providerId: string, programmeId: string) => void;
+}) {
+  const cards = providers.map((provider) => {
+    const providerProgrammes = programmes.filter((programme) => programme.providerId === provider.providerId && programme.recordStatus === "Active");
+    const featuredProgramme = firstProgramme(providerProgrammes);
+    const standard = featuredProgramme ? programmePrimaryStandard(featuredProgramme, standards) : undefined;
+    return { provider, providerProgrammes, featuredProgramme, standard };
+  });
+
+  const rows = [
+    {
+      label: "Delivery",
+      render: (card: (typeof cards)[number]) => card.featuredProgramme?.deliveryModels.join(", ") || card.provider.deliveryModels.join(", ") || "To confirm",
+    },
+    {
+      label: "Technologies",
+      render: (card: (typeof cards)[number]) => (card.featuredProgramme?.technologiesCovered.slice(0, 3).join(", ") || card.provider.technologies.slice(0, 3).join(", ") || "To confirm"),
+    },
+    {
+      label: "Industries",
+      render: (card: (typeof cards)[number]) => (card.featuredProgramme?.targetIndustries.slice(0, 3).join(", ") || card.provider.industries.slice(0, 3).join(", ") || "To confirm"),
+    },
+    {
+      label: "Strengths",
+      render: (card: (typeof cards)[number]) => (card.featuredProgramme?.commercialProfile.employerBenefits[0] || card.provider.specialisms[0] || "To confirm"),
+    },
+    {
+      label: "Limitations",
+      render: (card: (typeof cards)[number]) => (card.featuredProgramme?.verificationStatus === "Needs manual verification" ? "Verification still required" : "No material concern flagged"),
+    },
+    {
+      label: "Employer size",
+      render: (card: (typeof cards)[number]) => card.featuredProgramme?.employerSize || card.provider.commercialProfile.employerSizesSupported[0] || "To confirm",
+    },
+    {
+      label: "Regions",
+      render: (card: (typeof cards)[number]) => card.provider.regions.slice(0, 3).join(", ") || "To confirm",
+    },
+    {
+      label: "Funding",
+      render: (card: (typeof cards)[number]) => card.featuredProgramme?.fundingRoute || "To confirm",
+    },
+    {
+      label: "Duration",
+      render: (card: (typeof cards)[number]) => card.featuredProgramme?.duration || "To confirm",
+    },
+    {
+      label: "Recommendation",
+      render: (card: (typeof cards)[number]) => card.provider.commercialProfile.positioningStatement || fallbackProviderDescription(card.provider),
+    },
+  ];
+
+  return (
+    <div className="grid gap-4">
+      <div className="overflow-x-auto">
+        <div className="grid min-w-[980px] gap-3" style={{ gridTemplateColumns: `220px repeat(${cards.length}, minmax(0, 1fr))` }}>
+          <div className="rounded-2xl border border-dashed border-[#102c3d]/[0.12] bg-[#f8fbfa] p-4">
+            <p className="text-sm font-semibold text-[#102c3d]">Comparison focus</p>
+            <p className="mt-2 text-sm leading-6 text-[#102c3d]/56">Compare provider profiles the way an employer buyer would: proposition first, compliance after.</p>
+          </div>
+          {cards.map(({ provider, featuredProgramme, standard }) => (
+            <div key={provider.providerId} className="rounded-2xl border border-[#102c3d]/[0.07] bg-white p-4 shadow-[0_14px_30px_rgba(16,44,61,0.045)]">
+              <div className={`rounded-2xl bg-gradient-to-br ${providerTheme(provider.providerId)} p-4 text-white`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-white/70">{provider.providerType}</p>
+                    <h3 className="mt-2 text-lg font-semibold">{provider.providerName}</h3>
+                    <p className="mt-2 text-sm text-white/78">{provider.commercialProfile.positioningStatement || fallbackProviderDescription(provider)}</p>
+                  </div>
+                  <StatusBadge tone={provider.verificationStatus === "verified" ? "green" : "yellow"}>{provider.verificationStatus === "verified" ? "Verified" : "Review"}</StatusBadge>
+                </div>
+              </div>
+              <div className="mt-4 grid gap-3">
+                <MetricTile label="Featured programme" value={featuredProgramme?.programmeName || "To confirm"} />
+                <MetricTile label="Linked standard" value={standard?.title || "To confirm"} />
+                <div className="flex gap-2">
+                  <TableAction onClick={() => onOpenProfile(provider.providerId)}>Open profile</TableAction>
+                  {featuredProgramme ? <TableAction onClick={() => onOpenProgramme(provider.providerId, featuredProgramme.id)}>View programme</TableAction> : null}
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {rows.map((row) => (
+            <div key={row.label} className="contents">
+              <div className="rounded-2xl bg-[#f8fbfa] p-4 ring-1 ring-[#102c3d]/[0.06]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/50">{row.label}</p>
+              </div>
+              {cards.map((card) => (
+                <div key={`${row.label}-${card.provider.providerId}`} className="rounded-2xl bg-white p-4 ring-1 ring-[#102c3d]/[0.06]">
+                  <p className="text-sm leading-6 text-[#102c3d]/62">{row.render(card)}</p>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
 
-function ProgrammePreviewCard({ programme, standard, completion }: { programme: ProviderProgramme; standard?: ApprenticeshipStandard; completion: number }) {
-  return <div className="overflow-hidden rounded-2xl border border-[#102c3d]/[0.07] bg-white shadow-[0_18px_38px_rgba(16,44,61,0.06)]"><div className="bg-[linear-gradient(135deg,#f8fbfa_0%,#edf7f3_100%)] px-5 py-5"><div className="flex items-start justify-between gap-3"><div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-[#0b6f63] shadow-[0_12px_24px_rgba(16,44,61,0.08)]"><Sparkles size={18} /></div><StatusBadge tone={completion >= 70 ? "green" : completion >= 45 ? "yellow" : "red"}>{completion}% complete</StatusBadge></div><h3 className="mt-4 text-lg font-semibold text-[#102c3d]">{programme.programmeName || "Programme proposition"}</h3><p className="mt-1 text-sm text-[#0b6f63]">{programme.commercialProfile.tagline || "Position this programme in employer language."}</p></div><div className="grid gap-4 p-5"><p className="text-sm leading-6 text-[#102c3d]/58">{programme.shortDescription || "Programme summary to confirm."}</p><div className="grid gap-3"><MiniMetric title="Best for" value={programme.commercialProfile.idealAudience || "Audience to confirm"} /><MiniMetric title="Confidence" value={programme.commercialProfile.confidenceLabel || "High"} /><MiniMetric title="Funding route" value={programme.fundingRoute} /><MiniMetric title="Linked standard" value={standard?.title || programme.linkedStandardName || "Not linked"} /></div>{standard ? <div className="rounded-2xl bg-[#f8fbfa] p-4 ring-1 ring-[#102c3d]/[0.06]"><p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#0b6f63]">Compliance metadata</p><p className="mt-2 text-sm font-semibold text-[#102c3d]">{standard.title}</p><p className="mt-1 text-xs text-[#102c3d]/46">{standard.referenceCode} | Level {standard.level}</p><p className="mt-1 text-xs text-[#102c3d]/46">{formatFundingBand(standard)}</p></div> : null}</div></div>;
+function ProgrammeMarketplaceCard({
+  programme,
+  provider,
+  standard,
+  onOpen,
+  preview = false,
+}: {
+  programme: ProviderProgramme;
+  provider?: ProviderCatalogueRecord;
+  standard?: ApprenticeshipStandard;
+  onOpen: () => void;
+  preview?: boolean;
+}) {
+  return (
+    <article className="rounded-2xl border border-[#102c3d]/[0.07] bg-white p-4 shadow-[0_14px_32px_rgba(16,44,61,0.045)]">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">Programme destination</p>
+          <h4 className="mt-1 text-base font-semibold text-[#102c3d]">{programme.programmeName || "Programme name"}</h4>
+          <p className="mt-1 text-sm font-medium text-[#0b6f63]">{provider?.providerName || "Current provider"}</p>
+        </div>
+        <StatusBadge tone={programme.verificationStatus === "Needs manual verification" ? "yellow" : "green"}>{programme.commercialProfile.confidenceLabel || "High"}</StatusBadge>
+      </div>
+      <p className="mt-3 text-sm leading-6 text-[#102c3d]/58">{programme.commercialProfile.tagline || programme.shortDescription || "Add employer-facing programme copy."}</p>
+      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+        <MetricTile label="Delivery" value={programme.deliveryModels.join(", ") || "To confirm"} compact />
+        <MetricTile label="Standard" value={standard?.title || programme.linkedStandardName || "To confirm"} compact />
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        {programme.technologiesCovered.slice(0, 3).map((item) => <Tag key={item}>{item}</Tag>)}
+        {programme.targetIndustries.slice(0, 2).map((item) => <Tag key={item}>{item}</Tag>)}
+        {programme.businessProblemsSolved.slice(0, 2).map((item) => <Tag key={item} tone="accent">{item}</Tag>)}
+      </div>
+      {!preview ? (
+        <div className="mt-4 flex justify-end">
+          <TableAction onClick={onOpen}>View programme</TableAction>
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+function ProviderHeroCard({ provider, programmeCount }: { provider: ProviderCatalogueRecord; programmeCount: number }) {
+  return (
+    <section className={`overflow-hidden rounded-3xl bg-gradient-to-br ${providerTheme(provider.providerId)} text-white shadow-[0_18px_42px_rgba(16,44,61,0.16)]`}>
+      <div className="grid gap-4 p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="inline-flex rounded-2xl bg-white/12 px-3 py-2 text-sm font-semibold backdrop-blur-sm">{providerWordmark(provider)}</div>
+            <h3 className="mt-4 text-xl font-semibold">{provider.providerName || "Provider partner"}</h3>
+            <p className="mt-2 text-sm text-white/78">{provider.commercialProfile.positioningStatement || "Add a buyer-facing positioning statement."}</p>
+          </div>
+          <BadgeCheck size={18} className="text-white/80" />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <MetricTile inverse label="Programmes" value={String(programmeCount)} compact />
+          <MetricTile inverse label="Reach" value={providerReachLabel(provider)} compact />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function MarketplaceSignalCard({ title, copy, items }: { title: string; copy: string; items: string[] }) {
+  const values = items.filter(Boolean);
+  return (
+    <section className="rounded-2xl border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_14px_28px_rgba(16,44,61,0.045)]">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">{title}</p>
+      <p className="mt-2 text-sm leading-6 text-[#102c3d]/58">{copy}</p>
+      <div className="mt-4 grid gap-3">
+        {(values.length ? values : ["Add stronger commercial proof points here."]).map((item) => (
+          <div key={item} className="flex items-start gap-3 rounded-2xl bg-[#f8fbfa] px-3 py-3 ring-1 ring-[#102c3d]/[0.06]">
+            <Sparkles size={15} className="mt-0.5 shrink-0 text-[#0b8e82]" />
+            <p className="text-sm leading-6 text-[#102c3d]/60">{item}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 function SummaryCard({ label, value, copy, tone }: { label: string; value: string | number; copy: string; tone: "green" | "yellow" | "blue" }) {
-  const accent = { green: "bg-[#e9f7f2] text-[#0b6f63]", yellow: "bg-[#fff7cf] text-[#756000]", blue: "bg-[#eef4f8] text-[#315e78]" }[tone];
-  return <article className="rounded-xl border border-[#102c3d]/[0.07] bg-white p-4 shadow-[0_12px_26px_rgba(16,44,61,0.04)]"><div className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${accent}`}>{label}</div><p className="mt-3 text-2xl font-semibold text-[#102c3d]">{value}</p><p className="mt-1 text-sm leading-6 text-[#102c3d]/58">{copy}</p></article>;
+  const accent = {
+    green: "bg-[#e9f7f2] text-[#0b6f63]",
+    yellow: "bg-[#fff7cf] text-[#756000]",
+    blue: "bg-[#eef4f8] text-[#315e78]",
+  }[tone];
+  return (
+    <article className="rounded-xl border border-[#102c3d]/[0.07] bg-white p-4 shadow-[0_12px_26px_rgba(16,44,61,0.04)]">
+      <div className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${accent}`}>{label}</div>
+      <p className="mt-3 text-2xl font-semibold text-[#102c3d]">{value}</p>
+      <p className="mt-1 text-sm leading-6 text-[#102c3d]/58">{copy}</p>
+    </article>
+  );
 }
 
-function MetricPill({ icon: Icon, label, value }: { icon: typeof Building2; label: string; value: string | number }) {
-  return <div className="rounded-2xl bg-[#f8fbfa] px-3 py-3 ring-1 ring-[#102c3d]/[0.05]"><div className="flex items-center gap-2 text-[#102c3d]/42"><Icon size={14} /><span className="text-[11px] font-semibold uppercase tracking-[0.12em]">{label}</span></div><p className="mt-2 text-sm font-semibold text-[#102c3d]">{value}</p></div>;
+function MetricTile({ label, value, inverse = false, compact = false }: { label: string; value: string; inverse?: boolean; compact?: boolean }) {
+  return (
+    <div className={`rounded-2xl ${inverse ? "bg-white/10 ring-white/10 text-white" : "bg-[#f8fbfa] ring-[#102c3d]/[0.06] text-[#102c3d]"} ${compact ? "p-3" : "p-4"} ring-1`}>
+      <p className={`text-[10px] font-semibold uppercase tracking-[0.12em] ${inverse ? "text-white/62" : "text-[#102c3d]/42"}`}>{label}</p>
+      <p className={`mt-2 ${compact ? "text-sm" : "text-base"} font-semibold ${inverse ? "text-white" : "text-[#102c3d]"}`}>{value}</p>
+    </div>
+  );
 }
 
-function MiniMetric({ title, value }: { title: string; value: string }) {
-  return <div className="rounded-2xl bg-[#f8fbfa] p-3 ring-1 ring-[#102c3d]/[0.06]"><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/42">{title}</p><p className="mt-2 text-sm font-semibold text-[#102c3d]">{value}</p></div>;
+function InfoSection({ title, copy }: { title: string; copy: string }) {
+  return (
+    <section className="rounded-2xl border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_14px_32px_rgba(16,44,61,0.045)]">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">{title}</p>
+      <p className="mt-3 text-sm leading-7 text-[#102c3d]/60">{copy}</p>
+    </section>
+  );
 }
 
-function ProgrammeFact({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-2xl bg-[#f8fbfa] p-3 ring-1 ring-[#102c3d]/[0.06]"><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/42">{label}</p><p className="mt-2 text-sm font-semibold text-[#102c3d]">{value}</p></div>;
+function InfoChips({ title, icon: Icon, items }: { title: string; icon: typeof Users; items: string[] }) {
+  const values = items.filter(Boolean);
+  return (
+    <section className="rounded-2xl border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_14px_32px_rgba(16,44,61,0.045)]">
+      <div className="flex items-center gap-2 text-[#0b8e82]">
+        <Icon size={15} />
+        <p className="text-sm font-semibold text-[#102c3d]">{title}</p>
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        {values.length ? values.map((item) => <Tag key={item}>{item}</Tag>) : <p className="text-sm text-[#102c3d]/48">No content added yet.</p>}
+      </div>
+    </section>
+  );
 }
 
-function ProofRow({ icon: Icon, label, value }: { icon: typeof Award; label: string; value: string }) {
-  return <div className="flex items-start gap-2"><Icon size={14} className="mt-0.5 text-[#0b8e82]" /><div><p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/42">{label}</p><p className="mt-1 text-sm leading-5 text-[#102c3d]/62">{value}</p></div></div>;
+function Tag({ children, tone = "default" }: { children: string; tone?: "default" | "accent" }) {
+  return (
+    <span className={`inline-flex rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ${tone === "accent" ? "bg-[#edf7f3] text-[#0b6f63] ring-[#159b8f]/12" : "bg-white text-[#102c3d]/68 ring-[#102c3d]/[0.07]"}`}>
+      {children}
+    </span>
+  );
 }
 
-function Tag({ children, tone = "neutral" }: { children: string; tone?: "neutral" | "accent" }) {
-  return <span className={`inline-flex rounded-full px-3 py-1.5 text-xs font-semibold ${tone === "accent" ? "bg-[#edf7f3] text-[#0b6f63]" : "bg-[#f5f7f3] text-[#102c3d]/64"}`}>{children}</span>;
-}
 
-function InsightCard({ eyebrow, title, copy, items }: { eyebrow: string; title: string; copy: string; items: string[] }) {
-  return <div className="rounded-2xl border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_14px_30px_rgba(16,44,61,0.05)]"><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">{eyebrow}</p><h3 className="mt-1 text-base font-semibold text-[#102c3d]">{title}</h3><p className="mt-2 text-sm leading-6 text-[#102c3d]/58">{copy}</p><ul className="mt-4 grid gap-2 text-sm text-[#102c3d]/62">{items.filter(Boolean).map((item) => <li key={item} className="flex items-start gap-2"><ArrowUpRight size={14} className="mt-1 shrink-0 text-[#0b8e82]" /><span>{item}</span></li>)}</ul></div>;
-}
+

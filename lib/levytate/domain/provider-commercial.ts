@@ -49,6 +49,7 @@ export function normaliseCommercialLinks(value: unknown): CommercialLink[] {
 export function emptyProviderCommercialProfile(): ProviderCommercialProfile {
   return {
     organisationDescription: "",
+    positioningStatement: "",
     logoUrl: "",
     bannerUrl: "",
     primaryContactTitle: "",
@@ -58,6 +59,7 @@ export function emptyProviderCommercialProfile(): ProviderCommercialProfile {
     commercialContactPhone: "",
     yearsEstablished: "",
     learnerNumbers: "",
+    employerPartners: "",
     achievementRate: "",
     learnerSatisfaction: "",
     employerSatisfaction: "",
@@ -100,6 +102,7 @@ export function normaliseProviderCommercialProfile(value: unknown): ProviderComm
   const candidate = value && typeof value === "object" ? value as Partial<ProviderCommercialProfile> : {};
   return {
     organisationDescription: safeString(candidate.organisationDescription),
+    positioningStatement: safeString(candidate.positioningStatement),
     logoUrl: safeString(candidate.logoUrl),
     bannerUrl: safeString(candidate.bannerUrl),
     primaryContactTitle: safeString(candidate.primaryContactTitle),
@@ -109,6 +112,7 @@ export function normaliseProviderCommercialProfile(value: unknown): ProviderComm
     commercialContactPhone: safeString(candidate.commercialContactPhone),
     yearsEstablished: safeString(candidate.yearsEstablished),
     learnerNumbers: safeString(candidate.learnerNumbers),
+    employerPartners: safeString(candidate.employerPartners),
     achievementRate: safeString(candidate.achievementRate),
     learnerSatisfaction: safeString(candidate.learnerSatisfaction),
     employerSatisfaction: safeString(candidate.employerSatisfaction),
@@ -174,6 +178,7 @@ export function parseProgrammeRecordNotes(value?: string | null) {
 
 function isProviderCommercialProfileEmpty(profile: ProviderCommercialProfile) {
   return !profile.organisationDescription
+    && !profile.positioningStatement
     && !profile.logoUrl
     && !profile.bannerUrl
     && !profile.primaryContactTitle
@@ -183,6 +188,7 @@ function isProviderCommercialProfileEmpty(profile: ProviderCommercialProfile) {
     && !profile.commercialContactPhone
     && !profile.yearsEstablished
     && !profile.learnerNumbers
+    && !profile.employerPartners
     && !profile.achievementRate
     && !profile.learnerSatisfaction
     && !profile.employerSatisfaction
@@ -233,12 +239,14 @@ export function serialiseProgrammeRecordNotes(notes: string, commercialProfile: 
 export function commercialProfileCompletion(profile: ProviderCommercialProfile) {
   const checks = [
     profile.organisationDescription,
+    profile.positioningStatement,
     profile.logoUrl,
     profile.bannerUrl,
     profile.commercialContactName,
     profile.commercialContactEmail,
     profile.yearsEstablished,
     profile.learnerNumbers,
+    profile.employerPartners,
     profile.achievementRate,
     profile.learnerSatisfaction,
     profile.employerSatisfaction,
@@ -248,7 +256,7 @@ export function commercialProfileCompletion(profile: ProviderCommercialProfile) 
     profile.testimonials.length > 0 ? "testimonials" : "",
     profile.downloads.length > 0 ? "downloads" : "",
   ].filter(Boolean).length;
-  return Math.round((checks / 15) * 100);
+  return Math.round((checks / 17) * 100);
 }
 
 export function programmeProfileCompletion(profile: ProgrammeCommercialProfile) {

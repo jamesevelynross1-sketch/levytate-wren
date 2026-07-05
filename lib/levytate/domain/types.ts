@@ -236,6 +236,7 @@ export type CommercialLink = {
 
 export type ProviderCommercialProfile = {
   organisationDescription: string;
+  positioningStatement: string;
   logoUrl: string;
   bannerUrl: string;
   primaryContactTitle: string;
@@ -245,6 +246,7 @@ export type ProviderCommercialProfile = {
   commercialContactPhone: string;
   yearsEstablished: string;
   learnerNumbers: string;
+  employerPartners: string;
   achievementRate: string;
   learnerSatisfaction: string;
   employerSatisfaction: string;
@@ -441,6 +443,3 @@ export type SnapshotMetric = {
   series: number[];
   accent?: string;
 };
-
-
-
