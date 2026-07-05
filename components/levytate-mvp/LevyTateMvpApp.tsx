@@ -23,6 +23,7 @@ import { AskLevyTateAiWorkspace } from "@/components/levytate-mvp/AskLevyTateAiW
 import { DashboardModule, SettingsModule } from "@/components/levytate-mvp/DashboardSettingsModules";
 import { EarlyAccessModule } from "@/components/levytate-mvp/EarlyAccessModule";
 import { EmployeesModule } from "@/components/levytate-mvp/EmployeesModule";
+import { GuidanceCentreModule } from "@/components/levytate-mvp/GuidanceCentreModule";
 import { EnrolmentsModule } from "@/components/levytate-mvp/EnrolmentsModule";
 import { LevyTateStandardsProvider } from "@/components/levytate-mvp/LevyTateStandardsProvider";
 import { MvpWorkspaceProvider, useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
@@ -36,6 +37,7 @@ import { buildNotifications } from "@/lib/levytate/mvp/workspace-insights";
 const modules = [
   { name: "Home", icon: LayoutDashboard, section: "Workspace" },
   { name: "Ask LevyTate AI", icon: Sparkles, section: "Workspace" },
+  { name: "Guidance Centre", icon: BellRing, section: "Workspace" },
   { name: "Employees", icon: Users, section: "Records" },
   { name: "Roles", icon: BriefcaseBusiness, section: "Records" },
   { name: "Applications", icon: ClipboardList, section: "Workflow" },
@@ -52,6 +54,7 @@ type ModuleName = (typeof modules)[number]["name"];
 const moduleCopy: Record<ModuleName, string> = {
   Home: "Daily operating view for records, approvals, provider relationships and immediate next actions.",
   "Ask LevyTate AI": "Role-aware guidance grounded in live workspace data, recommendations and workflow rules.",
+  "Guidance Centre": "Trusted advisory guidance covering funding, provider selection, employer readiness and future skills.",
   Employees: "Create and maintain the employee apprenticeship record, from manager assignment to discovery history.",
   Roles: "Own role-led pathway mappings from one controlled role library.",
   Applications: "Manage the employee to line manager to apprenticeship lead workflow without spreadsheets.",
@@ -170,6 +173,7 @@ function MvpAppShell() {
 
             {activeModule === "Home" ? <DashboardModule onNavigate={(module) => setActiveModule(module as ModuleName)} /> : null}
             {activeModule === "Ask LevyTate AI" ? <AskLevyTateAiWorkspace initialEmployeeId={aiEmployeeId} /> : null}
+            {activeModule === "Guidance Centre" ? <GuidanceCentreModule /> : null}
             {activeModule === "Employees" ? <EmployeesModule onStartDiscovery={(employeeId) => { setAiEmployeeId(employeeId); setActiveModule("Ask LevyTate AI"); }} /> : null}
             {activeModule === "Roles" ? <RolesModule /> : null}
             {activeModule === "Applications" ? <ApplicationsModule /> : null}
@@ -185,4 +189,6 @@ function MvpAppShell() {
     </main>
   );
 }
+
+
 

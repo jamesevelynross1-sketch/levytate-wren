@@ -7,3 +7,5 @@ export * from './role-library';
 export * from './provider-catalogue';
 
 export * from './apprenticeship-standards';
+export * from './provider-commercial';
+

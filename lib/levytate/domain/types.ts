@@ -221,11 +221,64 @@ export type ApprenticeshipStandard = {
 
 export type ProviderVerificationStatus = "verified" | "needs_verification";
 export type ProviderRecordStatus = "Active" | "Archived";
-export type ProviderType = "Independent training provider" | "University" | "College" | "Specialist consultancy" | "Employer programme partner";
+export type ProviderType = "Independent training provider" | "University" | "College" | "Specialist consultancy" | "Employer programme partner" | "National provider" | "Regional provider" | "Employer Provider";
 export type ProviderProgrammeStatus = "Active" | "Needs verification" | "Paused" | "Not available" | "Defunded / unavailable for new starts";
 export type ProviderProgrammeVerificationStatus = "Verified from provider website" | "Needs manual verification" | "Provider confirmed" | "LevyTate reviewed";
 export type ProviderProgrammeSeniority = "Entry" | "Early career" | "Experienced" | "Supervisor" | "Manager" | "Mixed";
 export type ProviderEmployerSize = "SME" | "Mid-market" | "Large enterprise" | "Mixed employer base";
+export type CommercialLinkKind = "Download" | "Brochure" | "Case study" | "Video" | "FAQ";
+
+export type CommercialLink = {
+  label: string;
+  url: string;
+  kind: CommercialLinkKind;
+};
+
+export type ProviderCommercialProfile = {
+  organisationDescription: string;
+  logoUrl: string;
+  bannerUrl: string;
+  primaryContactTitle: string;
+  commercialContactName: string;
+  commercialContactEmail: string;
+  commercialContactTitle: string;
+  commercialContactPhone: string;
+  yearsEstablished: string;
+  learnerNumbers: string;
+  achievementRate: string;
+  learnerSatisfaction: string;
+  employerSatisfaction: string;
+  googleReviewSignal: string;
+  awards: string[];
+  accreditations: string[];
+  caseStudies: string[];
+  successStories: string[];
+  testimonials: string[];
+  videoUrl: string;
+  downloads: CommercialLink[];
+  pricingNotes: string;
+  commercialNotes: string;
+  employerSizesSupported: string[];
+};
+
+export type ProgrammeCommercialProfile = {
+  tagline: string;
+  idealAudience: string;
+  typicalDepartments: string[];
+  futureSkillsDeveloped: string[];
+  keyOutcomes: string[];
+  locations: string[];
+  fundingOptions: string[];
+  employerCommitment: string;
+  assessmentApproach: string;
+  progressionRoutes: string[];
+  caseStudies: string[];
+  faqs: string[];
+  downloads: CommercialLink[];
+  employerBenefits: string[];
+  futureCapabilityImpact: string[];
+  confidenceLabel: string;
+};
 
 export type ProviderProgramme = {
   id: string;
@@ -259,6 +312,7 @@ export type ProviderProgramme = {
   officialUrl: string;
   sourceUrl: string;
   notes: string;
+  commercialProfile: ProgrammeCommercialProfile;
   recordStatus: ProviderRecordStatus;
   createdAt: string;
   updatedAt: string;
@@ -282,6 +336,7 @@ export type ProviderCatalogueRecord = {
   status: ProviderRecordStatus;
   sourceUrls: string[];
   notes: string;
+  commercialProfile: ProviderCommercialProfile;
   lastVerified: string;
   verificationStatus: ProviderVerificationStatus;
 };
@@ -386,5 +441,6 @@ export type SnapshotMetric = {
   series: number[];
   accent?: string;
 };
+
 
 

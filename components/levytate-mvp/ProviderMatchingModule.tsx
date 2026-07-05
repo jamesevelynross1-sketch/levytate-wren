@@ -1,8 +1,19 @@
 "use client";
 
-
+import {
+  ArrowUpRight,
+  BriefcaseBusiness,
+  Building2,
+  CircleAlert,
+  Gauge,
+  Network,
+  ShieldCheck,
+  Sparkles,
+  Target,
+} from "lucide-react";
 import { useMemo, useState, type FormEvent } from "react";
-import { getApprenticeshipStandard, shortlistProvidersForNeed } from "@/lib/levytate/domain";
+import type { ProviderShortlistResult } from "@/lib/levytate/domain";
+import { shortlistProvidersForNeed } from "@/lib/levytate/domain";
 import {
   EmptyState,
   FormActions,
@@ -17,9 +28,6 @@ import {
   MvpToolbar,
   StatusBadge,
   TableAction,
-  TableBody,
-  TableHead,
-  TableShell,
 } from "@/components/levytate-mvp/MvpUi";
 import { useLevyTateStandards } from "@/components/levytate-mvp/LevyTateStandardsProvider";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
@@ -52,16 +60,55 @@ const relationshipStatuses: MvpProviderRelationshipStatus[] = ["Preferred", "Rev
 const matchingStatuses: MvpMatchingStatus[] = ["Submitted", "Under Review", "Provider Shortlist Being Prepared", "Shortlist Ready"];
 const employerSizeOptions = ["", "SME", "Mid-market", "Large enterprise", "Mixed employer base"] as const;
 
+function confidenceTone(confidence: ProviderShortlistResult["confidence"]) {
+  if (confidence === "High") return "green" as const;
+  if (confidence === "Medium") return "yellow" as const;
+  return "blue" as const;
+}
+
+function buildShortlist(
+  request: MvpMatchingRequest,
+  providers: ReturnType<typeof useMvpWorkspace>["data"]["providers"],
+  programmes: ReturnType<typeof useMvpWorkspace>["data"]["providerProgrammes"],
+  standards: ReturnType<typeof useLevyTateStandards>["selectableStandards"],
+  relationships: ReturnType<typeof useMvpWorkspace>["data"]["providerRelationships"],
+) {
+  return shortlistProvidersForNeed(
+    providers,
+    programmes,
+    standards,
+    {
+      roleNeed: request.roleNeed,
+      department: request.department || undefined,
+      futureCapability: request.futureCapability || undefined,
+      employerSize: request.employerSize || undefined,
+      programmeId: request.programmeId || undefined,
+      linkedStandardId: request.linkedStandardId || undefined,
+      deliveryModel: request.deliveryPreference || undefined,
+      region: request.sites[0],
+      technologies: request.technologies,
+      industries: request.industries,
+      businessProblems: request.businessProblems,
+      targetRoles: request.targetRoles,
+    },
+    relationships.map((relationship) => ({
+      preferredProviderId: relationship.preferredProviderId,
+      programmeIds: relationship.programmeIds,
+      status: relationship.status,
+    })),
+  );
+}
+
 export function ProviderMatchingModule() {
   const { data, saveProviderRelationship, saveMatchingRequest, updateMatchingStatus } = useMvpWorkspace();
+  const { selectableStandards } = useLevyTateStandards();
   const [search, setSearch] = useState("");
   const [relationshipDraft, setRelationshipDraft] = useState<MvpProviderRelationship | null>(null);
   const [requestDraft, setRequestDraft] = useState<MvpMatchingRequest | null>(null);
   const [selectedRelationshipProviders, setSelectedRelationshipProviders] = useState<string[]>([]);
   const [selectedRelationshipProgrammes, setSelectedRelationshipProgrammes] = useState<string[]>([]);
+  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const [error, setError] = useState("");
-
-  const { selectableStandards } = useLevyTateStandards();
 
   const activeProviders = useMemo(
     () => data.providers.filter((provider) => provider.status === "Active").sort((a, b) => a.providerName.localeCompare(b.providerName)),
@@ -73,56 +120,74 @@ export function ProviderMatchingModule() {
     [data.providerProgrammes],
   );
 
-  const visibleRelationships = useMemo(() => data.providerRelationships.filter((relationship) => {
-    const preferred = data.providers.find((provider) => provider.providerId === relationship.preferredProviderId)?.providerName ?? "";
-    const programmeText = relationship.programmeIds.map((id) => data.providerProgrammes.find((programme) => programme.id === id)?.programmeName ?? id).join(" ");
-    return includesSearch([relationship.category, relationship.status, preferred, programmeText, relationship.notes], search);
-  }), [data.providerProgrammes, data.providerRelationships, data.providers, search]);
+  const visibleRelationships = useMemo(
+    () => data.providerRelationships.filter((relationship) => {
+      const preferred = data.providers.find((provider) => provider.providerId === relationship.preferredProviderId)?.providerName ?? "";
+      const programmeText = relationship.programmeIds
+        .map((id) => data.providerProgrammes.find((programme) => programme.id === id)?.programmeName ?? id)
+        .join(" ");
+      return includesSearch([relationship.category, relationship.status, preferred, programmeText, relationship.notes], search);
+    }),
+    [data.providerProgrammes, data.providerRelationships, data.providers, search],
+  );
 
-  const visibleRequests = useMemo(() => data.matchingRequests.filter((request) => {
-    const programme = data.providerProgrammes.find((item) => item.id === request.programmeId);
-    return includesSearch([
-      request.roleNeed,
-      request.department,
-      request.futureCapability,
-      request.employerSize,
-      programme?.programmeName,
-      request.status,
-      request.sites.join(" "),
-      request.notes,
-      request.targetRoles.join(" "),
-      request.businessProblems.join(" "),
-      request.technologies.join(" "),
-      request.industries.join(" "),
-    ], search);
-  }), [data.matchingRequests, data.providerProgrammes, search]);
+  const visibleRequests = useMemo(
+    () => data.matchingRequests.filter((request) => {
+      const programme = data.providerProgrammes.find((item) => item.id === request.programmeId);
+      return includesSearch(
+        [
+          request.roleNeed,
+          request.department,
+          request.futureCapability,
+          request.employerSize,
+          programme?.programmeName,
+          request.status,
+          request.sites.join(" "),
+          request.notes,
+          request.targetRoles.join(" "),
+          request.businessProblems.join(" "),
+          request.technologies.join(" "),
+          request.industries.join(" "),
+        ],
+        search,
+      );
+    }),
+    [data.matchingRequests, data.providerProgrammes, search],
+  );
 
-  const requestShortlist = useMemo(() => requestDraft
-    ? shortlistProvidersForNeed(
-        data.providers,
-        data.providerProgrammes,
-        selectableStandards,
-        {
-          roleNeed: requestDraft.roleNeed,
-          department: requestDraft.department || undefined,
-          futureCapability: requestDraft.futureCapability || undefined,
-          employerSize: requestDraft.employerSize || undefined,
-          programmeId: requestDraft.programmeId || undefined,
-          linkedStandardId: requestDraft.linkedStandardId || undefined,
-          deliveryModel: requestDraft.deliveryPreference || undefined,
-          region: requestDraft.sites[0],
-          technologies: requestDraft.technologies,
-          industries: requestDraft.industries,
-          businessProblems: requestDraft.businessProblems,
-          targetRoles: requestDraft.targetRoles,
-        },
-        data.providerRelationships.map((relationship) => ({
-          preferredProviderId: relationship.preferredProviderId,
-          programmeIds: relationship.programmeIds,
-          status: relationship.status,
-        })),
-      )
-    : [], [data.providerProgrammes, data.providerRelationships, data.providers, requestDraft, selectableStandards]);
+  const requestShortlists = useMemo(() => {
+    const map = new Map<string, ProviderShortlistResult[]>();
+    for (const request of data.matchingRequests) {
+      map.set(
+        request.id,
+        buildShortlist(request, data.providers, data.providerProgrammes, selectableStandards, data.providerRelationships),
+      );
+    }
+    return map;
+  }, [data.matchingRequests, data.providerProgrammes, data.providerRelationships, data.providers, selectableStandards]);
+
+  const featuredRequest = visibleRequests.find((request) => request.id === selectedRequestId) ?? visibleRequests[0] ?? null;
+  const featuredShortlist = featuredRequest ? requestShortlists.get(featuredRequest.id) ?? [] : [];
+
+  const requestShortlist = useMemo(
+    () =>
+      requestDraft
+        ? buildShortlist(requestDraft, data.providers, data.providerProgrammes, selectableStandards, data.providerRelationships)
+        : [],
+    [data.providerProgrammes, data.providerRelationships, data.providers, requestDraft, selectableStandards],
+  );
+
+  const matchingStats = useMemo(() => {
+    const allMatches = [...requestShortlists.values()].flat();
+    const verifiedMatches = allMatches.filter((item) => item.verified);
+    const highConfidenceRequests = [...requestShortlists.values()].filter((items) => items[0]?.confidence === "High").length;
+    return {
+      relationshipCoverage: relationshipCategories.filter((category) => visibleRelationships.some((relationship) => relationship.category === category && relationship.preferredProviderId)).length,
+      requestsInFlight: data.matchingRequests.length,
+      highConfidenceRequests,
+      verifiedOptions: verifiedMatches.length,
+    };
+  }, [data.matchingRequests.length, requestShortlists, visibleRelationships]);
 
   function blankRelationship(): MvpProviderRelationship {
     return normaliseProviderRelationship({
@@ -187,11 +252,13 @@ export function ProviderMatchingModule() {
       setError("Category and preferred provider are required.");
       return;
     }
-    saveProviderRelationship(normaliseProviderRelationship({
-      ...relationshipDraft,
-      backupProviderIds: selectedRelationshipProviders.filter((id) => id !== relationshipDraft.preferredProviderId),
-      programmeIds: selectedRelationshipProgrammes,
-    }));
+    saveProviderRelationship(
+      normaliseProviderRelationship({
+        ...relationshipDraft,
+        backupProviderIds: selectedRelationshipProviders.filter((id) => id !== relationshipDraft.preferredProviderId),
+        programmeIds: selectedRelationshipProgrammes,
+      }),
+    );
     setRelationshipDraft(null);
     setSelectedRelationshipProviders([]);
     setSelectedRelationshipProgrammes([]);
@@ -205,145 +272,300 @@ export function ProviderMatchingModule() {
       setError("Workforce need is required.");
       return;
     }
-    const shortlistProviderIds = requestShortlist.filter((item) => item.verified).slice(0, 3).map((item) => item.provider.providerId);
-    saveMatchingRequest(normaliseMatchingRequest({
-      ...requestDraft,
-      roleNeed: requestDraft.roleNeed.trim(),
-      linkedStandardId: requestDraft.linkedStandardId || requestShortlist[0]?.standards[0]?.id || "",
-      shortlistProviderIds,
-      updatedAt: nowIso(),
-    }));
+    const shortlistProviderIds = requestShortlist
+      .filter((item) => item.verified)
+      .slice(0, 3)
+      .map((item) => item.provider.providerId);
+    saveMatchingRequest(
+      normaliseMatchingRequest({
+        ...requestDraft,
+        roleNeed: requestDraft.roleNeed.trim(),
+        linkedStandardId: requestDraft.linkedStandardId || requestShortlist[0]?.standards[0]?.id || "",
+        shortlistProviderIds,
+        updatedAt: nowIso(),
+      }),
+    );
     setRequestDraft(null);
     setError("");
   }
 
-  const relationshipCoverage = relationshipCategories.filter((category) => visibleRelationships.some((relationship) => relationship.category === category && relationship.preferredProviderId)).length;
-
   return (
     <div className="grid gap-5">
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard label="Covered categories" value={`${relationshipCoverage}/${relationshipCategories.length}`} copy="Preferred provider relationships with programme coverage already defined." tone="green" />
-        <SummaryCard label="Relationships to review" value={data.providerRelationships.filter((relationship) => relationship.status === "Review due").length} copy="Programme relationships that should be checked before new demand lands." tone="yellow" />
-        <SummaryCard label="Alternative sourcing" value={data.matchingRequests.length} copy="Programme-led sourcing requests where existing coverage needs support." tone="blue" />
-        <SummaryCard label="Verified shortlist options" value={requestShortlist.filter((item) => item.verified).length} copy="Verified programme matches for the current workforce requirement." tone="green" />
+        <SummaryCard
+          label="Covered categories"
+          value={`${matchingStats.relationshipCoverage}/${relationshipCategories.length}`}
+          copy="Capability areas where a preferred provider and programme position are already controlled."
+          tone="green"
+        />
+        <SummaryCard
+          label="Sourcing requests"
+          value={matchingStats.requestsInFlight}
+          copy="Employer workforce needs currently moving through LevyTate's provider matching workflow."
+          tone="blue"
+        />
+        <SummaryCard
+          label="High confidence matches"
+          value={matchingStats.highConfidenceRequests}
+          copy="Requests where the current top recommendation already has strong commercial and delivery alignment."
+          tone="green"
+        />
+        <SummaryCard
+          label="Verified shortlist options"
+          value={matchingStats.verifiedOptions}
+          copy="Programme-first shortlist options that have been verified and can support a controlled recommendation."
+          tone="yellow"
+        />
       </section>
 
-      <MvpPanel title="Provider relationships" eyebrow="Capability coverage by programme">
+      <MvpPanel title="Provider relationships" eyebrow="Controlled capability coverage">
         <MvpToolbar
           search={search}
           onSearch={setSearch}
           placeholder="Search categories, providers, programmes or notes"
           actionLabel="Add relationship"
           onAction={() => openRelationship()}
-          filters={<button type="button" onClick={() => openRequest()} className="inline-flex h-10 items-center justify-center rounded-full bg-[#edf7f3] px-4 text-xs font-semibold text-[#0b6f63] ring-1 ring-[#159b8f]/12">Create sourcing request</button>}
+          filters={
+            <button
+              type="button"
+              onClick={() => openRequest()}
+              className="inline-flex h-10 items-center justify-center rounded-full bg-[#edf7f3] px-4 text-xs font-semibold text-[#0b6f63] ring-1 ring-[#159b8f]/12"
+            >
+              Create sourcing request
+            </button>
+          }
         />
 
         {visibleRelationships.length ? (
-          <TableShell>
-            <TableHead>
-              <tr>
-                <th className="px-4 py-3">Capability area</th>
-                <th className="px-4 py-3">Preferred provider</th>
-                <th className="px-4 py-3">Fallback providers</th>
-                <th className="px-4 py-3">Programme coverage</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-right">Actions</th>
-              </tr>
-            </TableHead>
-            <TableBody>
-              {visibleRelationships.map((relationship) => {
-                const preferred = data.providers.find((provider) => provider.providerId === relationship.preferredProviderId);
-                const backups = relationship.backupProviderIds.map((id) => data.providers.find((provider) => provider.providerId === id)?.providerName).filter(Boolean);
-                const programmeNames = relationship.programmeIds.map((id) => data.providerProgrammes.find((programme) => programme.id === id)?.programmeName).filter(Boolean);
-                return (
-                  <tr key={relationship.id}>
-                    <td className="px-4 py-3 font-semibold">{relationship.category}</td>
-                    <td className="px-4 py-3">
-                      <p className="text-[#102c3d]/72">{preferred?.providerName ?? "Preferred provider not assigned"}</p>
-                      <p className="mt-0.5 text-xs text-[#102c3d]/42">Review {relationship.reviewDate || "date to confirm"}</p>
-                    </td>
-                    <td className="px-4 py-3 text-[#102c3d]/62">{backups.length ? backups.join(", ") : "No fallback providers"}</td>
-                    <td className="px-4 py-3 text-[#102c3d]/62">{programmeNames.length ? programmeNames.slice(0, 2).join(", ") : "No programmes linked"}</td>
-                    <td className="px-4 py-3"><StatusBadge tone={statusTone(relationship.status)}>{relationship.status}</StatusBadge></td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end gap-2">
-                        <TableAction onClick={() => openRelationship(relationship)}>Manage</TableAction>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </TableBody>
-          </TableShell>
+          <div className="grid gap-4 xl:grid-cols-2">
+            {visibleRelationships.map((relationship) => {
+              const preferred = data.providers.find((provider) => provider.providerId === relationship.preferredProviderId);
+              const backups = relationship.backupProviderIds
+                .map((id) => data.providers.find((provider) => provider.providerId === id)?.providerName)
+                .filter(Boolean) as string[];
+              const programmes = relationship.programmeIds
+                .map((id) => data.providerProgrammes.find((programme) => programme.id === id))
+                .filter(Boolean);
+
+              return (
+                <article
+                  key={relationship.id}
+                  className="rounded-2xl border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_14px_34px_rgba(16,44,61,0.045)]"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">
+                        {relationship.category}
+                      </p>
+                      <h3 className="mt-1 text-base font-semibold text-[#102c3d]">
+                        {preferred?.providerName ?? "Preferred provider not assigned"}
+                      </h3>
+                    </div>
+                    <StatusBadge tone={statusTone(relationship.status)}>{relationship.status}</StatusBadge>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 md:grid-cols-3">
+                    <MetricMini title="Programme coverage" value={String(programmes.length)} />
+                    <MetricMini title="Fallback providers" value={String(backups.length)} />
+                    <MetricMini title="Review date" value={relationship.reviewDate || "To confirm"} />
+                  </div>
+
+                  <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                    <InfoList label="Programme propositions" items={programmes.map((programme) => programme?.programmeName ?? "")} empty="No programmes linked yet" />
+                    <InfoList label="Fallback options" items={backups} empty="No fallback providers" />
+                  </div>
+
+                  <p className="mt-4 text-sm leading-6 text-[#102c3d]/58">
+                    {relationship.notes || "Add notes explaining why this provider relationship is commercially preferred."}
+                  </p>
+
+                  <div className="mt-4 flex justify-end">
+                    <TableAction onClick={() => openRelationship(relationship)}>Manage relationship</TableAction>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
         ) : (
-          <EmptyState title="No provider relationships yet" copy="Create preferred provider relationships by capability area and programme coverage so the employer does not restart from zero each time." actionLabel="Add relationship" onAction={() => openRelationship()} />
+          <EmptyState
+            title="No provider relationships yet"
+            copy="Create preferred provider relationships by capability area and programme coverage so the employer does not restart from zero each time."
+            actionLabel="Add relationship"
+            onAction={() => openRelationship()}
+          />
         )}
       </MvpPanel>
 
-      <MvpPanel title="Sourcing requests" eyebrow="Programme-based matching">
-        {visibleRequests.length ? (
-          <TableShell>
-            <TableHead>
-              <tr>
-                <th className="px-4 py-3">Need</th>
-                <th className="px-4 py-3">Programme focus</th>
-                <th className="px-4 py-3">Sites</th>
-                <th className="px-4 py-3">Shortlist</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-right">Actions</th>
-              </tr>
-            </TableHead>
-            <TableBody>
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,0.95fr)_minmax(360px,1.05fr)]">
+        <MvpPanel
+          title="Sourcing requests"
+          eyebrow="Employer matching workflow"
+          actions={
+            <button
+              type="button"
+              onClick={() => openRequest()}
+              className="inline-flex h-10 items-center justify-center rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white shadow-[0_8px_18px_rgba(16,44,61,0.12)]"
+            >
+              New request
+            </button>
+          }
+        >
+          {visibleRequests.length ? (
+            <div className="grid gap-4">
               {visibleRequests.map((request) => {
-                const programme = data.providerProgrammes.find((item) => item.id === request.programmeId);
-                const standard = getApprenticeshipStandard(request.linkedStandardId);
+                const shortlist = requestShortlists.get(request.id) ?? [];
+                const topMatch = shortlist[0];
                 return (
-                  <tr key={request.id}>
-                    <td className="px-4 py-3 font-semibold">{request.roleNeed}</td>
-                    <td className="px-4 py-3">
-                      <p className="text-[#102c3d]/72">{programme?.programmeName ?? "Programme to confirm"}</p>
-                      <p className="mt-0.5 text-xs text-[#102c3d]/42">{standard?.title ?? "Linked standard to confirm"}</p>
-                    </td>
-                    <td className="px-4 py-3 text-[#102c3d]/62">{request.sites.join(", ") || "All sites"}</td>
-                    <td className="px-4 py-3 text-[#102c3d]/62">{request.shortlistProviderIds.length} shortlisted</td>
-                    <td className="px-4 py-3"><select value={request.status} onChange={(event) => updateMatchingStatus(request.id, event.target.value as MvpMatchingStatus)} className="h-9 rounded-lg border border-[#102c3d]/[0.08] bg-[#f8fbfa] px-2 text-xs font-semibold">{matchingStatuses.map((item) => <option key={item}>{item}</option>)}</select></td>
-                    <td className="px-4 py-3 text-right"><TableAction onClick={() => openRequest(request)}>Review</TableAction></td>
-                  </tr>
+                  <RequestCard
+                    key={request.id}
+                    request={request}
+                    topMatch={topMatch}
+                    selected={featuredRequest?.id === request.id}
+                    onSelect={() => setSelectedRequestId(request.id)}
+                    onReview={() => openRequest(request)}
+                    onStatusChange={(value) => updateMatchingStatus(request.id, value)}
+                  />
                 );
               })}
-            </TableBody>
-          </TableShell>
-        ) : (
-          <EmptyState title="No sourcing requests yet" copy="Raise a sourcing request when the employer needs help finding the best-fit provider programme for a workforce challenge." actionLabel="Create request" onAction={() => openRequest()} />
-        )}
-      </MvpPanel>
+            </div>
+          ) : (
+            <EmptyState
+              title="No sourcing requests yet"
+              copy="Raise a sourcing request when an employer needs LevyTate to prepare a controlled shortlist of best-fit provider programmes."
+              actionLabel="Create request"
+              onAction={() => openRequest()}
+            />
+          )}
+        </MvpPanel>
+
+        <MvpPanel title="Executive shortlist" eyebrow="Programme-led recommendation">
+          {featuredRequest && featuredShortlist.length ? (
+            <div className="grid gap-4">
+              <div className="rounded-2xl border border-[#102c3d]/[0.07] bg-[linear-gradient(135deg,#f8fbfa_0%,#edf7f3_100%)] p-5">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">
+                      {featuredRequest.department || "Organisation-wide need"}
+                    </p>
+                    <h3 className="mt-1 text-lg font-semibold text-[#102c3d]">{featuredRequest.roleNeed}</h3>
+                    <p className="mt-2 text-sm leading-6 text-[#102c3d]/58">
+                      {featuredRequest.futureCapability || "Future capability objective to confirm"}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <StatusBadge tone={statusTone(featuredRequest.status)}>{featuredRequest.status}</StatusBadge>
+                    <StatusBadge tone={confidenceTone(featuredShortlist[0].confidence)}>
+                      {featuredShortlist[0].confidence} confidence
+                    </StatusBadge>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-4">
+                  <MetricMini title="Learners" value={String(featuredRequest.learnerCount)} />
+                  <MetricMini title="Delivery" value={featuredRequest.deliveryPreference} />
+                  <MetricMini title="Funding" value={featuredRequest.fundingPosition} />
+                  <MetricMini title="Sites" value={featuredRequest.sites.join(", ") || "All sites"} />
+                </div>
+              </div>
+
+              <RecommendationCard item={featuredShortlist[0]} featured />
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                {featuredShortlist.slice(1, 3).map((item) => (
+                  <RecommendationCard key={`${item.provider.providerId}-${item.programme.id}`} item={item} />
+                ))}
+              </div>
+            </div>
+          ) : (
+            <EmptyState
+              title="No shortlist in view"
+              copy="Create or select a sourcing request to see LevyTate's programme-led shortlist with rationale, risks and employer fit."
+              actionLabel="Create request"
+              onAction={() => openRequest()}
+            />
+          )}
+        </MvpPanel>
+      </div>
 
       {relationshipDraft ? (
         <MvpModal title="Provider relationship" eyebrow="Preferred programme setup" onClose={() => setRelationshipDraft(null)} wide>
           <form onSubmit={submitRelationship} className="grid gap-4">
             <FormSection title="Relationship settings" copy="Define the capability area, preferred provider and review cadence.">
               <FormGrid>
-                <FormSelect label="Capability area" value={relationshipDraft.category} onChange={(value) => setRelationshipDraft({ ...relationshipDraft, category: value as MvpProviderRelationshipCategory })} options={relationshipCategories} />
-                <FormSelect label="Preferred provider" value={relationshipDraft.preferredProviderId} onChange={(value) => setRelationshipDraft({ ...relationshipDraft, preferredProviderId: value })} options={[{ value: "", label: "Select preferred provider" }, ...activeProviders.map((provider) => ({ value: provider.providerId, label: provider.providerName }))]} />
-                <FormSelect label="Relationship status" value={relationshipDraft.status} onChange={(value) => setRelationshipDraft({ ...relationshipDraft, status: value as MvpProviderRelationshipStatus })} options={relationshipStatuses} />
-                <FormField label="Review date" type="date" value={relationshipDraft.reviewDate} onChange={(value) => setRelationshipDraft({ ...relationshipDraft, reviewDate: value })} />
-                <FormField label="Last used" type="date" value={relationshipDraft.lastUsedDate} onChange={(value) => setRelationshipDraft({ ...relationshipDraft, lastUsedDate: value })} />
-                <FormTextArea label="Relationship notes" value={relationshipDraft.notes} onChange={(value) => setRelationshipDraft({ ...relationshipDraft, notes: value })} wide />
+                <FormSelect
+                  label="Capability area"
+                  value={relationshipDraft.category}
+                  onChange={(value) =>
+                    setRelationshipDraft({ ...relationshipDraft, category: value as MvpProviderRelationshipCategory })
+                  }
+                  options={relationshipCategories}
+                />
+                <FormSelect
+                  label="Preferred provider"
+                  value={relationshipDraft.preferredProviderId}
+                  onChange={(value) => setRelationshipDraft({ ...relationshipDraft, preferredProviderId: value })}
+                  options={[
+                    { value: "", label: "Select preferred provider" },
+                    ...activeProviders.map((provider) => ({ value: provider.providerId, label: provider.providerName })),
+                  ]}
+                />
+                <FormSelect
+                  label="Relationship status"
+                  value={relationshipDraft.status}
+                  onChange={(value) => setRelationshipDraft({ ...relationshipDraft, status: value as MvpProviderRelationshipStatus })}
+                  options={relationshipStatuses}
+                />
+                <FormField
+                  label="Review date"
+                  type="date"
+                  value={relationshipDraft.reviewDate}
+                  onChange={(value) => setRelationshipDraft({ ...relationshipDraft, reviewDate: value })}
+                />
+                <FormField
+                  label="Last used"
+                  type="date"
+                  value={relationshipDraft.lastUsedDate}
+                  onChange={(value) => setRelationshipDraft({ ...relationshipDraft, lastUsedDate: value })}
+                />
+                <FormTextArea
+                  label="Relationship notes"
+                  value={relationshipDraft.notes}
+                  onChange={(value) => setRelationshipDraft({ ...relationshipDraft, notes: value })}
+                  wide
+                />
               </FormGrid>
             </FormSection>
 
             <div className="grid gap-4 lg:grid-cols-2">
               <FormSection title="Fallback providers" copy="Keep controlled alternatives ready when the preferred provider cannot deliver.">
                 <div className="grid gap-2">
-                  {activeProviders.filter((provider) => provider.providerId !== relationshipDraft.preferredProviderId).map((provider) => {
-                    const checked = selectedRelationshipProviders.includes(provider.providerId);
-                    return (
-                      <label key={provider.providerId} className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm ring-1 transition ${checked ? "bg-white ring-[#159b8f]/20 text-[#102c3d]" : "bg-transparent ring-[#102c3d]/[0.06] text-[#102c3d]/62"}`}>
-                        <input type="checkbox" checked={checked} onChange={() => setSelectedRelationshipProviders((current) => checked ? current.filter((item) => item !== provider.providerId) : [...current, provider.providerId])} className="accent-[#159b8f]" />
-                        {provider.providerName}
-                      </label>
-                    );
-                  })}
+                  {activeProviders
+                    .filter((provider) => provider.providerId !== relationshipDraft.preferredProviderId)
+                    .map((provider) => {
+                      const checked = selectedRelationshipProviders.includes(provider.providerId);
+                      return (
+                        <label
+                          key={provider.providerId}
+                          className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm ring-1 transition ${
+                            checked
+                              ? "bg-white ring-[#159b8f]/20 text-[#102c3d]"
+                              : "bg-transparent ring-[#102c3d]/[0.06] text-[#102c3d]/62"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() =>
+                              setSelectedRelationshipProviders((current) =>
+                                checked ? current.filter((item) => item !== provider.providerId) : [...current, provider.providerId],
+                              )
+                            }
+                            className="accent-[#159b8f]"
+                          />
+                          {provider.providerName}
+                        </label>
+                      );
+                    })}
                 </div>
               </FormSection>
 
@@ -352,12 +574,30 @@ export function ProviderMatchingModule() {
                   {activeProgrammes.map((programme) => {
                     const checked = selectedRelationshipProgrammes.includes(programme.id);
                     return (
-                      <label key={programme.id} className={`rounded-xl px-3 py-2 text-sm ring-1 transition ${checked ? "bg-white ring-[#159b8f]/20 text-[#102c3d]" : "bg-transparent ring-[#102c3d]/[0.06] text-[#102c3d]/62"}`}>
+                      <label
+                        key={programme.id}
+                        className={`rounded-xl px-3 py-2 text-sm ring-1 transition ${
+                          checked
+                            ? "bg-white ring-[#159b8f]/20 text-[#102c3d]"
+                            : "bg-transparent ring-[#102c3d]/[0.06] text-[#102c3d]/62"
+                        }`}
+                      >
                         <span className="flex items-start gap-3">
-                          <input type="checkbox" checked={checked} onChange={() => setSelectedRelationshipProgrammes((current) => checked ? current.filter((item) => item !== programme.id) : [...current, programme.id])} className="mt-1 accent-[#159b8f]" />
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() =>
+                              setSelectedRelationshipProgrammes((current) =>
+                                checked ? current.filter((item) => item !== programme.id) : [...current, programme.id],
+                              )
+                            }
+                            className="mt-1 accent-[#159b8f]"
+                          />
                           <span>
                             <span className="block font-semibold">{programme.programmeName}</span>
-                            <span className="text-xs text-[#102c3d]/46">{programme.targetJobRoles.slice(0, 2).join(", ") || "Programme roles to confirm"}</span>
+                            <span className="text-xs text-[#102c3d]/46">
+                              {programme.targetJobRoles.slice(0, 2).join(", ") || "Programme roles to confirm"}
+                            </span>
                           </span>
                         </span>
                       </label>
@@ -377,28 +617,81 @@ export function ProviderMatchingModule() {
           <form onSubmit={submitRequest} className="grid gap-4">
             <FormSection title="Workforce requirement" copy="Describe the business challenge and the programme proposition LevyTate should match against.">
               <FormGrid>
-                <FormField label="Workforce need" value={requestDraft.roleNeed} onChange={(value) => setRequestDraft({ ...requestDraft, roleNeed: value })} required wide />
-                <FormField label="Department" value={requestDraft.department} onChange={(value) => setRequestDraft({ ...requestDraft, department: value })} />
-                <FormField label="Future capability" value={requestDraft.futureCapability} onChange={(value) => setRequestDraft({ ...requestDraft, futureCapability: value })} />
-                <FormSelect label="Employer size" value={requestDraft.employerSize} onChange={(value) => setRequestDraft({ ...requestDraft, employerSize: value as MvpMatchingRequest["employerSize"] })} options={employerSizeOptions.map((item) => ({ value: item, label: item || "Not specified" }))} />
-                <FormSelect label="Preferred programme" value={requestDraft.programmeId} onChange={(value) => {
-                  const programme = data.providerProgrammes.find((item) => item.id === value);
-                  setRequestDraft({
-                    ...requestDraft,
-                    programmeId: value,
-                    linkedStandardId: programme?.linkedStandardId ?? requestDraft.linkedStandardId,
-                  });
-                }} options={[{ value: "", label: "Match from requirement" }, ...activeProgrammes.map((programme) => ({ value: programme.id, label: programme.programmeName }))]} wide />
+                <FormField
+                  label="Workforce need"
+                  value={requestDraft.roleNeed}
+                  onChange={(value) => setRequestDraft({ ...requestDraft, roleNeed: value })}
+                  required
+                  wide
+                />
+                <FormField
+                  label="Department"
+                  value={requestDraft.department}
+                  onChange={(value) => setRequestDraft({ ...requestDraft, department: value })}
+                />
+                <FormField
+                  label="Future capability"
+                  value={requestDraft.futureCapability}
+                  onChange={(value) => setRequestDraft({ ...requestDraft, futureCapability: value })}
+                />
+                <FormSelect
+                  label="Employer size"
+                  value={requestDraft.employerSize}
+                  onChange={(value) => setRequestDraft({ ...requestDraft, employerSize: value as MvpMatchingRequest["employerSize"] })}
+                  options={employerSizeOptions.map((item) => ({ value: item, label: item || "Not specified" }))}
+                />
+                <FormSelect
+                  label="Preferred programme"
+                  value={requestDraft.programmeId}
+                  onChange={(value) => {
+                    const programme = data.providerProgrammes.find((item) => item.id === value);
+                    setRequestDraft({
+                      ...requestDraft,
+                      programmeId: value,
+                      linkedStandardId: programme?.linkedStandardId ?? requestDraft.linkedStandardId,
+                    });
+                  }}
+                  options={[
+                    { value: "", label: "Match from requirement" },
+                    ...activeProgrammes.map((programme) => ({ value: programme.id, label: programme.programmeName })),
+                  ]}
+                  wide
+                />
               </FormGrid>
             </FormSection>
 
             <FormSection title="Matching signals" copy="These inputs help LevyTate rank programme propositions before standards and funding checks are applied.">
               <FormGrid>
-                <FormField label="Learners" type="number" value={String(requestDraft.learnerCount)} onChange={(value) => setRequestDraft({ ...requestDraft, learnerCount: Number(value) || 1 })} />
-                <FormSelect label="Delivery preference" value={requestDraft.deliveryPreference} onChange={(value) => setRequestDraft({ ...requestDraft, deliveryPreference: value })} options={["Blended", "Remote", "Employer site", "Hybrid", "Online"]} />
+                <FormField
+                  label="Learners"
+                  type="number"
+                  value={String(requestDraft.learnerCount)}
+                  onChange={(value) => setRequestDraft({ ...requestDraft, learnerCount: Number(value) || 1 })}
+                />
+                <FormSelect
+                  label="Delivery preference"
+                  value={requestDraft.deliveryPreference}
+                  onChange={(value) => setRequestDraft({ ...requestDraft, deliveryPreference: value })}
+                  options={["Blended", "Remote", "Employer site", "Hybrid", "Online"]}
+                />
                 <FormTagInput label="Sites" values={requestDraft.sites} onChange={(value) => setRequestDraft({ ...requestDraft, sites: value })} />
-                <FormSelect label="Funding position" value={requestDraft.fundingPosition} onChange={(value) => setRequestDraft({ ...requestDraft, fundingPosition: value })} options={["Potentially levy-funded", "Potentially funded through levy/co-investment", "Commercial training budget", "Unsure"]} />
-                <FormSelect label="Urgency" value={requestDraft.urgency} onChange={(value) => setRequestDraft({ ...requestDraft, urgency: value })} options={["Exploring", "This quarter", "Next cohort", "Urgent"]} />
+                <FormSelect
+                  label="Funding position"
+                  value={requestDraft.fundingPosition}
+                  onChange={(value) => setRequestDraft({ ...requestDraft, fundingPosition: value })}
+                  options={[
+                    "Potentially levy-funded",
+                    "Potentially funded through levy/co-investment",
+                    "Commercial training budget",
+                    "Unsure",
+                  ]}
+                />
+                <FormSelect
+                  label="Urgency"
+                  value={requestDraft.urgency}
+                  onChange={(value) => setRequestDraft({ ...requestDraft, urgency: value })}
+                  options={["Exploring", "This quarter", "Next cohort", "Urgent"]}
+                />
                 <FormTagInput label="Target roles" values={requestDraft.targetRoles} onChange={(value) => setRequestDraft({ ...requestDraft, targetRoles: value })} wide />
                 <FormTagInput label="Business problems" values={requestDraft.businessProblems} onChange={(value) => setRequestDraft({ ...requestDraft, businessProblems: value })} wide />
                 <FormTagInput label="Technologies" values={requestDraft.technologies} onChange={(value) => setRequestDraft({ ...requestDraft, technologies: value })} wide />
@@ -407,27 +700,21 @@ export function ProviderMatchingModule() {
               </FormGrid>
             </FormSection>
 
-            <FormSection title="Programme shortlist preview" copy="The shortlist ranks provider programmes first. The official standard is shown as supporting metadata underneath.">
-              <div className="grid gap-3 lg:grid-cols-3">
-                {requestShortlist.slice(0, 3).map((item) => {
-                  const standard = item.standards[0];
-                  return (
-                    <div key={`${item.provider.providerId}-${item.programme.id}`} className="rounded-xl bg-white p-4 ring-1 ring-[#102c3d]/[0.06]">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm font-semibold text-[#102c3d]">{item.programme.programmeName}</p>
-                        <StatusBadge tone={item.verified ? "green" : "yellow"}>{item.score}% match</StatusBadge>
-                      </div>
-                      <p className="mt-1 text-xs font-semibold text-[#0b6f63]">{item.provider.providerName}</p>
-                      <p className="mt-2 text-xs leading-5 text-[#102c3d]/56">{item.programme.shortDescription}</p>
-                      <p className="mt-2 text-xs text-[#102c3d]/42">Linked standard: {standard?.title ?? "To confirm"}</p>
-                      <ul className="mt-3 space-y-1 text-xs text-[#102c3d]/56">
-                        {item.reasons.slice(0, 4).map((reason) => <li key={reason}>- {reason}</li>)}
-                      </ul>
-                    </div>
-                  );
-                })}
-              </div>
-              {!requestShortlist.length ? <p className="mt-3 text-sm text-[#102c3d]/52">Add role need, business problems, delivery and industry context to preview programme matches.</p> : null}
+            <FormSection title="Programme shortlist preview" copy="The shortlist ranks provider programmes first. The linked standard stays underneath as funding and compliance metadata.">
+              {requestShortlist.length ? (
+                <div className="grid gap-4">
+                  <RecommendationCard item={requestShortlist[0]} featured />
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    {requestShortlist.slice(1, 3).map((item) => (
+                      <RecommendationCard key={`${item.provider.providerId}-${item.programme.id}`} item={item} />
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-[#102c3d]/52">
+                  Add role need, business problems, delivery and industry context to preview programme matches.
+                </p>
+              )}
             </FormSection>
 
             <FormActions onCancel={() => setRequestDraft(null)} label="Save request" error={error} />
@@ -453,4 +740,167 @@ function SummaryCard({ label, value, copy, tone }: { label: string; value: strin
   );
 }
 
+function MetricMini({ title, value }: { title: string; value: string }) {
+  return (
+    <div className="rounded-2xl bg-[#f8fbfa] p-3 ring-1 ring-[#102c3d]/[0.06]">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/42">{title}</p>
+      <p className="mt-2 text-sm font-semibold text-[#102c3d]">{value}</p>
+    </div>
+  );
+}
 
+function InfoList({ label, items, empty }: { label: string; items: string[]; empty: string }) {
+  const values = items.filter(Boolean);
+  return (
+    <div className="rounded-2xl bg-[#f8fbfa] p-4 ring-1 ring-[#102c3d]/[0.06]">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/42">{label}</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {values.length ? values.map((item) => <Tag key={item}>{item}</Tag>) : <p className="text-sm text-[#102c3d]/48">{empty}</p>}
+      </div>
+    </div>
+  );
+}
+
+function RequestCard({
+  request,
+  topMatch,
+  selected,
+  onSelect,
+  onReview,
+  onStatusChange,
+}: {
+  request: MvpMatchingRequest;
+  topMatch?: ProviderShortlistResult;
+  selected: boolean;
+  onSelect: () => void;
+  onReview: () => void;
+  onStatusChange: (value: MvpMatchingStatus) => void;
+}) {
+  return (
+    <article className={`rounded-2xl border p-4 shadow-[0_12px_28px_rgba(16,44,61,0.04)] transition ${selected ? "border-[#159b8f]/35 bg-[#f8fbfa]" : "border-[#102c3d]/[0.07] bg-white"}`}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#c95568]">{request.department || "Matching request"}</p>
+          <h3 className="mt-1 text-base font-semibold text-[#102c3d]">{request.roleNeed}</h3>
+          <p className="mt-1 text-sm text-[#102c3d]/56">{request.futureCapability || "Future capability to confirm"}</p>
+        </div>
+        <StatusBadge tone={statusTone(request.status)}>{request.status}</StatusBadge>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <MetricMini title="Top match" value={topMatch ? `${topMatch.score}%` : "Pending"} />
+        <MetricMini title="Learners" value={String(request.learnerCount)} />
+        <MetricMini title="Funding" value={request.fundingPosition} />
+      </div>
+
+      <div className="mt-4 rounded-2xl bg-[#f8fbfa] p-4 ring-1 ring-[#102c3d]/[0.06]">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm font-semibold text-[#102c3d]">{topMatch?.programme.programmeName ?? "Programme to confirm"}</p>
+          {topMatch ? <StatusBadge tone={confidenceTone(topMatch.confidence)}>{topMatch.confidence}</StatusBadge> : null}
+        </div>
+        <p className="mt-1 text-xs font-semibold text-[#0b6f63]">{topMatch?.provider.providerName ?? "Provider to be shortlisted"}</p>
+        <p className="mt-2 text-sm leading-6 text-[#102c3d]/58">{topMatch?.programme.shortDescription ?? "LevyTate will rank provider programmes against business need, delivery fit and workforce context."}</p>
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <select value={request.status} onChange={(event) => onStatusChange(event.target.value as MvpMatchingStatus)} className="h-9 rounded-lg border border-[#102c3d]/[0.08] bg-white px-3 text-xs font-semibold text-[#102c3d]">
+          {matchingStatuses.map((item) => <option key={item}>{item}</option>)}
+        </select>
+        <div className="flex gap-2">
+          <TableAction onClick={onSelect}>Focus shortlist</TableAction>
+          <TableAction onClick={onReview}>Review request</TableAction>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function RecommendationCard({ item, featured = false }: { item: ProviderShortlistResult; featured?: boolean }) {
+  const standard = item.standards[0];
+  return (
+    <article className={`overflow-hidden rounded-2xl border bg-white shadow-[0_16px_36px_rgba(16,44,61,0.05)] ${featured ? "border-[#159b8f]/28" : "border-[#102c3d]/[0.07]"}`}>
+      <div className={`px-5 py-5 ${featured ? "bg-[linear-gradient(135deg,#102c3d_0%,#174761_60%,#1f7b78_100%)] text-white" : "bg-[linear-gradient(135deg,#f8fbfa_0%,#edf7f3_100%)]"}`}>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className={`text-[10px] font-semibold uppercase tracking-[0.14em] ${featured ? "text-white/70" : "text-[#c95568]"}`}>{featured ? "Recommended programme" : "Alternative option"}</p>
+            <h3 className={`mt-1 text-lg font-semibold ${featured ? "text-white" : "text-[#102c3d]"}`}>{item.programme.programmeName}</h3>
+            <p className={`mt-1 text-sm ${featured ? "text-white/74" : "text-[#0b6f63]"}`}>{item.provider.providerName}</p>
+          </div>
+          <div className="text-right">
+            <StatusBadge tone={featured ? "green" : confidenceTone(item.confidence)}>{item.score}% match</StatusBadge>
+            <p className={`mt-2 text-xs font-semibold ${featured ? "text-white/74" : "text-[#102c3d]/46"}`}>{item.confidence} confidence</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-4 p-5">
+        <p className="text-sm leading-6 text-[#102c3d]/58">{item.programme.shortDescription}</p>
+
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <Fact icon={Target} label="Delivery fit" value={item.deliveryFit} />
+          <Fact icon={ShieldCheck} label="Funding" value={item.fundingSuitability} />
+          <Fact icon={BriefcaseBusiness} label="Employer fit" value={item.recommendedEmployerType} />
+          <Fact icon={Gauge} label="Verification" value={item.verified ? "Verified for shortlist" : "Requires verification"} />
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <SignalCard title="Why recommended" icon={Sparkles} items={item.reasons.slice(0, 5)} fallback="Recommendation rationale will appear here." />
+          <SignalCard title="Strengths" icon={ArrowUpRight} items={item.strengths.length ? item.strengths : item.employerBenefits.slice(0, 4)} fallback="Strengths to confirm." />
+          <SignalCard title="Employer benefits" icon={Building2} items={item.employerBenefits.slice(0, 4)} fallback="Employer outcomes to confirm." />
+          <SignalCard title="Future capability impact" icon={Network} items={item.futureCapabilityImpact.slice(0, 4)} fallback="Future capability impact to confirm." />
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+          <div className="rounded-2xl bg-[#f8fbfa] p-4 ring-1 ring-[#102c3d]/[0.06]">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/42">Evidence signals</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {item.technologyAlignment.map((value) => <Tag key={value}>{value}</Tag>)}
+              {item.industryAlignment.map((value) => <Tag key={value}>{value}</Tag>)}
+              {item.businessProblemsMatched.map((value) => <Tag key={value}>{value}</Tag>)}
+              {item.skillsMatched.map((value) => <Tag key={value}>{value}</Tag>)}
+              {!item.technologyAlignment.length && !item.industryAlignment.length && !item.businessProblemsMatched.length && !item.skillsMatched.length ? <p className="text-sm text-[#102c3d]/48">Add stronger role, industry, technology or business problem context to sharpen the evidence trail.</p> : null}
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-[#f8fbfa] p-4 ring-1 ring-[#102c3d]/[0.06]">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/42">Compliance metadata</p>
+            <p className="mt-3 text-sm font-semibold text-[#102c3d]">{standard?.title ?? "Linked standard to confirm"}</p>
+            <p className="mt-1 text-xs text-[#102c3d]/46">{standard ? `${standard.referenceCode} | Level ${standard.level}` : "Funding and compliance record to confirm"}</p>
+            <p className="mt-4 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/42">Potential risks</p>
+            <ul className="mt-2 space-y-2 text-sm text-[#102c3d]/58">
+              {(item.potentialRisks.length ? item.potentialRisks : ["No material risks flagged at this stage."]).map((risk) => (
+                <li key={risk} className="flex gap-2"><CircleAlert size={14} className="mt-1 shrink-0 text-[#c95568]" />{risk}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function Fact({ icon: Icon, label, value }: { icon: typeof Gauge; label: string; value: string }) {
+  return (
+    <div className="rounded-2xl bg-[#f8fbfa] p-3 ring-1 ring-[#102c3d]/[0.06]">
+      <div className="flex items-center gap-2 text-[#0b8e82]"><Icon size={14} /><span className="text-[10px] font-semibold uppercase tracking-[0.12em]">{label}</span></div>
+      <p className="mt-2 text-sm font-semibold text-[#102c3d]">{value}</p>
+    </div>
+  );
+}
+
+function SignalCard({ icon: Icon, title, items, fallback }: { icon: typeof Sparkles; title: string; items: string[]; fallback: string }) {
+  return (
+    <div className="rounded-2xl bg-[#f8fbfa] p-4 ring-1 ring-[#102c3d]/[0.06]">
+      <div className="flex items-center gap-2 text-[#0b8e82]"><Icon size={15} /><p className="text-sm font-semibold text-[#102c3d]">{title}</p></div>
+      <ul className="mt-3 space-y-2 text-sm text-[#102c3d]/58">
+        {(items.length ? items : [fallback]).map((item) => (
+          <li key={item} className="flex gap-2"><span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#159b8f]" />{item}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function Tag({ children }: { children: string }) {
+  return <span className="inline-flex rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#102c3d]/68 ring-1 ring-[#102c3d]/[0.07]">{children}</span>;
+}

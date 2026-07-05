@@ -4,6 +4,10 @@ import type {
   ProviderProgramme,
   RequestStatus,
 } from "@/lib/levytate/domain";
+import {
+  serialiseProgrammeRecordNotes,
+  serialiseProviderRecordNotes,
+} from "@/lib/levytate/domain";
 import { mvpProviderCatalogue, mvpProviderProgrammes } from "@/lib/levytate/data/mvp/provider-catalogue";
 import type { LevyTateBetaSession } from "@/lib/levytate/config/beta-access";
 import type { LevyTateWorkspaceBootstrap, LevyTateWorkspaceMeta, LevyTateWorkspaceMutation } from "@/lib/levytate/mvp/api";
@@ -13,6 +17,7 @@ import {
   createEmptyMvpWorkspace,
   normaliseMatchingRequest,
   normaliseProviderProgramme,
+  normaliseProviderRecord,
   normaliseProviderRelationship,
   nowIso,
   type MvpApplication,
@@ -647,7 +652,7 @@ async function seedOrganisationProviders(organisationId: string) {
     ofsted_rating: provider.ofstedRating,
     status: provider.status,
     source_urls: provider.sourceUrls,
-    notes: provider.notes,
+    notes: serialiseProviderRecordNotes(provider.notes, provider.commercialProfile),
     last_verified: provider.lastVerified,
     verification_status: provider.verificationStatus,
   }));
@@ -956,7 +961,7 @@ async function saveProvider(organisationId: string, provider: ProviderCatalogueR
     ofsted_rating: provider.ofstedRating,
     status: provider.status,
     source_urls: provider.sourceUrls,
-    notes: provider.notes,
+    notes: serialiseProviderRecordNotes(provider.notes, provider.commercialProfile),
     last_verified: provider.lastVerified,
     verification_status: provider.verificationStatus,
   };
@@ -1000,7 +1005,7 @@ async function saveProviderProgramme(organisationId: string, programme: Provider
     funding_band: normalised.fundingBand,
     official_url: normalised.officialUrl,
     source_url: normalised.sourceUrl,
-    notes: normalised.notes,
+    notes: serialiseProgrammeRecordNotes(normalised.notes, normalised.commercialProfile),
     funding_route: normalised.fundingRoute,
     record_status: normalised.recordStatus,
     created_at: normalised.createdAt,
@@ -1347,7 +1352,7 @@ function applicationRowToRecord(row: ApplicationRow, historyRows: ApplicationHis
 }
 
 function providerRowToRecord(row: ProviderRow): ProviderCatalogueRecord {
-  return {
+  return normaliseProviderRecord({
     providerId: row.provider_id,
     providerName: row.provider_name,
     website: row.website,
@@ -1367,7 +1372,7 @@ function providerRowToRecord(row: ProviderRow): ProviderCatalogueRecord {
     notes: row.notes,
     lastVerified: row.last_verified,
     verificationStatus: row.verification_status,
-  };
+  });
 }
 function providerProgrammeRowToRecord(row: ProviderProgrammeRow): ProviderProgramme {
   return normaliseProviderProgramme({
@@ -1506,4 +1511,11 @@ function assertSupabase() {
   }
   return config;
 }
+
+
+
+
+
+
+
 

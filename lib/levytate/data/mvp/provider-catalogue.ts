@@ -6,12 +6,16 @@ import type {
   ProviderProgrammeSeniority,
   ProviderProgrammeVerificationStatus,
 } from "@/lib/levytate/domain/types";
+import { emptyProgrammeCommercialProfile, emptyProviderCommercialProfile } from "@/lib/levytate/domain/provider-commercial";
 
 const now = "2026-07-02";
 const national = ["England", "Remote", "Hybrid"];
 
-function provider(config: ProviderCatalogueRecord): ProviderCatalogueRecord {
-  return config;
+function provider(config: Omit<ProviderCatalogueRecord, "commercialProfile"> & { commercialProfile?: ProviderCatalogueRecord["commercialProfile"] }): ProviderCatalogueRecord {
+  return {
+    ...config,
+    commercialProfile: config.commercialProfile ?? emptyProviderCommercialProfile(),
+  };
 }
 
 function programme(config: {
@@ -73,6 +77,7 @@ function programme(config: {
     officialUrl: "",
     sourceUrl: config.sourceUrl,
     notes: config.notes ?? "",
+    commercialProfile: emptyProgrammeCommercialProfile(),
     recordStatus: "Active",
     createdAt: now,
     updatedAt: now,
@@ -572,3 +577,7 @@ export const mvpProviderProgrammes: ProviderProgramme[] = [
     verificationStatus: "Needs manual verification",
   }),
 ];
+
+
+
+

@@ -2,13 +2,21 @@ import type {
   CareerLevel,
   DeliveryPreference,
   FundingRoute,
+  ProgrammeCommercialProfile,
   ProviderCatalogueRecord,
+  ProviderCommercialProfile,
   ProviderEmployerSize,
   ProviderProgramme,
   RequestStatus,
 } from "@/lib/levytate/domain";
 import {
+  emptyProgrammeCommercialProfile,
+  emptyProviderCommercialProfile,
   getApprenticeshipStandard,
+  normaliseProgrammeCommercialProfile,
+  normaliseProviderCommercialProfile,
+  parseProgrammeRecordNotes,
+  parseProviderRecordNotes,
   resolveApprenticeshipStandardId,
 } from "@/lib/levytate/domain";
 import type {
@@ -301,10 +309,64 @@ export function normaliseTagValues(values: unknown) {
   return [];
 }
 
+function mergeProviderCommercialProfile(
+  provider: Partial<ProviderCatalogueRecord> & { providerName: string; website?: string; contactName?: string; contactEmail?: string },
+  parsedProfile: ProviderCommercialProfile,
+) {
+  const base = emptyProviderCommercialProfile();
+  return normaliseProviderCommercialProfile({
+    ...base,
+    ...parsedProfile,
+    organisationDescription: parsedProfile.organisationDescription || provider.notes?.trim() || "",
+    primaryContactTitle: parsedProfile.primaryContactTitle || "LevyTate relationship lead",
+    commercialContactName: parsedProfile.commercialContactName || provider.contactName || "",
+    commercialContactEmail: parsedProfile.commercialContactEmail || provider.contactEmail || "",
+    accreditations: parsedProfile.accreditations.length ? parsedProfile.accreditations : normaliseTagValues(provider.specialisms),
+    commercialNotes: parsedProfile.commercialNotes || provider.notes?.trim() || "",
+    employerSizesSupported: parsedProfile.employerSizesSupported.length ? parsedProfile.employerSizesSupported : normaliseTagValues(provider.employerTypes),
+  });
+}
+
+function buildProgrammeAudience(programme: Partial<ProviderProgramme>) {
+  const roles = normaliseTagValues(programme.targetJobRoles).slice(0, 2).join(" and ");
+  const industries = normaliseTagValues(programme.targetIndustries).slice(0, 2).join(" and ");
+  if (roles && industries) return `${roles} across ${industries} employers`;
+  if (roles) return `${roles} building stronger workforce capability`;
+  if (industries) return `${industries} employers`;
+  return "Employers building workforce capability through role-led development";
+}
+
+function mergeProgrammeCommercialProfile(
+  programme: Partial<ProviderProgramme>,
+  parsedProfile: ProgrammeCommercialProfile,
+  primaryStandardTitle: string,
+) {
+  const base = emptyProgrammeCommercialProfile();
+  const derivedFunding = programme.fundingRoute ? [programme.fundingRoute] : [];
+  return normaliseProgrammeCommercialProfile({
+    ...base,
+    ...parsedProfile,
+    tagline: parsedProfile.tagline || programme.shortDescription?.trim() || "",
+    idealAudience: parsedProfile.idealAudience || buildProgrammeAudience(programme),
+    typicalDepartments: parsedProfile.typicalDepartments.length ? parsedProfile.typicalDepartments : normaliseTagValues(programme.targetOrganisations),
+    futureSkillsDeveloped: parsedProfile.futureSkillsDeveloped.length ? parsedProfile.futureSkillsDeveloped : normaliseTagValues(programme.skillsDeveloped),
+    keyOutcomes: parsedProfile.keyOutcomes.length ? parsedProfile.keyOutcomes : normaliseTagValues(programme.expectedOutcomes),
+    locations: parsedProfile.locations.length ? parsedProfile.locations : normaliseTagValues(programme.regions),
+    fundingOptions: parsedProfile.fundingOptions.length ? parsedProfile.fundingOptions : derivedFunding,
+    employerCommitment: parsedProfile.employerCommitment || (programme.duration ? `Typical duration ${programme.duration}. Delivery commitment confirmed during LevyTate matching.` : "Employer commitment confirmed during LevyTate matching."),
+    assessmentApproach: parsedProfile.assessmentApproach || (primaryStandardTitle ? `${primaryStandardTitle} assessment and gateway requirements apply.` : "Assessment approach confirmed against the linked standard."),
+    employerBenefits: parsedProfile.employerBenefits.length ? parsedProfile.employerBenefits : normaliseTagValues(programme.businessProblemsSolved),
+    futureCapabilityImpact: parsedProfile.futureCapabilityImpact.length ? parsedProfile.futureCapabilityImpact : normaliseTagValues(programme.expectedOutcomes),
+    confidenceLabel: parsedProfile.confidenceLabel || "High",
+  });
+}
+
 export function normaliseProviderRecord(provider: Partial<ProviderCatalogueRecord> & {
   providerId: string;
   providerName: string;
 }) {
+  const parsedNotes = parseProviderRecordNotes(provider.notes);
+  const notes = parsedNotes.notes || provider.notes?.trim() || "";
   return {
     providerId: provider.providerId,
     providerName: provider.providerName.trim(),
@@ -322,7 +384,8 @@ export function normaliseProviderRecord(provider: Partial<ProviderCatalogueRecor
     ofstedRating: provider.ofstedRating?.trim() ?? "Requires verification",
     status: provider.status ?? "Active",
     sourceUrls: normaliseTagValues(provider.sourceUrls),
-    notes: provider.notes?.trim() ?? "",
+    notes,
+    commercialProfile: mergeProviderCommercialProfile(provider, normaliseProviderCommercialProfile(provider.commercialProfile ?? parsedNotes.commercialProfile)),
     lastVerified: provider.lastVerified ?? todayIso(),
     verificationStatus: provider.verificationStatus ?? "needs_verification",
   } satisfies ProviderCatalogueRecord;
@@ -340,6 +403,7 @@ export function normaliseProviderProgramme(programme: Partial<ProviderProgramme>
   typicalJobRoles?: string[] | string;
   industriesServed?: string[] | string;
 }): ProviderProgramme {
+  const parsedNotes = parseProgrammeRecordNotes(programme.notes);
   const linkedStandardIds = normaliseTagValues(
     programme.linkedStandardIds
       ?? programme.linkedStandardId
@@ -347,13 +411,14 @@ export function normaliseProviderProgramme(programme: Partial<ProviderProgramme>
   );
   const primaryStandardId = linkedStandardIds[0] ?? "";
   const primaryStandard = primaryStandardId ? getApprenticeshipStandard(primaryStandardId) : undefined;
+  const notes = parsedNotes.notes || programme.notes?.trim() || "";
 
   return {
     id: programme.id,
     providerId: programme.providerId,
     programmeName: programme.programmeName?.trim() || primaryStandard?.title || "Provider programme",
-    shortDescription: programme.shortDescription?.trim() || programme.marketingDescription?.trim() || programme.notes?.trim() || "Programme summary to confirm.",
-    fullDescription: programme.fullDescription?.trim() || programme.shortDescription?.trim() || programme.marketingDescription?.trim() || programme.notes?.trim() || "Programme proposition to confirm.",
+    shortDescription: programme.shortDescription?.trim() || programme.marketingDescription?.trim() || notes || "Programme summary to confirm.",
+    fullDescription: programme.fullDescription?.trim() || programme.shortDescription?.trim() || programme.marketingDescription?.trim() || notes || "Programme proposition to confirm.",
     status: programme.status ?? "Needs verification",
     verificationStatus: programme.verificationStatus ?? "Needs manual verification",
     targetOrganisations: normaliseTagValues(programme.targetOrganisations),
@@ -379,7 +444,12 @@ export function normaliseProviderProgramme(programme: Partial<ProviderProgramme>
     fundingBand: programme.fundingBand ?? primaryStandard?.fundingBand ?? null,
     officialUrl: programme.officialUrl?.trim() || primaryStandard?.officialUrl || "",
     sourceUrl: programme.sourceUrl?.trim() || "",
-    notes: programme.notes?.trim() || "",
+    notes,
+    commercialProfile: mergeProgrammeCommercialProfile(
+      programme,
+      normaliseProgrammeCommercialProfile(programme.commercialProfile ?? parsedNotes.commercialProfile),
+      primaryStandard?.title || "",
+    ),
     recordStatus: programme.recordStatus ?? "Active",
     createdAt: programme.createdAt ?? nowIso(),
     updatedAt: programme.updatedAt ?? nowIso(),
@@ -671,6 +741,10 @@ export function normaliseApplication(application: MvpApplication): MvpApplicatio
     history,
   };
 }
+
+
+
+
 
 
 
