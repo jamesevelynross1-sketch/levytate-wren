@@ -23,8 +23,8 @@ import { AskLevyTateAiWorkspace } from "@/components/levytate-mvp/AskLevyTateAiW
 import { DashboardModule, SettingsModule } from "@/components/levytate-mvp/DashboardSettingsModules";
 import { EarlyAccessModule } from "@/components/levytate-mvp/EarlyAccessModule";
 import { EmployeesModule } from "@/components/levytate-mvp/EmployeesModule";
-import { GuidanceCentreModule } from "@/components/levytate-mvp/GuidanceCentreModule";
 import { EnrolmentsModule } from "@/components/levytate-mvp/EnrolmentsModule";
+import { GuidanceCentreModule } from "@/components/levytate-mvp/GuidanceCentreModule";
 import { LevyTateStandardsProvider } from "@/components/levytate-mvp/LevyTateStandardsProvider";
 import { MvpWorkspaceProvider, useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { ProviderMatchingModule } from "@/components/levytate-mvp/ProviderMatchingModule";
@@ -96,74 +96,112 @@ function MvpAppShell() {
     window.location.href = "/login";
   }
 
+  const workspaceName = data.profile.employerName || "LevyTate beta employer";
+  const workspaceLabel = data.profile.workspaceName || "Standalone employer workspace";
+  const storageStatus = meta?.storageMode === "supabase" ? "Supabase-backed workspace" : "Local fallback workspace";
+
   return (
     <main className="min-h-screen bg-[#f4f7f5] text-[#102c3d]">
-      <div className="grid min-h-screen lg:grid-cols-[280px_minmax(0,1fr)]">
-        <aside className="hidden border-r border-[#102c3d]/[0.08] bg-white px-4 py-5 lg:flex lg:h-screen lg:flex-col">
-          <div className="px-2"><LevyTateLogo className="[--levytate-logo-size:2.55rem]" /></div>
-          <div className="mt-6 rounded-xl border border-[#102c3d]/[0.07] bg-[#f7faf8] px-3.5 py-3">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">Active workspace</p>
-            <p className="mt-1 truncate text-sm font-semibold">{data.profile.employerName || "LevyTate beta employer"}</p>
-            <p className="mt-0.5 truncate text-xs text-[#102c3d]/48">{data.profile.workspaceName}</p>
+      <header className="sticky top-0 z-40 border-b border-[#102c3d]/[0.08] bg-white/94 backdrop-blur-xl">
+        <div className="mx-auto flex min-h-20 max-w-[1540px] flex-wrap items-center justify-between gap-x-4 gap-y-3 px-4 py-3 sm:px-6 lg:px-8 lg:py-0">
+          <div className="flex min-w-0 flex-1 items-center gap-3 lg:flex-none">
+            <LevyTateLogo className="[--levytate-logo-size:2.2rem] lg:[--levytate-logo-size:2.45rem]" />
+            <div className="hidden h-9 w-px bg-[#102c3d]/[0.08] lg:block" />
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">Active workspace</p>
+              <p className="truncate text-sm font-semibold text-[#102c3d]">{workspaceName}</p>
+              <p className="hidden truncate text-xs text-[#102c3d]/46 sm:block">{workspaceLabel}</p>
+            </div>
           </div>
 
-          <nav className="mt-5 space-y-4" aria-label="MVP navigation">
-            {Object.entries(groupedModules).map(([section, items]) => (
-              <div key={section}>
-                <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/36">{section}</p>
-                <div className="mt-2 grid gap-1">
-                  {items.map(({ name, icon: Icon }) => {
-                    const active = activeModule === name;
-                    const badge = moduleBadges[name as keyof typeof moduleBadges];
-                    return (
-                      <button key={name} onClick={() => setActiveModule(name)} className={`group flex min-h-11 items-center justify-between gap-3 rounded-lg px-3 text-left text-sm font-semibold transition ${active ? "bg-[#eaf5f1] text-[#102c3d] shadow-[inset_3px_0_0_#159b8f]" : "text-[#102c3d]/58 hover:bg-[#f6f9f7] hover:text-[#102c3d]"}`}>
-                        <span className="flex min-w-0 items-center gap-3">
-                          <Icon size={18} strokeWidth={active ? 2 : 1.7} className={`shrink-0 transition ${active ? "text-[#0b8e82]" : "text-[#102c3d]/42 group-hover:text-[#0b8e82]"}`} aria-hidden="true" />
-                          <span className="truncate">{name}</span>
-                        </span>
-                        {badge ? <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-[#0b6f63] ring-1 ring-[#159b8f]/12">{badge}</span> : null}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </nav>
+          <div className="flex w-full min-w-0 items-center gap-2 sm:gap-3 lg:w-auto">
+            <div className="min-w-0 flex-1 lg:hidden">
+              <select value={activeModule} onChange={(event) => setActiveModule(event.target.value as ModuleName)} className="h-11 w-full rounded-xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 text-sm font-semibold text-[#102c3d] shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+                {modules.map((module) => <option key={module.name}>{module.name}</option>)}
+              </select>
+            </div>
+            <span className="hidden rounded-full border border-[#159b8f]/10 bg-[#edf7f3] px-3.5 py-2 text-xs font-semibold text-[#0b6f63] sm:inline-flex">
+              {hydrated ? `${notifications.length} live alerts` : "Loading workspace"}
+            </span>
+            <button onClick={logout} title="Logout" className="inline-flex h-11 shrink-0 items-center gap-2 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white shadow-[0_10px_22px_rgba(16,44,61,0.12)] transition hover:bg-[#17394d]">
+              <LogOut size={15} aria-hidden="true" />
+              <span className="hidden sm:inline">Logout</span>
+            </button>
+          </div>
+        </div>
+      </header>
 
-          <div className="mt-auto border-t border-[#102c3d]/[0.07] pt-4">
-            <div className="flex items-center gap-3 px-2">
-              <div className="grid h-9 w-9 place-items-center rounded-full bg-[#102c3d] text-white"><UserRound size={17} strokeWidth={1.8} aria-hidden="true" /></div>
+      <div className="grid min-h-[calc(100vh-5rem)] lg:grid-cols-[276px_minmax(0,1fr)]">
+        <aside className="hidden border-r border-[#102c3d]/[0.08] bg-white lg:sticky lg:top-20 lg:flex lg:h-[calc(100vh-5rem)] lg:flex-col">
+          <div className="flex min-h-0 flex-1 flex-col px-4 py-4">
+            <div className="flex items-center justify-between px-2 pb-3">
               <div>
-                <p className="text-xs font-semibold">{meta?.userRole ?? "Workspace user"}</p>
-                <p className="mt-0.5 text-[11px] text-[#102c3d]/44">{meta?.storageMode === "supabase" ? "Supabase-backed workspace" : "Local fallback workspace"}</p>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/36">Workspace navigation</p>
+                <p className="mt-1 text-sm font-semibold text-[#102c3d]">LevyTate modules</p>
+              </div>
+              <span className="rounded-full border border-[#102c3d]/[0.07] bg-[#f8fbfa] px-2.5 py-1 text-[10px] font-semibold text-[#102c3d]/56">
+                {modules.length}
+              </span>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+              <nav className="space-y-3" aria-label="MVP navigation">
+                {Object.entries(groupedModules).map(([section, items]) => (
+                  <div key={section}>
+                    <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/34">{section}</p>
+                    <div className="mt-1.5 grid gap-1">
+                      {items.map(({ name, icon: Icon }) => {
+                        const active = activeModule === name;
+                        const badge = moduleBadges[name as keyof typeof moduleBadges];
+                        return (
+                          <button key={name} onClick={() => setActiveModule(name)} className={`group flex min-h-[42px] items-center justify-between gap-3 rounded-xl px-3 text-left text-sm font-semibold transition ${active ? "bg-[#eaf5f1] text-[#102c3d] shadow-[inset_3px_0_0_#159b8f,0_10px_18px_rgba(21,155,143,0.06)]" : "text-[#102c3d]/58 hover:bg-[#f6f9f7] hover:text-[#102c3d]"}`}>
+                            <span className="flex min-w-0 items-center gap-3">
+                              <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg transition ${active ? "bg-white text-[#0b8e82] ring-1 ring-[#159b8f]/12" : "bg-[#f7faf8] text-[#102c3d]/42 group-hover:bg-white group-hover:text-[#0b8e82] group-hover:ring-1 group-hover:ring-[#102c3d]/[0.06]"}`}>
+                                <Icon size={16} strokeWidth={active ? 2 : 1.8} aria-hidden="true" />
+                              </span>
+                              <span className="truncate">{name}</span>
+                            </span>
+                            {badge ? <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-[#0b6f63] ring-1 ring-[#159b8f]/12">{badge}</span> : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </nav>
+            </div>
+
+            <div className="mt-4 border-t border-[#102c3d]/[0.07] pt-4">
+              <div className="rounded-2xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4 shadow-[0_12px_26px_rgba(16,44,61,0.04)]">
+                <div className="flex items-start gap-3">
+                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#102c3d] text-white shadow-[0_8px_18px_rgba(16,44,61,0.12)]">
+                    <UserRound size={17} strokeWidth={1.8} aria-hidden="true" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">Platform admin</p>
+                    <p className="mt-1 truncate text-sm font-semibold text-[#102c3d]">{meta?.userRole ?? "Workspace user"}</p>
+                    <p className="mt-1 text-xs leading-5 text-[#102c3d]/52">Managing provider relationships, workspace settings and beta operations.</p>
+                  </div>
+                </div>
+
+                <div className="mt-4 rounded-2xl border border-[#102c3d]/[0.06] bg-white px-3.5 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/34">Workspace status</p>
+                      <p className="mt-1 truncate text-xs font-semibold text-[#102c3d]/68">{storageStatus}</p>
+                    </div>
+                    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#edf7f3] px-2.5 py-1 text-[10px] font-semibold text-[#0b6f63]">
+                      <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                      Live
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </aside>
 
         <section className="min-w-0">
-          <header className="sticky top-0 z-30 border-b border-[#102c3d]/[0.08] bg-white/94 backdrop-blur-xl">
-            <div className="mx-auto flex min-h-16 max-w-[1540px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
-              <div className="flex min-w-0 items-center gap-3 lg:hidden">
-                <LevyTateLogo className="[--levytate-logo-size:2rem]" />
-                <select value={activeModule} onChange={(event) => setActiveModule(event.target.value as ModuleName)} className="h-10 min-w-0 max-w-[220px] rounded-lg border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 text-sm font-semibold">
-                  {modules.map((module) => <option key={module.name}>{module.name}</option>)}
-                </select>
-              </div>
-              <div className="hidden min-w-0 lg:block">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">LevyTate MVP</p>
-                <p className="truncate text-sm font-semibold">{data.profile.employerName || "Standalone employer workspace"}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="hidden rounded-full bg-[#edf7f3] px-3 py-2 text-xs font-semibold text-[#0b6f63] sm:inline-flex">{hydrated ? `${notifications.length} live alerts` : "Loading workspace"}</span>
-                <button onClick={logout} title="Logout" className="inline-flex h-10 items-center gap-2 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white shadow-[0_8px_18px_rgba(16,44,61,0.12)]">
-                  <LogOut size={15} aria-hidden="true" />
-                  <span className="hidden sm:inline">Logout</span>
-                </button>
-              </div>
-            </div>
-          </header>
-
           <div className="mx-auto max-w-[1540px] px-4 py-5 sm:px-6 lg:px-8">
             <section className="mb-5 border-b border-[#102c3d]/[0.07] pb-4">
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">Protected workspace</p>
@@ -189,6 +227,3 @@ function MvpAppShell() {
     </main>
   );
 }
-
-
-
