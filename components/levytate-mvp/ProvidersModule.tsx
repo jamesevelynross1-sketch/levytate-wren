@@ -221,6 +221,140 @@ function providerCardBadges(provider: ProviderCatalogueRecord, featuredProgramme
   return uniqueValues([...(featuredProgramme?.deliveryModels ?? []), providerReachLabel(provider)]).slice(0, 3);
 }
 
+type BuyingGoal = {
+  id: string;
+  title: string;
+  description: string;
+  outcome: string;
+  icon: typeof Sparkles;
+  terms: string[];
+};
+
+type GuidedRecommendation = {
+  programme: ProviderProgramme;
+  provider: ProviderCatalogueRecord;
+  matchScore: number;
+  confidence: "High" | "Medium" | "Needs review";
+  why: string;
+  evidence: string[];
+  outcomes: string[];
+  technologies: string[];
+  industryFit: string[];
+};
+
+const buyingGoals: BuyingGoal[] = [
+  { id: "reporting", title: "Improve reporting & insight", description: "Move teams away from manual reports and disconnected spreadsheets.", outcome: "Clearer dashboards, better decisions and stronger data confidence.", icon: Layers3, terms: ["data", "reporting", "analytics", "insight", "business intelligence", "process"] },
+  { id: "ai", title: "Adopt AI", description: "Build practical AI confidence across operational and support teams.", outcome: "AI adoption, workflow automation and productivity gains.", icon: Sparkles, terms: ["ai", "automation", "digital", "technology", "productivity", "workflow"] },
+  { id: "digital", title: "Digital capability", description: "Strengthen the digital skills needed to modernise everyday work.", outcome: "More confident users, better systems adoption and improved digital delivery.", icon: Globe2, terms: ["digital", "software", "systems", "technology", "support", "data"] },
+  { id: "leadership", title: "Leadership", description: "Develop role-based leadership without defaulting to generic management routes.", outcome: "Better supervision, improvement habits and operational accountability.", icon: Users, terms: ["leadership", "supervisor", "improvement", "operations", "people", "team"] },
+  { id: "customer-service", title: "Customer service", description: "Improve service consistency, account handling and customer experience.", outcome: "Better retention, stronger escalation handling and customer confidence.", icon: Star, terms: ["customer", "service", "sales", "account", "experience", "support"] },
+  { id: "engineering", title: "Engineering", description: "Build technical competence for engineering, maintenance and site reliability.", outcome: "Stronger technical skills, safer work and reduced operational risk.", icon: ShieldCheck, terms: ["engineering", "maintenance", "technical", "manufacturing", "production"] },
+  { id: "operations", title: "Operations", description: "Improve process performance, productivity and cross-functional delivery.", outcome: "Better workflow, fewer bottlenecks and stronger operating discipline.", icon: BriefcaseBusiness, terms: ["operations", "process", "improvement", "delivery", "productivity", "workflow"] },
+  { id: "manufacturing", title: "Manufacturing", description: "Develop production capability across manufacturing and factory teams.", outcome: "Higher production confidence, process control and quality improvement.", icon: Award, terms: ["manufacturing", "production", "lean", "quality", "engineering", "maintenance"] },
+  { id: "procurement", title: "Procurement", description: "Strengthen commercial, sourcing and supplier management capability.", outcome: "Better buying decisions, supplier control and commercial value.", icon: CalendarCheck, terms: ["procurement", "supply", "commercial", "buyer", "contract", "logistics"] },
+  { id: "construction", title: "Construction", description: "Support site, project and built environment capability.", outcome: "Better site coordination, project control and delivery confidence.", icon: MapPin, terms: ["construction", "site", "project", "built environment", "property"] },
+  { id: "education", title: "Education", description: "Support teaching, learning, coaching and development capability.", outcome: "Stronger learning delivery, coaching and learner support.", icon: CheckCircle2, terms: ["education", "learning", "teaching", "coaching", "development"] },
+  { id: "healthcare", title: "Healthcare", description: "Develop care, wellbeing and service capability across people-focused teams.", outcome: "Safer services, stronger care capability and better learner support.", icon: ShieldCheck, terms: ["health", "care", "wellbeing", "support", "service"] },
+];
+
+const workforceAreas = ["Administration", "Finance", "IT", "Operations", "HR", "Sales", "Customer Service", "Engineering", "Education", "Manufacturing", "Procurement", "Construction"];
+const organisationContexts = ["Private sector", "Public sector", "MAT", "SME", "Enterprise", "College", "University", "Charity"];
+
+function textIndex(values: Array<unknown>) {
+  return cleanDisplayList(values).join(" ").toLowerCase();
+}
+
+function programmeIndex(programme: ProviderProgramme, provider: ProviderCatalogueRecord) {
+  return textIndex([
+    programme.programmeName,
+    programme.shortDescription,
+    programme.fullDescription,
+    programme.commercialProfile.tagline,
+    programme.commercialProfile.idealAudience,
+    programme.commercialProfile.typicalDepartments,
+    programme.commercialProfile.keyOutcomes,
+    programme.commercialProfile.futureCapabilityImpact,
+    programme.commercialProfile.employerBenefits,
+    programme.targetOrganisations,
+    programme.targetIndustries,
+    programme.targetJobRoles,
+    programme.businessProblemsSolved,
+    programme.skillsDeveloped,
+    programme.technologiesCovered,
+    programme.expectedOutcomes,
+    programme.deliveryModels,
+    programme.regions,
+    provider.providerName,
+    provider.providerType,
+    provider.sectors,
+    provider.industries,
+    provider.technologies,
+    provider.specialisms,
+    provider.employerTypes,
+  ]);
+}
+
+function termMatchCount(index: string, terms: string[]) {
+  return terms.reduce((score, term) => score + (index.includes(term.toLowerCase()) ? 1 : 0), 0);
+}
+
+function contextTerms(context: string) {
+  if (context === "Private sector") return ["private", "commercial", "employer", "enterprise", "mixed"];
+  if (context === "Public sector") return ["public", "local authority", "government", "public sector", "mixed"];
+  if (context === "Enterprise") return ["enterprise", "large", "national", "mixed"];
+  if (context === "SME") return ["sme", "small", "mid-market", "mixed"];
+  if (context === "MAT") return ["education", "school", "academy", "trust", "mat"];
+  if (context === "College") return ["college", "education", "learning"];
+  if (context === "University") return ["university", "higher education", "degree"];
+  if (context === "Charity") return ["charity", "third sector", "not for profit", "care", "support"];
+  return [context.toLowerCase()];
+}
+
+function scoreGuidedProgramme(programme: ProviderProgramme, provider: ProviderCatalogueRecord, goal: BuyingGoal, workforceArea: string, organisationContext: string): GuidedRecommendation {
+  const index = programmeIndex(programme, provider);
+  const goalMatches = termMatchCount(index, goal.terms);
+  const areaMatches = termMatchCount(index, [workforceArea, workforceArea.replace("&", "and")]);
+  const contextMatches = termMatchCount(index, contextTerms(organisationContext));
+  const verifiedBonus = provider.verificationStatus === "verified" ? 5 : 0;
+  const programmeBonus = programme.verificationStatus === "Needs manual verification" ? 0 : 4;
+  const activeBonus = programme.status === "Active" ? 4 : 0;
+  const rawScore = 56 + goalMatches * 7 + areaMatches * 8 + contextMatches * 4 + verifiedBonus + programmeBonus + activeBonus;
+  const matchScore = Math.max(58, Math.min(96, rawScore));
+  const confidence = matchScore >= 86 && programme.verificationStatus !== "Needs manual verification" ? "High" : matchScore >= 74 ? "Medium" : "Needs review";
+  const outcomes = cleanDisplayList([
+    ...programme.commercialProfile.employerBenefits,
+    ...programme.expectedOutcomes,
+    ...programme.businessProblemsSolved,
+    goal.outcome,
+  ]).slice(0, 3);
+  const technologies = cleanDisplayList([...programme.technologiesCovered, ...provider.technologies]).slice(0, 4);
+  const industryFit = cleanDisplayList([...programme.targetIndustries, ...provider.industries]).slice(0, 3);
+  const evidence = cleanDisplayList([
+    goalMatches ? `Matches ${goal.title.toLowerCase()}` : "",
+    areaMatches ? `Relevant to ${workforceArea}` : "",
+    contextMatches ? `Suitable for ${organisationContext}` : "",
+    programme.deliveryModels.length ? `${programme.deliveryModels[0]} delivery available` : "",
+    provider.verificationStatus === "verified" ? "Provider source reviewed" : "Provider evidence needs review",
+  ]).slice(0, 5);
+  const why = evidence.length
+    ? `${programme.programmeName} is recommended because it aligns to ${evidence.slice(0, 3).join(", ").toLowerCase()}.`
+    : `${programme.programmeName} is the closest available programme for this employer need.`;
+
+  return { programme, provider, matchScore, confidence, why, evidence, outcomes, technologies, industryFit };
+}
+
+function buildGuidedRecommendations(providers: ProviderCatalogueRecord[], programmes: ProviderProgramme[], goal: BuyingGoal, workforceArea: string, organisationContext: string) {
+  return programmes
+    .filter((programme) => programme.recordStatus === "Active" && programme.status !== "Not available" && programme.status !== "Defunded / unavailable for new starts")
+    .map((programme) => {
+      const provider = providers.find((item) => item.providerId === programme.providerId);
+      return provider ? scoreGuidedProgramme(programme, provider, goal, workforceArea, organisationContext) : null;
+    })
+    .filter(Boolean)
+    .sort((left, right) => (right as GuidedRecommendation).matchScore - (left as GuidedRecommendation).matchScore || (left as GuidedRecommendation).programme.programmeName.localeCompare((right as GuidedRecommendation).programme.programmeName))
+    .slice(0, 4) as GuidedRecommendation[];
+}
+
 
 type ProviderFilterOptions = ReturnType<typeof normalisedProviderCatalogueFilterOptions>;
 
@@ -274,6 +408,199 @@ function ProviderFilterControls({
     </div>
   );
 }
+
+function GuidedEmployerJourney({
+  selectedGoal,
+  selectedGoalId,
+  onGoal,
+  selectedWorkforceArea,
+  onWorkforceArea,
+  selectedOrganisationContext,
+  onOrganisationContext,
+  recommendations,
+  introRequest,
+  onDismissIntro,
+  onOpenProgramme,
+  onOpenProvider,
+  onCompare,
+  onRequestIntroduction,
+}: {
+  selectedGoal: BuyingGoal;
+  selectedGoalId: string;
+  onGoal: (goalId: string) => void;
+  selectedWorkforceArea: string;
+  onWorkforceArea: (area: string) => void;
+  selectedOrganisationContext: string;
+  onOrganisationContext: (context: string) => void;
+  recommendations: GuidedRecommendation[];
+  introRequest: { providerName: string; programmeName?: string } | null;
+  onDismissIntro: () => void;
+  onOpenProgramme: (providerId: string, programmeId: string) => void;
+  onOpenProvider: (providerId: string) => void;
+  onCompare: (providerId: string) => void;
+  onRequestIntroduction: (providerName: string, programmeName?: string) => void;
+}) {
+  const primary = recommendations[0];
+  const alternatives = recommendations.slice(1, 4);
+  const GoalIcon = selectedGoal.icon;
+
+  return (
+    <MvpPanel title="Find the right programme" eyebrow="Employer buying journey">
+      <div className="grid gap-5">
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div>
+            <h3 className="text-2xl font-semibold tracking-[-0.03em] text-[#102c3d]">What are you trying to achieve?</h3>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-[#102c3d]/58">Start with the business goal. LevyTate then connects workforce area, employer context and programme evidence before recommending a provider introduction.</p>
+          </div>
+          <div className="rounded-3xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4">
+            <div className="flex items-center gap-3">
+              <span className="grid h-10 w-10 place-items-center rounded-2xl bg-white text-[#0b8e82] ring-1 ring-[#102c3d]/[0.06]"><GoalIcon size={18} /></span>
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">Decision path</p>
+                <p className="mt-1 text-sm font-semibold text-[#102c3d]">Goal to area to context to programme to provider</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {buyingGoals.map((goal) => {
+            const Icon = goal.icon;
+            const selected = goal.id === selectedGoalId;
+            return (
+              <button
+                key={goal.id}
+                type="button"
+                onClick={() => onGoal(goal.id)}
+                className={`group rounded-3xl border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-[0_18px_34px_rgba(16,44,61,0.075)] ${selected ? "border-[#159b8f]/30 bg-[#edf7f3] shadow-[0_18px_34px_rgba(21,155,143,0.08)]" : "border-[#102c3d]/[0.07] bg-white"}`}
+              >
+                <span className={`grid h-10 w-10 place-items-center rounded-2xl transition ${selected ? "bg-[#102c3d] text-white" : "bg-[#f5f7f3] text-[#0b8e82] group-hover:bg-[#edf7f3]"}`}><Icon size={18} /></span>
+                <h4 className="mt-4 text-base font-semibold tracking-[-0.01em] text-[#102c3d]">{goal.title}</h4>
+                <p className="mt-2 min-h-[48px] text-sm leading-6 text-[#102c3d]/58">{goal.description}</p>
+                <p className="mt-3 text-xs font-semibold leading-5 text-[#0b6f63]">{goal.outcome}</p>
+              </button>
+            );
+          })}
+        </section>
+
+        <section className="grid gap-3 rounded-3xl border border-[#102c3d]/[0.07] bg-white p-4 lg:grid-cols-2">
+          <ChoiceGroup label="Role or department" options={workforceAreas} selected={selectedWorkforceArea} onSelect={onWorkforceArea} />
+          <ChoiceGroup label="Organisation context" options={organisationContexts} selected={selectedOrganisationContext} onSelect={onOrganisationContext} />
+        </section>
+
+        {introRequest ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-[#159b8f]/20 bg-[#edf7f3] px-5 py-4 text-sm text-[#102c3d]">
+            <div>
+              <p className="font-semibold">Introduction request prepared</p>
+              <p className="mt-1 text-[#102c3d]/62">LevyTate would qualify the need before introducing {introRequest.providerName}{introRequest.programmeName ? ` for ${introRequest.programmeName}` : ""}.</p>
+            </div>
+            <button type="button" onClick={onDismissIntro} className="rounded-full bg-white px-4 py-2 text-xs font-semibold text-[#102c3d] ring-1 ring-[#102c3d]/[0.08]">Dismiss</button>
+          </div>
+        ) : null}
+
+        {primary ? (
+          <section className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
+            <article className="overflow-hidden rounded-[28px] border border-[#102c3d]/[0.08] bg-white shadow-[0_20px_48px_rgba(16,44,61,0.07)]">
+              <div className="h-1.5 bg-gradient-to-r from-[#102c3d] via-[#0b8e82] to-[#f8d56b]" />
+              <div className="grid gap-5 p-6 lg:grid-cols-[minmax(0,1fr)_150px]">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">Recommended programme</p>
+                  <h3 className="mt-3 text-3xl font-semibold tracking-[-0.035em] text-[#102c3d]">{primary.programme.programmeName}</h3>
+                  <p className="mt-2 text-base font-semibold text-[#0b6f63]">{primary.provider.providerName}</p>
+                  <p className="mt-4 max-w-3xl text-sm leading-7 text-[#102c3d]/62">{primary.why}</p>
+                  <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                    <MiniEvidenceBlock title="Business outcomes" items={primary.outcomes} />
+                    <MiniEvidenceBlock title="Technologies" items={primary.technologies} />
+                    <MiniEvidenceBlock title="Industry fit" items={primary.industryFit} />
+                  </div>
+                </div>
+                <div className="grid gap-3 self-start rounded-3xl bg-[#f8fbfa] p-4 ring-1 ring-[#102c3d]/[0.06]">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/42">Match</p>
+                    <p className="mt-1 text-4xl font-semibold tracking-[-0.04em] text-[#102c3d]">{primary.matchScore}%</p>
+                    <p className="mt-1 text-xs font-semibold text-[#0b6f63]">{primary.confidence} confidence</p>
+                  </div>
+                  <div className="h-2 rounded-full bg-[#e8f0ec]"><div className="h-2 rounded-full bg-[#0b8e82]" style={{ width: `${primary.matchScore}%` }} /></div>
+                  <div className="grid gap-2 pt-1">
+                    {primary.evidence.slice(0, 3).map((item) => <div key={item} className="flex items-center gap-2 text-xs font-medium text-[#102c3d]/60"><CheckCircle2 size={13} className="text-[#0b8e82]" />{item}</div>)}
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2 border-t border-[#102c3d]/[0.06] bg-[#fbfcfa] px-6 py-4">
+                <button type="button" onClick={() => onRequestIntroduction(primary.provider.providerName, primary.programme.programmeName)} className="inline-flex h-10 items-center rounded-full bg-[#102c3d] px-4 text-sm font-semibold text-white shadow-[0_10px_20px_rgba(16,44,61,0.12)]">Request introduction</button>
+                <button type="button" onClick={() => onOpenProgramme(primary.provider.providerId, primary.programme.id)} className="inline-flex h-10 items-center rounded-full bg-white px-4 text-sm font-semibold text-[#102c3d] ring-1 ring-[#102c3d]/[0.08]">View programme</button>
+                <button type="button" onClick={() => onOpenProvider(primary.provider.providerId)} className="inline-flex h-10 items-center rounded-full bg-white px-4 text-sm font-semibold text-[#102c3d]/70 ring-1 ring-[#102c3d]/[0.08]">View provider</button>
+              </div>
+            </article>
+
+            <aside className="grid gap-3 content-start">
+              <div className="rounded-3xl border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_14px_32px_rgba(16,44,61,0.045)]">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">Alternative programmes</p>
+                <div className="mt-4 grid gap-3">
+                  {alternatives.map((item) => (
+                    <button key={item.programme.id} type="button" onClick={() => onOpenProgramme(item.provider.providerId, item.programme.id)} className="rounded-2xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4 text-left transition hover:bg-white">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-[#102c3d]">{item.programme.programmeName}</p>
+                          <p className="mt-1 text-xs text-[#102c3d]/54">{item.provider.providerName}</p>
+                        </div>
+                        <StatusBadge tone={item.confidence === "High" ? "green" : item.confidence === "Medium" ? "blue" : "yellow"}>{item.matchScore}%</StatusBadge>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded-3xl border border-[#102c3d]/[0.07] bg-[#102c3d] p-5 text-white shadow-[0_18px_42px_rgba(16,44,61,0.12)]">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/56">Next steps</p>
+                <div className="mt-4 grid gap-3 text-sm text-white/78">
+                  <p>1. Review programme evidence and fit.</p>
+                  <p>2. Compare provider coverage if needed.</p>
+                  <p>3. Ask LevyTate to qualify and introduce the provider.</p>
+                </div>
+                <button type="button" onClick={() => onCompare(primary.provider.providerId)} className="mt-5 inline-flex h-10 items-center rounded-full bg-white px-4 text-sm font-semibold text-[#102c3d]">Compare provider</button>
+              </div>
+            </aside>
+          </section>
+        ) : (
+          <EmptyState title="No programmes available" copy="Add provider programmes to unlock programme-first employer recommendations." actionLabel="Add provider" onAction={() => undefined} />
+        )}
+      </div>
+    </MvpPanel>
+  );
+}
+
+function ChoiceGroup({ label, options, selected, onSelect }: { label: string; options: string[]; selected: string; onSelect: (value: string) => void }) {
+  return (
+    <div>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#102c3d]/42">{label}</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {options.map((option) => (
+          <button
+            key={option}
+            type="button"
+            onClick={() => onSelect(option)}
+            className={`rounded-full px-3 py-2 text-xs font-semibold transition ${selected === option ? "bg-[#102c3d] text-white" : "bg-[#f5f7f3] text-[#102c3d]/64 ring-1 ring-[#102c3d]/[0.06] hover:bg-white hover:text-[#102c3d]"}`}
+          >
+            {option}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MiniEvidenceBlock({ title, items }: { title: string; items: string[] }) {
+  const visible = cleanDisplayList(items).slice(0, 3);
+  if (!visible.length) return null;
+  return (
+    <div className="rounded-2xl border border-[#102c3d]/[0.06] bg-[#f8fbfa] p-4">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/42">{title}</p>
+      <div className="mt-3 grid gap-2">
+        {visible.map((item) => <p key={item} className="text-xs font-medium leading-5 text-[#102c3d]/64">{item}</p>)}
+      </div>
+    </div>
+  );
+}
 export function ProvidersModule() {
   const { data, saveProvider, saveProviderProgramme, archiveProviderProgramme, removeProviderProgramme } = useMvpWorkspace();
   const { selectableStandards } = useLevyTateStandards();
@@ -284,6 +611,10 @@ export function ProvidersModule() {
   const [providerDraft, setProviderDraft] = useState<ProviderCatalogueRecord | null>(null);
   const [programmeDraft, setProgrammeDraft] = useState<ProviderProgramme | null>(null);
   const [standardSearch, setStandardSearch] = useState("");
+  const [selectedGoalId, setSelectedGoalId] = useState(buyingGoals[0].id);
+  const [selectedWorkforceArea, setSelectedWorkforceArea] = useState("Operations");
+  const [selectedOrganisationContext, setSelectedOrganisationContext] = useState("Private sector");
+  const [introRequest, setIntroRequest] = useState<{ providerName: string; programmeName?: string } | null>(null);
   const [error, setError] = useState("");
 
   const providerStats = useMemo(() => {
@@ -306,6 +637,12 @@ export function ProvidersModule() {
   const visibleProviders = useMemo(
     () => filterProviderCatalogue(data.providers, data.providerProgrammes, selectableStandards, filters),
     [data.providerProgrammes, data.providers, filters, selectableStandards],
+  );
+
+  const selectedGoal = buyingGoals.find((goal) => goal.id === selectedGoalId) ?? buyingGoals[0];
+  const guidedRecommendations = useMemo(
+    () => buildGuidedRecommendations(data.providers, data.providerProgrammes, selectedGoal, selectedWorkforceArea, selectedOrganisationContext),
+    [data.providerProgrammes, data.providers, selectedGoal, selectedOrganisationContext, selectedWorkforceArea],
   );
 
   function updateFilter(key: keyof ProviderCatalogueFilters, value: string) {
@@ -471,12 +808,29 @@ export function ProvidersModule() {
   return (
     <div className="grid gap-5">
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-        <SummaryCard label="Marketplace partners" value={providerStats.activeProviders} copy="Active provider profiles currently visible in the LevyTate marketplace." tone="blue" />
-        <SummaryCard label="Verified providers" value={providerStats.verifiedProviders} copy="Partners already carrying a verified provider signal in the marketplace." tone="green" />
-        <SummaryCard label="Profile quality" value={`${providerStats.providerCompletion}%`} copy="Average provider profile completeness across proof, reach and buyer confidence signals." tone="green" />
-        <SummaryCard label="Live programmes" value={providerStats.liveProgrammes} copy="Programme destinations currently available to support employer discovery and matching." tone="blue" />
-        <SummaryCard label="Programme quality" value={`${providerStats.programmeCompletion}%`} copy="Average programme completeness across audience, outcomes, delivery and compliance content." tone="yellow" />
+        <SummaryCard label="Programme routes" value={providerStats.liveProgrammes} copy="Employer-facing programmes ready for guided discovery and matching." tone="blue" />
+        <SummaryCard label="Verified providers" value={providerStats.verifiedProviders} copy="Provider records carrying a verified source signal." tone="green" />
+        <SummaryCard label="Provider coverage" value={providerStats.activeProviders} copy="Active providers available for LevyTate-led introductions." tone="blue" />
+        <SummaryCard label="Profile quality" value={`${providerStats.providerCompletion}%`} copy="Average provider completeness across proof, reach and confidence signals." tone="green" />
+        <SummaryCard label="Programme quality" value={`${providerStats.programmeCompletion}%`} copy="Average programme completeness across audience, outcomes and compliance content." tone="yellow" />
       </section>
+
+      <GuidedEmployerJourney
+        selectedGoal={selectedGoal}
+        selectedGoalId={selectedGoalId}
+        onGoal={setSelectedGoalId}
+        selectedWorkforceArea={selectedWorkforceArea}
+        onWorkforceArea={setSelectedWorkforceArea}
+        selectedOrganisationContext={selectedOrganisationContext}
+        onOrganisationContext={setSelectedOrganisationContext}
+        recommendations={guidedRecommendations}
+        introRequest={introRequest}
+        onDismissIntro={() => setIntroRequest(null)}
+        onOpenProgramme={(providerId, programmeId) => setProgrammeView({ providerId, programmeId })}
+        onOpenProvider={(providerId) => setProfileView({ providerId })}
+        onCompare={toggleCompare}
+        onRequestIntroduction={(providerName, programmeName) => setIntroRequest({ providerName, programmeName })}
+      />
 
       {comparisonProviders.length >= 2 ? (
         <MvpPanel
@@ -488,11 +842,11 @@ export function ProvidersModule() {
         </MvpPanel>
       ) : null}
 
-      <MvpPanel title="Provider marketplace" eyebrow="Commercial provider discovery">
+      <MvpPanel title="Supporting provider catalogue" eyebrow="Evidence and comparison">
         <MvpToolbar
           search={filters.search}
           onSearch={(value) => updateFilter("search", value)}
-          placeholder="Search provider profiles, technologies, industries, programmes or outcomes"
+          placeholder="Search supporting provider evidence, programmes, technologies or outcomes"
           actionLabel="Add provider"
           onAction={() => openProviderEditor()}
           filters={<ProviderFilterControls filters={filters} options={filterOptions} onFilter={updateFilter} />}
@@ -580,13 +934,13 @@ export function ProvidersModule() {
             })}
           </div>
         ) : (
-          <EmptyState title="No provider profiles yet" copy="Add a provider partner to begin building LevyTate's premium employer-facing provider marketplace." actionLabel="Add provider" onAction={() => openProviderEditor()} />
+          <EmptyState title="No provider profiles yet" copy="Add a provider partner to support programme-first matching and controlled introductions." actionLabel="Add provider" onAction={() => openProviderEditor()} />
         )}
       </MvpPanel>
 
       {profileProvider ? (
         <MvpModal title={profileProvider.providerName} eyebrow="Provider marketplace profile" onClose={() => setProfileView(null)} wide>
-          <ProviderProfileModal provider={profileProvider} programmes={profileProgrammes} standards={selectableStandards} onEdit={() => { setProfileView(null); openProviderEditor(profileProvider); }} onEditProgrammes={() => { setProfileView(null); openProgrammeEditor(profileProvider.providerId); }} onOpenProgramme={(programmeId) => setProgrammeView({ providerId: profileProvider.providerId, programmeId })} />
+          <ProviderProfileModal provider={profileProvider} programmes={profileProgrammes} standards={selectableStandards} onEdit={() => { setProfileView(null); openProviderEditor(profileProvider); }} onEditProgrammes={() => { setProfileView(null); openProgrammeEditor(profileProvider.providerId); }} onOpenProgramme={(programmeId) => setProgrammeView({ providerId: profileProvider.providerId, programmeId })} onCompare={() => toggleCompare(profileProvider.providerId)} onRequestIntroduction={(programmeName) => setIntroRequest({ providerName: profileProvider.providerName, programmeName })} />
         </MvpModal>
       ) : null}
 
@@ -667,6 +1021,8 @@ function ProviderProfileModal({
   onEdit,
   onEditProgrammes,
   onOpenProgramme,
+  onCompare,
+  onRequestIntroduction,
 }: {
   provider: ProviderCatalogueRecord;
   programmes: ProviderProgramme[];
@@ -674,6 +1030,8 @@ function ProviderProfileModal({
   onEdit: () => void;
   onEditProgrammes: () => void;
   onOpenProgramme: (programmeId: string) => void;
+  onCompare: () => void;
+  onRequestIntroduction: (programmeName?: string) => void;
 }) {
   const summary = fallbackProviderDescription(provider);
   const positioning = cleanDisplayText(provider.commercialProfile.positioningStatement) || summary;
@@ -723,6 +1081,8 @@ function ProviderProfileModal({
       </section>
 
       <div className="flex flex-wrap gap-2">
+        <TableAction onClick={() => onRequestIntroduction(programmes[0]?.programmeName)}>Request introduction</TableAction>
+        <TableAction onClick={onCompare}>Compare provider</TableAction>
         <TableAction onClick={onEdit}>Edit profile</TableAction>
         <TableAction onClick={onEditProgrammes}>Manage programmes</TableAction>
       </div>
