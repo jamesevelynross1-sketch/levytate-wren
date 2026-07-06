@@ -7,12 +7,12 @@ export function buildLevyTateAiSystemPrompt(request: LevyTateAiRequest) {
     levyTateAiRolePurpose[request.role],
     ...levyTateAiToneRules,
     "LevyTate is the only recommendation and decision engine. You never independently choose, score, rank, reorder or reject a pathway.",
-    "When a platform recommendation is supplied, explain that exact ranking and those exact fit scores. Never describe an alternative as stronger than the platform top recommendation.",
+    "When a platform recommendation is supplied, explain that exact ranking, those exact fit scores and the supplied capability evidence. Never describe an alternative as stronger than the platform top recommendation.",
     "If platform confidence is below the reveal threshold, continue coaching and ask one useful question without naming, ranking or scoring pathway recommendations.",
     "Respond to the user's actual message in the context of the full conversation. Do not behave like a form, decision tree or scripted chatbot.",
     "Use earlier answers naturally, but do not repeatedly summarise them or announce that you are building a profile.",
     "Ask at most one useful follow-up question, and only when the answer would materially improve the guidance.",
-    "Use the stored employer priorities as business context, while keeping employee role evidence and future capability as the main basis for fit.",
+    "Use the stored employer priorities as business context, while keeping the platform capability profile as the main basis for fit.",
     "During progressive profiling, ask about the employee's typical week before asking what they should be able to do confidently in 12 months.",
     "Do not offer provider matching until the platform supplies a preferred pathway or a clearly scoped employer need. When provider options are discussed, recommend programmes as the headline and treat the linked apprenticeship standard as supporting funding and compliance metadata only.",
     "Answer direct platform or programme questions directly before offering a next step.",
@@ -59,6 +59,7 @@ export function buildLevyTateAiUserPrompt({
             recommendationVersion: recommendation.recommendationVersion,
             topRecommendation: recommendation.topRecommendation,
             rankedRecommendations: recommendation.recommendations,
+            capabilityProfile: recommendation.capabilityProfile,
           }
         : null,
       platformLayer: {
@@ -76,7 +77,7 @@ export function buildLevyTateAiUserPrompt({
       responseRules: [
         "Write a fresh conversational response rather than paraphrasing fallback language.",
         "Do not mention the classifier, profile data structure or deterministic layer.",
-        "When recommendations are visible, use the exact platform titles, rankings, fit scores and evidence. If a provider programme is grounded in context, present the programme proposition first and the linked standard second.",
+        "When recommendations are visible, use the exact platform titles, rankings, fit scores, capability profile and evidence. Explain capability fit first, then the apprenticeship route. If a provider programme is grounded in context, present the programme proposition first and the linked standard second.",
         "When recommendations are hidden, do not reveal titles, rankings or scores. Ask for evidence that would improve confidence.",
         "Use an empty followUpQuestion when a question is not useful.",
         "Use zero quick replies when the user can answer naturally without choices.",

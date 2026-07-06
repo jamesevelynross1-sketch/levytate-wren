@@ -220,6 +220,19 @@ export type LevyTateRecommendationEvidence = {
   weight: number;
 };
 
+export type LevyTateCapabilityScore = {
+  domain: string;
+  score: number;
+  evidence: string[];
+  missingEvidence: string[];
+};
+
+export type LevyTateCapabilityFit = {
+  domain: string;
+  score: number;
+  weighting: number;
+};
+
 export type LevyTatePlatformRecommendation = {
   pathwayId: string;
   title: string;
@@ -228,6 +241,8 @@ export type LevyTatePlatformRecommendation = {
   confidence: number;
   rationale: string;
   evidence: LevyTateRecommendationEvidence[];
+  missingEvidence: string[];
+  capabilityFit: LevyTateCapabilityFit[];
   availability: "approved" | "role_fit_review" | "not_available";
   eligibility: "eligible" | "requires_review" | "ineligible";
   providerAvailability: "mapped" | "matching_available" | "unconfirmed";
@@ -241,6 +256,7 @@ export type LevyTateRecommendationResult = {
   revealThreshold: number;
   shouldRevealRecommendations: boolean;
   evidenceChanged: boolean;
+  capabilityProfile: LevyTateCapabilityScore[];
 };
 
 export type LevyTateApplicationPrefill = {
@@ -585,6 +601,13 @@ function parseRecommendationResult(value: unknown): LevyTateRecommendationResult
           confidence: Math.max(0, score(recommendation.confidence)),
           rationale: typeof recommendation.rationale === "string" ? recommendation.rationale.trim().slice(0, 600) : "",
           evidence,
+          missingEvidence: Array.isArray(recommendation.missingEvidence) ? recommendation.missingEvidence.filter((item): item is string => typeof item === "string").slice(0, 8) : [],
+          capabilityFit: Array.isArray(recommendation.capabilityFit) ? recommendation.capabilityFit.flatMap((item) => {
+            if (!item || typeof item !== "object") return [];
+            const fit = item as Partial<LevyTateCapabilityFit>;
+            if (typeof fit.domain !== "string") return [];
+            return [{ domain: fit.domain.trim().slice(0, 80), score: Math.max(0, score(fit.score)), weighting: Math.max(0, score(fit.weighting)) }];
+          }).slice(0, 12) : [],
           availability,
           eligibility,
           providerAvailability,
@@ -600,6 +623,17 @@ function parseRecommendationResult(value: unknown): LevyTateRecommendationResult
     revealThreshold: Math.max(0, score(candidate.revealThreshold)),
     shouldRevealRecommendations: candidate.shouldRevealRecommendations === true,
     evidenceChanged: candidate.evidenceChanged === true,
+    capabilityProfile: Array.isArray(candidate.capabilityProfile) ? candidate.capabilityProfile.flatMap((item) => {
+      if (!item || typeof item !== "object") return [];
+      const capability = item as Partial<LevyTateCapabilityScore>;
+      if (typeof capability.domain !== "string") return [];
+      return [{
+        domain: capability.domain.trim().slice(0, 80),
+        score: Math.max(0, score(capability.score)),
+        evidence: Array.isArray(capability.evidence) ? capability.evidence.filter((entry): entry is string => typeof entry === "string").slice(0, 8) : [],
+        missingEvidence: Array.isArray(capability.missingEvidence) ? capability.missingEvidence.filter((entry): entry is string => typeof entry === "string").slice(0, 8) : [],
+      }];
+    }).slice(0, 20) : [],
   };
 }
 function isPersonaSummary(value: unknown): value is PersonaSummary {
