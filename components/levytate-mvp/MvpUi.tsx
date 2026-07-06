@@ -20,14 +20,12 @@ export function MvpPanel({ title, eyebrow, actions, children }: { title: string;
 
 export function MvpToolbar({ search, onSearch, placeholder, actionLabel, onAction, filters }: { search: string; onSearch: (value: string) => void; placeholder: string; actionLabel: string; onAction: () => void; filters?: ReactNode }) {
   return (
-    <div className="mb-4 grid gap-3 lg:grid-cols-[minmax(260px,1fr)_auto] lg:items-end">
-      <div className="grid gap-3 md:grid-cols-[minmax(220px,1fr)_auto]">
-        <label className="flex h-10 min-w-0 items-center gap-2 rounded-lg border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 focus-within:border-[#159b8f] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#159b8f]/10">
-          <Search size={16} strokeWidth={1.8} className="shrink-0 text-[#102c3d]/38" aria-hidden="true" />
-          <input value={search} onChange={(event) => onSearch(event.target.value)} className="min-w-0 flex-1 bg-transparent text-sm text-[#102c3d] outline-none placeholder:text-[#102c3d]/34" placeholder={placeholder} />
-        </label>
-        {filters}
-      </div>
+    <div className={`mb-4 grid gap-3 ${filters ? "xl:grid-cols-[minmax(260px,0.8fr)_minmax(480px,1.4fr)_auto] xl:items-end" : "lg:grid-cols-[minmax(260px,1fr)_auto] lg:items-end"}`}>
+      <label className="flex h-10 min-w-0 items-center gap-2 rounded-lg border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 focus-within:border-[#159b8f] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#159b8f]/10">
+        <Search size={16} strokeWidth={1.8} className="shrink-0 text-[#102c3d]/38" aria-hidden="true" />
+        <input value={search} onChange={(event) => onSearch(event.target.value)} className="min-w-0 flex-1 bg-transparent text-sm text-[#102c3d] outline-none placeholder:text-[#102c3d]/34" placeholder={placeholder} />
+      </label>
+      {filters ? <div className="min-w-0">{filters}</div> : null}
       <button type="button" onClick={onAction} className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white shadow-[0_8px_18px_rgba(16,44,61,0.12)] transition hover:-translate-y-0.5 hover:bg-[#17394d]">
         <Plus size={15} strokeWidth={2} aria-hidden="true" />
         {actionLabel}
@@ -177,4 +175,3 @@ export function TableShell({ children }: { children: ReactNode }) { return <div 
 export function TableHead({ children }: { children: ReactNode }) { return <thead className="bg-[#f8fbfa] text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/42">{children}</thead>; }
 export function TableBody({ children }: { children: ReactNode }) { return <tbody className="divide-y divide-[#102c3d]/[0.055] bg-white">{children}</tbody>; }
 export function TableAction({ children, onClick, danger = false }: { children: ReactNode; onClick: () => void; danger?: boolean }) { return <button type="button" onClick={onClick} className={`rounded-full px-3 py-1.5 text-xs font-semibold ring-1 transition ${danger ? "bg-white text-[#b13b51] ring-[#b13b51]/15 hover:bg-[#fff0f2]" : "bg-[#f5f7f3] text-[#102c3d]/68 ring-[#102c3d]/[0.07] hover:text-[#102c3d]"}`}>{children}</button>; }
-

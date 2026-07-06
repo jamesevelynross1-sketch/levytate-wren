@@ -346,9 +346,13 @@ export type ProviderCatalogueRecord = {
 export type ProviderCatalogueFilters = {
   search: string;
   sector: string;
-  programme: string;
+  technology: string;
+  businessChallenge: string;
   deliveryModel: string;
   region: string;
+  employerType: string;
+  programmeLevel: string;
+  programme: string;
   status: ProviderRecordStatus | "All";
 };
 export type ProviderMatchingRequest = {

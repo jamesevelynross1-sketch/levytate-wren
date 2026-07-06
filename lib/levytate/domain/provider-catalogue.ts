@@ -8,13 +8,21 @@ import {
   commercialProfileCompletion,
   programmeProfileCompletion,
 } from "./provider-commercial";
+import {
+  normaliseProviderTaxonomy,
+  taxonomyValuesForProvider,
+} from "./provider-taxonomy";
 
 export const defaultProviderCatalogueFilters: ProviderCatalogueFilters = {
   search: "",
   sector: "All",
-  programme: "All",
+  technology: "All",
+  businessChallenge: "All",
   deliveryModel: "All",
   region: "All",
+  employerType: "All",
+  programmeLevel: "All",
+  programme: "All",
   status: "Active",
 };
 
@@ -50,12 +58,93 @@ export function uniqueProgrammeNames(programmes: ProviderProgramme[]) {
   return Array.from(new Set(programmes.map((programme) => programme.programmeName))).sort((a, b) => a.localeCompare(b));
 }
 
+function uniqueSorted(values: string[]) {
+  return normaliseProviderTaxonomy(values).sort((left, right) => {
+    if (left === "Needs verification") return 1;
+    if (right === "Needs verification") return -1;
+    return left.localeCompare(right);
+  });
+}
+
+export function providerCatalogueFilterOptions(
+  providers: ProviderCatalogueRecord[],
+  programmes: ProviderProgramme[],
+) {
+  const activeProgrammes = programmes.filter((programme) => programme.recordStatus === "Active");
+  return providers.reduce(
+    (options, provider) => {
+      const providerProgrammes = activeProgrammes.filter((programme) => programme.providerId === provider.providerId);
+      const taxonomy = taxonomyValuesForProvider(provider, providerProgrammes);
+      options.sectors.push(...taxonomy.sectors);
+      options.technologies.push(...taxonomy.technologies);
+      options.businessChallenges.push(...taxonomy.businessChallenges);
+      options.deliveryModels.push(...taxonomy.deliveryModels);
+      options.regions.push(...taxonomy.regions);
+      options.employerTypes.push(...taxonomy.employerTypes);
+      options.programmeLevels.push(...taxonomy.programmeLevels);
+      options.programmes.push(...providerProgrammes.map((programme) => programme.programmeName));
+      return options;
+    },
+    {
+      sectors: [] as string[],
+      technologies: [] as string[],
+      businessChallenges: [] as string[],
+      deliveryModels: [] as string[],
+      regions: [] as string[],
+      employerTypes: [] as string[],
+      programmeLevels: [] as string[],
+      programmes: [] as string[],
+    },
+  );
+}
+
+export function normalisedProviderCatalogueFilterOptions(
+  providers: ProviderCatalogueRecord[],
+  programmes: ProviderProgramme[],
+) {
+  const options = providerCatalogueFilterOptions(providers, programmes);
+  return {
+    sectors: uniqueSorted(options.sectors),
+    technologies: uniqueSorted(options.technologies),
+    businessChallenges: uniqueSorted(options.businessChallenges),
+    deliveryModels: uniqueSorted(options.deliveryModels),
+    regions: uniqueSorted(options.regions),
+    employerTypes: uniqueSorted(options.employerTypes),
+    programmeLevels: uniqueSorted(options.programmeLevels),
+    programmes: uniqueSorted(options.programmes),
+  };
+}
+
 function normalise(value: string) {
   return value.toLowerCase().trim();
 }
 
+function queryParts(query: string) {
+  return normalise(query).split(/\s+/).filter(Boolean);
+}
+
+function hasQuery(value: string, query: string) {
+  const target = normalise(value);
+  const parts = queryParts(query);
+  return Boolean(query) && parts.every((part) => target.includes(part));
+}
+
 function includesQuery(value: string, query: string) {
   return normalise(value).includes(query);
+}
+
+function fieldScore(values: string[], query: string, weight: number) {
+  if (!query.trim()) return 0;
+  const parts = queryParts(query);
+  return values.reduce((score, rawValue) => {
+    const value = normalise(rawValue);
+    if (!value) return score;
+    if (value === normalise(query)) return score + weight * 4;
+    if (value.startsWith(normalise(query))) return score + weight * 3;
+    if (parts.every((part) => value.split(/\s+/).some((word) => word.startsWith(part)))) return score + weight * 2.5;
+    if (parts.every((part) => value.includes(part))) return score + weight * 1.5;
+    return score;
+  }, 0);
 }
 
 function searchableProviderText(provider: ProviderCatalogueRecord, deliveries: ProviderProgramme[], standards: ApprenticeshipStandard[]) {
@@ -110,26 +199,68 @@ function searchableProviderText(provider: ProviderCatalogueRecord, deliveries: P
   ].join(" ").toLowerCase();
 }
 
+export function providerSearchScore(
+  provider: ProviderCatalogueRecord,
+  deliveries: ProviderProgramme[],
+  standards: ApprenticeshipStandard[],
+  query: string,
+) {
+  if (!query.trim()) return 0;
+  return fieldScore(deliveries.map((programme) => programme.programmeName), query, 20)
+    + fieldScore([provider.providerName], query, 18)
+    + fieldScore(deliveries.flatMap((programme) => programme.technologiesCovered), query, 14)
+    + fieldScore(provider.technologies, query, 13)
+    + fieldScore(deliveries.flatMap((programme) => programme.businessProblemsSolved), query, 12)
+    + fieldScore(deliveries.flatMap((programme) => programme.targetJobRoles), query, 11)
+    + fieldScore(deliveries.flatMap((programme) => programme.targetIndustries), query, 8)
+    + fieldScore(provider.industries, query, 6)
+    + (hasQuery(searchableProviderText(provider, deliveries, standards), query) ? 3 : 0);
+}
+
+function filterIsAll(value: string) {
+  return value === "All";
+}
+
+function providerMatchesFilters(
+  provider: ProviderCatalogueRecord,
+  deliveries: ProviderProgramme[],
+  standards: ApprenticeshipStandard[],
+  filters: ProviderCatalogueFilters,
+) {
+  const taxonomy = taxonomyValuesForProvider(provider, deliveries);
+  const linkedStandards = deliveries.flatMap((programme) => programme.linkedStandardIds.map((standardId) => standards.find((standard) => standard.id === standardId)).filter((standard): standard is ApprenticeshipStandard => Boolean(standard)));
+
+  return (filters.status === "All" || provider.status === filters.status)
+    && (filterIsAll(filters.sector) || taxonomy.sectors.includes(filters.sector) || linkedStandards.some((standard) => standard.occupationalRoute === filters.sector))
+    && (filterIsAll(filters.technology) || taxonomy.technologies.includes(filters.technology))
+    && (filterIsAll(filters.businessChallenge) || taxonomy.businessChallenges.includes(filters.businessChallenge))
+    && (filterIsAll(filters.deliveryModel) || taxonomy.deliveryModels.includes(filters.deliveryModel))
+    && (filterIsAll(filters.region) || taxonomy.regions.includes(filters.region))
+    && (filterIsAll(filters.employerType) || taxonomy.employerTypes.includes(filters.employerType))
+    && (filterIsAll(filters.programmeLevel) || taxonomy.programmeLevels.includes(filters.programmeLevel))
+    && (filterIsAll(filters.programme) || deliveries.some((programme) => programme.programmeName === filters.programme) || linkedStandards.some((standard) => standard.title === filters.programme));
+}
+
 export function filterProviderCatalogue(
   providers: ProviderCatalogueRecord[],
   programmes: ProviderProgramme[],
   standards: ApprenticeshipStandard[],
   filters: ProviderCatalogueFilters,
 ) {
-  const query = filters.search.trim().toLowerCase();
+  const query = filters.search.trim();
 
-  return providers.filter((provider) => {
-    const deliveries = providerProgrammesFor(provider.providerId, programmes);
-    const linkedStandards = deliveries.flatMap((programme) => programme.linkedStandardIds.map((standardId) => standards.find((standard) => standard.id === standardId)).filter((standard): standard is ApprenticeshipStandard => Boolean(standard)));
-    const searchable = searchableProviderText(provider, deliveries, standards);
-
-    return (!query || searchable.includes(query))
-      && (filters.sector === "All" || provider.sectors.includes(filters.sector) || provider.industries.includes(filters.sector) || deliveries.some((programme) => programme.targetIndustries.includes(filters.sector)) || linkedStandards.some((standard) => standard.occupationalRoute === filters.sector))
-      && (filters.programme === "All" || deliveries.some((programme) => programme.programmeName === filters.programme) || linkedStandards.some((standard) => standard.title === filters.programme))
-      && (filters.deliveryModel === "All" || provider.deliveryModels.includes(filters.deliveryModel) || deliveries.some((programme) => programme.deliveryModels.includes(filters.deliveryModel)))
-      && (filters.region === "All" || provider.regions.includes(filters.region) || deliveries.some((programme) => programme.regions.includes(filters.region)))
-      && (filters.status === "All" || provider.status === filters.status);
-  });
+  return providers
+    .map((provider) => {
+      const deliveries = providerProgrammesFor(provider.providerId, programmes).filter((programme) => programme.recordStatus === "Active");
+      return {
+        provider,
+        score: providerSearchScore(provider, deliveries, standards, query),
+        matches: providerMatchesFilters(provider, deliveries, standards, filters),
+      };
+    })
+    .filter((item) => item.matches && (!query || item.score > 0))
+    .sort((left, right) => right.score - left.score || left.provider.providerName.localeCompare(right.provider.providerName))
+    .map((item) => item.provider);
 }
 
 export type ProviderRelationshipSignal = {
@@ -179,15 +310,16 @@ export function isVerifiedProviderProgramme(programme: ProviderProgramme) {
 }
 
 function scoreOverlap(source: string[], targets: string[]) {
-  if (!source.length || !targets.length) return 0;
-  const normalisedSource = source.map(normalise);
-  const normalisedTargets = targets.map(normalise);
-  return normalisedTargets.reduce((score, target) => score + (normalisedSource.some((item) => item.includes(target) || target.includes(item)) ? 1 : 0), 0);
+  const normalisedSource = normaliseProviderTaxonomy(source);
+  const normalisedTargets = normaliseProviderTaxonomy(targets);
+  if (!normalisedSource.length || !normalisedTargets.length) return 0;
+  return normalisedTargets.reduce((score, target) => score + (normalisedSource.some((item) => normalise(item).includes(normalise(target)) || normalise(target).includes(normalise(item))) ? 1 : 0), 0);
 }
 
 function matchedValues(source: string[], targets: string[]) {
-  const normalisedTargets = targets.map(normalise);
-  return source.filter((item) => normalisedTargets.some((target) => normalise(item).includes(target) || target.includes(normalise(item))));
+  const normalisedSource = normaliseProviderTaxonomy(source);
+  const normalisedTargets = normaliseProviderTaxonomy(targets);
+  return normalisedSource.filter((item) => normalisedTargets.some((target) => normalise(item).includes(normalise(target)) || normalise(target).includes(normalise(item))));
 }
 
 export function shortlistProvidersForNeed(
@@ -206,6 +338,11 @@ export function shortlistProvidersForNeed(
     preferredRelationshipByProvider.set(relationship.preferredProviderId, current);
   }
 
+  const needTechnologies = normaliseProviderTaxonomy(need.technologies ?? []);
+  const needIndustries = normaliseProviderTaxonomy(need.industries ?? []);
+  const needBusinessProblems = normaliseProviderTaxonomy(need.businessProblems ?? []);
+  const needTargetRoles = normaliseProviderTaxonomy(need.targetRoles ?? []);
+
   return providers
     .filter((provider) => provider.status === "Active")
     .flatMap((provider) => {
@@ -223,12 +360,12 @@ export function shortlistProvidersForNeed(
         const roleFit = need.roleNeed ? (includesQuery(programmeText, need.roleNeed.toLowerCase()) || scoreOverlap(programme.targetJobRoles, [need.roleNeed]) > 0) : false;
         const departmentFit = need.department ? includesQuery(programmeText, need.department.toLowerCase()) || scoreOverlap(programme.commercialProfile.typicalDepartments, [need.department]) > 0 : false;
         const futureCapabilityFit = need.futureCapability ? includesQuery(programmeText, need.futureCapability.toLowerCase()) || scoreOverlap(programme.commercialProfile.futureCapabilityImpact, [need.futureCapability]) > 0 : false;
-        const technologyScore = scoreOverlap(programme.technologiesCovered, need.technologies ?? []);
-        const industryScore = scoreOverlap(programme.targetIndustries, need.industries ?? []);
-        const problemScore = scoreOverlap(programme.businessProblemsSolved, need.businessProblems ?? []);
-        const targetRoleScore = scoreOverlap(programme.targetJobRoles, need.targetRoles ?? []);
-        const deliveryFit = !need.deliveryModel || programme.deliveryModels.some((model) => normalise(model).includes(normalise(need.deliveryModel!))) || provider.deliveryModels.some((model) => normalise(model).includes(normalise(need.deliveryModel!)));
-        const regionFit = !need.region || programme.regions.includes(need.region) || provider.regions.includes(need.region) || programme.regions.includes("England");
+        const technologyScore = scoreOverlap([...provider.technologies, ...programme.technologiesCovered], needTechnologies);
+        const industryScore = scoreOverlap([...provider.industries, ...programme.targetIndustries], needIndustries);
+        const problemScore = scoreOverlap([...provider.specialisms, ...programme.businessProblemsSolved, ...programme.expectedOutcomes], needBusinessProblems);
+        const targetRoleScore = scoreOverlap(programme.targetJobRoles, needTargetRoles);
+        const deliveryFit = !need.deliveryModel || normaliseProviderTaxonomy([...programme.deliveryModels, ...provider.deliveryModels]).some((model) => normalise(model).includes(normalise(need.deliveryModel!)) || normalise(need.deliveryModel!).includes(normalise(model)));
+        const regionFit = !need.region || normaliseProviderTaxonomy([...programme.regions, ...provider.regions]).some((region) => region === need.region || region === "England");
         const employerSizeFit = !need.employerSize || programme.employerSize === "Mixed employer base" || programme.employerSize === need.employerSize || provider.commercialProfile.employerSizesSupported.includes(need.employerSize);
         const programmePinned = requestedProgramme ? requestedProgramme.id === programme.id : false;
         const standardFit = requiredStandard ? programme.linkedStandardIds.includes(requiredStandard.id) : false;
@@ -255,10 +392,10 @@ export function shortlistProvidersForNeed(
           + profileScore,
         );
 
-        const technologyAlignment = matchedValues(programme.technologiesCovered, need.technologies ?? []);
-        const industryAlignment = matchedValues(programme.targetIndustries, need.industries ?? []);
-        const businessProblemsMatched = matchedValues(programme.businessProblemsSolved, need.businessProblems ?? []);
-        const skillsMatched = matchedValues(programme.skillsDeveloped, [...(need.targetRoles ?? []), ...(need.technologies ?? []), ...(need.businessProblems ?? [])]);
+        const technologyAlignment = matchedValues([...provider.technologies, ...programme.technologiesCovered], needTechnologies);
+        const industryAlignment = matchedValues([...provider.industries, ...programme.targetIndustries], needIndustries);
+        const businessProblemsMatched = matchedValues([...provider.specialisms, ...programme.businessProblemsSolved, ...programme.expectedOutcomes], needBusinessProblems);
+        const skillsMatched = matchedValues(programme.skillsDeveloped, [...needTargetRoles, ...needTechnologies, ...needBusinessProblems]);
         const strengths = [
           ...technologyAlignment,
           ...industryAlignment,
@@ -287,13 +424,13 @@ export function shortlistProvidersForNeed(
             roleFit ? "Target role alignment" : null,
             departmentFit ? "Department context reflected in programme positioning" : null,
             futureCapabilityFit ? "Future capability goal reflected in expected outcomes" : null,
-            technologyScore ? `${technologyScore} technology match${technologyScore > 1 ? "es" : ""}` : null,
-            industryScore ? `${industryScore} industry match${industryScore > 1 ? "es" : ""}` : null,
-            problemScore ? `${problemScore} business problem match${problemScore > 1 ? "es" : ""}` : null,
+            technologyAlignment.length ? `Technology taxonomy match: ${technologyAlignment.join(", ")}` : null,
+            industryAlignment.length ? `Sector taxonomy match: ${industryAlignment.join(", ")}` : null,
+            businessProblemsMatched.length ? `Business challenge match: ${businessProblemsMatched.join(", ")}` : null,
             targetRoleScore ? `${targetRoleScore} target role match${targetRoleScore > 1 ? "es" : ""}` : null,
             deliveryFit ? "Delivery model fit" : null,
             regionFit ? "Regional fit" : null,
-            employerSizeFit ? "Employer size fit" : null,
+            employerSizeFit ? "Employer type fit" : null,
             verified ? programme.verificationStatus : "Programme needs verification",
           ].filter(Boolean) as string[],
           skillsMatched,

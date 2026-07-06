@@ -1,5 +1,10 @@
 import type { ProviderCatalogueRecord, ProviderProgramme } from "@/lib/levytate/domain";
-import { emptyProgrammeCommercialProfile, emptyProviderCommercialProfile } from "@/lib/levytate/domain";
+import {
+  emptyProgrammeCommercialProfile,
+  emptyProviderCommercialProfile,
+  normaliseProviderProgrammeTaxonomy,
+  normaliseProviderRecordTaxonomy,
+} from "@/lib/levytate/domain";
 import { normaliseProviderProgramme, normaliseProviderRecord } from "@/lib/levytate/mvp/workspace";
 
 type ProviderSeed = Omit<Partial<ProviderCatalogueRecord>, "commercialProfile"> & {
@@ -25,14 +30,14 @@ const programmeTimestamp = "2026-07-06T00:00:00.000Z";
 const allEmployerSizes = ["SME", "Mid-market", "Large enterprise"];
 
 function provider(seed: ProviderSeed): ProviderCatalogueRecord {
-  return normaliseProviderRecord({
+  return normaliseProviderRecordTaxonomy(normaliseProviderRecord({
     providerType: "Independent training provider",
     sectors: [],
     industries: [],
     technologies: [],
     deliveryModels: [],
     regions: [],
-    employerTypes: [],
+    employerTypes: allEmployerSizes,
     specialisms: [],
     contactName: "",
     contactEmail: "",
@@ -50,14 +55,14 @@ function provider(seed: ProviderSeed): ProviderCatalogueRecord {
       accreditations: seed.accreditations ?? [],
       employerSizesSupported: seed.employerSizesSupported ?? allEmployerSizes,
     },
-  });
+  }));
 }
 
 function programme(seed: ProgrammeSeed): ProviderProgramme {
   const linkedStandardIds = seed.linkedStandardIds ?? (seed.linkedStandardId ? [seed.linkedStandardId] : []);
   const sourceUrl = seed.sourceUrl ?? "";
   const expectedOutcomes = seed.expectedOutcomes ?? [];
-  return normaliseProviderProgramme({
+  return normaliseProviderProgrammeTaxonomy(normaliseProviderProgramme({
     status: linkedStandardIds.length ? "Active" : "Needs verification",
     verificationStatus: linkedStandardIds.length ? "Verified from provider website" : "Needs manual verification",
     targetOrganisations: [],
@@ -93,7 +98,7 @@ function programme(seed: ProgrammeSeed): ProviderProgramme {
       fundingOptions: [seed.fundingRoute ?? "Potentially funded through levy/co-investment"],
       futureCapabilityImpact: expectedOutcomes,
     },
-  });
+  }));
 }
 
 const providerSeeds: ProviderCatalogueRecord[] = [

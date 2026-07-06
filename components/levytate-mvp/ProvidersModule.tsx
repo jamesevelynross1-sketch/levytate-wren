@@ -19,6 +19,7 @@ import type {
   ApprenticeshipStandard,
   CommercialLink,
   FundingRoute,
+  ProviderCatalogueFilters,
   ProviderCatalogueRecord,
   ProviderEmployerSize,
   ProviderProgramme,
@@ -29,9 +30,12 @@ import type {
 } from "@/lib/levytate/domain";
 import {
   commercialProfileCompletion,
+  defaultProviderCatalogueFilters,
   emptyProgrammeCommercialProfile,
   emptyProviderCommercialProfile,
+  filterProviderCatalogue,
   formatFundingBand,
+  normalisedProviderCatalogueFilterOptions,
   programmePrimaryStandard,
   programmeProfileCompletion,
 } from "@/lib/levytate/domain";
@@ -52,7 +56,6 @@ import {
 } from "@/components/levytate-mvp/MvpUi";
 import { useLevyTateStandards } from "@/components/levytate-mvp/LevyTateStandardsProvider";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
-import { includesSearch } from "@/components/levytate-mvp/module-utils";
 import {
   createMvpId,
   normaliseProviderProgramme,
@@ -92,7 +95,7 @@ const fundingRoutes: FundingRoute[] = [
 ];
 const seniorityOptions: ProviderProgrammeSeniority[] = ["Entry", "Early career", "Experienced", "Supervisor", "Manager", "Mixed"];
 const employerSizeOptions: ProviderEmployerSize[] = ["SME", "Mid-market", "Large enterprise", "Mixed employer base"];
-const marketplaceFilters = ["Active", "Archived", "All"] as const;
+const marketplaceStatusFilters: Array<ProviderCatalogueFilters["status"]> = ["Active", "Archived", "All"];
 
 type ProviderView = {
   providerId: string;
@@ -179,11 +182,63 @@ function providerCardBadges(provider: ProviderCatalogueRecord, featuredProgramme
   return uniqueValues([...(featuredProgramme?.deliveryModels ?? []), providerReachLabel(provider)]).slice(0, 3);
 }
 
+
+type ProviderFilterOptions = ReturnType<typeof normalisedProviderCatalogueFilterOptions>;
+
+function MarketplaceFilterSelect({
+  label,
+  value,
+  options,
+  onChange,
+  includeAll = true,
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+  includeAll?: boolean;
+}) {
+  const selectOptions = includeAll ? ["All", ...options.filter((option) => option !== "All")] : options;
+  return (
+    <label className="grid gap-1 text-[10px] font-semibold uppercase tracking-[0.13em] text-[#102c3d]/42">
+      {label}
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-10 min-w-0 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-[12px] font-semibold normal-case tracking-normal text-[#102c3d]/78 outline-none transition focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10"
+      >
+        {selectOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+      </select>
+    </label>
+  );
+}
+
+function ProviderFilterControls({
+  filters,
+  options,
+  onFilter,
+}: {
+  filters: ProviderCatalogueFilters;
+  options: ProviderFilterOptions;
+  onFilter: (key: keyof ProviderCatalogueFilters, value: string) => void;
+}) {
+  return (
+    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+      <MarketplaceFilterSelect label="Sector" value={filters.sector} options={options.sectors} onChange={(value) => onFilter("sector", value)} />
+      <MarketplaceFilterSelect label="Technology" value={filters.technology} options={options.technologies} onChange={(value) => onFilter("technology", value)} />
+      <MarketplaceFilterSelect label="Business challenge" value={filters.businessChallenge} options={options.businessChallenges} onChange={(value) => onFilter("businessChallenge", value)} />
+      <MarketplaceFilterSelect label="Delivery" value={filters.deliveryModel} options={options.deliveryModels} onChange={(value) => onFilter("deliveryModel", value)} />
+      <MarketplaceFilterSelect label="Region" value={filters.region} options={options.regions} onChange={(value) => onFilter("region", value)} />
+      <MarketplaceFilterSelect label="Employer type" value={filters.employerType} options={options.employerTypes} onChange={(value) => onFilter("employerType", value)} />
+      <MarketplaceFilterSelect label="Level" value={filters.programmeLevel} options={options.programmeLevels} onChange={(value) => onFilter("programmeLevel", value)} />
+      <MarketplaceFilterSelect label="Status" value={filters.status} options={marketplaceStatusFilters} includeAll={false} onChange={(value) => onFilter("status", value)} />
+    </div>
+  );
+}
 export function ProvidersModule() {
   const { data, saveProvider, saveProviderProgramme, archiveProviderProgramme, removeProviderProgramme } = useMvpWorkspace();
   const { selectableStandards } = useLevyTateStandards();
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<(typeof marketplaceFilters)[number]>("Active");
+  const [filters, setFilters] = useState<ProviderCatalogueFilters>(defaultProviderCatalogueFilters);
   const [compareProviderIds, setCompareProviderIds] = useState<string[]>([]);
   const [profileView, setProfileView] = useState<ProviderView | null>(null);
   const [programmeView, setProgrammeView] = useState<ProgrammeView | null>(null);
@@ -204,42 +259,19 @@ export function ProvidersModule() {
     };
   }, [data.providerProgrammes, data.providers]);
 
-  const visibleProviders = useMemo(() => {
-    return data.providers
-      .filter((provider) => {
-        const providerProgrammes = data.providerProgrammes.filter((programme) => programme.providerId === provider.providerId && programme.recordStatus === "Active");
-        const searchableProgrammeText = providerProgrammes
-          .map((programme) => [
-            programme.programmeName,
-            programme.shortDescription,
-            programme.commercialProfile.tagline,
-            programme.targetIndustries.join(" "),
-            programme.targetJobRoles.join(" "),
-            programme.technologiesCovered.join(" "),
-            programme.businessProblemsSolved.join(" "),
-            programme.commercialProfile.employerBenefits.join(" "),
-          ].join(" "))
-          .join(" ");
+  const filterOptions = useMemo(
+    () => normalisedProviderCatalogueFilterOptions(data.providers, data.providerProgrammes),
+    [data.providerProgrammes, data.providers],
+  );
 
-        return (status === "All" || provider.status === status)
-          && includesSearch([
-            provider.providerName,
-            provider.providerType,
-            provider.commercialProfile.positioningStatement,
-            fallbackProviderDescription(provider),
-            provider.industries.join(" "),
-            provider.technologies.join(" "),
-            provider.specialisms.join(" "),
-            provider.commercialProfile.accreditations.join(" "),
-            provider.commercialProfile.caseStudies.join(" "),
-            provider.commercialProfile.testimonials.join(" "),
-            provider.commercialProfile.employerSizesSupported.join(" "),
-            provider.commercialProfile.pricingNotes,
-            searchableProgrammeText,
-          ], search);
-      })
-      .sort((left, right) => commercialProfileCompletion(right.commercialProfile) - commercialProfileCompletion(left.commercialProfile) || left.providerName.localeCompare(right.providerName));
-  }, [data.providerProgrammes, data.providers, search, status]);
+  const visibleProviders = useMemo(
+    () => filterProviderCatalogue(data.providers, data.providerProgrammes, selectableStandards, filters),
+    [data.providerProgrammes, data.providers, filters, selectableStandards],
+  );
+
+  function updateFilter(key: keyof ProviderCatalogueFilters, value: string) {
+    setFilters((current) => ({ ...current, [key]: value }));
+  }
 
   const comparisonProviders = useMemo(
     () => compareProviderIds.map((providerId) => data.providers.find((provider) => provider.providerId === providerId)).filter(Boolean) as ProviderCatalogueRecord[],
@@ -419,12 +451,12 @@ export function ProvidersModule() {
 
       <MvpPanel title="Provider marketplace" eyebrow="Commercial provider discovery">
         <MvpToolbar
-          search={search}
-          onSearch={setSearch}
+          search={filters.search}
+          onSearch={(value) => updateFilter("search", value)}
           placeholder="Search provider profiles, technologies, industries, programmes or outcomes"
           actionLabel="Add provider"
           onAction={() => openProviderEditor()}
-          filters={<select value={status} onChange={(event) => setStatus(event.target.value as (typeof marketplaceFilters)[number])} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-sm font-semibold">{marketplaceFilters.map((filter) => <option key={filter}>{filter}</option>)}</select>}
+          filters={<ProviderFilterControls filters={filters} options={filterOptions} onFilter={updateFilter} />}
         />
 
         {visibleProviders.length ? (
@@ -1179,4 +1211,3 @@ function Tag({ children, tone = "default" }: { children: string; tone?: "default
     </span>
   );
 }
-
