@@ -147,8 +147,37 @@ function programmeTone(status: ProviderProgrammeStatus) {
   return "red" as const;
 }
 
+function uniqueValues(values: string[]) {
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
+}
+
+function limitedTags(values: string[], limit = 4) {
+  const unique = uniqueValues(values);
+  return {
+    visible: unique.slice(0, limit),
+    overflow: Math.max(unique.length - limit, 0),
+  };
+}
+
+function providerCardSummary(provider: ProviderCatalogueRecord) {
+  return provider.commercialProfile.positioningStatement || fallbackProviderDescription(provider) || provider.providerType;
+}
+
+function providerCardTags(provider: ProviderCatalogueRecord, featuredProgramme?: ProviderProgramme) {
+  return limitedTags([
+    ...provider.specialisms,
+    ...(featuredProgramme?.technologiesCovered ?? []),
+    ...(featuredProgramme?.targetIndustries ?? []),
+    ...provider.technologies,
+  ]);
+}
+
+function providerCardBadges(provider: ProviderCatalogueRecord, featuredProgramme?: ProviderProgramme) {
+  return uniqueValues([...(featuredProgramme?.deliveryModels ?? []), providerReachLabel(provider)]).slice(0, 3);
+}
+
 export function ProvidersModule() {
-  const { data, saveProvider, archiveProvider, saveProviderProgramme, archiveProviderProgramme, removeProviderProgramme } = useMvpWorkspace();
+  const { data, saveProvider, saveProviderProgramme, archiveProviderProgramme, removeProviderProgramme } = useMvpWorkspace();
   const { selectableStandards } = useLevyTateStandards();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<(typeof marketplaceFilters)[number]>("Active");
@@ -396,63 +425,80 @@ export function ProvidersModule() {
         />
 
         {visibleProviders.length ? (
-          <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {visibleProviders.map((provider) => {
               const providerProgrammes = data.providerProgrammes.filter((programme) => programme.providerId === provider.providerId && programme.recordStatus === "Active");
               const featuredProgramme = firstProgramme(providerProgrammes);
-              const completion = commercialProfileCompletion(provider.commercialProfile);
               const compared = compareProviderIds.includes(provider.providerId);
+              const cardTags = providerCardTags(provider, featuredProgramme);
+              const cardBadges = providerCardBadges(provider, featuredProgramme);
+              const summary = providerCardSummary(provider);
               return (
-                <article key={provider.providerId} className="overflow-hidden rounded-2xl border border-[#102c3d]/[0.07] bg-white shadow-[0_18px_36px_rgba(16,44,61,0.05)] transition hover:-translate-y-0.5 hover:shadow-[0_24px_48px_rgba(16,44,61,0.08)]">
-                  <div className={`bg-gradient-to-br ${providerTheme(provider.providerId)} px-5 py-5 text-white`}>
-                    <div className="flex items-start justify-between gap-4">
+                <article key={provider.providerId} className="flex h-full flex-col overflow-hidden rounded-[26px] border border-[#102c3d]/[0.08] bg-white shadow-[0_16px_34px_rgba(16,44,61,0.045)] transition hover:-translate-y-0.5 hover:shadow-[0_24px_46px_rgba(16,44,61,0.08)]">
+                  <div className={`h-1.5 w-full bg-gradient-to-r ${providerTheme(provider.providerId)}`} />
+
+                  <div className="flex h-full flex-col p-5">
+                    <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="inline-flex rounded-2xl bg-white/12 px-3 py-2 text-sm font-semibold backdrop-blur-sm">{providerWordmark(provider)}</div>
-                        <div className="mt-4 flex flex-wrap items-center gap-2">
-                          <h3 className="text-xl font-semibold">{provider.providerName}</h3>
-                          {provider.verificationStatus === "verified" ? <StatusBadge tone="green">Verified Provider</StatusBadge> : <StatusBadge tone="yellow">Under review</StatusBadge>}
-                          <StatusBadge tone="blue">{providerReachLabel(provider)}</StatusBadge>
-                        </div>
-                        <p className="mt-2 text-sm text-white/76">{provider.providerType}</p>
-                        <p className="mt-3 max-w-xl text-sm leading-6 text-white/86">{provider.commercialProfile.positioningStatement || fallbackProviderDescription(provider)}</p>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/42">{provider.providerType}</p>
+                        <h3 className="mt-2 text-[22px] font-semibold tracking-[-0.02em] text-[#102c3d]">{provider.providerName}</h3>
                       </div>
-                      <StatusBadge tone={completion >= 70 ? "green" : completion >= 45 ? "yellow" : "red"}>{completion}% complete</StatusBadge>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-4 p-5">
-                    <p className="text-sm leading-6 text-[#102c3d]/58">{fallbackProviderDescription(provider)}</p>
-
-                    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-                      <MetricTile label="Years" value={provider.commercialProfile.yearsEstablished || "To confirm"} />
-                      <MetricTile label="Learners" value={provider.commercialProfile.learnerNumbers || "To confirm"} />
-                      <MetricTile label="Partners" value={provider.commercialProfile.employerPartners || "To confirm"} />
-                      <MetricTile label="Achievement" value={provider.commercialProfile.achievementRate || "To confirm"} />
+                      <StatusBadge tone={provider.verificationStatus === "verified" ? "green" : "yellow"}>
+                        {provider.verificationStatus === "verified" ? "Verified" : "Review"}
+                      </StatusBadge>
                     </div>
 
-                    <div className="grid gap-3 rounded-2xl bg-[#f8fbfa] p-4 ring-1 ring-[#102c3d]/[0.06]">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#c95568]">Featured programme</p>
-                          <p className="mt-1 text-sm font-semibold text-[#102c3d]">{featuredProgramme?.programmeName ?? "Programme to confirm"}</p>
-                        </div>
-                        {featuredProgramme ? <StatusBadge tone={programmeTone(featuredProgramme.status)}>{featuredProgramme.status}</StatusBadge> : null}
+                    <p className="mt-3 truncate text-sm font-medium text-[#102c3d]/68" title={summary}>{summary}</p>
+
+                    {cardBadges.length ? (
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {cardBadges.map((item) => (
+                          <StatusBadge key={item} tone={item === providerReachLabel(provider) ? "blue" : "neutral"}>{item}</StatusBadge>
+                        ))}
                       </div>
-                      <p className="text-sm leading-6 text-[#102c3d]/58">{featuredProgramme?.commercialProfile.tagline || featuredProgramme?.shortDescription || "Programme proposition to confirm"}</p>
-                    </div>
+                    ) : null}
 
-                    <div className="flex flex-wrap gap-2">
-                      {provider.industries.slice(0, 3).map((item) => <Tag key={item}>{item}</Tag>)}
-                      {provider.technologies.slice(0, 2).map((item) => <Tag key={item}>{item}</Tag>)}
-                      {provider.commercialProfile.accreditations.slice(0, 2).map((item) => <Tag key={item} tone="accent">{item}</Tag>)}
-                    </div>
+                    {cardTags.visible.length ? (
+                      <div className="mt-4 flex min-h-[68px] flex-wrap content-start gap-2 overflow-hidden">
+                        {cardTags.visible.map((item) => <Tag key={item}>{item}</Tag>)}
+                        {cardTags.overflow ? <Tag tone="accent">{`+${cardTags.overflow} more`}</Tag> : null}
+                      </div>
+                    ) : null}
 
-                    <div className="flex flex-wrap gap-2">
-                      <TableAction onClick={() => setProfileView({ providerId: provider.providerId })}>Open profile</TableAction>
-                      <TableAction onClick={() => toggleCompare(provider.providerId)}>{compared ? "Remove from compare" : "Compare provider"}</TableAction>
-                      {featuredProgramme ? <TableAction onClick={() => setProgrammeView({ providerId: provider.providerId, programmeId: featuredProgramme.id })}>View programme</TableAction> : null}
-                      <TableAction onClick={() => openProviderEditor(provider)}>Edit record</TableAction>
-                      <TableAction onClick={() => archiveProvider(provider.providerId)} danger={provider.status === "Active"}>{provider.status === "Archived" ? "Restore" : "Archive"}</TableAction>
+                    {featuredProgramme ? (
+                      <button
+                        type="button"
+                        onClick={() => setProgrammeView({ providerId: provider.providerId, programmeId: featuredProgramme.id })}
+                        className="mt-5 min-h-[112px] rounded-2xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4 text-left transition hover:border-[#159b8f]/20 hover:bg-white"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">Featured programme</p>
+                            <p className="mt-2 text-sm font-semibold text-[#102c3d]">{featuredProgramme.programmeName}</p>
+                          </div>
+                          <StatusBadge tone={programmeTone(featuredProgramme.status)}>{featuredProgramme.status}</StatusBadge>
+                        </div>
+                        <p className="mt-2 truncate text-sm text-[#102c3d]/56" title={featuredProgramme.commercialProfile.tagline || featuredProgramme.shortDescription}>
+                          {featuredProgramme.commercialProfile.tagline || featuredProgramme.shortDescription}
+                        </p>
+                      </button>
+                    ) : null}
+
+                    <div className="mt-auto grid grid-cols-2 gap-2 pt-5">
+                      <button
+                        type="button"
+                        onClick={() => setProfileView({ providerId: provider.providerId })}
+                        className="inline-flex h-11 items-center justify-center rounded-full bg-[#102c3d] px-4 text-sm font-semibold text-white shadow-[0_10px_20px_rgba(16,44,61,0.12)] transition hover:bg-[#17394d]"
+                      >
+                        View profile
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleCompare(provider.providerId)}
+                        className={`inline-flex h-11 items-center justify-center rounded-full px-4 text-sm font-semibold ring-1 transition ${compared ? "bg-[#edf7f3] text-[#0b6f63] ring-[#159b8f]/16" : "bg-white text-[#102c3d]/70 ring-[#102c3d]/[0.08] hover:text-[#102c3d]"}`}
+                      >
+                        {compared ? "Compared" : "Compare"}
+                      </button>
                     </div>
                   </div>
                 </article>
@@ -690,7 +736,7 @@ function ProgrammeDestination({
         <div className="rounded-2xl border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_14px_32px_rgba(16,44,61,0.045)]">
           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">Funding and compliance</p>
           <h4 className="mt-2 text-base font-semibold text-[#102c3d]">{standard?.title || programme.linkedStandardName || "Linked standard to confirm"}</h4>
-          <p className="mt-1 text-sm text-[#102c3d]/56">{standard ? `${standard.referenceCode} ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ Level ${standard.level}` : "Standard metadata will appear here once linked."}</p>
+          <p className="mt-1 text-sm text-[#102c3d]/56">{standard ? `${standard.referenceCode} | Level ${standard.level}` : "Standard metadata will appear here once linked."}</p>
           <p className="mt-3 text-sm text-[#102c3d]/60">{standard ? formatFundingBand(standard) : programme.fundingRoute}</p>
           <div className="mt-4 grid gap-2 text-sm text-[#102c3d]/58">
             {(programme.commercialProfile.downloads.length ? downloadLabels(programme.commercialProfile.downloads) : ["Download placeholders ready for future provider enablement"]).map((item) => <div key={item} className="flex items-center gap-2"><Download size={14} className="text-[#0b8e82]" />{item}</div>)}
