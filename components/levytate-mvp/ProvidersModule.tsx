@@ -113,7 +113,10 @@ function firstProgramme(programmes: ProviderProgramme[]) {
 }
 
 function providerReachLabel(provider: ProviderCatalogueRecord) {
-  return provider.providerType === "National provider" || provider.regions.includes("England") ? "National delivery" : "Regional delivery";
+  if (provider.providerType === "National provider" || provider.regions.includes("England")) return "National delivery";
+  if (provider.regions.length > 1) return "Multi-region delivery";
+  if (provider.regions.length === 1) return provider.regions[0];
+  return "Delivery scope to confirm";
 }
 
 function providerTheme(providerId: string) {
@@ -130,7 +133,7 @@ function providerWordmark(provider: ProviderCatalogueRecord) {
 }
 
 function fallbackProviderDescription(provider: ProviderCatalogueRecord) {
-  return provider.commercialProfile.organisationDescription || provider.notes || "Commercial summary to confirm.";
+  return provider.commercialProfile.organisationDescription || provider.notes || "Provider summary pending manual verification.";
 }
 
 function downloadLabels(links: CommercialLink[]) {
@@ -448,7 +451,7 @@ export function ProvidersModule() {
                       </StatusBadge>
                     </div>
 
-                    <p className="mt-3 truncate text-sm font-medium text-[#102c3d]/68" title={summary}>{summary}</p>
+                    <p className="mt-3 min-h-[44px] text-sm font-medium leading-6 text-[#102c3d]/68" title={summary}>{summary}</p>
 
                     {cardBadges.length ? (
                       <div className="mt-4 flex flex-wrap gap-2">
@@ -622,10 +625,10 @@ function ProviderProfileModal({
           </div>
 
           <div className="grid gap-3 self-start rounded-3xl bg-white/10 p-4 backdrop-blur-sm ring-1 ring-white/10">
-            <MetricTile inverse label="Years established" value={provider.commercialProfile.yearsEstablished || "To confirm"} />
-            <MetricTile inverse label="Learner numbers" value={provider.commercialProfile.learnerNumbers || "To confirm"} />
-            <MetricTile inverse label="Employer partners" value={provider.commercialProfile.employerPartners || "To confirm"} />
-            <MetricTile inverse label="Achievement rate" value={provider.commercialProfile.achievementRate || "To confirm"} />
+            <MetricTile inverse label="Verification" value={provider.verificationStatus === "verified" ? "Source verified" : "Needs verification"} />
+            <MetricTile inverse label="Programmes" value={String(programmes.length)} />
+            <MetricTile inverse label="Reach" value={providerReachLabel(provider)} />
+            <MetricTile inverse label="Last checked" value={provider.lastVerified || "Needs verification"} />
           </div>
         </div>
       </section>
@@ -644,19 +647,26 @@ function ProviderProfileModal({
         </div>
 
         <div className="grid gap-5">
-          <MarketplaceSignalCard title="Trust signals" copy="Use these proof points when explaining why the provider belongs on a controlled employer shortlist." items={[provider.commercialProfile.employerSatisfaction || "Employer satisfaction to confirm", provider.commercialProfile.learnerSatisfaction || "Learner satisfaction to confirm", provider.ofstedRating || "Ofsted to confirm"]} />
+          <MarketplaceSignalCard title="Trust signals" copy="These proof points come from reviewed provider pages and should stay source-backed." items={[
+            provider.ofstedRating && provider.ofstedRating !== "Requires verification" ? provider.ofstedRating : "",
+            ...provider.commercialProfile.accreditations,
+            provider.verificationStatus === "verified" ? "Source reviewed " + provider.lastVerified : "Manual verification still required",
+          ]} />
           <InfoChips title="Accreditations" icon={ShieldCheck} items={provider.commercialProfile.accreditations} />
           <InfoChips title="Awards" icon={Award} items={provider.commercialProfile.awards} />
         </div>
       </section>
 
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
-        <MarketplaceSignalCard title="Case studies and testimonials" copy="These seeded stories help the marketplace feel commercially credible during demonstrations." items={[...provider.commercialProfile.caseStudies, ...provider.commercialProfile.testimonials]} />
-        <MarketplaceSignalCard title="Downloads, video and contact" copy="Keep the marketplace ready for future partner enablement and sales follow-up." items={[
+        <MarketplaceSignalCard title="Case studies and testimonials" copy="Keep this area limited to evidence that is published or directly confirmed by the provider." items={[
+          ...provider.commercialProfile.caseStudies,
+          ...provider.commercialProfile.testimonials,
+          provider.notes,
+        ]} />
+        <MarketplaceSignalCard title="Sources and follow-up" copy="Use this panel to keep every provider profile grounded in reviewed source material." items={[
           ...downloadLabels(provider.commercialProfile.downloads),
-          provider.commercialProfile.videoUrl ? `Video: ${provider.commercialProfile.videoUrl}` : "Video placeholder ready",
-          `${provider.commercialProfile.commercialContactName || provider.contactName || "Primary contact"} | ${provider.commercialProfile.commercialContactTitle || provider.commercialProfile.primaryContactTitle || "Relationship lead"}`,
-          provider.commercialProfile.commercialContactEmail || provider.contactEmail || "Contact email to confirm",
+          ...provider.sourceUrls.map((url) => "Source: " + url),
+          provider.commercialProfile.commercialContactEmail || provider.contactEmail || "",
         ]} />
       </section>
 
@@ -697,7 +707,7 @@ function ProgrammeDestination({
               <StatusBadge tone="blue">{provider.providerName}</StatusBadge>
             </div>
             <h3 className="mt-5 text-3xl font-semibold tracking-[-0.03em] text-[#102c3d]">{programme.programmeName}</h3>
-            <p className="mt-3 text-base font-medium text-[#0b6f63]">{programme.commercialProfile.tagline || "Programme proposition to confirm"}</p>
+            <p className="mt-3 text-base font-medium text-[#0b6f63]">{programme.commercialProfile.tagline || "Programme summary pending manual verification"}</p>
             <p className="mt-4 max-w-3xl text-sm leading-7 text-[#102c3d]/60">{programme.fullDescription || programme.shortDescription}</p>
             <div className="mt-5 flex flex-wrap gap-2">
               {programme.targetIndustries.slice(0, 3).map((item) => <Tag key={item}>{item}</Tag>)}
@@ -706,10 +716,10 @@ function ProgrammeDestination({
             </div>
           </div>
           <div className="grid gap-3 self-start rounded-3xl bg-[#f8fbfa] p-4 ring-1 ring-[#102c3d]/[0.06]">
-            <MetricTile label="Delivery" value={programme.deliveryModels.join(", ") || "To confirm"} />
-            <MetricTile label="Duration" value={programme.duration || "To confirm"} />
-            <MetricTile label="Employer fit" value={programme.employerSize} />
-            <MetricTile label="Confidence" value={programme.commercialProfile.confidenceLabel || "High"} />
+            <MetricTile label="Verification" value={programme.verificationStatus === "Needs manual verification" ? "Needs verification" : "Source verified"} />
+            <MetricTile label="Delivery" value={programme.deliveryModels.join(", ") || "Not published"} />
+            <MetricTile label="Linked standard" value={standard?.title || programme.linkedStandardName || "Needs verification"} />
+            <MetricTile label="Funding route" value={programme.fundingRoute} />
           </div>
         </div>
       </section>
@@ -719,14 +729,14 @@ function ProgrammeDestination({
       </div>
 
       <section className="grid gap-5 xl:grid-cols-2">
-        <InfoSection title="Who this programme is for" copy={programme.commercialProfile.idealAudience || "Audience description to confirm."} />
-        <InfoSection title="Business challenges solved" copy={(programme.businessProblemsSolved.length ? programme.businessProblemsSolved : ["Business challenge positioning to confirm"]).join(" / ")} />
+        <InfoSection title="Who this programme is for" copy={programme.commercialProfile.idealAudience || "Audience detail pending manual verification."} />
+        <InfoSection title="Business challenges solved" copy={(programme.businessProblemsSolved.length ? programme.businessProblemsSolved : ["Business challenge detail not published"]).join(" / ")} />
         <InfoChips title="Target roles" icon={Users} items={programme.targetJobRoles} />
         <InfoChips title="Technologies" icon={Layers3} items={programme.technologiesCovered} />
         <InfoChips title="Skills developed" icon={Sparkles} items={programme.skillsDeveloped} />
         <InfoChips title="Expected outcomes" icon={CheckCircle2} items={programme.expectedOutcomes} />
-        <InfoSection title="Employer commitment" copy={programme.commercialProfile.employerCommitment || "Employer commitment to confirm."} />
-        <InfoSection title="Assessment approach" copy={programme.commercialProfile.assessmentApproach || "Assessment approach to confirm."} />
+        <InfoSection title="Employer commitment" copy={programme.commercialProfile.employerCommitment || "Employer commitment not published."} />
+        <InfoSection title="Assessment approach" copy={programme.commercialProfile.assessmentApproach || "Assessment approach not published."} />
         <InfoChips title="Progression routes" icon={ArrowUpRight} items={programme.commercialProfile.progressionRoutes} />
         <InfoChips title="Case studies and FAQs" icon={Star} items={[...programme.commercialProfile.caseStudies, ...programme.commercialProfile.faqs]} />
       </section>
@@ -735,11 +745,11 @@ function ProgrammeDestination({
         <MarketplaceSignalCard title="Employer value" copy="This programme should lead with employer outcomes, not the standard." items={programme.commercialProfile.employerBenefits.length ? programme.commercialProfile.employerBenefits : programme.expectedOutcomes} />
         <div className="rounded-2xl border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_14px_32px_rgba(16,44,61,0.045)]">
           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">Funding and compliance</p>
-          <h4 className="mt-2 text-base font-semibold text-[#102c3d]">{standard?.title || programme.linkedStandardName || "Linked standard to confirm"}</h4>
+          <h4 className="mt-2 text-base font-semibold text-[#102c3d]">{standard?.title || programme.linkedStandardName || "Linked standard needs verification"}</h4>
           <p className="mt-1 text-sm text-[#102c3d]/56">{standard ? `${standard.referenceCode} | Level ${standard.level}` : "Standard metadata will appear here once linked."}</p>
           <p className="mt-3 text-sm text-[#102c3d]/60">{standard ? formatFundingBand(standard) : programme.fundingRoute}</p>
           <div className="mt-4 grid gap-2 text-sm text-[#102c3d]/58">
-            {(programme.commercialProfile.downloads.length ? downloadLabels(programme.commercialProfile.downloads) : ["Download placeholders ready for future provider enablement"]).map((item) => <div key={item} className="flex items-center gap-2"><Download size={14} className="text-[#0b8e82]" />{item}</div>)}
+            {(programme.commercialProfile.downloads.length ? downloadLabels(programme.commercialProfile.downloads) : ["No downloads published"]).map((item) => <div key={item} className="flex items-center gap-2"><Download size={14} className="text-[#0b8e82]" />{item}</div>)}
           </div>
         </div>
       </section>
@@ -944,19 +954,19 @@ function ProviderComparison({
   const rows = [
     {
       label: "Delivery",
-      render: (card: (typeof cards)[number]) => card.featuredProgramme?.deliveryModels.join(", ") || card.provider.deliveryModels.join(", ") || "To confirm",
+      render: (card: (typeof cards)[number]) => card.featuredProgramme?.deliveryModels.join(", ") || card.provider.deliveryModels.join(", ") || "Not published",
     },
     {
       label: "Technologies",
-      render: (card: (typeof cards)[number]) => (card.featuredProgramme?.technologiesCovered.slice(0, 3).join(", ") || card.provider.technologies.slice(0, 3).join(", ") || "To confirm"),
+      render: (card: (typeof cards)[number]) => (card.featuredProgramme?.technologiesCovered.slice(0, 3).join(", ") || card.provider.technologies.slice(0, 3).join(", ") || "Not published"),
     },
     {
       label: "Industries",
-      render: (card: (typeof cards)[number]) => (card.featuredProgramme?.targetIndustries.slice(0, 3).join(", ") || card.provider.industries.slice(0, 3).join(", ") || "To confirm"),
+      render: (card: (typeof cards)[number]) => (card.featuredProgramme?.targetIndustries.slice(0, 3).join(", ") || card.provider.industries.slice(0, 3).join(", ") || "Not published"),
     },
     {
       label: "Strengths",
-      render: (card: (typeof cards)[number]) => (card.featuredProgramme?.commercialProfile.employerBenefits[0] || card.provider.specialisms[0] || "To confirm"),
+      render: (card: (typeof cards)[number]) => (card.featuredProgramme?.commercialProfile.employerBenefits[0] || card.provider.specialisms[0] || "Not published"),
     },
     {
       label: "Limitations",
@@ -964,19 +974,19 @@ function ProviderComparison({
     },
     {
       label: "Employer size",
-      render: (card: (typeof cards)[number]) => card.featuredProgramme?.employerSize || card.provider.commercialProfile.employerSizesSupported[0] || "To confirm",
+      render: (card: (typeof cards)[number]) => card.featuredProgramme?.employerSize || card.provider.commercialProfile.employerSizesSupported[0] || "Not published",
     },
     {
       label: "Regions",
-      render: (card: (typeof cards)[number]) => card.provider.regions.slice(0, 3).join(", ") || "To confirm",
+      render: (card: (typeof cards)[number]) => card.provider.regions.slice(0, 3).join(", ") || "Not published",
     },
     {
       label: "Funding",
-      render: (card: (typeof cards)[number]) => card.featuredProgramme?.fundingRoute || "To confirm",
+      render: (card: (typeof cards)[number]) => card.featuredProgramme?.fundingRoute || "Not published",
     },
     {
       label: "Duration",
-      render: (card: (typeof cards)[number]) => card.featuredProgramme?.duration || "To confirm",
+      render: (card: (typeof cards)[number]) => card.featuredProgramme?.duration || "Not published",
     },
     {
       label: "Recommendation",
@@ -1005,8 +1015,8 @@ function ProviderComparison({
                 </div>
               </div>
               <div className="mt-4 grid gap-3">
-                <MetricTile label="Featured programme" value={featuredProgramme?.programmeName || "To confirm"} />
-                <MetricTile label="Linked standard" value={standard?.title || "To confirm"} />
+                <MetricTile label="Featured programme" value={featuredProgramme?.programmeName || "Needs verification"} />
+                <MetricTile label="Linked standard" value={standard?.title || featuredProgramme?.linkedStandardName || "Needs verification"} />
                 <div className="flex gap-2">
                   <TableAction onClick={() => onOpenProfile(provider.providerId)}>Open profile</TableAction>
                   {featuredProgramme ? <TableAction onClick={() => onOpenProgramme(provider.providerId, featuredProgramme.id)}>View programme</TableAction> : null}
@@ -1058,8 +1068,8 @@ function ProgrammeMarketplaceCard({
       </div>
       <p className="mt-3 text-sm leading-6 text-[#102c3d]/58">{programme.commercialProfile.tagline || programme.shortDescription || "Add employer-facing programme copy."}</p>
       <div className="mt-4 grid gap-2 sm:grid-cols-2">
-        <MetricTile label="Delivery" value={programme.deliveryModels.join(", ") || "To confirm"} compact />
-        <MetricTile label="Standard" value={standard?.title || programme.linkedStandardName || "To confirm"} compact />
+        <MetricTile label="Delivery" value={programme.deliveryModels.join(", ") || "Not published"} compact />
+        <MetricTile label="Standard" value={standard?.title || programme.linkedStandardName || "Needs verification"} compact />
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
         {programme.technologiesCovered.slice(0, 3).map((item) => <Tag key={item}>{item}</Tag>)}
@@ -1169,6 +1179,4 @@ function Tag({ children, tone = "default" }: { children: string; tone?: "default
     </span>
   );
 }
-
-
 

@@ -477,11 +477,10 @@ async function ensureWorkspaceContext(session: LevyTateBetaSession): Promise<Wor
   );
 
   const organisation = existingOrganisation ?? await createOrganisation(seed);
-  if (!existingOrganisation) {
-    await seedOrganisationProviders(organisation.id);
-  } else {
+  if (existingOrganisation) {
     await updateOrganisationDefaults(organisation.id, seed);
   }
+  await syncSeedProviderCatalogue(organisation.id);
 
   const existingUser = await selectOne<UserRow>(
     usersTable,
@@ -631,8 +630,27 @@ async function updateOrganisationDefaults(
   });
 }
 
+async function syncSeedProviderCatalogue(organisationId: string) {
+  await removeLegacySeedProviders(organisationId);
+  await seedOrganisationProviders(organisationId);
+}
+
+async function removeLegacySeedProviders(organisationId: string) {
+  const config = assertSupabase();
+  const legacyProviderIds = ["provider-multiverse", "provider-sr-apprenticeships"];
+  if (!legacyProviderIds.length) return;
+  const legacyQuery = `${buildOrganisationQuery(organisationId)}&provider_id=in.(${legacyProviderIds.join(",")})`;
+  await supabaseDelete(config, providerProgrammesTable, legacyQuery);
+  await supabaseDelete(config, providersTable, legacyQuery);
+}
+
 async function seedOrganisationProviders(organisationId: string) {
   if (!mvpProviderCatalogue.length) return;
+
+  const config = assertSupabase();
+  const seededProviderIds = mvpProviderCatalogue.map((provider) => provider.providerId);
+  const seededProgrammeQuery = `${buildOrganisationQuery(organisationId)}&provider_id=in.(${seededProviderIds.join(",")})`;
+  await supabaseDelete(config, providerProgrammesTable, seededProgrammeQuery);
 
   const providerRows: ProviderRow[] = mvpProviderCatalogue.map((provider) => ({
     organisation_id: organisationId,
@@ -689,18 +707,18 @@ async function seedOrganisationProviders(organisationId: string) {
     funding_band: programme.fundingBand,
     official_url: programme.officialUrl,
     source_url: programme.sourceUrl,
-    notes: programme.notes,
+    notes: serialiseProgrammeRecordNotes(programme.notes, programme.commercialProfile),
     funding_route: programme.fundingRoute,
     record_status: programme.recordStatus,
     created_at: programme.createdAt,
     updated_at: programme.updatedAt,
   }));
 
-  await supabaseInsert<ProviderRow>(assertSupabase(), providersTable, providerRows, {
+  await supabaseInsert<ProviderRow>(config, providersTable, providerRows, {
     query: "on_conflict=organisation_id,provider_id",
     prefer: "resolution=merge-duplicates,return=minimal",
   });
-  await supabaseInsert<ProviderProgrammeRow>(assertSupabase(), providerProgrammesTable, programmeRows, {
+  await supabaseInsert<ProviderProgrammeRow>(config, providerProgrammesTable, programmeRows, {
     query: "on_conflict=organisation_id,id",
     prefer: "resolution=merge-duplicates,return=minimal",
   });
