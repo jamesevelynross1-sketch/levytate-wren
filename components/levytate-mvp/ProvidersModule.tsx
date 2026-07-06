@@ -6,7 +6,10 @@ import {
   BadgeCheck,
   BriefcaseBusiness,
   CheckCircle2,
+  CalendarCheck,
   Download,
+  ExternalLink,
+  Globe2,
   Layers3,
   MapPin,
   ShieldCheck,
@@ -136,7 +139,7 @@ function providerWordmark(provider: ProviderCatalogueRecord) {
 }
 
 function fallbackProviderDescription(provider: ProviderCatalogueRecord) {
-  return provider.commercialProfile.organisationDescription || provider.notes || "Provider summary pending manual verification.";
+  return cleanDisplayText(provider.commercialProfile.organisationDescription) || cleanDisplayText(provider.notes);
 }
 
 function downloadLabels(links: CommercialLink[]) {
@@ -147,6 +150,42 @@ function labelsToLinks(labels: string[], kind: CommercialLink["kind"] = "Downloa
   return labels.map((label) => ({ label, url: "", kind }));
 }
 
+function cleanDisplayText(value: unknown) {
+  if (typeof value !== "string") return "";
+  const text = value.trim();
+  if (!text) return "";
+  const lower = text.toLowerCase();
+  if (text.includes("__LEVYTATE_PROVIDER_META__") || text.includes("__LEVYTATE_PROGRAMME_META__")) return "";
+  if (text === "[object Object]" || lower === "json") return "";
+  if ((text.startsWith("{") && text.endsWith("}")) || (text.startsWith("[") && text.endsWith("]"))) return "";
+  if (lower.includes("commercialprofile") || lower.includes("sourceurls")) return "";
+  return text;
+}
+
+function cleanDisplayList(values: unknown[]) {
+  return Array.from(new Set(values.flatMap((value) => Array.isArray(value) ? value : [value]).map(cleanDisplayText).filter(Boolean)));
+}
+
+function cleanSourceUrls(values: string[]) {
+  return cleanDisplayList(values).filter((value) => /^https?:\/\//i.test(value));
+}
+
+function formatReviewedDate(value: string) {
+  const clean = cleanDisplayText(value);
+  if (!clean) return "";
+  const parsed = new Date(clean);
+  if (Number.isNaN(parsed.getTime())) return clean;
+  return parsed.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function sourceHost(url: string) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "Official source";
+  }
+}
+
 function programmeTone(status: ProviderProgrammeStatus) {
   if (status === "Active") return "green" as const;
   if (status === "Needs verification" || status === "Paused") return "yellow" as const;
@@ -154,7 +193,7 @@ function programmeTone(status: ProviderProgrammeStatus) {
 }
 
 function uniqueValues(values: string[]) {
-  return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
+  return cleanDisplayList(values);
 }
 
 function limitedTags(values: string[], limit = 4) {
@@ -166,7 +205,7 @@ function limitedTags(values: string[], limit = 4) {
 }
 
 function providerCardSummary(provider: ProviderCatalogueRecord) {
-  return provider.commercialProfile.positioningStatement || fallbackProviderDescription(provider) || provider.providerType;
+  return cleanDisplayText(provider.commercialProfile.positioningStatement) || fallbackProviderDescription(provider) || provider.providerType;
 }
 
 function providerCardTags(provider: ProviderCatalogueRecord, featuredProgramme?: ProviderProgramme) {
@@ -636,31 +675,49 @@ function ProviderProfileModal({
   onEditProgrammes: () => void;
   onOpenProgramme: (programmeId: string) => void;
 }) {
+  const summary = fallbackProviderDescription(provider);
+  const positioning = cleanDisplayText(provider.commercialProfile.positioningStatement) || summary;
+  const heroSpecialisms = cleanDisplayList([...provider.specialisms, ...provider.industries]).slice(0, 6);
+  const deliveryValues = cleanDisplayList([...provider.deliveryModels, ...provider.regions]);
+  const technologyValues = cleanDisplayList([...provider.industries, ...provider.technologies]);
+  const employerFitValues = cleanDisplayList([...provider.specialisms, ...provider.commercialProfile.employerSizesSupported]);
+  const trustSignals = cleanDisplayList([
+    provider.ofstedRating && provider.ofstedRating !== "Requires verification" ? provider.ofstedRating : "",
+    ...provider.commercialProfile.accreditations,
+    provider.verificationStatus === "verified" ? `Source reviewed ${formatReviewedDate(provider.lastVerified)}` : "",
+  ]);
+  const awards = cleanDisplayList(provider.commercialProfile.awards);
+  const proofPoints = cleanDisplayList([
+    ...provider.commercialProfile.caseStudies,
+    ...provider.commercialProfile.testimonials,
+    provider.notes,
+  ]);
+
   return (
     <div className="grid gap-5">
       <section className={`overflow-hidden rounded-3xl bg-gradient-to-br ${providerTheme(provider.providerId)} text-white shadow-[0_22px_54px_rgba(16,44,61,0.16)]`}>
-        <div className="grid gap-6 px-6 py-6 lg:grid-cols-[minmax(0,1fr)_260px] lg:px-7">
+        <div className="grid gap-6 px-6 py-6 lg:grid-cols-[minmax(0,1fr)_280px] lg:px-7">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <StatusBadge tone={provider.verificationStatus === "verified" ? "green" : "yellow"}>{provider.verificationStatus === "verified" ? "Verified Provider" : "Profile under review"}</StatusBadge>
+              <span className="rounded-full bg-white/14 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/74 ring-1 ring-white/12">Provider</span>
+              <StatusBadge tone={provider.verificationStatus === "verified" ? "green" : "yellow"}>{provider.verificationStatus === "verified" ? "Verified" : "Review needed"}</StatusBadge>
               <StatusBadge tone="blue">{provider.providerType}</StatusBadge>
-              <StatusBadge tone="blue">{providerReachLabel(provider)}</StatusBadge>
             </div>
-            <div className="mt-5 inline-flex rounded-2xl bg-white/12 px-4 py-3 text-lg font-semibold backdrop-blur-sm">{providerWordmark(provider)}</div>
             <h3 className="mt-5 text-3xl font-semibold tracking-[-0.03em]">{provider.providerName}</h3>
-            <p className="mt-3 max-w-3xl text-base leading-7 text-white/84">{provider.commercialProfile.positioningStatement || fallbackProviderDescription(provider)}</p>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-white/72">{fallbackProviderDescription(provider)}</p>
-            <div className="mt-5 flex flex-wrap gap-2">
-              {provider.industries.slice(0, 4).map((item) => <Tag key={item}>{item}</Tag>)}
-              {provider.commercialProfile.accreditations.slice(0, 3).map((item) => <Tag key={item} tone="accent">{item}</Tag>)}
-            </div>
+            {positioning ? <p className="mt-3 max-w-3xl text-base leading-7 text-white/86">{positioning}</p> : null}
+            {summary && summary !== positioning ? <p className="mt-3 max-w-3xl text-sm leading-6 text-white/72">{summary}</p> : null}
+            {heroSpecialisms.length ? (
+              <div className="mt-5 flex flex-wrap gap-2">
+                {heroSpecialisms.map((item) => <Tag key={item}>{item}</Tag>)}
+              </div>
+            ) : null}
           </div>
 
           <div className="grid gap-3 self-start rounded-3xl bg-white/10 p-4 backdrop-blur-sm ring-1 ring-white/10">
-            <MetricTile inverse label="Verification" value={provider.verificationStatus === "verified" ? "Source verified" : "Needs verification"} />
-            <MetricTile inverse label="Programmes" value={String(programmes.length)} />
-            <MetricTile inverse label="Reach" value={providerReachLabel(provider)} />
-            <MetricTile inverse label="Last checked" value={provider.lastVerified || "Needs verification"} />
+            <MetricTile inverse label="Verification" value={provider.verificationStatus === "verified" ? "Source verified" : "Needs review"} />
+            <MetricTile inverse label="Specialisms" value={String(heroSpecialisms.length || provider.specialisms.length || 0)} />
+            <MetricTile inverse label="Delivery" value={cleanDisplayList(provider.deliveryModels).join(", ")} />
+            <MetricTile inverse label="Coverage" value={providerReachLabel(provider)} />
           </div>
         </div>
       </section>
@@ -672,35 +729,26 @@ function ProviderProfileModal({
 
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
         <div className="grid gap-5">
-          <InfoSection title="Provider summary" copy={fallbackProviderDescription(provider)} />
-          <InfoChips title="Delivery and regions" icon={MapPin} items={[...provider.deliveryModels, ...provider.regions]} />
-          <InfoChips title="Industries and technologies" icon={Layers3} items={[...provider.industries, ...provider.technologies]} />
-          <InfoChips title="Specialisms and employer fit" icon={BriefcaseBusiness} items={[...provider.specialisms, ...provider.commercialProfile.employerSizesSupported]} />
+          <InfoSection title="Provider summary" copy={summary} />
+          <InfoChips title="Delivery and coverage" icon={MapPin} items={deliveryValues} />
+          <InfoChips title="Industries and technologies" icon={Layers3} items={technologyValues} />
+          <InfoChips title="Specialisms and employer fit" icon={BriefcaseBusiness} items={employerFitValues} />
         </div>
 
         <div className="grid gap-5">
-          <MarketplaceSignalCard title="Trust signals" copy="These proof points come from reviewed provider pages and should stay source-backed." items={[
-            provider.ofstedRating && provider.ofstedRating !== "Requires verification" ? provider.ofstedRating : "",
-            ...provider.commercialProfile.accreditations,
-            provider.verificationStatus === "verified" ? "Source reviewed " + provider.lastVerified : "Manual verification still required",
-          ]} />
+          <VerifiedSourcesCard urls={provider.sourceUrls} lastReviewed={provider.lastVerified} />
+          <MarketplaceSignalCard title="Trust signals" copy="Source-backed proof points for employer review." items={trustSignals} />
           <InfoChips title="Accreditations" icon={ShieldCheck} items={provider.commercialProfile.accreditations} />
-          <InfoChips title="Awards" icon={Award} items={provider.commercialProfile.awards} />
+          <InfoChips title="Awards" icon={Award} items={awards} />
         </div>
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
-        <MarketplaceSignalCard title="Case studies and testimonials" copy="Keep this area limited to evidence that is published or directly confirmed by the provider." items={[
-          ...provider.commercialProfile.caseStudies,
-          ...provider.commercialProfile.testimonials,
-          provider.notes,
-        ]} />
-        <MarketplaceSignalCard title="Sources and follow-up" copy="Use this panel to keep every provider profile grounded in reviewed source material." items={[
-          ...downloadLabels(provider.commercialProfile.downloads),
-          ...provider.sourceUrls.map((url) => "Source: " + url),
-          provider.commercialProfile.commercialContactEmail || provider.contactEmail || "",
-        ]} />
-      </section>
+      {proofPoints.length || provider.commercialProfile.downloads.length ? (
+        <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
+          <MarketplaceSignalCard title="Evidence" copy="Published or directly confirmed provider evidence only." items={proofPoints} />
+          <DownloadsCard links={provider.commercialProfile.downloads} contactEmail={provider.commercialProfile.commercialContactEmail || provider.contactEmail} />
+        </section>
+      ) : null}
 
       <MvpPanel title="Programme catalogue" eyebrow="Employer-facing programme destinations">
         {programmes.length ? (
@@ -716,7 +764,6 @@ function ProviderProfileModal({
     </div>
   );
 }
-
 function ProgrammeDestination({
   programme,
   provider,
@@ -739,8 +786,8 @@ function ProgrammeDestination({
               <StatusBadge tone="blue">{provider.providerName}</StatusBadge>
             </div>
             <h3 className="mt-5 text-3xl font-semibold tracking-[-0.03em] text-[#102c3d]">{programme.programmeName}</h3>
-            <p className="mt-3 text-base font-medium text-[#0b6f63]">{programme.commercialProfile.tagline || "Programme summary pending manual verification"}</p>
-            <p className="mt-4 max-w-3xl text-sm leading-7 text-[#102c3d]/60">{programme.fullDescription || programme.shortDescription}</p>
+            {cleanDisplayText(programme.commercialProfile.tagline) ? <p className="mt-3 text-base font-medium text-[#0b6f63]">{cleanDisplayText(programme.commercialProfile.tagline)}</p> : null}
+            {cleanDisplayText(programme.fullDescription || programme.shortDescription) ? <p className="mt-4 max-w-3xl text-sm leading-7 text-[#102c3d]/60">{cleanDisplayText(programme.fullDescription || programme.shortDescription)}</p> : null}
             <div className="mt-5 flex flex-wrap gap-2">
               {programme.targetIndustries.slice(0, 3).map((item) => <Tag key={item}>{item}</Tag>)}
               {programme.technologiesCovered.slice(0, 3).map((item) => <Tag key={item}>{item}</Tag>)}
@@ -749,7 +796,7 @@ function ProgrammeDestination({
           </div>
           <div className="grid gap-3 self-start rounded-3xl bg-[#f8fbfa] p-4 ring-1 ring-[#102c3d]/[0.06]">
             <MetricTile label="Verification" value={programme.verificationStatus === "Needs manual verification" ? "Needs verification" : "Source verified"} />
-            <MetricTile label="Delivery" value={programme.deliveryModels.join(", ") || "Not published"} />
+            <MetricTile label="Delivery" value={cleanDisplayList(programme.deliveryModels).join(", ")} />
             <MetricTile label="Linked standard" value={standard?.title || programme.linkedStandardName || "Needs verification"} />
             <MetricTile label="Funding route" value={programme.fundingRoute} />
           </div>
@@ -761,14 +808,14 @@ function ProgrammeDestination({
       </div>
 
       <section className="grid gap-5 xl:grid-cols-2">
-        <InfoSection title="Who this programme is for" copy={programme.commercialProfile.idealAudience || "Audience detail pending manual verification."} />
-        <InfoSection title="Business challenges solved" copy={(programme.businessProblemsSolved.length ? programme.businessProblemsSolved : ["Business challenge detail not published"]).join(" / ")} />
+        <InfoSection title="Who this programme is for" copy={programme.commercialProfile.idealAudience} />
+        <InfoSection title="Business challenges solved" copy={cleanDisplayList(programme.businessProblemsSolved).join(" / ")} />
         <InfoChips title="Target roles" icon={Users} items={programme.targetJobRoles} />
         <InfoChips title="Technologies" icon={Layers3} items={programme.technologiesCovered} />
         <InfoChips title="Skills developed" icon={Sparkles} items={programme.skillsDeveloped} />
         <InfoChips title="Expected outcomes" icon={CheckCircle2} items={programme.expectedOutcomes} />
-        <InfoSection title="Employer commitment" copy={programme.commercialProfile.employerCommitment || "Employer commitment not published."} />
-        <InfoSection title="Assessment approach" copy={programme.commercialProfile.assessmentApproach || "Assessment approach not published."} />
+        <InfoSection title="Employer commitment" copy={programme.commercialProfile.employerCommitment} />
+        <InfoSection title="Assessment approach" copy={programme.commercialProfile.assessmentApproach} />
         <InfoChips title="Progression routes" icon={ArrowUpRight} items={programme.commercialProfile.progressionRoutes} />
         <InfoChips title="Case studies and FAQs" icon={Star} items={[...programme.commercialProfile.caseStudies, ...programme.commercialProfile.faqs]} />
       </section>
@@ -777,12 +824,10 @@ function ProgrammeDestination({
         <MarketplaceSignalCard title="Employer value" copy="This programme should lead with employer outcomes, not the standard." items={programme.commercialProfile.employerBenefits.length ? programme.commercialProfile.employerBenefits : programme.expectedOutcomes} />
         <div className="rounded-2xl border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_14px_32px_rgba(16,44,61,0.045)]">
           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">Funding and compliance</p>
-          <h4 className="mt-2 text-base font-semibold text-[#102c3d]">{standard?.title || programme.linkedStandardName || "Linked standard needs verification"}</h4>
-          <p className="mt-1 text-sm text-[#102c3d]/56">{standard ? `${standard.referenceCode} | Level ${standard.level}` : "Standard metadata will appear here once linked."}</p>
+          <h4 className="mt-2 text-base font-semibold text-[#102c3d]">{standard?.title || cleanDisplayText(programme.linkedStandardName) || "Linked standard under review"}</h4>
+          {standard ? <p className="mt-1 text-sm text-[#102c3d]/56">{`${standard.referenceCode} | Level ${standard.level}`}</p> : null}
           <p className="mt-3 text-sm text-[#102c3d]/60">{standard ? formatFundingBand(standard) : programme.fundingRoute}</p>
-          <div className="mt-4 grid gap-2 text-sm text-[#102c3d]/58">
-            {(programme.commercialProfile.downloads.length ? downloadLabels(programme.commercialProfile.downloads) : ["No downloads published"]).map((item) => <div key={item} className="flex items-center gap-2"><Download size={14} className="text-[#0b8e82]" />{item}</div>)}
-          </div>
+          {programme.commercialProfile.downloads.length ? <div className="mt-4 grid gap-2 text-sm text-[#102c3d]/58">{downloadLabels(programme.commercialProfile.downloads).map((item) => <div key={item} className="flex items-center gap-2"><Download size={14} className="text-[#0b8e82]" />{item}</div>)}</div> : null}
         </div>
       </section>
     </div>
@@ -1138,14 +1183,83 @@ function ProviderHeroCard({ provider, programmeCount }: { provider: ProviderCata
   );
 }
 
+function VerifiedSourcesCard({ urls, lastReviewed }: { urls: string[]; lastReviewed: string }) {
+  const sources = cleanSourceUrls(urls);
+  const reviewed = formatReviewedDate(lastReviewed);
+  if (!sources.length && !reviewed) return null;
+
+  return (
+    <section className="rounded-2xl border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_14px_32px_rgba(16,44,61,0.045)]">
+      <div className="flex items-center gap-2 text-[#0b8e82]">
+        <ShieldCheck size={15} />
+        <p className="text-sm font-semibold text-[#102c3d]">Verified Sources</p>
+      </div>
+      {reviewed ? (
+        <div className="mt-4 flex items-center gap-3 rounded-2xl bg-[#f8fbfa] px-3 py-3 ring-1 ring-[#102c3d]/[0.06]">
+          <CalendarCheck size={15} className="shrink-0 text-[#0b8e82]" />
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#102c3d]/42">Last reviewed</p>
+            <p className="mt-0.5 text-sm font-semibold text-[#102c3d]">{reviewed}</p>
+          </div>
+        </div>
+      ) : null}
+      {sources.length ? (
+        <div className="mt-3 grid gap-2">
+          {sources.map((url) => (
+            <a key={url} href={url} target="_blank" rel="noreferrer" className="group flex items-center justify-between gap-3 rounded-2xl bg-[#f8fbfa] px-3 py-3 text-sm ring-1 ring-[#102c3d]/[0.06] transition hover:bg-white hover:ring-[#159b8f]/20">
+              <span className="flex min-w-0 items-center gap-3">
+                <Globe2 size={15} className="shrink-0 text-[#0b8e82]" />
+                <span className="min-w-0">
+                  <span className="block font-semibold text-[#102c3d]">Official provider website</span>
+                  <span className="block truncate text-xs text-[#102c3d]/48">{sourceHost(url)}</span>
+                </span>
+              </span>
+              <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-[#0b6f63]">View source <ExternalLink size={13} /></span>
+            </a>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function DownloadsCard({ links, contactEmail }: { links: CommercialLink[]; contactEmail?: string }) {
+  const downloads = links.filter((link) => cleanDisplayText(link.label));
+  const email = cleanDisplayText(contactEmail);
+  if (!downloads.length && !email) return null;
+
+  return (
+    <section className="rounded-2xl border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_14px_32px_rgba(16,44,61,0.045)]">
+      <div className="flex items-center gap-2 text-[#0b8e82]">
+        <Download size={15} />
+        <p className="text-sm font-semibold text-[#102c3d]">Downloads and contact</p>
+      </div>
+      <div className="mt-4 grid gap-2">
+        {downloads.map((link) => (
+          <div key={`${link.kind}-${link.label}`} className="flex items-center gap-3 rounded-2xl bg-[#f8fbfa] px-3 py-3 text-sm text-[#102c3d]/64 ring-1 ring-[#102c3d]/[0.06]">
+            <Download size={14} className="shrink-0 text-[#0b8e82]" />
+            <span>{cleanDisplayText(link.label)}</span>
+          </div>
+        ))}
+        {email ? (
+          <div className="flex items-center gap-3 rounded-2xl bg-[#f8fbfa] px-3 py-3 text-sm text-[#102c3d]/64 ring-1 ring-[#102c3d]/[0.06]">
+            <Users size={14} className="shrink-0 text-[#0b8e82]" />
+            <span>{email}</span>
+          </div>
+        ) : null}
+      </div>
+    </section>
+  );
+}
 function MarketplaceSignalCard({ title, copy, items }: { title: string; copy: string; items: string[] }) {
-  const values = items.filter(Boolean);
+  const values = cleanDisplayList(items);
+  if (!values.length) return null;
   return (
     <section className="rounded-2xl border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_14px_28px_rgba(16,44,61,0.045)]">
       <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">{title}</p>
       <p className="mt-2 text-sm leading-6 text-[#102c3d]/58">{copy}</p>
       <div className="mt-4 grid gap-3">
-        {(values.length ? values : ["Add stronger commercial proof points here."]).map((item) => (
+        {values.map((item) => (
           <div key={item} className="flex items-start gap-3 rounded-2xl bg-[#f8fbfa] px-3 py-3 ring-1 ring-[#102c3d]/[0.06]">
             <Sparkles size={15} className="mt-0.5 shrink-0 text-[#0b8e82]" />
             <p className="text-sm leading-6 text-[#102c3d]/60">{item}</p>
@@ -1172,25 +1286,30 @@ function SummaryCard({ label, value, copy, tone }: { label: string; value: strin
 }
 
 function MetricTile({ label, value, inverse = false, compact = false }: { label: string; value: string; inverse?: boolean; compact?: boolean }) {
+  const displayValue = cleanDisplayText(value);
+  if (!displayValue) return null;
   return (
     <div className={`rounded-2xl ${inverse ? "bg-white/10 ring-white/10 text-white" : "bg-[#f8fbfa] ring-[#102c3d]/[0.06] text-[#102c3d]"} ${compact ? "p-3" : "p-4"} ring-1`}>
       <p className={`text-[10px] font-semibold uppercase tracking-[0.12em] ${inverse ? "text-white/62" : "text-[#102c3d]/42"}`}>{label}</p>
-      <p className={`mt-2 ${compact ? "text-sm" : "text-base"} font-semibold ${inverse ? "text-white" : "text-[#102c3d]"}`}>{value}</p>
+      <p className={`mt-2 ${compact ? "text-sm" : "text-base"} font-semibold ${inverse ? "text-white" : "text-[#102c3d]"}`}>{displayValue}</p>
     </div>
   );
 }
 
 function InfoSection({ title, copy }: { title: string; copy: string }) {
+  const value = cleanDisplayText(copy);
+  if (!value) return null;
   return (
     <section className="rounded-2xl border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_14px_32px_rgba(16,44,61,0.045)]">
       <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">{title}</p>
-      <p className="mt-3 text-sm leading-7 text-[#102c3d]/60">{copy}</p>
+      <p className="mt-3 text-sm leading-7 text-[#102c3d]/60">{value}</p>
     </section>
   );
 }
 
 function InfoChips({ title, icon: Icon, items }: { title: string; icon: typeof Users; items: string[] }) {
-  const values = items.filter(Boolean);
+  const values = cleanDisplayList(items);
+  if (!values.length) return null;
   return (
     <section className="rounded-2xl border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_14px_32px_rgba(16,44,61,0.045)]">
       <div className="flex items-center gap-2 text-[#0b8e82]">
@@ -1198,16 +1317,18 @@ function InfoChips({ title, icon: Icon, items }: { title: string; icon: typeof U
         <p className="text-sm font-semibold text-[#102c3d]">{title}</p>
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
-        {values.length ? values.map((item) => <Tag key={item}>{item}</Tag>) : <p className="text-sm text-[#102c3d]/48">No content added yet.</p>}
+        {values.map((item) => <Tag key={item}>{item}</Tag>)}
       </div>
     </section>
   );
 }
 
 function Tag({ children, tone = "default" }: { children: string; tone?: "default" | "accent" }) {
+  const label = cleanDisplayText(children);
+  if (!label) return null;
   return (
     <span className={`inline-flex rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ${tone === "accent" ? "bg-[#edf7f3] text-[#0b6f63] ring-[#159b8f]/12" : "bg-white text-[#102c3d]/68 ring-[#102c3d]/[0.07]"}`}>
-      {children}
+      {label}
     </span>
   );
 }
