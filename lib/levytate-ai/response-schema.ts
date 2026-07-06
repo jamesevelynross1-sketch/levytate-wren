@@ -233,6 +233,37 @@ export type LevyTateCapabilityFit = {
   weighting: number;
 };
 
+export type LevyTateStrategicSignal = {
+  category:
+    | "current_capability"
+    | "future_capability"
+    | "organisation_priority"
+    | "business_strategy"
+    | "provider_capability"
+    | "programme_suitability"
+    | "delivery_fit";
+  label: string;
+  score: number;
+  evidence: string[];
+};
+
+export type LevyTateStrategicRecommendation = {
+  currentBestFit: string | null;
+  futureDevelopmentOpportunity: string | null;
+  strategicRecommendation: string | null;
+  alternativeRoute: string | null;
+  confidence: number;
+  businessImpact: string;
+  organisationBenefit: string;
+  employeeBenefit: string;
+  whyRecommended: string;
+  whyOtherRoutesRankedLower: string[];
+  missingEvidence: string[];
+  suggestedQuestions: string[];
+  organisationPrioritiesInfluenced: string[];
+  employeeCapabilitiesInfluenced: string[];
+};
+
 export type LevyTatePlatformRecommendation = {
   pathwayId: string;
   title: string;
@@ -243,6 +274,15 @@ export type LevyTatePlatformRecommendation = {
   evidence: LevyTateRecommendationEvidence[];
   missingEvidence: string[];
   capabilityFit: LevyTateCapabilityFit[];
+  strategicRole: "current_best_fit" | "future_development" | "strategic_recommendation" | "alternative_route" | "supporting_option";
+  strategicSignals: LevyTateStrategicSignal[];
+  businessImpact: string;
+  organisationBenefit: string;
+  employeeBenefit: string;
+  providerRationale: string;
+  programmeRationale: string;
+  whyRankedLower: string[];
+  suggestedQuestions: string[];
   availability: "approved" | "role_fit_review" | "not_available";
   eligibility: "eligible" | "requires_review" | "ineligible";
   providerAvailability: "mapped" | "matching_available" | "unconfirmed";
@@ -257,6 +297,9 @@ export type LevyTateRecommendationResult = {
   shouldRevealRecommendations: boolean;
   evidenceChanged: boolean;
   capabilityProfile: LevyTateCapabilityScore[];
+  currentCapabilityProfile: LevyTateCapabilityScore[];
+  futureCapabilityProfile: LevyTateCapabilityScore[];
+  strategicRecommendation: LevyTateStrategicRecommendation | null;
 };
 
 export type LevyTateApplicationPrefill = {
@@ -563,6 +606,62 @@ function parseRecommendationResult(value: unknown): LevyTateRecommendationResult
   const score = (item: unknown) => typeof item === "number" && Number.isFinite(item)
     ? Math.max(-100, Math.min(100, Math.round(item)))
     : 0;
+  const text = (item: unknown, limit = 240) => typeof item === "string" && item.trim()
+    ? item.trim().slice(0, limit)
+    : "";
+  const parseCapabilityProfile = (profile: unknown): LevyTateCapabilityScore[] => Array.isArray(profile) ? profile.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const capability = item as Partial<LevyTateCapabilityScore>;
+    if (typeof capability.domain !== "string") return [];
+    return [{
+      domain: capability.domain.trim().slice(0, 80),
+      score: Math.max(0, score(capability.score)),
+      evidence: Array.isArray(capability.evidence) ? capability.evidence.filter((entry): entry is string => typeof entry === "string").slice(0, 8) : [],
+      missingEvidence: Array.isArray(capability.missingEvidence) ? capability.missingEvidence.filter((entry): entry is string => typeof entry === "string").slice(0, 8) : [],
+    }];
+  }).slice(0, 20) : [];
+  const parseStrategicSignals = (signals: unknown): LevyTateStrategicSignal[] => Array.isArray(signals) ? signals.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const signal = item as Partial<LevyTateStrategicSignal>;
+    const category: LevyTateStrategicSignal["category"] =
+      signal.category === "current_capability" ||
+      signal.category === "future_capability" ||
+      signal.category === "organisation_priority" ||
+      signal.category === "business_strategy" ||
+      signal.category === "provider_capability" ||
+      signal.category === "programme_suitability" ||
+      signal.category === "delivery_fit"
+        ? signal.category
+        : "programme_suitability";
+    const label = text(signal.label, 160);
+    if (!label) return [];
+    return [{
+      category,
+      label,
+      score: Math.max(0, score(signal.score)),
+      evidence: Array.isArray(signal.evidence) ? signal.evidence.filter((entry): entry is string => typeof entry === "string").slice(0, 6) : [],
+    }];
+  }).slice(0, 12) : [];
+  const parseStrategicRecommendation = (item: unknown): LevyTateStrategicRecommendation | null => {
+    if (!item || typeof item !== "object") return null;
+    const strategic = item as Partial<LevyTateStrategicRecommendation>;
+    return {
+      currentBestFit: text(strategic.currentBestFit, 180) || null,
+      futureDevelopmentOpportunity: text(strategic.futureDevelopmentOpportunity, 180) || null,
+      strategicRecommendation: text(strategic.strategicRecommendation, 180) || null,
+      alternativeRoute: text(strategic.alternativeRoute, 180) || null,
+      confidence: Math.max(0, score(strategic.confidence)),
+      businessImpact: text(strategic.businessImpact, 360),
+      organisationBenefit: text(strategic.organisationBenefit, 360),
+      employeeBenefit: text(strategic.employeeBenefit, 360),
+      whyRecommended: text(strategic.whyRecommended, 520),
+      whyOtherRoutesRankedLower: cleanStringArray(strategic.whyOtherRoutesRankedLower, 6) ?? [],
+      missingEvidence: cleanStringArray(strategic.missingEvidence, 6) ?? [],
+      suggestedQuestions: cleanStringArray(strategic.suggestedQuestions, 6) ?? [],
+      organisationPrioritiesInfluenced: cleanStringArray(strategic.organisationPrioritiesInfluenced, 6) ?? [],
+      employeeCapabilitiesInfluenced: cleanStringArray(strategic.employeeCapabilitiesInfluenced, 8) ?? [],
+    };
+  };
   const recommendations: LevyTatePlatformRecommendation[] = Array.isArray(candidate.recommendations)
     ? candidate.recommendations.slice(0, 8).flatMap((item) => {
         if (!item || typeof item !== "object") return [];
@@ -593,6 +692,14 @@ function parseRecommendationResult(value: unknown): LevyTateRecommendationResult
         const providerAvailability = recommendation.providerAvailability === "mapped" || recommendation.providerAvailability === "unconfirmed"
           ? recommendation.providerAvailability
           : "matching_available";
+        const strategicRole: LevyTatePlatformRecommendation["strategicRole"] =
+          recommendation.strategicRole === "current_best_fit" ||
+          recommendation.strategicRole === "future_development" ||
+          recommendation.strategicRole === "strategic_recommendation" ||
+          recommendation.strategicRole === "alternative_route" ||
+          recommendation.strategicRole === "supporting_option"
+            ? recommendation.strategicRole
+            : "supporting_option";
         return [{
           pathwayId: recommendation.pathwayId.trim().slice(0, 120),
           title: recommendation.title.trim().slice(0, 180),
@@ -608,6 +715,15 @@ function parseRecommendationResult(value: unknown): LevyTateRecommendationResult
             if (typeof fit.domain !== "string") return [];
             return [{ domain: fit.domain.trim().slice(0, 80), score: Math.max(0, score(fit.score)), weighting: Math.max(0, score(fit.weighting)) }];
           }).slice(0, 12) : [],
+          strategicRole,
+          strategicSignals: parseStrategicSignals(recommendation.strategicSignals),
+          businessImpact: text(recommendation.businessImpact, 360),
+          organisationBenefit: text(recommendation.organisationBenefit, 360),
+          employeeBenefit: text(recommendation.employeeBenefit, 360),
+          providerRationale: text(recommendation.providerRationale, 360),
+          programmeRationale: text(recommendation.programmeRationale, 360),
+          whyRankedLower: cleanStringArray(recommendation.whyRankedLower, 6) ?? [],
+          suggestedQuestions: cleanStringArray(recommendation.suggestedQuestions, 6) ?? [],
           availability,
           eligibility,
           providerAvailability,
@@ -615,6 +731,7 @@ function parseRecommendationResult(value: unknown): LevyTateRecommendationResult
       })
     : [];
   const topRecommendation = recommendations.find((item) => item.pathwayId === candidate.topRecommendation?.pathwayId) ?? recommendations[0] ?? null;
+  const capabilityProfile = parseCapabilityProfile(candidate.capabilityProfile);
   return {
     recommendations,
     topRecommendation,
@@ -623,17 +740,10 @@ function parseRecommendationResult(value: unknown): LevyTateRecommendationResult
     revealThreshold: Math.max(0, score(candidate.revealThreshold)),
     shouldRevealRecommendations: candidate.shouldRevealRecommendations === true,
     evidenceChanged: candidate.evidenceChanged === true,
-    capabilityProfile: Array.isArray(candidate.capabilityProfile) ? candidate.capabilityProfile.flatMap((item) => {
-      if (!item || typeof item !== "object") return [];
-      const capability = item as Partial<LevyTateCapabilityScore>;
-      if (typeof capability.domain !== "string") return [];
-      return [{
-        domain: capability.domain.trim().slice(0, 80),
-        score: Math.max(0, score(capability.score)),
-        evidence: Array.isArray(capability.evidence) ? capability.evidence.filter((entry): entry is string => typeof entry === "string").slice(0, 8) : [],
-        missingEvidence: Array.isArray(capability.missingEvidence) ? capability.missingEvidence.filter((entry): entry is string => typeof entry === "string").slice(0, 8) : [],
-      }];
-    }).slice(0, 20) : [],
+    capabilityProfile,
+    currentCapabilityProfile: parseCapabilityProfile(candidate.currentCapabilityProfile ?? candidate.capabilityProfile),
+    futureCapabilityProfile: parseCapabilityProfile(candidate.futureCapabilityProfile),
+    strategicRecommendation: parseStrategicRecommendation(candidate.strategicRecommendation),
   };
 }
 function isPersonaSummary(value: unknown): value is PersonaSummary {

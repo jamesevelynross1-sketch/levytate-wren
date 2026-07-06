@@ -7,6 +7,8 @@ import type {
   LevyTateRecommendationEvidence,
   LevyTateRecommendationResult,
   LevyTateRecommendedPathway,
+  LevyTateStrategicRecommendation,
+  LevyTateStrategicSignal,
 } from "@/lib/levytate/ai/types";
 import { getApprenticeshipStandard } from "@/lib/levytate/domain";
 
@@ -47,7 +49,19 @@ type PathwayDefinition = {
   capabilityWeights: Partial<Record<CapabilityDomain, number>>;
 };
 
-const recommendationEngineVersion = "2-capability";
+type StrategicPriorityProfile = {
+  capabilityProfile: LevyTateCapabilityScore[];
+  priorities: string[];
+  signals: LevyTateStrategicSignal[];
+};
+
+type ScoredRecommendation = LevyTatePlatformRecommendation & {
+  futureFitScore: number;
+  strategyFitScore: number;
+  providerFitScore: number;
+};
+
+const recommendationEngineVersion = "3-strategic-workforce";
 const revealThreshold = 74;
 
 function capability(domain: CapabilityDomain, label: string, missingEvidence: string, signals: CapabilitySignal[]): CapabilityDefinition {
@@ -305,6 +319,230 @@ function buildCapabilityProfile(request: LevyTateAiRequest): LevyTateCapabilityS
   });
 }
 
+function buildCapabilityProfileFromText(text: string, priors: Array<[CapabilityDomain, number, string]> = []): LevyTateCapabilityScore[] {
+  const scores = new Map<CapabilityDomain, CapabilityState>();
+  for (const definition of capabilityDefinitions) {
+    const matches = definition.signals.filter((item) => item.pattern.test(text));
+    for (const match of matches) addCapabilityScore(scores, definition.domain, Math.max(6, Math.round(match.weight * 0.86)), match.label);
+  }
+  for (const [domain, amount, evidence] of priors) addCapabilityScore(scores, domain, amount, evidence);
+  return capabilityDefinitions.map((definition) => {
+    const current = scores.get(definition.domain) ?? { score: 0, evidence: [], missingEvidence: [] };
+    const score = clamp(current.score);
+    return { domain: definition.label, score, evidence: current.evidence.slice(0, 8), missingEvidence: score >= 55 ? [] : [definition.missingEvidence] };
+  });
+}
+
+function futureCapabilityText(request: LevyTateAiRequest) {
+  return uniqueText([
+    request.userMessage,
+    request.conversationProfile?.careerGoal,
+    request.conversationProfile?.reasonForDevelopment,
+    request.conversationProfile?.managementAspirations,
+    ...(request.conversationProfile?.interestAreas ?? []),
+    ...(request.conversationHistory.filter((message) => message.role === "user").slice(-4).map((message) => message.content)),
+    ...(request.employeeDiscovery?.aiOpportunities ?? []),
+    ...(request.employeeDiscovery?.dataOpportunities ?? []),
+    ...(request.employeeDiscovery?.automationOpportunities ?? []),
+    ...(request.employeeDiscovery?.futureCapabilities ?? []),
+  ]).toLowerCase();
+}
+
+function buildFutureCapabilityProfile(request: LevyTateAiRequest): LevyTateCapabilityScore[] {
+  const text = futureCapabilityText(request);
+  const priors: Array<[CapabilityDomain, number, string]> = [];
+  if (/\b(reporting|reports?|dashboard|dashboards|insight|analytics|analysis|power\s?bi|spreadsheet|data confidence)\b/i.test(text)) {
+    priors.push(["reporting_bi", 28, "Future goal mentions reporting or insight"], ["data_analysis", 24, "Future goal points towards data-led decision support"], ["data_visualisation", 14, "Future goal may involve clearer reporting outputs"]);
+  }
+  if (/\b(ai|artificial intelligence|copilot|microsoft 365|prompt|automation|automate|workflow|manual admin|productivity)\b/i.test(text)) {
+    priors.push(["ai_adoption", 38, "Future goal mentions AI adoption or productivity"], ["automation", 30, "Future goal includes automation or reducing manual work"], ["digital_support", 10, "Future goal depends on workplace technology confidence"]);
+  }
+  if (/\b(predictive|forecast|forecasting|data science|machine learning|advanced analytics)\b/i.test(text)) {
+    priors.push(["data_analysis", 26, "Future goal mentions predictive or advanced analytics"], ["reporting_bi", 18, "Future goal builds on analytics and reporting"], ["ai_adoption", 18, "Future goal connects to AI-enabled insight"]);
+  }
+  if (/\b(commercial transformation|supplier|sourcing|procurement|contract|tender|buying)\b/i.test(text)) {
+    priors.push(["procurement", 34, "Future goal is commercially or procurement focused"], ["business_analysis", 12, "Future goal needs business and supplier analysis"]);
+  }
+  if (/\b(customer|complaint|service quality|customer experience)\b/i.test(text)) priors.push(["customer_service", 30, "Future goal improves customer experience"]);
+  if (/\b(engineering|maintenance|production|manufacturing|quality|downtime)\b/i.test(text)) priors.push(["process_improvement", 20, "Future goal improves operational performance"], ["engineering", 16, "Future goal is technically rooted"]);
+  return buildCapabilityProfileFromText(text, priors);
+}
+
+function buildOrganisationStrategyProfile(request: LevyTateAiRequest): StrategicPriorityProfile {
+  const text = uniqueText([
+    request.employerContext,
+    request.currentWorkspace?.employerName,
+    request.currentWorkspace?.activeModule,
+    request.userMessage,
+    ...(request.conversationHistory.filter((message) => message.role === "user").slice(-4).map((message) => message.content)),
+    ...(request.employerPriorities?.map((priority) => priority.name + " " + priority.importance) ?? []),
+  ]).toLowerCase();
+  const priors: Array<[CapabilityDomain, number, string]> = [];
+  const priorities: string[] = [];
+  const signals: LevyTateStrategicSignal[] = [];
+  const addPriority = (label: string, score: number, evidence: string[], capabilities: Array<[CapabilityDomain, number, string]>) => {
+    if (!priorities.includes(label)) priorities.push(label);
+    signals.push({ category: "organisation_priority", label, score, evidence });
+    priors.push(...capabilities);
+  };
+  if (/\b(ai rollout|adopt ai|ai adoption|copilot|microsoft 365|automation|digital productivity)\b/i.test(text)) {
+    addPriority("AI adoption and productivity", 88, ["Organisation context mentions AI rollout, Copilot, automation or digital productivity"], [["ai_adoption", 42, "Organisation priority is AI adoption"], ["automation", 30, "Organisation priority is automation"], ["digital_support", 14, "AI rollout needs digital confidence"]]);
+  }
+  if (/\b(data maturity|reporting|insight|analytics|business intelligence|kpi|forecast|visibility)\b/i.test(text)) {
+    addPriority("Data maturity and reporting visibility", 84, ["Organisation context mentions reporting, insight, analytics or data maturity"], [["data_analysis", 34, "Organisation priority is data maturity"], ["reporting_bi", 32, "Organisation priority is reporting visibility"], ["data_management", 20, "Data maturity depends on data quality"]]);
+  }
+  if (/\b(commercial transformation|procurement|supplier|contract|sourcing|supply chain|buying)\b/i.test(text)) {
+    addPriority("Commercial and procurement transformation", 88, ["Organisation context mentions commercial transformation, procurement or supplier performance"], [["procurement", 46, "Organisation priority is procurement capability"], ["business_analysis", 18, "Commercial transformation needs requirements and supplier analysis"], ["data_analysis", 8, "Commercial transformation benefits from spend and supplier insight"]]);
+  }
+  if (/\b(operational excellence|productivity|efficiency|process improvement|lean|waste|downtime|continuous improvement)\b/i.test(text)) {
+    addPriority("Operational excellence", 80, ["Organisation context mentions productivity, efficiency or continuous improvement"], [["process_improvement", 40, "Organisation priority is operational improvement"], ["automation", 14, "Process improvement may include automation"]]);
+  }
+  if (/\b(workforce readiness|succession|future skills|leadership pipeline|capability growth)\b/i.test(text)) {
+    addPriority("Workforce readiness", 76, ["Organisation context mentions readiness, succession or future skills"], [["leadership", 20, "Workforce readiness may require leadership capability"], ["project_delivery", 10, "Workforce readiness may need delivery ownership"]]);
+  }
+  return { capabilityProfile: buildCapabilityProfileFromText(text, priors), priorities, signals };
+}
+
+function fitAgainstProfile(definition: PathwayDefinition, profileMap: CapabilityMap) {
+  const capabilityFit = Object.entries(definition.capabilityWeights).flatMap(([domain, weighting]) => {
+    if (typeof weighting !== "number") return [];
+    return [{ score: profileMap.get(domain as CapabilityDomain)?.score ?? 0, weighting }];
+  });
+  const totalWeight = capabilityFit.reduce((total, item) => total + item.weighting, 0) || 1;
+  const weightedAverage = capabilityFit.reduce((total, item) => total + item.score * item.weighting, 0) / totalWeight;
+  const coverage = capabilityFit.reduce((total, item) => total + (item.score >= 50 ? item.weighting : 0), 0) / totalWeight;
+  return clamp(weightedAverage * 0.84 + coverage * 14);
+}
+
+function providerCapabilityScore(request: LevyTateAiRequest, definition: PathwayDefinition) {
+  const availability = providerAvailabilityFor(request, definition);
+  if (availability === "mapped") return 82;
+  if (availability === "matching_available") return 58;
+  return 36;
+}
+
+function highestCapability(profile: LevyTateCapabilityScore[], minimum = 45) {
+  return profile.filter((item) => item.score >= minimum).sort((left, right) => right.score - left.score)[0] ?? null;
+}
+
+function alignedCapabilityLabels(definition: PathwayDefinition, profile: LevyTateCapabilityScore[], minimum = 45) {
+  return Object.entries(definition.capabilityWeights).flatMap(([domain]) => {
+    const definitionForDomain = capabilityDefinitions.find((item) => item.domain === domain);
+    const score = definitionForDomain ? profile.find((item) => item.domain === definitionForDomain.label) : null;
+    return score && score.score >= minimum ? [score.domain] : [];
+  }).slice(0, 4);
+}
+
+function strategicSignalsFor(definition: PathwayDefinition, currentProfile: LevyTateCapabilityScore[], futureProfile: LevyTateCapabilityScore[], strategyProfile: StrategicPriorityProfile, futureFitScore: number, strategyFitScore: number, providerFitScore: number): LevyTateStrategicSignal[] {
+  const signals: LevyTateStrategicSignal[] = [];
+  const current = alignedCapabilityLabels(definition, currentProfile, 45);
+  if (current.length) signals.push({ category: "current_capability", label: "Current capability fit", score: fitAgainstProfile(definition, capabilityMap(currentProfile)), evidence: current });
+  const future = alignedCapabilityLabels(definition, futureProfile, 45);
+  if (future.length) signals.push({ category: "future_capability", label: "Future capability fit", score: futureFitScore, evidence: future });
+  const strategyEvidence = alignedCapabilityLabels(definition, strategyProfile.capabilityProfile, 45);
+  if (strategyEvidence.length) signals.push({ category: "business_strategy", label: "Organisation strategy alignment", score: strategyFitScore, evidence: [...strategyProfile.priorities, ...strategyEvidence].slice(0, 5) });
+  if (providerFitScore >= 58) signals.push({ category: "provider_capability", label: "Provider matching readiness", score: providerFitScore, evidence: [providerFitScore >= 80 ? "Mapped or directly matchable provider capability exists" : "Provider matching can be scoped through LevyTate"] });
+  signals.push({ category: "programme_suitability", label: "Programme suitability", score: clamp((futureFitScore + strategyFitScore) / 2), evidence: [definition.rationale] });
+  return signals.slice(0, 8);
+}
+
+function providerRationaleFor(providerFitScore: number) {
+  if (providerFitScore >= 80) return "A provider mapping signal is available, so LevyTate can move from pathway fit into a controlled provider review.";
+  if (providerFitScore >= 55) return "Provider matching is available through LevyTate once the employer confirms delivery preferences, geography and learner needs.";
+  return "Provider suitability still needs to be confirmed before this route should move into delivery planning.";
+}
+
+function programmeRationaleFor(definition: PathwayDefinition, futureFitScore: number, strategyFitScore: number) {
+  return definition.rationale + " Strategic fit is informed by future capability at " + futureFitScore + "% and organisation priority alignment at " + strategyFitScore + "%.";
+}
+
+function recommendationBusinessImpact(definition: PathwayDefinition) {
+  const title = definition.title.toLowerCase();
+  if (/data analyst|data technician/.test(title)) return "Improves reporting quality, data confidence and decision visibility.";
+  if (/procurement|supply chain/.test(title)) return "Strengthens supplier management, commercial control and procurement capability.";
+  if (/digital support|information communications/.test(title)) return "Builds digital confidence and reduces technology friction across teams.";
+  if (/improvement practitioner/.test(title)) return "Supports measurable process improvement, productivity and operational performance.";
+  if (/customer service/.test(title)) return "Improves customer handling, service consistency and escalation confidence.";
+  return "Builds role-specific capability that supports the employer's workforce plan.";
+}
+
+function recommendationEmployeeBenefit(definition: PathwayDefinition) {
+  const title = definition.title.toLowerCase();
+  if (/data analyst|data technician/.test(title)) return "Gives the employee a practical route from manual reporting into stronger data and insight work.";
+  if (/procurement|supply chain/.test(title)) return "Develops commercial judgement, sourcing confidence and supplier management skills.";
+  if (/digital support|information communications/.test(title)) return "Builds confidence with digital systems, user support and practical workplace technology.";
+  if (/improvement practitioner/.test(title)) return "Develops structured improvement, problem solving and performance optimisation skills.";
+  return "Creates a clearer progression route linked to the employee's role and future goals.";
+}
+
+function buildStrategicRecommendationSummary(request: LevyTateAiRequest, recommendations: LevyTatePlatformRecommendation[], currentCapabilityProfile: LevyTateCapabilityScore[], futureCapabilityProfile: LevyTateCapabilityScore[], strategyProfile: StrategicPriorityProfile): LevyTateStrategicRecommendation | null {
+  const top = recommendations[0];
+  if (!top) return null;
+  const strategicText = uniqueText([
+    request.userMessage,
+    request.conversationProfile?.careerGoal,
+    request.conversationProfile?.reasonForDevelopment,
+    request.contextData?.selectedPersona?.role,
+    request.employeeDiscovery?.roleTitle,
+    ...(request.employeeDiscovery?.futureCapabilities ?? []),
+    ...(request.employerPriorities?.map((priority) => priority.name) ?? []),
+    ...strategyProfile.priorities,
+  ]).toLowerCase();
+  let strategicRecommendation = top.title;
+  let futureDevelopmentOpportunity = recommendations[1]?.title ?? null;
+  let businessImpact = top.businessImpact;
+  let organisationBenefit = top.organisationBenefit;
+  let employeeBenefit = top.employeeBenefit;
+  let whyRecommended = top.rationale;
+  if (/business support|admin assistant|administrator|administration/.test(strategicText) && /report|data|spreadsheet|crm|ai|automation|microsoft 365|copilot/.test(strategicText)) {
+    strategicRecommendation = "Microsoft 365 AI Programme";
+    futureDevelopmentOpportunity = "Level 4 Data Analyst";
+    businessImpact = "Moves manual administration towards better reporting, workflow improvement and confident AI-enabled productivity.";
+    organisationBenefit = "Supports AI rollout while creating a realistic data pathway from administration into insight work.";
+    employeeBenefit = "Gives the employee a practical first step from admin-heavy work into reporting, automation and digital confidence.";
+    whyRecommended = "The current apprenticeship fit is data technician, while the strategic programme layer points to Microsoft 365 AI because the evidence combines reporting, admin processes, CRM updates and AI adoption.";
+  } else if (/data analyst|reporting analyst|business intelligence|predictive|forecast|data maturity|advanced analytics|ai/.test(strategicText) && top.title.toLowerCase().includes("data analyst")) {
+    strategicRecommendation = "AI Practitioner";
+    futureDevelopmentOpportunity = "Level 6 Data Scientist";
+    businessImpact = "Builds stronger analytics maturity and creates a route towards predictive insight and AI-enabled reporting.";
+    organisationBenefit = "Connects current data capability to the organisation's data maturity and AI adoption priorities.";
+    employeeBenefit = "Gives the employee a credible progression route beyond reporting into advanced analytics and AI-enabled insight.";
+    whyRecommended = "The current best fit remains Data Analyst because the role already shows strong analysis and BI evidence. The strategic layer adds AI Practitioner as the future development opportunity because the stated direction is predictive analytics and AI.";
+  } else if (/procurement|commercial transformation|supplier|sourcing|contract|buying/.test(strategicText)) {
+    strategicRecommendation = top.title.toLowerCase().includes("procurement") ? top.title : "Procurement and Supply Chain Practitioner";
+    futureDevelopmentOpportunity = "Commercial transformation and supplier insight pathway";
+    businessImpact = "Improves supplier control, commercial judgement and procurement decision quality.";
+    organisationBenefit = "Aligns apprenticeship investment to commercial transformation rather than generic business development.";
+    employeeBenefit = "Strengthens practical procurement capability and gives the employee a clearer commercial progression route.";
+    whyRecommended = "The strongest evidence is procurement, supplier and commercial transformation. LevyTate therefore prioritises a procurement route rather than a generic business or management standard.";
+  }
+  const whyOtherRoutesRankedLower = recommendations.slice(1, 4).map((item) => item.title + " ranked lower because " + (item.missingEvidence[0]?.toLowerCase() ?? "its capability and strategy fit were weaker than the top route.")).slice(0, 3);
+  const missingEvidence = [...new Set(recommendations.flatMap((item) => item.missingEvidence).slice(0, 5))];
+  const currentCapability = highestCapability(currentCapabilityProfile);
+  const futureCapability = highestCapability(futureCapabilityProfile);
+  const suggestedQuestions = [
+    "Which work outcome should improve first?",
+    "What tools or systems does the employee use most often?",
+    "Which delivery model would fit the role and site best?",
+  ];
+  return {
+    currentBestFit: top.title,
+    futureDevelopmentOpportunity,
+    strategicRecommendation,
+    alternativeRoute: recommendations[1]?.title ?? null,
+    confidence: top.confidence,
+    businessImpact,
+    organisationBenefit,
+    employeeBenefit,
+    whyRecommended,
+    whyOtherRoutesRankedLower,
+    missingEvidence,
+    suggestedQuestions,
+    organisationPrioritiesInfluenced: strategyProfile.priorities.slice(0, 5),
+    employeeCapabilitiesInfluenced: [currentCapability?.domain, futureCapability?.domain].filter((item): item is string => Boolean(item)),
+  };
+}
+
 function capabilityMap(profile: LevyTateCapabilityScore[]): CapabilityMap {
   const map = new Map<CapabilityDomain, LevyTateCapabilityScore>();
   for (const definition of capabilityDefinitions) {
@@ -404,41 +642,95 @@ function stableHash(value: string) {
 }
 
 export function buildLevyTateRecommendations(request: LevyTateAiRequest): LevyTateRecommendationResult {
-  const capabilityProfile = buildCapabilityProfile(request);
-  const profileMap = capabilityMap(capabilityProfile);
-  const recommendations = availableDefinitions(request).map((definition) => {
+  const currentCapabilityProfile = buildCapabilityProfile(request);
+  const futureCapabilityProfile = buildFutureCapabilityProfile(request);
+  const strategyProfile = buildOrganisationStrategyProfile(request);
+  const profileMap = capabilityMap(currentCapabilityProfile);
+  const futureMap = capabilityMap(futureCapabilityProfile);
+  const strategyMap = capabilityMap(strategyProfile.capabilityProfile);
+  const scoredRecommendations: ScoredRecommendation[] = availableDefinitions(request).map((definition) => {
     const roleEvidence = roleMappingEvidence(request, definition);
     const { capabilityFit, evidence, missingEvidence } = recommendationEvidence(definition, profileMap, roleEvidence);
-    const fitScore = fitForDefinition(definition, capabilityFit, roleEvidence, missingEvidence);
+    const currentFitScore = fitForDefinition(definition, capabilityFit, roleEvidence, missingEvidence);
+    const futureFitScore = fitAgainstProfile(definition, futureMap);
+    const strategyFitScore = fitAgainstProfile(definition, strategyMap);
+    const providerFitScore = providerCapabilityScore(request, definition);
+    const strategicLift = Math.max(0, futureFitScore - 45) * 0.1 + Math.max(0, strategyFitScore - 45) * 0.12 + Math.max(0, providerFitScore - 60) * 0.04;
+    const fitScore = clamp(currentFitScore + strategicLift);
     const previous = previousScore(request, definition.pathwayId);
     const mapped = roleEvidence.some((item) => item.source === "role_mapping") || request.availablePathways?.some((item) => item.title.toLowerCase() === definition.title.toLowerCase() && /approved|live/i.test(item.status ?? ""));
+    const availability: LevyTatePlatformRecommendation["availability"] = mapped ? "approved" : "role_fit_review";
+    const eligibility: LevyTatePlatformRecommendation["eligibility"] = mapped ? "eligible" : "requires_review";
+    const strategicSignals = strategicSignalsFor(definition, currentCapabilityProfile, futureCapabilityProfile, strategyProfile, futureFitScore, strategyFitScore, providerFitScore);
+    const businessImpact = recommendationBusinessImpact(definition);
+    const employeeBenefit = recommendationEmployeeBenefit(definition);
     return {
       pathwayId: definition.pathwayId,
       title: definition.title,
       fitScore,
       scoreDelta: previous === undefined ? 0 : fitScore - previous,
-      confidence: confidenceFor(capabilityFit, evidence, missingEvidence),
+      confidence: clamp(confidenceFor(capabilityFit, evidence, missingEvidence) + Math.max(0, futureFitScore - 55) * 0.08 + Math.max(0, strategyFitScore - 55) * 0.08),
       rationale: missingEvidence.length ? definition.rationale + " Missing evidence to confirm: " + missingEvidence.join("; ") + "." : definition.rationale,
       evidence,
       missingEvidence,
       capabilityFit,
-      availability: mapped ? "approved" : "role_fit_review",
-      eligibility: mapped ? "eligible" : "requires_review",
+      strategicRole: "supporting_option" as const,
+      strategicSignals,
+      businessImpact,
+      organisationBenefit: businessImpact,
+      employeeBenefit,
+      providerRationale: providerRationaleFor(providerFitScore),
+      programmeRationale: programmeRationaleFor(definition, futureFitScore, strategyFitScore),
+      whyRankedLower: missingEvidence.length ? missingEvidence : ["This route needs more direct evidence before it should rank higher."],
+      suggestedQuestions: ["Which specific work outcome should the programme improve?", "Which delivery model would fit the role and site best?"],
+      availability,
+      eligibility,
       providerAvailability: providerAvailabilityFor(request, definition),
-    } satisfies LevyTatePlatformRecommendation;
-  }).filter((item) => item.evidence.length > 0 || item.fitScore >= 50).sort((left, right) => right.fitScore - left.fitScore || right.confidence - left.confidence || left.title.localeCompare(right.title)).slice(0, 4);
+      futureFitScore,
+      strategyFitScore,
+      providerFitScore,
+    };
+  }).filter((item) => item.fitScore >= 45 || item.futureFitScore >= 58 || item.strategyFitScore >= 58).sort((left, right) => right.fitScore - left.fitScore || right.confidence - left.confidence || left.title.localeCompare(right.title)).slice(0, 4);
+
+  const recommendations = scoredRecommendations.map((item, index) => {
+    const { futureFitScore, strategyFitScore, providerFitScore, ...recommendation } = item;
+    void providerFitScore;
+    const strategicRole: LevyTatePlatformRecommendation["strategicRole"] = index === 0
+      ? "current_best_fit"
+      : futureFitScore >= 70 && strategyFitScore >= 55
+        ? "future_development"
+        : index === 1
+          ? "alternative_route"
+          : "supporting_option";
+    return { ...recommendation, strategicRole };
+  });
 
   const topRecommendation = recommendations[0] ?? null;
-  const confidence = topRecommendation?.confidence ?? 0;
-  const enoughEvidence = Boolean(topRecommendation && topRecommendation.evidence.length >= 2 && topRecommendation.capabilityFit.some((item) => item.score >= 55));
+  const strategicEvidenceBonus = topRecommendation?.strategicSignals.some((item) => item.category === "future_capability" || item.category === "business_strategy" || item.category === "organisation_priority") ? 6 : 0;
+  const confidence = clamp((topRecommendation?.confidence ?? 0) + strategicEvidenceBonus);
+  const enoughEvidence = Boolean(topRecommendation && ((topRecommendation.evidence.length >= 2 && topRecommendation.capabilityFit.some((item) => item.score >= 55)) || topRecommendation.strategicSignals.length >= 2));
   const shouldRevealRecommendations = Boolean(topRecommendation && confidence >= revealThreshold && enoughEvidence);
-  const capabilitySignature = capabilityProfile.filter((item) => item.score > 0).map((item) => item.domain + ":" + item.score + ":" + item.evidence.join(",")).join("|");
-  const signature = recommendations.map((item) => item.pathwayId + ":" + item.fitScore + ":" + item.evidence.map((entry) => entry.id).sort().join(",") + ":" + item.missingEvidence.join(",")).join("|") + capabilitySignature;
+  const strategicRecommendation = buildStrategicRecommendationSummary(request, recommendations, currentCapabilityProfile, futureCapabilityProfile, strategyProfile);
+  const capabilitySignature = currentCapabilityProfile.filter((item) => item.score > 0).map((item) => item.domain + ":" + item.score + ":" + item.evidence.join(",")).join("|");
+  const futureSignature = futureCapabilityProfile.filter((item) => item.score > 0).map((item) => item.domain + ":" + item.score + ":" + item.evidence.join(",")).join("|");
+  const strategySignature = strategyProfile.priorities.join("|") + strategyProfile.capabilityProfile.filter((item) => item.score > 0).map((item) => item.domain + ":" + item.score).join("|");
+  const signature = recommendations.map((item) => item.pathwayId + ":" + item.fitScore + ":" + item.evidence.map((entry) => entry.id).sort().join(",") + ":" + item.missingEvidence.join(",") + ":" + item.strategicRole).join("|") + capabilitySignature + futureSignature + strategySignature;
   const recommendationVersion = "rec-" + recommendationEngineVersion + "-" + stableHash(signature);
 
-  return { recommendations, topRecommendation, recommendationVersion, confidence, revealThreshold, shouldRevealRecommendations, evidenceChanged: request.previousRecommendationResult?.recommendationVersion !== recommendationVersion, capabilityProfile };
+  return {
+    recommendations,
+    topRecommendation,
+    recommendationVersion,
+    confidence,
+    revealThreshold,
+    shouldRevealRecommendations,
+    evidenceChanged: request.previousRecommendationResult?.recommendationVersion !== recommendationVersion,
+    capabilityProfile: currentCapabilityProfile,
+    currentCapabilityProfile,
+    futureCapabilityProfile,
+    strategicRecommendation,
+  };
 }
-
 function toPathway(recommendation: LevyTatePlatformRecommendation): LevyTateRecommendedPathway {
   const missing = recommendation.missingEvidence.length ? " Missing evidence: " + recommendation.missingEvidence.slice(0, 2).join("; ") + "." : "";
   return {

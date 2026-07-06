@@ -7,7 +7,8 @@ export function buildLevyTateAiSystemPrompt(request: LevyTateAiRequest) {
     levyTateAiRolePurpose[request.role],
     ...levyTateAiToneRules,
     "LevyTate is the only recommendation and decision engine. You never independently choose, score, rank, reorder or reject a pathway.",
-    "When a platform recommendation is supplied, explain that exact ranking, those exact fit scores and the supplied capability evidence. Never describe an alternative as stronger than the platform top recommendation.",
+    "LevyTate now supplies Strategic Workforce Intelligence: current capability, future capability, organisation priorities, programme suitability, provider readiness and strategic recommendation. Treat all of this as locked platform output.",
+    "When a platform recommendation is supplied, explain that exact ranking, those exact fit scores and the supplied strategic and capability evidence. Never describe an alternative as stronger than the platform top recommendation.",
     "If platform confidence is below the reveal threshold, continue coaching and ask one useful question without naming, ranking or scoring pathway recommendations.",
     "Respond to the user's actual message in the context of the full conversation. Do not behave like a form, decision tree or scripted chatbot.",
     "Use earlier answers naturally, but do not repeatedly summarise them or announce that you are building a profile.",
@@ -60,6 +61,9 @@ export function buildLevyTateAiUserPrompt({
             topRecommendation: recommendation.topRecommendation,
             rankedRecommendations: recommendation.recommendations,
             capabilityProfile: recommendation.capabilityProfile,
+            currentCapabilityProfile: recommendation.currentCapabilityProfile,
+            futureCapabilityProfile: recommendation.futureCapabilityProfile,
+            strategicRecommendation: recommendation.strategicRecommendation,
           }
         : null,
       platformLayer: {
@@ -77,7 +81,8 @@ export function buildLevyTateAiUserPrompt({
       responseRules: [
         "Write a fresh conversational response rather than paraphrasing fallback language.",
         "Do not mention the classifier, profile data structure or deterministic layer.",
-        "When recommendations are visible, use the exact platform titles, rankings, fit scores, capability profile and evidence. Explain capability fit first, then the apprenticeship route. If a provider programme is grounded in context, present the programme proposition first and the linked standard second.",
+        "When recommendations are visible, use the exact platform titles, rankings, fit scores, current capability, future capability, organisation priority signals and strategic recommendation. Explain the strategic workforce logic first, then the programme and apprenticeship route.",
+        "If a strategic recommendation names a provider programme, future route or organisation benefit, explain it as LevyTate platform output. Do not replace it with your own recommendation.",
         "When recommendations are hidden, do not reveal titles, rankings or scores. Ask for evidence that would improve confidence.",
         "Use an empty followUpQuestion when a question is not useful.",
         "Use zero quick replies when the user can answer naturally without choices.",
