@@ -638,6 +638,165 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null }: { initialEm
   );
 }
 
+
+function inlineConfidenceLabel(score: number | undefined) {
+  if ((score ?? 0) >= 78) return "High confidence";
+  if ((score ?? 0) >= 62) return "Good confidence";
+  return "Developing confidence";
+}
+
+function inlineCapabilityStrength(score: number) {
+  if (score >= 75) return "Strong";
+  if (score >= 55) return "Good";
+  if (score >= 35) return "Emerging";
+  return "Early signal";
+}
+
+function inlineUnique(items: Array<string | null | undefined>) {
+  return [...new Set(items.map((item) => item?.trim()).filter((item): item is string => Boolean(item)))];
+}
+
+function InlineCapabilityBars({ title, items }: { title: string; items: NonNullable<LevyTateAiResponse["recommendationResult"]>["currentCapabilityProfile"] }) {
+  const visible = items.filter((item) => item.score > 0).sort((left, right) => right.score - left.score).slice(0, 6);
+
+  return (
+    <div className="rounded-xl bg-white p-3 ring-1 ring-[#102c3d]/[0.06]">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/42">{title}</p>
+      <div className="mt-3 grid gap-2">
+        {visible.length ? visible.map((item) => (
+          <div key={title + "-" + item.domain} className="grid gap-1.5">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs font-semibold text-[#102c3d]/68">{item.domain}</span>
+              <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#102c3d]/36">{inlineCapabilityStrength(item.score)}</span>
+            </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-[#102c3d]/[0.06]">
+              <div className="h-full rounded-full bg-[#159b8f]" style={{ width: Math.max(10, Math.min(100, item.score)) + "%" }} />
+            </div>
+          </div>
+        )) : <p className="text-xs leading-5 text-[#102c3d]/50">Evidence is still being gathered.</p>}
+      </div>
+    </div>
+  );
+}
+
+function InlineRecommendationTrust({
+  response,
+  onSelectPathway,
+  selectedPathwayTitle,
+}: {
+  response: LevyTateAiResponse;
+  onSelectPathway?: (title: string) => void;
+  selectedPathwayTitle?: string | null;
+}) {
+  const recommendationResult = response.recommendationResult;
+  const top = recommendationResult?.topRecommendation ?? recommendationResult?.recommendations[0];
+  if (!recommendationResult || !top) return null;
+
+  const strategic = recommendationResult.strategicRecommendation;
+  const alternatives = recommendationResult.recommendations.filter((item) => item.pathwayId !== top.pathwayId).slice(0, 2);
+  const evidence = inlineUnique([
+    ...top.evidence.map((item) => item.label),
+    ...top.capabilityFit.filter((item) => item.score >= 55).map((item) => item.domain + " capability detected"),
+    ...top.strategicSignals.filter((item) => item.category === "current_capability" || item.category === "future_capability").map((item) => item.label),
+  ]).slice(0, 5);
+  const priorities = inlineUnique([
+    ...(strategic?.organisationPrioritiesInfluenced ?? []),
+    ...top.strategicSignals.filter((item) => item.category === "organisation_priority" || item.category === "business_strategy").map((item) => item.label),
+  ]).slice(0, 4);
+  const missing = inlineUnique([...(top.missingEvidence ?? []), ...(strategic?.missingEvidence ?? [])]).slice(0, 4);
+  const questions = inlineUnique([...(top.suggestedQuestions ?? []), ...(strategic?.suggestedQuestions ?? [])]).slice(0, 3);
+  const selected = selectedPathwayTitle === top.title;
+
+  return (
+    <div className="grid gap-3 rounded-2xl bg-[#f8fbfa] p-3 ring-1 ring-[#102c3d]/[0.055]">
+      <div className="rounded-xl bg-white p-3 ring-1 ring-[#102c3d]/[0.055]">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">Why LevyTate recommended this</p>
+            <p className="mt-1 text-sm font-semibold text-[#102c3d]">{top.title}</p>
+          </div>
+          <span className="rounded-full bg-[#edf8f5] px-3 py-1.5 text-[11px] font-semibold text-[#0b6f63]">{inlineConfidenceLabel(top.confidence)}</span>
+        </div>
+        <p className="mt-3 text-xs leading-5 text-[#102c3d]/56">
+          This route currently shows the strongest balance between role evidence, future capability and organisational priorities.
+        </p>
+        {evidence.length ? (
+          <div className="mt-3 grid gap-2">
+            {evidence.map((item) => (
+              <div key={item} className="flex items-start gap-2 rounded-lg bg-[#f8fbfa] px-3 py-2 text-xs leading-5 text-[#102c3d]/62">
+                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[#159b8f]" />
+                <span>{item}</span>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        {onSelectPathway ? (
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/40">
+              {selected ? "Preferred route selected" : "Set preferred route"}
+            </span>
+            <button
+              type="button"
+              onClick={() => onSelectPathway(top.title)}
+              className={selected ? "rounded-full bg-[#edf7f3] px-3 py-1.5 text-[11px] font-semibold text-[#0b6f63]" : "rounded-full bg-[#102c3d] px-3 py-1.5 text-[11px] font-semibold text-white transition hover:-translate-y-0.5"}
+            >
+              {selected ? "Selected" : "Use this pathway"}
+            </button>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        <InlineCapabilityBars title="Current capability" items={recommendationResult.currentCapabilityProfile} />
+        <InlineCapabilityBars title="Future capability" items={recommendationResult.futureCapabilityProfile} />
+      </div>
+
+      {priorities.length ? (
+        <div className="rounded-xl bg-white p-3 ring-1 ring-[#102c3d]/[0.06]">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/42">Business priorities</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {priorities.map((item) => <span key={item} className="rounded-full bg-[#edf8f5] px-3 py-1.5 text-[11px] font-semibold text-[#0b6f63]">{item}</span>)}
+          </div>
+        </div>
+      ) : null}
+
+      {alternatives.length ? (
+        <div className="rounded-xl bg-white p-3 ring-1 ring-[#102c3d]/[0.06]">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/42">Alternative programmes</p>
+          <div className="mt-3 grid gap-2">
+            {alternatives.map((item) => (
+              <div key={item.pathwayId} className="rounded-lg bg-[#f8fbfa] px-3 py-2 text-xs leading-5 text-[#102c3d]/58">
+                <p className="font-semibold text-[#102c3d]">{item.title}</p>
+                <p className="mt-1">{item.whyRankedLower[0] ?? item.missingEvidence[0] ?? "Ranked lower because the current evidence is stronger for the top route."}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      <div className="grid gap-3 md:grid-cols-2">
+        <div className="rounded-xl bg-white p-3 ring-1 ring-[#102c3d]/[0.06]">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/42">Missing evidence</p>
+          <div className="mt-3 grid gap-2">
+            {missing.length ? missing.map((item, index) => (
+              <div key={item} className="flex items-center justify-between gap-3 rounded-lg bg-[#f8fbfa] px-3 py-2 text-xs leading-5 text-[#102c3d]/56">
+                <span>{item}</span>
+                <span className="shrink-0 rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-[#102c3d]/42 ring-1 ring-[#102c3d]/[0.05]">{index % 2 === 0 ? "Ask employee" : "Ask manager"}</span>
+              </div>
+            )) : <p className="text-xs leading-5 text-[#102c3d]/50">No major evidence gaps are blocking this recommendation.</p>}
+          </div>
+        </div>
+        <div className="rounded-xl bg-white p-3 ring-1 ring-[#102c3d]/[0.06]">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/42">Next best questions</p>
+          <div className="mt-3 grid gap-2">
+            {questions.length ? questions.map((item) => <p key={item} className="rounded-lg bg-[#f8fbfa] px-3 py-2 text-xs leading-5 text-[#102c3d]/56">{item}</p>) : null}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function InlineResponse({
   response,
   onAction,
@@ -665,49 +824,11 @@ function InlineResponse({
     <div className="mt-4 grid gap-3 border-t border-[#102c3d]/[0.07] pt-4">
       {showWarning ? <p className="rounded-xl bg-[#fff9dc] px-3 py-2 text-xs leading-5 text-[#765f00]">{response.applicationWarning}</p> : null}
       {showPathways ? (
-        <div className="grid gap-2">
-          {response.recommendedPathways.slice(0, 3).map((pathway) => {
-            const selected = selectedPathwayTitle === pathway.title;
-            return (
-              <div key={pathway.title} className="rounded-xl bg-[#f8fbfa] px-3 py-2.5 ring-1 ring-[#102c3d]/[0.055] transition-all duration-300">
-                <div className="flex items-start justify-between gap-3">
-                  <p className="font-semibold text-[#102c3d]">{pathway.title}</p>
-                  <div className="flex shrink-0 items-center gap-1.5">
-                    {typeof pathway.scoreDelta === "number" && pathway.scoreDelta !== 0 ? (
-                      <span className="rounded-full bg-[#edf7f3] px-1.5 py-0.5 text-[10px] font-semibold text-[#0b6f63]">
-                        {pathway.scoreDelta > 0 ? "+" : ""}{pathway.scoreDelta}%
-                      </span>
-                    ) : null}
-                    {pathway.fit ? <span className="text-xs font-semibold text-[#0b6f63]">{pathway.fit}% fit</span> : null}
-                  </div>
-                </div>
-                <p className="mt-1 text-xs leading-5 text-[#102c3d]/54">{pathway.reason}</p>
-                {pathway.evidence?.length ? (
-                  <details className="mt-2 text-xs text-[#102c3d]/58">
-                    <summary className="cursor-pointer font-semibold text-[#0b6f63]">Why this score?</summary>
-                    <ul className="mt-2 grid gap-1">
-                      {pathway.evidence.slice(0, 4).map((item) => <li key={item}>+ {item}</li>)}
-                    </ul>
-                  </details>
-                ) : null}
-                {onSelectPathway ? (
-                  <div className="mt-3 flex items-center justify-between gap-3">
-                    <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/40">
-                      {selected ? "Preferred route selected" : "Set preferred route"}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => onSelectPathway(pathway.title)}
-                      className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${selected ? "bg-[#edf7f3] text-[#0b6f63]" : "bg-[#102c3d] text-white hover:-translate-y-0.5"}`}
-                    >
-                      {selected ? "Selected" : "Use this pathway"}
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
+        <InlineRecommendationTrust
+          response={response}
+          onSelectPathway={onSelectPathway}
+          selectedPathwayTitle={selectedPathwayTitle}
+        />
       ) : null}
       {showActions ? (
         <div className="flex flex-wrap gap-2">

@@ -2878,6 +2878,162 @@ async function requestLevyTateAI(payload: ApiLevyTateAiRequest): Promise<ApiLevy
   }
 }
 
+
+function confidenceLabel(score: number | undefined) {
+  if ((score ?? 0) >= 78) return "High confidence";
+  if ((score ?? 0) >= 62) return "Good confidence";
+  return "Developing confidence";
+}
+
+function capabilityStrength(score: number) {
+  if (score >= 75) return "Strong";
+  if (score >= 55) return "Good";
+  if (score >= 35) return "Emerging";
+  return "Early signal";
+}
+
+function uniqueList(items: Array<string | null | undefined>) {
+  return [...new Set(items.map((item) => item?.trim()).filter((item): item is string => Boolean(item)))];
+}
+
+function CapabilityProfileBars({ title, items, emptyText }: { title: string; items: NonNullable<ApiLevyTateAiResponse["recommendationResult"]>["currentCapabilityProfile"]; emptyText: string }) {
+  const visibleItems = items.filter((item) => item.score > 0).sort((left, right) => right.score - left.score).slice(0, 8);
+
+  return (
+    <div className="rounded-xl bg-white p-3 ring-1 ring-[#102c3d]/[0.06]">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/44">{title}</p>
+      <div className="mt-3 grid gap-2.5">
+        {visibleItems.length ? visibleItems.map((item) => (
+          <div key={title + "-" + item.domain} className="grid gap-1.5">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs font-semibold text-[#102c3d]/72">{item.domain}</span>
+              <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#102c3d]/38">{capabilityStrength(item.score)}</span>
+            </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-[#102c3d]/[0.06]">
+              <div className="h-full rounded-full bg-[#159b8f]" style={{ width: Math.max(10, Math.min(100, item.score)) + "%" }} />
+            </div>
+          </div>
+        )) : <p className="text-xs leading-5 text-[#102c3d]/52">{emptyText}</p>}
+      </div>
+    </div>
+  );
+}
+
+function RecommendationExplainabilityPanel({ result, compact = false }: { result: ApiLevyTateAiResponse; compact?: boolean }) {
+  const recommendationResult = result.recommendationResult;
+  const top = recommendationResult?.topRecommendation ?? recommendationResult?.recommendations[0];
+  if (!recommendationResult || !top) return null;
+
+  const strategic = recommendationResult.strategicRecommendation;
+  const alternatives = recommendationResult.recommendations.filter((item) => item.pathwayId !== top.pathwayId).slice(0, 2);
+  const evidenceItems = uniqueList([
+    ...top.evidence.map((item) => item.label),
+    ...top.capabilityFit.filter((item) => item.score >= 55).map((item) => item.domain + " capability detected"),
+    ...top.strategicSignals.filter((item) => item.category === "current_capability" || item.category === "future_capability").map((item) => item.label),
+  ]).slice(0, 6);
+  const organisationPriorities = uniqueList([
+    ...(strategic?.organisationPrioritiesInfluenced ?? []),
+    ...top.strategicSignals.filter((item) => item.category === "organisation_priority" || item.category === "business_strategy").map((item) => item.label),
+  ]).slice(0, 5);
+  const missingEvidence = uniqueList([...(top.missingEvidence ?? []), ...(strategic?.missingEvidence ?? [])]).slice(0, 5);
+  const questions = uniqueList([...(top.suggestedQuestions ?? []), ...(strategic?.suggestedQuestions ?? [])]).slice(0, 4);
+  const confidenceSignals = uniqueList([
+    top.evidence.some((item) => item.source === "profile") ? "Current role" : null,
+    top.evidence.length ? "Observed capability" : null,
+    organisationPriorities.length ? "Organisation priorities" : null,
+    top.evidence.some((item) => item.source === "role_mapping") ? "Manager or role mapping input" : null,
+    top.strategicSignals.some((item) => item.category === "future_capability") ? "Future capability goal" : null,
+  ]).slice(0, 4);
+
+  return (
+    <div className={["mt-3 grid gap-3", compact ? "" : "rounded-[1rem] bg-white p-3 ring-1 ring-[#102c3d]/[0.06]"].join(" ")}>
+      <div className="rounded-xl bg-[#f8fbfa] p-4 ring-1 ring-[#102c3d]/[0.05]">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">Why LevyTate recommended this</p>
+            <p className="mt-1 text-sm font-semibold text-[#102c3d]">{top.title}</p>
+          </div>
+          <span className="rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-[#0b6f63] ring-1 ring-[#159b8f]/[0.14]">{confidenceLabel(top.confidence)}</span>
+        </div>
+        <p className="mt-3 text-xs leading-5 text-[#102c3d]/58">
+          Based on the evidence currently available, this programme provides the strongest balance between current capability, future development and organisational priorities.
+        </p>
+        {evidenceItems.length ? (
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {evidenceItems.map((item) => (
+              <div key={item} className="flex items-start gap-2 rounded-lg bg-white px-3 py-2 text-xs leading-5 text-[#102c3d]/64 ring-1 ring-[#102c3d]/[0.045]">
+                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[#159b8f]" />
+                <span>{item}</span>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-2">
+        <CapabilityProfileBars title="Current capability profile" items={recommendationResult.currentCapabilityProfile} emptyText="Current capability evidence is still being gathered." />
+        <CapabilityProfileBars title="Future capability" items={recommendationResult.futureCapabilityProfile} emptyText="Future capability signals will appear as the conversation develops." />
+      </div>
+
+      {organisationPriorities.length ? (
+        <div className="rounded-xl bg-white p-3 ring-1 ring-[#102c3d]/[0.06]">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/44">Organisation priorities influencing this recommendation</p>
+          <p className="mt-2 text-xs leading-5 text-[#102c3d]/54">This recommendation has been positively influenced by the organisation priority profile.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {organisationPriorities.map((item) => <span key={item} className="rounded-full bg-[#edf8f5] px-3 py-1.5 text-[11px] font-semibold text-[#0b6f63]">{item}</span>)}
+          </div>
+        </div>
+      ) : null}
+
+      {alternatives.length ? (
+        <div className="rounded-xl bg-white p-3 ring-1 ring-[#102c3d]/[0.06]">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/44">Alternative programmes</p>
+          <div className="mt-3 grid gap-2">
+            {alternatives.map((item) => (
+              <div key={item.pathwayId} className="rounded-lg bg-[#f8fbfa] px-3 py-2.5">
+                <p className="text-xs font-semibold text-[#102c3d]">{item.title}</p>
+                <p className="mt-1 text-xs leading-5 text-[#102c3d]/56">
+                  {item.whyRankedLower[0] ?? item.missingEvidence[0] ?? "Ranked lower because the available evidence is stronger for the top recommendation."}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      <div className="grid gap-3 lg:grid-cols-2">
+        <div className="rounded-xl bg-white p-3 ring-1 ring-[#102c3d]/[0.06]">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/44">Missing evidence</p>
+          <div className="mt-3 grid gap-2">
+            {missingEvidence.length ? missingEvidence.map((item, index) => (
+              <div key={item} className="flex items-center justify-between gap-3 rounded-lg bg-[#f8fbfa] px-3 py-2 text-xs leading-5 text-[#102c3d]/58">
+                <span>{item}</span>
+                <span className="shrink-0 rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-[#102c3d]/46 ring-1 ring-[#102c3d]/[0.05]">{index % 2 === 0 ? "Ask employee" : "Ask manager"}</span>
+              </div>
+            )) : <p className="text-xs leading-5 text-[#102c3d]/52">No major evidence gaps are currently blocking this recommendation.</p>}
+          </div>
+        </div>
+        <div className="rounded-xl bg-white p-3 ring-1 ring-[#102c3d]/[0.06]">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/44">Next best questions</p>
+          <div className="mt-3 grid gap-2">
+            {questions.length ? questions.map((item) => (
+              <p key={item} className="rounded-lg bg-[#f8fbfa] px-3 py-2 text-xs leading-5 text-[#102c3d]/58">{item}</p>
+            )) : <p className="text-xs leading-5 text-[#102c3d]/52">The next question will appear once more role context is available.</p>}
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-xl bg-[#102c3d] p-3 text-white">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/54">Confidence</p>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#102c3d]">{confidenceLabel(recommendationResult.confidence)}</span>
+          {confidenceSignals.map((item) => <span key={item} className="rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-semibold text-white/74">{item}</span>)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AIGuidanceCallout({ result }: { result: ApiLevyTateAiResponse }) {
   const sourceLabel = result.employeeGuidance
     ? result.source === "openai"
@@ -2886,7 +3042,7 @@ function AIGuidanceCallout({ result }: { result: ApiLevyTateAiResponse }) {
     : result.source === "openai"
       ? "Live GenAI guidance"
       : "Guided response";
-  const showEmployeeExtras = Boolean(result.employeeGuidance || result.applicationWarning || result.managerMessageDraft);
+  const showExplainability = Boolean(result.recommendationResult?.recommendations.length && (result.shouldShowPathways ?? true));
 
   return (
     <div className="rounded-[1rem] border border-[#102c3d]/[0.055] bg-[#f8fbfa] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.84)]">
@@ -2895,20 +3051,7 @@ function AIGuidanceCallout({ result }: { result: ApiLevyTateAiResponse }) {
         {!result.employeeGuidance && result.safetyNotes[0] ? <span className="rounded-full bg-white px-3 py-1 text-[10px] font-semibold text-[#102c3d]/52 ring-1 ring-[#102c3d]/[0.06]">{result.safetyNotes[0]}</span> : null}
       </div>
       <p className="mt-2 text-sm leading-6 text-[#102c3d]/66">{result.assistantMessage}</p>
-      {showEmployeeExtras && result.shouldShowPathways && result.recommendedPathways.length ? (
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          {result.recommendedPathways.slice(0, 3).map((pathway) => (
-            <div key={pathway.title} className="rounded-xl bg-white px-3 py-2.5 ring-1 ring-[#102c3d]/[0.06] transition-all duration-300">
-              <div className="flex items-start justify-between gap-3">
-                <span className="text-[11px] font-semibold leading-5 text-[#102c3d]/68">{pathway.title}</span>
-                <span className="shrink-0 text-[11px] font-semibold text-[#0b6f63]">{pathway.fit}%</span>
-              </div>
-              {pathway.scoreDelta ? <p className="mt-1 text-[10px] font-semibold text-[#0b6f63]">{pathway.scoreDelta > 0 ? "↑" : "↓"} {pathway.scoreDelta > 0 ? "+" : ""}{pathway.scoreDelta}% from new evidence</p> : null}
-              {pathway.evidence?.length ? <p className="mt-1 text-[10px] leading-4 text-[#102c3d]/48">Why: {pathway.evidence.slice(0, 2).join(" · ")}</p> : null}
-            </div>
-          ))}
-        </div>
-      ) : null}
+      {showExplainability ? <RecommendationExplainabilityPanel result={result} /> : null}
       {result.applicationWarning ? (
         <div className="mt-3 rounded-xl border border-[#102c3d]/[0.055] bg-white px-3.5 py-2.5 text-xs leading-5 text-[#102c3d]/58">
           {result.applicationWarning}
@@ -3014,36 +3157,10 @@ function employeeActionFromApi(action: ApiLevyTateAiResponse["recommendedActions
   if (action.type === "start_application" || action.type === "draft_application_reason") return { label: action.label, type: "start_application", target: action.target };
   return null;
 }
-function EmployeeInlineResult({ result }: { result: ApiLevyTateAiResponse }) {
-  if (!result.shouldShowPathways || !result.recommendedPathways.length) return null;
 
-  return (
-    <div className="mt-4 grid gap-2">
-      {result.recommendedPathways.slice(0, 3).map((pathway, index) => (
-        <div key={pathway.title} className={`rounded-xl border p-3 transition-all duration-300 ${index === 0 ? "border-[#159b8f]/20 bg-[#edf8f5]" : "border-[#102c3d]/[0.055] bg-white"}`}>
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#0b6f63]">{index === 0 ? "Top platform match" : "Alternative"}</p>
-              <p className="mt-1 text-sm font-semibold text-[#102c3d]">{pathway.title}</p>
-            </div>
-            <div className="flex shrink-0 items-center gap-1.5">
-              {pathway.scoreDelta ? <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-[#0b6f63]">{pathway.scoreDelta > 0 ? "↑" : "↓"} {pathway.scoreDelta > 0 ? "+" : ""}{pathway.scoreDelta}%</span> : null}
-              <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-[#0b6f63]">{pathway.fit}%</span>
-            </div>
-          </div>
-          <p className="mt-2 text-xs leading-5 text-[#102c3d]/58">{pathway.reason}</p>
-          {pathway.evidence?.length ? (
-            <details className="mt-2 text-xs text-[#102c3d]/58">
-              <summary className="cursor-pointer font-semibold text-[#0b6f63]">Why this score?</summary>
-              <ul className="mt-2 grid gap-1">
-                {pathway.evidence.slice(0, 4).map((item) => <li key={item}>✓ {item}</li>)}
-              </ul>
-            </details>
-          ) : null}
-        </div>
-      ))}
-    </div>
-  );
+function EmployeeInlineResult({ result }: { result: ApiLevyTateAiResponse }) {
+  if (!result.shouldShowPathways || !result.recommendationResult?.recommendations.length) return null;
+  return <RecommendationExplainabilityPanel result={result} compact />;
 }
 function ApprenticeshipLeadAIPage({ selectedSite }: { selectedSite: string }) {
   const [query, setQuery] = useState("");
