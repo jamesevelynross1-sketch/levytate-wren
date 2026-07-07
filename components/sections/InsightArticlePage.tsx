@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { FinalCta } from "@/components/sections/FinalCta";
 import { SectionEyebrow } from "@/components/ui/SectionEyebrow";
+import { ENQUIRY_MAILTO } from "@/lib/contact";
+import { cleanDisplayText } from "@/lib/html-text";
 import type { InsightArticle } from "@/lib/insights";
 import { getRelatedInsights } from "@/lib/insights";
 
@@ -24,10 +26,10 @@ export function InsightArticlePage({ article }: InsightArticlePageProps) {
           <div className="max-w-4xl">
             <SectionEyebrow>Insight</SectionEyebrow>
             <h1 className="display-heading mt-5 text-5xl leading-[1.04] text-ink text-balance md:text-6xl">
-              {article.title}
+              {cleanDisplayText(article.title)}
             </h1>
             <p className="mt-6 max-w-3xl text-xl leading-8 text-ink/68">
-              {article.subtitle}
+              {cleanDisplayText(article.subtitle)}
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3 border-y border-ink/10 py-4 text-[13px] font-semibold text-ink/54">
               <time dateTime={article.publishDate}>
@@ -44,16 +46,16 @@ export function InsightArticlePage({ article }: InsightArticlePageProps) {
         <section className="container-px mx-auto max-w-7xl pb-10 lg:pb-14">
           <div className="grid gap-8 lg:grid-cols-[minmax(0,720px)_minmax(260px,1fr)] lg:gap-16">
             <div className="min-w-0">
-              <PullQuote>{article.pullQuote}</PullQuote>
+              <PullQuote>{cleanDisplayText(article.pullQuote)}</PullQuote>
 
               {article.sections.map((section, index) => (
                 <section key={section.title} className="border-t border-ink/10 py-9 first:border-t-0 first:pt-0">
                   <h2 className="display-heading text-3xl leading-tight text-ink md:text-4xl">
-                    {section.title}
+                    {cleanDisplayText(section.title)}
                   </h2>
                   <div className="mt-5 space-y-5 text-[17px] leading-8 text-ink/72">
                     {section.body.map((paragraph) => (
-                      <p key={paragraph}>{paragraph}</p>
+                      <p key={paragraph}>{cleanDisplayText(paragraph)}</p>
                     ))}
                   </div>
 
@@ -82,7 +84,7 @@ export function InsightArticlePage({ article }: InsightArticlePageProps) {
                 </h2>
                 <div className="mt-5 space-y-5 text-[17px] leading-8 text-ink/72">
                   {article.finalPerspective.map((paragraph) => (
-                    <p key={paragraph}>{paragraph}</p>
+                    <p key={paragraph}>{cleanDisplayText(paragraph)}</p>
                   ))}
                 </div>
               </section>
@@ -97,10 +99,10 @@ export function InsightArticlePage({ article }: InsightArticlePageProps) {
                   {article.stats.map((stat) => (
                     <div key={stat.label} className="border-t border-ink/10 pt-4 first:border-t-0 first:pt-0">
                       <p className="display-heading text-3xl leading-none text-ink">
-                        {stat.value}
+                        {cleanDisplayText(stat.value)}
                       </p>
                       <p className="mt-2 text-sm leading-6 text-ink/64">
-                        {stat.label}
+                        {cleanDisplayText(stat.label)}
                       </p>
                     </div>
                   ))}
@@ -123,10 +125,10 @@ export function InsightArticlePage({ article }: InsightArticlePageProps) {
                 className="group rounded-xl border border-ink/10 bg-white/34 p-6 shadow-[0_10px_24px_rgba(15,37,39,0.03)] transition hover:-translate-y-1 hover:border-teal/25 hover:bg-white/48"
               >
                 <h3 className="text-xl font-semibold leading-snug text-ink">
-                  {relatedArticle.title}
+                  {cleanDisplayText(relatedArticle.title)}
                 </h3>
                 <p className="mt-3 text-sm leading-7 text-ink/66">
-                  {relatedArticle.summary}
+                  {cleanDisplayText(relatedArticle.summary)}
                 </p>
                 <p className="mt-5 text-[13px] font-semibold text-ink transition group-hover:text-teal">
                   Read article →
@@ -152,17 +154,17 @@ export function InsightArticlePage({ article }: InsightArticlePageProps) {
               </p>
             </div>
             <Link
-              href="/contact"
-              className="inline-flex min-h-10 items-center justify-center rounded-full bg-ink px-4 text-[13px] font-semibold text-cream transition hover:bg-forest"
+              href={ENQUIRY_MAILTO}
+              className="button-pill button-pill--primary min-h-10 px-4 text-[13px]"
             >
-              Speak to MPR Consulting
+              Book a Conversation
             </Link>
           </div>
         </div>
       </section>
 
       <FinalCta
-        title="Need an independent view on apprenticeship options?"
+        title="Want to discuss how this applies to your organisation?"
         copy="Bring us the priorities, providers and funding questions you are working through. We will help turn them into a practical route forward."
       />
     </>
@@ -189,7 +191,7 @@ function InsightPanel({
   return (
     <div className="mt-7 rounded-xl border border-teal/18 bg-teal/[0.08] p-5">
       <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-teal">
-        {title}
+        {cleanDisplayText(title)}
       </p>
       <p className="mt-3 text-sm leading-7 text-ink/70">{children}</p>
     </div>
@@ -205,7 +207,7 @@ function InsightList({ title, items }: { title: string; items: string[] }) {
       <div className="mt-6 grid gap-3">
         {items.map((item) => (
           <div key={item} className="rounded-xl border border-ink/10 bg-white/34 p-4 text-sm leading-7 text-ink/70">
-            {item}
+            {cleanDisplayText(item)}
           </div>
         ))}
       </div>
@@ -219,11 +221,11 @@ function MethodCard({ slug }: { slug: string }) {
   return (
     <div className="mt-5 rounded-xl border border-teal/18 bg-teal/[0.08] p-5">
       <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-teal">
-        {content.title}
+        {cleanDisplayText(content.title)}
       </p>
       <div className="mt-4 grid gap-2 text-sm leading-6 text-ink/70">
         {content.items.map((item) => (
-          <p key={item}>{item}</p>
+          <p key={item}>{cleanDisplayText(item)}</p>
         ))}
       </div>
     </div>

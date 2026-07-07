@@ -31,7 +31,7 @@ export async function generateMetadata(): Promise<Metadata> {
       template: "%s | MPR Consulting",
     },
     description:
-      "Independent apprenticeship consultancy for employers, covering apprenticeship strategy, levy advice, provider matching and workforce capability.",
+      "Independent apprenticeship consultancy for employers, covering strategy, levy advice, provider matching and access to 130+ apprenticeship programmes.",
   };
 }
 

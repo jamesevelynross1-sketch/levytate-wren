@@ -6,7 +6,7 @@ import { ENQUIRY_MAILTO } from "@/lib/contact";
 export const metadata: Metadata = {
   title: "Apprenticeship Framework Consultancy",
   description:
-    "Build a structured apprenticeship framework across roles, departments, skills gaps and workforce priorities with MPR Consulting.",
+    "Build a structured apprenticeship framework across roles, skills gaps and 130+ potential apprenticeship programme routes with MPR Consulting.",
   openGraph: {
     title: "Apprenticeship Framework Consultancy | MPR Consulting",
     description:
@@ -59,9 +59,9 @@ export default function FrameworkPage() {
           </p>
           <div className="mt-9 flex flex-col gap-3 sm:flex-row">
             <ButtonLink href={ENQUIRY_MAILTO} variant="secondary" className="bg-cream">
-              Book a Strategy Call
+              Book a Conversation
             </ButtonLink>
-            <ButtonLink href="/levy-health-check" variant="secondary" className="border-cream/18 bg-transparent text-cream hover:bg-cream/10">
+            <ButtonLink href="/levy-health-check" variant="secondary">
               Start with a Levy Health Check
             </ButtonLink>
           </div>
@@ -86,6 +86,13 @@ export default function FrameworkPage() {
               It is designed for employers who want a clearer link between levy
               funding, workforce planning, provider decisions and measurable
               capability building.
+            </p>
+            <p>
+              Once workforce priorities have been identified, MPR Consulting
+              maps suitable roles to apprenticeship programmes from a trusted
+              network delivering more than 130 programmes. This ensures
+              recommendations are driven by organisational need rather than
+              provider limitations.
             </p>
           </div>
         </div>

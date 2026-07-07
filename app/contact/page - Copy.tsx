@@ -119,7 +119,7 @@ export default function ContactPage() {
           </label>
           <button
             type="submit"
-            className="mt-2 inline-flex min-h-11 items-center justify-center rounded-full bg-ink px-5 text-[13px] font-semibold text-cream shadow-[0_12px_28px_rgba(15,37,39,0.12)] transition hover:bg-forest focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ink"
+            className="button-pill button-pill--primary mt-2"
           >
             Send enquiry
           </button>

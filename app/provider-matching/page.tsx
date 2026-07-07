@@ -6,11 +6,11 @@ import { ENQUIRY_MAILTO } from "@/lib/contact";
 export const metadata: Metadata = {
   title: "Apprenticeship Provider Matching",
   description:
-    "Independent apprenticeship provider matching for employers who want better fit, quality and confidence.",
+    "Independent apprenticeship provider matching for employers, with access to 130+ programmes through trusted provider partners.",
   openGraph: {
     title: "Apprenticeship Provider Matching | MPR Consulting",
     description:
-      "Independent support to identify, assess and select apprenticeship providers based on quality, fit and employer need.",
+      "Independent support to identify apprenticeship programmes and trusted providers based on quality, fit and employer need.",
   },
   alternates: {
     canonical: "/provider-matching",
@@ -33,6 +33,20 @@ const assessment = [
   "Evidence of quality, outcomes and delivery consistency",
 ];
 
+const directProviderComparison = [
+  "Limited programme portfolio",
+  "One delivery model",
+  "Recommendations limited to internal offer",
+];
+
+const mprComparison = [
+  "130+ apprenticeship programmes",
+  "Multiple trusted providers",
+  "Independent recommendations",
+  "Employer-first approach",
+  "Greater flexibility",
+];
+
 export default function ProviderMatchingPage() {
   return (
     <>
@@ -49,6 +63,37 @@ export default function ProviderMatchingPage() {
           <ButtonLink href={ENQUIRY_MAILTO} variant="secondary" className="mt-9 bg-cream">
             Discuss Provider Matching
           </ButtonLink>
+        </div>
+      </section>
+
+      <section className="container-px bg-cream">
+        <div className="mx-auto max-w-7xl border-b border-ink/10 py-16 lg:py-20">
+          <div className="grid gap-10 lg:grid-cols-[0.82fr_1.18fr] lg:items-start">
+            <div>
+              <SectionEyebrow>More choice</SectionEyebrow>
+              <h2 className="display-heading mt-5 text-4xl leading-[1.06] text-ink md:text-5xl">
+                More Choice. Better Decisions.
+              </h2>
+              <div className="mt-5 grid gap-4 text-[16px] leading-8 text-ink/68">
+                <p>
+                  Unlike working directly with a single provider, MPR
+                  Consulting can explore apprenticeship solutions across a
+                  trusted provider network covering more than 130 apprenticeship
+                  programmes.
+                </p>
+                <p>
+                  This enables employers to identify the most suitable
+                  programme, provider and delivery approach based on
+                  organisational objectives.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <ComparisonCard title="Working Directly With One Provider" items={directProviderComparison} />
+              <ComparisonCard title="Working With MPR Consulting" items={mprComparison} highlight />
+            </div>
+          </div>
         </div>
       </section>
 
@@ -126,5 +171,29 @@ export default function ProviderMatchingPage() {
         </div>
       </section>
     </>
+  );
+}
+
+function ComparisonCard({
+  title,
+  items,
+  highlight = false,
+}: {
+  title: string;
+  items: string[];
+  highlight?: boolean;
+}) {
+  return (
+    <div className={`rounded-2xl border p-6 ${highlight ? "border-teal/24 bg-teal/[0.08]" : "border-ink/10 bg-white/36"}`}>
+      <h3 className="text-lg font-semibold leading-snug text-ink">{title}</h3>
+      <div className="mt-5 grid gap-3 text-sm leading-6 text-ink/68">
+        {items.map((item) => (
+          <div key={item} className="flex gap-3">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-teal" />
+            <span>{item}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

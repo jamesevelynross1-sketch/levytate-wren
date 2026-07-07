@@ -1,26 +1,26 @@
 export const intelligenceSegments = [
   {
-    label: "All MPR Intelligence",
+    label: "All Updates",
     value: "all",
   },
   {
-    label: "AI, Data & Automation",
+    label: "AI & Data",
     value: "ai",
   },
   {
-    label: "Apprenticeships & Levy",
+    label: "Apprenticeships",
     value: "apprenticeships",
   },
   {
-    label: "Workforce & Skills Strategy",
+    label: "Workforce Development",
     value: "workforce",
   },
   {
-    label: "Procurement & Supply Chain",
+    label: "Procurement",
     value: "procurement",
   },
   {
-    label: "Public Sector / Education",
+    label: "Public Sector",
     value: "public_sector",
   },
   {

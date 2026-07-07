@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import StrategyBuilderClient from "./StrategyBuilderClient";
 
 export const metadata: Metadata = {
-  title: "AI Apprenticeship Strategy Builder | MPR Consulting",
+  title: "Apprenticeship Opportunity Review | MPR Consulting",
   description:
-    "Create a practical apprenticeship strategy brief using organisation context, scorecard signals and AI refinement.",
+    "Understand your current apprenticeship position, identify immediate opportunities and create practical next steps.",
 };
 
 export default function StrategyBuilderPage() {

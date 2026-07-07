@@ -4,24 +4,24 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Members Dashboard | MPR Consulting",
   description:
-    "Access member tools from MPR Consulting, including the AI Apprenticeship Strategy Builder.",
+    "Access member tools from MPR Consulting, including the Apprenticeship Opportunity Review.",
 };
 
 const dashboardCards = [
   {
-    title: "Guided strategy inputs",
+    title: "Guided diagnostic inputs",
     description:
-      "Capture organisation context, priorities, funding confidence and provider confidence before AI generation begins.",
+      "Capture organisation details, apprenticeship activity, current challenges and business priorities.",
   },
   {
-    title: "Scorecard-aware context",
+    title: "Practical opportunity review",
     description:
-      "Use available Opportunity Scorecard signals to shape the draft around real apprenticeship readiness and blind spots.",
+      "Identify immediate opportunities without scores, maturity labels or generic AI reporting.",
   },
   {
-    title: "Board-friendly outputs",
+    title: "Action-focused output",
     description:
-      "Generate, refine, save and export a practical apprenticeship strategy brief for internal review.",
+      "Create 30, 60 and 90 day actions that can support a more useful employer conversation.",
   },
 ];
 
@@ -35,17 +35,17 @@ export default function MembersDashboardPage() {
               MPR Members
             </p>
             <h1 className="display-heading text-balance text-4xl font-semibold leading-[1.04] text-[var(--ink)] sm:text-5xl lg:text-6xl">
-              Build Your Apprenticeship Strategy
+              Review Your Apprenticeship Opportunity
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-[var(--muted)]">
-              Turn your organisation&apos;s priorities, scorecard results and workforce challenges into a practical apprenticeship strategy draft.
+              Turn your organisation&apos;s context, challenges and workforce priorities into a practical diagnostic review.
             </p>
             <div className="mt-9">
               <Link
                 href="/members/strategy-builder"
-                className="inline-flex items-center justify-center gap-2 rounded-full bg-[var(--emerald)] px-6 py-3 text-sm font-semibold text-[var(--cream)] shadow-[0_18px_42px_rgba(12,48,42,0.16)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-2)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--teal)]"
+                className="button-pill button-pill--emerald"
               >
-                Start Strategy Builder
+                Start Opportunity Review
                 <span aria-hidden>{"->"}</span>
               </Link>
             </div>
@@ -53,7 +53,7 @@ export default function MembersDashboardPage() {
 
           <div className="rounded-[28px] border border-[rgba(12,48,42,0.12)] bg-white/55 p-6 shadow-[0_24px_70px_rgba(12,48,42,0.08)] sm:p-8">
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--teal)]">
-              Strategy workspace
+              Opportunity workspace
             </p>
             <div className="mt-6 grid gap-4">
               {dashboardCards.map((card) => (

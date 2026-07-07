@@ -11,7 +11,11 @@ type SubscribeState = "idle" | "loading" | "success" | "error";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function BriefingSubscribeForm() {
+type BriefingSubscribeFormProps = {
+  sourcePage?: string;
+};
+
+export function BriefingSubscribeForm({ sourcePage = "/insights" }: BriefingSubscribeFormProps) {
   const [email, setEmail] = useState("");
   const [segments, setSegments] = useState<IntelligenceSegment[]>(defaultSegments);
   const [state, setState] = useState<SubscribeState>("idle");
@@ -45,21 +49,39 @@ export function BriefingSubscribeForm() {
 
     setState("loading");
     setMessage("");
+    const endpoint = "/api/subscribe";
+    const requestPayload = {
+      email: normalisedEmail,
+      sourcePage,
+      segments,
+    };
 
     try {
-      const response = await fetch("/api/subscribe", {
+      console.info("Submitting MPR Insights subscription", {
+        endpoint,
+        payload: {
+          emailDomain: normalisedEmail.split("@").at(-1),
+          sourcePage,
+          segments,
+        },
+      });
+
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          email: normalisedEmail,
-          sourcePage: "/insights",
-          segments,
-        }),
+        body: JSON.stringify(requestPayload),
       });
 
-      const payload = (await response.json()) as { message?: string };
+      const payload = (await response.json().catch(() => ({}))) as { message?: string };
+
+      console.info("MPR Insights subscription response", {
+        endpoint,
+        status: response.status,
+        ok: response.ok,
+        payload,
+      });
 
       if (!response.ok) {
         throw new Error(payload.message ?? "Subscription failed.");
@@ -73,12 +95,17 @@ export function BriefingSubscribeForm() {
       setEmail("");
       setSegments(defaultSegments);
     } catch (error) {
+      console.error("MPR Insights subscription failed", {
+        endpoint,
+        payload: {
+          emailDomain: normalisedEmail.split("@").at(-1),
+          sourcePage,
+          segments,
+        },
+        error,
+      });
       setState("error");
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "We could not complete the subscription. Please try again.",
-      );
+      setMessage(getSubscriptionErrorMessage(error));
     }
   }
 
@@ -132,9 +159,9 @@ export function BriefingSubscribeForm() {
         <button
           type="submit"
           disabled={state === "loading"}
-          className="inline-flex min-h-12 w-full items-center justify-center rounded-full bg-ink px-6 text-[13px] font-semibold text-cream shadow-[0_14px_28px_rgba(15,37,39,0.12)] transition hover:-translate-y-0.5 hover:bg-forest focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-teal disabled:cursor-not-allowed disabled:opacity-65 sm:w-auto sm:min-w-44"
+          className="button-pill button-pill--primary w-full disabled:opacity-100 sm:w-auto sm:min-w-44"
         >
-          {state === "loading" ? "Subscribing..." : "Subscribe to updates"}
+          {state === "loading" ? "Subscribing..." : "Subscribe"}
         </button>
       </div>
 
@@ -152,4 +179,19 @@ export function BriefingSubscribeForm() {
       </div>
     </form>
   );
+}
+
+function getSubscriptionErrorMessage(error: unknown) {
+  if (!(error instanceof Error)) {
+    return "Subscription service is temporarily unavailable. Please try again or contact MPR Consulting directly.";
+  }
+
+  if (
+    error.message.toLowerCase().includes("fetch failed") ||
+    error.message.toLowerCase().includes("failed to fetch")
+  ) {
+    return "Unable to connect to subscription service. Please try again or contact MPR Consulting directly.";
+  }
+
+  return error.message || "Subscription service is temporarily unavailable. Please try again or contact MPR Consulting directly.";
 }

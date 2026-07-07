@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { InsightArticlePage } from "@/components/sections/InsightArticlePage";
+import { cleanDisplayText } from "@/lib/html-text";
 import { getInsightArticle, insightArticles } from "@/lib/insights";
 
 type InsightArticleRouteProps = {
@@ -26,8 +27,8 @@ export async function generateMetadata({
   }
 
   return {
-    title: article.title,
-    description: article.subtitle,
+    title: cleanDisplayText(article.title),
+    description: cleanDisplayText(article.subtitle),
   };
 }
 

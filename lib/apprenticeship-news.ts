@@ -1,3 +1,5 @@
+import { cleanDisplayText } from "@/lib/html-text";
+
 export type NewsCategory =
   | "Private Providers"
   | "Provider Market"
@@ -19,6 +21,7 @@ type FeedSource = {
   name: string;
   url: string;
   defaultCategory: NewsCategory;
+  sourceWeight?: number;
 };
 
 type FeedItem = {
@@ -33,48 +36,96 @@ type FeedItem = {
 type ScoredFeedItem = FeedItem & {
   score: number;
   signalScore: number;
+  timestamp: number;
 };
 
+const FEED_REVALIDATE_SECONDS = 86400;
+const RECENT_ARTICLE_DAYS = 90;
+const FRESH_ARTICLE_DAYS = 180;
 const TOP_SECTION_LIMIT = 5;
 const MAX_PER_SOURCE_TOP_SECTION = 1;
 const MAX_PER_SOURCE_FULL_FEED = 2;
-const SIMILAR_SCORE_RANGE = 6;
+const DEBUG_NEWS_INGESTION =
+  process.env.NODE_ENV === "development" || process.env.MPR_NEWS_DEBUG === "1";
 
 const FEEDS: FeedSource[] = [
   {
     name: "FE Week",
     url: "https://feweek.co.uk/feed/",
     defaultCategory: "Provider Market",
+    sourceWeight: 8,
   },
   {
     name: "FE News",
     url: "https://www.fenews.co.uk/feed/",
     defaultCategory: "Provider Market",
+    sourceWeight: 5,
   },
   {
     name: "Department for Education",
     url: "https://www.gov.uk/search/news-and-communications.atom?organisations%5B%5D=department-for-education",
     defaultCategory: "Policy",
+    sourceWeight: 8,
   },
   {
     name: "GOV.UK apprenticeships",
     url: "https://www.gov.uk/search/all.atom?keywords=apprenticeships&organisations%5B%5D=department-for-education",
     defaultCategory: "Policy",
+    sourceWeight: 12,
+  },
+  {
+    name: "GOV.UK AI and skills",
+    url: "https://www.gov.uk/search/news-and-communications.atom?keywords=artificial%20intelligence%20skills",
+    defaultCategory: "Skills",
+    sourceWeight: 9,
+  },
+  {
+    name: "Ofsted",
+    url: "https://www.gov.uk/search/news-and-communications.atom?organisations%5B%5D=ofsted",
+    defaultCategory: "Policy",
+    sourceWeight: 8,
   },
   {
     name: "Skills England",
     url: "https://skillsengland.education.gov.uk/rss-feed",
     defaultCategory: "Skills",
+    sourceWeight: 10,
+  },
+  {
+    name: "AELP",
+    url: "https://www.aelp.org.uk/news/feed/",
+    defaultCategory: "Provider Market",
+    sourceWeight: 8,
+  },
+  {
+    name: "Personnel Today",
+    url: "https://www.personneltoday.com/feed/",
+    defaultCategory: "Employers",
+    sourceWeight: 7,
+  },
+  {
+    name: "Training Journal",
+    url: "https://www.trainingjournal.com/feed/",
+    defaultCategory: "Skills",
+    sourceWeight: 7,
+  },
+  {
+    name: "TechRepublic AI",
+    url: "https://www.techrepublic.com/rssfeeds/topic/artificial-intelligence/",
+    defaultCategory: "Skills",
+    sourceWeight: 3,
   },
   {
     name: "Baltic Apprenticeships",
     url: "https://www.balticapprenticeships.com/blog/feed/",
     defaultCategory: "Private Providers",
+    sourceWeight: 1,
   },
   {
     name: "Avado",
     url: "https://www.avadolearning.com/blog/feed/",
     defaultCategory: "Private Providers",
+    sourceWeight: 1,
   },
 ];
 
@@ -153,13 +204,19 @@ const DOWNRANK_TERMS: Array<{ term: string; score: number }> = [
 ];
 
 const SOURCE_WEIGHTS: Record<string, number> = {
-  "Baltic Apprenticeships": 8,
-  Avado: 8,
-  "Skills England": 7,
-  "GOV.UK apprenticeships": 7,
-  "Department for Education": 6,
-  "FE Week": 4,
-  "FE News": 2,
+  "GOV.UK apprenticeships": 12,
+  "Skills England": 10,
+  "GOV.UK AI and skills": 9,
+  "Department for Education": 8,
+  "FE Week": 8,
+  Ofsted: 8,
+  AELP: 8,
+  "Personnel Today": 7,
+  "Training Journal": 7,
+  "FE News": 5,
+  "TechRepublic AI": 3,
+  "Baltic Apprenticeships": 1,
+  Avado: 1,
 };
 
 const CATEGORY_RULES: Array<{ category: NewsCategory; terms: string[] }> = [
@@ -212,14 +269,24 @@ const CATEGORY_RULES: Array<{ category: NewsCategory; terms: string[] }> = [
 ];
 
 export async function getApprenticeshipNews(limit = 8): Promise<ApprenticeshipNewsArticle[]> {
-  const results = await Promise.allSettled(FEEDS.map(fetchFeed));
-  const items = results.flatMap((result) =>
-    result.status === "fulfilled" ? result.value : [],
+  const results = await Promise.allSettled(
+    FEEDS.map(async (source) => ({
+      source: source.name,
+      items: await fetchFeed(source),
+    })),
   );
+  const successfulSources = results.filter(
+    (result): result is PromiseFulfilledResult<{ source: string; items: FeedItem[] }> =>
+      result.status === "fulfilled",
+  );
+  const failedSources = results
+    .filter((result): result is PromiseRejectedResult => result.status === "rejected")
+    .map((result) => (result.reason instanceof Error ? result.reason.message : "Unknown feed failure"));
+  const items = successfulSources.flatMap((result) => result.value.items);
 
   const relevantItems = items
     .map(scoreArticle)
-    .filter((item) => item.signalScore >= 5 && item.score >= 8)
+    .filter(isRelevantArticle)
     .map((item) => ({
       ...item,
       category: categoriseArticle(item),
@@ -227,21 +294,30 @@ export async function getApprenticeshipNews(limit = 8): Promise<ApprenticeshipNe
     }));
 
   const deduped = dedupeArticles(relevantItems);
+  const candidatePool = getRecentCandidatePool(deduped, limit);
+  const rankedForDiversity = sortByRecencyAndScore(candidatePool);
+  const balanced = applySourceDiversity(rankedForDiversity, limit);
+  const newestFirst = sortByPublishDate(balanced);
+  const finalArticles = (newestFirst.length > 0 ? newestFirst : FALLBACK_ARTICLES).slice(0, limit);
 
-  const sorted = deduped.sort(
-    (a, b) =>
-      b.score - a.score ||
-      new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
-  );
+  logIngestionDiagnostics({
+    fetchedItems: items,
+    sourceCounts: successfulSources.map((result) => ({
+      source: result.value.source,
+      count: result.value.items.length,
+    })),
+    failedSources,
+    relevantItems,
+    deduped,
+    finalArticles,
+  });
 
-  const balanced = applySourceDiversity(sorted, limit);
-
-  return (balanced.length > 0 ? balanced : FALLBACK_ARTICLES).slice(0, limit);
+  return finalArticles;
 }
 
 async function fetchFeed(source: FeedSource): Promise<FeedItem[]> {
   const response = await fetch(source.url, {
-    next: { revalidate: 86400 },
+    next: { revalidate: FEED_REVALIDATE_SECONDS },
     headers: {
       Accept: "application/rss+xml, application/atom+xml, application/xml, text/xml",
     },
@@ -312,24 +388,7 @@ function getAtomLink(block: string) {
 }
 
 function cleanText(value: string) {
-  return decodeEntities(
-    value
-      .replace(/<!\[CDATA\[/g, "")
-      .replace(/\]\]>/g, "")
-      .replace(/<[^>]+>/g, " ")
-      .replace(/\s+/g, " ")
-      .trim(),
-  );
-}
-
-function decodeEntities(value: string) {
-  return value
-    .replace(/&amp;/g, "&")
-    .replace(/&quot;/g, "\"")
-    .replace(/&#039;/g, "'")
-    .replace(/&apos;/g, "'")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">");
+  return cleanDisplayText(value);
 }
 
 function trimSummary(summary: string) {
@@ -342,6 +401,7 @@ function trimSummary(summary: string) {
 
 function scoreArticle(item: FeedItem): ScoredFeedItem {
   const haystack = `${item.title} ${item.summary} ${item.source}`.toLowerCase();
+  const timestamp = toTimestamp(item.publishedAt);
   const boost = BOOST_TERMS.reduce(
     (score, entry) => score + (haystack.includes(entry.term) ? entry.score : 0),
     0,
@@ -350,12 +410,92 @@ function scoreArticle(item: FeedItem): ScoredFeedItem {
     (score, entry) => score + (haystack.includes(entry.term) ? entry.score : 0),
     0,
   );
+  const recency = getRecencyScore(timestamp);
+  const sourceWeight =
+    FEEDS.find((source) => source.name === item.source)?.sourceWeight ??
+    SOURCE_WEIGHTS[item.source] ??
+    0;
 
   return {
     ...item,
-    score: boost + drag + (SOURCE_WEIGHTS[item.source] ?? 0),
+    score: boost + drag + recency + sourceWeight,
     signalScore: boost,
+    timestamp,
   };
+}
+
+function isRelevantArticle(item: ScoredFeedItem) {
+  const haystack = `${item.title} ${item.summary} ${item.category} ${item.source}`.toLowerCase();
+  const hasPositiveSignal = item.signalScore >= 5 || hasCoreSignal(haystack);
+  const hasHardNegative = DOWNRANK_TERMS.some(
+    (entry) => entry.score <= -12 && haystack.includes(entry.term),
+  );
+
+  if (!hasPositiveSignal) {
+    return false;
+  }
+
+  if (hasHardNegative && item.signalScore < 18) {
+    return false;
+  }
+
+  return item.score >= 5;
+}
+
+function hasCoreSignal(haystack: string) {
+  return [
+    "apprenticeship",
+    "apprenticeships",
+    "levy",
+    "funding",
+    "skills england",
+    "department for education",
+    "dfe",
+    "ofsted",
+    "training provider",
+    "provider",
+    "workforce",
+    "learning and development",
+    "leadership",
+    "management",
+    "procurement",
+    "ai",
+    "artificial intelligence",
+    "automation",
+    "digital skills",
+    "data skills",
+    "upskilling",
+    "reskilling",
+    "future of work",
+    "productivity",
+    "employer",
+  ].some((term) => haystack.includes(term));
+}
+
+function getRecencyScore(timestamp: number) {
+  if (timestamp <= 0) {
+    return -40;
+  }
+
+  const ageDays = (Date.now() - timestamp) / 86_400_000;
+
+  if (ageDays <= 7) {
+    return 24;
+  }
+
+  if (ageDays <= 30) {
+    return 16;
+  }
+
+  if (ageDays <= RECENT_ARTICLE_DAYS) {
+    return 8;
+  }
+
+  if (ageDays <= FRESH_ARTICLE_DAYS) {
+    return -8;
+  }
+
+  return -28;
 }
 
 function categoriseArticle(item: FeedItem): NewsCategory {
@@ -380,6 +520,44 @@ function dedupeArticles(items: ScoredFeedItem[]): ScoredFeedItem[] {
     seen.add(key);
     return true;
   });
+}
+
+function getRecentCandidatePool(items: ScoredFeedItem[], limit: number) {
+  const dated = items.filter((item) => item.timestamp > 0);
+  const recent = dated.filter((item) => getAgeDays(item.timestamp) <= RECENT_ARTICLE_DAYS);
+  const fresh = dated.filter((item) => getAgeDays(item.timestamp) <= FRESH_ARTICLE_DAYS);
+  const minimumRecentVolume = Math.min(limit, 8);
+
+  if (recent.length >= minimumRecentVolume) {
+    return recent;
+  }
+
+  if (fresh.length >= minimumRecentVolume) {
+    return fresh;
+  }
+
+  return items;
+}
+
+function sortByRecencyAndScore(items: ScoredFeedItem[]) {
+  return [...items].sort((a, b) => b.timestamp - a.timestamp || b.score - a.score);
+}
+
+function sortByPublishDate(items: ScoredFeedItem[]): ApprenticeshipNewsArticle[] {
+  return [...items]
+    .sort((a, b) => b.timestamp - a.timestamp || b.score - a.score)
+    .map(toPublicArticle);
+}
+
+function toPublicArticle(item: ScoredFeedItem): ApprenticeshipNewsArticle {
+  return {
+    title: item.title,
+    summary: item.summary,
+    url: item.url,
+    source: item.source,
+    publishedAt: item.publishedAt,
+    category: item.category,
+  };
 }
 
 function applySourceDiversity(
@@ -428,12 +606,12 @@ function pickDiverseCandidate(
     (candidate) => !isSameSourceAsPrevious(candidate, selected),
   );
   const pool = nonConsecutive.length > 0 ? nonConsecutive : allowed;
-  const strongestScore = pool[0].score;
-  const similarStrength = pool.filter(
-    (candidate) => strongestScore - candidate.score <= SIMILAR_SCORE_RANGE,
+  const newestTimestamp = pool[0].timestamp;
+  const similarRecency = pool.filter(
+    (candidate) => Math.abs(newestTimestamp - candidate.timestamp) <= 7 * 86_400_000,
   );
 
-  return similarStrength.sort((a, b) => {
+  return similarRecency.sort((a, b) => {
     const sourceBalance = getSourceCount(a.source, sourceCounts) - getSourceCount(b.source, sourceCounts);
 
     if (sourceBalance !== 0) {
@@ -449,8 +627,8 @@ function pickDiverseCandidate(
     }
 
     return (
-      b.score - a.score ||
-      new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
+      b.timestamp - a.timestamp ||
+      b.score - a.score
     );
   })[0];
 }
@@ -485,10 +663,60 @@ function getSourceCount(source: string, sourceCounts: Map<string, number>) {
   return sourceCounts.get(source) ?? 0;
 }
 
+function getAgeDays(timestamp: number) {
+  return (Date.now() - timestamp) / 86_400_000;
+}
+
+function toTimestamp(value: string) {
+  const timestamp = new Date(value).getTime();
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
 function normaliseKey(value: string) {
   return value
     .toLowerCase()
     .replace(/^https?:\/\/(www\.)?/, "")
     .replace(/[?#].*$/, "")
     .replace(/\/$/, "");
+}
+
+function logIngestionDiagnostics({
+  fetchedItems,
+  sourceCounts,
+  failedSources,
+  relevantItems,
+  deduped,
+  finalArticles,
+}: {
+  fetchedItems: FeedItem[];
+  sourceCounts: Array<{ source: string; count: number }>;
+  failedSources: string[];
+  relevantItems: ScoredFeedItem[];
+  deduped: ScoredFeedItem[];
+  finalArticles: ApprenticeshipNewsArticle[];
+}) {
+  if (!DEBUG_NEWS_INGESTION) {
+    return;
+  }
+
+  const timestamps = finalArticles
+    .map((article) => toTimestamp(article.publishedAt))
+    .filter((timestamp) => timestamp > 0);
+
+  console.info("MPR intelligence ingestion", {
+    totalFetched: fetchedItems.length,
+    afterFiltering: relevantItems.length,
+    afterDedupe: deduped.length,
+    finalRendered: finalArticles.length,
+    newestDate:
+      timestamps.length > 0 ? new Date(Math.max(...timestamps)).toISOString() : null,
+    oldestDate:
+      timestamps.length > 0 ? new Date(Math.min(...timestamps)).toISOString() : null,
+    sourceCounts,
+    finalSources: finalArticles.reduce<Record<string, number>>((counts, article) => {
+      counts[article.source] = (counts[article.source] ?? 0) + 1;
+      return counts;
+    }, {}),
+    failedSources,
+  });
 }

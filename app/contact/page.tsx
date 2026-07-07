@@ -65,6 +65,20 @@ export default function ContactPage() {
           Tell us what you are trying to understand, improve or decide. We will
           come back with a practical route into the right conversation.
         </p>
+        <div className="mt-7 rounded-2xl border border-teal/18 bg-teal/[0.08] p-5">
+          <h2 className="text-lg font-semibold leading-snug text-ink">
+            Not sure which apprenticeship programme is right for your organisation?
+          </h2>
+          <p className="mt-3 text-sm leading-7 text-ink/68">
+            MPR Consulting provides independent guidance and access to more than
+            130 apprenticeship programmes through a trusted network of provider
+            partners.
+          </p>
+          <p className="mt-3 text-sm leading-7 text-ink/68">
+            We&apos;ll help you identify the right solution, not simply the only
+            solution available.
+          </p>
+        </div>
         <a
           href={`mailto:${ENQUIRY_EMAIL}`}
           className="mt-5 inline-flex text-sm font-semibold text-ink underline decoration-ink/20 underline-offset-8 transition hover:text-teal"
@@ -119,7 +133,7 @@ export default function ContactPage() {
           </label>
           <button
             type="submit"
-            className="mt-2 inline-flex min-h-11 items-center justify-center rounded-full bg-ink px-5 text-[13px] font-semibold text-cream shadow-[0_12px_28px_rgba(15,37,39,0.12)] transition hover:bg-forest focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ink"
+            className="button-pill button-pill--primary mt-2"
           >
             Send enquiry
           </button>

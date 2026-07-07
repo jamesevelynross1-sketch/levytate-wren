@@ -5,13 +5,14 @@ import { FinalCta } from "@/components/sections/FinalCta";
 import { SectionEyebrow } from "@/components/ui/SectionEyebrow";
 import { getApprenticeshipNews } from "@/lib/apprenticeship-news";
 import { insightCards } from "@/lib/content";
+import { cleanDisplayText } from "@/lib/html-text";
 
 export const revalidate = 86400;
 
 export const metadata: Metadata = {
   title: "Insights",
   description:
-    "Perspectives from MPR Consulting on apprenticeship strategy, provider matching and funded workforce development.",
+    "Practical MPR Consulting insight on apprenticeship strategy, provider matching and funded workforce development.",
   openGraph: {
     title: "Insights | MPR Consulting",
     description:
@@ -68,15 +69,12 @@ export default async function InsightsPage() {
               href={insight.href}
               className="premium-card group flex min-h-72 flex-col rounded-xl p-6 transition duration-300 hover:-translate-y-1 hover:border-teal/20 hover:bg-white/[0.44] hover:shadow-[0_18px_38px_rgba(15,37,39,0.055)]"
             >
-              <p className="mb-7 text-[11px] font-semibold uppercase tracking-[0.24em] text-teal">
-                Perspective
-              </p>
               <h2 className="text-xl font-semibold leading-snug text-ink">
-                {insight.title}
+                {cleanDisplayText(insight.title)}
               </h2>
-              <p className="mt-4 text-sm leading-7 text-ink/66">{insight.summary}</p>
+              <p className="mt-4 text-sm leading-7 text-ink/66">{cleanDisplayText(insight.summary)}</p>
               <p className="mt-auto pt-7 text-[13px] font-semibold text-ink transition group-hover:text-teal">
-                Read article &rarr;
+                Read article
               </p>
             </Link>
           ))}
@@ -145,19 +143,19 @@ export default async function InsightsPage() {
                   <div>
                     <div className="mb-4 flex flex-wrap items-center gap-3 text-[12px] font-semibold text-ink/52">
                       <span className="rounded-full border border-teal/20 bg-teal/[0.08] px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-teal">
-                        {article.category}
+                        {cleanDisplayText(article.category)}
                       </span>
-                      <span>{article.source}</span>
+                      <span>{cleanDisplayText(article.source)}</span>
                       <span aria-hidden="true">/</span>
                       <time dateTime={article.publishedAt}>
                         {dateFormatter.format(new Date(article.publishedAt))}
                       </time>
                     </div>
                     <h3 className="text-lg font-semibold leading-snug text-ink md:text-xl">
-                      {article.title}
+                      {cleanDisplayText(article.title)}
                     </h3>
                     <p className="mt-3 max-w-2xl text-sm leading-7 text-ink/66">
-                      {article.summary}
+                      {cleanDisplayText(article.summary)}
                     </p>
                   </div>
 
@@ -166,7 +164,7 @@ export default async function InsightsPage() {
                       href={article.url}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex min-h-10 items-center justify-center rounded-full border border-ink/14 px-4 text-[13px] font-semibold text-ink transition hover:border-teal/45 hover:text-teal focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-teal"
+                      className="button-pill min-h-10 px-4 text-[13px]"
                     >
                       Read article
                     </a>

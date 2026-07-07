@@ -69,7 +69,7 @@ export default async function AdminSubscribersPage({
           <form action={logoutAdmin}>
             <button
               type="submit"
-              className="inline-flex min-h-10 items-center justify-center rounded-full border border-ink/14 px-4 text-[13px] font-semibold text-ink transition hover:border-teal/45 hover:text-teal"
+              className="button-pill min-h-10 px-4 text-[13px]"
             >
               Sign out
             </button>
@@ -107,14 +107,14 @@ export default async function AdminSubscribersPage({
               </select>
               <button
                 type="submit"
-                className="inline-flex min-h-11 items-center justify-center rounded-full bg-ink px-5 text-[13px] font-semibold text-cream transition hover:bg-forest"
+                className="button-pill button-pill--primary"
               >
                 Search
               </button>
             </form>
             <Link
               href={exportHref}
-              className="inline-flex min-h-11 items-center justify-center rounded-full border border-ink/14 px-5 text-[13px] font-semibold text-ink transition hover:border-teal/45 hover:text-teal"
+              className="button-pill"
             >
               Export CSV
             </Link>
@@ -237,7 +237,7 @@ function AdminLogin({ showError }: { showError: boolean }) {
             />
             <button
               type="submit"
-              className="inline-flex min-h-12 items-center justify-center rounded-full bg-ink px-6 text-[13px] font-semibold text-cream transition hover:bg-forest"
+              className="button-pill button-pill--primary"
             >
               Sign in
             </button>

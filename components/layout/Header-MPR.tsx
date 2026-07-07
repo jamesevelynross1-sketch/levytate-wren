@@ -19,7 +19,7 @@ export function Header() {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="container-px sticky top-0 z-40 border-b border-ink/[0.08] bg-cream/94 backdrop-blur-xl">
+    <header className="container-px sticky top-0 z-40 border-b border-ink/[0.08] bg-cream">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-5 py-3.5">
         <Link href="/" aria-label="MPR Consulting home" onClick={() => setOpen(false)}>
           <Logo />
@@ -36,14 +36,14 @@ export function Header() {
         <div className="flex items-center gap-3">
           <a
             href={ENQUIRY_MAILTO}
-            className="hidden min-h-10 items-center rounded-full bg-ink px-4 text-[11px] font-semibold uppercase leading-none tracking-[0.09em] text-cream transition duration-300 hover:bg-forest lg:inline-flex"
+            className="button-pill button-pill--primary hidden min-h-10 px-4 text-[11px] lg:inline-flex"
           >
-            Book a Strategy Call
+            Book a Conversation
           </a>
           <button
             type="button"
             onClick={() => setOpen((value) => !value)}
-            className="inline-flex min-h-10 items-center rounded-full border border-ink/12 px-4 text-[11px] font-semibold uppercase tracking-[0.1em] text-ink xl:hidden"
+            className="button-pill inline-flex min-h-10 px-4 text-[11px] xl:hidden"
             aria-expanded={open}
             aria-controls="mobile-navigation"
           >
@@ -67,9 +67,9 @@ export function Header() {
             ))}
             <a
               href={ENQUIRY_MAILTO}
-              className="mt-2 rounded-full bg-ink px-4 py-3 text-center text-[12px] text-cream"
+              className="button-pill button-pill--primary mt-2"
             >
-              Book a Strategy Call
+              Book a Conversation
             </a>
           </nav>
         </div>

@@ -29,16 +29,19 @@ export const services = [
 export const insightCards = [
   {
     title: "Why apprenticeship strategy needs to move beyond compliance",
+    href: "/insights/apprenticeship-strategy-beyond-compliance",
     summary:
       "A sharper look at how employers can connect funded learning to workforce planning, retention and measurable capability growth.",
   },
   {
     title: "The value of independent provider matching",
+    href: "/insights/independent-provider-matching",
     summary:
       "Why comparing providers through an employer lens can reduce delivery risk and improve learner experience.",
   },
   {
     title: "How funded training can support workforce transformation",
+    href: "/insights/funded-training-workforce-transformation",
     summary:
       "Where apprenticeships and funded development can sit within wider organisational change and capability programmes.",
   },

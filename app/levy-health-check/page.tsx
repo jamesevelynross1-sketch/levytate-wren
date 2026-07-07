@@ -5,7 +5,7 @@ import { ENQUIRY_EMAIL } from "@/lib/contact";
 export const metadata: Metadata = {
   title: "Apprenticeship Levy Health Check",
   description:
-    "Request a practical apprenticeship levy health check to review usage, missed opportunities, provider decisions and potential next steps.",
+    "Request an apprenticeship levy health check to review funding, programme options, provider decisions and practical next steps.",
   openGraph: {
     title: "Apprenticeship Levy Health Check | MPR Consulting",
     description:
@@ -48,6 +48,28 @@ export default function LevyHealthCheckPage() {
             opportunities across apprenticeship usage, funding decisions and
             provider activity.
           </p>
+        </div>
+      </section>
+
+      <section className="container-px bg-cream">
+        <div className="mx-auto grid max-w-7xl gap-8 border-b border-ink/10 py-14 lg:grid-cols-[0.8fr_1.2fr] lg:py-16">
+          <div>
+            <SectionEyebrow>Programme options</SectionEyebrow>
+            <h2 className="display-heading mt-5 text-4xl leading-[1.06] text-ink md:text-5xl">
+              Your Health Check Doesn&apos;t End With Funding
+            </h2>
+          </div>
+          <div className="premium-card rounded-2xl p-6 md:p-8">
+            <p className="text-[16px] leading-8 text-ink/68">
+              A levy review should identify the right programme, not simply
+              confirm available funding.
+            </p>
+            <p className="mt-4 text-[16px] leading-8 text-ink/68">
+              With access to more than 130 apprenticeship programmes across
+              trusted provider partners, MPR Consulting can recommend options
+              that genuinely support workforce priorities.
+            </p>
+          </div>
         </div>
       </section>
 
@@ -112,7 +134,7 @@ export default function LevyHealthCheckPage() {
               What would you like to understand?
               <textarea name="Message" rows={5} className="rounded-xl border border-ink/12 bg-cream p-3 text-sm font-normal" required />
             </label>
-            <button className="mt-5 rounded-full bg-ink px-5 py-3 text-[12px] font-semibold uppercase tracking-[0.1em] text-cream transition hover:bg-forest">
+            <button className="button-pill button-pill--primary mt-5">
               Request a Levy Health Check
             </button>
           </form>

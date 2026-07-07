@@ -43,7 +43,7 @@ export default function ServicesPage() {
             training spend or improving workforce capability.
           </p>
           <ButtonLink href={ENQUIRY_MAILTO} variant="secondary" className="mt-9 bg-cream">
-            Book a Strategy Call
+            Book a Conversation
           </ButtonLink>
         </div>
       </section>

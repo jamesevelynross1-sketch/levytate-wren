@@ -35,7 +35,7 @@ export function Header() {
         </div>
         <Link
           href="/contact"
-          className="inline-flex min-h-10 items-center rounded-full border border-ink/15 px-4 text-sm font-semibold text-ink lg:hidden"
+          className="button-pill min-h-10 px-4 text-sm lg:hidden"
         >
           Contact
         </Link>

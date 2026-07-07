@@ -100,7 +100,7 @@ export default async function InsightsPage() {
                       href={article.url}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex min-h-10 items-center justify-center rounded-full border border-ink/14 px-4 text-[13px] font-semibold text-ink transition hover:border-teal/45 hover:text-teal focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-teal"
+                      className="button-pill min-h-10 px-4 text-[13px]"
                     >
                       Read article
                     </a>

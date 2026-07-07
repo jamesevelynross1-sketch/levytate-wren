@@ -528,10 +528,10 @@ export default function ScorecardPage() {
               Use the Employer Apprenticeship Opportunity Scorecard to understand how well your organisation is using apprenticeship funding, where capability gaps may exist and what your next strategic move could be.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <a href="#scorecard" className="inline-flex min-h-11 items-center justify-center rounded-full bg-cream px-5 text-center text-[12px] font-semibold uppercase tracking-[0.1em] text-ink transition hover:bg-white">
+              <a href="#scorecard" className="button-pill">
                 Start the 3-minute assessment
               </a>
-              <a href="#scorecard" className="inline-flex min-h-11 items-center justify-center rounded-full border border-cream/24 px-5 text-center text-[12px] font-semibold uppercase tracking-[0.1em] text-cream transition hover:bg-cream/10">
+              <a href="#scorecard" className="button-pill">
                 Receive your score and employer briefing
               </a>
             </div>
@@ -710,6 +710,12 @@ export default function ScorecardPage() {
                     <p className="mt-4 text-base leading-7 text-ink/68">
                       Based on your answers, the most useful next step may be {supportRoute}.
                     </p>
+                    <p className="mt-4 text-base leading-7 text-ink/68">
+                      Based on your priorities, MPR Consulting can explore
+                      relevant apprenticeship pathways from a trusted provider
+                      network delivering more than 130 apprenticeship
+                      programmes.
+                    </p>
                     <div className="mt-5 grid gap-3 text-sm leading-6 text-ink/64">
                       {[
                         "reviewing provider options",
@@ -738,13 +744,13 @@ export default function ScorecardPage() {
                   </p>
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row lg:flex-col xl:flex-row">
-                  <a href="mailto:james@mprconsulting.co.uk?subject=Employer%20Apprenticeship%20Strategy%20Conversation" className="inline-flex min-h-11 items-center justify-center rounded-full bg-cream px-5 text-center text-[12px] font-semibold uppercase tracking-[0.1em] text-ink transition hover:bg-white">
+                  <a href="mailto:james@mprconsulting.co.uk?subject=Employer%20Apprenticeship%20Strategy%20Conversation" className="button-pill">
                     Book a Strategy Conversation
                   </a>
-                  <Link href="/insights" className="inline-flex min-h-11 items-center justify-center rounded-full border border-cream/24 px-5 text-center text-[12px] font-semibold uppercase tracking-[0.1em] text-cream transition hover:bg-cream/10">
+                  <Link href="/insights" className="button-pill">
                     Receive My Full Summary &amp; Employer Briefing
                   </Link>
-                  <Link href="/services" className="inline-flex min-h-11 items-center justify-center rounded-full border border-cream/24 px-5 text-center text-[12px] font-semibold uppercase tracking-[0.1em] text-cream transition hover:bg-cream/10">
+                  <Link href="/services" className="button-pill">
                     Explore Advisory Services
                   </Link>
                 </div>
@@ -860,7 +866,7 @@ export default function ScorecardPage() {
                     <p className="text-xs leading-5 text-ink/50">
                       We will use your details only for this scorecard follow-up and relevant employer guidance. You can unsubscribe from the briefing at any time.
                     </p>
-                    <button type="submit" disabled={isSubmitting} className="inline-flex min-h-11 items-center justify-center rounded-full bg-ink px-5 text-[12px] font-semibold uppercase tracking-[0.1em] text-cream transition hover:bg-forest disabled:cursor-not-allowed disabled:opacity-60">
+                    <button type="submit" disabled={isSubmitting} className="button-pill button-pill--primary disabled:opacity-100">
                       {isSubmitting ? "Preparing scorecard..." : "View my scorecard"}
                     </button>
                   </form>
@@ -874,10 +880,10 @@ export default function ScorecardPage() {
 
                 {step < 5 ? (
                   <div className="mt-8 flex flex-col gap-3 border-t border-ink/10 pt-6 sm:flex-row sm:items-center sm:justify-between">
-                    <button type="button" onClick={goBack} disabled={step === 0} className="inline-flex min-h-11 items-center justify-center rounded-full border border-ink/14 px-5 text-[12px] font-semibold uppercase tracking-[0.1em] text-ink transition hover:bg-cream disabled:cursor-not-allowed disabled:opacity-40">
+                    <button type="button" onClick={goBack} disabled={step === 0} className="button-pill disabled:opacity-100">
                       Previous
                     </button>
-                    <button type="button" onClick={goNext} className="inline-flex min-h-11 items-center justify-center rounded-full bg-ink px-5 text-[12px] font-semibold uppercase tracking-[0.1em] text-cream transition hover:bg-forest">
+                    <button type="button" onClick={goNext} className="button-pill button-pill--primary">
                       {step === 4 ? "Continue to score" : "Next"}
                     </button>
                   </div>

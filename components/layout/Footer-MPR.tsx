@@ -34,8 +34,8 @@ export function Footer() {
             funding, provider choice and workforce development to work harder.
           </p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <a href={ENQUIRY_MAILTO} className="inline-flex rounded-full bg-cream px-5 py-3 text-[12px] font-semibold uppercase tracking-[0.1em] text-ink">
-              Book a Strategy Call
+            <a href={ENQUIRY_MAILTO} className="button-pill">
+              Book a Conversation
             </a>
             <a href={`mailto:${ENQUIRY_EMAIL}`} className="text-sm text-cream/78 hover:text-cream">
               {ENQUIRY_EMAIL}

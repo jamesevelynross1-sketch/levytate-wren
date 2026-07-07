@@ -79,7 +79,7 @@ export function UnsubscribeForm({ initialEmail = "", token = "" }: UnsubscribeFo
         <button
           type="submit"
           disabled={state === "loading"}
-          className="inline-flex min-h-11 items-center justify-center rounded-full bg-ink px-6 text-[13px] font-semibold text-cream shadow-[0_14px_28px_rgba(15,37,39,0.12)] transition hover:-translate-y-0.5 hover:bg-forest focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-teal disabled:cursor-not-allowed disabled:opacity-65"
+          className="button-pill button-pill--primary disabled:opacity-100"
         >
           {state === "loading" ? "Updating..." : "Unsubscribe"}
         </button>

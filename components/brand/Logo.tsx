@@ -1,69 +1,44 @@
 import Image from "next/image";
 
 type LogoProps = {
-  variant?: "primary" | "reversed" | "dark";
+  variant?: "light" | "dark" | "primary" | "reversed";
   placement?: "header" | "footer";
   priority?: boolean;
+  className?: string;
 };
 
-const placementStyles = {
-  header: "w-[170px] sm:w-[190px] lg:w-[220px]",
-  footer: "w-[150px] sm:w-[170px]",
-};
+export function Logo({ variant = "light", placement = "header", priority = true, className = "" }: LogoProps) {
+  const isDark = variant === "dark" || variant === "reversed";
 
-const darkLockupStyles = {
-  header: {
-    wrap: "gap-3",
-    icon: "w-[58px] sm:w-[64px] lg:w-[74px]",
-    mpr: "text-[2.25rem] sm:text-[2.55rem] lg:text-[3rem]",
-    consulting: "text-[1.35rem] sm:text-[1.5rem] lg:text-[1.75rem]",
-  },
-  footer: {
-    wrap: "gap-2",
-    icon: "w-[44px] sm:w-[50px]",
-    mpr: "text-[1.7rem] sm:text-[1.95rem]",
-    consulting: "text-[1.02rem] sm:text-[1.16rem]",
-  },
-};
-
-export function Logo({
-  variant = "primary",
-  placement = "header",
-  priority = false,
-}: LogoProps) {
-  if (variant === "reversed" || variant === "dark") {
-    const styles = darkLockupStyles[placement];
-
+  if (isDark) {
     return (
-      <span className={`inline-flex items-center ${styles.wrap}`} aria-label="MPR Consulting">
+      <div
+        className={`inline-flex items-center rounded-lg border border-cream/70 bg-cream px-3.5 py-2 shadow-[0_12px_28px_rgba(0,0,0,0.13)] ${className}`}
+      >
         <Image
-          src="/mpr-consulting-icon-transparent.png"
-          alt=""
-          width={178}
+          src="/brand/mpr-consulting-logo-original.png"
+          alt="MPR Consulting"
+          width={511}
           height={232}
           priority={priority}
-          className={`h-auto shrink-0 ${styles.icon}`}
+        className={`h-auto ${placement === "footer" ? "w-[150px] md:w-[168px]" : "w-[128px] md:w-[142px]"}`}
         />
-        <span className="flex flex-col leading-none text-cream">
-          <span className={`${styles.mpr} font-extrabold tracking-normal`}>
-            MPR
-          </span>
-          <span className={`${styles.consulting} -mt-0.5 font-bold tracking-normal`}>
-            Consulting
-          </span>
-        </span>
-      </span>
+      </div>
     );
   }
 
   return (
-    <Image
-      src="/mpr-consulting-logo-transparent.png"
-      alt="MPR Consulting"
-      width={512}
-      height={232}
-      priority={priority}
-      className={`h-auto ${placementStyles[placement]}`}
-    />
+    <div
+      className={`inline-flex items-center rounded-md border border-ink/[0.08] bg-cream px-2.5 py-1.5 shadow-[0_8px_18px_rgba(15,37,39,0.045)] ${className}`}
+    >
+      <Image
+        src="/brand/mpr-consulting-logo-original.png"
+        alt="MPR Consulting"
+        width={511}
+        height={232}
+        priority={priority}
+        className={`h-auto ${placement === "footer" ? "w-[150px] md:w-[170px]" : "w-[132px] md:w-[146px]"}`}
+      />
+    </div>
   );
 }

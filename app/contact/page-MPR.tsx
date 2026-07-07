@@ -66,7 +66,7 @@ export default function ContactPage() {
             Message
             <textarea name="Message" rows={7} className="rounded-xl border border-ink/12 bg-cream p-3 text-sm font-normal" required />
           </label>
-          <button className="mt-5 rounded-full bg-ink px-5 py-3 text-[12px] font-semibold uppercase tracking-[0.1em] text-cream transition hover:bg-forest">
+          <button className="button-pill button-pill--primary mt-5">
             Send enquiry
           </button>
           <p className="mt-4 text-sm leading-6 text-ink/54">

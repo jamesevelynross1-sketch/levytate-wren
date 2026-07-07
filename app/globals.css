@@ -2,20 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
-@font-face {
-  font-family: "Cherry Bomb One";
-  src: url("/fonts/cherry-bomb-one-latin.woff2") format("woff2");
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-}
-
 :root {
   color-scheme: light;
   background: #f7f2e8;
   color: #0f2527;
-  --font-heading: "Satoshi", "Inter", "Aptos Display", "Segoe UI", Arial, sans-serif;
-  --font-body: "Inter", "Aptos", "Segoe UI", Arial, sans-serif;
+  --ink: #0f2527;
+  --forest: #15392f;
+  --teal: #2c8c83;
+  --cream: #f7f2e8;
+  --parchment: #eee4d4;
+  --brass: #b89561;
 }
 
 * {
@@ -30,21 +26,15 @@ body {
   margin: 0;
   min-height: 100vh;
   background:
-    radial-gradient(circle at top left, rgba(44, 140, 131, 0.12), transparent 32rem),
+    radial-gradient(circle at top left, rgba(44, 140, 131, 0.09), transparent 34rem),
     linear-gradient(180deg, #f8f3ea 0%, #f3ebdf 100%);
   color: #0f2527;
-  font-feature-settings: "kern";
-  font-family: var(--font-body);
-  font-weight: 400;
+  font-feature-settings: "kern", "liga", "calt";
+  font-synthesis-weight: none;
+  letter-spacing: 0;
   line-height: 1.5;
-  letter-spacing: 0;
-}
-
-h1,
-h2,
-h3 {
-  font-family: var(--font-heading);
-  letter-spacing: 0;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
 }
 
 button,
@@ -80,30 +70,288 @@ a {
   font-family: var(--font-serif, "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif);
   font-weight: 500;
   letter-spacing: 0;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
 }
 
-.levytate-wordmark {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.06em;
-  font-family: "Cherry Bomb One", Arial, Helvetica, sans-serif;
-  font-size: clamp(2.25rem, 4vw, 3.1rem);
-  line-height: 0.78;
-  letter-spacing: -0.05em;
-  text-shadow: 2px 2px 0 #17325c;
-  white-space: nowrap;
+.premium-card {
+  border: 1px solid rgba(15, 37, 39, 0.08);
+  background: rgba(255, 255, 255, 0.32);
+  box-shadow: 0 14px 36px rgba(15, 37, 39, 0.035);
 }
 
-.levytate-wordmark span:first-child {
-  color: #c7f0e4;
+.reveal-up {
+  animation: reveal-up 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.levytate-wordmark span:last-child {
-  color: #ff8e95;
+.reveal-delay-1 {
+  animation-delay: 90ms;
+}
+
+.reveal-delay-2 {
+  animation-delay: 180ms;
+}
+
+.hero-atmosphere {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transform: translateZ(0);
+}
+
+.hero-atmosphere__wash {
+  position: absolute;
+  inset: -24%;
+  background:
+    radial-gradient(circle at 72% 24%, rgba(44, 140, 131, 0.18), transparent 28rem),
+    radial-gradient(circle at 18% 82%, rgba(247, 242, 232, 0.09), transparent 24rem);
+  opacity: 0.82;
+  animation: atmosphere-drift 28s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+.hero-atmosphere__grid {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  width: 100%;
+  opacity: 0.78;
+}
+
+.hero-atmosphere__mesh path {
+  fill: none;
+  stroke: rgba(247, 242, 232, 0.055);
+  stroke-width: 1;
+}
+
+.hero-atmosphere__mesh {
+  animation: mesh-breathe 18s ease-in-out infinite alternate;
+  transform-origin: center;
+  will-change: opacity, transform;
+}
+
+.hero-atmosphere__signals path {
+  fill: none;
+  stroke: url("#signalLine");
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-dasharray: 320 760;
+  animation: signal-flow 22s linear infinite;
+  will-change: stroke-dashoffset, opacity;
+}
+
+.hero-atmosphere__signals path:nth-child(2) {
+  animation-duration: 28s;
+  animation-delay: -8s;
+  opacity: 0.68;
+}
+
+.hero-atmosphere__signals path:nth-child(3) {
+  animation-duration: 34s;
+  animation-delay: -14s;
+  opacity: 0.48;
+}
+
+@keyframes reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes atmosphere-drift {
+  from {
+    transform: translate3d(-1.5%, 0, 0) scale(1);
+  }
+
+  to {
+    transform: translate3d(1.5%, -1%, 0) scale(1.035);
+  }
+}
+
+@keyframes mesh-breathe {
+  from {
+    opacity: 0.48;
+    transform: scale(1);
+  }
+
+  to {
+    opacity: 0.78;
+    transform: scale(1.012);
+  }
+}
+
+@keyframes signal-flow {
+  from {
+    stroke-dashoffset: 0;
+  }
+
+  to {
+    stroke-dashoffset: -1080;
+  }
 }
 
 @layer components {
   .input-field {
     @apply w-full rounded-2xl border border-[rgba(12,48,42,0.14)] bg-white/70 px-4 py-3 text-sm font-medium text-[var(--ink)] shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] outline-none transition placeholder:text-[rgba(15,37,39,0.38)] focus:border-[var(--teal)] focus:ring-4 focus:ring-[rgba(52,116,103,0.12)];
+  }
+
+  .button-pill {
+    display: inline-flex;
+    min-height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 9999px;
+    border: 1px solid rgba(6, 26, 31, 0.18);
+    background: #fbf7ef;
+    color: #061a1f;
+    padding: 0.75rem 1.35rem;
+    text-align: center;
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    box-shadow: 0 12px 26px rgba(15, 37, 39, 0.08);
+    transition:
+      background-color 180ms ease,
+      border-color 180ms ease,
+      color 180ms ease,
+      box-shadow 180ms ease,
+      transform 180ms ease;
+  }
+
+  .button-pill:hover {
+    border-color: rgba(44, 140, 131, 0.55);
+    background: #ffffff;
+    color: #061a1f;
+    transform: translateY(-1px);
+  }
+
+  .button-pill:focus-visible {
+    outline: 2px solid #2c8c83;
+    outline-offset: 4px;
+  }
+
+  .button-pill:disabled,
+  .button-pill[aria-disabled="true"] {
+    cursor: not-allowed;
+    border-color: rgba(6, 26, 31, 0.16);
+    background: #eee4d4;
+    color: rgba(6, 26, 31, 0.62);
+    box-shadow: none;
+    transform: none;
+  }
+
+  .button-pill--primary {
+    border-color: #0f2527;
+    background: #0f2527;
+    color: #f7f2e8;
+  }
+
+  .button-pill--primary:hover {
+    border-color: #15392f;
+    background: #15392f;
+    color: #ffffff;
+  }
+
+  .button-pill--emerald {
+    border-color: #15392f;
+    background: #15392f;
+    color: #f7f2e8;
+  }
+
+  .button-pill--emerald:hover {
+    border-color: #2c8c83;
+    background: #0f2527;
+    color: #ffffff;
+  }
+
+  .button-pill--quiet {
+    box-shadow: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
+  .hero-atmosphere__wash,
+  .hero-atmosphere__mesh,
+  .hero-atmosphere__signals path {
+    animation: none !important;
+  }
+}
+
+@media print {
+  @page {
+    margin: 18mm;
+    size: A4;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    color: #0f2527 !important;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  .opportunity-review-report,
+  .opportunity-review-report * {
+    visibility: visible !important;
+  }
+
+  .opportunity-review-report {
+    position: absolute !important;
+    inset: 0 auto auto 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    background: #ffffff !important;
+    color: #0f2527 !important;
+  }
+
+  .opportunity-review-report section,
+  .opportunity-review-report > div > div {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    background: #ffffff !important;
+    border-color: #d8d0c5 !important;
+    box-shadow: none !important;
+  }
+
+  .opportunity-review-report h1,
+  .opportunity-review-report h2,
+  .opportunity-review-report h3,
+  .opportunity-review-report h4,
+  .opportunity-review-report h5,
+  .opportunity-review-report p {
+    color: #0f2527 !important;
+  }
+
+  .opportunity-review-report p {
+    font-size: 11pt !important;
+    line-height: 1.6 !important;
+  }
+
+  .opportunity-review-report a,
+  .opportunity-review-report button,
+  .opportunity-review-report .print-hidden {
+    display: none !important;
   }
 }

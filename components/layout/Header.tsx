@@ -1,45 +1,79 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 import { Logo } from "@/components/brand/Logo";
-import { ButtonLink } from "@/components/ui/ButtonLink";
 import { ENQUIRY_MAILTO } from "@/lib/contact";
 
 const navItems = [
   { href: "/", label: "Home" },
-  { href: "/services", label: "Services" },
-  { href: "/about", label: "About" },
+  { href: "/framework", label: "Framework" },
+  { href: "/levy-health-check", label: "Levy Health Check" },
+  { href: "/provider-matching", label: "Provider Matching" },
+  { href: "/neet-on-our-watch", label: "NEET On Our Watch" },
   { href: "/insights", label: "Insights" },
   { href: "/contact", label: "Contact" },
 ];
 
 export function Header() {
+  const [open, setOpen] = useState(false);
+
   return (
-    <header className="sticky top-0 z-50 border-b border-ink/10 bg-cream shadow-[0_10px_30px_rgba(15,37,39,0.045)]">
-      <div className="container-px mx-auto flex max-w-7xl items-center justify-between gap-5 py-3.5">
-        <Link
-          href="/"
-          className="flex shrink-0 items-center rounded-xl border border-ink/10 bg-cream px-3 py-2 shadow-[0_10px_24px_rgba(15,37,39,0.06)]"
-        >
-          <Logo priority />
+    <header className="container-px sticky top-0 z-40 border-b border-ink/[0.08] bg-cream shadow-[0_8px_24px_rgba(15,37,39,0.035)]">
+      <div className="mx-auto flex min-h-[72px] max-w-7xl items-center justify-between gap-5 py-2">
+        <Link href="/" aria-label="MPR Consulting home" onClick={() => setOpen(false)}>
+          <Logo />
         </Link>
 
-        <nav className="hidden items-center gap-7 text-[13px] font-semibold text-ink/70 lg:flex">
+        <nav className="hidden items-center gap-4 text-[13px] font-bold uppercase leading-none tracking-[0.09em] text-ink/68 xl:flex">
           {navItems.map((item) => (
-            <Link key={item.href} href={item.href} className="transition hover:text-ink">
+            <Link key={item.href} href={item.href} className="whitespace-nowrap transition duration-300 hover:text-ink">
               {item.label}
             </Link>
           ))}
         </nav>
 
-        <div className="hidden lg:block">
-          <ButtonLink href={ENQUIRY_MAILTO}>Book a conversation</ButtonLink>
+        <div className="flex items-center gap-3">
+          <a
+            href={ENQUIRY_MAILTO}
+            className="button-pill button-pill--primary hidden min-h-9 px-4 text-[10px] lg:inline-flex"
+          >
+            Book a Conversation
+          </a>
+          <button
+            type="button"
+            onClick={() => setOpen((value) => !value)}
+            className="button-pill inline-flex min-h-9 px-4 text-[10px] xl:hidden"
+            aria-expanded={open}
+            aria-controls="mobile-navigation"
+          >
+            Menu
+          </button>
         </div>
-        <Link
-          href="/contact"
-          className="inline-flex min-h-10 items-center rounded-full border border-ink/15 px-4 text-sm font-semibold text-ink lg:hidden"
-        >
-          Contact
-        </Link>
       </div>
+
+      {open && (
+        <div id="mobile-navigation" className="mx-auto max-w-7xl border-t border-ink/10 py-4 xl:hidden">
+          <nav className="grid gap-2 text-[13px] font-semibold uppercase tracking-[0.1em] text-ink/72">
+            {navItems.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setOpen(false)}
+                className="rounded-xl px-3 py-3 transition hover:bg-white/45 hover:text-ink"
+              >
+                {item.label}
+              </Link>
+            ))}
+            <a
+              href={ENQUIRY_MAILTO}
+              className="button-pill button-pill--primary mt-2"
+            >
+              Book a Conversation
+            </a>
+          </nav>
+        </div>
+      )}
     </header>
   );
 }
