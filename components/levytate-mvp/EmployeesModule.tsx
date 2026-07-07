@@ -13,9 +13,6 @@ import {
   MvpToolbar,
   StatusBadge,
   TableAction,
-  TableBody,
-  TableHead,
-  TableShell,
 } from "@/components/levytate-mvp/MvpUi";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { includesSearch, statusTone } from "@/components/levytate-mvp/module-utils";
@@ -155,77 +152,84 @@ export function EmployeesModule({ onStartDiscovery }: { onStartDiscovery?: (empl
         actionLabel="Add employee"
         onAction={() => openEmployee()}
         filters={
-          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             <select value={status} onChange={(event) => setStatus(event.target.value)} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-sm font-semibold text-[#102c3d]/66"><option>Active</option><option>Archived</option><option>All</option></select>
             <select value={departmentFilter} onChange={(event) => setDepartmentFilter(event.target.value)} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-sm font-semibold text-[#102c3d]/66"><option>All</option>{departments.map((department) => <option key={department}>{department}</option>)}</select>
-            <select value={managerFilter} onChange={(event) => setManagerFilter(event.target.value)} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-sm font-semibold text-[#102c3d]/66"><option>All</option>{managers.map((manager) => <option key={manager.id} value={manager.id}>{manager.name}</option>)}</select>
-            <select value={siteFilter} onChange={(event) => setSiteFilter(event.target.value)} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-sm font-semibold text-[#102c3d]/66"><option>All</option>{sites.map((site) => <option key={site}>{site}</option>)}</select>
-            <select value={applicationFilter} onChange={(event) => setApplicationFilter(event.target.value)} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-sm font-semibold text-[#102c3d]/66"><option>All</option>{applicationStatuses.map((statusOption) => <option key={statusOption}>{statusOption}</option>)}</select>
+            <details className="group rounded-lg border border-[#102c3d]/[0.09] bg-white">
+              <summary className="flex h-10 cursor-pointer list-none items-center justify-between gap-2 px-3 text-sm font-semibold text-[#102c3d]/66">
+                More filters
+                <ChevronDown size={15} className="transition group-open:rotate-180" aria-hidden="true" />
+              </summary>
+              <div className="grid gap-2 border-t border-[#102c3d]/[0.06] p-2">
+                <select value={managerFilter} onChange={(event) => setManagerFilter(event.target.value)} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-sm font-semibold text-[#102c3d]/66"><option value="All">All managers</option>{managers.map((manager) => <option key={manager.id} value={manager.id}>{manager.name}</option>)}</select>
+                <select value={siteFilter} onChange={(event) => setSiteFilter(event.target.value)} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-sm font-semibold text-[#102c3d]/66"><option value="All">All sites</option>{sites.map((site) => <option key={site}>{site}</option>)}</select>
+                <select value={applicationFilter} onChange={(event) => setApplicationFilter(event.target.value)} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-sm font-semibold text-[#102c3d]/66"><option value="All">All applications</option>{applicationStatuses.map((statusOption) => <option key={statusOption}>{statusOption}</option>)}</select>
+              </div>
+            </details>
           </div>
         }
       />
 
       {visible.length ? (
-        <TableShell>
-          <TableHead>
-            <tr>
-              <th className="px-4 py-3">Employee</th>
-              <th className="px-4 py-3">Role</th>
-              <th className="px-4 py-3">Manager</th>
-              <th className="px-4 py-3">Department</th>
-              <th className="px-4 py-3">Application</th>
-              <th className="px-4 py-3 text-right">Actions</th>
-            </tr>
-          </TableHead>
-          <TableBody>
-            {visible.map((employee) => {
-              const role = data.roles.find((item) => item.id === employee.roleId);
-              const application = employeeCurrentApplication(data, employee.id);
-              const profile = data.employeeDevelopmentProfiles.find((item) => item.employeeId === employee.id);
-              const recommendation = employeeRecommendedPathway(data, employee.id);
+        <div className="grid gap-4 xl:grid-cols-2">
+          {visible.map((employee) => {
+            const role = data.roles.find((item) => item.id === employee.roleId);
+            const application = employeeCurrentApplication(data, employee.id);
+            const profile = data.employeeDevelopmentProfiles.find((item) => item.employeeId === employee.id);
+            const recommendation = employeeRecommendedPathway(data, employee.id);
+            const statusLabel = recommendation
+              ? "Recommendation ready"
+              : profile
+                ? "Discovery in progress"
+                : "Needs discovery";
+            const primaryAction = application
+              ? "Review"
+              : recommendation
+                ? "Continue"
+                : "Start AI";
 
-              return (
-                <tr key={employee.id}>
-                  <td className="px-4 py-3">
-                    <p className="font-semibold">{employee.name}</p>
-                    <p className="mt-0.5 text-xs text-[#102c3d]/48">{employee.email || employee.employeeNumber}</p>
-                  </td>
-                  <td className="px-4 py-3">
-                    <p className="text-[#102c3d]/68">{employee.jobTitle || role?.title || "Not set"}</p>
-                    <p className="mt-0.5 text-xs text-[#102c3d]/42">
-                      {recommendation
-                        ? `${recommendation.title} (${recommendation.fitScore}% fit)`
-                        : profile
-                          ? "Discovery in progress"
-                          : "No recommendation yet"}
-                    </p>
-                  </td>
-                  <td className="px-4 py-3 text-[#102c3d]/62">{managerName(data, employee)}</td>
-                  <td className="px-4 py-3 text-[#102c3d]/62">{employee.department || "Not set"}</td>
-                  <td className="px-4 py-3">
-                    <StatusBadge tone={application ? statusTone(application.status) : "neutral"}>
-                      {application?.status ?? "No active application"}
-                    </StatusBadge>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex justify-end gap-2">
-                      <TableAction onClick={() => setSelectedEmployeeId(employee.id)}>View record</TableAction>
-                      <TableAction onClick={() => onStartDiscovery?.(employee.id)}>Ask AI</TableAction>
-                      <TableAction onClick={() => openEmployee(employee)}>Edit</TableAction>
-                      <TableAction onClick={() => archiveEmployee(employee.id)} danger={employee.status === "Active"}>
-                        {employee.status === "Archived" ? "Restore" : "Archive"}
-                      </TableAction>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </TableBody>
-        </TableShell>
+            return (
+              <article key={employee.id} className="rounded-2xl border border-[#102c3d]/[0.07] bg-white p-4 shadow-[0_14px_32px_rgba(16,44,61,0.04)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_42px_rgba(16,44,61,0.07)]">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="truncate text-base font-semibold text-[#102c3d]">{employee.name}</p>
+                    <p className="mt-1 text-sm leading-6 text-[#102c3d]/58">{employee.jobTitle || role?.title || "Role to confirm"}</p>
+                  </div>
+                  <StatusBadge tone={application ? statusTone(application.status) : recommendation ? "green" : profile ? "yellow" : "neutral"}>
+                    {application?.status ?? statusLabel}
+                  </StatusBadge>
+                </div>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <DecisionFact label="Manager" value={managerName(data, employee)} />
+                  <DecisionFact label="Team" value={employee.department || "Department to confirm"} />
+                  <DecisionFact label="Development status" value={statusLabel} />
+                  <DecisionFact label="AI confidence" value={recommendation ? "High" : profile ? "Building" : "Not started"} />
+                </div>
+
+                {recommendation ? (
+                  <div className="mt-4 rounded-xl bg-[#f8fbfa] px-4 py-3 ring-1 ring-[#102c3d]/[0.055]">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">Leading route</p>
+                    <p className="mt-1 text-sm font-semibold text-[#102c3d]">{recommendation.title}</p>
+                  </div>
+                ) : null}
+
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#102c3d]/[0.06] pt-4">
+                  <button type="button" onClick={() => application ? setSelectedEmployeeId(employee.id) : onStartDiscovery?.(employee.id)} className="rounded-full bg-[#102c3d] px-4 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5">
+                    {primaryAction}
+                  </button>
+                  <button type="button" onClick={() => setSelectedEmployeeId(employee.id)} className="rounded-full bg-[#f5f7f3] px-4 py-2 text-xs font-semibold text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.07] transition hover:text-[#102c3d]">
+                    Details
+                  </button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
       ) : (
         <EmptyState
-          title="No employees yet"
-          copy="Create an employee record and LevyTate will turn it into a living apprenticeship record."
+          title="Add the first employee"
+          copy="Create one record. LevyTate will guide discovery and recommend the next development route."
           actionLabel="Add employee"
           onAction={() => openEmployee()}
         />
@@ -276,6 +280,16 @@ export function EmployeesModule({ onStartDiscovery }: { onStartDiscovery?: (empl
 
       {selectedEmployee ? (
         <MvpModal title={selectedEmployee.name} eyebrow="Employee apprenticeship record" onClose={() => setSelectedEmployeeId(null)} wide>
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[#f8fbfa] px-4 py-3 ring-1 ring-[#102c3d]/[0.055]">
+            <p className="text-sm leading-6 text-[#102c3d]/58">Keep the record simple. Use AI for discovery, then open details only when needed.</p>
+            <div className="flex flex-wrap gap-2">
+              <TableAction onClick={() => onStartDiscovery?.(selectedEmployee.id)}>Ask AI</TableAction>
+              <TableAction onClick={() => openEmployee(selectedEmployee)}>Edit</TableAction>
+              <TableAction onClick={() => archiveEmployee(selectedEmployee.id)} danger={selectedEmployee.status === "Active"}>
+                {selectedEmployee.status === "Archived" ? "Restore" : "Archive"}
+              </TableAction>
+            </div>
+          </div>
           <div className="grid gap-5 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
             <div className="space-y-4 rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4">
               <section>
@@ -384,6 +398,15 @@ export function EmployeesModule({ onStartDiscovery }: { onStartDiscovery?: (empl
         </MvpModal>
       ) : null}
     </MvpPanel>
+  );
+}
+
+function DecisionFact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl bg-[#f8fbfa] px-3.5 py-3 ring-1 ring-[#102c3d]/[0.055]">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#102c3d]/38">{label}</p>
+      <p className="mt-1 truncate text-sm font-semibold text-[#102c3d]/72">{value}</p>
+    </div>
   );
 }
 

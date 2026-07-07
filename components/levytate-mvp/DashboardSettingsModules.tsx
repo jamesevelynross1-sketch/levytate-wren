@@ -1,16 +1,12 @@
 "use client";
 
-import { BellRing, Building2, Check, ChevronDown, Sparkles, Target, Users } from "lucide-react";
+import { Check, ChevronDown, Target } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
-import { FormField, FormGrid, MvpPanel, StatusBadge, TableAction } from "@/components/levytate-mvp/MvpUi";
+import { FormField, FormGrid, MvpPanel, StatusBadge } from "@/components/levytate-mvp/MvpUi";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import {
   buildNotifications,
-  employeeName,
-  employerWorkspaceSummary,
-  managerName,
   providerCoverageSummary,
-  recentRecommendations,
   upcomingEnrolments,
   employeesNeedingSupport,
 } from "@/lib/levytate/mvp/workspace-insights";
@@ -31,12 +27,18 @@ const importanceOptions: Array<{ value: MvpEmployerPriorityImportance; copy: str
 
 export function DashboardModule({ onNavigate }: { onNavigate: (module: string) => void }) {
   const { data } = useMvpWorkspace();
-  const summary = employerWorkspaceSummary(data);
   const notifications = buildNotifications(data);
-  const recommendations = recentRecommendations(data);
   const support = employeesNeedingSupport(data);
   const enrolments = upcomingEnrolments(data);
   const providerCoverage = providerCoverageSummary(data);
+  const providerIssues = providerCoverage.missing.slice(0, 3);
+  const primaryAction = notifications[0]
+    ? { label: "Review urgent work", target: notifications[0].module }
+    : support[0]
+      ? { label: "Continue employee discovery", target: "Employees" }
+      : providerIssues[0]
+        ? { label: "Improve provider coverage", target: "Provider Relationships" }
+        : { label: "Ask LevyTate AI", target: "Ask LevyTate AI" };
 
   if (!data.profile.priorities.length) {
     return <EmployerPrioritiesSetup />;
@@ -45,32 +47,23 @@ export function DashboardModule({ onNavigate }: { onNavigate: (module: string) =
   return (
     <div className="grid gap-5">
       <section className="rounded-[1.25rem] border border-[#102c3d]/[0.07] bg-[#102c3d] p-5 text-white shadow-[0_20px_55px_rgba(16,44,61,0.12)] sm:p-6">
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
           <div className="max-w-2xl">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8fe0d2]">Employer workspace</p>
-            <h2 className="mt-2 text-2xl font-semibold">What needs attention today</h2>
-            <p className="mt-2 text-sm leading-6 text-white/62">LevyTate is now organised around workforce records, approval workflow, provider relationships and operational reporting.</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8fe0d2]">Today</p>
+            <h2 className="mt-2 text-2xl font-semibold">What needs attention?</h2>
+            <p className="mt-2 text-sm leading-6 text-white/62">A short operating briefing. Open the next decision, then let LevyTate handle the detail.</p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => onNavigate("Employees")} className="h-11 rounded-full bg-[#ffde59] px-5 text-sm font-semibold text-[#102c3d] transition hover:-translate-y-0.5">Add employee</button>
-            <button type="button" onClick={() => onNavigate("Applications")} className="h-11 rounded-full bg-white/10 px-5 text-sm font-semibold text-white ring-1 ring-white/10">Review workflow</button>
-          </div>
-        </div>
-        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-6">
-          <SummaryCard icon={Building2} label="Sites" value={summary.sites} />
-          <SummaryCard icon={Users} label="Employees" value={summary.employees} />
-          <SummaryCard icon={Users} label="Managers" value={summary.managers} />
-          <SummaryCard icon={BellRing} label="Awaiting approval" value={summary.applicationsAwaitingApproval} />
-          <SummaryCard icon={Sparkles} label="Provider partners" value={summary.providerPartners} />
-          <SummaryCard icon={Target} label="Departments" value={summary.departments} />
+          <button type="button" onClick={() => onNavigate(primaryAction.target)} className="h-11 self-start rounded-full bg-[#ffde59] px-5 text-sm font-semibold text-[#102c3d] transition hover:-translate-y-0.5 xl:self-center">
+            {primaryAction.label}
+          </button>
         </div>
       </section>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.85fr)]">
-        <MvpPanel title="Applications awaiting approval" eyebrow="Today">
+      <div className="grid gap-5 xl:grid-cols-3">
+        <MvpPanel title="Urgent approvals" eyebrow="Decision">
           {notifications.length ? (
             <div className="grid gap-3">
-              {notifications.map((notification) => (
+              {notifications.slice(0, 4).map((notification) => (
                 <button key={notification.id} type="button" onClick={() => onNavigate(notification.module)} className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] px-4 py-3 text-left transition hover:border-[#159b8f]/18 hover:bg-white">
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -83,73 +76,30 @@ export function DashboardModule({ onNavigate }: { onNavigate: (module: string) =
               ))}
             </div>
           ) : (
-            <p className="text-sm leading-6 text-[#102c3d]/56">Nothing urgent is waiting for approval right now. Use the reports workspace to check readiness, enrolments, and provider coverage.</p>
+            <p className="text-sm leading-6 text-[#102c3d]/56">Nothing urgent is waiting. Ask LevyTate AI if you want to plan the next development move.</p>
           )}
         </MvpPanel>
 
-        <MvpPanel title="Recommended next actions" eyebrow="Operational focus">
+        <MvpPanel title="Employees requiring attention" eyebrow="People">
           <div className="grid gap-3">
-            <ActionCard title="Support employee discovery" copy={`${support.length} employee records still need role or future-capability context before recommendations are complete.`} cta="Open employees" onClick={() => onNavigate("Employees")} />
-            <ActionCard title="Protect provider continuity" copy={providerCoverage.missing.length ? `${providerCoverage.missing.length} partner categories still need a preferred provider relationship.` : "Provider partner coverage is in place across all core categories."} cta="Open provider relationships" onClick={() => onNavigate("Provider Relationships")} />
-            <ActionCard title="Move approved learners into starts" copy={enrolments.length ? `${enrolments.length} enrolment records are active and should be checked for dates, providers, and readiness.` : "No enrolments are currently in flight. The next milestone is turning approvals into starts."} cta="Open enrolments" onClick={() => onNavigate("Enrolments")} />
-          </div>
-        </MvpPanel>
-      </div>
-
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
-        <MvpPanel title="Employees needing support" eyebrow="People records">
-          <div className="grid gap-3">
-            {support.length ? support.map((employee) => (
-              <div key={employee.id} className="rounded-xl border border-[#102c3d]/[0.07] bg-white px-4 py-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-[#102c3d]">{employee.name}</p>
-                    <p className="mt-1 text-xs leading-5 text-[#102c3d]/54">{employee.jobTitle || "Role to confirm"} · {employee.department || "Department to confirm"} · {employee.site || "Site to confirm"}</p>
-                  </div>
-                  <TableAction onClick={() => onNavigate("Employees")}>Open</TableAction>
-                </div>
-              </div>
-            )) : <p className="text-sm leading-6 text-[#102c3d]/56">Every active employee has a role-linked profile and recommendation-ready record.</p>}
-          </div>
-        </MvpPanel>
-
-        <MvpPanel title="Recent AI recommendations" eyebrow="Ask LevyTate AI">
-          <div className="grid gap-3">
-            {recommendations.length ? recommendations.map(({ employee, recommendation }) => (
-              <div key={employee.id} className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] px-4 py-3">
+            {support.length ? support.slice(0, 4).map((employee) => (
+              <button key={employee.id} type="button" onClick={() => onNavigate("Employees")} className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] px-4 py-3 text-left transition hover:border-[#159b8f]/18 hover:bg-white">
                 <p className="text-sm font-semibold text-[#102c3d]">{employee.name}</p>
-                <p className="mt-1 text-xs leading-5 text-[#102c3d]/54">{recommendation.title} · {recommendation.fitScore}% fit</p>
-                <p className="mt-2 text-xs leading-5 text-[#102c3d]/56">{recommendation.rationale}</p>
-              </div>
-            )) : <p className="text-sm leading-6 text-[#102c3d]/56">Recommendations will appear here as employees complete guided discovery and role mapping.</p>}
+                <p className="mt-1 text-xs leading-5 text-[#102c3d]/54">{employee.jobTitle || "Role to confirm"} needs discovery context.</p>
+              </button>
+            )) : <p className="text-sm leading-6 text-[#102c3d]/56">Employee records look ready. New recommendations will appear as AI conversations progress.</p>}
+          </div>
+        </MvpPanel>
+
+        <MvpPanel title="Provider issues" eyebrow="Coverage">
+          <div className="grid gap-3">
+            {providerIssues.length ? providerIssues.map((issue) => (
+              <ActionCard key={issue} title={issue} copy="Preferred provider coverage is not complete for this category." cta="Resolve" onClick={() => onNavigate("Provider Relationships")} />
+            )) : <p className="text-sm leading-6 text-[#102c3d]/56">Provider coverage is in place for the current priority areas.</p>}
+            {enrolments.length ? <ActionCard title="Approved learners need handoff" copy={`${enrolments.length} enrolment record${enrolments.length === 1 ? "" : "s"} need dates, provider or learner readiness checked.`} cta="Open enrolments" onClick={() => onNavigate("Enrolments")} /> : null}
           </div>
         </MvpPanel>
       </div>
-
-      <MvpPanel title="Upcoming enrolments" eyebrow="Starts">
-        <div className="grid gap-3 lg:grid-cols-3">
-          {enrolments.length ? enrolments.map((enrolment) => (
-            <div key={enrolment.id} className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] px-4 py-3">
-              <p className="text-sm font-semibold text-[#102c3d]">{employeeName(data, enrolment.employeeId)}</p>
-              <p className="mt-1 text-xs leading-5 text-[#102c3d]/54">{enrolment.startDate || "Start date to confirm"}</p>
-              <p className="mt-2 text-xs leading-5 text-[#102c3d]/56">{managerName(data, data.employees.find((employee) => employee.id === enrolment.employeeId) ?? data.employees[0])}</p>
-              <div className="mt-3"><StatusBadge tone={enrolment.status === "Live learner" ? "green" : "yellow"}>{enrolment.status}</StatusBadge></div>
-            </div>
-          )) : <p className="text-sm leading-6 text-[#102c3d]/56">No enrolments are active yet. This section will become the daily handoff view once approvals begin moving into starts.</p>}
-        </div>
-      </MvpPanel>
-    </div>
-  );
-}
-
-function SummaryCard({ icon: Icon, label, value }: { icon: typeof Building2; label: string; value: number }) {
-  return (
-    <div className="rounded-xl bg-white/8 px-4 py-3 ring-1 ring-white/10">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/62">{label}</p>
-        <Icon size={15} className="text-[#8fe0d2]" aria-hidden="true" />
-      </div>
-      <p className="mt-2 text-2xl font-semibold text-white">{value}</p>
     </div>
   );
 }
@@ -308,7 +258,7 @@ export function SettingsModule() {
             <FormField label="Departments" value={draft.departments.join(", ")} onChange={(value) => setDraft({ ...draft, departments: splitMvpList(value) })} wide />
           </FormGrid>
           <div className="mt-5 flex items-center justify-between border-t border-[#102c3d]/[0.07] pt-4">
-            {saved ? <p className="text-xs font-semibold text-[#0b6f63]">Workspace settings saved locally.</p> : <span />}
+            {saved ? <p className="text-xs font-semibold text-[#0b6f63]">Workspace saved.</p> : <span />}
             <button className="h-10 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white">Save details</button>
           </div>
         </form>

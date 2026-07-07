@@ -3,12 +3,8 @@
 import type { LucideIcon } from "lucide-react";
 import {
   BellRing,
-  BriefcaseBusiness,
   Building2,
-  ClipboardList,
-  ClipboardPlus,
-  FolderKanban,
-  GraduationCap,
+  ChartNoAxesCombined,
   LayoutDashboard,
   LogOut,
   Settings,
@@ -16,7 +12,7 @@ import {
   UserRound,
   Users,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { LevyTateLogo } from "@/components/levytate-demo/PlatformShell";
 import { ApplicationsModule } from "@/components/levytate-mvp/ApplicationsModule";
 import { AskLevyTateAiWorkspace } from "@/components/levytate-mvp/AskLevyTateAiWorkspace";
@@ -35,35 +31,28 @@ import type { LevyTateWorkspaceBootstrap } from "@/lib/levytate/mvp/api";
 import { buildNotifications } from "@/lib/levytate/mvp/workspace-insights";
 
 const modules = [
-  { name: "Home", icon: LayoutDashboard, section: "Workspace" },
-  { name: "Ask LevyTate AI", icon: Sparkles, section: "Workspace" },
-  { name: "Guidance Centre", icon: BellRing, section: "Workspace" },
-  { name: "Employees", icon: Users, section: "Records" },
-  { name: "Roles", icon: BriefcaseBusiness, section: "Records" },
-  { name: "Applications", icon: ClipboardList, section: "Workflow" },
-  { name: "Enrolments", icon: GraduationCap, section: "Workflow" },
-  { name: "Provider Partners", icon: Building2, section: "Partners" },
-  { name: "Provider Relationships", icon: FolderKanban, section: "Partners" },
-  { name: "Early Access", icon: ClipboardPlus, section: "Oversight" },
-  { name: "Reports", icon: BellRing, section: "Oversight" },
-  { name: "Settings", icon: Settings, section: "Oversight" },
-] as const satisfies ReadonlyArray<{ name: string; icon: LucideIcon; section: string }>;
+  { name: "Home", icon: LayoutDashboard },
+  { name: "People", icon: Users },
+  { name: "Providers", icon: Building2 },
+  { name: "AI", icon: Sparkles },
+  { name: "Knowledge", icon: BellRing },
+  { name: "Reports", icon: ChartNoAxesCombined },
+  { name: "Settings", icon: Settings },
+] as const satisfies ReadonlyArray<{ name: string; icon: LucideIcon }>;
 
 type ModuleName = (typeof modules)[number]["name"];
+type PeopleView = "Employees" | "Roles" | "Applications" | "Enrolments";
+type ProviderView = "Programmes" | "Relationships";
+type SettingsView = "Workspace" | "Early Access";
 
 const moduleCopy: Record<ModuleName, string> = {
-  Home: "Daily operating view for records, approvals, provider relationships and immediate next actions.",
-  "Ask LevyTate AI": "Role-aware guidance grounded in live workspace data, recommendations and workflow rules.",
-  "Guidance Centre": "Trusted advisory guidance covering funding, provider selection, employer readiness and future skills.",
-  Employees: "Create and maintain the employee apprenticeship record, from manager assignment to discovery history.",
-  Roles: "Own role-led pathway mappings from one controlled role library.",
-  Applications: "Manage the employee to line manager to apprenticeship lead workflow without spreadsheets.",
-  Enrolments: "Move final-approved applications into provider handoff, start dates and live learner tracking.",
-  "Provider Partners": "Maintain the controlled provider catalogue and programme delivery records.",
-  "Provider Relationships": "Set preferred partners by category and raise sourcing exceptions only when needed.",
-  "Early Access": "Capture, qualify and progress employer beta demand inside LevyTate's first commercial workspace.",
-  Reports: "Operational reporting generated from real workspace data instead of static demo metrics.",
-  Settings: "Configure organisation, sites, departments and business priorities for the workspace.",
+  Home: "A short daily briefing showing what needs attention now.",
+  People: "Employees, roles, applications and enrolments in one guided workspace.",
+  Providers: "Programme-first matching, provider evidence and relationship coverage.",
+  AI: "Ask LevyTate for the next best decision, pathway or provider action.",
+  Knowledge: "Trusted guidance for funding, readiness, provider selection and future skills.",
+  Reports: "Board-ready workforce readiness, provider and participation insight.",
+  Settings: "Workspace setup, business priorities and beta access controls.",
 };
 
 export function LevyTateMvpApp({ initialWorkspace }: { initialWorkspace?: LevyTateWorkspaceBootstrap | null }) {
@@ -73,32 +62,71 @@ export function LevyTateMvpApp({ initialWorkspace }: { initialWorkspace?: LevyTa
 function MvpAppShell() {
   const { data, meta, hydrated } = useMvpWorkspace();
   const [activeModule, setActiveModule] = useState<ModuleName>("Home");
+  const [peopleView, setPeopleView] = useState<PeopleView>("Employees");
+  const [providerView, setProviderView] = useState<ProviderView>("Programmes");
+  const [settingsView, setSettingsView] = useState<SettingsView>("Workspace");
   const [aiEmployeeId, setAiEmployeeId] = useState<string | null>(null);
 
   const notifications = useMemo(() => buildNotifications(data), [data]);
   const moduleBadges = useMemo(() => ({
-    Applications: notifications.filter((item) => item.module === "Applications").length,
-    "Provider Relationships": notifications.filter((item) => item.module === "Provider Relationships").length,
-    Enrolments: notifications.filter((item) => item.module === "Enrolments").length,
+    People: notifications.filter((item) => item.module === "Applications" || item.module === "Enrolments").length,
+    Providers: notifications.filter((item) => item.module === "Provider Relationships").length,
     Reports: notifications.length,
   }), [notifications]);
-
-  const groupedModules = useMemo(() => {
-    return modules.reduce<Record<string, Array<(typeof modules)[number]>>>((groups, module) => {
-      groups[module.section] = groups[module.section] ?? [];
-      groups[module.section].push(module);
-      return groups;
-    }, {});
-  }, []);
 
   async function logout() {
     await fetch("/api/levytate-beta-logout", { method: "POST" });
     window.location.href = "/login";
   }
 
+  function openModule(module: ModuleName) {
+    setActiveModule(module);
+  }
+
+  function navigateTo(target: string) {
+    if (target === "Ask LevyTate AI" || target === "AI") {
+      openModule("AI");
+      return;
+    }
+    if (target === "Employees" || target === "Roles" || target === "Applications" || target === "Enrolments") {
+      setPeopleView(target as PeopleView);
+      openModule("People");
+      return;
+    }
+    if (target === "Provider Partners") {
+      setProviderView("Programmes");
+      openModule("Providers");
+      return;
+    }
+    if (target === "Provider Relationships") {
+      setProviderView("Relationships");
+      openModule("Providers");
+      return;
+    }
+    if (target === "Guidance Centre" || target === "Knowledge") {
+      openModule("Knowledge");
+      return;
+    }
+    if (target === "Early Access") {
+      setSettingsView("Early Access");
+      openModule("Settings");
+      return;
+    }
+    if (target === "Settings") {
+      setSettingsView("Workspace");
+      openModule("Settings");
+      return;
+    }
+    if (target === "Reports") {
+      openModule("Reports");
+      return;
+    }
+    openModule("Home");
+  }
+
   const workspaceName = data.profile.employerName || "LevyTate beta employer";
   const workspaceLabel = data.profile.workspaceName || "Standalone employer workspace";
-  const storageStatus = meta?.storageMode === "supabase" ? "Supabase-backed workspace" : "Local fallback workspace";
+  const storageStatus = meta?.storageMode === "supabase" ? "Supabase workspace" : "Local fallback";
 
   return (
     <main className="min-h-screen bg-[#f4f7f5] text-[#102c3d]">
@@ -116,12 +144,12 @@ function MvpAppShell() {
 
           <div className="flex w-full min-w-0 items-center gap-2 sm:gap-3 lg:w-auto">
             <div className="min-w-0 flex-1 lg:hidden">
-              <select value={activeModule} onChange={(event) => setActiveModule(event.target.value as ModuleName)} className="h-11 w-full rounded-xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 text-sm font-semibold text-[#102c3d] shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+              <select value={activeModule} onChange={(event) => openModule(event.target.value as ModuleName)} className="h-11 w-full rounded-xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 text-sm font-semibold text-[#102c3d] shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
                 {modules.map((module) => <option key={module.name}>{module.name}</option>)}
               </select>
             </div>
             <span className="hidden rounded-full border border-[#159b8f]/10 bg-[#edf7f3] px-3.5 py-2 text-xs font-semibold text-[#0b6f63] sm:inline-flex">
-              {hydrated ? `${notifications.length} live alerts` : "Loading workspace"}
+              {hydrated ? `${notifications.length} alerts` : "Loading"}
             </span>
             <button onClick={logout} title="Logout" className="inline-flex h-11 shrink-0 items-center gap-2 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white shadow-[0_10px_22px_rgba(16,44,61,0.12)] transition hover:bg-[#17394d]">
               <LogOut size={15} aria-hidden="true" />
@@ -131,43 +159,31 @@ function MvpAppShell() {
         </div>
       </header>
 
-      <div className="grid min-h-[calc(100vh-5rem)] lg:grid-cols-[276px_minmax(0,1fr)]">
+      <div className="grid min-h-[calc(100vh-5rem)] lg:grid-cols-[244px_minmax(0,1fr)]">
         <aside className="hidden border-r border-[#102c3d]/[0.08] bg-white lg:sticky lg:top-20 lg:flex lg:h-[calc(100vh-5rem)] lg:flex-col">
           <div className="flex min-h-0 flex-1 flex-col px-4 py-4">
-            <div className="flex items-center justify-between px-2 pb-3">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/36">Workspace navigation</p>
-                <p className="mt-1 text-sm font-semibold text-[#102c3d]">LevyTate modules</p>
-              </div>
-              <span className="rounded-full border border-[#102c3d]/[0.07] bg-[#f8fbfa] px-2.5 py-1 text-[10px] font-semibold text-[#102c3d]/56">
-                {modules.length}
-              </span>
+            <div className="px-2 pb-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/36">Navigation</p>
+              <p className="mt-1 text-sm font-semibold text-[#102c3d]">Decision areas</p>
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-              <nav className="space-y-3" aria-label="MVP navigation">
-                {Object.entries(groupedModules).map(([section, items]) => (
-                  <div key={section}>
-                    <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/34">{section}</p>
-                    <div className="mt-1.5 grid gap-1">
-                      {items.map(({ name, icon: Icon }) => {
-                        const active = activeModule === name;
-                        const badge = moduleBadges[name as keyof typeof moduleBadges];
-                        return (
-                          <button key={name} onClick={() => setActiveModule(name)} className={`group flex min-h-[42px] items-center justify-between gap-3 rounded-xl px-3 text-left text-sm font-semibold transition ${active ? "bg-[#eaf5f1] text-[#102c3d] shadow-[inset_3px_0_0_#159b8f,0_10px_18px_rgba(21,155,143,0.06)]" : "text-[#102c3d]/58 hover:bg-[#f6f9f7] hover:text-[#102c3d]"}`}>
-                            <span className="flex min-w-0 items-center gap-3">
-                              <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg transition ${active ? "bg-white text-[#0b8e82] ring-1 ring-[#159b8f]/12" : "bg-[#f7faf8] text-[#102c3d]/42 group-hover:bg-white group-hover:text-[#0b8e82] group-hover:ring-1 group-hover:ring-[#102c3d]/[0.06]"}`}>
-                                <Icon size={16} strokeWidth={active ? 2 : 1.8} aria-hidden="true" />
-                              </span>
-                              <span className="truncate">{name}</span>
-                            </span>
-                            {badge ? <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-[#0b6f63] ring-1 ring-[#159b8f]/12">{badge}</span> : null}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
+              <nav className="grid gap-1" aria-label="MVP navigation">
+                {modules.map(({ name, icon: Icon }) => {
+                  const active = activeModule === name;
+                  const badge = moduleBadges[name as keyof typeof moduleBadges];
+                  return (
+                    <button key={name} onClick={() => openModule(name)} className={`group flex min-h-[44px] items-center justify-between gap-3 rounded-xl px-3 text-left text-sm font-semibold transition ${active ? "bg-[#eaf5f1] text-[#102c3d] shadow-[inset_3px_0_0_#159b8f,0_10px_18px_rgba(21,155,143,0.06)]" : "text-[#102c3d]/58 hover:bg-[#f6f9f7] hover:text-[#102c3d]"}`}>
+                      <span className="flex min-w-0 items-center gap-3">
+                        <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg transition ${active ? "bg-white text-[#0b8e82] ring-1 ring-[#159b8f]/12" : "bg-[#f7faf8] text-[#102c3d]/42 group-hover:bg-white group-hover:text-[#0b8e82] group-hover:ring-1 group-hover:ring-[#102c3d]/[0.06]"}`}>
+                          <Icon size={16} strokeWidth={active ? 2 : 1.8} aria-hidden="true" />
+                        </span>
+                        <span className="truncate">{name}</span>
+                      </span>
+                      {badge ? <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-[#0b6f63] ring-1 ring-[#159b8f]/12">{badge}</span> : null}
+                    </button>
+                  );
+                })}
               </nav>
             </div>
 
@@ -180,14 +196,14 @@ function MvpAppShell() {
                   <div className="min-w-0">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">Platform admin</p>
                     <p className="mt-1 truncate text-sm font-semibold text-[#102c3d]">{meta?.userRole ?? "Workspace user"}</p>
-                    <p className="mt-1 text-xs leading-5 text-[#102c3d]/52">Managing provider relationships, workspace settings and beta operations.</p>
+                    <p className="mt-1 text-xs leading-5 text-[#102c3d]/52">People, providers and workspace setup.</p>
                   </div>
                 </div>
 
                 <div className="mt-4 rounded-2xl border border-[#102c3d]/[0.06] bg-white px-3.5 py-3">
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/34">Workspace status</p>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/34">Status</p>
                       <p className="mt-1 truncate text-xs font-semibold text-[#102c3d]/68">{storageStatus}</p>
                     </div>
                     <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#edf7f3] px-2.5 py-1 text-[10px] font-semibold text-[#0b6f63]">
@@ -209,21 +225,63 @@ function MvpAppShell() {
               <p className="mt-1.5 max-w-3xl text-sm leading-6 text-[#102c3d]/56">{moduleCopy[activeModule]}</p>
             </section>
 
-            {activeModule === "Home" ? <DashboardModule onNavigate={(module) => setActiveModule(module as ModuleName)} /> : null}
-            {activeModule === "Ask LevyTate AI" ? <AskLevyTateAiWorkspace initialEmployeeId={aiEmployeeId} /> : null}
-            {activeModule === "Guidance Centre" ? <GuidanceCentreModule /> : null}
-            {activeModule === "Employees" ? <EmployeesModule onStartDiscovery={(employeeId) => { setAiEmployeeId(employeeId); setActiveModule("Ask LevyTate AI"); }} /> : null}
-            {activeModule === "Roles" ? <RolesModule /> : null}
-            {activeModule === "Applications" ? <ApplicationsModule /> : null}
-            {activeModule === "Enrolments" ? <EnrolmentsModule /> : null}
-            {activeModule === "Provider Partners" ? <ProvidersModule /> : null}
-            {activeModule === "Provider Relationships" ? <ProviderMatchingModule /> : null}
-            {activeModule === "Early Access" ? <EarlyAccessModule /> : null}
+            {activeModule === "Home" ? <DashboardModule onNavigate={navigateTo} /> : null}
+            {activeModule === "AI" ? <AskLevyTateAiWorkspace initialEmployeeId={aiEmployeeId} /> : null}
+            {activeModule === "Knowledge" ? <GuidanceCentreModule /> : null}
+            {activeModule === "People" ? (
+              <ModuleStackNav items={["Employees", "Roles", "Applications", "Enrolments"]} active={peopleView} onSelect={(item) => setPeopleView(item as PeopleView)}>
+                {peopleView === "Employees" ? <EmployeesModule onStartDiscovery={(employeeId) => { setAiEmployeeId(employeeId); openModule("AI"); }} /> : null}
+                {peopleView === "Roles" ? <RolesModule /> : null}
+                {peopleView === "Applications" ? <ApplicationsModule /> : null}
+                {peopleView === "Enrolments" ? <EnrolmentsModule /> : null}
+              </ModuleStackNav>
+            ) : null}
+            {activeModule === "Providers" ? (
+              <ModuleStackNav items={["Programmes", "Relationships"]} active={providerView} onSelect={(item) => setProviderView(item as ProviderView)}>
+                {providerView === "Programmes" ? <ProvidersModule /> : null}
+                {providerView === "Relationships" ? <ProviderMatchingModule /> : null}
+              </ModuleStackNav>
+            ) : null}
             {activeModule === "Reports" ? <ReportsModule /> : null}
-            {activeModule === "Settings" ? <SettingsModule /> : null}
+            {activeModule === "Settings" ? (
+              <ModuleStackNav items={["Workspace", "Early Access"]} active={settingsView} onSelect={(item) => setSettingsView(item as SettingsView)}>
+                {settingsView === "Workspace" ? <SettingsModule /> : null}
+                {settingsView === "Early Access" ? <EarlyAccessModule /> : null}
+              </ModuleStackNav>
+            ) : null}
           </div>
         </section>
       </div>
     </main>
+  );
+}
+
+function ModuleStackNav({
+  items,
+  active,
+  onSelect,
+  children,
+}: {
+  items: string[];
+  active: string;
+  onSelect: (item: string) => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className="grid gap-4">
+      <div className="flex flex-wrap gap-2 rounded-2xl border border-[#102c3d]/[0.07] bg-white p-2 shadow-[0_12px_30px_rgba(16,44,61,0.035)]">
+        {items.map((item) => (
+          <button
+            key={item}
+            type="button"
+            onClick={() => onSelect(item)}
+            className={`rounded-full px-4 py-2 text-xs font-semibold transition ${active === item ? "bg-[#102c3d] text-white shadow-[0_8px_18px_rgba(16,44,61,0.12)]" : "text-[#102c3d]/58 hover:bg-[#f6f9f7] hover:text-[#102c3d]"}`}
+          >
+            {item}
+          </button>
+        ))}
+      </div>
+      {children}
+    </div>
   );
 }
