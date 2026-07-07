@@ -180,7 +180,7 @@ const capabilityDefinitions: CapabilityDefinition[] = [
     signal("handover-quality", "Handover, safety or site quality evidence", 18, /\b(handover|site safety|snagging|quality control)\b/i),
   ]),
   capability("hr", "HR", "HR advisory, employee relations or recruitment evidence not yet confirmed.", [
-    signal("hr-role", "HR role or responsibility", 36, /\b(hr advisor|human resources|employee relations|recruitment|people policy|hr support)\b/i),
+    signal("hr-role", "HR role or responsibility", 36, /\b(hr advisor|human resources|employee relations|recruitment|people policy|people director|people partner|people business partner|hr director|talent and development|hr support)\b/i),
     signal("people-process", "People process or policy work", 18, /\b(onboarding|absence|performance process|policy)\b/i),
   ]),
   capability("finance", "Finance", "Finance processing, accounting or financial reporting evidence not yet confirmed.", [
@@ -503,8 +503,9 @@ function addRolePriors(request: LevyTateAiRequest, scores: Map<CapabilityDomain,
     add("cyber", /cyber|security|cloud|network/.test(role) ? 24 : 14, "IT support role may touch secure systems, networks or cloud access");
     add("customer_service", 8, "IT support role supports internal users");
   }
-  if (/hr advisor|hr support|human resources|people advisor|recruitment|employee relations|people professional/.test(role)) {
+  if (/hr advisor|hr support|human resources|people advisor|people director|people partner|people business partner|hr director|talent and development|recruitment|employee relations|people professional/.test(role)) {
     add("hr", 48, "Role context indicates HR or people operations");
+    add("leadership", /director|head|manager|lead/.test(role) ? 18 : 6, "People function context includes workforce leadership");
     add("administration", 8, "HR work often includes people process administration");
     add("customer_service", 6, "HR advisory work supports internal colleagues");
   }

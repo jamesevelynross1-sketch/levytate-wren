@@ -16,11 +16,11 @@ import {
 } from "@/components/levytate-mvp/MvpUi";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { includesSearch, statusTone } from "@/components/levytate-mvp/module-utils";
+import type { LevyTateRecommendationResult } from "@/lib/levytate/ai/types";
 import { getApprenticeshipStandard } from "@/lib/levytate/domain";
 import {
   employeeCurrentApplication,
   employeeDevelopmentInterests,
-  employeeRecommendedPathway,
   managerName,
 } from "@/lib/levytate/mvp/workspace-insights";
 import {
@@ -82,9 +82,7 @@ export function EmployeesModule({ onStartDiscovery }: { onStartDiscovery?: (empl
   const selectedProfile = selectedEmployee
     ? data.employeeDevelopmentProfiles.find((item) => item.employeeId === selectedEmployee.id) ?? null
     : null;
-  const selectedRecommendation = selectedEmployee
-    ? employeeRecommendedPathway(data, selectedEmployee.id)
-    : null;
+  const selectedRouteOutcome = careerRouteOutcome(selectedProfile?.recommendationResult ?? null);
   const selectedCurrentApplication = selectedEmployee
     ? employeeCurrentApplication(data, selectedEmployee.id)
     : null;
@@ -176,15 +174,17 @@ export function EmployeesModule({ onStartDiscovery }: { onStartDiscovery?: (empl
             const role = data.roles.find((item) => item.id === employee.roleId);
             const application = employeeCurrentApplication(data, employee.id);
             const profile = data.employeeDevelopmentProfiles.find((item) => item.employeeId === employee.id);
-            const recommendation = employeeRecommendedPathway(data, employee.id);
-            const statusLabel = recommendation
+            const routeOutcome = careerRouteOutcome(profile?.recommendationResult ?? null);
+            const statusLabel = routeOutcome?.isStrategicDiscussion
+              ? "Strategic discussion"
+              : routeOutcome
               ? "Recommendation ready"
               : profile
                 ? "Discovery in progress"
                 : "Needs discovery";
             const primaryAction = application
               ? "Review"
-              : recommendation
+              : routeOutcome
                 ? "Continue"
                 : "Start AI";
 
@@ -195,7 +195,7 @@ export function EmployeesModule({ onStartDiscovery }: { onStartDiscovery?: (empl
                     <p className="truncate text-base font-semibold text-[#102c3d]">{employee.name}</p>
                     <p className="mt-1 text-sm leading-6 text-[#102c3d]/58">{employee.jobTitle || role?.title || "Role to confirm"}</p>
                   </div>
-                  <StatusBadge tone={application ? statusTone(application.status) : recommendation ? "green" : profile ? "yellow" : "neutral"}>
+                  <StatusBadge tone={application ? statusTone(application.status) : routeOutcome ? routeOutcome.tone : profile ? "yellow" : "neutral"}>
                     {application?.status ?? statusLabel}
                   </StatusBadge>
                 </div>
@@ -204,13 +204,14 @@ export function EmployeesModule({ onStartDiscovery }: { onStartDiscovery?: (empl
                   <DecisionFact label="Manager" value={managerName(data, employee)} />
                   <DecisionFact label="Team" value={employee.department || "Department to confirm"} />
                   <DecisionFact label="Development status" value={statusLabel} />
-                  <DecisionFact label="AI confidence" value={recommendation ? "High" : profile ? "Building" : "Not started"} />
+                  <DecisionFact label="AI confidence" value={routeOutcome?.isStrategicDiscussion ? "Adviser review" : routeOutcome ? "High" : profile ? "Building" : "Not started"} />
                 </div>
 
-                {recommendation ? (
+                {routeOutcome ? (
                   <div className="mt-4 rounded-xl bg-[#f8fbfa] px-4 py-3 ring-1 ring-[#102c3d]/[0.055]">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">Leading route</p>
-                    <p className="mt-1 text-sm font-semibold text-[#102c3d]">{recommendation.title}</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">{routeOutcome.label}</p>
+                    <p className="mt-1 text-sm font-semibold text-[#102c3d]">{routeOutcome.title}</p>
+                    {routeOutcome.copy ? <p className="mt-1 line-clamp-2 text-xs leading-5 text-[#102c3d]/54">{routeOutcome.copy}</p> : null}
                   </div>
                 ) : null}
 
@@ -295,7 +296,7 @@ export function EmployeesModule({ onStartDiscovery }: { onStartDiscovery?: (empl
               <section>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#c95568]">Current profile</p>
                 <h3 className="mt-1 text-lg font-semibold text-[#102c3d]">{selectedEmployee.jobTitle || "Role to confirm"}</h3>
-                <p className="mt-2 text-sm leading-6 text-[#102c3d]/56">{selectedEmployee.department || "Department to confirm"} · {selectedEmployee.site || "Site to confirm"}</p>
+                <p className="mt-2 text-sm leading-6 text-[#102c3d]/56">{selectedEmployee.department || "Department to confirm"} - {selectedEmployee.site || "Site to confirm"}</p>
                 <p className="mt-2 text-sm leading-6 text-[#102c3d]/56">Manager: {managerName(data, selectedEmployee)}</p>
               </section>
 
@@ -333,14 +334,14 @@ export function EmployeesModule({ onStartDiscovery }: { onStartDiscovery?: (empl
                     Ask AI
                   </button>
                 </div>
-                {selectedRecommendation ? (
+                {selectedRouteOutcome ? (
                   <div className="mt-2 rounded-xl bg-white px-4 py-3 ring-1 ring-[#102c3d]/[0.07]">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="text-sm font-semibold text-[#102c3d]">{selectedRecommendation.title}</p>
-                        <p className="mt-1 text-xs leading-5 text-[#102c3d]/56">{selectedRecommendation.rationale}</p>
+                        <p className="text-sm font-semibold text-[#102c3d]">{selectedRouteOutcome.title}</p>
+                        <p className="mt-1 text-xs leading-5 text-[#102c3d]/56">{selectedRouteOutcome.copy}</p>
                       </div>
-                      <StatusBadge tone="green">{selectedRecommendation.fitScore}% fit</StatusBadge>
+                      <StatusBadge tone={selectedRouteOutcome.tone}>{selectedRouteOutcome.badge}</StatusBadge>
                     </div>
                   </div>
                 ) : <p className="mt-2 text-sm text-[#102c3d]/54">LevyTate will show the leading recommendation once discovery is complete.</p>}
@@ -412,4 +413,37 @@ function DecisionFact({ label, value }: { label: string; value: string }) {
 
 function applicationLabel(standardId: string) {
   return getApprenticeshipStandard(standardId)?.title ?? standardId;
+}
+
+function careerRouteOutcome(result: LevyTateRecommendationResult | null): {
+  label: string;
+  title: string;
+  copy: string;
+  badge: string;
+  tone: "neutral" | "green" | "yellow" | "red" | "blue";
+  isStrategicDiscussion: boolean;
+} | null {
+  if (!result) return null;
+  const top = result.topRecommendation;
+  if (top) {
+    return {
+      label: "Leading route",
+      title: top.title,
+      copy: top.rationale,
+      badge: top.recommendationCategory,
+      tone: top.recommendationCategory === "Strong Recommendation" ? "green" : "blue",
+      isStrategicDiscussion: false,
+    };
+  }
+  if (result.strategicDiscussion) {
+    return {
+      label: "Career Intelligence outcome",
+      title: "Strategic Discussion Required",
+      copy: result.strategicDiscussion,
+      badge: result.careerStage,
+      tone: "yellow",
+      isStrategicDiscussion: true,
+    };
+  }
+  return null;
 }

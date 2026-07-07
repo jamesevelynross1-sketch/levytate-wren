@@ -1,4 +1,5 @@
-import type { LevyTateRecommendationResult, LevyTatePlatformRecommendation } from "@/lib/levytate/ai/types";
+import type { LevyTateRecommendationResult } from "@/lib/levytate/ai/types";
+import { buildLevyTateRecommendations } from "@/lib/levytate/ai/recommendationEngine";
 import { groundControlImportSummary, groundControlOrganisationRows, groundControlPersonaImports, type GroundControlOrganisationRow, type GroundControlPersonaImport } from "@/lib/levytate/data/demo/ground-control-import";
 import type { LevyTateWorkspaceBootstrap } from "@/lib/levytate/mvp/api";
 import {
@@ -448,6 +449,7 @@ function toEmployee(seed: EmployeeSeed): MvpEmployee {
 function toDevelopmentProfile(seed: EmployeeSeed): MvpEmployeeDevelopmentProfile {
   const result = recommendationResult(seed);
   const role = spreadsheetRoleSeeds.find((item) => item.id === seed.roleId);
+  const leadingRoute = result.topRecommendation?.title ?? "Strategic Discussion Required";
   return {
     employeeId: seed.id,
     stage: "recommendation_ready",
@@ -461,7 +463,7 @@ function toDevelopmentProfile(seed: EmployeeSeed): MvpEmployeeDevelopmentProfile
     automationOpportunities: seed.automationOpportunities,
     futureCapabilities: seed.futureCapabilities,
     conversationHistory: [
-      { role: "assistant", content: `I already have ${seed.name}'s role, department, manager and organisation priorities. The current strongest route is ${seed.recommendation.title}.` },
+      { role: "assistant", content: `I already have ${seed.name}'s role, department, manager and organisation priorities. The current Career Intelligence outcome is ${leadingRoute}.` },
     ],
     conversationProfile: {
       currentRole: role?.title ?? "",
@@ -476,13 +478,13 @@ function toDevelopmentProfile(seed: EmployeeSeed): MvpEmployeeDevelopmentProfile
       preferredLearningStyle: "Blended",
       managementAspirations: seed.futureCapabilities.some((item) => /manager|lead|supervisor/i.test(item)) ? "Progression into greater responsibility" : null,
       currentApplicationStatus: seed.applicationStatus ?? null,
-      recommendedPathways: [{
-        title: seed.recommendation.title,
-        confidence: seed.recommendation.fitScore,
-        stage: "recommended",
+      recommendedPathways: result.topRecommendation ? [{
+        title: leadingRoute,
+        confidence: result.confidence,
+        stage: "recommended" as const,
         firstDiscussedAt: 1760000000000,
         lastDiscussedAt: 1760000000000,
-      }],
+      }] : [],
       confidence: {
         role: 90,
         careerGoal: seed.careerGoal ? 86 : 70,
@@ -497,169 +499,129 @@ function toDevelopmentProfile(seed: EmployeeSeed): MvpEmployeeDevelopmentProfile
       latestMessageClassification: "new_information",
     },
     recommendationResult: result,
-    preferredStandardId: result.topRecommendation?.pathwayId ?? seed.recommendation.standardId,
+    preferredStandardId: result.topRecommendation?.pathwayId ?? "",
     updatedAt,
   };
 }
 
 function recommendationResult(seed: EmployeeSeed): LevyTateRecommendationResult {
   const role = spreadsheetRoleSeeds.find((item) => item.id === seed.roleId);
-  const careerStage = seedCareerStage(role?.title ?? seed.jobRole ?? seed.department);
-  const top = platformRecommendation(seed.recommendation, "current_best_fit", careerStage);
-  const alternativeSeed = alternativeForRow({
-    roleId: seed.roleId,
-    division: seed.department,
-    subdivision: seed.subdivision ?? "",
-    team: seed.team ?? "",
-    jobRole: seed.jobRole ?? "",
-    jobTitle: role?.title ?? seed.department,
-    sourceRow: 0,
-  }, seed.recommendation.standardId);
-  const alternative = platformRecommendation({ ...alternativeSeed, fitScore: Math.max(72, seed.recommendation.fitScore - 7) }, "alternative_route", careerStage);
-
-  return {
-    recommendations: [top, alternative],
-    topRecommendation: top,
-    recommendationVersion: `gc-demo-${seed.id}-${seed.recommendation.standardId}`,
-    confidence: Math.min(96, seed.recommendation.fitScore + 2),
-    revealThreshold: 65,
-    shouldRevealRecommendations: true,
-    evidenceChanged: false,
-    capabilityProfile: capabilityProfile(seed),
-    currentCapabilityProfile: capabilityProfile(seed),
-    futureCapabilityProfile: futureCapabilityProfile(seed),
-    careerStage,
-    recommendationEnvelope: {
-      careerStage,
-      minimumLevel: careerStage === "Director" || careerStage === "Head Of" ? 5 : careerStage === "Manager" ? 4 : 3,
-      maximumLevel: careerStage === "Entry" ? 4 : careerStage === "Operational" ? 4 : careerStage === "Professional" ? 6 : 7,
-      label: `Seeded ${careerStage} role envelope for the Ground Control demonstration workspace.`,
-      excludedRoutes: careerStage === "Director" || careerStage === "Head Of" ? ["assistant", "foundation", "technician"] : [],
-      strategicOnly: careerStage === "Executive",
+  return buildLevyTateRecommendations({
+    role: "Employee",
+    selectedSite: seed.site,
+    currentSection: "People",
+    userMessage: `${role?.title ?? seed.jobRole}: ${seed.careerGoal ?? seed.futureCapabilities[0] ?? "Career progression"}`,
+    conversationHistory: [{ role: "user", content: `${role?.title ?? seed.jobRole}: ${seed.responsibilities.join("; ")}. ${seed.futureCapabilities.join("; ")}` }],
+    conversationProfile: {
+      currentRole: role?.title ?? seed.jobRole ?? seed.department,
+      currentDepartment: seed.department,
+      currentEmployer: "Ground Control",
+      careerGoal: seed.careerGoal ?? seed.futureCapabilities[0] ?? "Career progression",
+      reasonForDevelopment: seed.applicationReason ?? seed.recommendation.rationale,
+      currentSkills: seed.currentSkills,
+      aiConfidence: seed.aiOpportunities.length ? 72 : 48,
+      digitalConfidence: seed.dataOpportunities.length || seed.automationOpportunities.length ? 76 : 52,
+      interestAreas: [...seed.futureCapabilities, ...seed.aiOpportunities].slice(0, 5),
+      preferredLearningStyle: "Blended",
+      managementAspirations: seed.futureCapabilities.some((item) => /manager|lead|supervisor|director|strategic/i.test(item)) ? "Progression into greater responsibility" : null,
+      currentApplicationStatus: seed.applicationStatus ?? null,
+      recommendedPathways: [],
+      confidence: {
+        role: 90,
+        careerGoal: seed.careerGoal ? 86 : 70,
+        technicalConfidence: 82,
+        managementAmbition: seed.futureCapabilities.some((item) => /manager|lead|supervisor|director|strategic/i.test(item)) ? 78 : 54,
+        overall: Math.min(95, seed.recommendation.fitScore),
+      },
+      conversationSummary: `${seed.name} is a ${role?.title ?? "colleague"} in ${seed.department}${seed.team ? ` / ${seed.team}` : ""}.`,
+      questionsAlreadyAsked: ["What does the employee do today?", "What capability do they need next?"],
+      questionsStillToAsk: ["Which project can evidence the pathway?", "What study time can the manager support?"],
+      exchangeCount: 2,
+      latestMessageClassification: "new_information",
     },
-    qualificationAwareness: {
-      highestQualification: null,
-      previousApprenticeshipLevel: null,
-      professionalMemberships: [],
-      charteredStatus: null,
-      existingCertifications: [],
-      status: "not_collected",
-      missingFields: ["highest qualification", "previous apprenticeship level", "professional memberships", "chartered status", "existing certifications"],
-    },
-    strategicDiscussion: null,
-    strategicRecommendation: {
-      currentBestFit: top.title,
-      futureDevelopmentOpportunity: alternative.title,
-      strategicRecommendation: top.title,
-      alternativeRoute: alternative.title,
-      confidence: top.confidence,
-      businessImpact: "Supports Ground Control priorities around operational productivity, AI-enabled field operations, safety, sustainability and customer service excellence.",
-      organisationBenefit: "Creates a clearer workforce development route using the imported organisational structure rather than generic job families.",
-      employeeBenefit: "Connects day-to-day work to a credible apprenticeship pathway and future capability profile.",
-      whyRecommended: top.rationale,
-      whyOtherRoutesRankedLower: alternative.whyRankedLower,
-      missingEvidence: top.missingEvidence,
-      suggestedQuestions: top.suggestedQuestions,
-      organisationPrioritiesInfluenced: ["Operational productivity", "AI-enabled field operations", "Digital transformation", "Health & Safety", "Sustainability"],
-      employeeCapabilitiesInfluenced: seed.futureCapabilities,
-    },
-  };
-}
-
-function seedCareerStage(title: string): LevyTatePlatformRecommendation["careerStage"] {
-  if (/\b(managing director|chief|executive)\b/i.test(title)) return "Executive";
-  if (/\bdirector\b/i.test(title)) return "Director";
-  if (/\bhead of\b/i.test(title)) return "Head Of";
-  if (/\b(senior manager|regional manager)\b/i.test(title)) return "Senior Manager";
-  if (/\bmanager\b/i.test(title)) return "Manager";
-  if (/\b(supervisor|team leader|foreman)\b/i.test(title)) return "Team Leader";
-  if (/\b(senior|specialist|advisor|adviser|analyst|engineer|surveyor|designer)\b/i.test(title)) return "Professional";
-  if (/\b(operative|arborist|technician|driver|field)\b/i.test(title)) return "Operational";
-  return "Entry";
-}
-
-function platformRecommendation(
-  seed: EmployeeSeed["recommendation"],
-  strategicRole: LevyTatePlatformRecommendation["strategicRole"],
-  careerStage: LevyTatePlatformRecommendation["careerStage"],
-): LevyTatePlatformRecommendation {
-  return {
-    pathwayId: seed.standardId,
-    title: seed.title,
-    fitScore: seed.fitScore,
-    scoreDelta: 0,
-    confidence: Math.min(96, seed.fitScore + 1),
-    rationale: seed.rationale,
-    careerStage,
-    recommendationCategory: seed.fitScore >= 82 ? "Strong Recommendation" : "Development Opportunity",
-    careerStageFit: "inside_envelope",
-    credibilityNotes: ["Seeded workspace recommendation checked against role-led Ground Control context."],
-    evidence: seed.evidence.map((label, index) => ({
-      id: `${seed.standardId}-evidence-${index + 1}`,
-      label,
-      source: index === 0 ? "profile" : index === 1 ? "platform_rule" : "role_mapping",
-      weight: 18 - index * 2,
-    })),
-    missingEvidence: seed.missingEvidence ?? [],
-    capabilityFit: [
-      { domain: "Operational", score: Math.min(96, seed.fitScore), weighting: 22 },
-      { domain: "Digital", score: seed.title.includes("Data") || seed.title.includes("Digital") || seed.title.includes("Business Analyst") ? seed.fitScore : 62, weighting: 16 },
-      { domain: "Customer", score: seed.title.includes("Customer") ? seed.fitScore : 48, weighting: 8 },
+    employerContext: "Ground Control demonstration workspace",
+    employerPriorities: [
+      { name: "Operational productivity", importance: "Critical" },
+      { name: "AI-enabled field operations", importance: "High" },
+      { name: "Leadership capability", importance: "High" },
+      { name: "Commercial performance", importance: "High" },
+      { name: "Health & Safety", importance: "High" },
+      { name: "Sustainability", importance: "High" },
+      { name: "Digital transformation", importance: "High" },
+      { name: "Customer service excellence", importance: "Medium" },
     ],
-    strategicRole,
-    strategicSignals: [
-      { category: "organisation_priority", label: "Ground Control strategic priority", score: 82, evidence: ["Operational efficiency", "Digital capability"] },
-      { category: "current_capability", label: "Current role evidence", score: seed.fitScore, evidence: seed.evidence },
-    ],
-    businessImpact: "Improves role capability, operational consistency and workforce readiness.",
-    organisationBenefit: "Creates a stronger internal pipeline aligned to Ground Control's operating model.",
-    employeeBenefit: "Connects day-to-day work to a credible progression route.",
-    providerRationale: `${seed.provider} is shown as the recommended delivery partner for this demo scenario.`,
-    programmeRationale: "Programme selected from role evidence, organisation priorities and capability signals.",
-    whyRankedLower: seed.missingEvidence ?? ["Other routes had weaker direct evidence for the role and business objective."],
-    suggestedQuestions: ["Which projects could evidence this pathway?", "What time commitment can the manager support?", "Which capability matters most this quarter?"],
-    availability: "approved",
-    eligibility: "eligible",
-    providerAvailability: "mapped",
-  };
-}
-
-function capabilityProfile(seed: EmployeeSeed) {
-  return [
-    capability("Current role", 86, seed.currentSkills),
-    capability("Data and reporting", seed.dataOpportunities.length ? 76 : 42, seed.dataOpportunities),
-    capability("AI adoption", seed.aiOpportunities.length ? 70 : 38, seed.aiOpportunities),
-    capability("Operational improvement", seed.automationOpportunities.length ? 78 : 48, seed.automationOpportunities),
-  ];
-}
-
-function futureCapabilityProfile(seed: EmployeeSeed) {
-  return [
-    capability("Future capability", 84, seed.futureCapabilities),
-    capability("Organisation priority fit", 82, ["AI adoption", "Operational efficiency", "Digital capability"]),
-  ];
-}
-
-function capability(domain: string, score: number, evidence: string[]) {
-  return {
-    domain,
-    score,
-    evidence,
-    missingEvidence: evidence.length ? [] : ["More employee evidence required."],
-  };
+    employeeDiscovery: {
+      roleTitle: role?.title ?? seed.jobRole ?? seed.department,
+      department: seed.department,
+      responsibilities: seed.responsibilities,
+      currentSkills: seed.currentSkills,
+      businessFunctions: compact([seed.department, seed.subdivision, seed.team, seed.jobRole, role?.businessArea ?? seed.department]),
+      currentCapabilities: seed.currentSkills,
+      apprenticeshipIndicators: ["Role-led pathway", "Manager discussion ready"],
+      aiOpportunities: seed.aiOpportunities,
+      dataOpportunities: seed.dataOpportunities,
+      automationOpportunities: seed.automationOpportunities,
+      futureCapabilities: seed.futureCapabilities,
+      stage: "recommendation_ready",
+    },
+    workspaceEmployeeContext: {
+      resolution: "selected_employee",
+      missingData: [],
+      employee: {
+        id: seed.id,
+        name: seed.name,
+        employeeNumber: seed.employeeNumber,
+        jobTitle: role?.title ?? seed.jobRole ?? seed.department,
+        division: seed.department,
+        department: seed.department,
+        team: seed.team,
+        manager: seed.managerId,
+        location: seed.site,
+        platformRole: seed.platformRole,
+      },
+      role: {
+        title: role?.title ?? seed.jobRole ?? seed.department,
+        businessArea: role?.businessArea ?? seed.department,
+        careerLevel: role?.careerLevel,
+        skillsTags: role?.skillsTags ?? [],
+        progression: role?.progression ?? [],
+        preferredPathway: seed.recommendation.title,
+        businessRationale: seed.recommendation.rationale,
+      },
+      application: null,
+      development: {
+        roleTitle: role?.title ?? seed.jobRole,
+        department: seed.department,
+        responsibilities: seed.responsibilities,
+        currentSkills: seed.currentSkills,
+        businessFunctions: compact([seed.department, seed.subdivision, seed.team, seed.jobRole, role?.businessArea ?? seed.department]),
+        currentCapabilities: seed.currentSkills,
+        apprenticeshipIndicators: ["Role-led pathway", "Manager discussion ready"],
+        aiOpportunities: seed.aiOpportunities,
+        dataOpportunities: seed.dataOpportunities,
+        automationOpportunities: seed.automationOpportunities,
+        futureCapabilities: seed.futureCapabilities,
+        stage: "recommendation_ready",
+      },
+    },
+    preferredStandardId: seed.recommendation.standardId,
+  });
 }
 
 function toApplication(seed: EmployeeSeed): MvpApplication[] {
   if (!seed.applicationStatus) return [];
+  const result = recommendationResult(seed);
+  const standardId = result.topRecommendation?.pathwayId;
+  if (!standardId) return [];
   const submittedAt = seed.applicationStatus === "Draft" ? "2026-06-20T09:00:00.000Z" : "2026-06-18T09:00:00.000Z";
   const status = seed.applicationStatus;
   return [{
     id: `gc-app-${seed.id}`,
     employeeId: seed.id,
-    apprenticeshipStandardId: seed.recommendation.standardId,
+    apprenticeshipStandardId: standardId,
     status,
     currentOwner: applicationOwnerForStatus(status),
-    reason: seed.applicationReason ?? `Application for ${seed.recommendation.title}.`,
+    reason: seed.applicationReason ?? `Application for ${result.topRecommendation?.title ?? "the selected apprenticeship route"}.`,
     careerGoal: seed.careerGoal ?? seed.futureCapabilities[0] ?? "Career progression.",
     supportRequired: seed.supportRequired ?? "Manager support with evidence and protected learning time.",
     managerNote: status === "Approved by Line Manager" || status === "Awaiting Final Approval" || status === "Approved for Enrolment"
