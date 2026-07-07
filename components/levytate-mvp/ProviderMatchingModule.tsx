@@ -120,6 +120,14 @@ export function ProviderMatchingModule() {
     [data.providerProgrammes],
   );
 
+  const relationshipProviderProgrammes = useMemo(
+    () =>
+      relationshipDraft
+        ? activeProgrammes.filter((programme) => programme.providerId === relationshipDraft.preferredProviderId)
+        : [],
+    [activeProgrammes, relationshipDraft],
+  );
+
   const visibleRelationships = useMemo(
     () => data.providerRelationships.filter((relationship) => {
       const preferred = data.providers.find((provider) => provider.providerId === relationship.preferredProviderId)?.providerName ?? "";
@@ -230,11 +238,20 @@ export function ProviderMatchingModule() {
 
   function openRelationship(relationship?: MvpProviderRelationship) {
     const next = relationship ? structuredClone(relationship) : blankRelationship();
+    const validProgrammeIds = new Set(activeProgrammes.filter((programme) => programme.providerId === next.preferredProviderId).map((programme) => programme.id));
     setRelationshipDraft(next);
-    setSelectedRelationshipProviders(next.backupProviderIds);
-    setSelectedRelationshipProgrammes(next.programmeIds);
+    setSelectedRelationshipProviders(Array.from(new Set(next.backupProviderIds.filter((id) => id && id !== next.preferredProviderId))));
+    setSelectedRelationshipProgrammes(Array.from(new Set(next.programmeIds.filter((id) => validProgrammeIds.has(id)))));
     setRequestDraft(null);
     setError("");
+  }
+
+  function changePreferredProvider(providerId: string) {
+    if (!relationshipDraft) return;
+    const validProgrammeIds = new Set(activeProgrammes.filter((programme) => programme.providerId === providerId).map((programme) => programme.id));
+    setRelationshipDraft({ ...relationshipDraft, preferredProviderId: providerId });
+    setSelectedRelationshipProviders((current) => Array.from(new Set(current.filter((id) => id && id !== providerId))));
+    setSelectedRelationshipProgrammes((current) => Array.from(new Set(current.filter((id) => validProgrammeIds.has(id)))));
   }
 
   function openRequest(request?: MvpMatchingRequest) {
@@ -249,14 +266,15 @@ export function ProviderMatchingModule() {
     event.preventDefault();
     if (!relationshipDraft) return;
     if (!relationshipDraft.category || !relationshipDraft.preferredProviderId) {
-      setError("Category and preferred provider are required.");
+      setError("Capability area and preferred provider are required.");
       return;
     }
+    const validProgrammeIds = new Set(activeProgrammes.filter((programme) => programme.providerId === relationshipDraft.preferredProviderId).map((programme) => programme.id));
     saveProviderRelationship(
       normaliseProviderRelationship({
         ...relationshipDraft,
-        backupProviderIds: selectedRelationshipProviders.filter((id) => id !== relationshipDraft.preferredProviderId),
-        programmeIds: selectedRelationshipProgrammes,
+        backupProviderIds: Array.from(new Set(selectedRelationshipProviders.filter((id) => id && id !== relationshipDraft.preferredProviderId))),
+        programmeIds: Array.from(new Set(selectedRelationshipProgrammes.filter((id) => validProgrammeIds.has(id)))),
       }),
     );
     setRelationshipDraft(null);
@@ -325,26 +343,18 @@ export function ProviderMatchingModule() {
           placeholder="Search categories, providers, programmes or notes"
           actionLabel="Add relationship"
           onAction={() => openRelationship()}
-          filters={
-            <button
-              type="button"
-              onClick={() => openRequest()}
-              className="inline-flex h-10 items-center justify-center rounded-full bg-[#edf7f3] px-4 text-xs font-semibold text-[#0b6f63] ring-1 ring-[#159b8f]/12"
-            >
-              Create sourcing request
-            </button>
-          }
         />
 
         {visibleRelationships.length ? (
           <div className="grid gap-4 xl:grid-cols-2">
             {visibleRelationships.map((relationship) => {
               const preferred = data.providers.find((provider) => provider.providerId === relationship.preferredProviderId);
-              const backups = relationship.backupProviderIds
+              const backups = Array.from(new Set(relationship.backupProviderIds.filter((id) => id && id !== relationship.preferredProviderId)))
                 .map((id) => data.providers.find((provider) => provider.providerId === id)?.providerName)
                 .filter(Boolean) as string[];
               const programmes = relationship.programmeIds
                 .map((id) => data.providerProgrammes.find((programme) => programme.id === id))
+                .filter((programme) => programme?.providerId === relationship.preferredProviderId)
                 .filter(Boolean);
 
               return (
@@ -366,17 +376,17 @@ export function ProviderMatchingModule() {
 
                   <div className="mt-4 grid gap-3 md:grid-cols-3">
                     <MetricMini title="Programme coverage" value={String(programmes.length)} />
-                    <MetricMini title="Fallback providers" value={String(backups.length)} />
+                    <MetricMini title="Backup providers" value={String(backups.length)} />
                     <MetricMini title="Review date" value={relationship.reviewDate || "To confirm"} />
                   </div>
 
                   <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                    <InfoList label="Programme propositions" items={programmes.map((programme) => programme?.programmeName ?? "")} empty="No programmes linked yet" />
-                    <InfoList label="Fallback options" items={backups} empty="No fallback providers" />
+                    <InfoList label="Programme coverage" items={programmes.map((programme) => programme?.programmeName ?? "")} empty="No programmes linked yet" />
+                    <InfoList label="Backup providers" items={backups} empty="No backup providers" />
                   </div>
 
                   <p className="mt-4 text-sm leading-6 text-[#102c3d]/58">
-                    {relationship.notes || "Add notes explaining why this provider relationship is commercially preferred."}
+                    {relationship.notes || "Add relationship notes explaining why this preferred provider is suitable for the capability area."}
                   </p>
 
                   <div className="mt-4 flex justify-end">
@@ -490,7 +500,7 @@ export function ProviderMatchingModule() {
       {relationshipDraft ? (
         <MvpModal title="Provider relationship" eyebrow="Preferred programme setup" onClose={() => setRelationshipDraft(null)} wide>
           <form onSubmit={submitRelationship} className="grid gap-4">
-            <FormSection title="Relationship settings" copy="Define the capability area, preferred provider and review cadence.">
+            <FormSection title="Relationship settings" copy="Define the capability area, preferred provider, programme coverage and review cadence.">
               <FormGrid>
                 <FormSelect
                   label="Capability area"
@@ -503,7 +513,7 @@ export function ProviderMatchingModule() {
                 <FormSelect
                   label="Preferred provider"
                   value={relationshipDraft.preferredProviderId}
-                  onChange={(value) => setRelationshipDraft({ ...relationshipDraft, preferredProviderId: value })}
+                  onChange={changePreferredProvider}
                   options={[
                     { value: "", label: "Select preferred provider" },
                     ...activeProviders.map((provider) => ({ value: provider.providerId, label: provider.providerName })),
@@ -537,7 +547,7 @@ export function ProviderMatchingModule() {
             </FormSection>
 
             <div className="grid gap-4 lg:grid-cols-2">
-              <FormSection title="Fallback providers" copy="Keep controlled alternatives ready when the preferred provider cannot deliver.">
+              <FormSection title="Backup providers" copy="Keep controlled alternatives ready when the preferred provider cannot deliver.">
                 <div className="grid gap-2">
                   {activeProviders
                     .filter((provider) => provider.providerId !== relationshipDraft.preferredProviderId)
@@ -569,9 +579,9 @@ export function ProviderMatchingModule() {
                 </div>
               </FormSection>
 
-              <FormSection title="Programme coverage" copy="Link the specific programmes this relationship is expected to cover.">
+              <FormSection title="Programme coverage" copy="Only programmes delivered by the preferred provider can be linked to this relationship.">
                 <div className="grid max-h-72 gap-2 overflow-y-auto">
-                  {activeProgrammes.map((programme) => {
+                  {relationshipProviderProgrammes.length ? relationshipProviderProgrammes.map((programme) => {
                     const checked = selectedRelationshipProgrammes.includes(programme.id);
                     return (
                       <label
@@ -602,7 +612,11 @@ export function ProviderMatchingModule() {
                         </span>
                       </label>
                     );
-                  })}
+                  }) : (
+                    <p className="rounded-xl bg-[#f8fbfa] px-3 py-3 text-sm leading-6 text-[#102c3d]/58 ring-1 ring-[#102c3d]/[0.06]">
+                      Select a preferred provider with active programmes to set programme coverage.
+                    </p>
+                  )}
                 </div>
               </FormSection>
             </div>

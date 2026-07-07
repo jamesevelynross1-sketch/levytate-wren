@@ -430,7 +430,8 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null }: { initialEm
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    void sendMessage(input);
+    const nextMessage = input.trim() || roleContent[role].prompts[0] || roleContent[role].welcome;
+    void sendMessage(nextMessage);
   }
 
   function chooseAction(action: LevyTateAiAction) {
@@ -469,6 +470,9 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null }: { initialEm
   }
 
   const employeePrioritySummary = data.profile.priorities.slice(0, 3);
+  const conversationStarted = messages.some((message) => message.role === "user");
+  const conversationCtaLabel = conversationStarted ? "Continue conversation" : "Start conversation";
+  const conversationDisabled = loading || (role === "Employee" && !selectedEmployee);
 
   return (
     <div className="grid gap-5">
@@ -577,8 +581,8 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null }: { initialEm
                 placeholder={role === "Employee" ? "Answer the current discovery question or ask for guidance" : "Describe the role, goal or decision you are working through"}
                 className="min-h-[54px] flex-1 resize-none rounded-2xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-4 py-3 text-sm font-medium leading-6 text-[#102c3d] outline-none transition placeholder:text-[#102c3d]/34 focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10"
               />
-              <button disabled={!input.trim() || loading} className="min-h-[48px] rounded-full bg-[#102c3d] px-5 text-sm font-semibold text-white transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-45">
-                Send
+              <button disabled={conversationDisabled} className="min-h-[48px] rounded-full bg-[#102c3d] px-5 text-sm font-semibold text-white transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-45">
+                {input.trim() ? "Continue conversation" : conversationCtaLabel}
               </button>
             </div>
           </form>
