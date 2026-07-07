@@ -161,7 +161,7 @@ function applyMutationLocally(current: MvpWorkspaceData, mutation: LevyTateWorks
   }
 }
 
-export function MvpWorkspaceProvider({ children, initialWorkspace }: { children: ReactNode; initialWorkspace?: LevyTateWorkspaceBootstrap | null }) {
+export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal = true }: { children: ReactNode; initialWorkspace?: LevyTateWorkspaceBootstrap | null; persistLocal?: boolean }) {
   const [data, setData] = useState<MvpWorkspaceData>(initialWorkspace?.data ?? createEmptyMvpWorkspace());
   const [meta, setMeta] = useState<LevyTateWorkspaceMeta | null>(initialWorkspace?.meta ?? null);
   const [hydrated, setHydrated] = useState(Boolean(initialWorkspace));
@@ -170,7 +170,7 @@ export function MvpWorkspaceProvider({ children, initialWorkspace }: { children:
 
   useEffect(() => {
     if (initialWorkspace) {
-      persistLocalWorkspace(initialWorkspace.data);
+      if (persistLocal) persistLocalWorkspace(initialWorkspace.data);
       return;
     }
 
@@ -224,12 +224,12 @@ export function MvpWorkspaceProvider({ children, initialWorkspace }: { children:
     return () => {
       cancelled = true;
     };
-  }, [initialWorkspace]);
+  }, [initialWorkspace, persistLocal]);
 
   useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || !persistLocal) return;
     persistLocalWorkspace(data);
-  }, [data, hydrated]);
+  }, [data, hydrated, persistLocal]);
 
 
   const syncMutation = useCallback((mutation: LevyTateWorkspaceMutation) => {

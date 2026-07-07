@@ -55,8 +55,8 @@ const moduleCopy: Record<ModuleName, string> = {
   Settings: "Workspace setup, business priorities and beta access controls.",
 };
 
-export function LevyTateMvpApp({ initialWorkspace }: { initialWorkspace?: LevyTateWorkspaceBootstrap | null }) {
-  return <LevyTateStandardsProvider><MvpWorkspaceProvider initialWorkspace={initialWorkspace}><MvpAppShell /></MvpWorkspaceProvider></LevyTateStandardsProvider>;
+export function LevyTateMvpApp({ initialWorkspace, persistLocal = true }: { initialWorkspace?: LevyTateWorkspaceBootstrap | null; persistLocal?: boolean }) {
+  return <LevyTateStandardsProvider><MvpWorkspaceProvider initialWorkspace={initialWorkspace} persistLocal={persistLocal}><MvpAppShell /></MvpWorkspaceProvider></LevyTateStandardsProvider>;
 }
 
 function MvpAppShell() {
