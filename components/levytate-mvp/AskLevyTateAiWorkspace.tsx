@@ -962,10 +962,13 @@ function InlineRecommendationTrust({
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">Why LevyTate recommended this</p>
             <p className="mt-1 text-sm font-semibold text-[#102c3d]">{top.title}</p>
           </div>
-          <span className="rounded-full bg-[#edf8f5] px-3 py-1.5 text-[11px] font-semibold text-[#0b6f63]">{inlineConfidenceLabel(top.confidence)}</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-[#102c3d] px-3 py-1.5 text-[11px] font-semibold text-white">{top.recommendationCategory}</span>
+            <span className="rounded-full bg-[#edf8f5] px-3 py-1.5 text-[11px] font-semibold text-[#0b6f63]">{inlineConfidenceLabel(top.confidence)}</span>
+          </div>
         </div>
         <p className="mt-3 text-xs leading-5 text-[#102c3d]/56">
-          This route currently shows the strongest balance between role evidence, future capability and organisational priorities.
+          Career stage detected: {recommendationResult.careerStage}. This route is inside the sensible recommendation envelope for the role, capability evidence and organisation priorities.
         </p>
         {evidence.length ? (
           <div className="mt-3 grid gap-2">

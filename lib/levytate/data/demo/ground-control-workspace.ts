@@ -503,8 +503,9 @@ function toDevelopmentProfile(seed: EmployeeSeed): MvpEmployeeDevelopmentProfile
 }
 
 function recommendationResult(seed: EmployeeSeed): LevyTateRecommendationResult {
-  const top = platformRecommendation(seed.recommendation, "current_best_fit");
   const role = spreadsheetRoleSeeds.find((item) => item.id === seed.roleId);
+  const careerStage = seedCareerStage(role?.title ?? seed.jobRole ?? seed.department);
+  const top = platformRecommendation(seed.recommendation, "current_best_fit", careerStage);
   const alternativeSeed = alternativeForRow({
     roleId: seed.roleId,
     division: seed.department,
@@ -514,7 +515,7 @@ function recommendationResult(seed: EmployeeSeed): LevyTateRecommendationResult 
     jobTitle: role?.title ?? seed.department,
     sourceRow: 0,
   }, seed.recommendation.standardId);
-  const alternative = platformRecommendation({ ...alternativeSeed, fitScore: Math.max(72, seed.recommendation.fitScore - 7) }, "alternative_route");
+  const alternative = platformRecommendation({ ...alternativeSeed, fitScore: Math.max(72, seed.recommendation.fitScore - 7) }, "alternative_route", careerStage);
 
   return {
     recommendations: [top, alternative],
@@ -527,6 +528,25 @@ function recommendationResult(seed: EmployeeSeed): LevyTateRecommendationResult 
     capabilityProfile: capabilityProfile(seed),
     currentCapabilityProfile: capabilityProfile(seed),
     futureCapabilityProfile: futureCapabilityProfile(seed),
+    careerStage,
+    recommendationEnvelope: {
+      careerStage,
+      minimumLevel: careerStage === "Director" || careerStage === "Head Of" ? 5 : careerStage === "Manager" ? 4 : 3,
+      maximumLevel: careerStage === "Entry" ? 4 : careerStage === "Operational" ? 4 : careerStage === "Professional" ? 6 : 7,
+      label: `Seeded ${careerStage} role envelope for the Ground Control demonstration workspace.`,
+      excludedRoutes: careerStage === "Director" || careerStage === "Head Of" ? ["assistant", "foundation", "technician"] : [],
+      strategicOnly: careerStage === "Executive",
+    },
+    qualificationAwareness: {
+      highestQualification: null,
+      previousApprenticeshipLevel: null,
+      professionalMemberships: [],
+      charteredStatus: null,
+      existingCertifications: [],
+      status: "not_collected",
+      missingFields: ["highest qualification", "previous apprenticeship level", "professional memberships", "chartered status", "existing certifications"],
+    },
+    strategicDiscussion: null,
     strategicRecommendation: {
       currentBestFit: top.title,
       futureDevelopmentOpportunity: alternative.title,
@@ -546,7 +566,23 @@ function recommendationResult(seed: EmployeeSeed): LevyTateRecommendationResult 
   };
 }
 
-function platformRecommendation(seed: EmployeeSeed["recommendation"], strategicRole: LevyTatePlatformRecommendation["strategicRole"]): LevyTatePlatformRecommendation {
+function seedCareerStage(title: string): LevyTatePlatformRecommendation["careerStage"] {
+  if (/\b(managing director|chief|executive)\b/i.test(title)) return "Executive";
+  if (/\bdirector\b/i.test(title)) return "Director";
+  if (/\bhead of\b/i.test(title)) return "Head Of";
+  if (/\b(senior manager|regional manager)\b/i.test(title)) return "Senior Manager";
+  if (/\bmanager\b/i.test(title)) return "Manager";
+  if (/\b(supervisor|team leader|foreman)\b/i.test(title)) return "Team Leader";
+  if (/\b(senior|specialist|advisor|adviser|analyst|engineer|surveyor|designer)\b/i.test(title)) return "Professional";
+  if (/\b(operative|arborist|technician|driver|field)\b/i.test(title)) return "Operational";
+  return "Entry";
+}
+
+function platformRecommendation(
+  seed: EmployeeSeed["recommendation"],
+  strategicRole: LevyTatePlatformRecommendation["strategicRole"],
+  careerStage: LevyTatePlatformRecommendation["careerStage"],
+): LevyTatePlatformRecommendation {
   return {
     pathwayId: seed.standardId,
     title: seed.title,
@@ -554,6 +590,10 @@ function platformRecommendation(seed: EmployeeSeed["recommendation"], strategicR
     scoreDelta: 0,
     confidence: Math.min(96, seed.fitScore + 1),
     rationale: seed.rationale,
+    careerStage,
+    recommendationCategory: seed.fitScore >= 82 ? "Strong Recommendation" : "Development Opportunity",
+    careerStageFit: "inside_envelope",
+    credibilityNotes: ["Seeded workspace recommendation checked against role-led Ground Control context."],
     evidence: seed.evidence.map((label, index) => ({
       id: `${seed.standardId}-evidence-${index + 1}`,
       label,

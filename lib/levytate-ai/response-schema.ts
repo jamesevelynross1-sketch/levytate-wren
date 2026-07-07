@@ -233,6 +233,42 @@ export type LevyTateCapabilityFit = {
   weighting: number;
 };
 
+export type LevyTateCareerStage =
+  | "Entry"
+  | "Operational"
+  | "Professional"
+  | "Senior Professional"
+  | "Team Leader"
+  | "Manager"
+  | "Senior Manager"
+  | "Head Of"
+  | "Director"
+  | "Executive";
+
+export type LevyTateRecommendationCategory =
+  | "Strong Recommendation"
+  | "Development Opportunity"
+  | "Strategic Discussion Required";
+
+export type LevyTateRecommendationEnvelope = {
+  careerStage: LevyTateCareerStage;
+  minimumLevel: number | null;
+  maximumLevel: number | null;
+  label: string;
+  excludedRoutes: string[];
+  strategicOnly: boolean;
+};
+
+export type LevyTateQualificationAwareness = {
+  highestQualification?: string | null;
+  previousApprenticeshipLevel?: number | null;
+  professionalMemberships?: string[];
+  charteredStatus?: string | null;
+  existingCertifications?: string[];
+  status: "not_collected";
+  missingFields: string[];
+};
+
 export type LevyTateStrategicSignal = {
   category:
     | "current_capability"
@@ -286,6 +322,10 @@ export type LevyTatePlatformRecommendation = {
   availability: "approved" | "role_fit_review" | "not_available";
   eligibility: "eligible" | "requires_review" | "ineligible";
   providerAvailability: "mapped" | "matching_available" | "unconfirmed";
+  careerStage: LevyTateCareerStage;
+  recommendationCategory: LevyTateRecommendationCategory;
+  careerStageFit: "inside_envelope" | "development_stretch" | "outside_envelope" | "strategic_only";
+  credibilityNotes: string[];
 };
 
 export type LevyTateRecommendationResult = {
@@ -299,6 +339,10 @@ export type LevyTateRecommendationResult = {
   capabilityProfile: LevyTateCapabilityScore[];
   currentCapabilityProfile: LevyTateCapabilityScore[];
   futureCapabilityProfile: LevyTateCapabilityScore[];
+  careerStage: LevyTateCareerStage;
+  recommendationEnvelope: LevyTateRecommendationEnvelope;
+  qualificationAwareness: LevyTateQualificationAwareness;
+  strategicDiscussion: string | null;
   strategicRecommendation: LevyTateStrategicRecommendation | null;
 };
 
@@ -787,6 +831,19 @@ function parseRecommendationResult(value: unknown): LevyTateRecommendationResult
   if (value === null) return null;
   if (!value || typeof value !== "object") return undefined;
   const candidate = value as Partial<LevyTateRecommendationResult>;
+  const careerStage: LevyTateCareerStage =
+    candidate.careerStage === "Entry" ||
+    candidate.careerStage === "Operational" ||
+    candidate.careerStage === "Professional" ||
+    candidate.careerStage === "Senior Professional" ||
+    candidate.careerStage === "Team Leader" ||
+    candidate.careerStage === "Manager" ||
+    candidate.careerStage === "Senior Manager" ||
+    candidate.careerStage === "Head Of" ||
+    candidate.careerStage === "Director" ||
+    candidate.careerStage === "Executive"
+      ? candidate.careerStage
+      : "Professional";
   const score = (item: unknown) => typeof item === "number" && Number.isFinite(item)
     ? Math.max(-100, Math.min(100, Math.round(item)))
     : 0;
@@ -876,6 +933,17 @@ function parseRecommendationResult(value: unknown): LevyTateRecommendationResult
         const providerAvailability = recommendation.providerAvailability === "mapped" || recommendation.providerAvailability === "unconfirmed"
           ? recommendation.providerAvailability
           : "matching_available";
+        const recommendationCategory: LevyTateRecommendationCategory =
+          recommendation.recommendationCategory === "Strategic Discussion Required" ||
+          recommendation.recommendationCategory === "Development Opportunity"
+            ? recommendation.recommendationCategory
+            : "Strong Recommendation";
+        const careerStageFit: LevyTatePlatformRecommendation["careerStageFit"] =
+          recommendation.careerStageFit === "development_stretch" ||
+          recommendation.careerStageFit === "outside_envelope" ||
+          recommendation.careerStageFit === "strategic_only"
+            ? recommendation.careerStageFit
+            : "inside_envelope";
         const strategicRole: LevyTatePlatformRecommendation["strategicRole"] =
           recommendation.strategicRole === "current_best_fit" ||
           recommendation.strategicRole === "future_development" ||
@@ -911,6 +979,10 @@ function parseRecommendationResult(value: unknown): LevyTateRecommendationResult
           availability,
           eligibility,
           providerAvailability,
+          careerStage: recommendation.careerStage ?? careerStage,
+          recommendationCategory,
+          careerStageFit,
+          credibilityNotes: cleanStringArray(recommendation.credibilityNotes, 6) ?? [],
         }];
       })
     : [];
@@ -927,6 +999,34 @@ function parseRecommendationResult(value: unknown): LevyTateRecommendationResult
     capabilityProfile,
     currentCapabilityProfile: parseCapabilityProfile(candidate.currentCapabilityProfile ?? candidate.capabilityProfile),
     futureCapabilityProfile: parseCapabilityProfile(candidate.futureCapabilityProfile),
+    careerStage,
+    recommendationEnvelope: candidate.recommendationEnvelope && typeof candidate.recommendationEnvelope === "object"
+      ? {
+          careerStage,
+          minimumLevel: typeof candidate.recommendationEnvelope.minimumLevel === "number" ? candidate.recommendationEnvelope.minimumLevel : null,
+          maximumLevel: typeof candidate.recommendationEnvelope.maximumLevel === "number" ? candidate.recommendationEnvelope.maximumLevel : null,
+          label: text(candidate.recommendationEnvelope.label, 180) || "Career-stage envelope not previously recorded.",
+          excludedRoutes: cleanStringArray(candidate.recommendationEnvelope.excludedRoutes, 12) ?? [],
+          strategicOnly: candidate.recommendationEnvelope.strategicOnly === true,
+        }
+      : {
+          careerStage,
+          minimumLevel: null,
+          maximumLevel: null,
+          label: "Career-stage envelope not previously recorded.",
+          excludedRoutes: [],
+          strategicOnly: false,
+        },
+    qualificationAwareness: {
+      highestQualification: candidate.qualificationAwareness?.highestQualification ?? null,
+      previousApprenticeshipLevel: candidate.qualificationAwareness?.previousApprenticeshipLevel ?? null,
+      professionalMemberships: cleanStringArray(candidate.qualificationAwareness?.professionalMemberships, 8) ?? [],
+      charteredStatus: candidate.qualificationAwareness?.charteredStatus ?? null,
+      existingCertifications: cleanStringArray(candidate.qualificationAwareness?.existingCertifications, 8) ?? [],
+      status: "not_collected",
+      missingFields: cleanStringArray(candidate.qualificationAwareness?.missingFields, 8) ?? ["highest qualification", "previous apprenticeship level", "professional memberships", "chartered status", "existing certifications"],
+    },
+    strategicDiscussion: text(candidate.strategicDiscussion, 700) || null,
     strategicRecommendation: parseStrategicRecommendation(candidate.strategicRecommendation),
   };
 }
