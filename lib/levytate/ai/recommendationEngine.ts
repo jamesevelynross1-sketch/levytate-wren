@@ -4,6 +4,8 @@ import type {
   LevyTateCapabilityFit,
   LevyTateCapabilityScore,
   LevyTateCareerStage,
+  LevyTateDevelopmentObjective,
+  LevyTateExcludedPathway,
   LevyTatePlatformRecommendation,
   LevyTateQualificationAwareness,
   LevyTateRecommendationEvidence,
@@ -11,6 +13,7 @@ import type {
   LevyTateRecommendationResult,
   LevyTateRecommendationCategory,
   LevyTateRecommendedPathway,
+  LevyTateRoleFamily,
   LevyTateStrategicRecommendation,
   LevyTateStrategicSignal,
 } from "@/lib/levytate/ai/types";
@@ -54,6 +57,7 @@ type PathwayDefinition = {
   baseScore: number;
   rationale: string;
   capabilityWeights: Partial<Record<CapabilityDomain, number>>;
+  roleFamilies: LevyTateRoleFamily[];
 };
 
 type StrategicPriorityProfile = {
@@ -78,6 +82,7 @@ type ScoredRecommendation = LevyTatePlatformRecommendation & {
 
 const recommendationEngineVersion = "4-career-intelligence";
 const revealThreshold = 74;
+const minimumConsultantConfidence = 58;
 
 const careerStageConfigs: Record<LevyTateCareerStage, CareerStageConfig> = {
   Entry: { minimumLevel: 2, maximumLevel: 4, label: "Entry roles usually suit Level 2 to Level 4 routes where the programme builds foundational role capability." },
@@ -201,41 +206,41 @@ const capabilityDefinitions: CapabilityDefinition[] = [
   ]),
 ];
 
-function pathway(standardId: string, baseScore: number, rationale: string, capabilityWeights: Partial<Record<CapabilityDomain, number>>): PathwayDefinition {
+function pathway(standardId: string, baseScore: number, rationale: string, capabilityWeights: Partial<Record<CapabilityDomain, number>>, roleFamilies: LevyTateRoleFamily[]): PathwayDefinition {
   const standard = getApprenticeshipStandard(standardId);
   if (!standard) throw new Error("Unknown apprenticeship standard: " + standardId);
-  return { pathwayId: standard.id, title: "Level " + standard.level + " " + standard.title, standard: standard.title, baseScore, rationale, capabilityWeights };
+  return { pathwayId: standard.id, title: "Level " + standard.level + " " + standard.title, standard: standard.title, baseScore, rationale, capabilityWeights, roleFamilies };
 }
 
 const pathwayCatalogue: PathwayDefinition[] = [
-  pathway("ST0118", 20, "Best where the role combines analysis, SQL, BI reporting, visualisation and business insight ownership.", { data_analysis: 24, sql: 18, reporting_bi: 22, data_visualisation: 14, data_management: 10, business_analysis: 8 }),
-  pathway("ST0795", 33, "Best where the role needs practical data handling, reporting, spreadsheets, CRM data quality and repeatable operational insight.", { data_analysis: 20, reporting_bi: 30, data_management: 24, data_visualisation: 4, administration: 8, automation: 12, finance: 4 }),
-  pathway("ST0117", 20, "Best where the role needs requirements discovery, process analysis, stakeholder engagement and systems change capability.", { business_analysis: 28, project_delivery: 12, process_improvement: 12, data_analysis: 8, digital_support: 6 }),
-  pathway("ST0310", 19, "Best where the role needs project planning, risk control, stakeholder coordination and accountable delivery.", { project_delivery: 32, business_analysis: 10, leadership: 8, process_improvement: 8 }),
-  pathway("ST0313", 24, "Best where the role needs sourcing, supplier management, commercial judgement and procurement practice.", { procurement: 42, business_analysis: 8, project_delivery: 6, data_analysis: 5 }),
-  pathway("ST0811", 25, "Best where the role needs senior procurement strategy, commercial leadership, supplier performance and supply chain decision-making.", { procurement: 50, business_analysis: 12, project_delivery: 8, data_analysis: 6, leadership: 8 }),
-  pathway("ST0071", 23, "Best where the role needs complex customer handling, service quality and ownership of customer outcomes.", { customer_service: 40, data_management: 8, leadership: 6, process_improvement: 6 }),
-  pathway("ST0120", 22, "Best where the role supports colleagues with digital systems, user needs, digital processes and practical workplace technology.", { digital_support: 34, customer_service: 10, data_management: 8, automation: 8, cyber: 6 }),
-  pathway("ST0973", 18, "Best where the role is closer to ICT support, infrastructure, networking, devices and technical troubleshooting.", { digital_support: 28, cyber: 8, software_development: 6, customer_service: 6 }),
-  pathway("ST0116", 20, "Best where the role is focused on coding, building software, APIs, testing and application development.", { software_development: 42, sql: 8, digital_support: 6, automation: 6 }),
-  pathway("ST0865", 31, "Best where the role needs cyber security practice, secure systems awareness, threat detection and user protection capability.", { cyber: 62, digital_support: 10, data_management: 6, software_development: 4 }),
-  pathway("ST1512", 24, "Best where the role needs practical AI adoption, automation, productivity improvement and responsible use of AI-enabled tools.", { ai_adoption: 34, automation: 28, process_improvement: 8, digital_support: 6, data_analysis: 4, marketing: 10, education_administration: 6 }),
-  pathway("ST0070", 8, "Best where the role needs broad business administration, records, coordination and operational support capability.", { administration: 14, customer_service: 8, data_management: 3, reporting_bi: 2 }),
-  pathway("ST0238", 24, "Best where the role needs people advisory, employee relations, workforce policy and HR professional capability.", { hr: 42, leadership: 8, administration: 6, customer_service: 6, data_management: 4 }),
-  pathway("ST0813", 25, "Best where the role is senior people strategy, complex HR leadership, workforce planning or organisational development.", { hr: 48, leadership: 14, business_analysis: 8, project_delivery: 6 }),
-  pathway("ST0608", 18, "Best where the role needs accounts processing, finance administration, reconciliations and accurate financial records.", { finance: 48, administration: 8, data_management: 8, reporting_bi: 5 }),
-  pathway("ST1303", 25, "Best where the role is finance management, accounting operations, governance, reporting control and financial decision support.", { finance: 50, reporting_bi: 16, data_analysis: 10, leadership: 8 }),
-  pathway("ST0575", 16, "Best where the role needs school business administration, trust operations, school reporting and education support processes.", { education_administration: 48, administration: 8, reporting_bi: 5, data_management: 5, project_delivery: 5 }),
-  pathway("ST0596", 22, "Best where the role needs campaign delivery, marketing planning, customer growth, content performance and marketing analytics.", { marketing: 42, customer_service: 8, reporting_bi: 8, automation: 8, data_analysis: 5 }),
-  pathway("ST0192", 24, "Best where the role is explicitly focused on continuous improvement, lean practice, operational performance and measurable process change.", { process_improvement: 42, manufacturing: 12, engineering: 8, automation: 6, leadership: 8 }),
-  pathway("ST0555", 24, "Best where the role needs senior continuous improvement, improvement strategy and cross-functional operational change capability.", { process_improvement: 48, leadership: 14, project_delivery: 10, manufacturing: 8, engineering: 8 }),
-  pathway("ST0556", 24, "Best where the role leads improvement programmes, operational excellence and measurable transformation across teams.", { process_improvement: 50, leadership: 18, project_delivery: 12, manufacturing: 8, engineering: 8 }),
-  pathway("ST0457", 23, "Best where the role needs applied engineering, maintenance, technical evidence and manufacturing workplace competence.", { engineering: 34, manufacturing: 16, process_improvement: 6, automation: 4 }),
-  pathway("ST0048", 22, "Best where the role needs construction site supervision, safety, quality control and built environment delivery.", { construction: 40, project_delivery: 8, leadership: 6 }),
-  pathway("ST0585", 23, "Best where the role is moving from analytics into data science, predictive modelling and advanced insight.", { data_analysis: 44, sql: 16, reporting_bi: 12, data_visualisation: 10, ai_adoption: 10 }),
-  pathway("ST0119", 23, "Best where the role needs broad digital technology professional capability across systems, data, software and technology delivery.", { digital_support: 22, software_development: 18, business_analysis: 12, project_delivery: 10, data_analysis: 8 }),
-  pathway("ST0482", 23, "Best where the role is senior specialist digital technology, architecture, transformation or advanced technical leadership.", { digital_support: 24, software_development: 20, business_analysis: 14, project_delivery: 12, cyber: 10 }),
-  pathway("ST0411", 23, "Best where the role has senior project leadership, delivery governance, commercial risk and cross-functional programme ownership.", { project_delivery: 44, leadership: 14, business_analysis: 8, process_improvement: 8 }),
+  pathway("ST0118", 20, "Best where the role combines analysis, SQL, BI reporting, visualisation and business insight ownership.", { data_analysis: 24, sql: 18, reporting_bi: 22, data_visualisation: 14, data_management: 10, business_analysis: 8 }, ["Data", "Digital", "Business Analysis"]),
+  pathway("ST0795", 33, "Best where the role needs practical data handling, reporting, spreadsheets, CRM data quality and repeatable operational insight.", { data_analysis: 20, reporting_bi: 30, data_management: 24, data_visualisation: 4, administration: 8, automation: 12, finance: 4 }, ["Data", "Administration", "Digital"]),
+  pathway("ST0117", 20, "Best where the role needs requirements discovery, process analysis, stakeholder engagement and systems change capability.", { business_analysis: 28, project_delivery: 12, process_improvement: 12, data_analysis: 8, digital_support: 6 }, ["Business Analysis", "Digital", "Project Delivery"]),
+  pathway("ST0310", 19, "Best where the role needs project planning, risk control, stakeholder coordination and accountable delivery.", { project_delivery: 32, business_analysis: 10, leadership: 8, process_improvement: 8 }, ["Project Delivery", "Operations", "Construction"]),
+  pathway("ST0313", 24, "Best where the role needs sourcing, supplier management, commercial judgement and procurement practice.", { procurement: 42, business_analysis: 8, project_delivery: 6, data_analysis: 5 }, ["Procurement", "Commercial"]),
+  pathway("ST0811", 25, "Best where the role needs senior procurement strategy, commercial leadership, supplier performance and supply chain decision-making.", { procurement: 50, business_analysis: 12, project_delivery: 8, data_analysis: 6, leadership: 8 }, ["Procurement", "Commercial", "Leadership"]),
+  pathway("ST0071", 23, "Best where the role needs complex customer handling, service quality and ownership of customer outcomes.", { customer_service: 40, data_management: 8, leadership: 6, process_improvement: 6 }, ["Customer Service"]),
+  pathway("ST0120", 22, "Best where the role supports colleagues with digital systems, user needs, digital processes and practical workplace technology.", { digital_support: 34, customer_service: 10, data_management: 8, automation: 8, cyber: 6 }, ["Digital", "IT"]),
+  pathway("ST0973", 18, "Best where the role is closer to ICT support, infrastructure, networking, devices and technical troubleshooting.", { digital_support: 28, cyber: 8, software_development: 6, customer_service: 6 }, ["IT", "Digital"]),
+  pathway("ST0116", 20, "Best where the role is focused on coding, building software, APIs, testing and application development.", { software_development: 42, sql: 8, digital_support: 6, automation: 6 }, ["Digital", "IT"]),
+  pathway("ST0865", 31, "Best where the role needs cyber security practice, secure systems awareness, threat detection and user protection capability.", { cyber: 62, digital_support: 10, data_management: 6, software_development: 4 }, ["Cyber", "IT", "Digital"]),
+  pathway("ST1512", 24, "Best where the role needs practical AI adoption, automation, productivity improvement and responsible use of AI-enabled tools.", { ai_adoption: 34, automation: 28, process_improvement: 8, digital_support: 6, data_analysis: 4, marketing: 10, education_administration: 6 }, ["Digital", "Operations", "Administration"]),
+  pathway("ST0070", 8, "Best where the role needs broad business administration, records, coordination and operational support capability.", { administration: 14, customer_service: 8, data_management: 3, reporting_bi: 2 }, ["Administration"]),
+  pathway("ST0238", 24, "Best where the role needs people advisory, employee relations, workforce policy and HR professional capability.", { hr: 42, leadership: 8, administration: 6, customer_service: 6, data_management: 4 }, ["HR", "Learning & Development"]),
+  pathway("ST0813", 25, "Best where the role is senior people strategy, complex HR leadership, workforce planning or organisational development.", { hr: 48, leadership: 14, business_analysis: 8, project_delivery: 6 }, ["HR", "Learning & Development", "Leadership"]),
+  pathway("ST0608", 18, "Best where the role needs accounts processing, finance administration, reconciliations and accurate financial records.", { finance: 48, administration: 8, data_management: 8, reporting_bi: 5 }, ["Finance", "Administration"]),
+  pathway("ST1303", 25, "Best where the role is finance management, accounting operations, governance, reporting control and financial decision support.", { finance: 50, reporting_bi: 16, data_analysis: 10, leadership: 8 }, ["Finance", "Leadership"]),
+  pathway("ST0575", 16, "Best where the role needs school business administration, trust operations, school reporting and education support processes.", { education_administration: 48, administration: 8, reporting_bi: 5, data_management: 5, project_delivery: 5 }, ["Education", "Administration"]),
+  pathway("ST0596", 22, "Best where the role needs campaign delivery, marketing planning, customer growth, content performance and marketing analytics.", { marketing: 42, customer_service: 8, reporting_bi: 8, automation: 8, data_analysis: 5 }, ["Marketing", "Commercial"]),
+  pathway("ST0192", 24, "Best where the role is explicitly focused on continuous improvement, lean practice, operational performance and measurable process change.", { process_improvement: 42, manufacturing: 12, engineering: 8, automation: 6, leadership: 8 }, ["Operations", "Manufacturing", "Field Operations"]),
+  pathway("ST0555", 24, "Best where the role needs senior continuous improvement, improvement strategy and cross-functional operational change capability.", { process_improvement: 48, leadership: 14, project_delivery: 10, manufacturing: 8, engineering: 8 }, ["Operations", "Leadership", "Manufacturing"]),
+  pathway("ST0556", 24, "Best where the role leads improvement programmes, operational excellence and measurable transformation across teams.", { process_improvement: 50, leadership: 18, project_delivery: 12, manufacturing: 8, engineering: 8 }, ["Operations", "Leadership", "Manufacturing"]),
+  pathway("ST0457", 23, "Best where the role needs applied engineering, maintenance, technical evidence and manufacturing workplace competence.", { engineering: 34, manufacturing: 16, process_improvement: 6, automation: 4 }, ["Engineering", "Manufacturing"]),
+  pathway("ST0048", 22, "Best where the role needs construction site supervision, safety, quality control and built environment delivery.", { construction: 40, project_delivery: 8, leadership: 6 }, ["Construction", "Project Delivery"]),
+  pathway("ST0585", 23, "Best where the role is moving from analytics into data science, predictive modelling and advanced insight.", { data_analysis: 44, sql: 16, reporting_bi: 12, data_visualisation: 10, ai_adoption: 10 }, ["Data", "Digital"]),
+  pathway("ST0119", 23, "Best where the role needs broad digital technology professional capability across systems, data, software and technology delivery.", { digital_support: 22, software_development: 18, business_analysis: 12, project_delivery: 10, data_analysis: 8 }, ["Digital", "IT", "Leadership"]),
+  pathway("ST0482", 23, "Best where the role is senior specialist digital technology, architecture, transformation or advanced technical leadership.", { digital_support: 24, software_development: 20, business_analysis: 14, project_delivery: 12, cyber: 10 }, ["Digital", "IT", "Cyber", "Leadership"]),
+  pathway("ST0411", 23, "Best where the role has senior project leadership, delivery governance, commercial risk and cross-functional programme ownership.", { project_delivery: 44, leadership: 14, business_analysis: 8, process_improvement: 8 }, ["Project Delivery", "Leadership", "Operations"]),
 ];
 
 function clamp(value: number) {
@@ -255,6 +260,102 @@ function roleSeniorityText(request: LevyTateAiRequest) {
     request.contextData?.selectedPersona?.role,
     request.employeeDiscovery?.roleTitle,
   ]).toLowerCase();
+}
+
+function consultantContextText(request: LevyTateAiRequest) {
+  return uniqueText([
+    request.workspaceEmployeeContext?.employee?.jobTitle,
+    request.workspaceEmployeeContext?.employee?.division,
+    request.workspaceEmployeeContext?.employee?.department,
+    request.workspaceEmployeeContext?.employee?.team,
+    request.workspaceEmployeeContext?.role?.title,
+    request.workspaceEmployeeContext?.role?.businessArea,
+    request.workspaceEmployeeContext?.role?.careerLevel,
+    ...(request.workspaceEmployeeContext?.role?.skillsTags ?? []),
+    request.conversationProfile?.currentRole,
+    request.conversationProfile?.currentDepartment,
+    request.conversationProfile?.careerGoal,
+    request.conversationProfile?.reasonForDevelopment,
+    ...(request.conversationProfile?.currentSkills ?? []),
+    ...(request.conversationProfile?.interestAreas ?? []),
+    request.employeeDiscovery?.roleTitle,
+    request.employeeDiscovery?.department,
+    ...(request.employeeDiscovery?.responsibilities ?? []),
+    ...(request.employeeDiscovery?.currentSkills ?? []),
+    ...(request.employeeDiscovery?.businessFunctions ?? []),
+    ...(request.employeeDiscovery?.currentCapabilities ?? []),
+    ...(request.employeeDiscovery?.futureCapabilities ?? []),
+    request.contextData?.selectedPersona?.role,
+    request.contextData?.selectedPersona?.department,
+    request.contextData?.selectedPersona?.careerGoal,
+    request.userMessage,
+  ]).toLowerCase();
+}
+
+type RoleFamilyDecision = {
+  primary: LevyTateRoleFamily;
+  secondary: LevyTateRoleFamily[];
+  evidence: string[];
+};
+
+function inferRoleFamily(request: LevyTateAiRequest, careerStage: LevyTateCareerStage): RoleFamilyDecision {
+  const text = consultantContextText(request);
+  const matches: Array<{ family: LevyTateRoleFamily; weight: number; evidence: string }> = [];
+  const add = (family: LevyTateRoleFamily, weight: number, pattern: RegExp, evidence: string) => {
+    if (pattern.test(text)) matches.push({ family, weight, evidence });
+  };
+
+  add("Executive", 95, /\b(managing director|chief executive|chief operating|chief finance|ceo|coo|cfo|executive director|non-exec)\b/i, "Executive role title detected");
+  add("Finance", 90, /\b(finance director|finance manager|finance assistant|accounts|accounting|payroll|ledger|commercial finance)\b/i, "Finance role or function detected");
+  add("HR", 90, /\b(people director|hr director|head of hr|hr advisor|people advisor|people partner|human resources|employee relations)\b/i, "People or HR function detected");
+  add("Learning & Development", 74, /\b(learning|talent|development|organisational development|training)\b/i, "Learning or talent development context detected");
+  add("Procurement", 90, /\b(procurement|buyer|buying|sourcing|supplier|supply chain|commercial procurement)\b/i, "Procurement or supplier context detected");
+  add("Commercial", 86, /\b(commercial director|commercial operations|business development|sales director|bid director|tender|proposal)\b/i, "Commercial function detected");
+  add("Health & Safety", 92, /\b(hsqe|health and safety|hsqe director|safety director|health and safety manager)\b/i, "Explicit health, safety, quality or compliance role detected");
+  add("Health & Safety", 62, /\b(safety|risk|compliance|audit|quality assurance)\b/i, "Health, safety, quality or compliance context detected");
+  add("Environment", 72, /\b(environment|environmental|sustainability|ecology|biodiversity|carbon|nature recovery)\b/i, "Environmental or sustainability context detected");
+  add("Quality", 62, /\b(quality|assurance|audit|compliance)\b/i, "Quality or assurance context detected");
+  add("Utilities", 84, /\b(utilities|inland waterways|waterways|winter maintenance|vegetation management)\b/i, "Utilities or waterways context detected");
+  add("Arboriculture", 92, /\b(arborist|arboriculture|tree|forestry|vegetation|climbing)\b/i, "Arboriculture context detected");
+  add("Grounds Maintenance", 86, /\b(grounds|landscape|horticulture|litter|grounds maintenance)\b/i, "Grounds maintenance context detected");
+  add("Land Based", 66, /\b(field|land based|outdoor|estate|grounds|landscape)\b/i, "Land-based operational context detected");
+  add("Field Operations", 70, /\b(field operations|regional operations|operative|mobile crew|contracts manager|operations team)\b/i, "Field operations context detected");
+  add("Operations", 86, /\b(operations director|operations manager|operational|productivity|process improvement|efficiency)\b/i, "Operational delivery context detected");
+  add("Engineering", 82, /\b(engineer|engineering|maintenance|fault finding|plant|technical maintenance)\b/i, "Engineering or maintenance context detected");
+  add("Construction", 82, /\b(construction|site supervisor|built environment|quantity surveyor|estimator|site delivery)\b/i, "Construction or built environment context detected");
+  add("Project Delivery", 72, /\b(project manager|project coordinator|project delivery|mobilisation|programme manager|implementation)\b/i, "Project delivery context detected");
+  add("Business Analysis", 82, /\b(business analyst|business analysis|requirements|process mapping|product owner|transformation)\b/i, "Business analysis context detected");
+  add("Data", 84, /\b(data analyst|reporting analyst|business intelligence|insight|analytics|power bi|sql|reporting)\b/i, "Data or reporting context detected");
+  add("Digital", 76, /\b(digital|ai|automation|copilot|microsoft 365|systems|application|software)\b/i, "Digital or automation context detected");
+  add("IT", 82, /\b(it support|ict|service desk|helpdesk|network|infrastructure|desktop support|devops)\b/i, "IT support or infrastructure context detected");
+  add("Cyber", 86, /\b(cyber|security|secure systems|information security|network security)\b/i, "Cyber security context detected");
+  add("Customer Service", 80, /\b(customer service|customer advisor|contact centre|client services|account manager|crm)\b/i, "Customer service context detected");
+  add("Marketing", 80, /\b(marketing|campaign|brand|communications|content|social media)\b/i, "Marketing or communications context detected");
+  add("Transport", 72, /\b(transport|fleet|driver|logistics)\b/i, "Transport or logistics context detected");
+  add("Fleet", 76, /\b(fleet|vehicle|driver|transport)\b/i, "Fleet context detected");
+  add("Education", 76, /\b(school|academy|mat|education)\b/i, "Education context detected");
+  add("Administration", 48, /\b(admin|administrator|assistant|coordinator|scheduler|planner|pa to)\b/i, "Administrative role context detected");
+  add("Leadership", careerStage === "Director" || careerStage === "Head Of" || careerStage === "Senior Manager" ? 55 : 36, /\b(manager|director|head of|lead|supervisor|leadership|succession)\b/i, "Leadership responsibility detected");
+
+  const ordered = matches.sort((left, right) => right.weight - left.weight);
+  const primary = ordered[0]?.family ?? (careerStage === "Executive" ? "Executive" : "Administration");
+  const secondary = [...new Set(ordered.map((item) => item.family).filter((family) => family !== primary))].slice(0, 5);
+  const evidence = [...new Set(ordered.map((item) => item.evidence))].slice(0, 5);
+  return { primary, secondary, evidence };
+}
+
+function inferDevelopmentObjective(request: LevyTateAiRequest): LevyTateDevelopmentObjective {
+  const text = consultantContextText(request);
+  if (/\b(ai|copilot|automation|automate|prompt|generative ai|microsoft 365)\b/i.test(text)) return "AI adoption";
+  if (/\b(productivity|efficiency|process improvement|lean|continuous improvement|waste|downtime|streamline)\b/i.test(text)) return "Productivity improvement";
+  if (/\b(succession|future leader|pipeline|ready for next role|progression)\b/i.test(text)) return "Succession preparation";
+  if (/\b(compliance|hsqe|safety|risk|audit|quality|assurance)\b/i.test(text)) return "Compliance improvement";
+  if (/\b(transformation|change|implementation|programme|digital transformation|operating model)\b/i.test(text)) return "Transformation support";
+  if (/\b(manager|management|lead a team|leadership|supervisor)\b/i.test(text)) return "Management progression";
+  if (/\b(commercial|procurement|supplier|contract|sourcing|bid|sales)\b/i.test(text)) return "Commercial capability";
+  if (/\b(technical|engineer|cyber|software|data science|specialist|infrastructure)\b/i.test(text)) return "Technical specialism";
+  if (/\b(better at current role|current role|confidence|core role|day-to-day)\b/i.test(text)) return "Current role capability";
+  return "Career exploration";
 }
 
 function inferCareerStage(request: LevyTateAiRequest): LevyTateCareerStage {
@@ -374,16 +475,119 @@ function careerStageAssessment(definition: PathwayDefinition, envelope: LevyTate
   };
 }
 
-function recommendationCategoryFor(score: number, confidence: number, careerStageFit: LevyTatePlatformRecommendation["careerStageFit"]): LevyTateRecommendationCategory {
+function roleFamilyAssessment(
+  definition: PathwayDefinition,
+  roleFamily: RoleFamilyDecision,
+  developmentObjective: LevyTateDevelopmentObjective,
+  profileMap: CapabilityMap,
+  careerStage: LevyTateCareerStage,
+) {
+  const candidateFamilies = [roleFamily.primary, ...roleFamily.secondary];
+  const familyMatch = definition.roleFamilies.some((family) => candidateFamilies.includes(family));
+  const strongestWeightedCapability = Math.max(
+    0,
+    ...Object.keys(definition.capabilityWeights).map((domain) => profileMap.get(domain as CapabilityDomain)?.score ?? 0),
+  );
+  const crossFamilyAllowed =
+    (developmentObjective === "AI adoption" && definition.roleFamilies.some((family) => ["Digital", "Data", "Operations", "Administration"].includes(family))) ||
+    (developmentObjective === "Productivity improvement" && definition.roleFamilies.some((family) => ["Operations", "Field Operations", "Manufacturing", "Business Analysis"].includes(family))) ||
+    (developmentObjective === "Transformation support" && definition.roleFamilies.some((family) => ["Business Analysis", "Project Delivery", "Digital", "Operations"].includes(family))) ||
+    (developmentObjective === "Commercial capability" && definition.roleFamilies.some((family) => ["Commercial", "Procurement", "Finance"].includes(family))) ||
+    (developmentObjective === "Technical specialism" && definition.roleFamilies.some((family) => ["Engineering", "IT", "Cyber", "Data", "Digital"].includes(family)));
+  const restrictedOperationalFamily = ["Arboriculture", "Grounds Maintenance", "Land Based", "Field Operations", "Utilities"].includes(roleFamily.primary);
+  const seniorStrategicFamily = ["Director", "Executive", "Head Of", "Senior Manager"].includes(careerStage);
+  const notes = [
+    `Role family detected: ${roleFamily.primary}.`,
+    `Development objective inferred: ${developmentObjective}.`,
+    `Programme families: ${definition.roleFamilies.join(", ")}.`,
+  ];
+
+  if (roleFamily.primary === "Executive") {
+    return {
+      include: false,
+      penalty: 100,
+      notes: [...notes, "Executive roles require a strategic development discussion rather than automatic apprenticeship matching."],
+      excludedReason: `${definition.title} was excluded because the employee is in an executive role family.`,
+    };
+  }
+
+  if (seniorStrategicFamily && /\b(level 2|assistant|technician|foundation|business administrator)\b/i.test(definition.title)) {
+    return {
+      include: false,
+      penalty: 100,
+      notes: [...notes, "The route is too junior for the detected seniority."],
+      excludedReason: `${definition.title} was excluded because it would undermine confidence for a ${careerStage} role.`,
+    };
+  }
+
+  if (restrictedOperationalFamily && !familyMatch && !crossFamilyAllowed) {
+    return {
+      include: false,
+      penalty: 100,
+      notes: [...notes, "The programme sits outside the employee's operational role family."],
+      excludedReason: `${definition.title} was excluded because ${roleFamily.primary} roles need role-family evidence before LevyTate recommends ${definition.roleFamilies.join(", ")} routes.`,
+    };
+  }
+
+  if (["Health & Safety", "Environment", "Quality"].includes(roleFamily.primary) && !familyMatch && strongestWeightedCapability < 75) {
+    return {
+      include: false,
+      penalty: 100,
+      notes: [...notes, "The programme does not have enough SHEQ, environment or quality evidence."],
+      excludedReason: `${definition.title} was excluded because ${roleFamily.primary} requires a specialist or clearly evidenced route.`,
+    };
+  }
+
+  if (!familyMatch && !crossFamilyAllowed && strongestWeightedCapability < (seniorStrategicFamily ? 75 : 62)) {
+    return {
+      include: false,
+      penalty: 100,
+      notes: [...notes, "The route family is not strongly evidenced enough for a consultant to recommend it."],
+      excludedReason: `${definition.title} was excluded because it is outside the ${roleFamily.primary} role family without strong explicit evidence.`,
+    };
+  }
+
+  const penalty = familyMatch ? 0 : Math.max(8, seniorStrategicFamily ? 18 : 12);
+  return {
+    include: true,
+    penalty,
+    notes: [...notes, familyMatch ? "Role family directly matches the programme family." : "Cross-family recommendation allowed only because explicit evidence supports it."],
+    excludedReason: null,
+  };
+}
+
+function recommendationCategoryFor(
+  score: number,
+  confidence: number,
+  careerStageFit: LevyTatePlatformRecommendation["careerStageFit"],
+  currentFitScore: number,
+  futureFitScore: number,
+): LevyTateRecommendationCategory {
   if (careerStageFit === "strategic_only" || careerStageFit === "outside_envelope") return "Strategic Discussion Required";
+  if (futureFitScore >= currentFitScore + 12 && futureFitScore >= 62) return "Future Progression";
   if (score >= 78 && confidence >= 70 && careerStageFit === "inside_envelope") return "Strong Recommendation";
   return "Development Opportunity";
 }
 
-function strategicDiscussionMessage(envelope: LevyTateRecommendationEnvelope, excluded: string[]) {
-  const uniqueExcluded = [...new Set(excluded)].filter(Boolean);
-  const excludedDetail = uniqueExcluded.length ? " Excluded routes included: " + uniqueExcluded.slice(0, 4).join("; ") + "." : "";
-  return "No apprenticeship is an obvious fit for this employee's current role and career stage. This may indicate that a different development route is more suitable, the role sits beyond current apprenticeship provision, or a discussion with L&D or LevyTate would provide a better outcome." + excludedDetail;
+function strategicDiscussionMessage(envelope: LevyTateRecommendationEnvelope, roleFamily: LevyTateRoleFamily, developmentObjective: LevyTateDevelopmentObjective, excluded: LevyTateExcludedPathway[]) {
+  const excludedDetail = excluded.length ? " Excluded routes included: " + excluded.slice(0, 4).map((item) => `${item.title}: ${item.reason}`).join("; ") + "." : "";
+  return "No apprenticeship is an obvious fit for this employee's current role, career stage and development objective. This does not necessarily indicate a problem. A discussion with L&D or LevyTate is recommended to explore alternative development routes. Role family: " + roleFamily + ". Development objective: " + developmentObjective + ". " + envelope.label + excludedDetail;
+}
+
+function consultantReasoningFor(
+  recommendation: {
+    title: string;
+    fitScore: number;
+    confidence: number;
+    recommendationCategory: LevyTateRecommendationCategory;
+  },
+  roleFamily: RoleFamilyDecision,
+  developmentObjective: LevyTateDevelopmentObjective,
+  careerStage: LevyTateCareerStage,
+  careerNotes: string[],
+  familyNotes: string[],
+) {
+  return `${recommendation.recommendationCategory}: ${recommendation.title} is credible for a ${careerStage} employee in the ${roleFamily.primary} role family because LevyTate first checked the person, organisation priorities, development objective, apprenticeship suitability, role family and career-stage envelope. Score ${recommendation.fitScore}% and confidence ${recommendation.confidence}%. ${[...careerNotes, ...familyNotes].slice(0, 4).join(" ")}`;
 }
 
 function conversationText(request: LevyTateAiRequest) {
@@ -865,7 +1069,18 @@ function suppliedPathwayDefinitions(request: LevyTateAiRequest) {
     if (/customer/.test(title)) Object.assign(capabilityWeights, { customer_service: 28 });
     if (/procurement|supply/.test(title)) Object.assign(capabilityWeights, { procurement: 32 });
     if (/business admin|administration/.test(title)) Object.assign(capabilityWeights, { administration: 28, data_management: 8 });
-    return [{ pathwayId: slugify(pathwayContext.standard ?? pathwayContext.title), title: pathwayContext.title, standard: pathwayContext.standard ?? pathwayContext.title, baseScore: 18, rationale: "An employer-supplied pathway available for role-fit assessment. LevyTate still ranks it through capability evidence.", capabilityWeights: Object.keys(capabilityWeights).length ? capabilityWeights : { administration: 10, business_analysis: 8 } } satisfies PathwayDefinition];
+    const roleFamilies: LevyTateRoleFamily[] = /data|report|analytics|insight/.test(title)
+      ? ["Data", "Digital"]
+      : /digital|ict|it support/.test(title)
+        ? ["Digital", "IT"]
+        : /customer/.test(title)
+          ? ["Customer Service"]
+          : /procurement|supply/.test(title)
+            ? ["Procurement", "Commercial"]
+            : /business admin|administration/.test(title)
+              ? ["Administration"]
+              : ["Administration"];
+    return [{ pathwayId: slugify(pathwayContext.standard ?? pathwayContext.title), title: pathwayContext.title, standard: pathwayContext.standard ?? pathwayContext.title, baseScore: 18, rationale: "An employer-supplied pathway available for role-fit assessment. LevyTate still ranks it through capability evidence.", capabilityWeights: Object.keys(capabilityWeights).length ? capabilityWeights : { administration: 10, business_analysis: 8 }, roleFamilies } satisfies PathwayDefinition];
   });
 }
 
@@ -962,13 +1177,26 @@ export function buildLevyTateRecommendations(request: LevyTateAiRequest): LevyTa
   const futureMap = capabilityMap(futureCapabilityProfile);
   const strategyMap = capabilityMap(strategyProfile.capabilityProfile);
   const careerStage = inferCareerStage(request);
+  const roleFamily = inferRoleFamily(request, careerStage);
+  const developmentObjective = inferDevelopmentObjective(request);
   const recommendationEnvelope = recommendationEnvelopeFor(careerStage);
   const qualification = qualificationAwareness();
-  const excludedByCareerStage: string[] = [];
+  const excludedPathways: LevyTateExcludedPathway[] = [];
   const scoredRecommendations: ScoredRecommendation[] = availableDefinitions(request).flatMap((definition) => {
     const careerAssessment = careerStageAssessment(definition, recommendationEnvelope);
     if (!careerAssessment.include) {
-      excludedByCareerStage.push(careerAssessment.credibilityNotes.at(-1) ?? definition.title + " was excluded by career stage.");
+      excludedPathways.push({
+        title: definition.title,
+        reason: careerAssessment.credibilityNotes.at(-1) ?? "Excluded by career-stage envelope.",
+      });
+      return [];
+    }
+    const familyAssessment = roleFamilyAssessment(definition, roleFamily, developmentObjective, profileMap, careerStage);
+    if (!familyAssessment.include) {
+      excludedPathways.push({
+        title: definition.title,
+        reason: familyAssessment.excludedReason ?? "Excluded by consultant role-family judgement.",
+      });
       return [];
     }
     const roleEvidence = roleMappingEvidence(request, definition);
@@ -978,7 +1206,7 @@ export function buildLevyTateRecommendations(request: LevyTateAiRequest): LevyTa
     const strategyFitScore = fitAgainstProfile(definition, strategyMap);
     const providerFitScore = providerCapabilityScore(request, definition);
     const strategicLift = Math.max(0, futureFitScore - 45) * 0.1 + Math.max(0, strategyFitScore - 45) * 0.12 + Math.max(0, providerFitScore - 60) * 0.04;
-    const fitScore = clamp(currentFitScore + strategicLift - careerAssessment.penalty);
+    const fitScore = clamp(currentFitScore + strategicLift - careerAssessment.penalty - familyAssessment.penalty);
     const previous = previousScore(request, definition.pathwayId);
     const mapped = roleEvidence.some((item) => item.source === "role_mapping") || request.availablePathways?.some((item) => item.title.toLowerCase() === definition.title.toLowerCase() && /approved|live/i.test(item.status ?? ""));
     const availability: LevyTatePlatformRecommendation["availability"] = mapped ? "approved" : "role_fit_review";
@@ -987,6 +1215,15 @@ export function buildLevyTateRecommendations(request: LevyTateAiRequest): LevyTa
     const businessImpact = recommendationBusinessImpact(definition);
     const employeeBenefit = recommendationEmployeeBenefit(definition);
     const confidence = clamp(confidenceFor(capabilityFit, evidence, missingEvidence) + Math.max(0, futureFitScore - 55) * 0.08 + Math.max(0, strategyFitScore - 55) * 0.08);
+    const recommendationCategory = recommendationCategoryFor(fitScore, confidence, careerAssessment.fit, currentFitScore, futureFitScore);
+    const consultantReasoning = consultantReasoningFor(
+      { title: definition.title, fitScore, confidence, recommendationCategory },
+      roleFamily,
+      developmentObjective,
+      careerStage,
+      careerAssessment.credibilityNotes,
+      familyAssessment.notes,
+    );
     return {
       pathwayId: definition.pathwayId,
       title: definition.title,
@@ -998,9 +1235,12 @@ export function buildLevyTateRecommendations(request: LevyTateAiRequest): LevyTa
       missingEvidence,
       capabilityFit,
       careerStage,
-      recommendationCategory: recommendationCategoryFor(fitScore, confidence, careerAssessment.fit),
+      recommendationCategory,
       careerStageFit: careerAssessment.fit,
-      credibilityNotes: careerAssessment.credibilityNotes,
+      credibilityNotes: [...careerAssessment.credibilityNotes, ...familyAssessment.notes].slice(0, 8),
+      roleFamilies: definition.roleFamilies,
+      developmentObjective,
+      consultantReasoning,
       strategicRole: "supporting_option" as const,
       strategicSignals,
       businessImpact,
@@ -1017,7 +1257,14 @@ export function buildLevyTateRecommendations(request: LevyTateAiRequest): LevyTa
       strategyFitScore,
       providerFitScore,
     };
-  }).filter((item) => item.fitScore >= 45 || item.futureFitScore >= 58 || item.strategyFitScore >= 58).sort((left, right) => right.fitScore - left.fitScore || right.confidence - left.confidence || left.title.localeCompare(right.title)).slice(0, 4);
+  }).filter((item) => (
+    item.confidence >= minimumConsultantConfidence &&
+    (item.fitScore >= 45 || item.futureFitScore >= 58 || item.strategyFitScore >= 58)
+  )).sort((left, right) => {
+    const leftFamily = left.roleFamilies.includes(roleFamily.primary) ? 8 : 0;
+    const rightFamily = right.roleFamilies.includes(roleFamily.primary) ? 8 : 0;
+    return (right.fitScore + rightFamily) - (left.fitScore + leftFamily) || right.confidence - left.confidence || left.title.localeCompare(right.title);
+  }).slice(0, 4);
 
   const recommendations = scoredRecommendations.map((item, index) => {
     const { futureFitScore, strategyFitScore, providerFitScore, ...recommendation } = item;
@@ -1057,16 +1304,24 @@ export function buildLevyTateRecommendations(request: LevyTateAiRequest): LevyTa
     futureCapabilityProfile,
     strategicRecommendation,
     careerStage,
+    roleFamily: roleFamily.primary,
+    secondaryRoleFamilies: roleFamily.secondary,
+    developmentObjective,
+    apprenticeshipAppropriate: Boolean(topRecommendation),
+    consultantReasoning: topRecommendation
+      ? topRecommendation.consultantReasoning
+      : strategicDiscussionMessage(recommendationEnvelope, roleFamily.primary, developmentObjective, excludedPathways),
+    excludedPathways,
     recommendationEnvelope,
     qualificationAwareness: qualification,
-    strategicDiscussion: topRecommendation ? null : strategicDiscussionMessage(recommendationEnvelope, excludedByCareerStage),
+    strategicDiscussion: topRecommendation ? null : strategicDiscussionMessage(recommendationEnvelope, roleFamily.primary, developmentObjective, excludedPathways),
   };
 }
 function toPathway(recommendation: LevyTatePlatformRecommendation): LevyTateRecommendedPathway {
   const missing = recommendation.missingEvidence.length ? " Missing evidence: " + recommendation.missingEvidence.slice(0, 2).join("; ") + "." : "";
   return {
     title: recommendation.title,
-    reason: recommendation.recommendationCategory + ": " + recommendation.rationale + " Career stage: " + recommendation.careerStage + "." + missing,
+    reason: recommendation.recommendationCategory + ": " + recommendation.consultantReasoning + missing,
     availability: recommendation.availability === "approved" ? "approved" : recommendation.availability === "not_available" ? "not_available" : "alternative",
     fit: recommendation.fitScore,
     scoreDelta: recommendation.scoreDelta,
@@ -1134,5 +1389,5 @@ export function buildPlatformRecommendationExplanation(result: LevyTateRecommend
   const evidence = top.evidence.slice(0, 2).map((item) => item.label.toLowerCase()).join(" and ");
   const missing = top.missingEvidence.length ? " The main evidence still to confirm is " + top.missingEvidence.slice(0, 2).join(" and ").toLowerCase() + "." : "";
   const alternativeDetail = alternative ? " " + alternative.title + " remains the next option because its capability fit is slightly lower against the evidence captured so far." : "";
-  return top.recommendationCategory + ": " + top.title + " is currently LevyTate's strongest credible match for a " + result.careerStage + " career stage. " + result.recommendationEnvelope.label + " " + (evidence ? "That is mainly because " + evidence + "." : top.rationale) + missing + alternativeDetail;
+  return top.recommendationCategory + ": " + top.title + " is currently LevyTate's strongest credible intervention for a " + result.careerStage + " employee in the " + result.roleFamily + " role family. " + result.recommendationEnvelope.label + " " + (evidence ? "That is mainly because " + evidence + "." : top.consultantReasoning) + missing + alternativeDetail;
 }

@@ -248,7 +248,58 @@ export type LevyTateCareerStage =
 export type LevyTateRecommendationCategory =
   | "Strong Recommendation"
   | "Development Opportunity"
+  | "Future Progression"
   | "Strategic Discussion Required";
+
+export type LevyTateRoleFamily =
+  | "Field Operations"
+  | "Arboriculture"
+  | "Grounds Maintenance"
+  | "Land Based"
+  | "Commercial"
+  | "Procurement"
+  | "Finance"
+  | "HR"
+  | "Learning & Development"
+  | "IT"
+  | "Cyber"
+  | "Digital"
+  | "Data"
+  | "Engineering"
+  | "Manufacturing"
+  | "Customer Service"
+  | "Leadership"
+  | "Executive"
+  | "Operations"
+  | "Project Delivery"
+  | "Business Analysis"
+  | "Health & Safety"
+  | "Environment"
+  | "Quality"
+  | "Construction"
+  | "Utilities"
+  | "Transport"
+  | "Fleet"
+  | "Administration"
+  | "Marketing"
+  | "Education";
+
+export type LevyTateDevelopmentObjective =
+  | "Current role capability"
+  | "Management progression"
+  | "Technical specialism"
+  | "Commercial capability"
+  | "AI adoption"
+  | "Productivity improvement"
+  | "Succession preparation"
+  | "Compliance improvement"
+  | "Transformation support"
+  | "Career exploration";
+
+export type LevyTateExcludedPathway = {
+  title: string;
+  reason: string;
+};
 
 export type LevyTateRecommendationEnvelope = {
   careerStage: LevyTateCareerStage;
@@ -326,6 +377,9 @@ export type LevyTatePlatformRecommendation = {
   recommendationCategory: LevyTateRecommendationCategory;
   careerStageFit: "inside_envelope" | "development_stretch" | "outside_envelope" | "strategic_only";
   credibilityNotes: string[];
+  roleFamilies: LevyTateRoleFamily[];
+  developmentObjective: LevyTateDevelopmentObjective;
+  consultantReasoning: string;
 };
 
 export type LevyTateRecommendationResult = {
@@ -340,6 +394,12 @@ export type LevyTateRecommendationResult = {
   currentCapabilityProfile: LevyTateCapabilityScore[];
   futureCapabilityProfile: LevyTateCapabilityScore[];
   careerStage: LevyTateCareerStage;
+  roleFamily: LevyTateRoleFamily;
+  secondaryRoleFamilies: LevyTateRoleFamily[];
+  developmentObjective: LevyTateDevelopmentObjective;
+  apprenticeshipAppropriate: boolean;
+  consultantReasoning: string;
+  excludedPathways: LevyTateExcludedPathway[];
   recommendationEnvelope: LevyTateRecommendationEnvelope;
   qualificationAwareness: LevyTateQualificationAwareness;
   strategicDiscussion: string | null;
@@ -568,6 +628,40 @@ function cleanStringArray(value: unknown, limit = 8) {
         .slice(0, limit)
         .map((item) => item.trim().slice(0, 180))
     : undefined;
+}
+
+const levyTateRoleFamilies: LevyTateRoleFamily[] = [
+  "Field Operations", "Arboriculture", "Grounds Maintenance", "Land Based", "Commercial", "Procurement", "Finance", "HR", "Learning & Development", "IT", "Cyber", "Digital", "Data", "Engineering", "Manufacturing", "Customer Service", "Leadership", "Executive", "Operations", "Project Delivery", "Business Analysis", "Health & Safety", "Environment", "Quality", "Construction", "Utilities", "Transport", "Fleet", "Administration", "Marketing", "Education",
+];
+
+function cleanRoleFamily(value: unknown): LevyTateRoleFamily | null {
+  return typeof value === "string" && levyTateRoleFamilies.includes(value as LevyTateRoleFamily)
+    ? value as LevyTateRoleFamily
+    : null;
+}
+
+function cleanRoleFamilies(value: unknown, limit = 6): LevyTateRoleFamily[] {
+  return Array.isArray(value)
+    ? value.flatMap((item) => {
+        const family = cleanRoleFamily(item);
+        return family ? [family] : [];
+      }).slice(0, limit)
+    : [];
+}
+
+function cleanDevelopmentObjective(value: unknown): LevyTateDevelopmentObjective {
+  return value === "Current role capability" ||
+    value === "Management progression" ||
+    value === "Technical specialism" ||
+    value === "Commercial capability" ||
+    value === "AI adoption" ||
+    value === "Productivity improvement" ||
+    value === "Succession preparation" ||
+    value === "Compliance improvement" ||
+    value === "Transformation support" ||
+    value === "Career exploration"
+    ? value
+    : "Career exploration";
 }
 
 function parseConversationProfile(value: unknown): LevyTateConversationProfile | undefined {
@@ -935,7 +1029,8 @@ function parseRecommendationResult(value: unknown): LevyTateRecommendationResult
           : "matching_available";
         const recommendationCategory: LevyTateRecommendationCategory =
           recommendation.recommendationCategory === "Strategic Discussion Required" ||
-          recommendation.recommendationCategory === "Development Opportunity"
+          recommendation.recommendationCategory === "Development Opportunity" ||
+          recommendation.recommendationCategory === "Future Progression"
             ? recommendation.recommendationCategory
             : "Strong Recommendation";
         const careerStageFit: LevyTatePlatformRecommendation["careerStageFit"] =
@@ -983,6 +1078,9 @@ function parseRecommendationResult(value: unknown): LevyTateRecommendationResult
           recommendationCategory,
           careerStageFit,
           credibilityNotes: cleanStringArray(recommendation.credibilityNotes, 6) ?? [],
+          roleFamilies: cleanRoleFamilies(recommendation.roleFamilies, 6),
+          developmentObjective: cleanDevelopmentObjective(recommendation.developmentObjective),
+          consultantReasoning: text(recommendation.consultantReasoning, 700),
         }];
       })
     : [];
@@ -1000,6 +1098,20 @@ function parseRecommendationResult(value: unknown): LevyTateRecommendationResult
     currentCapabilityProfile: parseCapabilityProfile(candidate.currentCapabilityProfile ?? candidate.capabilityProfile),
     futureCapabilityProfile: parseCapabilityProfile(candidate.futureCapabilityProfile),
     careerStage,
+    roleFamily: cleanRoleFamily(candidate.roleFamily) ?? "Administration",
+    secondaryRoleFamilies: cleanRoleFamilies(candidate.secondaryRoleFamilies, 8),
+    developmentObjective: cleanDevelopmentObjective(candidate.developmentObjective),
+    apprenticeshipAppropriate: candidate.apprenticeshipAppropriate === true,
+    consultantReasoning: text(candidate.consultantReasoning, 900),
+    excludedPathways: Array.isArray(candidate.excludedPathways)
+      ? candidate.excludedPathways.slice(0, 12).flatMap((item) => {
+          if (!item || typeof item !== "object") return [];
+          const excluded = item as Partial<LevyTateExcludedPathway>;
+          const title = text(excluded.title, 180);
+          const reason = text(excluded.reason, 320);
+          return title && reason ? [{ title, reason }] : [];
+        })
+      : [],
     recommendationEnvelope: candidate.recommendationEnvelope && typeof candidate.recommendationEnvelope === "object"
       ? {
           careerStage,
