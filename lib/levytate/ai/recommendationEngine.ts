@@ -33,6 +33,9 @@ type CapabilityDomain =
   | "manufacturing"
   | "construction"
   | "hr"
+  | "finance"
+  | "marketing"
+  | "education_administration"
   | "administration";
 
 type CapabilitySignal = { id: string; label: string; weight: number; pattern: RegExp };
@@ -155,9 +158,21 @@ const capabilityDefinitions: CapabilityDefinition[] = [
     signal("hr-role", "HR role or responsibility", 36, /\b(hr advisor|human resources|employee relations|recruitment|people policy|hr support)\b/i),
     signal("people-process", "People process or policy work", 18, /\b(onboarding|absence|performance process|policy)\b/i),
   ]),
+  capability("finance", "Finance", "Finance processing, accounting or financial reporting evidence not yet confirmed.", [
+    signal("finance-role", "Finance or accounts role", 36, /\b(finance assistant|accounts assistant|accounting|finance|invoice|invoices|reconciliation|reconciliations)\b/i),
+    signal("finance-reporting", "Finance reporting or month-end work", 20, /\b(monthly reports?|finance reporting|budget|forecast|ledger|payroll|purchase ledger|sales ledger)\b/i),
+  ]),
+  capability("marketing", "Marketing", "Marketing campaign, content or customer growth evidence not yet confirmed.", [
+    signal("marketing-role", "Marketing role or responsibility", 38, /\b(marketing executive|marketing assistant|digital marketing|campaigns?|content marketing|email marketing|brand|social media)\b/i),
+    signal("marketing-automation", "Marketing automation or CRM activity", 20, /\b(marketing automation|crm|campaign automation|email campaigns?|analytics|customer growth)\b/i),
+  ]),
+  capability("education_administration", "Education administration", "School, trust or MAT administration evidence not yet confirmed.", [
+    signal("school-admin-role", "School or MAT administration role", 36, /\b(school administrator|school admin|\bmat\b|multi academy trust|academy trust|school business|attendance reporting|parent communications)\b/i),
+    signal("school-records", "School records or attendance reporting", 18, /\b(attendance|school records|parent communications|sims|arbor|school reporting)\b/i),
+  ]),
   capability("administration", "Administration", "Business support or administration evidence not yet confirmed.", [
-    signal("admin-role", "Business support or administration role", 34, /\b(admin assistant|administrator|administration|business support|office coordinator)\b/i),
-    signal("admin-processes", "Process administration work", 18, /\b(scheduling|records|crm updates|document control|process admin)\b/i),
+    signal("admin-role", "Business support or administration role", 34, /\b(admin assistant|administrator|administration|business support|office coordinator|school administrator)\b/i),
+    signal("admin-processes", "Process administration work", 18, /\b(scheduling|records|crm updates|document control|process admin|school records)\b/i),
   ]),
 ];
 
@@ -169,17 +184,22 @@ function pathway(standardId: string, baseScore: number, rationale: string, capab
 
 const pathwayCatalogue: PathwayDefinition[] = [
   pathway("ST0118", 20, "Best where the role combines analysis, SQL, BI reporting, visualisation and business insight ownership.", { data_analysis: 24, sql: 18, reporting_bi: 22, data_visualisation: 14, data_management: 10, business_analysis: 8 }),
-  pathway("ST0795", 28, "Best where the role needs practical data handling, reporting, spreadsheets, CRM data quality and repeatable operational insight.", { data_analysis: 18, reporting_bi: 24, data_management: 22, data_visualisation: 4, administration: 16, automation: 10 }),
+  pathway("ST0795", 33, "Best where the role needs practical data handling, reporting, spreadsheets, CRM data quality and repeatable operational insight.", { data_analysis: 20, reporting_bi: 30, data_management: 24, data_visualisation: 4, administration: 8, automation: 12, finance: 4 }),
   pathway("ST0117", 20, "Best where the role needs requirements discovery, process analysis, stakeholder engagement and systems change capability.", { business_analysis: 28, project_delivery: 12, process_improvement: 12, data_analysis: 8, digital_support: 6 }),
   pathway("ST0310", 19, "Best where the role needs project planning, risk control, stakeholder coordination and accountable delivery.", { project_delivery: 32, business_analysis: 10, leadership: 8, process_improvement: 8 }),
   pathway("ST0313", 24, "Best where the role needs sourcing, supplier management, commercial judgement and procurement practice.", { procurement: 42, business_analysis: 8, project_delivery: 6, data_analysis: 5 }),
   pathway("ST0071", 23, "Best where the role needs complex customer handling, service quality and ownership of customer outcomes.", { customer_service: 40, data_management: 8, leadership: 6, process_improvement: 6 }),
   pathway("ST0120", 22, "Best where the role supports colleagues with digital systems, user needs, digital processes and practical workplace technology.", { digital_support: 34, customer_service: 10, data_management: 8, automation: 8, cyber: 6 }),
-  pathway("ST0973", 22, "Best where the role is closer to ICT support, infrastructure, networking, devices and technical troubleshooting.", { digital_support: 32, cyber: 12, software_development: 6, customer_service: 6 }),
+  pathway("ST0973", 18, "Best where the role is closer to ICT support, infrastructure, networking, devices and technical troubleshooting.", { digital_support: 28, cyber: 8, software_development: 6, customer_service: 6 }),
   pathway("ST0116", 20, "Best where the role is focused on coding, building software, APIs, testing and application development.", { software_development: 42, sql: 8, digital_support: 6, automation: 6 }),
-  pathway("ST0070", 10, "Best where the role needs broad business administration, records, coordination and operational support capability.", { administration: 18, customer_service: 8, data_management: 4, reporting_bi: 3 }),
-  pathway("ST0239", 22, "Best where the role needs HR administration, policy support, employee relations confidence and people process capability.", { hr: 40, administration: 8, customer_service: 6, data_management: 5 }),
-  pathway("ST0192", 18, "Best where the role is explicitly focused on continuous improvement, lean practice, operational performance and measurable process change.", { process_improvement: 42, manufacturing: 10, engineering: 8, automation: 6, leadership: 5 }),
+  pathway("ST0865", 31, "Best where the role needs cyber security practice, secure systems awareness, threat detection and user protection capability.", { cyber: 62, digital_support: 10, data_management: 6, software_development: 4 }),
+  pathway("ST1512", 24, "Best where the role needs practical AI adoption, automation, productivity improvement and responsible use of AI-enabled tools.", { ai_adoption: 34, automation: 28, process_improvement: 8, digital_support: 6, data_analysis: 4, marketing: 10, education_administration: 6 }),
+  pathway("ST0070", 8, "Best where the role needs broad business administration, records, coordination and operational support capability.", { administration: 14, customer_service: 8, data_management: 3, reporting_bi: 2 }),
+  pathway("ST0238", 24, "Best where the role needs people advisory, employee relations, workforce policy and HR professional capability.", { hr: 42, leadership: 8, administration: 6, customer_service: 6, data_management: 4 }),
+  pathway("ST0608", 18, "Best where the role needs accounts processing, finance administration, reconciliations and accurate financial records.", { finance: 48, administration: 8, data_management: 8, reporting_bi: 5 }),
+  pathway("ST0575", 16, "Best where the role needs school business administration, trust operations, school reporting and education support processes.", { education_administration: 48, administration: 8, reporting_bi: 5, data_management: 5, project_delivery: 5 }),
+  pathway("ST0596", 22, "Best where the role needs campaign delivery, marketing planning, customer growth, content performance and marketing analytics.", { marketing: 42, customer_service: 8, reporting_bi: 8, automation: 8, data_analysis: 5 }),
+  pathway("ST0192", 24, "Best where the role is explicitly focused on continuous improvement, lean practice, operational performance and measurable process change.", { process_improvement: 42, manufacturing: 12, engineering: 8, automation: 6, leadership: 8 }),
   pathway("ST0457", 23, "Best where the role needs applied engineering, maintenance, technical evidence and manufacturing workplace competence.", { engineering: 34, manufacturing: 16, process_improvement: 6, automation: 4 }),
   pathway("ST0048", 22, "Best where the role needs construction site supervision, safety, quality control and built environment delivery.", { construction: 40, project_delivery: 8, leadership: 6 }),
 ];
@@ -278,13 +298,31 @@ function addRolePriors(request: LevyTateAiRequest, scores: Map<CapabilityDomain,
   }
   if (/it support|ict technician|digital support|helpdesk|service desk/.test(role)) {
     add("digital_support", 42, "Role context indicates IT or digital support");
-    add("cyber", 10, "IT support role may touch secure systems");
+    add("cyber", /cyber|security|cloud|network/.test(role) ? 24 : 14, "IT support role may touch secure systems, networks or cloud access");
     add("customer_service", 8, "IT support role supports internal users");
   }
-  if (/hr advisor|hr support|human resources|people advisor|recruitment/.test(role)) {
-    add("hr", 42, "Role context indicates HR or people operations");
+  if (/hr advisor|hr support|human resources|people advisor|recruitment|employee relations|people professional/.test(role)) {
+    add("hr", 48, "Role context indicates HR or people operations");
     add("administration", 8, "HR work often includes people process administration");
     add("customer_service", 6, "HR advisory work supports internal colleagues");
+  }
+  if (/finance assistant|accounts assistant|accounting|finance|payroll|ledger/.test(role)) {
+    add("finance", 46, "Role context indicates finance or accounts work");
+    add("administration", 10, "Finance work includes controlled process administration");
+    add("reporting_bi", 14, "Finance roles often support recurring reports");
+    add("data_management", 10, "Finance roles depend on accurate records and reconciliations");
+  }
+  if (/school administrator|school admin|\bmat\b|multi academy trust|academy trust|school business/.test(role)) {
+    add("education_administration", 46, "Role context indicates school or MAT administration");
+    add("administration", 24, "School administration needs controlled records and processes");
+    add("reporting_bi", 12, "School administration often includes attendance or operational reporting");
+    add("data_management", 12, "School administration depends on accurate pupil and business records");
+  }
+  if (/marketing executive|marketing assistant|digital marketing|campaign|content|brand|social media/.test(role)) {
+    add("marketing", 46, "Role context indicates marketing or campaign delivery");
+    add("customer_service", 10, "Marketing work supports customer engagement");
+    add("reporting_bi", 10, "Marketing roles often use campaign reporting");
+    add("automation", 8, "Marketing roles may use CRM or campaign automation");
   }
   if (/maintenance|engineer|engineering/.test(role)) {
     add("engineering", 36, "Role context indicates engineering or maintenance");
@@ -293,6 +331,12 @@ function addRolePriors(request: LevyTateAiRequest, scores: Map<CapabilityDomain,
   if (/manufacturing|production|factory|assembly/.test(role)) {
     add("manufacturing", 34, "Role context indicates manufacturing or production");
     add("process_improvement", 6, "Manufacturing roles may support operational improvement");
+  }
+  if (/operations supervisor|operational supervisor|shift supervisor|production supervisor/.test(role)) {
+    add("process_improvement", 32, "Operations supervisor role indicates operational improvement responsibility");
+    add("manufacturing", 18, "Operations supervisor context is operational or production focused");
+    add("leadership", 18, "Supervisor role indicates people coordination and succession coverage");
+    add("project_delivery", 8, "Operations supervision includes coordination and delivery ownership");
   }
   if (/site supervisor|construction|built environment/.test(role)) {
     add("construction", 42, "Role context indicates construction or site delivery");
@@ -363,7 +407,19 @@ function buildFutureCapabilityProfile(request: LevyTateAiRequest): LevyTateCapab
   if (/\b(commercial transformation|supplier|sourcing|procurement|contract|tender|buying)\b/i.test(text)) {
     priors.push(["procurement", 34, "Future goal is commercially or procurement focused"], ["business_analysis", 12, "Future goal needs business and supplier analysis"]);
   }
-  if (/\b(customer|complaint|service quality|customer experience)\b/i.test(text)) priors.push(["customer_service", 30, "Future goal improves customer experience"]);
+  if (/\b(cyber|cybersecurity|cloud|network security|secure systems|security operations)\b/i.test(text)) {
+    priors.push(["cyber", 38, "Future goal mentions cyber, cloud or secure systems"], ["digital_support", 16, "Cyber/cloud progression builds on digital support capability"]);
+  }
+  if (/\b(finance reporting|finance visibility|accounts|accounting|reconciliation|budget|forecast|month end|monthly reports?)\b/i.test(text)) {
+    priors.push(["finance", 36, "Future goal is finance or accounts focused"], ["reporting_bi", 22, "Future goal includes finance reporting"], ["data_analysis", 16, "Finance reporting goal needs data analysis"], ["data_management", 12, "Finance reporting needs accurate records"]);
+  }
+  if (/\b(marketing|campaign|content|customer growth|crm|email marketing|marketing automation)\b/i.test(text)) {
+    priors.push(["marketing", 38, "Future goal is marketing or customer growth focused"], ["automation", 18, "Marketing goal includes automation or CRM workflows"], ["reporting_bi", 12, "Marketing goal includes campaign reporting"]);
+  }
+  if (/\b(school|mat|multi academy trust|academy trust|attendance|school records|parent communications)\b/i.test(text)) {
+    priors.push(["education_administration", 36, "Future goal is school or MAT administration focused"], ["administration", 14, "School business processes need structured administration"]);
+  }
+  if (/\b(customer|complaint|service quality|customer experience|team leadership|coaching)\b/i.test(text)) priors.push(["customer_service", 30, "Future goal improves customer experience"], ["leadership", 14, "Future goal includes coaching or team leadership"]);
   if (/\b(engineering|maintenance|production|manufacturing|quality|downtime)\b/i.test(text)) priors.push(["process_improvement", 20, "Future goal improves operational performance"], ["engineering", 16, "Future goal is technically rooted"]);
   return buildCapabilityProfileFromText(text, priors);
 }
@@ -396,6 +452,15 @@ function buildOrganisationStrategyProfile(request: LevyTateAiRequest): Strategic
   }
   if (/\b(operational excellence|productivity|efficiency|process improvement|lean|waste|downtime|continuous improvement)\b/i.test(text)) {
     addPriority("Operational excellence", 80, ["Organisation context mentions productivity, efficiency or continuous improvement"], [["process_improvement", 40, "Organisation priority is operational improvement"], ["automation", 14, "Process improvement may include automation"]]);
+  }
+  if (/\b(cyber resilience|cyber|security|cloud|digital capability)\b/i.test(text)) {
+    addPriority("Cyber resilience and digital capability", 84, ["Organisation context mentions cyber resilience, cloud or digital capability"], [["cyber", 38, "Organisation priority is cyber resilience"], ["digital_support", 22, "Digital capability depends on strong support skills"]]);
+  }
+  if (/\b(finance visibility|financial visibility|finance reporting|budget visibility)\b/i.test(text)) {
+    addPriority("Finance visibility", 80, ["Organisation context mentions finance reporting or visibility"], [["finance", 34, "Organisation priority is finance capability"], ["reporting_bi", 24, "Finance visibility depends on better reporting"]]);
+  }
+  if (/\b(customer growth|marketing automation|campaign performance|growth)\b/i.test(text)) {
+    addPriority("Customer growth and marketing performance", 78, ["Organisation context mentions customer growth, marketing automation or campaign performance"], [["marketing", 34, "Organisation priority is marketing capability"], ["automation", 20, "Marketing performance can be improved through automation"], ["reporting_bi", 12, "Campaign performance depends on reporting"]]);
   }
   if (/\b(workforce readiness|succession|future skills|leadership pipeline|capability growth)\b/i.test(text)) {
     addPriority("Workforce readiness", 76, ["Organisation context mentions readiness, succession or future skills"], [["leadership", 20, "Workforce readiness may require leadership capability"], ["project_delivery", 10, "Workforce readiness may need delivery ownership"]]);
@@ -459,7 +524,13 @@ function programmeRationaleFor(definition: PathwayDefinition, futureFitScore: nu
 function recommendationBusinessImpact(definition: PathwayDefinition) {
   const title = definition.title.toLowerCase();
   if (/data analyst|data technician/.test(title)) return "Improves reporting quality, data confidence and decision visibility.";
+  if (/cyber security/.test(title)) return "Improves cyber resilience, secure working practices and first-line protection of business systems.";
+  if (/artificial intelligence|automation practitioner/.test(title)) return "Accelerates responsible AI adoption, workflow automation and productivity improvement.";
   if (/procurement|supply chain/.test(title)) return "Strengthens supplier management, commercial control and procurement capability.";
+  if (/people professional/.test(title)) return "Strengthens employee relations, people policy and workforce advisory capability.";
+  if (/accounts or finance/.test(title)) return "Improves finance processing, reconciliations, reporting accuracy and financial control.";
+  if (/school business/.test(title)) return "Improves school business operations, trust administration, reporting and education support processes.";
+  if (/marketing executive/.test(title)) return "Improves campaign performance, marketing planning, customer growth and marketing analytics.";
   if (/digital support|information communications/.test(title)) return "Builds digital confidence and reduces technology friction across teams.";
   if (/improvement practitioner/.test(title)) return "Supports measurable process improvement, productivity and operational performance.";
   if (/customer service/.test(title)) return "Improves customer handling, service consistency and escalation confidence.";
@@ -469,10 +540,31 @@ function recommendationBusinessImpact(definition: PathwayDefinition) {
 function recommendationEmployeeBenefit(definition: PathwayDefinition) {
   const title = definition.title.toLowerCase();
   if (/data analyst|data technician/.test(title)) return "Gives the employee a practical route from manual reporting into stronger data and insight work.";
+  if (/cyber security/.test(title)) return "Builds a credible progression route from IT support into cyber security practice.";
+  if (/artificial intelligence|automation practitioner/.test(title)) return "Develops confidence using AI and automation to improve real business workflows.";
   if (/procurement|supply chain/.test(title)) return "Develops commercial judgement, sourcing confidence and supplier management skills.";
+  if (/people professional/.test(title)) return "Develops stronger advisory confidence across employee relations, policy and people practice.";
+  if (/accounts or finance/.test(title)) return "Builds a stronger finance foundation while opening a route into reporting and data work.";
+  if (/school business/.test(title)) return "Connects school administration experience to broader trust operations and progression.";
+  if (/marketing executive/.test(title)) return "Strengthens campaign planning, marketing analytics and automation confidence.";
   if (/digital support|information communications/.test(title)) return "Builds confidence with digital systems, user support and practical workplace technology.";
   if (/improvement practitioner/.test(title)) return "Develops structured improvement, problem solving and performance optimisation skills.";
   return "Creates a clearer progression route linked to the employee's role and future goals.";
+}
+
+function suggestedQuestionsFor(definition: PathwayDefinition) {
+  const title = definition.title.toLowerCase();
+  if (/data analyst|data technician/.test(title)) return ["Which reports or decisions should improve first?", "Which tools does the employee use today, such as Excel, SQL, Power BI or CRM?"];
+  if (/cyber security|information communications|digital support/.test(title)) return ["Which systems, devices or networks does the employee support today?", "Is the future goal cyber security, cloud infrastructure or broader digital support?"];
+  if (/artificial intelligence|automation practitioner/.test(title)) return ["Which manual workflow should be automated first?", "Which AI tools are approved or planned inside the organisation?"];
+  if (/procurement|supply chain/.test(title)) return ["Which supplier or contract outcomes need to improve?", "Does the role involve sourcing, tendering, contract management or supply chain operations?"];
+  if (/customer service/.test(title)) return ["Which customer situations should the employee handle with more confidence?", "Is the progression goal coaching others, improving service quality or handling complex escalations?"];
+  if (/people professional/.test(title)) return ["Which people advisory situations does the employee handle today?", "Is the goal employee relations, policy, recruitment or workforce planning?"];
+  if (/accounts or finance/.test(title)) return ["Which finance process does the employee own today?", "Is the goal better reconciliations, month-end reporting or broader finance analysis?"];
+  if (/school business/.test(title)) return ["Which school or MAT processes need to improve first?", "Which systems support attendance, records and parent communications today?"];
+  if (/marketing executive/.test(title)) return ["Which campaigns or channels does the employee manage today?", "Is the goal campaign performance, CRM automation or AI-supported content workflows?"];
+  if (/improvement practitioner/.test(title)) return ["Which operational process should improve first?", "What performance measure should change, such as quality, waste, downtime or productivity?"];
+  return ["Which specific work outcome should the programme improve?", "Which delivery model would fit the role and site best?"];
 }
 
 function buildStrategicRecommendationSummary(request: LevyTateAiRequest, recommendations: LevyTatePlatformRecommendation[], currentCapabilityProfile: LevyTateCapabilityScore[], futureCapabilityProfile: LevyTateCapabilityScore[], strategyProfile: StrategicPriorityProfile): LevyTateStrategicRecommendation | null {
@@ -520,7 +612,7 @@ function buildStrategicRecommendationSummary(request: LevyTateAiRequest, recomme
   const missingEvidence = [...new Set(recommendations.flatMap((item) => item.missingEvidence).slice(0, 5))];
   const currentCapability = highestCapability(currentCapabilityProfile);
   const futureCapability = highestCapability(futureCapabilityProfile);
-  const suggestedQuestions = [
+  const suggestedQuestions = top.suggestedQuestions.length ? top.suggestedQuestions : [
     "Which work outcome should improve first?",
     "What tools or systems does the employee use most often?",
     "Which delivery model would fit the role and site best?",
@@ -682,7 +774,7 @@ export function buildLevyTateRecommendations(request: LevyTateAiRequest): LevyTa
       providerRationale: providerRationaleFor(providerFitScore),
       programmeRationale: programmeRationaleFor(definition, futureFitScore, strategyFitScore),
       whyRankedLower: missingEvidence.length ? missingEvidence : ["This route needs more direct evidence before it should rank higher."],
-      suggestedQuestions: ["Which specific work outcome should the programme improve?", "Which delivery model would fit the role and site best?"],
+      suggestedQuestions: suggestedQuestionsFor(definition),
       availability,
       eligibility,
       providerAvailability: providerAvailabilityFor(request, definition),
