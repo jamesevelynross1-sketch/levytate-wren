@@ -56,6 +56,7 @@ export function buildLevyTateAiContext(request: LevyTateAiRequest) {
     role: request.role,
     conversationProfile: request.conversationProfile ?? null,
     selectedEmployee: request.selectedEmployee ?? request.contextData?.selectedPersona?.name ?? null,
+    workspaceEmployeeContext: request.workspaceEmployeeContext ?? null,
     employeePersona: request.contextData?.selectedPersona ?? null,
     currentApplication: request.currentApplication ?? request.contextData?.activeApplication ?? null,
     visibleApplications: request.contextData?.requests?.slice(0, 20) ?? [],

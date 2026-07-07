@@ -28,7 +28,7 @@ PERSONA_SPECS = [
     ("GC-0012", "Mark Trelawney", "Utilities & Inland Waterways Director", "Department Head", "GC-0001", "Bristol Regional Hub", ""),
     ("GC-0013", "Eleanor Stone", "Finance Director", "Department Head", "GC-0001", "Billericay Support Office", ""),
     ("GC-0014", "Leah Morrison", "People Director", "Department Head", "GC-0001", "Billericay Support Office", ""),
-    ("GC-0015", "James Whitaker", "Contract Manager", "Line Manager", "GC-0004", "Birmingham Regional Hub", "Awaiting Manager Review"),
+    ("GC-0015", "Rachel Mason", "Contract Manager", "Line Manager", "GC-0004", "Birmingham Regional Hub", "Awaiting Manager Review"),
     ("GC-0016", "Aisha Morgan", "Grounds Maintenance Supervisor", "Line Manager", "GC-0003", "Leeds Regional Hub", "Approved by Line Manager"),
     ("GC-0017", "Tom Llewellyn", "Grounds Maintenance Team Leader", "Line Manager", "GC-0016", "Leeds Regional Hub", ""),
     ("GC-0018", "Sofia Bennett", "Grounds Maintenance Operative", "Employee", "GC-0017", "Leeds Regional Hub", "Submitted to Line Manager"),

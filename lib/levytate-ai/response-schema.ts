@@ -369,6 +369,70 @@ export type LevyTateEmployeeDiscoveryContext = {
   stage: "role_context" | "future_capability" | "recommendation_ready";
 };
 
+export type LevyTateWorkspaceEmployeeContext = {
+  resolution: "selected_employee" | "matched_by_name" | "multiple_matches" | "not_found" | "none";
+  searchText?: string;
+  missingData: string[];
+  matchedEmployees?: Array<{
+    id: string;
+    name: string;
+    jobTitle: string;
+    department: string;
+    site: string;
+  }>;
+  employee?: {
+    id: string;
+    name: string;
+    employeeNumber?: string;
+    jobTitle: string;
+    division?: string;
+    department: string;
+    team?: string;
+    manager?: string;
+    location?: string;
+    platformRole?: string;
+  };
+  role?: {
+    title: string;
+    businessArea?: string;
+    careerLevel?: string;
+    skillsTags?: string[];
+    progression?: string[];
+    preferredPathway?: string;
+    alternativePathways?: string[];
+    businessRationale?: string;
+  };
+  application?: {
+    id: string;
+    status: LevyTateRequestStatus;
+    currentOwner?: string;
+    pathway: string;
+    submittedDate?: string;
+    reason?: string;
+    careerGoal?: string;
+    supportRequired?: string;
+    managerNote?: string;
+    approvalHistory?: string[];
+  } | null;
+  development?: LevyTateEmployeeDiscoveryContext;
+  recommendation?: {
+    topRecommendation?: string;
+    fitScore?: number;
+    confidence?: number;
+    rationale?: string;
+    evidence?: string[];
+    currentCapabilityProfile?: LevyTateCapabilityScore[];
+    futureCapabilityProfile?: LevyTateCapabilityScore[];
+  } | null;
+  providerProgramme?: {
+    providerName?: string;
+    programmeName?: string;
+    linkedStandard?: string;
+    verificationStatus?: string;
+    deliveryModels?: string[];
+  } | null;
+};
+
 export type LevyTateAiRequest = {
   role: LevyTateRole;
   userRole?: LevyTateRole;
@@ -387,6 +451,7 @@ export type LevyTateAiRequest = {
   availablePathways?: LevyTateAiPathwayContext[];
   employerPriorities?: LevyTateEmployerPriorityContext[];
   employeeDiscovery?: LevyTateEmployeeDiscoveryContext;
+  workspaceEmployeeContext?: LevyTateWorkspaceEmployeeContext;
   preferredStandardId?: string;
   contextData?: {
     selectedPersona?: PersonaSummary;
@@ -596,6 +661,125 @@ function parseEmployeeDiscovery(value: unknown): LevyTateEmployeeDiscoveryContex
     automationOpportunities: cleanStringArray(candidate.automationOpportunities, 12) ?? [],
     futureCapabilities: cleanStringArray(candidate.futureCapabilities, 12) ?? [],
     stage,
+  };
+}
+
+function parseWorkspaceEmployeeContext(value: unknown): LevyTateWorkspaceEmployeeContext | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const candidate = value as Partial<LevyTateWorkspaceEmployeeContext>;
+  const text = (item: unknown, limit = 240) => typeof item === "string" && item.trim()
+    ? item.trim().slice(0, limit)
+    : undefined;
+  const numberScore = (item: unknown) => typeof item === "number" && Number.isFinite(item)
+    ? Math.max(0, Math.min(100, Math.round(item)))
+    : undefined;
+  const resolution: LevyTateWorkspaceEmployeeContext["resolution"] =
+    candidate.resolution === "selected_employee" ||
+    candidate.resolution === "matched_by_name" ||
+    candidate.resolution === "multiple_matches" ||
+    candidate.resolution === "not_found"
+      ? candidate.resolution
+      : "none";
+  const parseCapabilityScores = (profile: unknown): LevyTateCapabilityScore[] | undefined => Array.isArray(profile)
+    ? profile.slice(0, 12).flatMap((item) => {
+        if (!item || typeof item !== "object") return [];
+        const score = item as Partial<LevyTateCapabilityScore>;
+        const domain = text(score.domain, 80);
+        const value = numberScore(score.score);
+        if (!domain || value === undefined) return [];
+        return [{
+          domain,
+          score: value,
+          evidence: cleanStringArray(score.evidence, 6) ?? [],
+          missingEvidence: cleanStringArray(score.missingEvidence, 6) ?? [],
+        }];
+      })
+    : undefined;
+
+  return {
+    resolution,
+    searchText: text(candidate.searchText, 160),
+    missingData: cleanStringArray(candidate.missingData, 12) ?? [],
+    matchedEmployees: Array.isArray(candidate.matchedEmployees)
+      ? candidate.matchedEmployees.slice(0, 8).flatMap((item) => {
+          if (!item || typeof item !== "object") return [];
+          const employee = item as NonNullable<LevyTateWorkspaceEmployeeContext["matchedEmployees"]>[number];
+          const name = text(employee.name, 120);
+          if (!name) return [];
+          return [{
+            id: text(employee.id, 80) ?? name,
+            name,
+            jobTitle: text(employee.jobTitle, 160) ?? "Role missing",
+            department: text(employee.department, 160) ?? "Department missing",
+            site: text(employee.site, 160) ?? "Location missing",
+          }];
+        })
+      : undefined,
+    employee: candidate.employee && typeof candidate.employee === "object"
+      ? {
+          id: text(candidate.employee.id, 80) ?? "",
+          name: text(candidate.employee.name, 120) ?? "",
+          employeeNumber: text(candidate.employee.employeeNumber, 80),
+          jobTitle: text(candidate.employee.jobTitle, 160) ?? "",
+          division: text(candidate.employee.division, 160),
+          department: text(candidate.employee.department, 160) ?? "",
+          team: text(candidate.employee.team, 160),
+          manager: text(candidate.employee.manager, 120),
+          location: text(candidate.employee.location, 160),
+          platformRole: text(candidate.employee.platformRole, 80),
+        }
+      : undefined,
+    role: candidate.role && typeof candidate.role === "object"
+      ? {
+          title: text(candidate.role.title, 160) ?? "",
+          businessArea: text(candidate.role.businessArea, 160),
+          careerLevel: text(candidate.role.careerLevel, 80),
+          skillsTags: cleanStringArray(candidate.role.skillsTags, 12),
+          progression: cleanStringArray(candidate.role.progression, 8),
+          preferredPathway: text(candidate.role.preferredPathway, 180),
+          alternativePathways: cleanStringArray(candidate.role.alternativePathways, 8),
+          businessRationale: text(candidate.role.businessRationale, 500),
+        }
+      : undefined,
+    application: candidate.application === null
+      ? null
+      : candidate.application && typeof candidate.application === "object" && isRequestStatus(candidate.application.status)
+        ? {
+            id: text(candidate.application.id, 80) ?? "",
+            status: candidate.application.status,
+            currentOwner: text(candidate.application.currentOwner, 120),
+            pathway: text(candidate.application.pathway, 180) ?? "",
+            submittedDate: text(candidate.application.submittedDate, 80),
+            reason: text(candidate.application.reason, 500),
+            careerGoal: text(candidate.application.careerGoal, 300),
+            supportRequired: text(candidate.application.supportRequired, 300),
+            managerNote: text(candidate.application.managerNote, 500),
+            approvalHistory: cleanStringArray(candidate.application.approvalHistory, 8),
+          }
+        : undefined,
+    development: parseEmployeeDiscovery(candidate.development),
+    recommendation: candidate.recommendation && typeof candidate.recommendation === "object"
+      ? {
+          topRecommendation: text(candidate.recommendation.topRecommendation, 180),
+          fitScore: numberScore(candidate.recommendation.fitScore),
+          confidence: numberScore(candidate.recommendation.confidence),
+          rationale: text(candidate.recommendation.rationale, 600),
+          evidence: cleanStringArray(candidate.recommendation.evidence, 10),
+          currentCapabilityProfile: parseCapabilityScores(candidate.recommendation.currentCapabilityProfile),
+          futureCapabilityProfile: parseCapabilityScores(candidate.recommendation.futureCapabilityProfile),
+        }
+      : undefined,
+    providerProgramme: candidate.providerProgramme === null
+      ? null
+      : candidate.providerProgramme && typeof candidate.providerProgramme === "object"
+        ? {
+            providerName: text(candidate.providerProgramme.providerName, 160),
+            programmeName: text(candidate.providerProgramme.programmeName, 180),
+            linkedStandard: text(candidate.providerProgramme.linkedStandard, 180),
+            verificationStatus: text(candidate.providerProgramme.verificationStatus, 100),
+            deliveryModels: cleanStringArray(candidate.providerProgramme.deliveryModels, 8),
+          }
+        : undefined,
   };
 }
 
@@ -845,6 +1029,7 @@ export function parseLevyTateAiRequest(payload: unknown): LevyTateAiRequest | nu
     availablePathways: parseAvailablePathways(candidate.availablePathways),
     employerPriorities: parseEmployerPriorities(candidate.employerPriorities),
     employeeDiscovery: parseEmployeeDiscovery(candidate.employeeDiscovery),
+    workspaceEmployeeContext: parseWorkspaceEmployeeContext(candidate.workspaceEmployeeContext),
     preferredStandardId: typeof candidate.preferredStandardId === "string" ? candidate.preferredStandardId.trim().slice(0, 120) : undefined,
     contextData,
   };

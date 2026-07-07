@@ -11,9 +11,10 @@ import type {
   LevyTateConversationProfile,
   LevyTateRecommendationResult,
   LevyTateRole,
+  LevyTateWorkspaceEmployeeContext,
 } from "@/lib/levytate/ai/types";
 import { updateEmployeeDiscovery } from "@/lib/levytate/mvp/progressive-profiling";
-import { activeApplicationStatuses, createEmployeeDevelopmentProfile, nowIso } from "@/lib/levytate/mvp/workspace";
+import { activeApplicationStatuses, createEmployeeDevelopmentProfile, nowIso, type MvpEmployee, type MvpRole, type MvpWorkspaceData } from "@/lib/levytate/mvp/workspace";
 
 type AssistantRole = Exclude<LevyTateRole, "Department Head">;
 type ChatMessage = {
@@ -146,6 +147,243 @@ function buildCurrentApplicationSummary(
     submittedDate: application.submittedAt.slice(0, 10),
     decisionNotes: application.managerNote,
   } satisfies NonNullable<LevyTateAiRequest["currentApplication"]>;
+}
+
+function normalisePersonSearch(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[’']/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractNameLikePhrases(message: string) {
+  const phrases = new Set<string>();
+  const cleaned = message.replace(/[’']/g, "");
+  const pattern = /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})\b/g;
+  for (const match of cleaned.matchAll(pattern)) {
+    const phrase = match[1].trim();
+    if (!/^(Ask LevyTate|Line Manager|Department Head|Apprenticeship Lead|Ground Control)$/i.test(phrase)) {
+      phrases.add(phrase);
+    }
+  }
+  return [...phrases];
+}
+
+function employeeMatchesMessage(employee: MvpEmployee, message: string) {
+  const messageText = normalisePersonSearch(message);
+  const fullName = normalisePersonSearch(employee.name);
+  const parts = fullName.split(" ").filter(Boolean);
+  if (!messageText || !fullName || parts.length < 2) return false;
+  return messageText.includes(fullName) || parts.every((part) => messageText.includes(part));
+}
+
+function compactText(values: Array<string | null | undefined>) {
+  return values.map((value) => value?.trim() ?? "").filter(Boolean);
+}
+
+function rolePathwayContext(roleRecord: MvpRole | null) {
+  const mappings = roleRecord?.pathwayMappings.slice().sort((left, right) => left.priority - right.priority) ?? [];
+  const primary = mappings.find((mapping) => mapping.recommendationType === "Primary") ?? mappings[0];
+  const primaryStandard = primary ? getApprenticeshipStandard(primary.apprenticeshipStandardId) : null;
+  return {
+    primary,
+    primaryTitle: primaryStandard?.title ?? primary?.apprenticeshipStandardId ?? "",
+    alternatives: mappings
+      .filter((mapping) => mapping.id !== primary?.id)
+      .flatMap((mapping) => {
+        const standard = getApprenticeshipStandard(mapping.apprenticeshipStandardId);
+        return standard ? [standard.title] : [];
+      }),
+    rationale: primary?.businessRationale,
+  };
+}
+
+function providerProgrammeForStandard(data: MvpWorkspaceData, standardId: string | undefined) {
+  if (!standardId) return { provider: null, programme: null };
+  const programme = data.providerProgrammes.find((item) => item.linkedStandardIds.includes(standardId) || item.linkedStandardId === standardId) ?? null;
+  const provider = programme ? data.providers.find((item) => item.providerId === programme.providerId) ?? null : null;
+  return { provider, programme };
+}
+
+function buildWorkspaceEmployeeResolution(
+  data: MvpWorkspaceData,
+  message: string,
+  selectedEmployeeId: string,
+) {
+  const activeEmployees = data.employees.filter((employee) => employee.status === "Active");
+  const namedMatches = activeEmployees.filter((employee) => employeeMatchesMessage(employee, message));
+  const namePhrases = extractNameLikePhrases(message);
+  const explicitlyNamed = namedMatches.length > 0 || namePhrases.length > 0;
+
+  if (namedMatches.length > 1) {
+    return {
+      workspaceEmployeeContext: {
+        resolution: "multiple_matches",
+        searchText: namePhrases[0] ?? message,
+        missingData: [],
+        matchedEmployees: namedMatches.map((employee) => ({
+          id: employee.id,
+          name: employee.name,
+          jobTitle: employee.jobTitle,
+          department: employee.department,
+          site: employee.site,
+        })),
+      } satisfies LevyTateWorkspaceEmployeeContext,
+      employee: null,
+      roleRecord: null,
+      developmentProfile: null,
+      application: null,
+      managerName: "",
+    };
+  }
+
+  if (!namedMatches.length && explicitlyNamed) {
+    const phrase = namePhrases[0] ?? message;
+    const phraseParts = normalisePersonSearch(phrase).split(" ").filter(Boolean);
+    const possibleMatches = activeEmployees
+      .filter((employee) => {
+        const employeeName = normalisePersonSearch(employee.name);
+        return phraseParts.some((part) => part.length > 2 && employeeName.includes(part));
+      })
+      .slice(0, 5);
+
+    return {
+      workspaceEmployeeContext: {
+        resolution: "not_found",
+        searchText: phrase,
+        missingData: ["employee record"],
+        matchedEmployees: possibleMatches.map((employee) => ({
+          id: employee.id,
+          name: employee.name,
+          jobTitle: employee.jobTitle,
+          department: employee.department,
+          site: employee.site,
+        })),
+      } satisfies LevyTateWorkspaceEmployeeContext,
+      employee: null,
+      roleRecord: null,
+      developmentProfile: null,
+      application: null,
+      managerName: "",
+    };
+  }
+
+  const employee = namedMatches[0] ?? activeEmployees.find((item) => item.id === selectedEmployeeId) ?? null;
+  if (!employee) {
+    return {
+      workspaceEmployeeContext: { resolution: "none", missingData: ["employee record"] } satisfies LevyTateWorkspaceEmployeeContext,
+      employee: null,
+      roleRecord: null,
+      developmentProfile: null,
+      application: null,
+      managerName: "",
+    };
+  }
+
+  const roleRecord = data.roles.find((item) => item.id === employee.roleId) ?? null;
+  const manager = employee.managerId ? data.employees.find((item) => item.id === employee.managerId) ?? null : null;
+  const developmentProfile = data.employeeDevelopmentProfiles.find((profile) => profile.employeeId === employee.id) ?? null;
+  const application = data.applications.find((item) => item.employeeId === employee.id && activeStatuses.has(item.status))
+    ?? data.applications.filter((item) => item.employeeId === employee.id).sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0]
+    ?? null;
+  const pathway = rolePathwayContext(roleRecord);
+  const applicationStandard = application ? getApprenticeshipStandard(application.apprenticeshipStandardId) : null;
+  const preferredStandardId = application?.apprenticeshipStandardId || developmentProfile?.preferredStandardId || pathway.primary?.apprenticeshipStandardId;
+  const { provider, programme } = providerProgrammeForStandard(data, preferredStandardId);
+  const topRecommendation = developmentProfile?.recommendationResult?.topRecommendation ?? developmentProfile?.recommendationResult?.recommendations[0] ?? null;
+  const missingData = compactText([
+    !employee.jobTitle && !roleRecord?.title ? "job title" : null,
+    !employee.department ? "department" : null,
+    !employee.site ? "location" : null,
+    !manager ? "manager" : null,
+    !roleRecord ? "assigned role" : null,
+    !developmentProfile ? "capability profile" : null,
+    !application ? "application record" : null,
+    !preferredStandardId ? "preferred pathway" : null,
+  ]);
+
+  return {
+    workspaceEmployeeContext: {
+      resolution: namedMatches.length ? "matched_by_name" : "selected_employee",
+      searchText: namedMatches.length ? employee.name : undefined,
+      missingData,
+      employee: {
+        id: employee.id,
+        name: employee.name,
+        employeeNumber: employee.employeeNumber,
+        jobTitle: employee.jobTitle || roleRecord?.title || "",
+        division: roleRecord?.department,
+        department: employee.department,
+        team: roleRecord?.businessArea,
+        manager: manager?.name,
+        location: employee.site,
+        platformRole: employee.platformRole,
+      },
+      role: roleRecord ? {
+        title: roleRecord.title,
+        businessArea: roleRecord.businessArea,
+        careerLevel: roleRecord.careerLevel,
+        skillsTags: roleRecord.skillsTags,
+        progression: roleRecord.progression,
+        preferredPathway: pathway.primaryTitle,
+        alternativePathways: pathway.alternatives,
+        businessRationale: pathway.rationale,
+      } : undefined,
+      application: application ? {
+        id: application.id,
+        status: application.status,
+        currentOwner: application.currentOwner,
+        pathway: applicationStandard?.title ?? application.apprenticeshipStandardId,
+        submittedDate: application.submittedAt.slice(0, 10),
+        reason: application.reason,
+        careerGoal: application.careerGoal,
+        supportRequired: application.supportRequired,
+        managerNote: application.managerNote,
+        approvalHistory: application.history.map((entry) => `${entry.status}: ${entry.note}`).slice(-6),
+      } : null,
+      development: developmentProfile ? {
+        roleTitle: employee.jobTitle || roleRecord?.title || undefined,
+        department: employee.department,
+        responsibilities: developmentProfile.responsibilities,
+        currentSkills: developmentProfile.currentSkills,
+        businessFunctions: developmentProfile.businessFunctions,
+        currentCapabilities: developmentProfile.currentCapabilities,
+        apprenticeshipIndicators: developmentProfile.apprenticeshipIndicators,
+        aiOpportunities: developmentProfile.aiOpportunities,
+        dataOpportunities: developmentProfile.dataOpportunities,
+        automationOpportunities: developmentProfile.automationOpportunities,
+        futureCapabilities: developmentProfile.futureCapabilities,
+        stage: developmentProfile.stage,
+      } : undefined,
+      recommendation: topRecommendation ? {
+        topRecommendation: topRecommendation.title,
+        fitScore: topRecommendation.fitScore,
+        confidence: topRecommendation.confidence,
+        rationale: topRecommendation.rationale,
+        evidence: topRecommendation.evidence.map((item) => item.label).slice(0, 8),
+        currentCapabilityProfile: developmentProfile?.recommendationResult?.currentCapabilityProfile,
+        futureCapabilityProfile: developmentProfile?.recommendationResult?.futureCapabilityProfile,
+      } : pathway.primaryTitle ? {
+        topRecommendation: pathway.primaryTitle,
+        rationale: pathway.rationale,
+        evidence: compactText([roleRecord?.title, roleRecord?.businessArea, roleRecord?.department]),
+      } : null,
+      providerProgramme: programme || provider ? {
+        providerName: provider?.providerName,
+        programmeName: programme?.programmeName,
+        linkedStandard: applicationStandard?.title ?? programme?.linkedStandardName,
+        verificationStatus: programme?.verificationStatus ?? provider?.verificationStatus,
+        deliveryModels: programme?.deliveryModels ?? provider?.deliveryModels,
+      } : null,
+    } satisfies LevyTateWorkspaceEmployeeContext,
+    employee,
+    roleRecord,
+    developmentProfile,
+    application,
+    managerName: manager?.name ?? "Line manager to confirm",
+  };
 }
 
 export function AskLevyTateAiWorkspace({ initialEmployeeId = null }: { initialEmployeeId?: string | null }) {
@@ -293,10 +531,14 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null }: { initialEm
       .filter((item) => !item.id.startsWith("welcome-"))
       .map(({ role: messageRole, content }) => ({ role: messageRole, content }));
 
-    const roleRecord = activeRole === "Employee" ? selectedRoleRecord : null;
-    const developmentProfile = activeRole === "Employee" && selectedEmployee
-      ? updateEmployeeDiscovery(selectedDevelopmentProfile ?? createEmployeeDevelopmentProfile(selectedEmployee.id), selectedEmployee.id, trimmed)
-      : null;
+    const resolvedContext = buildWorkspaceEmployeeResolution(data, trimmed, selectedEmployeeId);
+    const contextEmployee = resolvedContext.employee;
+    const roleRecord = resolvedContext.roleRecord ?? (activeRole === "Employee" ? selectedRoleRecord : null);
+    const existingDevelopmentProfile = resolvedContext.developmentProfile;
+    const shouldUpdateSelectedEmployeeProfile = activeRole === "Employee" && selectedEmployee && contextEmployee?.id === selectedEmployee.id;
+    const developmentProfile = shouldUpdateSelectedEmployeeProfile && contextEmployee
+      ? updateEmployeeDiscovery(existingDevelopmentProfile ?? createEmployeeDevelopmentProfile(contextEmployee.id), contextEmployee.id, trimmed)
+      : existingDevelopmentProfile;
     const availablePathways = roleRecord
       ? roleRecord.pathwayMappings
           .slice()
@@ -333,26 +575,26 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null }: { initialEm
     const payload: LevyTateAiRequest = {
       role: activeRole,
       userRole: activeRole,
-      selectedEmployee: activeRole === "Employee" ? selectedEmployee?.name : undefined,
-      selectedSite: activeRole === "Employee" ? selectedEmployee?.site || data.profile.defaultSite || "All sites" : data.profile.defaultSite || "All sites",
+      selectedEmployee: contextEmployee?.name ?? (activeRole === "Employee" ? selectedEmployee?.name : undefined),
+      selectedSite: contextEmployee?.site || (activeRole === "Employee" ? selectedEmployee?.site || data.profile.defaultSite || "All sites" : data.profile.defaultSite || "All sites"),
       currentSection: "Ask LevyTate AI",
       userMessage: trimmed,
       conversationHistory,
-      conversationProfile: activeRole === "Employee" ? selectedDevelopmentProfile?.conversationProfile ?? undefined : profiles[activeRole] ?? undefined,
-      previousRecommendationResult: activeRole === "Employee" ? selectedDevelopmentProfile?.recommendationResult ?? null : recommendationResults[activeRole],
+      conversationProfile: developmentProfile?.conversationProfile ?? (activeRole === "Employee" ? selectedDevelopmentProfile?.conversationProfile ?? undefined : profiles[activeRole] ?? undefined),
+      previousRecommendationResult: developmentProfile?.recommendationResult ?? (activeRole === "Employee" ? selectedDevelopmentProfile?.recommendationResult ?? null : recommendationResults[activeRole]),
       employerContext: data.profile.employerName || "LevyTate beta workspace",
       currentWorkspace: {
         employerName: data.profile.employerName || "LevyTate beta workspace",
-        selectedSite: activeRole === "Employee" ? selectedEmployee?.site || data.profile.defaultSite || "All sites" : data.profile.defaultSite || "All sites",
+        selectedSite: contextEmployee?.site || (activeRole === "Employee" ? selectedEmployee?.site || data.profile.defaultSite || "All sites" : data.profile.defaultSite || "All sites"),
         activeModule: "Ask LevyTate AI",
       },
-      currentApplication: activeRole === "Employee" && selectedEmployee
+      currentApplication: contextEmployee
         ? buildCurrentApplicationSummary(
-            selectedApplication ?? undefined,
-            selectedEmployee,
-            selectedManagerName,
-            selectedApplication ? getApprenticeshipStandard(selectedApplication.apprenticeshipStandardId)?.title ?? selectedApplication.apprenticeshipStandardId : "No active application",
-            selectedApplicationIndex >= 0 ? selectedApplicationIndex : 0,
+            resolvedContext.application ?? undefined,
+            contextEmployee,
+            resolvedContext.managerName || selectedManagerName,
+            resolvedContext.application ? getApprenticeshipStandard(resolvedContext.application.apprenticeshipStandardId)?.title ?? resolvedContext.application.apprenticeshipStandardId : "No active application",
+            resolvedContext.application ? Math.max(0, data.applications.findIndex((application) => application.id === resolvedContext.application?.id)) : selectedApplicationIndex >= 0 ? selectedApplicationIndex : 0,
           )
         : null,
       roleMappings,
@@ -367,10 +609,10 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null }: { initialEm
           verificationStatus: provider.verificationStatus,
         })),
       employerPriorities: data.profile.priorities.map((priority) => ({ name: priority.name, importance: priority.importance })),
-      employeeDiscovery: developmentProfile && selectedEmployee
+      employeeDiscovery: developmentProfile && contextEmployee
         ? {
-            roleTitle: selectedEmployee.jobTitle || roleRecord?.title || undefined,
-            department: selectedEmployee.department,
+            roleTitle: contextEmployee.jobTitle || roleRecord?.title || undefined,
+            department: contextEmployee.department,
             responsibilities: developmentProfile.responsibilities,
             currentSkills: developmentProfile.currentSkills,
             businessFunctions: developmentProfile.businessFunctions,
@@ -383,7 +625,8 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null }: { initialEm
             stage: developmentProfile.stage,
           }
         : undefined,
-      preferredStandardId: activeRole === "Employee" ? selectedDevelopmentProfile?.preferredStandardId || undefined : undefined,
+      workspaceEmployeeContext: resolvedContext.workspaceEmployeeContext,
+      preferredStandardId: developmentProfile?.preferredStandardId || (activeRole === "Employee" ? selectedDevelopmentProfile?.preferredStandardId || undefined : undefined),
     };
 
     setConversations((current) => ({ ...current, [activeRole]: nextMessages }));
@@ -409,7 +652,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null }: { initialEm
       setProfiles((current) => ({ ...current, [activeRole]: result.conversationProfile ?? current[activeRole] ?? null }));
       setRecommendationResults((current) => ({ ...current, [activeRole]: result.recommendationResult ?? current[activeRole] ?? null }));
 
-      if (activeRole === "Employee" && selectedEmployee && developmentProfile) {
+      if (shouldUpdateSelectedEmployeeProfile && selectedEmployee && developmentProfile) {
         const existing = selectedDevelopmentProfile ?? createEmployeeDevelopmentProfile(selectedEmployee.id);
         saveEmployeeDevelopmentProfile({
           ...existing,
