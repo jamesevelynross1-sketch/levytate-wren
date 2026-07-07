@@ -1,4 +1,5 @@
 import type { LevyTateRecommendationResult, LevyTatePlatformRecommendation } from "@/lib/levytate/ai/types";
+import { groundControlImportSummary, groundControlOrganisationRows, groundControlPersonaImports, type GroundControlOrganisationRow, type GroundControlPersonaImport } from "@/lib/levytate/data/demo/ground-control-import";
 import type { LevyTateWorkspaceBootstrap } from "@/lib/levytate/mvp/api";
 import {
   applicationOwnerForStatus,
@@ -17,7 +18,7 @@ import {
 
 const createdAt = "2026-07-07T09:00:00.000Z";
 const updatedAt = "2026-07-07T09:00:00.000Z";
-const demoSeparator = " · ";
+const demoSeparator = " - ";
 
 type RoleSeed = {
   id: string;
@@ -37,6 +38,9 @@ type EmployeeSeed = {
   roleId: string;
   managerId: string;
   department: string;
+  subdivision?: string;
+  team?: string;
+  jobRole?: string;
   site: string;
   platformRole: MvpEmployee["platformRole"];
   currentSkills: string[];
@@ -71,285 +75,249 @@ const sites = [
   "North West Field Region",
 ];
 
-const departments = [
-  "Operations",
-  "Arboriculture",
-  "Landscape Maintenance",
-  "Winter Services",
-  "Commercial",
-  "Fleet",
-  "Health & Safety",
-  "People",
-  "Sustainability",
-  "Technology",
-  "Finance",
-  "Customer Experience",
-];
+const importedDivisions = unique(groundControlOrganisationRows.map((row) => row.division).filter(Boolean));
+const importedSubdivisions = unique(groundControlOrganisationRows.map((row) => row.subdivision).filter(Boolean));
+const employeeIdByNumber = new Map(
+  groundControlPersonaImports.map((seed, index) => [seed.employeeNumber, `gc-emp-${String(index + 1).padStart(3, "0")}`]),
+);
+const spreadsheetRoleSeeds: RoleSeed[] = groundControlOrganisationRows.map(toSpreadsheetRoleSeed);
+const spreadsheetRoleByTitle = new Map(spreadsheetRoleSeeds.map((role) => [normaliseLookup(role.title), role]));
+const spreadsheetEmployeeSeeds: EmployeeSeed[] = groundControlPersonaImports.map(toSpreadsheetEmployeeSeed);
 
-const roleSeeds: RoleSeed[] = [
-  {
-    id: "gc-role-contracts-manager",
-    title: "Contracts Manager",
-    department: "Operations",
-    businessArea: "Regional Operations",
-    careerLevel: "Manager",
-    skillsTags: ["Contract delivery", "Commercial performance", "People coordination", "Client service"],
-    progression: ["Regional Operations Manager", "Account Director"],
+function toSpreadsheetRoleSeed(row: GroundControlOrganisationRow): RoleSeed {
+  const recommendation = recommendationForRow(row);
+  const alternative = alternativeForRow(row, recommendation.standardId);
+  return {
+    id: row.roleId,
+    title: row.jobTitle,
+    department: row.division,
+    businessArea: compact([row.subdivision, row.team]).join(" / ") || row.division,
+    careerLevel: careerLevelFor(row),
+    skillsTags: skillsFor(row),
+    progression: progressionFor(row),
     mappings: [
-      mapping("ST0192", "Primary", 1, "Develops process improvement, operational performance and cross-functional delivery leadership without relying on generic management standards."),
-      mapping("ST0310", "Alternative", 2, "Supports structured delivery planning and project controls where contract mobilisation is a key part of the role."),
+      mapping(recommendation.standardId, "Primary", 1, recommendation.rationale),
+      mapping(alternative.standardId, "Alternative", 2, alternative.rationale),
     ],
-  },
-  {
-    id: "gc-role-field-team-leader",
-    title: "Field Team Leader",
-    department: "Landscape Maintenance",
-    businessArea: "Field Operations",
-    careerLevel: "Supervisor",
-    skillsTags: ["Crew coordination", "Quality checks", "Customer standards", "Operational safety"],
-    progression: ["Contracts Supervisor", "Contracts Manager"],
-    mappings: [
-      mapping("ST0192", "Primary", 1, "Builds continuous improvement, productivity and safer ways of working in live operational teams."),
-      mapping("ST0071", "Alternative", 2, "Useful where customer experience and service ownership are the main development need."),
-    ],
-  },
-  {
-    id: "gc-role-arborist",
-    title: "Lead Arborist",
-    department: "Arboriculture",
-    businessArea: "Arboriculture",
-    careerLevel: "Experienced",
-    skillsTags: ["Tree works", "Site safety", "Technical supervision", "Customer assurance"],
-    progression: ["Arboriculture Supervisor", "Tree Works Manager"],
-    mappings: [
-      mapping("ST0550", "Primary", 1, "Supports safety, compliance and site risk capability for technical field environments."),
-      mapping("ST0192", "Alternative", 2, "Supports productivity and process improvement across mobile crews."),
-    ],
-  },
-  {
-    id: "gc-role-sheq-advisor",
-    title: "SHEQ Advisor",
-    department: "Health & Safety",
-    businessArea: "SHEQ",
-    careerLevel: "Experienced",
-    skillsTags: ["Safety assurance", "Audits", "Compliance", "Risk management"],
-    progression: ["SHEQ Manager", "Head of Safety"],
-    mappings: [
-      mapping("ST0550", "Primary", 1, "Directly develops safety, health and environment capability for compliance and operational assurance."),
-      mapping("ST0192", "Alternative", 2, "Useful where the role also owns improvement projects and prevention activity."),
-    ],
-  },
-  {
-    id: "gc-role-business-analyst",
-    title: "Business Analyst",
-    department: "Technology",
-    businessArea: "Digital Transformation",
-    careerLevel: "Experienced",
-    skillsTags: ["Requirements", "Systems", "Stakeholder analysis", "Process mapping"],
-    progression: ["Digital Product Owner", "Transformation Lead"],
-    mappings: [
-      mapping("ST0117", "Primary", 1, "Builds structured business analysis, requirements gathering and change design capability."),
-      mapping("ST0118", "Alternative", 2, "Useful if the role is moving further into analytics and performance reporting."),
-    ],
-  },
-  {
-    id: "gc-role-data-analyst",
-    title: "Data Analyst",
-    department: "Technology",
-    businessArea: "Data & Insight",
-    careerLevel: "Experienced",
-    skillsTags: ["Reporting", "Power BI", "Data quality", "Operational insight"],
-    progression: ["Senior Data Analyst", "Insight Manager"],
-    mappings: [
-      mapping("ST0118", "Primary", 1, "Builds deeper analytics, insight and stakeholder reporting capability for operational decision making."),
-      mapping("ST0117", "Alternative", 2, "Useful if the role is moving into requirements, process change and business systems."),
-    ],
-  },
-  {
-    id: "gc-role-it-support-technician",
-    title: "IT Support Technician",
-    department: "Technology",
-    businessArea: "IT Service",
-    careerLevel: "Entry",
-    skillsTags: ["User support", "Microsoft 365", "Device management", "Service desk"],
-    progression: ["Systems Technician", "Infrastructure Analyst"],
-    mappings: [
-      mapping("ST0120", "Primary", 1, "Develops digital support, user enablement and service confidence across operational teams."),
-      mapping("ST0973", "Alternative", 2, "Useful where the role is more infrastructure and communications technology focused."),
-    ],
-  },
-  {
-    id: "gc-role-procurement-manager",
-    title: "Procurement Manager",
-    department: "Commercial",
-    businessArea: "Procurement & Supply Chain",
-    careerLevel: "Manager",
-    skillsTags: ["Supplier management", "Sourcing", "Commercial governance", "Contract value"],
-    progression: ["Head of Procurement", "Commercial Director"],
-    mappings: [
-      mapping("ST0810", "Primary", 1, "Develops procurement governance, sourcing discipline and supplier management foundations for commercial teams."),
-      mapping("ST0117", "Alternative", 2, "Useful if the immediate priority is process mapping and systems change."),
-    ],
-  },
-  {
-    id: "gc-role-customer-success-advisor",
-    title: "Customer Success Advisor",
-    department: "Customer Experience",
-    businessArea: "Customer Operations",
-    careerLevel: "Entry",
-    skillsTags: ["Customer service", "Issue resolution", "Account support", "CRM"],
-    progression: ["Customer Success Lead", "Account Manager"],
-    mappings: [
-      mapping("ST0071", "Primary", 1, "Strengthens service ownership, customer conversations and complex issue resolution."),
-      mapping("ST0120", "Alternative", 2, "Useful where the role is becoming more CRM, digital support or workflow focused."),
-    ],
-  },
-  {
-    id: "gc-role-fleet-coordinator",
-    title: "Fleet Coordinator",
-    department: "Fleet",
-    businessArea: "Fleet Operations",
-    careerLevel: "Experienced",
-    skillsTags: ["Fleet scheduling", "Compliance", "Supplier coordination", "Operational reporting"],
-    progression: ["Fleet Manager", "Operations Planning Manager"],
-    mappings: [
-      mapping("ST0192", "Primary", 1, "Builds process optimisation, waste reduction and measurable operational improvement capability."),
-      mapping("ST0810", "Alternative", 2, "Useful where supplier coordination and commercial control are the main development needs."),
-    ],
-  },
-];
+  };
+}
 
-const employeeSeeds: EmployeeSeed[] = [
-  employee("gc-emp-001", "GC-0001", "Nadia Brooks", "gc-role-contracts-manager", "", "Operations", "Leeds Regional Hub", "Line Manager", ["Contract delivery", "Client reviews"], ["Operational improvement", "Commercial performance"], ["AI reporting summaries"], ["Regional KPI dashboards"], ["Mobilisation workflows"], ["Manages multi-site grounds maintenance contracts"], {
-    standardId: "ST0192",
-    title: "Level 4 Improvement Practitioner",
-    fitScore: 91,
-    provider: "Apprentify",
-    rationale: "Strong fit because the role owns operational performance, client delivery and improvement opportunities across regional teams.",
-    evidence: ["Contract delivery leadership", "Operational efficiency priority", "Regional KPI ownership"],
-  }, "Awaiting Manager Review", "I want to improve contract mobilisation, reporting and team productivity across my region.", "Progress into Regional Operations Manager.", "Time to evidence improvement projects."),
-  employee("gc-emp-002", "GC-0002", "Marcus Ellison", "gc-role-field-team-leader", "gc-emp-001", "Landscape Maintenance", "North West Field Region", "Employee", ["Crew planning", "Quality checks"], ["Improvement projects", "Customer standards"], ["Route planning support"], ["Job completion reporting"], ["Daily work allocation"], ["Leads mobile grounds maintenance crews"], {
-    standardId: "ST0192",
-    title: "Level 4 Improvement Practitioner",
-    fitScore: 88,
-    provider: "Apprentify",
-    rationale: "Best fit because Marcus needs practical improvement tools for crew productivity, quality and safer operating routines.",
-    evidence: ["Crew productivity", "Operational efficiency", "Quality checks"],
-  }, "Approved by Line Manager", "I want to improve how our crews plan work, record quality and reduce repeat visits.", "Move into Contracts Supervisor.", "Protected time for evidence collection."),
-  employee("gc-emp-003", "GC-0003", "Amira Patel", "gc-role-data-analyst", "gc-emp-011", "Technology", "Billericay Support Office", "Employee", ["Power BI", "Excel modelling", "Data quality"], ["Predictive analytics", "AI adoption"], ["Forecasting use cases"], ["Operational dashboards"], ["Automated data checks"], ["Builds contract and workforce reporting"], {
-    standardId: "ST0118",
-    title: "Level 4 Data Analyst",
-    fitScore: 94,
-    provider: "QA",
-    rationale: "Highest fit because the role already centres on reporting, insight and data quality, with future movement toward predictive analytics.",
-    evidence: ["Power BI reporting", "Data quality", "Predictive analytics ambition"],
-  }, "Awaiting Manager Review", "I want to move from reporting into stronger insight and predictive analytics.", "Progress into Senior Data Analyst.", "Access to cross-region datasets."),
-  employee("gc-emp-004", "GC-0004", "Theo Morgan", "gc-role-it-support-technician", "gc-emp-011", "Technology", "Billericay Support Office", "Employee", ["Microsoft 365", "Service desk", "Device support"], ["Cloud support", "Cyber awareness"], ["AI helpdesk knowledge"], ["Ticket trend analysis"], ["Self-service support"], ["Supports users across field and office teams"], {
-    standardId: "ST0120",
-    title: "Level 3 Digital Support Technician",
-    fitScore: 89,
-    provider: "HBTC",
-    rationale: "Strong fit because the role combines user enablement, digital support and Microsoft 365 adoption across operational teams.",
-    evidence: ["User support", "Microsoft 365", "Digital capability priority"],
-  }, "Draft", "I want a clearer route into cloud and better digital support for field teams.", "Become Systems Technician.", "Mentor support from IT service lead."),
-  employee("gc-emp-005", "GC-0005", "Elena Reeves", "gc-role-sheq-advisor", "gc-emp-012", "Health & Safety", "Birmingham Regional Hub", "Employee", ["Site audits", "Risk registers", "Incident learning"], ["Safety culture", "Digital inspections"], ["Inspection trend summaries"], ["Safety dashboards"], ["Audit workflow automation"], ["Supports field teams with SHEQ assurance"], {
-    standardId: "ST0550",
-    title: "Level 3 Safety, Health and Environment Technician",
-    fitScore: 93,
-    provider: "RHG Consult",
-    rationale: "Direct fit because the role is centred on operational safety, audits, risk prevention and environment compliance.",
-    evidence: ["SHEQ role", "Health and safety priority", "Audit evidence"],
-  }, "Submitted to Apprenticeship Lead", "I want to build stronger technical safety evidence and improve how we share learning after incidents.", "Progress into SHEQ Manager.", "Access to audit and incident review evidence."),
-  employee("gc-emp-006", "GC-0006", "Callum Price", "gc-role-arborist", "gc-emp-001", "Arboriculture", "South East Field Region", "Employee", ["Tree works", "Crew safety", "Customer assurance"], ["Technical supervision", "Safety leadership"], ["Photo evidence review"], ["Job progress reporting"], ["Risk assessment templates"], ["Leads arboriculture jobs and technical site checks"], {
-    standardId: "ST0550",
-    title: "Level 3 Safety, Health and Environment Technician",
-    fitScore: 85,
-    provider: "RHG Consult",
-    rationale: "Useful fit because technical field supervision depends on safe systems of work, risk evidence and compliance behaviours.",
-    evidence: ["Field safety", "Technical supervision", "Operational risk"],
-  }),
-  employee("gc-emp-007", "GC-0007", "Priya Shah", "gc-role-procurement-manager", "", "Commercial", "Billericay Support Office", "Line Manager", ["Supplier review", "Commercial governance"], ["Procurement analytics", "Sustainable sourcing"], ["Supplier summary drafting"], ["Spend dashboards"], ["Supplier review workflow"], ["Manages national supplier relationships"], {
-    standardId: "ST0810",
-    title: "Level 3 Procurement and Supply Assistant",
-    fitScore: 82,
-    provider: "SRSCC",
-    rationale: "Recommended as a practical procurement route while the organisation confirms the most suitable higher-level commercial pathway.",
-    evidence: ["Procurement role", "Commercial performance priority", "Supplier management"],
-    missingEvidence: ["Confirm whether a higher level procurement standard is available for new starts."],
-  }, "Approved for Enrolment", "I want to improve supplier governance and sustainability within procurement decisions.", "Move into Head of Procurement.", "Time with finance and sustainability stakeholders."),
-  employee("gc-emp-008", "GC-0008", "Hannah Wilkes", "gc-role-customer-success-advisor", "gc-emp-007", "Customer Experience", "Manchester Regional Hub", "Employee", ["Customer calls", "CRM updates", "Issue tracking"], ["Customer insight", "Account confidence"], ["Call summary drafting"], ["CRM reporting"], ["Case routing"], ["Supports contract managers with customer queries"], {
-    standardId: "ST0071",
-    title: "Level 3 Customer Service Specialist",
-    fitScore: 87,
-    provider: "Learning Curve Group",
-    rationale: "Strong fit because the role involves complex customer conversations, CRM ownership and service recovery.",
-    evidence: ["Customer service role", "CRM work", "Customer experience priority"],
-  }, "Declined by Line Manager", "I wanted to build confidence handling complex customer issues.", "Progress into Customer Success Lead.", "Needs clearer business case."),
-  employee("gc-emp-009", "GC-0009", "Owen Clarke", "gc-role-fleet-coordinator", "gc-emp-012", "Fleet", "Bristol Regional Hub", "Employee", ["Fleet scheduling", "Compliance checks"], ["Operational efficiency", "Supplier coordination"], ["Maintenance forecast prompts"], ["Fleet utilisation reporting"], ["Service schedule automation"], ["Coordinates fleet availability and compliance"], {
-    standardId: "ST0192",
-    title: "Level 4 Improvement Practitioner",
-    fitScore: 90,
-    provider: "Apprentify",
-    rationale: "Strong fit because the role has clear opportunities to improve scheduling, compliance routines and fleet utilisation.",
-    evidence: ["Fleet efficiency", "Compliance checks", "Process improvement"],
-  }, "Awaiting Final Approval", "I want to reduce downtime and improve fleet compliance planning.", "Move into Fleet Manager.", "Access to maintenance and supplier data."),
-  employee("gc-emp-010", "GC-0010", "Sophie Lang", "gc-role-business-analyst", "gc-emp-011", "Technology", "Billericay Support Office", "Employee", ["Requirements", "Process mapping", "Stakeholder workshops"], ["Digital transformation", "AI adoption"], ["AI discovery notes"], ["Process metrics"], ["Workflow redesign"], ["Maps requirements for operational systems"], {
-    standardId: "ST0117",
-    title: "Level 4 Business Analyst",
-    fitScore: 92,
-    provider: "QA",
-    rationale: "Best fit because Sophie works directly on requirements, process change and digital transformation activity.",
-    evidence: ["Business analysis", "Digital transformation priority", "Process mapping"],
-  }, "Submitted to Line Manager", "I want to formalise my business analysis skills as more transformation work comes into the team.", "Progress into Product Owner.", "Access to system implementation projects."),
-  employee("gc-emp-011", "GC-0011", "Jacob Turner", "gc-role-business-analyst", "", "Technology", "Billericay Support Office", "Apprenticeship Lead", ["Transformation planning", "Systems change"], ["AI governance", "Workforce planning"], ["AI opportunity triage"], ["Portfolio reporting"], ["Workflow prioritisation"], ["Leads technology change and apprenticeship oversight"], {
-    standardId: "ST0117",
-    title: "Level 4 Business Analyst",
-    fitScore: 86,
-    provider: "QA",
-    rationale: "Useful fit for formalising business analysis practice across transformation and apprenticeship planning.",
-    evidence: ["Transformation leadership", "Systems change", "Workforce planning"],
-  }),
-  employee("gc-emp-012", "GC-0012", "Rachel Mason", "gc-role-sheq-advisor", "", "Operations", "Birmingham Regional Hub", "Department Head", ["Operational assurance", "Risk review"], ["Workforce readiness", "Safety culture"], ["Risk trend summaries"], ["Participation reporting"], ["Assurance workflow"], ["Oversees regional operational assurance"], {
-    standardId: "ST0550",
-    title: "Level 3 Safety, Health and Environment Technician",
-    fitScore: 78,
-    provider: "RHG Consult",
-    rationale: "Supports stronger safety and assurance capability across regional teams.",
-    evidence: ["Operational assurance", "Health and safety priority", "Regional reporting"],
-  }),
-  employee("gc-emp-013", "GC-0013", "Liam Foster", "gc-role-field-team-leader", "gc-emp-001", "Winter Services", "Scotland Operations Hub", "Employee", ["Route planning", "Seasonal mobilisation"], ["Operational efficiency", "Commercial performance"], ["Weather briefing summaries"], ["Route performance reporting"], ["Mobilisation checklists"], ["Coordinates winter service crews"], {
-    standardId: "ST0192",
-    title: "Level 4 Improvement Practitioner",
-    fitScore: 86,
-    provider: "Apprentify",
-    rationale: "Useful fit for improving mobilisation planning, route productivity and operational consistency.",
-    evidence: ["Winter mobilisation", "Route planning", "Efficiency priority"],
-  }),
-  employee("gc-emp-014", "GC-0014", "Maya Collins", "gc-role-customer-success-advisor", "gc-emp-007", "Commercial", "Billericay Support Office", "Employee", ["Bid coordination", "Customer detail", "CRM"], ["Commercial performance", "Data confidence"], ["Proposal drafting"], ["Pipeline reporting"], ["Bid workflow"], ["Supports bids and account growth activity"], {
-    standardId: "ST0117",
-    title: "Level 4 Business Analyst",
-    fitScore: 84,
-    provider: "QA",
-    rationale: "Good fit because the role is moving from administration into process, requirements and commercial pipeline insight.",
-    evidence: ["Commercial process", "CRM data", "Workflow improvement"],
-  }),
-  employee("gc-emp-015", "GC-0015", "Ben Harris", "gc-role-field-team-leader", "gc-emp-001", "Landscape Maintenance", "South East Field Region", "Employee", ["Grounds maintenance", "Team briefings"], ["Leadership routines", "Quality standards"], ["Briefing templates"], ["Quality trend reporting"], ["Job close workflow"], ["Supervises field delivery and customer standards"], {
-    standardId: "ST0071",
-    title: "Level 3 Customer Service Specialist",
-    fitScore: 80,
-    provider: "Learning Curve Group",
-    rationale: "Recommended where customer standards and service ownership are the priority alongside field delivery.",
-    evidence: ["Customer standards", "Team briefings", "Service recovery"],
-  }),
-  employee("gc-emp-016", "GC-0016", "Laura Bennett", "gc-role-data-analyst", "gc-emp-011", "Sustainability", "Billericay Support Office", "Employee", ["Carbon reporting", "Excel", "Supplier data"], ["Sustainability analytics", "Automation"], ["Carbon insight summaries"], ["Sustainability dashboards"], ["Data collection automation"], ["Builds sustainability and social value reporting"], {
-    standardId: "ST0118",
-    title: "Level 4 Data Analyst",
-    fitScore: 89,
-    provider: "QA",
-    rationale: "Strong fit because sustainability reporting depends on data quality, dashboards and insight for decision makers.",
-    evidence: ["Carbon reporting", "Sustainability priority", "Data dashboards"],
-  }),
-];
+function toSpreadsheetEmployeeSeed(seed: GroundControlPersonaImport, index: number): EmployeeSeed {
+  const role = spreadsheetRoleByTitle.get(normaliseLookup(seed.jobTitle));
+  const row = groundControlOrganisationRows.find((item) => normaliseLookup(item.jobTitle) === normaliseLookup(seed.jobTitle));
+  const recommendation = row ? recommendationForRow(row) : rec("ST0192", "Level 4 Improvement Practitioner", 78, "Apprentify", "Useful where the role can evidence operational improvement, productivity or service quality benefits.", ["Ground Control productivity priority", "Role-led development need"]);
+  return {
+    id: employeeIdByNumber.get(seed.employeeNumber) ?? `gc-emp-${String(index + 1).padStart(3, "0")}`,
+    employeeNumber: seed.employeeNumber,
+    name: seed.name,
+    roleId: role?.id ?? row?.roleId ?? `gc-role-imported-${index + 1}`,
+    managerId: seed.managerEmployeeNumber ? employeeIdByNumber.get(seed.managerEmployeeNumber) ?? "" : "",
+    department: row?.division ?? "Ground Control",
+    subdivision: row?.subdivision,
+    team: row?.team,
+    jobRole: row?.jobRole,
+    site: seed.site,
+    platformRole: seed.platformRole,
+    currentSkills: row ? skillsFor(row).slice(0, 4) : ["Operational delivery", "Customer service"],
+    futureCapabilities: row ? futureCapabilitiesFor(row) : ["Operational improvement", "Digital confidence"],
+    aiOpportunities: row ? aiOpportunitiesFor(row) : ["Workflow summaries"],
+    dataOpportunities: row ? dataOpportunitiesFor(row) : ["Performance reporting"],
+    automationOpportunities: row ? automationOpportunitiesFor(row) : ["Process automation"],
+    responsibilities: row ? responsibilitiesFor(row) : [`Performs the ${seed.jobTitle} role`, "Contributes to Ground Control priorities"],
+    recommendation,
+    applicationStatus: normaliseApplicationStatus(seed.applicationStatus),
+    applicationReason: `I want to build capability in ${recommendation.evidence[0]?.toLowerCase() ?? "my current role"} and support Ground Control's priorities.`,
+    careerGoal: row ? futureCapabilitiesFor(row)[0] : "Career progression",
+    supportRequired: "Manager support to evidence workplace projects and protect study time.",
+  };
+}
+
+function recommendationForRow(row: GroundControlOrganisationRow): EmployeeSeed["recommendation"] {
+  const text = normaliseLookup(`${row.jobTitle} ${row.jobRole} ${row.division} ${row.subdivision} ${row.team}`);
+
+  if (matches(text, ["data", "insight", "reporting", "analyst", "power bi", "performance"])) {
+    return rec("ST0118", "Level 4 Data Analyst", 91, "QA", "Strong fit where the role works with reporting, insight, data quality or performance decisions.", ["Reporting and insight evidence", "Ground Control data capability priority", "Business performance visibility"]);
+  }
+
+  if (matches(text, ["business analyst", "product owner", "transformation", "system", "application architect", "change"])) {
+    return rec("ST0117", "Level 4 Business Analyst", 89, "QA", "Strong fit where the role translates operational needs into digital change, process design and system requirements.", ["Process mapping", "Digital transformation priority", "Stakeholder requirements"]);
+  }
+
+  if (matches(text, ["3rd line", "infrastructure", "network", "devops", "cyber", "support technician"])) {
+    return rec("ST0973", "Level 3 Information Communications Technician", 88, "HBTC", "Relevant for infrastructure, network and technical support capability across a distributed workforce.", ["IT support evidence", "Digital capability priority", "Technology service delivery"]);
+  }
+
+  if (matches(text, ["it support", "digital support", "service desk", "desktop", "user support"])) {
+    return rec("ST0120", "Level 3 Digital Support Technician", 87, "HBTC", "Strong fit where the role supports Microsoft 365, users, devices and digital adoption.", ["User support", "Microsoft 365 or systems support", "Digital confidence"]);
+  }
+
+  if (matches(text, ["procurement", "buyer", "supply chain", "supplier", "commercial"])) {
+    if (matches(text, ["manager", "lead", "head", "director", "senior"])) {
+      return rec("ST0811", "Level 4 Commercial Procurement and Supply", 89, "SRSCC", "Strong fit for strategic sourcing, supplier performance and commercial governance.", ["Supplier management", "Commercial performance priority", "Sustainable procurement opportunity"]);
+    }
+    return rec("ST0810", "Level 3 Procurement and Supply Assistant", 86, "SRSCC", "Practical fit for developing sourcing, supplier coordination and procurement administration capability.", ["Procurement role", "Supplier coordination", "Commercial control"]);
+  }
+
+  if (matches(text, ["finance", "accounts", "payroll", "credit", "purchase ledger"])) {
+    return rec("ST0608", "Level 2 Accounts or Finance Assistant", 84, "HBTC", "Appropriate where the role needs stronger finance processing, controls and reporting confidence.", ["Finance operations", "Controls and accuracy", "Reporting opportunity"]);
+  }
+
+  if (matches(text, ["people", "hr", "talent", "recruit", "learning", "organisational development"])) {
+    return rec("ST0238", "Level 5 People Professional", 86, "LevyTate provider matching", "Fits HR, talent and people roles where the priority is workforce capability, employee experience and organisational development.", ["People function role", "Workforce planning", "Capability development"]);
+  }
+
+  if (matches(text, ["hsqe", "safety", "health", "environment", "quality", "compliance", "risk", "audit"])) {
+    return rec("ST0550", "Level 3 Safety, Health and Environment Technician", 90, "RHG Consult", "Direct fit for operational safety, health, environment, risk and compliance capability.", ["Safety and compliance evidence", "Ground Control health and safety priority", "Field assurance"]);
+  }
+
+  if (matches(text, ["sustainability", "biodiversity", "ecology", "environmental", "carbon", "nature"])) {
+    return rec("ST0934", "Level 4 Corporate Responsibility and Sustainability Practitioner", 88, "RHG Consult", "Supports sustainability, biodiversity, carbon and responsible business outcomes.", ["Sustainability priority", "Environmental expertise", "Client impact"]);
+  }
+
+  if (matches(text, ["arbor", "tree", "forestry", "vegetation", "veg"])) {
+    return rec("ST0921", "Level 4 Arboriculturist", 87, "LevyTate provider matching", "Best specialist route where the role is centred on arboriculture, vegetation management and technical tree work.", ["Arboriculture role", "Field safety", "Technical land-based capability"]);
+  }
+
+  if (matches(text, ["grounds", "landscape", "horticulture", "litter", "operative", "team leader"])) {
+    return rec("ST0226", "Level 3 Horticulture or Landscape Supervisor", 85, "LevyTate provider matching", "Relevant for landscape maintenance, grounds operations, crew supervision and service quality.", ["Landscape maintenance", "Operational productivity", "Field team development"]);
+  }
+
+  if (matches(text, ["rail", "construction", "site", "project", "quantity surveyor", "estimator", "mobilisation"])) {
+    if (matches(text, ["quantity surveyor", "commercial surveyor"])) {
+      return rec("ST0049", "Level 4 Construction Quantity Surveying Technician", 87, "Learning Curve Group", "Relevant where the role needs cost, commercial and construction project controls capability.", ["Commercial construction role", "Project controls", "Cost management"]);
+    }
+    return rec("ST0310", "Level 4 Associate Project Manager", 86, "Learning Curve Group", "Strong fit where work involves delivery planning, mobilisation, risk, stakeholders and project controls.", ["Project delivery", "Operational planning", "Cross-functional coordination"]);
+  }
+
+  if (matches(text, ["marketing", "campaign", "brand", "communications", "digital marketing"])) {
+    return rec("ST1031", "Level 3 Multi-channel Marketer", 85, "The Marketing Trainer", "Fits roles focused on campaigns, content, digital channels and customer engagement.", ["Marketing activity", "Digital communication", "Brand and customer engagement"]);
+  }
+
+  if (matches(text, ["bid", "proposal", "tender"])) {
+    return rec("ST0056", "Level 3 Bid and Proposal Co-ordinator", 86, "RHG Consult", "Directly supports bid writing, tender coordination and commercial opportunity development.", ["Bid activity", "Tender process", "Commercial performance"]);
+  }
+
+  if (matches(text, ["customer", "client", "account", "service", "crm"])) {
+    return rec("ST0071", "Level 3 Customer Service Specialist", 84, "Learning Curve Group", "Strong fit where the role owns customer conversations, service recovery, CRM updates or account support.", ["Customer contact", "Service quality", "Customer experience priority"]);
+  }
+
+  if (matches(text, ["admin", "administrator", "coordinator", "assistant", "scheduler", "planner"])) {
+    return rec("ST0070", "Level 3 Business Administrator", 82, "Learning Curve Group", "Useful for building structured administration, coordination, process and stakeholder support skills.", ["Administrative coordination", "Process improvement", "Business support"]);
+  }
+
+  return rec("ST0192", "Level 4 Improvement Practitioner", 78, "Apprentify", "Useful where the role can evidence operational improvement, productivity, quality or service redesign benefits.", ["Operational productivity priority", "Continuous improvement opportunity", "Role-led workplace project"]);
+}
+
+function alternativeForRow(row: GroundControlOrganisationRow, primaryStandardId: string) {
+  const text = normaliseLookup(`${row.jobTitle} ${row.jobRole} ${row.division} ${row.subdivision} ${row.team}`);
+  const fallback = matches(text, ["data", "analyst", "reporting"])
+    ? rec("ST0117", "Level 4 Business Analyst", 82, "QA", "Alternative if the role moves more toward process change and requirements.", ["Process change", "Stakeholder insight"])
+    : matches(text, ["field", "grounds", "landscape", "arbor", "operations"])
+      ? rec("ST0192", "Level 4 Improvement Practitioner", 82, "Apprentify", "Alternative where productivity, quality and safer operating routines become the main development focus.", ["Operational improvement", "Crew productivity"])
+      : rec("ST0118", "Level 4 Data Analyst", 80, "QA", "Alternative if the role needs stronger reporting and insight capability.", ["Data visibility", "Performance reporting"]);
+  return fallback.standardId === primaryStandardId
+    ? rec("ST0070", "Level 3 Business Administrator", 76, "Learning Curve Group", "Alternative for structured business coordination and process administration.", ["Business coordination", "Process discipline"])
+    : fallback;
+}
+
+function rec(
+  standardId: string,
+  title: string,
+  fitScore: number,
+  provider: string,
+  rationale: string,
+  evidence: string[],
+  missingEvidence: string[] = [],
+): EmployeeSeed["recommendation"] {
+  return { standardId, title, fitScore, provider, rationale, evidence, missingEvidence };
+}
+
+function normaliseApplicationStatus(value: string): MvpApplication["status"] | undefined {
+  const lookup: Record<string, MvpApplication["status"]> = {
+    Draft: "Draft",
+    "Submitted to Line Manager": "Submitted to Line Manager",
+    "Awaiting Manager Review": "Awaiting Manager Review",
+    "Approved by Line Manager": "Approved by Line Manager",
+    "Submitted to Apprenticeship Lead": "Submitted to Apprenticeship Lead",
+    "Awaiting Final Approval": "Awaiting Final Approval",
+    "Approved for Enrolment": "Approved for Enrolment",
+    "Declined by Line Manager": "Declined by Line Manager",
+    "Declined by Apprenticeship Lead": "Declined by Apprenticeship Lead",
+  };
+  return lookup[value];
+}
+
+function careerLevelFor(row: GroundControlOrganisationRow): MvpRole["careerLevel"] {
+  const text = normaliseLookup(`${row.jobTitle} ${row.jobRole}`);
+  if (matches(text, ["apprentice", "trainee", "assistant", "operative", "administrator"])) return "Entry";
+  if (matches(text, ["team leader", "supervisor", "coordinator", "advisor", "specialist", "analyst", "technician", "engineer", "surveyor", "consultant"])) return "Experienced";
+  if (matches(text, ["senior manager", "head of", "director", "chief", "cio"])) return "Senior Manager";
+  if (matches(text, ["manager", "lead", "product owner"])) return "Manager";
+  return "Experienced";
+}
+
+function skillsFor(row: GroundControlOrganisationRow) {
+  const text = normaliseLookup(`${row.jobTitle} ${row.jobRole} ${row.division} ${row.subdivision} ${row.team}`);
+  if (matches(text, ["data", "reporting", "analyst", "insight"])) return ["Reporting", "Data quality", "Stakeholder insight", "Performance dashboards"];
+  if (matches(text, ["it", "support", "digital", "network", "infrastructure"])) return ["Digital support", "Systems", "Microsoft 365", "Service delivery"];
+  if (matches(text, ["procurement", "buyer", "supplier"])) return ["Supplier management", "Sourcing", "Commercial governance", "Contract value"];
+  if (matches(text, ["finance", "accounts", "payroll"])) return ["Financial processing", "Controls", "Accuracy", "Reporting"];
+  if (matches(text, ["safety", "hsqe", "quality", "compliance", "risk"])) return ["Safety assurance", "Compliance", "Risk management", "Audits"];
+  if (matches(text, ["arbor", "tree", "grounds", "landscape", "horticulture", "field"])) return ["Field operations", "Site safety", "Quality checks", "Customer standards"];
+  if (matches(text, ["customer", "client", "account"])) return ["Customer service", "CRM", "Issue resolution", "Account support"];
+  return compact([row.jobRole, row.team, row.subdivision, "Operational delivery"]).slice(0, 4);
+}
+
+function futureCapabilitiesFor(row: GroundControlOrganisationRow) {
+  const text = normaliseLookup(`${row.jobTitle} ${row.jobRole} ${row.division} ${row.subdivision} ${row.team}`);
+  if (matches(text, ["data", "analyst", "reporting"])) return ["Predictive insight", "AI-enabled reporting", "Business performance visibility"];
+  if (matches(text, ["it", "digital", "support", "system"])) return ["Cloud confidence", "AI-enabled service support", "Digital adoption"];
+  if (matches(text, ["procurement", "commercial", "buyer"])) return ["Sustainable sourcing", "Supplier performance", "Commercial analytics"];
+  if (matches(text, ["safety", "hsqe", "compliance", "quality"])) return ["Digital inspections", "Safety culture", "Risk prevention"];
+  if (matches(text, ["field", "grounds", "landscape", "arbor", "operations"])) return ["Operational productivity", "Crew coordination", "Safer ways of working"];
+  return ["Process improvement", "Digital confidence", "Career progression"];
+}
+
+function dataOpportunitiesFor(row: GroundControlOrganisationRow) {
+  const text = normaliseLookup(`${row.jobTitle} ${row.jobRole} ${row.division} ${row.subdivision} ${row.team}`);
+  if (matches(text, ["data", "finance", "commercial", "procurement", "operations", "field", "fleet"])) return ["Performance dashboards", "Trend reporting", "Data quality checks"];
+  if (matches(text, ["safety", "compliance", "quality"])) return ["Incident trend reporting", "Audit dashboards"];
+  return ["Progress reporting", "Team activity summaries"];
+}
+
+function aiOpportunitiesFor(row: GroundControlOrganisationRow) {
+  const text = normaliseLookup(`${row.jobTitle} ${row.jobRole} ${row.division} ${row.subdivision} ${row.team}`);
+  if (matches(text, ["field", "operations", "grounds", "arbor", "rail", "utilities"])) return ["AI job summaries", "Route and task prioritisation prompts"];
+  if (matches(text, ["customer", "client", "account"])) return ["Customer conversation summaries", "CRM prompt support"];
+  if (matches(text, ["data", "it", "digital", "business analyst"])) return ["AI insight prompts", "Workflow discovery"];
+  return ["AI-supported admin summaries"];
+}
+
+function automationOpportunitiesFor(row: GroundControlOrganisationRow) {
+  const text = normaliseLookup(`${row.jobTitle} ${row.jobRole} ${row.division} ${row.subdivision} ${row.team}`);
+  if (matches(text, ["admin", "coordinator", "planner", "scheduler"])) return ["Workflow automation", "Approval reminders", "Document routing"];
+  if (matches(text, ["fleet", "field", "operations"])) return ["Schedule reminders", "Evidence capture workflows"];
+  if (matches(text, ["finance", "procurement"])) return ["Supplier and invoice workflow checks"];
+  return ["Process prompts", "Routine task reminders"];
+}
+
+function responsibilitiesFor(row: GroundControlOrganisationRow) {
+  return compact([
+    row.jobRole ? `Performs the ${row.jobRole} role` : `Performs the ${row.jobTitle} role`,
+    row.team ? `Works in ${row.team}` : row.subdivision ? `Works in ${row.subdivision}` : "Works in Ground Control operations",
+    row.division ? `Part of ${row.division}` : "Part of Ground Control",
+    "Contributes to operational productivity, safety, customer service and workforce readiness priorities",
+  ]);
+}
+
+function progressionFor(row: GroundControlOrganisationRow) {
+  const text = normaliseLookup(`${row.jobTitle} ${row.jobRole}`);
+  if (matches(text, ["assistant", "administrator", "coordinator", "apprentice", "trainee", "junior", "operative", "technician"])) return ["Experienced specialist", "Team Leader", "Supervisor"];
+  if (matches(text, ["team leader", "supervisor", "advisor", "analyst", "engineer", "surveyor", "consultant"])) return ["Senior Specialist", "Manager", "Capability Lead"];
+  if (matches(text, ["manager", "lead", "product owner"])) return ["Senior Manager", "Head of Function", "Director"];
+  if (matches(text, ["director", "chief", "head of", "cio"])) return ["Executive sponsor", "Strategic capability owner"];
+  return ["Career progression", "Future specialist route"];
+}
 
 export const groundControlWorkspace: LevyTateWorkspaceBootstrap = {
   data: buildGroundControlWorkspace(),
@@ -359,27 +327,30 @@ export const groundControlWorkspace: LevyTateWorkspaceBootstrap = {
     userEmail: "demo@levytate.co.uk",
     userRole: "Employer Admin",
     storageMode: "local_fallback",
-    warnings: ["Seeded demonstration workspace. Changes are not written to the internal LevyTate MVP workspace."],
+    warnings: [
+      "Seeded demonstration workspace. Changes are not written to the internal LevyTate MVP workspace.",
+      `Imported ${groundControlImportSummary.uniqueJobTitlesImported} job titles, ${groundControlImportSummary.divisionsImported} divisions and ${importedSubdivisions.length} departments from the Ground Control spreadsheet.`,
+    ],
   },
 };
 
 function buildGroundControlWorkspace(): MvpWorkspaceData {
   const empty = createEmptyMvpWorkspace();
-  const roles = roleSeeds.map(toRole);
-  const employees = employeeSeeds.map(toEmployee);
-  const employeeDevelopmentProfiles = employeeSeeds.map(toDevelopmentProfile);
-  const applications = employeeSeeds.flatMap(toApplication);
+  const roles = spreadsheetRoleSeeds.map(toRole);
+  const employees = spreadsheetEmployeeSeeds.map(toEmployee);
+  const employeeDevelopmentProfiles = spreadsheetEmployeeSeeds.map(toDevelopmentProfile);
+  const applications = spreadsheetEmployeeSeeds.flatMap(toApplication);
 
   return sanitiseSeedValue({
     ...empty,
     profile: {
       employerName: "Ground Control",
       workspaceName: "Ground Control demonstration workspace",
-      primaryContact: "Jacob Turner",
+      primaryContact: "Megan Rowe",
       contactEmail: "demo@levytate.co.uk",
       defaultSite: "Billericay Support Office",
       sites,
-      departments,
+      departments: importedDivisions,
       priorities: [
         { id: "gc-priority-ai", name: "Introduce AI into the business", importance: "High", detail: "Use AI to improve field productivity, reporting summaries and customer workflows." },
         { id: "gc-priority-efficiency", name: "Increase productivity", importance: "Critical", detail: "Improve operational planning, reduce repeat visits and strengthen crew utilisation." },
@@ -400,12 +371,11 @@ function buildGroundControlWorkspace(): MvpWorkspaceData {
 
 function sanitiseDemoText(value: string) {
   return value
-    .replace(/ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â·/g, "·")
-    .replace(/Ãƒâ€šÃ‚Â·/g, "·")
-    .replace(/Ã‚Â·/g, "·")
-    .replace(/Â·/g, "·")
-    .replace(/â€¢/g, "·")
-    .replace(/\s*·\s*/g, demoSeparator)
+    .replace(/\u00c2\u00b7/g, "-")
+    .replace(/\u00b7/g, "-")
+    .replace(/\u2022/g, "-")
+    .replace(/\ufffd/g, "-")
+    .replace(/\s+-\s+/g, demoSeparator)
     .replace(/\s{2,}/g, " ")
     .trim();
 }
@@ -439,50 +409,6 @@ function mapping(apprenticeshipStandardId: string, recommendationType: MvpPathwa
   };
 }
 
-function employee(
-  id: string,
-  employeeNumber: string,
-  name: string,
-  roleId: string,
-  managerId: string,
-  department: string,
-  site: string,
-  platformRole: MvpEmployee["platformRole"],
-  currentSkills: string[],
-  futureCapabilities: string[],
-  aiOpportunities: string[],
-  dataOpportunities: string[],
-  automationOpportunities: string[],
-  responsibilities: string[],
-  recommendation: EmployeeSeed["recommendation"],
-  applicationStatus?: MvpApplication["status"],
-  applicationReason?: string,
-  careerGoal?: string,
-  supportRequired?: string,
-): EmployeeSeed {
-  return {
-    id,
-    employeeNumber,
-    name,
-    roleId,
-    managerId,
-    department,
-    site,
-    platformRole,
-    currentSkills,
-    futureCapabilities,
-    aiOpportunities,
-    dataOpportunities,
-    automationOpportunities,
-    responsibilities,
-    recommendation,
-    applicationStatus,
-    applicationReason,
-    careerGoal,
-    supportRequired,
-  };
-}
-
 function toRole(seed: RoleSeed): MvpRole {
   return {
     id: seed.id,
@@ -500,7 +426,7 @@ function toRole(seed: RoleSeed): MvpRole {
 }
 
 function toEmployee(seed: EmployeeSeed): MvpEmployee {
-  const role = roleSeeds.find((item) => item.id === seed.roleId);
+  const role = spreadsheetRoleSeeds.find((item) => item.id === seed.roleId);
   return {
     id: seed.id,
     employeeNumber: seed.employeeNumber,
@@ -521,12 +447,13 @@ function toEmployee(seed: EmployeeSeed): MvpEmployee {
 
 function toDevelopmentProfile(seed: EmployeeSeed): MvpEmployeeDevelopmentProfile {
   const result = recommendationResult(seed);
+  const role = spreadsheetRoleSeeds.find((item) => item.id === seed.roleId);
   return {
     employeeId: seed.id,
     stage: "recommendation_ready",
     responsibilities: seed.responsibilities,
     currentSkills: seed.currentSkills,
-    businessFunctions: [seed.department, roleSeeds.find((role) => role.id === seed.roleId)?.businessArea ?? seed.department],
+    businessFunctions: compact([seed.department, seed.subdivision, seed.team, seed.jobRole, role?.businessArea ?? seed.department]),
     currentCapabilities: seed.currentSkills,
     apprenticeshipIndicators: [seed.recommendation.title, "Role-led pathway", "Manager discussion ready"],
     aiOpportunities: seed.aiOpportunities,
@@ -537,7 +464,7 @@ function toDevelopmentProfile(seed: EmployeeSeed): MvpEmployeeDevelopmentProfile
       { role: "assistant", content: `I already have ${seed.name}'s role, department, manager and organisation priorities. The current strongest route is ${seed.recommendation.title}.` },
     ],
     conversationProfile: {
-      currentRole: roleSeeds.find((role) => role.id === seed.roleId)?.title ?? "",
+      currentRole: role?.title ?? "",
       currentDepartment: seed.department,
       currentEmployer: "Ground Control",
       careerGoal: seed.careerGoal ?? seed.futureCapabilities[0] ?? "Career progression",
@@ -563,7 +490,7 @@ function toDevelopmentProfile(seed: EmployeeSeed): MvpEmployeeDevelopmentProfile
         managementAmbition: seed.futureCapabilities.some((item) => /manager|lead|supervisor/i.test(item)) ? 78 : 54,
         overall: Math.min(95, seed.recommendation.fitScore),
       },
-      conversationSummary: `${seed.name} is a ${roleSeeds.find((role) => role.id === seed.roleId)?.title ?? "colleague"} in ${seed.department}. LevyTate should use Ground Control priorities around AI adoption, operational efficiency, safety, sustainability and digital capability when coaching this employee.`,
+      conversationSummary: `${seed.name} is a ${role?.title ?? "colleague"} in ${seed.department}${seed.team ? ` / ${seed.team}` : ""}. LevyTate should use Ground Control priorities around AI-enabled field operations, operational productivity, safety, sustainability, commercial performance and digital transformation when coaching this employee.`,
       questionsAlreadyAsked: ["What does the employee do today?", "What capability do they need next?"],
       questionsStillToAsk: ["Which project can evidence the pathway?", "What study time can the manager support?"],
       exchangeCount: 2,
@@ -577,15 +504,17 @@ function toDevelopmentProfile(seed: EmployeeSeed): MvpEmployeeDevelopmentProfile
 
 function recommendationResult(seed: EmployeeSeed): LevyTateRecommendationResult {
   const top = platformRecommendation(seed.recommendation, "current_best_fit");
-  const alternative = platformRecommendation({
-    ...seed.recommendation,
-    standardId: seed.recommendation.standardId === "ST0192" ? "ST0117" : "ST0192",
-    title: seed.recommendation.standardId === "ST0192" ? "Level 4 Business Analyst" : "Level 4 Improvement Practitioner",
-    fitScore: Math.max(72, seed.recommendation.fitScore - 8),
-    rationale: "Alternative route to review if the role focus shifts after manager discussion.",
-    evidence: ["Alternative capability route", "Future skills discussion"],
-    missingEvidence: ["Confirm role emphasis before progressing."],
-  }, "alternative_route");
+  const role = spreadsheetRoleSeeds.find((item) => item.id === seed.roleId);
+  const alternativeSeed = alternativeForRow({
+    roleId: seed.roleId,
+    division: seed.department,
+    subdivision: seed.subdivision ?? "",
+    team: seed.team ?? "",
+    jobRole: seed.jobRole ?? "",
+    jobTitle: role?.title ?? seed.department,
+    sourceRow: 0,
+  }, seed.recommendation.standardId);
+  const alternative = platformRecommendation({ ...alternativeSeed, fitScore: Math.max(72, seed.recommendation.fitScore - 7) }, "alternative_route");
 
   return {
     recommendations: [top, alternative],
@@ -604,14 +533,14 @@ function recommendationResult(seed: EmployeeSeed): LevyTateRecommendationResult 
       strategicRecommendation: top.title,
       alternativeRoute: alternative.title,
       confidence: top.confidence,
-      businessImpact: "Supports Ground Control's priorities around operational efficiency, digital capability and safer, more consistent field delivery.",
-      organisationBenefit: "Creates a clearer workforce development route using role-specific evidence rather than generic management training.",
-      employeeBenefit: "Gives the employee a pathway connected to their current role and future progression.",
+      businessImpact: "Supports Ground Control priorities around operational productivity, AI-enabled field operations, safety, sustainability and customer service excellence.",
+      organisationBenefit: "Creates a clearer workforce development route using the imported organisational structure rather than generic job families.",
+      employeeBenefit: "Connects day-to-day work to a credible apprenticeship pathway and future capability profile.",
       whyRecommended: top.rationale,
       whyOtherRoutesRankedLower: alternative.whyRankedLower,
       missingEvidence: top.missingEvidence,
       suggestedQuestions: top.suggestedQuestions,
-      organisationPrioritiesInfluenced: ["Operational efficiency", "AI adoption", "Digital capability", "Health & Safety"],
+      organisationPrioritiesInfluenced: ["Operational productivity", "AI-enabled field operations", "Digital transformation", "Health & Safety", "Sustainability"],
       employeeCapabilitiesInfluenced: seed.futureCapabilities,
     },
   };
@@ -812,16 +741,48 @@ function matchingRequests(): MvpMatchingRequest[] {
 function enrolments(applications: MvpApplication[]): MvpEnrolment[] {
   return applications
     .filter((application) => application.status === "Approved for Enrolment")
-    .map((application) => ({
-      id: `gc-enrol-${application.employeeId}`,
-      applicationId: application.id,
-      employeeId: application.employeeId,
-      providerId: employeeSeeds.find((employeeSeed) => employeeSeed.id === application.employeeId)?.recommendation.provider === "SRSCC" ? "provider-srscc" : "provider-qa",
-      apprenticeshipStandardId: application.apprenticeshipStandardId,
-      status: "Ready for provider",
-      startDate: "2026-09-14",
-      notes: "Ready for provider introduction once cohort dates are confirmed.",
-      createdAt,
-      updatedAt,
-    }));
+    .map((application) => {
+      const seed = spreadsheetEmployeeSeeds.find((employeeSeed) => employeeSeed.id === application.employeeId);
+      return {
+        id: `gc-enrol-${application.employeeId}`,
+        applicationId: application.id,
+        employeeId: application.employeeId,
+        providerId: providerIdFor(seed?.recommendation.provider ?? ""),
+        apprenticeshipStandardId: application.apprenticeshipStandardId,
+        status: "Ready for provider",
+        startDate: "2026-09-14",
+        notes: "Ready for provider introduction once cohort dates are confirmed.",
+        createdAt,
+        updatedAt,
+      };
+    });
+}
+
+function providerIdFor(providerName: string) {
+  const lookup: Record<string, string> = {
+    Apprentify: "provider-apprentify",
+    HBTC: "provider-hbtc",
+    "Learning Curve Group": "provider-learning-curve-group",
+    QA: "provider-qa",
+    "RHG Consult": "provider-rhg-consult",
+    SRSCC: "provider-srscc",
+    "The Marketing Trainer": "provider-the-marketing-trainer",
+  };
+  return lookup[providerName] ?? "provider-qa";
+}
+
+function compact(values: Array<string | undefined | null>) {
+  return values.map((value) => value?.trim() ?? "").filter(Boolean);
+}
+
+function unique(values: string[]) {
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
+}
+
+function normaliseLookup(value: string) {
+  return value.toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function matches(text: string, terms: string[]) {
+  return terms.some((term) => text.includes(normaliseLookup(term)));
 }
