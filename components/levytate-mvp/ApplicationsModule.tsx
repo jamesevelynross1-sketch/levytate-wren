@@ -202,7 +202,7 @@ export function ApplicationsModule() {
                   <tr key={application.id}>
                     <td className="px-4 py-3">
                       <p className="font-semibold">{displayEmployee(employee)}</p>
-                      <p className="mt-0.5 text-xs text-[#102c3d]/46">{employee?.department || "Department to confirm"} Ãƒâ€šÃ‚Â· {employee?.site || "Site to confirm"}</p>
+                      <p className="mt-0.5 text-xs text-[#102c3d]/46">{employee?.department || "Department to confirm"} · {employee?.site || "Site to confirm"}</p>
                     </td>
                     <td className="px-4 py-3">
                       <p className="text-[#102c3d]/72">{standard?.title ?? application.apprenticeshipStandardId}</p>
@@ -279,7 +279,7 @@ export function ApplicationsModule() {
                     return {
                       value: mapping.apprenticeshipStandardId,
                       label: standard
-                        ? `Level ${standard.level} Ãƒâ€šÃ‚Â· ${standard.title} Ãƒâ€šÃ‚Â· ${standard.referenceCode}`
+                        ? `Level ${standard.level} · ${standard.title} · ${standard.referenceCode}`
                         : mapping.apprenticeshipStandardId,
                     };
                   }),
@@ -326,7 +326,7 @@ function ApplicationDetailModal({ application, onClose }: { application: MvpAppl
           <section>
             <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#c95568]">Application summary</p>
             <h3 className="mt-1 text-lg font-semibold text-[#102c3d]">{standard?.title ?? application.apprenticeshipStandardId}</h3>
-            <p className="mt-2 text-sm leading-6 text-[#102c3d]/56">{employee?.jobTitle || "Role to confirm"} Ãƒâ€šÃ‚Â· {employee?.department || "Department to confirm"} Ãƒâ€šÃ‚Â· {employee?.site || "Site to confirm"}</p>
+            <p className="mt-2 text-sm leading-6 text-[#102c3d]/56">{employee?.jobTitle || "Role to confirm"} · {employee?.department || "Department to confirm"} · {employee?.site || "Site to confirm"}</p>
           </section>
           <section>
             <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#0b6f63]">Workflow status</p>

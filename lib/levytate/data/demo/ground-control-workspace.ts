@@ -17,6 +17,7 @@ import {
 
 const createdAt = "2026-07-07T09:00:00.000Z";
 const updatedAt = "2026-07-07T09:00:00.000Z";
+const demoSeparator = " · ";
 
 type RoleSeed = {
   id: string;
@@ -369,7 +370,7 @@ function buildGroundControlWorkspace(): MvpWorkspaceData {
   const employeeDevelopmentProfiles = employeeSeeds.map(toDevelopmentProfile);
   const applications = employeeSeeds.flatMap(toApplication);
 
-  return {
+  return sanitiseSeedValue({
     ...empty,
     profile: {
       employerName: "Ground Control",
@@ -394,7 +395,37 @@ function buildGroundControlWorkspace(): MvpWorkspaceData {
     providerRelationships: providerRelationships(),
     matchingRequests: matchingRequests(),
     enrolments: enrolments(applications),
-  };
+  });
+}
+
+function sanitiseDemoText(value: string) {
+  return value
+    .replace(/ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â·/g, "·")
+    .replace(/Ãƒâ€šÃ‚Â·/g, "·")
+    .replace(/Ã‚Â·/g, "·")
+    .replace(/Â·/g, "·")
+    .replace(/â€¢/g, "·")
+    .replace(/\s*·\s*/g, demoSeparator)
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+function sanitiseSeedValue<T>(value: T): T {
+  if (typeof value === "string") {
+    return sanitiseDemoText(value) as T;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitiseSeedValue(item)) as T;
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, sanitiseSeedValue(item)]),
+    ) as T;
+  }
+
+  return value;
 }
 
 function mapping(apprenticeshipStandardId: string, recommendationType: MvpPathwayMapping["recommendationType"], priority: number, businessRationale: string): Omit<MvpPathwayMapping, "id"> {
