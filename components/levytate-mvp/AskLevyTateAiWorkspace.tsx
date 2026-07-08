@@ -29,43 +29,43 @@ const activeStatuses = new Set<RequestStatus>(activeApplicationStatuses());
 
 const roleContent: Record<AssistantRole, { purpose: string; welcome: string; prompts: string[] }> = {
   Employee: {
-    purpose: "Explore pathways, prepare application answers and plan a manager conversation.",
-    welcome: "Create or select an employee, then I will guide the discovery one useful question at a time.",
+    purpose: "Explain recommendations, open the current application and prepare useful next-step drafts.",
+    welcome: "Select an employee, then I can explain their recommendation, find the current application or prepare the next LevyTate workflow step.",
     prompts: [
-      "What could help this employee move into more reporting and automation work?",
-      "Which pathway fits someone who wants to improve productivity with AI?",
-      "Help me prepare a manager conversation.",
-      "Compare the strongest pathway against one alternative.",
+      "Explain this recommendation",
+      "Show the current application",
+      "Generate a manager conversation",
+      "What should I do next?",
     ],
   },
   "Line Manager": {
-    purpose: "Review development requests and understand role fit, commitment and business benefit.",
-    welcome: "I can help you think through a direct report's application without making the decision for you. Share the role, pathway and business need you are weighing up.",
+    purpose: "Find review work, explain recommendations and draft manager decision notes.",
+    welcome: "I can help you review direct-report applications, understand recommendation evidence and prepare a decision rationale without making the decision for you.",
     prompts: [
-      "What should I consider before approving a Data Technician application?",
-      "Help me assess the business benefit for this request.",
-      "What questions should I ask the employee?",
-      "Prepare a balanced approval rationale.",
+      "Show everyone awaiting approval",
+      "What should I ask before approving this?",
+      "Explain the business benefit for this request",
+      "Generate an approval note",
     ],
   },
   "Apprenticeship Lead": {
-    purpose: "Map roles to specialist pathways and prepare controlled provider matching requests.",
-    welcome: "Describe the role, capability gap and intended outcome. I will help distinguish the strongest specialist route from plausible alternatives before provider matching is considered.",
+    purpose: "Review approvals, explain programme fit and prepare controlled provider matching work.",
+    welcome: "I can help you explain recommendations, compare provider relationships, review final approvals and prepare controlled provider matching requests using LevyTate data.",
     prompts: [
-      "We want to improve reporting in operations. Which programme and provider fit?",
-      "We need AI adoption for admin-heavy roles. What should we explore?",
-      "Compare programme options for a procurement capability gap.",
-      "Draft a provider matching request for a procurement cohort.",
+      "Show final approvals",
+      "Help me add Primary Goal",
+      "Find AI programmes",
+      "Generate a provider matching summary",
     ],
   },
   "LevyTate Admin": {
-    purpose: "Prepare provider matching notes, controlled shortlist criteria and internal next actions.",
-    welcome: "Share the employer need and I will help structure the matching brief, identify what evidence is missing and prepare the next internal action. Catalogue entries remain candidates until reviewed.",
+    purpose: "Find platform records, prepare provider notes and create internal follow-up drafts.",
+    welcome: "Tell me the platform task. I can find records, structure provider matching notes, identify missing evidence and prepare the next internal action.",
     prompts: [
-      "Prepare matching criteria from business goal to programme to provider.",
-      "What information is missing before we shortlist providers?",
-      "Draft internal provider matching notes with alternatives.",
-      "Create a follow-up task for a data apprenticeship enquiry.",
+      "Show provider relationships",
+      "Help me add a provider",
+      "Generate provider notes",
+      "Create a follow-up task",
     ],
   },
 };
@@ -100,6 +100,19 @@ function initialRecommendationResults() {
 
 function responseActions(response: LevyTateAiResponse) {
   return response.suggestedActions ?? response.recommendedActions;
+}
+
+function targetForCopilotAction(action: LevyTateAiAction) {
+  if (action.type === "open_my_applications") return "Applications";
+  if (action.type === "open_review_queue") return "Applications";
+  if (action.type === "open_final_approvals") return "Applications";
+  if (action.type === "open_team_development") return "Employees";
+  if (action.type === "open_department_analytics") return "Reports";
+  if (action.type === "open_site_breakdown") return "Reports";
+  if (action.type === "open_reporting") return "Reports";
+  if (action.type === "open_provider_relationships") return "Provider Relationships";
+  if (action.type === "request_provider_matching") return "Provider Relationships";
+  return null;
 }
 
 function toChatMessages(history: LevyTateConversationMessage[], fallback: string): ChatMessage[] {
@@ -386,7 +399,7 @@ function buildWorkspaceEmployeeResolution(
   };
 }
 
-export function AskLevyTateAiWorkspace({ initialEmployeeId = null }: { initialEmployeeId?: string | null }) {
+export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate }: { initialEmployeeId?: string | null; onNavigate?: (target: string) => void }) {
   const { data, saveEmployeeDevelopmentProfile } = useMvpWorkspace();
   const [role, setRole] = useState<AssistantRole>("Employee");
   const [conversations, setConversations] = useState<Record<AssistantRole, ChatMessage[]>>(initialConversations);
@@ -577,7 +590,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null }: { initialEm
       userRole: activeRole,
       selectedEmployee: contextEmployee?.name ?? (activeRole === "Employee" ? selectedEmployee?.name : undefined),
       selectedSite: contextEmployee?.site || (activeRole === "Employee" ? selectedEmployee?.site || data.profile.defaultSite || "All sites" : data.profile.defaultSite || "All sites"),
-      currentSection: "Ask LevyTate AI",
+      currentSection: "LevyTate Copilot",
       userMessage: trimmed,
       conversationHistory,
       conversationProfile: developmentProfile?.conversationProfile ?? (activeRole === "Employee" ? selectedDevelopmentProfile?.conversationProfile ?? undefined : profiles[activeRole] ?? undefined),
@@ -586,7 +599,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null }: { initialEm
       currentWorkspace: {
         employerName: data.profile.employerName || "LevyTate beta workspace",
         selectedSite: contextEmployee?.site || (activeRole === "Employee" ? selectedEmployee?.site || data.profile.defaultSite || "All sites" : data.profile.defaultSite || "All sites"),
-        activeModule: "Ask LevyTate AI",
+        activeModule: "LevyTate Copilot",
       },
       currentApplication: contextEmployee
         ? buildCurrentApplicationSummary(
@@ -644,7 +657,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null }: { initialEm
         body: JSON.stringify(payload),
       });
       const result = await response.json() as LevyTateAiResponse & { message?: string };
-      if (!response.ok) throw new Error(result.message || "Ask LevyTate AI could not respond.");
+      if (!response.ok) throw new Error(result.message || "LevyTate Copilot could not respond.");
 
       const content = [result.assistantMessage, result.followUpQuestion].filter(Boolean).join("\n\n");
       const assistantMessage: ChatMessage = { id: messageId(), role: "assistant", content, response: result };
@@ -665,7 +678,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null }: { initialEm
         });
       }
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Ask LevyTate AI could not respond.");
+      setError(requestError instanceof Error ? requestError.message : "LevyTate Copilot could not respond.");
     } finally {
       setLoading(false);
     }
@@ -686,6 +699,11 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null }: { initialEm
     }
     setPendingAction(null);
     setRevealedAction(action);
+    const navigationTarget = targetForCopilotAction(action);
+    if (navigationTarget && onNavigate) {
+      onNavigate(navigationTarget);
+      setActionStatus(`Opened ${navigationTarget}.`);
+    }
   }
 
   function confirmAction() {
@@ -723,8 +741,8 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null }: { initialEm
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="grid gap-3">
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">Role-aware guidance</p>
-              <h2 className="mt-1 text-xl font-semibold tracking-[-0.02em]">Choose the conversation mode</h2>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">Platform Copilot</p>
+              <h2 className="mt-1 text-xl font-semibold tracking-[-0.02em]">Choose the workflow mode</h2>
             </div>
             {role === "Employee" ? (
               <label className="grid gap-1.5">
@@ -742,7 +760,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null }: { initialEm
               </label>
             ) : null}
           </div>
-          <div className="grid gap-1 rounded-2xl bg-[#f5f8f6] p-1 sm:grid-cols-2 xl:grid-cols-4" aria-label="Ask LevyTate AI role">
+          <div className="grid gap-1 rounded-2xl bg-[#f5f8f6] p-1 sm:grid-cols-2 xl:grid-cols-4" aria-label="LevyTate Copilot role">
             {assistantRoles.map((item) => (
               <button
                 key={item}
@@ -761,7 +779,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null }: { initialEm
         <div className="flex min-h-0 flex-col">
           <div className="flex items-center justify-between gap-4 border-b border-[#102c3d]/[0.07] px-5 py-4">
             <div>
-              <p className="font-semibold">Ask LevyTate AI</p>
+              <p className="font-semibold">LevyTate Copilot</p>
               <p className="mt-1 text-xs text-[#102c3d]/48">
                 {role === "Employee" && selectedEmployee ? `${selectedEmployee.name} - ${selectedEmployee.department}` : `${role} mode`}
               </p>
@@ -773,7 +791,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null }: { initialEm
                 </span>
               ) : null}
               <span className="rounded-full bg-[#edf7f3] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#0b6f63]">
-                {latestResponse?.source === "openai" ? "Live GenAI" : "Guided mode"}
+                {latestResponse?.source === "openai" ? "Live Copilot" : "Guided mode"}
               </span>
             </div>
           </div>
@@ -808,7 +826,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null }: { initialEm
           </div>
 
           <form onSubmit={submit} className="border-t border-[#102c3d]/[0.07] bg-white p-4">
-            <label htmlFor="levytate-ai-message" className="sr-only">Message Ask LevyTate AI</label>
+            <label htmlFor="levytate-ai-message" className="sr-only">Message LevyTate Copilot</label>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
               <textarea
                 id="levytate-ai-message"
@@ -821,7 +839,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null }: { initialEm
                   }
                 }}
                 rows={2}
-                placeholder={role === "Employee" ? "Answer the current discovery question or ask for guidance" : "Describe the role, goal or decision you are working through"}
+                placeholder="How can I help you today?"
                 className="min-h-[54px] flex-1 resize-none rounded-2xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-4 py-3 text-sm font-medium leading-6 text-[#102c3d] outline-none transition placeholder:text-[#102c3d]/34 focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10"
               />
               <button disabled={conversationDisabled} className="min-h-[48px] rounded-full bg-[#102c3d] px-5 text-sm font-semibold text-white transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-45">

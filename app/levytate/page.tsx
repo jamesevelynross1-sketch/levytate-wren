@@ -262,13 +262,13 @@ function AiSection() {
     <section id="ai" className="border-y border-[#102c3d]/[0.07] bg-[#102c3d] text-white">
       <div className="mx-auto grid max-w-7xl gap-10 px-5 py-16 sm:px-8 lg:grid-cols-[0.78fr_1.22fr] lg:items-center lg:py-20">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#ffde59]">Ask LevyTate AI</p>
-          <h2 className="mt-3 text-4xl font-semibold leading-tight sm:text-5xl">Supportive guidance, grounded in real roles.</h2>
-          <p className="mt-5 text-base leading-8 text-white/64">Help employees and apprenticeship teams understand suitable approved pathways without starting from a confusing list of standards.</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#ffde59]">LevyTate Copilot</p>
+          <h2 className="mt-3 text-4xl font-semibold leading-tight sm:text-5xl">Platform help, grounded in real work.</h2>
+          <p className="mt-5 text-base leading-8 text-white/64">Help employees and apprenticeship teams explain recommendations, find work, prepare drafts and continue the right LevyTate workflow.</p>
         </div>
         <div className="rounded-[1.8rem] bg-white p-4 text-[#102c3d] shadow-[0_28px_80px_rgba(0,0,0,0.18)] sm:p-5">
           <ChatBubble speaker="User" message="We have an admin-heavy role that is starting to involve more reporting and automation. What pathway could help?" />
-          <ChatBubble speaker="LevyTate AI" message="A Level 3 Data Technician route could be a strong fit if the role involves spreadsheets, reporting, CRM updates or process admin. An AI support pathway could also be explored if the goal is automation and digital confidence." highlighted />
+          <ChatBubble speaker="LevyTate Copilot" message="Level 3 Data Technician is the strongest platform recommendation for this role. I can explain the evidence, compare the alternative AI route or prepare the manager conversation draft." highlighted />
           <div className="mt-4 grid gap-2 sm:grid-cols-3">
             <Link href="/solutions/employees" className="rounded-xl bg-[#eef8f4] px-4 py-3 text-center text-xs font-semibold text-[#0b6f63]">Compare pathways</Link>
             <Link href="/early-access" className="rounded-xl bg-[#fff0f2] px-4 py-3 text-center text-xs font-semibold text-[#c95568]">Request Early Access</Link>

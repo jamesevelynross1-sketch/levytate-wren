@@ -100,7 +100,7 @@ export function buildNotifications(data: MvpWorkspaceData): WorkspaceNotificatio
     notifications.push({
       id: "recommendation-ready",
       title: `${recommendationReady} employee records have live pathway recommendations`,
-      copy: "Use Ask LevyTate AI or the employee record to turn those recommendations into applications.",
+      copy: "Use LevyTate Copilot or the employee record to turn those recommendations into applications.",
       module: "Employees",
       tone: "blue",
     });

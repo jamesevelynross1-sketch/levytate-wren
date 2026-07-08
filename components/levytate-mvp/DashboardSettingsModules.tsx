@@ -38,7 +38,7 @@ export function DashboardModule({ onNavigate }: { onNavigate: (module: string) =
       ? { label: "Continue employee discovery", target: "Employees" }
       : providerIssues[0]
         ? { label: "Improve provider coverage", target: "Provider Relationships" }
-        : { label: "Ask LevyTate AI", target: "Ask LevyTate AI" };
+        : { label: "Open LevyTate Copilot", target: "LevyTate Copilot" };
 
   if (!data.profile.priorities.length) {
     return <EmployerPrioritiesSetup />;
@@ -76,7 +76,7 @@ export function DashboardModule({ onNavigate }: { onNavigate: (module: string) =
               ))}
             </div>
           ) : (
-            <p className="text-sm leading-6 text-[#102c3d]/56">Nothing urgent is waiting. Ask LevyTate AI if you want to plan the next development move.</p>
+            <p className="text-sm leading-6 text-[#102c3d]/56">Nothing urgent is waiting. Use LevyTate Copilot if you want to plan the next development move.</p>
           )}
         </MvpPanel>
 

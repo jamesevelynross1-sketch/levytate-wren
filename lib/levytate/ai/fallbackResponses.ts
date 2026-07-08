@@ -113,29 +113,61 @@ function neutraliseEmployerReferences(response: LevyTateAiResponse, request: Lev
 }
 
 function roleFollowUp(request: LevyTateAiRequest) {
-  if (request.role === "Employee") return "Would you like to compare the routes, prepare an application answer or plan a manager conversation?";
-  if (request.role === "Line Manager") return "Which evidence, workload constraint or business outcome would you like to test before making a decision?";
-  if (request.role === "Department Head") return "Would you like to explore participation, site variation or future capability risk next?";
-  if (request.role === "Apprenticeship Lead") return "Should we refine the role fit, compare specialist standards or prepare a provider matching request?";
-  return "Would you like to refine the requirement, review catalogue candidates or create an internal follow-up task?";
+  if (request.role === "Employee") return "Next useful LevyTate step: view the current application, compare the recommendation or generate a manager conversation draft.";
+  if (request.role === "Line Manager") return "Next useful LevyTate step: open the review queue, check the recommendation evidence or prepare a decision rationale.";
+  if (request.role === "Department Head") return "Next useful LevyTate step: open reports, review site variation or explain a workforce capability signal.";
+  if (request.role === "Apprenticeship Lead") return "Next useful LevyTate step: open final approvals, compare specialist routes or prepare a provider matching request.";
+  return "Next useful LevyTate step: review catalogue candidates, prepare matching notes or create an internal follow-up task.";
 }
 
 function roleQuickReplies(request: LevyTateAiRequest, response: LevyTateAiResponse) {
   const actionLabels = response.recommendedActions.map((action) => action.label);
   const defaults = {
-    Employee: ["Compare pathways", "Prepare manager message", "Explain the commitment"],
-    "Line Manager": ["Review business benefit", "Check time commitment", "Draft decision rationale"],
-    "Department Head": ["Show site variation", "Explain participation", "Review future skills"],
-    "Apprenticeship Lead": ["Compare specialist standards", "Draft provider matching request", "Explain funding route"],
-    "LevyTate Admin": ["Prepare controlled shortlist", "Draft matching notes", "Create follow-up task"],
+    Employee: ["View current application", "Compare pathways", "Generate manager conversation"],
+    "Line Manager": ["Show pending approvals", "Review business benefit", "Draft decision rationale"],
+    "Department Head": ["Open reports", "Show site variation", "Explain participation"],
+    "Apprenticeship Lead": ["Show final approvals", "Draft provider matching request", "Explain funding route"],
+    "LevyTate Admin": ["Show provider relationships", "Draft matching notes", "Create follow-up task"],
   }[request.role];
 
   return [...actionLabels, ...defaults].filter((item, index, values) => values.indexOf(item) === index).slice(0, 4);
 }
 
+function copilotIntentActions(request: LevyTateAiRequest): LevyTateAiAction[] {
+  const text = request.userMessage.toLowerCase();
+  const actions: LevyTateAiAction[] = [];
+
+  if (request.role === "Employee" && /\b(current application|my application|track|status)\b/.test(text)) {
+    actions.push({ label: "View current application", type: "open_my_applications", target: "Applications" });
+  }
+
+  if (request.role === "Line Manager" && /\b(awaiting|pending|approval|review queue|review)\b/.test(text)) {
+    actions.push({ label: "Open review queue", type: "open_review_queue", target: "Applications" });
+  }
+
+  if (request.role === "Department Head" && /\b(report|analytics|participation|site|skills|future)\b/.test(text)) {
+    actions.push({ label: "Open reports", type: "open_reporting", target: "Reports" });
+  }
+
+  if (request.role === "Apprenticeship Lead" && /\b(final approval|approvals|awaiting approval|approved for enrolment)\b/.test(text)) {
+    actions.push({ label: "Open final approvals", type: "open_final_approvals", target: "Applications" });
+  }
+
+  if ((request.role === "Apprenticeship Lead" || request.role === "LevyTate Admin") && /\b(provider|primary goal|matching|programme)\b/.test(text)) {
+    actions.push({ label: "Open provider relationships", type: "open_provider_relationships", target: "Provider Relationships" });
+  }
+
+  if ((request.role === "Apprenticeship Lead" || request.role === "LevyTate Admin") && /\b(request|draft|prepare|generate|submit).{0,30}\b(provider matching|matching request|shortlist)\b/.test(text)) {
+    actions.push({ label: "Prepare provider matching request", type: "request_provider_matching", target: "Provider Relationships" });
+  }
+
+  return actions;
+}
+
 function adminFallback(request: LevyTateAiRequest) {
   const leadResponse = buildLegacyFallbackResponse({ ...request, role: "Apprenticeship Lead" });
   const actions: LevyTateAiAction[] = [
+    { label: "Open provider relationships", type: "open_provider_relationships", target: "Provider Relationships" },
     { label: "Review provider matching draft", type: "request_provider_matching", target: leadResponse.providerMatchDraft?.recommendedProgramme },
     { label: "Create internal follow-up", type: "create_admin_follow_up_task", target: leadResponse.providerMatchDraft?.roleFamily },
     { label: "Compare specialist routes", type: "compare_routes", target: leadResponse.providerMatchDraft?.recommendedProgramme },
@@ -143,9 +175,9 @@ function adminFallback(request: LevyTateAiRequest) {
 
   return {
     ...leadResponse,
-    assistantMessage: `I have treated this as a controlled provider matching question. ${leadResponse.assistantMessage} Any provider programmes should be handled as catalogue candidates until programme fit, delivery capability and relationship status have been checked.`,
-    followUpQuestion: "What learner volume, locations, delivery preference and target start window should the shortlist use?",
-    quickReplies: ["Add learner volume", "Set delivery preference", "Review catalogue candidates", "Create follow-up task"],
+    assistantMessage: `I have treated this as a LevyTate platform task. ${leadResponse.assistantMessage} If the user wants to add or review a provider, open Provider Relationships first, then confirm capability area, preferred provider, programme coverage, backup providers, status, review date and notes.`,
+    followUpQuestion: "Would you like to open Provider Relationships or prepare the matching notes first?",
+    quickReplies: ["Open provider relationships", "Set delivery preference", "Review catalogue candidates", "Create follow-up task"],
     recommendedActions: actions,
     suggestedActions: actions,
     applicationDraft: null,
@@ -171,7 +203,7 @@ export function buildLevyTateAiFallbackResponse(request: LevyTateAiRequest): Lev
   const extraActions: LevyTateAiAction[] = request.role === "Line Manager"
     ? [{ label: "Prepare decision rationale", type: "prepare_approval_rationale" }]
     : [];
-  const recommendedActions = [...response.recommendedActions, ...extraActions];
+  const recommendedActions = [...copilotIntentActions(request), ...response.recommendedActions, ...extraActions];
 
   return {
     ...response,

@@ -2,15 +2,15 @@
 
 ## Priority 1 - Core Commercial Features
 
-### Ask LevyTate AI
+### LevyTate Copilot
 
 Status: In Development
 
 Purpose:
-Guide employees, managers and apprenticeship leads to the most relevant apprenticeship pathways.
+Help employees, managers, apprenticeship leads and LevyTate admins explain, find, guide, create and coach work inside the platform.
 
 Business Value:
-Drives engagement and pathway adoption.
+Drives workflow completion, engagement, pathway adoption and provider matching opportunities.
 
 ---
 

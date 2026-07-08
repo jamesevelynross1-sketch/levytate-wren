@@ -136,7 +136,7 @@ export async function POST(request: Request) {
   try {
     parsedRequest = parseLevyTateAiRequest(await request.json());
     if (!parsedRequest) {
-      return NextResponse.json({ message: "Invalid LevyTate AI request payload." }, { status: 400 });
+      return NextResponse.json({ message: "Invalid LevyTate Copilot request payload." }, { status: 400 });
     }
 
     parsedRequest = withConversationMemory(parsedRequest);
@@ -159,12 +159,12 @@ export async function POST(request: Request) {
 
     return NextResponse.json(finaliseResponse(parsedRequest, mergeGeneratedGuidance(fallback, generated)));
   } catch (error) {
-    console.error("LevyTate AI request failed", { error });
+    console.error("LevyTate Copilot request failed", { error });
 
     if (parsedRequest) {
       return NextResponse.json(finaliseResponse(parsedRequest, buildGroundedFallback(parsedRequest)));
     }
 
-    return NextResponse.json({ message: "LevyTate AI could not process this request." }, { status: 500 });
+    return NextResponse.json({ message: "LevyTate Copilot could not process this request." }, { status: 500 });
   }
 }

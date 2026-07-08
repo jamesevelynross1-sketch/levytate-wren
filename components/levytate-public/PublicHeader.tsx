@@ -52,8 +52,8 @@ const platformItems: NavItem[] = [
     href: "/solutions/employers#provider-matching",
   },
   {
-    title: "Ask LevyTate AI",
-    description: "AI-supported apprenticeship guidance for employees and apprenticeship teams.",
+    title: "LevyTate Copilot",
+    description: "Platform assistance for recommendations, applications, provider work and reports.",
     href: "/#ai",
   },
   {

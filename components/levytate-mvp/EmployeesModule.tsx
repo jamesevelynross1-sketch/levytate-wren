@@ -243,7 +243,7 @@ export function EmployeesModule({ onStartDiscovery }: { onStartDiscovery?: (empl
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white text-[#0b8e82]"><UserPlus size={17} aria-hidden="true" /></span>
               <div>
                 <p className="text-sm font-semibold">Start with the essentials</p>
-                <p className="mt-1 text-xs leading-5 text-[#102c3d]/54">After saving, Ask LevyTate AI will guide the role and capability conversation before any application begins.</p>
+                <p className="mt-1 text-xs leading-5 text-[#102c3d]/54">After saving, LevyTate Copilot can guide the role and capability conversation before any application begins.</p>
               </div>
             </div>
 
@@ -284,7 +284,7 @@ export function EmployeesModule({ onStartDiscovery }: { onStartDiscovery?: (empl
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[#f8fbfa] px-4 py-3 ring-1 ring-[#102c3d]/[0.055]">
             <p className="text-sm leading-6 text-[#102c3d]/58">Keep the record simple. Use AI for discovery, then open details only when needed.</p>
             <div className="flex flex-wrap gap-2">
-              <TableAction onClick={() => onStartDiscovery?.(selectedEmployee.id)}>Ask AI</TableAction>
+              <TableAction onClick={() => onStartDiscovery?.(selectedEmployee.id)}>Open Copilot</TableAction>
               <TableAction onClick={() => openEmployee(selectedEmployee)}>Edit</TableAction>
               <TableAction onClick={() => archiveEmployee(selectedEmployee.id)} danger={selectedEmployee.status === "Active"}>
                 {selectedEmployee.status === "Archived" ? "Restore" : "Archive"}
@@ -331,7 +331,7 @@ export function EmployeesModule({ onStartDiscovery }: { onStartDiscovery?: (empl
                   </div>
                   <button type="button" onClick={() => onStartDiscovery?.(selectedEmployee.id)} className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-[#0b6f63] ring-1 ring-[#102c3d]/[0.08]">
                     <Sparkles size={12} aria-hidden="true" />
-                    Ask AI
+                    Open Copilot
                   </button>
                 </div>
                 {selectedRouteOutcome ? (
@@ -355,7 +355,7 @@ export function EmployeesModule({ onStartDiscovery }: { onStartDiscovery?: (empl
                     <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#c95568]">Application history</p>
                     <p className="mt-1 text-sm text-[#102c3d]/54">Every workflow step is kept on the employee record.</p>
                   </div>
-                  <TableAction onClick={() => onStartDiscovery?.(selectedEmployee.id)}>Ask AI</TableAction>
+                  <TableAction onClick={() => onStartDiscovery?.(selectedEmployee.id)}>Open Copilot</TableAction>
                 </div>
                 <div className="mt-4 grid gap-3">
                   {selectedEmployeeApplications.length ? selectedEmployeeApplications.map((application) => (

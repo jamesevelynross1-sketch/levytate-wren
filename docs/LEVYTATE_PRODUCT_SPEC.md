@@ -269,12 +269,26 @@ Dashboard should show:
 
 Daniel must not show "2 applications in progress".
 
-## Ask LevyTate AI
+## LevyTate Copilot
+
+Purpose:
+Help users complete work inside LevyTate. Copilot is the operating system assistant for recommendations, applications, provider relationships, reporting and workflow support.
+
+Primary behaviours:
+
+- Explain recommendations, provider rationale, funding and workflows
+- Guide users through existing LevyTate tasks
+- Find employees, applications, programmes, provider relationships and reports
+- Create draft notes, summaries, emails, application answers and decision rationale
+- Coach platform decisions using grounded records and role permissions
+
+Non-goal:
+LevyTate Copilot should not behave like a general-purpose chatbot, search engine or generic career coach.
 
 ### Employee AI
 
 Purpose:
-Help the employee find the most relevant approved pathway and complete the application journey.
+Help the employee understand the current recommendation, track the current application and prepare the next application or manager conversation step.
 
 Rules:
 

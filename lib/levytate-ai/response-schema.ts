@@ -188,6 +188,7 @@ export type LevyTateAiAction = {
     | "open_site_breakdown"
     | "open_reporting"
     | "open_final_approvals"
+    | "open_provider_relationships"
     | "request_provider_matching"
     | "compare_routes"
     | "save_interest"

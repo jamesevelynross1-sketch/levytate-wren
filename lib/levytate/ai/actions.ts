@@ -26,12 +26,14 @@ const allowedActionTypes: Record<LevyTateRole, Set<LevyTateAiAction["type"]>> = 
   ]),
   "Apprenticeship Lead": new Set([
     "open_final_approvals",
+    "open_provider_relationships",
     "request_provider_matching",
     "compare_routes",
     "open_reporting",
     "ask_follow_up",
   ]),
   "LevyTate Admin": new Set([
+    "open_provider_relationships",
     "request_provider_matching",
     "create_admin_follow_up_task",
     "compare_routes",

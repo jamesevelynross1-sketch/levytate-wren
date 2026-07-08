@@ -76,15 +76,25 @@ View workforce analytics, site participation, skills gaps and reports. No approv
 Apprenticeship Lead:
 Final approval, programme and provider oversight, Ask LevyTate AI role mapping, provider matching and reports.
 
-## AI Assistant Rules
+## Copilot Rules
 
-Ask LevyTate AI is role-specific.
+LevyTate Copilot is role-specific and platform-first.
+
+It should help users complete work inside LevyTate by:
+
+- explaining recommendations, funding, provider choices and workflows
+- guiding users through existing platform tasks
+- finding applications, employees, providers, programmes and reports
+- creating drafts for notes, summaries, emails and decision rationale
+- coaching platform decisions with grounded data
+
+It should not behave like a general-purpose chatbot, search engine or generic career coach.
 
 Employee:
-Guided pathway support and application assistance.
+Recommendation explanation, current application support and application preparation.
 
 Line Manager:
-Team development and application review support.
+Direct-report review support and manager decision notes.
 
 Department Head:
 Workforce capability and reporting insight.

@@ -34,7 +34,7 @@ const modules = [
   { name: "Home", icon: LayoutDashboard },
   { name: "People", icon: Users },
   { name: "Providers", icon: Building2 },
-  { name: "AI", icon: Sparkles },
+  { name: "Copilot", icon: Sparkles },
   { name: "Knowledge", icon: BellRing },
   { name: "Reports", icon: ChartNoAxesCombined },
   { name: "Settings", icon: Settings },
@@ -49,7 +49,7 @@ const moduleCopy: Record<ModuleName, string> = {
   Home: "A short daily briefing showing what needs attention now.",
   People: "Employees, roles, applications and enrolments in one guided workspace.",
   Providers: "Programme-first matching, provider evidence and relationship coverage.",
-  AI: "Ask LevyTate for the next best decision, pathway or provider action.",
+  Copilot: "Use LevyTate Copilot to explain, find, guide and create work inside the platform.",
   Knowledge: "Trusted guidance for funding, readiness, provider selection and future skills.",
   Reports: "Board-ready workforce readiness, provider and participation insight.",
   Settings: "Workspace setup, business priorities and beta access controls.",
@@ -84,8 +84,8 @@ function MvpAppShell() {
   }
 
   function navigateTo(target: string) {
-    if (target === "Ask LevyTate AI" || target === "AI") {
-      openModule("AI");
+    if (target === "Ask LevyTate AI" || target === "LevyTate Copilot" || target === "AI" || target === "Copilot") {
+      openModule("Copilot");
       return;
     }
     if (target === "Employees" || target === "Roles" || target === "Applications" || target === "Enrolments") {
@@ -226,11 +226,11 @@ function MvpAppShell() {
             </section>
 
             {activeModule === "Home" ? <DashboardModule onNavigate={navigateTo} /> : null}
-            {activeModule === "AI" ? <AskLevyTateAiWorkspace initialEmployeeId={aiEmployeeId} /> : null}
+            {activeModule === "Copilot" ? <AskLevyTateAiWorkspace initialEmployeeId={aiEmployeeId} onNavigate={navigateTo} /> : null}
             {activeModule === "Knowledge" ? <GuidanceCentreModule /> : null}
             {activeModule === "People" ? (
               <ModuleStackNav items={["Employees", "Roles", "Applications", "Enrolments"]} active={peopleView} onSelect={(item) => setPeopleView(item as PeopleView)}>
-                {peopleView === "Employees" ? <EmployeesModule onStartDiscovery={(employeeId) => { setAiEmployeeId(employeeId); openModule("AI"); }} /> : null}
+                {peopleView === "Employees" ? <EmployeesModule onStartDiscovery={(employeeId) => { setAiEmployeeId(employeeId); openModule("Copilot"); }} /> : null}
                 {peopleView === "Roles" ? <RolesModule /> : null}
                 {peopleView === "Applications" ? <ApplicationsModule /> : null}
                 {peopleView === "Enrolments" ? <EnrolmentsModule /> : null}
