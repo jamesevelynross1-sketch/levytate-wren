@@ -24,9 +24,10 @@ export async function GET() {
     const workspace = await getWorkspaceBootstrapForSession(session);
     return NextResponse.json({ ok: true, workspace });
   } catch (error) {
+    const status = error instanceof LevyTateWorkspacePermissionError ? 403 : 500;
     return NextResponse.json(
       { message: getMessage(error) },
-      { status: 500 },
+      { status },
     );
   }
 }

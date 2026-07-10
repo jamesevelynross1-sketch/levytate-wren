@@ -46,6 +46,8 @@ import {
   supabaseUpdate,
 } from "@/lib/server/levytate-supabase";
 import { getEarlyAccessRequestByEmail } from "@/lib/server/levytate-early-access";
+import { getPersistentEarlyAccessState } from "@/lib/server/levytate-beta-access-grants";
+import { isBetaApprovedEarlyAccessStatus } from "@/lib/levytate/early-access/domain";
 
 type OrganisationRow = {
   id: string;
@@ -338,6 +340,7 @@ export async function getWorkspaceBootstrapForSession(session: LevyTateBetaSessi
 
   try {
     const context = await ensureWorkspaceContext(session);
+    await assertWorkspaceReadAllowed(context);
     const data = await loadWorkspaceData(context);
 
     return {
@@ -353,6 +356,10 @@ export async function getWorkspaceBootstrapForSession(session: LevyTateBetaSessi
       },
     };
   } catch (error) {
+    if (error instanceof LevyTateWorkspacePermissionError) {
+      throw error;
+    }
+
     const message = error instanceof Error ? error.message : "Unknown Supabase workspace bootstrap error.";
     return {
       data: createEmptyMvpWorkspace(),
@@ -642,6 +649,7 @@ function employeeRecordToRow(employee: MvpEmployee): EmployeeRow {
 
 async function ensureWorkspaceContext(session: LevyTateBetaSession): Promise<WorkspaceContext> {
   const config = assertSupabase();
+  await assertSessionStillAllowed(session);
   const seed = await deriveOrganisationSeed(session);
   const now = nowIso();
 
@@ -714,6 +722,41 @@ async function ensureWorkspaceContext(session: LevyTateBetaSession): Promise<Wor
     user: savedUser,
     warnings: [],
   };
+}
+
+async function assertSessionStillAllowed(session: LevyTateBetaSession) {
+  if (session.accessLevel === "beta_admin") return;
+
+  const [lead, persistentState] = await Promise.all([
+    getEarlyAccessRequestByEmail(session.email),
+    getPersistentEarlyAccessState(session.email),
+  ]);
+
+  if (persistentState === "approved" || (lead && isBetaApprovedEarlyAccessStatus(lead.status))) {
+    return;
+  }
+
+  throw new LevyTateWorkspacePermissionError(
+    "Your LevyTate account is not fully configured. Please contact your Apprenticeship Lead.",
+  );
+}
+
+async function assertWorkspaceReadAllowed(context: WorkspaceContext) {
+  const role = normaliseMvpUserRole(context.user.role);
+  if (role !== "Employee" && role !== "Line Manager") return;
+
+  const employees = await selectMany<EmployeeRow>(
+    employeesTable,
+    context.organisation.id,
+    "id,email,manager_id,status,employee_number,name,job_title,role_id,department,site,platform_role,start_date,created_at,updated_at",
+    "name.asc",
+  );
+
+  if (readableEmployeeIdsForUser(context.user.email, role, employees).size > 0) return;
+
+  throw new LevyTateWorkspacePermissionError(
+    "Your LevyTate account is not fully configured. Please contact your Apprenticeship Lead.",
+  );
 }
 
 function resolveSessionWorkspaceRole(
