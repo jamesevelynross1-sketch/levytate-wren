@@ -126,7 +126,6 @@ export const mvpRolePermissions = {
     "applications:status",
     "copilot:use",
     "knowledge:read",
-    "reports:read",
   ],
   Employee: [
     "workspace:read",

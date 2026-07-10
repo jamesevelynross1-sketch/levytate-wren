@@ -32,7 +32,7 @@ import {
 } from "@/lib/levytate/mvp/workspace";
 
 export function EmployeesModule({ onStartDiscovery }: { onStartDiscovery?: (employeeId: string) => void }) {
-  const { data, saveEmployee, archiveEmployee } = useMvpWorkspace();
+  const { data, saveEmployee, archiveEmployee, can, meta } = useMvpWorkspace();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("Active");
   const [departmentFilter, setDepartmentFilter] = useState("All");
@@ -86,6 +86,8 @@ export function EmployeesModule({ onStartDiscovery }: { onStartDiscovery?: (empl
   const selectedCurrentApplication = selectedEmployee
     ? employeeCurrentApplication(data, selectedEmployee.id)
     : null;
+  const canWriteEmployees = can("employees:write");
+  const isLineManager = meta?.userRole === "Line Manager";
 
   function blankEmployee(): MvpEmployee {
     const now = nowIso();
@@ -142,13 +144,13 @@ export function EmployeesModule({ onStartDiscovery }: { onStartDiscovery?: (empl
   }
 
   return (
-    <MvpPanel title="Employees" eyebrow="Workforce records">
+    <MvpPanel title={isLineManager ? "My Team" : "Employees"} eyebrow={isLineManager ? "Direct reports" : "Workforce records"}>
       <MvpToolbar
         search={search}
         onSearch={setSearch}
         placeholder="Search name, role, department, manager or site"
-        actionLabel="Add employee"
-        onAction={() => openEmployee()}
+        actionLabel={canWriteEmployees ? "Add employee" : undefined}
+        onAction={canWriteEmployees ? () => openEmployee() : undefined}
         filters={
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             <select value={status} onChange={(event) => setStatus(event.target.value)} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-sm font-semibold text-[#102c3d]/66"><option>Active</option><option>Archived</option><option>All</option></select>
@@ -228,12 +230,19 @@ export function EmployeesModule({ onStartDiscovery }: { onStartDiscovery?: (empl
           })}
         </div>
       ) : (
-        <EmptyState
-          title="Add the first employee"
-          copy="Create one record. LevyTate will guide discovery and recommend the next development route."
-          actionLabel="Add employee"
-          onAction={() => openEmployee()}
-        />
+        canWriteEmployees ? (
+          <EmptyState
+            title="Add the first employee"
+            copy="Create one record. LevyTate will guide discovery and recommend the next development route."
+            actionLabel="Add employee"
+            onAction={() => openEmployee()}
+          />
+        ) : (
+          <div className="rounded-xl border border-dashed border-[#102c3d]/[0.14] bg-[#f8fbfa] px-5 py-10 text-center">
+            <h3 className="text-base font-semibold text-[#102c3d]">No direct reports found</h3>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#102c3d]/56">Your view is limited to your own profile and direct reports. Ask a workspace admin if your reporting line looks incorrect.</p>
+          </div>
+        )
       )}
 
       {draft ? (
@@ -285,10 +294,14 @@ export function EmployeesModule({ onStartDiscovery }: { onStartDiscovery?: (empl
             <p className="text-sm leading-6 text-[#102c3d]/58">Keep the record simple. Use AI for discovery, then open details only when needed.</p>
             <div className="flex flex-wrap gap-2">
               <TableAction onClick={() => onStartDiscovery?.(selectedEmployee.id)}>Open Copilot</TableAction>
-              <TableAction onClick={() => openEmployee(selectedEmployee)}>Edit</TableAction>
-              <TableAction onClick={() => archiveEmployee(selectedEmployee.id)} danger={selectedEmployee.status === "Active"}>
-                {selectedEmployee.status === "Archived" ? "Restore" : "Archive"}
-              </TableAction>
+              {canWriteEmployees ? (
+                <>
+                  <TableAction onClick={() => openEmployee(selectedEmployee)}>Edit</TableAction>
+                  <TableAction onClick={() => archiveEmployee(selectedEmployee.id)} danger={selectedEmployee.status === "Active"}>
+                    {selectedEmployee.status === "Archived" ? "Restore" : "Archive"}
+                  </TableAction>
+                </>
+              ) : null}
             </div>
           </div>
           <div className="grid gap-5 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">

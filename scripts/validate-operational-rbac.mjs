@@ -116,8 +116,8 @@ async function main() {
   await expectStatus("manager direct report status allowed", () => postWorkspace(sessions.manager.cookie, {
     type: "updateApplicationStatus",
     id: "gc-rbac-app-erin",
-    status: "Awaiting Manager Review",
-    note: "Operational RBAC validation status check.",
+    status: "Approved by Line Manager",
+    note: "Operational RBAC validation manager approval check.",
   }), 200);
   await expectStatus("lead organisation status allowed", () => postWorkspace(sessions.lead.cookie, {
     type: "updateApplicationStatus",

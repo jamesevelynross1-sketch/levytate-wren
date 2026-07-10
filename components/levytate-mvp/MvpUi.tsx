@@ -18,7 +18,7 @@ export function MvpPanel({ title, eyebrow, actions, children }: { title: string;
   );
 }
 
-export function MvpToolbar({ search, onSearch, placeholder, actionLabel, onAction, filters }: { search: string; onSearch: (value: string) => void; placeholder: string; actionLabel: string; onAction: () => void; filters?: ReactNode }) {
+export function MvpToolbar({ search, onSearch, placeholder, actionLabel, onAction, filters }: { search: string; onSearch: (value: string) => void; placeholder: string; actionLabel?: string; onAction?: () => void; filters?: ReactNode }) {
   return (
     <div className={`mb-4 grid gap-3 ${filters ? "xl:grid-cols-[minmax(260px,0.8fr)_minmax(480px,1.4fr)_auto] xl:items-end" : "lg:grid-cols-[minmax(260px,1fr)_auto] lg:items-end"}`}>
       <label className="flex h-10 min-w-0 items-center gap-2 rounded-lg border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 focus-within:border-[#159b8f] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#159b8f]/10">
@@ -26,10 +26,12 @@ export function MvpToolbar({ search, onSearch, placeholder, actionLabel, onActio
         <input value={search} onChange={(event) => onSearch(event.target.value)} className="min-w-0 flex-1 bg-transparent text-sm text-[#102c3d] outline-none placeholder:text-[#102c3d]/34" placeholder={placeholder} />
       </label>
       {filters ? <div className="min-w-0">{filters}</div> : null}
-      <button type="button" onClick={onAction} className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white shadow-[0_8px_18px_rgba(16,44,61,0.12)] transition hover:-translate-y-0.5 hover:bg-[#17394d]">
-        <Plus size={15} strokeWidth={2} aria-hidden="true" />
-        {actionLabel}
-      </button>
+      {actionLabel && onAction ? (
+        <button type="button" onClick={onAction} className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white shadow-[0_8px_18px_rgba(16,44,61,0.12)] transition hover:-translate-y-0.5 hover:bg-[#17394d]">
+          <Plus size={15} strokeWidth={2} aria-hidden="true" />
+          {actionLabel}
+        </button>
+      ) : null}
     </div>
   );
 }

@@ -312,6 +312,8 @@ const providerRelationshipsTable = "levytate_provider_relationships";
 const matchingRequestsTable = "levytate_matching_requests";
 const enrolmentsTable = "levytate_enrolments";
 const auditEventsTable = "levytate_audit_events";
+const lineManagerReviewStatuses: RequestStatus[] = ["Submitted to Line Manager", "Awaiting Manager Review"];
+const lineManagerDecisionStatuses: RequestStatus[] = ["Approved by Line Manager", "More information requested", "Declined by Line Manager"];
 
 export class LevyTateWorkspacePersistenceError extends Error {
   constructor(message: string) {
@@ -507,6 +509,9 @@ async function assertMutationAllowed(context: WorkspaceContext, mutation: LevyTa
     "id,email,manager_id,status,employee_number,name,job_title,role_id,department,site,platform_role,start_date,created_at,updated_at",
     "name.asc",
   );
+  const currentEmployee = employees.find((employee) =>
+    employee.status === "Active" && employee.email.trim().toLowerCase() === context.user.email.trim().toLowerCase()
+  );
   const visibleEmployeeIds = readableEmployeeIdsForUser(context.user.email, role, employees);
 
   if (visibleEmployeeIds.size === 0) {
@@ -528,7 +533,7 @@ async function assertMutationAllowed(context: WorkspaceContext, mutation: LevyTa
       return;
     case "updateApplicationStatus": {
       const application = await selectOne<ApplicationRow>(applicationsTable, new URLSearchParams({
-        select: "id,employee_id",
+        select: "id,employee_id,status,current_owner",
         organisation_id: `eq.${context.organisation.id}`,
         id: `eq.${mutation.id}`,
         limit: "1",
@@ -537,6 +542,9 @@ async function assertMutationAllowed(context: WorkspaceContext, mutation: LevyTa
         throw new LevyTateWorkspacePermissionError("Application record was not found.");
       }
       assertCanAccessEmployee(application.employee_id);
+      if (role === "Line Manager") {
+        assertLineManagerCanUpdateApplication(currentEmployee, application, mutation.status, mutation.note);
+      }
       return;
     }
     default:
@@ -612,6 +620,33 @@ async function assertEmployeeCanSaveApplication(
 
   if (!mapping) {
     throw new LevyTateWorkspacePermissionError("Employees can only apply for programmes mapped to their assigned role.");
+  }
+}
+
+function assertLineManagerCanUpdateApplication(
+  manager: EmployeeRow | undefined,
+  application: ApplicationRow,
+  nextStatus: RequestStatus,
+  note: string | undefined,
+) {
+  if (!manager) {
+    throw new LevyTateWorkspacePermissionError("Your user account is not linked to an active line manager record.");
+  }
+
+  if (application.employee_id === manager.id) {
+    throw new LevyTateWorkspacePermissionError("Line managers cannot review their own application.");
+  }
+
+  if (!lineManagerDecisionStatuses.includes(nextStatus)) {
+    throw new LevyTateWorkspacePermissionError("Line managers can only approve, request more information or decline applications.");
+  }
+
+  if (!lineManagerReviewStatuses.includes(application.status)) {
+    throw new LevyTateWorkspacePermissionError("This application is not awaiting a line manager decision.");
+  }
+
+  if (!note?.trim()) {
+    throw new LevyTateWorkspacePermissionError("A manager decision note is required.");
   }
 }
 

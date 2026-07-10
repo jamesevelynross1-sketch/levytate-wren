@@ -6,10 +6,12 @@ import { FormField, FormGrid, MvpPanel, StatusBadge } from "@/components/levytat
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import {
   buildNotifications,
+  employeeCurrentApplication,
   providerCoverageSummary,
   upcomingEnrolments,
   employeesNeedingSupport,
 } from "@/lib/levytate/mvp/workspace-insights";
+import { getApprenticeshipStandard } from "@/lib/levytate/domain";
 import {
   createMvpId,
   mvpEmployerPriorityOptions,
@@ -24,6 +26,8 @@ const importanceOptions: Array<{ value: MvpEmployerPriorityImportance; copy: str
   { value: "High", copy: "Important and expected to shape development decisions." },
   { value: "Medium", copy: "Relevant, but balanced with other priorities." },
 ];
+
+const managerReviewStatuses = ["Submitted to Line Manager", "Awaiting Manager Review"] as const;
 
 export function DashboardModule({ onNavigate }: { onNavigate: (module: string) => void }) {
   const { data, can } = useMvpWorkspace();
@@ -110,6 +114,91 @@ export function DashboardModule({ onNavigate }: { onNavigate: (module: string) =
           </div>
         </MvpPanel>
       </div>
+    </div>
+  );
+}
+
+export function LineManagerHomeModule({ onNavigate }: { onNavigate: (module: string) => void }) {
+  const { data, meta } = useMvpWorkspace();
+  const manager = data.employees.find((employee) =>
+    employee.status === "Active" && employee.email.trim().toLowerCase() === (meta?.userEmail ?? "").trim().toLowerCase()
+  );
+  const directReports = data.employees.filter((employee) => employee.managerId === manager?.id);
+  const directReportIds = new Set(directReports.map((employee) => employee.id));
+  const awaitingReview = data.applications
+    .filter((application) => directReportIds.has(application.employeeId) && managerReviewStatuses.includes(application.status as typeof managerReviewStatuses[number]))
+    .sort((a, b) => a.submittedAt.localeCompare(b.submittedAt));
+  const needingSupport = directReports.filter((employee) => {
+    const application = employeeCurrentApplication(data, employee.id);
+    return !application || application.status === "More information requested" || application.status === "Draft";
+  });
+  const nextApplication = awaitingReview[0] ?? null;
+  const nextEmployee = nextApplication ? data.employees.find((employee) => employee.id === nextApplication.employeeId) : null;
+  const nextStandard = nextApplication ? getApprenticeshipStandard(nextApplication.apprenticeshipStandardId) : null;
+
+  return (
+    <div className="grid gap-5">
+      <section className="rounded-[1.25rem] border border-[#102c3d]/[0.07] bg-[#102c3d] p-5 text-white shadow-[0_20px_55px_rgba(16,44,61,0.12)] sm:p-6">
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+          <div className="max-w-2xl">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8fe0d2]">Line Manager</p>
+            <h2 className="mt-2 text-2xl font-semibold">What needs my decision today?</h2>
+            <p className="mt-2 text-sm leading-6 text-white/62">
+              {awaitingReview.length
+                ? `${awaitingReview.length} direct-report application${awaitingReview.length === 1 ? "" : "s"} awaiting manager review.`
+                : "No direct-report applications are awaiting review right now."}
+            </p>
+          </div>
+          <button type="button" onClick={() => onNavigate(awaitingReview.length ? "Approvals" : "My Team")} className="h-11 self-start rounded-full bg-[#ffde59] px-5 text-sm font-semibold text-[#102c3d] transition hover:-translate-y-0.5 xl:self-center">
+            {awaitingReview.length ? "Review application" : "View my team"}
+          </button>
+        </div>
+      </section>
+
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
+        <MvpPanel title="Next manager decision" eyebrow="Approval review">
+          {nextApplication && nextEmployee ? (
+            <button type="button" onClick={() => onNavigate("Approvals")} className="w-full rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4 text-left transition hover:border-[#159b8f]/18 hover:bg-white">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-base font-semibold text-[#102c3d]">{nextEmployee.name}</p>
+                  <p className="mt-1 text-sm leading-6 text-[#102c3d]/58">{nextEmployee.jobTitle || "Role to confirm"} - {nextEmployee.department || "Department to confirm"}</p>
+                </div>
+                <StatusBadge tone="yellow">{nextApplication.status}</StatusBadge>
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <DashboardFact label="Programme" value={nextStandard?.title ?? nextApplication.apprenticeshipStandardId} />
+                <DashboardFact label="Submitted" value={nextApplication.submittedAt.slice(0, 10)} />
+              </div>
+              <p className="mt-4 line-clamp-2 text-sm leading-6 text-[#102c3d]/62">{nextApplication.reason || "No reason recorded yet."}</p>
+              <p className="mt-4 text-xs font-semibold text-[#0b6f63]">Open review</p>
+            </button>
+          ) : (
+            <p className="text-sm leading-6 text-[#102c3d]/56">Your approval queue is clear. Use My Team to check direct-report development status.</p>
+          )}
+        </MvpPanel>
+
+        <MvpPanel title="Direct reports needing support" eyebrow="Team support">
+          <div className="grid gap-3">
+            <div className="rounded-xl bg-[#f8fbfa] px-4 py-3 ring-1 ring-[#102c3d]/[0.055]">
+              <p className="text-2xl font-semibold text-[#102c3d]">{needingSupport.length}</p>
+              <p className="mt-1 text-sm leading-6 text-[#102c3d]/56">Direct reports with draft, returned or no active application state.</p>
+            </div>
+            <button type="button" onClick={() => onNavigate("My Team")} className="h-10 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white transition hover:-translate-y-0.5">
+              View my team
+            </button>
+          </div>
+        </MvpPanel>
+      </div>
+    </div>
+  );
+}
+
+function DashboardFact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl bg-white px-3.5 py-3 ring-1 ring-[#102c3d]/[0.055]">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#102c3d]/38">{label}</p>
+      <p className="mt-1 line-clamp-2 text-sm font-semibold text-[#102c3d]/72">{value}</p>
     </div>
   );
 }

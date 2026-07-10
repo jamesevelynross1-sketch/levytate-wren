@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import type { RequestStatus } from "@/lib/levytate/domain";
 import { getApprenticeshipStandard } from "@/lib/levytate/domain";
 import {
@@ -51,7 +51,7 @@ const reviewableManagerStatuses: RequestStatus[] = ["Submitted to Line Manager",
 const reviewableLeadStatuses: RequestStatus[] = ["Approved by Line Manager", "Submitted to Apprenticeship Lead", "Awaiting Final Approval"];
 
 export function ApplicationsModule() {
-  const { data, saveApplication, updateApplicationStatus } = useMvpWorkspace();
+  const { data, saveApplication, updateApplicationStatus, meta } = useMvpWorkspace();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("All");
   const [ownerFilter, setOwnerFilter] = useState("All");
@@ -60,7 +60,11 @@ export function ApplicationsModule() {
   const [error, setError] = useState("");
 
   const activeSet = useMemo(() => new Set(activeApplicationStatuses()), []);
-  const visible = useMemo(() => data.applications.filter((application) => {
+
+  if (meta?.userRole === "Line Manager") {
+    return <LineManagerApprovalsModule />;
+  }
+  const visible = data.applications.filter((application) => {
     const employee = data.employees.find((item) => item.id === application.employeeId);
     const standard = getApprenticeshipStandard(application.apprenticeshipStandardId);
     return (status === "All" || application.status === status)
@@ -69,7 +73,7 @@ export function ApplicationsModule() {
         [employee?.name, employee?.department, employee?.site, standard?.title, standard?.referenceCode, application.status, application.currentOwner],
         search,
       );
-  }), [data.applications, data.employees, ownerFilter, search, status]);
+  });
 
   const queueSummary = {
     total: data.applications.filter((application) => activeSet.has(application.status)).length,
@@ -300,6 +304,349 @@ export function ApplicationsModule() {
         <ApplicationDetailModal application={selectedApplication} onClose={() => setSelectedId(null)} />
       ) : null}
     </div>
+  );
+}
+
+function LineManagerApprovalsModule() {
+  const { data, updateApplicationStatus, meta } = useMvpWorkspace();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const manager = data.employees.find((employee) =>
+    employee.status === "Active" && employee.email.trim().toLowerCase() === (meta?.userEmail ?? "").trim().toLowerCase()
+  );
+  const directReports = data.employees.filter((employee) => employee.managerId === manager?.id);
+  const directReportIds = new Set(directReports.map((employee) => employee.id));
+  const queue = data.applications
+    .filter((application) => directReportIds.has(application.employeeId) && reviewableManagerStatuses.includes(application.status))
+    .sort((a, b) => {
+      const statusRank = reviewableManagerStatuses.indexOf(a.status) - reviewableManagerStatuses.indexOf(b.status);
+      return statusRank || a.submittedAt.localeCompare(b.submittedAt);
+    });
+  const supportCount = data.applications.filter((application) =>
+    directReportIds.has(application.employeeId) && application.status === "More information requested"
+  ).length;
+  const selectedApplication = selectedId ? queue.find((application) => application.id === selectedId) ?? null : null;
+
+  return (
+    <div className="grid gap-5">
+      <section className="grid gap-3 md:grid-cols-3">
+        <QueueCard label="Awaiting review" value={queue.length} copy="Direct-report applications requiring your decision." tone={queue.length ? "yellow" : "green"} />
+        <QueueCard label="Returned to employee" value={supportCount} copy="Applications waiting for employee updates before you can decide." tone={supportCount ? "yellow" : "green"} />
+        <QueueCard label="Direct reports" value={directReports.length} copy="Your scoped team view in this workspace." />
+      </section>
+
+      <MvpPanel title="Approvals" eyebrow="Line manager review">
+        {queue.length ? (
+          <div className="grid gap-3">
+            {queue.map((application) => {
+              const employee = data.employees.find((item) => item.id === application.employeeId);
+              const standard = getApprenticeshipStandard(application.apprenticeshipStandardId);
+              return (
+                <article key={application.id} className="rounded-xl border border-[#102c3d]/[0.07] bg-white p-4 shadow-[0_14px_32px_rgba(16,44,61,0.035)]">
+                  <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-base font-semibold text-[#102c3d]">{displayEmployee(employee)}</h3>
+                        <StatusBadge tone={statusTone(application.status)}>{application.status}</StatusBadge>
+                      </div>
+                      <p className="mt-1 text-sm leading-6 text-[#102c3d]/58">{employee?.jobTitle || "Role to confirm"} - {employee?.department || "Department to confirm"} - {employee?.site || "Site to confirm"}</p>
+                      <p className="mt-3 text-sm font-semibold text-[#102c3d]">{standard?.title ?? application.apprenticeshipStandardId}</p>
+                      <p className="mt-1 line-clamp-2 text-sm leading-6 text-[#102c3d]/58">{application.reason || "No reason recorded yet."}</p>
+                      <p className="mt-2 text-xs font-medium text-[#102c3d]/42">Submitted {application.submittedAt.slice(0, 10)}</p>
+                    </div>
+                    <button type="button" onClick={() => setSelectedId(application.id)} className="h-10 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white transition hover:-translate-y-0.5">
+                      Review application
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-[#102c3d]/[0.14] bg-[#f8fbfa] px-5 py-10 text-center">
+            <h3 className="text-base font-semibold text-[#102c3d]">No applications awaiting review</h3>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#102c3d]/56">Applications will appear here only when a direct report has submitted or resubmitted a request for your decision.</p>
+          </div>
+        )}
+      </MvpPanel>
+
+      {selectedApplication ? (
+        <ManagerReviewModal
+          application={selectedApplication}
+          managerName={manager?.name ?? "Line Manager"}
+          onClose={() => setSelectedId(null)}
+          onDecision={(status, note) => updateApplicationStatus(selectedApplication.id, status, note)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function ManagerReviewModal({ application, managerName: reviewerName, onClose, onDecision }: {
+  application: MvpApplication;
+  managerName: string;
+  onClose: () => void;
+  onDecision: (status: RequestStatus, note: string) => void;
+}) {
+  const { data } = useMvpWorkspace();
+  const [decision, setDecision] = useState<"approve" | "info" | "decline" | null>(null);
+  const [supportReason, setSupportReason] = useState("");
+  const [workplaceSupport, setWorkplaceSupport] = useState("");
+  const [leadNote, setLeadNote] = useState("");
+  const [informationRequest, setInformationRequest] = useState("");
+  const [declineReason, setDeclineReason] = useState("");
+  const [nextStep, setNextStep] = useState("");
+  const [error, setError] = useState("");
+  const [confirmation, setConfirmation] = useState("");
+
+  const employee = data.employees.find((item) => item.id === application.employeeId);
+  const role = data.roles.find((item) => item.id === employee?.roleId);
+  const standard = getApprenticeshipStandard(application.apprenticeshipStandardId);
+  const mapping = role?.pathwayMappings.find((item) => item.apprenticeshipStandardId === application.apprenticeshipStandardId);
+  const programme = data.providerProgrammes.find((item) =>
+    item.linkedStandardId === application.apprenticeshipStandardId || item.linkedStandardIds.includes(application.apprenticeshipStandardId)
+  );
+  const profile = data.employeeDevelopmentProfiles.find((item) => item.employeeId === application.employeeId);
+  const latestHistory = application.history.at(-1);
+  const canDecide = reviewableManagerStatuses.includes(application.status);
+
+  function submitDecision(event: FormEvent) {
+    event.preventDefault();
+    setError("");
+
+    if (decision === "approve") {
+      if (!supportReason.trim() || !workplaceSupport.trim()) {
+        setError("Please confirm why you support the application and what workplace support the team can provide.");
+        return;
+      }
+      onDecision("Approved by Line Manager", [
+        `Manager decision by ${reviewerName}: approved for Apprenticeship Lead review.`,
+        `Why supported: ${supportReason.trim()}`,
+        `Workplace opportunity or support: ${workplaceSupport.trim()}`,
+        leadNote.trim() ? `Notes for Apprenticeship Lead: ${leadNote.trim()}` : "",
+      ].filter(Boolean).join("\n"));
+      setConfirmation("Application approved and sent to the Apprenticeship Lead for final review.");
+      return;
+    }
+
+    if (decision === "info") {
+      if (!informationRequest.trim()) {
+        setError("Please write the information you need from the employee.");
+        return;
+      }
+      onDecision("More information requested", [
+        `Manager decision by ${reviewerName}: more information requested.`,
+        `Request: ${informationRequest.trim()}`,
+      ].join("\n"));
+      setConfirmation("The application has been returned to the employee for more information.");
+      return;
+    }
+
+    if (decision === "decline") {
+      if (!declineReason.trim()) {
+        setError("Please provide a clear reason for declining the application.");
+        return;
+      }
+      onDecision("Declined by Line Manager", [
+        `Manager decision by ${reviewerName}: declined.`,
+        `Reason: ${declineReason.trim()}`,
+        nextStep.trim() ? `Suggested next step: ${nextStep.trim()}` : "",
+        leadNote.trim() ? `Note for Apprenticeship Lead: ${leadNote.trim()}` : "",
+      ].filter(Boolean).join("\n"));
+      setConfirmation("The application has been declined and the employee will be able to review your feedback.");
+      return;
+    }
+
+    setError("Choose approve, request more information or decline.");
+  }
+
+  return (
+    <MvpModal title="Review application" eyebrow="Line manager decision" onClose={onClose} wide>
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+        <div className="grid gap-4">
+          <ReviewSection title="Employee">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <ReviewFact label="Employee" value={displayEmployee(employee)} />
+              <ReviewFact label="Current role" value={employee?.jobTitle || "Role to confirm"} />
+              <ReviewFact label="Team" value={employee?.department || "Department to confirm"} />
+              <ReviewFact label="Site" value={employee?.site || "Site to confirm"} />
+              <ReviewFact label="Manager" value={employee ? managerName(data, employee) : "Manager to confirm"} />
+              <ReviewFact label="Development status" value={profile?.stage === "recommendation_ready" ? "Recommendation ready" : "Discovery in progress"} />
+            </div>
+          </ReviewSection>
+
+          <ReviewSection title="Programme">
+            <h3 className="text-lg font-semibold text-[#102c3d]">{programme?.programmeName ?? standard?.title ?? application.apprenticeshipStandardId}</h3>
+            <p className="mt-2 text-sm leading-6 text-[#102c3d]/58">{programme?.shortDescription || standard?.overview || "Programme summary will be confirmed by the Apprenticeship Lead."}</p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <ReviewFact label="Provider" value={data.providers.find((provider) => provider.providerId === programme?.providerId)?.providerName ?? "Provider to confirm"} />
+              <ReviewFact label="Duration" value={programme?.duration || standard?.typicalDuration || "Duration to confirm"} />
+              <ReviewFact label="Delivery model" value={programme?.deliveryModels[0] || "Delivery to confirm"} />
+              <ReviewFact label="Time commitment" value="Manager to confirm protected learning time" />
+            </div>
+            <details className="mt-4 rounded-xl border border-[#102c3d]/[0.07] bg-white">
+              <summary className="cursor-pointer list-none px-4 py-3 text-xs font-semibold text-[#102c3d]/62">Funding and standard details</summary>
+              <div className="border-t border-[#102c3d]/[0.06] px-4 py-3 text-sm leading-6 text-[#102c3d]/58">
+                <p>{standard ? `Level ${standard.level} - ${standard.title} - ${standard.referenceCode}` : application.apprenticeshipStandardId}</p>
+                <p>{mapping?.fundingRoute ?? programme?.fundingRoute ?? "Potential funding route to confirm"}</p>
+              </div>
+            </details>
+          </ReviewSection>
+
+          <ReviewSection title="Why this may fit">
+            <p className="text-sm leading-6 text-[#102c3d]/62">
+              LevyTate identified a credible alignment between the {employee?.jobTitle || "current role"} responsibilities held by {employee?.name ?? "the employee"} and {standard?.title ?? "the selected programme"}. The manager should still confirm workload, role relevance and available support before approving.
+            </p>
+            <div className="mt-4 grid gap-3">
+              <EvidenceItem label="Role relevance" value={mapping?.businessRationale || `${employee?.jobTitle || "The role"} has responsibilities that can generate workplace evidence for this route.`} />
+              <EvidenceItem label="Employee development goal" value={application.careerGoal || "Career goal not yet captured."} />
+              <EvidenceItem label="Business benefit" value={programme?.expectedOutcomes[0] || "Improved capability should be evidenced through current team priorities."} />
+              <EvidenceItem label="Uncertainty to check" value="Confirm workload, evidence opportunities and protected learning support before deciding." />
+            </div>
+          </ReviewSection>
+        </div>
+
+        <div className="grid gap-4">
+          <ReviewSection title="Employee answers">
+            <div className="grid gap-3">
+              <AnswerBlock question="Why are you interested?" answer={application.reason} />
+              <AnswerBlock question="How could it help your current role or future development?" answer={application.careerGoal} />
+              <AnswerBlock question="What support will you need?" answer={application.supportRequired} />
+              <AnswerBlock question="Is there anything your manager should know?" answer={application.managerNote} />
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <ReviewFact label="Submitted" value={application.submittedAt.slice(0, 10)} />
+              <ReviewFact label="Version" value="Submitted version 1" />
+              <ReviewFact label="Latest update" value={latestHistory?.createdAt.slice(0, 10) ?? application.updatedAt.slice(0, 10)} />
+            </div>
+          </ReviewSection>
+
+          <ReviewSection title="Manager considerations">
+            <ul className="grid gap-2 text-sm leading-6 text-[#102c3d]/62">
+              {[
+                "Is the programme relevant to the employee's current or planned role?",
+                "Can the learning be applied in the workplace?",
+                "Can the team support the time commitment?",
+                "Is the employee ready to participate?",
+                "Is further information needed?",
+                "Is there a clear employee and business benefit?",
+              ].map((item) => <li key={item} className="rounded-lg bg-[#f8fbfa] px-3 py-2 ring-1 ring-[#102c3d]/[0.05]">{item}</li>)}
+            </ul>
+          </ReviewSection>
+
+          <ReviewSection title="Decision">
+            {confirmation ? (
+              <div className="rounded-xl bg-[#edf7f3] p-4 text-sm font-semibold leading-6 text-[#0b6f63] ring-1 ring-[#159b8f]/15">{confirmation}</div>
+            ) : null}
+            {!confirmation && canDecide ? (
+              <form onSubmit={submitDecision}>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <DecisionButton active={decision === "approve"} onClick={() => setDecision("approve")}>Approve</DecisionButton>
+                  <DecisionButton active={decision === "info"} onClick={() => setDecision("info")}>Request more information</DecisionButton>
+                  <DecisionButton active={decision === "decline"} onClick={() => setDecision("decline")} danger>Decline</DecisionButton>
+                </div>
+
+                {decision === "approve" ? (
+                  <div className="mt-4 grid gap-3">
+                    <FormTextArea label="Why do you support this application?" value={supportReason} onChange={setSupportReason} required />
+                    <FormTextArea label="What workplace opportunity or support can the team provide?" value={workplaceSupport} onChange={setWorkplaceSupport} required />
+                    <FormTextArea label="Any notes for the Apprenticeship Lead?" value={leadNote} onChange={setLeadNote} />
+                  </div>
+                ) : null}
+
+                {decision === "info" ? (
+                  <div className="mt-4">
+                    <FormTextArea label="What information do you need from the employee?" value={informationRequest} onChange={setInformationRequest} required rows={4} />
+                  </div>
+                ) : null}
+
+                {decision === "decline" ? (
+                  <div className="mt-4 grid gap-3">
+                    <FormTextArea label="Clear reason for declining" value={declineReason} onChange={setDeclineReason} required />
+                    <FormTextArea label="Suggested next step" value={nextStep} onChange={setNextStep} />
+                    <FormTextArea label="Optional note for the Apprenticeship Lead" value={leadNote} onChange={setLeadNote} />
+                  </div>
+                ) : null}
+
+                <div className="mt-4 flex flex-col gap-3 border-t border-[#102c3d]/[0.07] pt-4 sm:flex-row sm:items-center sm:justify-between">
+                  {error ? <p className="text-xs font-semibold text-[#b53c52]">{error}</p> : <p className="text-xs leading-5 text-[#102c3d]/48">Your decision will be recorded in the application history.</p>}
+                  <button className="h-10 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white">Confirm decision</button>
+                </div>
+              </form>
+            ) : null}
+            {!canDecide && !confirmation ? <p className="text-sm leading-6 text-[#102c3d]/56">This application is no longer awaiting a line manager decision.</p> : null}
+          </ReviewSection>
+
+          <ReviewSection title="Application history">
+            <div className="grid gap-3">
+              {application.history.map((entry) => (
+                <div key={entry.id} className="rounded-xl bg-[#f8fbfa] px-4 py-3 ring-1 ring-[#102c3d]/[0.06]">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-[#102c3d]">{entry.status}</p>
+                      <p className="mt-1 whitespace-pre-line text-xs leading-5 text-[#102c3d]/54">{entry.note}</p>
+                    </div>
+                    <StatusBadge tone="blue">{entry.owner}</StatusBadge>
+                  </div>
+                  <p className="mt-2 text-[11px] font-medium text-[#102c3d]/42">{entry.createdAt.slice(0, 10)}</p>
+                </div>
+              ))}
+            </div>
+          </ReviewSection>
+        </div>
+      </div>
+    </MvpModal>
+  );
+}
+
+function ReviewSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="rounded-xl border border-[#102c3d]/[0.07] bg-[#fbfcfb] p-4">
+      <h3 className="text-sm font-semibold text-[#102c3d]">{title}</h3>
+      <div className="mt-3">{children}</div>
+    </section>
+  );
+}
+
+function ReviewFact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl bg-white px-3.5 py-3 ring-1 ring-[#102c3d]/[0.055]">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#102c3d]/38">{label}</p>
+      <p className="mt-1 line-clamp-2 text-sm font-semibold text-[#102c3d]/72">{value}</p>
+    </div>
+  );
+}
+
+function EvidenceItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl bg-white px-4 py-3 ring-1 ring-[#102c3d]/[0.06]">
+      <p className="text-xs font-semibold text-[#102c3d]">{label}</p>
+      <p className="mt-1 text-sm leading-6 text-[#102c3d]/58">{value}</p>
+    </div>
+  );
+}
+
+function AnswerBlock({ question, answer }: { question: string; answer: string }) {
+  return (
+    <div className="rounded-xl bg-white px-4 py-3 ring-1 ring-[#102c3d]/[0.06]">
+      <p className="text-xs font-semibold text-[#102c3d]">{question}</p>
+      <p className="mt-1 text-sm leading-6 text-[#102c3d]/58">{answer || "No answer recorded yet."}</p>
+    </div>
+  );
+}
+
+function DecisionButton({ active, onClick, danger = false, children }: { active: boolean; onClick: () => void; danger?: boolean; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`min-h-10 rounded-xl px-3 py-2 text-xs font-semibold ring-1 transition ${active
+        ? danger
+          ? "bg-[#fff0f2] text-[#b13b51] ring-[#b13b51]/20"
+          : "bg-[#102c3d] text-white ring-[#102c3d]"
+        : "bg-white text-[#102c3d]/64 ring-[#102c3d]/[0.08] hover:text-[#102c3d]"}`}
+    >
+      {children}
+    </button>
   );
 }
 

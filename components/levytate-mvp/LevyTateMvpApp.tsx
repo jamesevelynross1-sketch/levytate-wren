@@ -18,7 +18,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { LevyTateLogo } from "@/components/levytate-demo/PlatformShell";
 import { ApplicationsModule } from "@/components/levytate-mvp/ApplicationsModule";
 import { AskLevyTateAiWorkspace } from "@/components/levytate-mvp/AskLevyTateAiWorkspace";
-import { DashboardModule, SettingsModule } from "@/components/levytate-mvp/DashboardSettingsModules";
+import { DashboardModule, LineManagerHomeModule, SettingsModule } from "@/components/levytate-mvp/DashboardSettingsModules";
 import { EarlyAccessModule } from "@/components/levytate-mvp/EarlyAccessModule";
 import { EmployeeApplicationModule, EmployeeHomeModule, EmployeeProgrammeModule } from "@/components/levytate-mvp/EmployeeExperienceModule";
 import { EmployeesModule } from "@/components/levytate-mvp/EmployeesModule";
@@ -38,6 +38,8 @@ const modules = [
   { name: "Home", icon: LayoutDashboard },
   { name: "My Programme", icon: BookOpenCheck },
   { name: "My Application", icon: ClipboardCheck },
+  { name: "My Team", icon: Users },
+  { name: "Approvals", icon: ClipboardCheck },
   { name: "People", icon: Users },
   { name: "Providers", icon: Building2 },
   { name: "Copilot", icon: Sparkles },
@@ -55,6 +57,8 @@ const modulePermissions = {
   Home: "workspace:read",
   "My Programme": "workspace:read",
   "My Application": "applications:read",
+  "My Team": "employees:read",
+  Approvals: "applications:read",
   People: "employees:read",
   Providers: "providers:read",
   Copilot: "copilot:use",
@@ -84,6 +88,8 @@ const moduleCopy: Record<ModuleName, string> = {
   Home: "A short daily briefing showing what needs attention now.",
   "My Programme": "Understand your recommended programme, why it fits and what support you can expect.",
   "My Application": "Start, save and track your current apprenticeship application.",
+  "My Team": "Direct reports, development status and current application activity.",
+  Approvals: "Review direct-report apprenticeship applications and record fair manager decisions.",
   People: "Employees, roles, applications and enrolments in one guided workspace.",
   Providers: "Programme-first matching, provider evidence and relationship coverage.",
   Copilot: "Use LevyTate Copilot to explain, find, guide and create work inside the platform.",
@@ -108,9 +114,12 @@ function MvpAppShell() {
   const permissions = meta?.permissions ?? permissionsForMvpRole(meta?.userRole);
   const can = (permission: MvpPermission) => hasMvpPermission(permissions, permission);
   const employeeModules: readonly ModuleName[] = ["Home", "My Programme", "My Application", "Copilot", "Knowledge"];
+  const lineManagerModules: readonly ModuleName[] = ["Home", "My Team", "Approvals", "Copilot", "Knowledge"];
   const availableModules = modules.filter((module) => {
     if (meta?.userRole === "Employee" && !employeeModules.includes(module.name)) return false;
+    if (meta?.userRole === "Line Manager" && !lineManagerModules.includes(module.name)) return false;
     if (meta?.userRole !== "Employee" && (module.name === "My Programme" || module.name === "My Application")) return false;
+    if (meta?.userRole !== "Line Manager" && (module.name === "My Team" || module.name === "Approvals")) return false;
     return can(modulePermissions[module.name]);
   });
   const peopleItems = (["Employees", "Roles", "Applications", "Enrolments"] as PeopleView[]).filter((item) => can(peopleViewPermissions[item]));
@@ -166,6 +175,10 @@ function MvpAppShell() {
       return;
     }
     if (target === "Employees" || target === "Roles" || target === "Applications" || target === "Enrolments") {
+      if (meta?.userRole === "Line Manager") {
+        openModule(target === "Applications" ? "Approvals" : "My Team");
+        return;
+      }
       if (!peopleItems.includes(target as PeopleView)) return;
       setPeopleView(target as PeopleView);
       openModule("People");
@@ -310,12 +323,16 @@ function MvpAppShell() {
             {activeModule === "Home" ? (
               meta?.userRole === "Employee"
                 ? <EmployeeHomeModule onNavigate={(target) => navigateTo(target)} />
+                : meta?.userRole === "Line Manager"
+                  ? <LineManagerHomeModule onNavigate={(target) => navigateTo(target)} />
                 : <DashboardModule onNavigate={navigateTo} />
             ) : null}
             {activeModule === "My Programme" ? <EmployeeProgrammeModule onNavigate={(target) => navigateTo(target)} /> : null}
             {activeModule === "My Application" ? <EmployeeApplicationModule /> : null}
             {activeModule === "Copilot" ? <AskLevyTateAiWorkspace initialEmployeeId={aiEmployeeId} onNavigate={navigateTo} /> : null}
             {activeModule === "Knowledge" ? <GuidanceCentreModule /> : null}
+            {activeModule === "My Team" ? <EmployeesModule onStartDiscovery={(employeeId) => { setAiEmployeeId(employeeId); openModule("Copilot"); }} /> : null}
+            {activeModule === "Approvals" ? <ApplicationsModule /> : null}
             {activeModule === "People" ? (
               <ModuleStackNav items={peopleItems} active={peopleView} onSelect={(item) => setPeopleView(item as PeopleView)}>
                 {peopleView === "Employees" ? <EmployeesModule onStartDiscovery={(employeeId) => { setAiEmployeeId(employeeId); openModule("Copilot"); }} /> : null}
