@@ -5,6 +5,9 @@ const legacyPhrases = [
   "That adds something useful",
   "Which parts of your current work would you most like to improve",
   "What business or personal outcome matters most",
+  "What outcome matters most",
+  "Would you prefer workshops or online learning",
+  "Tell me more about your future goals",
   "Tell me a little about what",
 ];
 
@@ -88,6 +91,28 @@ const scenarios = [
         forbiddenActions: ["draft_application_reason", "start_application"],
       },
       {
+        prompt: "What does manager review mean?",
+        includes: ["Manager review means", "Morgan Price"],
+        forbiddenActions: ["draft_application_reason", "start_application"],
+      },
+      {
+        prompt: "Prepare for a manager conversation.",
+        includes: ["Here is a simple way", "Morgan Price", "Suggested opening", "Data analyst"],
+        actionTypes: ["prepare_manager_message", "open_my_applications", "ask_follow_up"],
+        forbiddenActions: ["draft_application_reason", "start_application"],
+        noWarning: true,
+        noQuickReplies: true,
+        managerDraftIncludes: ["Morgan Price", "Data analyst"],
+      },
+      {
+        prompt: "Generate a manager conversation",
+        includes: ["Here is a simple way", "Morgan Price", "Suggested opening"],
+        actionTypes: ["prepare_manager_message", "open_my_applications", "ask_follow_up"],
+        forbiddenActions: ["draft_application_reason", "start_application"],
+        noWarning: true,
+        noQuickReplies: true,
+      },
+      {
         prompt: "Who owns the next action?",
         includes: ["Morgan Price"],
         forbiddenActions: ["draft_application_reason", "start_application"],
@@ -114,7 +139,8 @@ const scenarios = [
       },
       {
         prompt: "Start a new conversation.",
-        includes: ["fresh conversation", "Morgan Price"],
+        includes: ["fresh conversation", "Morgan Price", "submitted application", "review stage"],
+        noQuickReplies: true,
       },
       {
         prompt: "Show current application",
@@ -182,6 +208,9 @@ async function main() {
       }
       if (test.target) {
         assert(`${scenario.label}: "${test.prompt}" target ${test.target}`, targets.includes(test.target), { targets });
+      }
+      for (const expected of test.managerDraftIncludes ?? []) {
+        assert(`${scenario.label}: "${test.prompt}" manager draft includes ${expected}`, includesLoose(response.managerMessageDraft ?? "", expected), { managerMessageDraft: response.managerMessageDraft });
       }
       if (test.noWarning) {
         assert(`${scenario.label}: "${test.prompt}" no repeated warning`, !response.applicationWarning, { warning: response.applicationWarning });

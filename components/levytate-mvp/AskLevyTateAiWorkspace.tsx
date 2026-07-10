@@ -496,9 +496,11 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate }:
   );
 
   const selectedManagerName = useMemo(() => {
-    if (!selectedEmployee?.managerId) return "Line manager to confirm";
-    return data.employees.find((employee) => employee.id === selectedEmployee.managerId)?.name ?? "Line manager to confirm";
-  }, [data.employees, selectedEmployee?.managerId]);
+    if (!selectedEmployee) return "Line manager to confirm";
+    return selectedEmployee.managerName
+      || data.employees.find((employee) => employee.id === selectedEmployee.managerId)?.name
+      || "Line manager to confirm";
+  }, [data.employees, selectedEmployee]);
 
   const selectedDevelopmentProfile = useMemo(
     () => data.employeeDevelopmentProfiles.find((profile) => profile.employeeId === selectedEmployeeId) ?? null,
@@ -605,7 +607,9 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate }:
       : selectedPreferredStandard?.title ?? "your recommended programme";
     const fallback = role === "Employee" && selectedEmployee
       ? selectedApplication
-        ? `Your ${programme} application is currently ${selectedApplication.status}${selectedApplication.currentOwner === "Line Manager" ? ` with ${selectedManagerName} for review` : ""}. I can explain the status, show your submitted answers or help you prepare for the next step.`
+        ? selectedApplication.status === "Submitted to Line Manager" || selectedApplication.status === "Awaiting Manager Review"
+          ? `Your ${programme} application is currently with ${selectedManagerName} for review. I can show your submitted application, explain the review stage or help you prepare for the conversation.`
+          : `Your ${programme} application is currently ${selectedApplication.status}. I can explain the status, show your submitted answers or help you prepare for the next step.`
         : `Hi ${firstName(selectedEmployee.name)}. ${programme} is your current recommendation. I can explain it, help draft an application or open the programme view.`
       : roleContent[role].welcome;
     setConversations((current) => ({ ...current, [role]: [{ id: `reset-${role}-${messageId()}`, role: "assistant", content: fallback }] }));

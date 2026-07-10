@@ -124,6 +124,7 @@ function employeeApplicationWarningForState(request: LevyTateAiRequest, text: st
 
 function employeePlatformTaskIntent(text: string) {
   if (/\b(new conversation|start over|reset conversation|fresh conversation)\b/.test(text)) return "new_conversation";
+  if (/\b(prepare|generate|draft|write|help).{0,45}\b(manager conversation|conversation with manager|manager message|message for manager|manager discussion)\b|\b(manager conversation|conversation with manager|manager message|message for manager|manager discussion)\b/.test(text)) return "prepare_manager_conversation";
   if (/\b(show|open|view|take me to|go to)\b.{0,35}\b(current application|my application|submitted answers|submitted application|application)\b|\b(track|status)\b.{0,25}\b(application|request)\b/.test(text)) return "open_application";
   if (/\b(show|open|view|take me to|go to)\b.{0,35}\b(programme|program|pathway|recommendation)\b/.test(text)) return "open_programme";
   if (/\b(start|apply|submit|create)\b.{0,35}\b(application|apprenticeship|request)\b/.test(text)) return "start_application";
@@ -135,6 +136,34 @@ function employeePlatformTaskIntent(text: string) {
 
 function employeeActionForPlatformTask(request: LevyTateAiRequest, type: LevyTateAiAction["type"], label: string, target: string) {
   return [employeeAction(label, type, target)];
+}
+
+function employeeManagerConversationDraft(request: LevyTateAiRequest) {
+  const application = employeeContextApplication(request);
+  const employee = request.workspaceEmployeeContext?.employee;
+  const role = request.workspaceEmployeeContext?.role;
+  const manager = employeeManagerName(request);
+  const programme = employeeProgrammeTitle(request);
+  const status = employeeCurrentStatus(request) ?? "current review";
+  const reason = application?.reason || request.workspaceEmployeeContext?.recommendation?.rationale || role?.businessRationale || `you want to apply ${programme} in your role`;
+  const careerGoal = application?.careerGoal || "build useful capability for your current role and future progression";
+  const support = application?.supportRequired || "agree realistic study time, workplace evidence and any support needed during delivery";
+  const roleTitle = employee?.jobTitle || role?.title || "your role";
+
+  return [
+    `Here is a simple way to prepare for your conversation with ${manager}:`,
+    "",
+    `- Explain why the ${programme} programme interests you.`,
+    `- Connect it to your current role as ${roleTitle}.`,
+    `- Give one practical example of how it could support ${careerGoal}.`,
+    `- Be clear that the current application status is ${status}.`,
+    `- Ask whether ${manager} needs any further evidence before completing the review.`,
+    `- Agree the support you may need: ${support}.`,
+    "",
+    "Suggested opening:",
+    "",
+    `'I'm interested in the ${programme} programme because ${reason}. I'd like to discuss how the learning could be applied in my role and what support would be realistic during the programme.'`,
+  ].join("\n");
 }
 
 function employeePlatformTaskMessage(request: LevyTateAiRequest, text: string) {
@@ -152,13 +181,35 @@ function employeePlatformTaskMessage(request: LevyTateAiRequest, text: string) {
       return {
         message: `Starting a fresh conversation. You have not started an application yet, and ${programme} is the current recommendation I can help explain or turn into a draft.`,
         actions: employeeActionsForState(request),
-        quickReplies: employeeQuickRepliesForState(request),
+        quickReplies: [],
+      };
+    }
+    if (managerReviewStatuses.has(status ?? "")) {
+      return {
+        message: `Starting a fresh conversation. Your ${programme} application is currently with ${manager} for review. I can show your submitted application, explain the review stage or help you prepare for the conversation.`,
+        actions: employeeActionsForState(request),
+        quickReplies: [],
       };
     }
     return {
       message: `Starting a fresh conversation. Your ${programme} application is currently ${status}${managerReviewStatuses.has(status ?? "") ? ` with ${manager} for review` : ` with ${owner}`}. I can show the application, explain the status or help you prepare for the next step.`,
       actions: employeeActionsForState(request),
-      quickReplies: employeeQuickRepliesForState(request),
+      quickReplies: [],
+    };
+  }
+
+  if (intent === "prepare_manager_conversation") {
+    const draft = employeeManagerConversationDraft(request);
+    return {
+      message: draft,
+      actions: [
+        employeeAction("Copy conversation draft", "prepare_manager_message", manager),
+        employeeAction("View submitted application", "open_my_applications", "My Application"),
+        employeeAction("Explain manager review", "ask_follow_up", "manager review"),
+      ],
+      quickReplies: [],
+      managerMessageDraft: draft,
+      suppressApplicationWarning: true,
     };
   }
 
@@ -420,7 +471,9 @@ function employeeWorkspaceFallback(request: LevyTateAiRequest): LevyTateAiRespon
       ...(typeof direct !== "string" && "autoExecute" in direct && direct.autoExecute ? ["Employee Copilot platform task action may be executed immediately by the client."] : []),
     ],
     applicationWarning: typeof direct !== "string" && "suppressApplicationWarning" in direct && direct.suppressApplicationWarning ? null : employeeApplicationWarningForState(request, text),
-    managerMessageDraft: `Hi ${employeeManagerName(request)}, I wanted to discuss my apprenticeship application and make sure I understand the next step. Could we review the programme fit, workload and support needed?`,
+    managerMessageDraft: typeof direct !== "string" && "managerMessageDraft" in direct && direct.managerMessageDraft
+      ? direct.managerMessageDraft
+      : `Hi ${employeeManagerName(request)}, I wanted to discuss my apprenticeship application and make sure I understand the next step. Could we review the programme fit, workload and support needed?`,
   };
 }
 
