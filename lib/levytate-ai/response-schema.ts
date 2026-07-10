@@ -512,12 +512,17 @@ export type LevyTateWorkspaceEmployeeContext = {
     id: string;
     status: LevyTateRequestStatus;
     currentOwner?: string;
+    currentOwnerName?: string;
     pathway: string;
+    provider?: string;
     submittedDate?: string;
     reason?: string;
     careerGoal?: string;
     supportRequired?: string;
     managerNote?: string;
+    latestComment?: string;
+    requestedInformation?: string;
+    enrolmentStatus?: string;
     approvalHistory?: string[];
   } | null;
   development?: LevyTateEmployeeDiscoveryContext;

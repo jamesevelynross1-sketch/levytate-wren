@@ -21,6 +21,232 @@ function activeApplication(request: LevyTateAiRequest) {
   return request.currentApplication ?? request.contextData?.activeApplication ?? null;
 }
 
+const employeeEditableStatuses = new Set(["Draft", "More information requested"]);
+const managerReviewStatuses = new Set(["Submitted to Line Manager", "Awaiting Manager Review"]);
+const leadReviewStatuses = new Set(["Approved by Line Manager", "Submitted to Apprenticeship Lead", "Awaiting Final Approval"]);
+
+function employeeWorkspaceContext(request: LevyTateAiRequest) {
+  return request.workspaceEmployeeContext;
+}
+
+function employeeContextApplication(request: LevyTateAiRequest) {
+  return employeeWorkspaceContext(request)?.application ?? null;
+}
+
+function employeeProgrammeTitle(request: LevyTateAiRequest) {
+  return employeeContextApplication(request)?.pathway
+    || request.workspaceEmployeeContext?.role?.preferredPathway
+    || request.availablePathways?.[0]?.title
+    || request.roleMappings?.[0]?.primaryPathway
+    || "your recommended programme";
+}
+
+function employeeManagerName(request: LevyTateAiRequest) {
+  return request.workspaceEmployeeContext?.employee?.manager
+    || request.currentApplication?.manager
+    || "your line manager";
+}
+
+function employeeOwnerName(request: LevyTateAiRequest) {
+  const application = employeeContextApplication(request);
+  if (!application) return "you";
+  return application.currentOwnerName || (application.currentOwner === "Line Manager" ? employeeManagerName(request) : application.currentOwner || "the current owner");
+}
+
+function employeeCurrentStatus(request: LevyTateAiRequest) {
+  return employeeContextApplication(request)?.status ?? null;
+}
+
+function employeeAction(label: string, type: LevyTateAiAction["type"], target?: string): LevyTateAiAction {
+  return { label, type, target, requiresConfirmation: type === "start_application" };
+}
+
+function employeeActionsForState(request: LevyTateAiRequest): LevyTateAiAction[] {
+  const status = employeeCurrentStatus(request);
+  if (!status) {
+    return [
+      employeeAction("Start application", "start_application", "My Application"),
+      employeeAction("Explain this programme", "open_pathway", employeeProgrammeTitle(request)),
+    ];
+  }
+  if (status === "Draft") {
+    return [
+      employeeAction("Continue application", "draft_application_reason", "My Application"),
+      employeeAction("Review my answers", "draft_application_reason", "My Application"),
+    ];
+  }
+  if (managerReviewStatuses.has(status)) {
+    return [
+      employeeAction("View submitted application", "open_my_applications", "My Application"),
+      employeeAction("Explain manager review", "ask_follow_up", "manager review"),
+      employeeAction("Prepare for manager conversation", "prepare_manager_message", employeeManagerName(request)),
+    ];
+  }
+  if (status === "More information requested") {
+    return [
+      employeeAction("Provide requested information", "draft_application_reason", "My Application"),
+      employeeAction("Help draft my response", "draft_application_reason", "My Application"),
+    ];
+  }
+  if (leadReviewStatuses.has(status)) {
+    return [
+      employeeAction("Track application", "open_my_applications", "My Application"),
+      employeeAction("Explain final review", "ask_follow_up", "final review"),
+    ];
+  }
+  if (status === "Approved for Enrolment") {
+    return [
+      employeeAction("View enrolment details", "open_my_applications", "My Application"),
+      employeeAction("Open my programme", "open_pathway", employeeProgrammeTitle(request)),
+    ];
+  }
+  if (/Declined/.test(status)) {
+    return [
+      employeeAction("Review feedback", "open_my_applications", "My Application"),
+      employeeAction("Prepare manager conversation", "prepare_manager_message", employeeManagerName(request)),
+    ];
+  }
+  return [employeeAction("Track application", "open_my_applications", "My Application")];
+}
+
+function employeeApplicationWarningForState(request: LevyTateAiRequest) {
+  const status = employeeCurrentStatus(request);
+  if (!status) return null;
+  if (status === "Draft") return "You already have a draft application. Continue that draft rather than starting a second one.";
+  if (status === "More information requested") return "Your current application is reopened only for the information your manager requested.";
+  if (managerReviewStatuses.has(status)) return "Your current application is submitted and locked while your manager reviews it.";
+  if (leadReviewStatuses.has(status)) return "Your current application is already in the final review stage.";
+  if (status === "Approved for Enrolment") return "Your current application is approved for enrolment, so the next step is enrolment preparation.";
+  return null;
+}
+
+function employeeRecommendationExplanation(request: LevyTateAiRequest) {
+  const employee = request.workspaceEmployeeContext?.employee;
+  const role = request.workspaceEmployeeContext?.role;
+  const recommendation = request.workspaceEmployeeContext?.recommendation;
+  const programme = employeeProgrammeTitle(request);
+  const rationale = recommendation?.rationale || role?.businessRationale || "it is the approved pathway mapped to this role in LevyTate.";
+  const evidence = recommendation?.evidence?.length ? ` The strongest evidence is ${recommendation.evidence.slice(0, 3).join(", ")}.` : "";
+  return `${programme} is the current LevyTate recommendation for ${employee?.name ?? "you"} because ${rationale}${evidence} It is linked to the ${employee?.jobTitle || role?.title || "current"} role and the development context LevyTate already holds.`;
+}
+
+function employeeNoApplicationMessage(request: LevyTateAiRequest, text: string) {
+  const programme = employeeProgrammeTitle(request);
+  if (/draft|application|apply|answer|start|today|next/.test(text)) {
+    return `You have not started an application yet. The next useful step is to start an application for ${programme}, or I can help you draft the answers before you submit anything to ${employeeManagerName(request)}.`;
+  }
+  return `${programme} is the approved programme currently mapped to your role. I can explain why it fits, help you prepare application answers or open the application workflow when you are ready.`;
+}
+
+function employeeDirectMessage(request: LevyTateAiRequest) {
+  const text = request.userMessage.toLowerCase();
+  const application = employeeContextApplication(request);
+  const status = application?.status ?? null;
+  const manager = employeeManagerName(request);
+  const owner = employeeOwnerName(request);
+  const programme = employeeProgrammeTitle(request);
+
+  if (/\b(another employee|someone else|other employee|nadia|rachel|show me .*employee)\b/.test(text)) {
+    return `I can only help with your own apprenticeship journey. Your current ${application ? `application is ${status} with ${owner}` : `recommended programme is ${programme}`}. I can show your application, explain its status or help you prepare for the next step.`;
+  }
+
+  if (/\b(explain|why).{0,25}(recommendation|programme|pathway|route)\b/.test(text)) {
+    return employeeRecommendationExplanation(request);
+  }
+
+  if (/\bwhy\b.{0,40}\b(edit|change|rewrite)\b|\b(can.?t|cannot|can't).{0,30}\b(edit|change)\b/.test(text)) {
+    if (!application) return "You can still start and edit a draft because you have not submitted an application yet.";
+    if (employeeEditableStatuses.has(status ?? "")) return `You can edit the current application because it is ${status}. When you submit it, the answers will lock for review.`;
+    return `You cannot edit this application because it has already been submitted. The submitted version is locked to protect the review record, and the next action sits with ${owner}. Editing becomes available again only if ${manager} requests more information.`;
+  }
+
+  if (/\bwhat happens next\b|\bnext action\b|\bwho owns\b|\bowner\b/.test(text)) {
+    if (!application) return `You own the next step. You can start an application for ${programme}, save it as a draft, or ask me to help draft the answers first.`;
+    if (status && managerReviewStatuses.has(status)) return `The next action sits with ${manager}. Your application is awaiting manager review, and you do not need to edit anything unless ${manager} asks for more information.`;
+    if (status === "Draft") return "You own the next step. Continue the draft, complete the required answers and submit it when you are ready.";
+    if (status === "More information requested") return `${manager} has asked for more information. You own the next step: provide the requested response in the reopened application section and resubmit.`;
+    if (status && leadReviewStatuses.has(status)) return `Manager approval is complete. The Apprenticeship Lead owns the final review, and you can track progress while they check readiness, programme fit and enrolment timing.`;
+    if (status === "Approved for Enrolment") return `Your application is approved for enrolment. The next step is enrolment preparation with ${application.provider || request.workspaceEmployeeContext?.providerProgramme?.providerName || "the approved delivery partner"}.`;
+    if (status && /Declined/.test(status)) return "A decision has been recorded. Review the feedback first, then prepare a calm follow-up conversation with your manager or Apprenticeship Lead if you need clarity.";
+  }
+
+  if (/\b(manager review|review mean|what does manager)\b/.test(text)) {
+    return `Manager review means ${manager} checks role fit, workload, business benefit and whether the team can support the learning time. At this stage your answers are locked, and ${manager} owns the decision.`;
+  }
+
+  if (/\b(manager need|information.*manager|what information)\b/.test(text)) {
+    if (status === "More information requested") {
+      return `${manager} has requested: ${application?.requestedInformation || application?.managerNote || application?.latestComment || "more detail on the application evidence"}. I can help draft a clear response.`;
+    }
+    if (application) return `${manager} can already see your submitted reason, career goal, support request and manager note. They mainly need to decide whether the programme fits your role, workload and team priorities.`;
+    return `${manager} will need a clear reason for interest, how the programme supports your role or future development, and what support you need at work.`;
+  }
+
+  if (/\b(time|commitment|hours|duration|off.the.job|off the job)\b/.test(text)) {
+    return `The time commitment will be confirmed before enrolment, but apprenticeships normally require regular protected learning time alongside workplace evidence. For ${programme}, your manager will need to agree how learning time fits around your role before the application moves forward.`;
+  }
+
+  if (/\bdraft|help me draft|answers|application\b/.test(text)) {
+    if (!application) return `I can help draft the application for ${programme}. Start with a short reason for interest, a practical career goal and the support you need from ${manager}.`;
+    if (status === "Draft") return "You have a draft in progress. I can help improve the answers before you submit it to your line manager.";
+    if (status === "More information requested") return `I can help draft the requested response for ${manager}. Keep it specific to the question asked and explain what evidence or support you can provide.`;
+    return `Your application is already submitted, so I cannot help rewrite the answers right now. I can help you prepare for a conversation with ${manager} or explain the review stage.`;
+  }
+
+  if (/\btoday\b|\bwhat should i do\b/.test(text)) {
+    if (!application) return `Today, review ${programme} and start the application if it still feels right. I can help draft the answers first.`;
+    if (status === "Draft") return "Today, continue the draft and complete any missing answers before submitting it to your line manager.";
+    if (status && managerReviewStatuses.has(status)) return `Today, you do not need to edit anything. Your application is with ${manager}; you can review your submitted answers or prepare for a manager conversation.`;
+    if (status === "More information requested") return `Today, respond to ${manager}'s request for more information and resubmit the application.`;
+    return `Today, track the application and review the latest status. The current owner is ${owner}.`;
+  }
+
+  return null;
+}
+
+function employeeWorkspaceFallback(request: LevyTateAiRequest): LevyTateAiResponse | null {
+  if (request.role !== "Employee" || !request.workspaceEmployeeContext?.employee) return null;
+  const text = request.userMessage.toLowerCase();
+  const direct = employeeDirectMessage(request) ?? (!employeeContextApplication(request) ? employeeNoApplicationMessage(request, text) : null);
+  if (!direct) return null;
+  const actions = employeeActionsForState(request);
+  const status = employeeCurrentStatus(request);
+  return {
+    source: "mock",
+    assistantMessage: direct,
+    followUpQuestion: null,
+    quickReplies: employeeQuickRepliesForState(request),
+    shouldShowActions: true,
+    shouldShowPathways: false,
+    recommendedActions: actions,
+    suggestedActions: actions,
+    recommendedPathways: [],
+    applicationPrefill: status ? null : {
+      selectedApprenticeship: employeeProgrammeTitle(request),
+      reasonForInterest: "I want to build capability that supports my current role and future development.",
+      careerGoal: "Develop stronger skills linked to my role and progression goals.",
+      supportRequired: `Protected learning time and practical support from ${employeeManagerName(request)}.`,
+    },
+    applicationDraft: null,
+    providerMatchDraft: null,
+    nextStep: actions[0]?.type ?? null,
+    safetyNotes: ["Employee Copilot response was grounded in the server-scoped employee record and current application state."],
+    applicationWarning: employeeApplicationWarningForState(request),
+    managerMessageDraft: `Hi ${employeeManagerName(request)}, I wanted to discuss my apprenticeship application and make sure I understand the next step. Could we review the programme fit, workload and support needed?`,
+  };
+}
+
+function employeeQuickRepliesForState(request: LevyTateAiRequest) {
+  const status = employeeCurrentStatus(request);
+  if (!status) return ["Explain this programme", "Help me draft my application", "What should I do today?"];
+  if (status === "Draft") return ["Review my answers", "What should I do today?", "How much time will it require?"];
+  if (managerReviewStatuses.has(status)) return ["Explain manager review", "Who owns the next action?", "Prepare for a manager conversation"];
+  if (status === "More information requested") return ["Help draft my response", "What information does my manager need?", "What should I do today?"];
+  if (leadReviewStatuses.has(status)) return ["What happens next?", "Who owns the next action?", "Explain final review"];
+  if (status === "Approved for Enrolment") return ["View enrolment details", "How much time will it require?", "What should I do today?"];
+  return ["Review feedback", "Prepare manager conversation", "What should I do today?"];
+}
+
 function adminRoleEmployeeFallback(request: LevyTateAiRequest): LevyTateAiResponse {
   const application = activeApplication(request);
   const pathways: LevyTateRecommendedPathway[] = [
@@ -190,6 +416,9 @@ function adminFallback(request: LevyTateAiRequest) {
 
 export function buildLevyTateAiFallbackResponse(request: LevyTateAiRequest): LevyTateAiResponse {
   if (request.role === "LevyTate Admin") return neutraliseEmployerReferences(adminFallback(request), request);
+
+  const employeeResponse = employeeWorkspaceFallback(request);
+  if (employeeResponse) return employeeResponse;
 
   if (request.role === "Employee" && /(admin|spreadsheet|reporting|report|crm|automation|manual process)/i.test(request.userMessage)) {
     return adminRoleEmployeeFallback(request);

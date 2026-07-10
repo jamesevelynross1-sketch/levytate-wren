@@ -110,9 +110,20 @@ function progressiveEmployeeFollowUp(request: LevyTateAiRequest) {
 }
 function buildGroundedFallback(request: LevyTateAiRequest) {
   const recommendationResult = buildLevyTateRecommendations(request);
+  const baseFallback = buildLevyTateAiFallbackResponse(request);
+  if (isDeterministicEmployeeStateResponse(request, baseFallback)) {
+    const grounded = applyPlatformRecommendations(request, baseFallback, recommendationResult);
+    return {
+      ...grounded,
+      recommendedActions: baseFallback.recommendedActions,
+      suggestedActions: baseFallback.suggestedActions,
+      applicationPrefill: baseFallback.applicationPrefill,
+      applicationDraft: baseFallback.applicationDraft ?? baseFallback.applicationPrefill,
+    };
+  }
   const conversationalFallback = applyConversationMemoryToFallback(
     request,
-    buildLevyTateAiFallbackResponse(request),
+    baseFallback,
   );
   const grounded = applyPlatformRecommendations(request, conversationalFallback, recommendationResult);
   if (recommendationResult.shouldRevealRecommendations && !recommendationNarrativeIsAligned(grounded.assistantMessage, recommendationResult)) {
@@ -163,6 +174,9 @@ export async function POST(request: Request) {
     }
 
     const fallback = buildGroundedFallback(parsedRequest);
+    if (isDeterministicEmployeeStateResponse(parsedRequest, fallback)) {
+      return NextResponse.json(finaliseResponse(parsedRequest, fallback));
+    }
     if (!levyTateAiEnabled()) {
       return NextResponse.json(finaliseResponse(parsedRequest, fallback));
     }
@@ -189,6 +203,11 @@ export async function POST(request: Request) {
   }
 }
 
+function isDeterministicEmployeeStateResponse(request: LevyTateAiRequest, response: LevyTateAiResponse) {
+  return request.role === "Employee"
+    && response.safetyNotes.some((note) => note.includes("server-scoped employee record"));
+}
+
 async function getSession() {
   const cookieStore = await cookies();
   return readLevyTateBetaSession(cookieStore.get(levytateBetaSessionCookie)?.value);
@@ -210,6 +229,8 @@ function sanitiseCopilotRequest(request: LevyTateAiRequest, workspace: LevyTateW
   const standardId = application?.apprenticeshipStandardId ?? roleRecord?.pathwayMappings[0]?.apprenticeshipStandardId;
   const standard = standardId ? getApprenticeshipStandard(standardId) : null;
   const employeeProfile = employee ? data.employeeDevelopmentProfiles.find((profile) => profile.employeeId === employee.id) ?? null : null;
+  const providerProgramme = providerProgrammeForStandard(data, standardId);
+  const enrolment = application ? data.enrolments.find((item) => item.applicationId === application.id) ?? null : null;
 
   return {
     ...request,
@@ -264,7 +285,14 @@ function sanitiseCopilotRequest(request: LevyTateAiRequest, workspace: LevyTateW
       futureCapabilities: employeeProfile.futureCapabilities,
       stage: employeeProfile.stage,
     } : undefined,
-    workspaceEmployeeContext: buildScopedEmployeeContext(data.employees, employee, roleRecord, application, employeeProfile ?? undefined, request),
+    workspaceEmployeeContext: buildScopedEmployeeContext(data.employees, employee, roleRecord, application, employeeProfile ?? undefined, request, {
+      providerName: providerProgramme.provider?.providerName,
+      programmeName: providerProgramme.programme?.programmeName,
+      linkedStandard: standard?.title,
+      verificationStatus: providerProgramme.provider?.verificationStatus,
+      deliveryModels: providerProgramme.programme?.deliveryModels,
+      enrolmentStatus: enrolment?.status,
+    }),
     preferredStandardId: employeeProfile?.preferredStandardId || standardId,
     contextData: {
       selectedPersona: employee ? {
@@ -318,6 +346,13 @@ function sanitiseCopilotRequest(request: LevyTateAiRequest, workspace: LevyTateW
   };
 }
 
+function providerProgrammeForStandard(data: LevyTateWorkspaceBootstrap["data"], standardId: string | undefined) {
+  if (!standardId) return { provider: null, programme: null };
+  const programme = data.providerProgrammes.find((item) => item.linkedStandardId === standardId || item.linkedStandardIds.includes(standardId)) ?? null;
+  const provider = programme ? data.providers.find((item) => item.providerId === programme.providerId) ?? null : null;
+  return { provider, programme };
+}
+
 function resolveScopedEmployee(employees: MvpEmployee[], request: LevyTateAiRequest, role: LevyTateRole) {
   if (!employees.length) return null;
   const selected = request.selectedEmployee?.trim().toLowerCase();
@@ -340,7 +375,7 @@ function latestApplicationForEmployee(applications: MvpApplication[], employeeId
 }
 
 function managerNameForEmployee(employees: MvpEmployee[], employee: MvpEmployee) {
-  return employees.find((item) => item.id === employee.managerId)?.name ?? "Line manager to confirm";
+  return employee.managerName || employees.find((item) => item.id === employee.managerId)?.name || "Line manager to confirm";
 }
 
 function roleMappingContext(roleRecord: MvpRole) {
@@ -380,6 +415,14 @@ function buildScopedEmployeeContext(
   application: MvpApplication | null,
   profile: MvpEmployeeDevelopmentProfile | undefined,
   request: LevyTateAiRequest,
+  programmeContext?: {
+    providerName?: string;
+    programmeName?: string;
+    linkedStandard?: string;
+    verificationStatus?: string;
+    deliveryModels?: string[];
+    enrolmentStatus?: string;
+  },
 ): LevyTateWorkspaceEmployeeContext {
   if (!employee) {
     return {
@@ -392,6 +435,8 @@ function buildScopedEmployeeContext(
 
   const standard = application ? getApprenticeshipStandard(application.apprenticeshipStandardId) : null;
   const topRecommendation = profile?.recommendationResult?.topRecommendation ?? profile?.recommendationResult?.recommendations[0] ?? null;
+  const latestComment = application?.history.at(-1)?.note ?? "";
+  const ownerName = application ? applicationOwnerLabelForEmployee(employees, employee, application, programmeContext?.providerName) : "";
 
   return {
     resolution: "selected_employee",
@@ -426,12 +471,17 @@ function buildScopedEmployeeContext(
       id: application.id,
       status: application.status,
       currentOwner: application.currentOwner,
+      currentOwnerName: ownerName,
       pathway: standard?.title ?? application.apprenticeshipStandardId,
+      provider: programmeContext?.providerName,
       submittedDate: application.submittedAt.slice(0, 10),
       reason: application.reason,
       careerGoal: application.careerGoal,
       supportRequired: application.supportRequired,
       managerNote: application.managerNote,
+      latestComment,
+      requestedInformation: application.status === "More information requested" ? application.managerNote || latestComment : "",
+      enrolmentStatus: programmeContext?.enrolmentStatus,
       approvalHistory: application.history.map((entry) => `${entry.status}: ${entry.note}`).slice(-6),
     } : null,
     development: profile ? {
@@ -457,6 +507,24 @@ function buildScopedEmployeeContext(
       currentCapabilityProfile: profile?.recommendationResult?.currentCapabilityProfile,
       futureCapabilityProfile: profile?.recommendationResult?.futureCapabilityProfile,
     } : null,
-    providerProgramme: null,
+    providerProgramme: programmeContext?.providerName || programmeContext?.programmeName ? {
+      providerName: programmeContext.providerName,
+      programmeName: programmeContext.programmeName,
+      linkedStandard: programmeContext.linkedStandard,
+      verificationStatus: programmeContext.verificationStatus,
+      deliveryModels: programmeContext.deliveryModels,
+    } : null,
   };
+}
+
+function applicationOwnerLabelForEmployee(
+  employees: MvpEmployee[],
+  employee: MvpEmployee,
+  application: MvpApplication,
+  providerName?: string,
+) {
+  if (application.currentOwner === "Line Manager") return managerNameForEmployee(employees, employee);
+  if (application.currentOwner === "Employee") return employee.name;
+  if (application.currentOwner === "Provider Partner") return providerName || "Approved delivery partner";
+  return application.currentOwner;
 }

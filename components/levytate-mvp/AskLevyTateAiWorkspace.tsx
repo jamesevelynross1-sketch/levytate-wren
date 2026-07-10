@@ -82,6 +82,49 @@ function employeeWelcome(name: string) {
   return `Tell me a little about what ${firstName(name)} does during a typical week.`;
 }
 
+function employeeCopilotStageContent(application: { status: RequestStatus } | null) {
+  if (!application) {
+    return {
+      purpose: "Explain the recommended programme, help draft application answers and guide the first application step.",
+      prompts: ["Explain this recommendation", "Help me draft my application", "What should I do today?"],
+    };
+  }
+  if (application.status === "Draft") {
+    return {
+      purpose: "Help improve draft answers, explain missing information and prepare the application for manager review.",
+      prompts: ["Review my answers", "Help me draft my application", "What should I do today?"],
+    };
+  }
+  if (application.status === "Submitted to Line Manager" || application.status === "Awaiting Manager Review") {
+    return {
+      purpose: "Explain the submitted application, manager review and what the employee can do while answers are locked.",
+      prompts: ["Why can't I edit my application?", "What happens next?", "What does manager review mean?"],
+    };
+  }
+  if (application.status === "More information requested") {
+    return {
+      purpose: "Explain the manager's request and help draft the reopened response.",
+      prompts: ["What information does my manager need?", "Help draft my response", "What should I do today?"],
+    };
+  }
+  if (application.status === "Approved for Enrolment") {
+    return {
+      purpose: "Explain enrolment preparation, provider details and what happens before the programme starts.",
+      prompts: ["What happens next?", "How much time will the programme require?", "What should I do today?"],
+    };
+  }
+  if (application.status === "Approved by Line Manager" || application.status === "Submitted to Apprenticeship Lead" || application.status === "Awaiting Final Approval") {
+    return {
+      purpose: "Explain final review and help the employee track progress without changing approval status.",
+      prompts: ["Who owns the next action?", "What happens next?", "Explain final review"],
+    };
+  }
+  return {
+    purpose: "Explain the decision feedback and help prepare a calm follow-up conversation.",
+    prompts: ["Review feedback", "Prepare manager conversation", "What should I do today?"],
+  };
+}
+
 function initialMessages(role: AssistantRole): ChatMessage[] {
   return [{ id: `welcome-${role}`, role: "assistant", content: roleContent[role].welcome }];
 }
@@ -470,6 +513,12 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate }:
     () => [...messages].reverse().find((message) => message.response)?.response ?? null,
     [messages],
   );
+  const employeeStageContent = useMemo(
+    () => employeeCopilotStageContent(selectedApplication),
+    [selectedApplication],
+  );
+  const activePurpose = role === "Employee" ? employeeStageContent.purpose : roleContent[role].purpose;
+  const activePrompts = role === "Employee" ? employeeStageContent.prompts : roleContent[role].prompts;
 
   useEffect(() => {
     if (initialEmployeeId && initialEmployeeId !== selectedEmployeeId) {
@@ -531,6 +580,18 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate }:
   function chooseEmployee(nextEmployeeId: string) {
     setSelectedEmployeeId(nextEmployeeId);
     loadedEmployeeRef.current = "";
+    setInput("");
+    setError("");
+    setPendingAction(null);
+    setRevealedAction(null);
+    setActionStatus("");
+  }
+
+  function resetConversation() {
+    const fallback = role === "Employee" && selectedEmployee
+      ? `Hi ${firstName(selectedEmployee.name)}. I can use your programme, application status and manager context to help with the next step.`
+      : roleContent[role].welcome;
+    setConversations((current) => ({ ...current, [role]: [{ id: `reset-${role}-${messageId()}`, role: "assistant", content: fallback }] }));
     setInput("");
     setError("");
     setPendingAction(null);
@@ -697,7 +758,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate }:
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const nextMessage = input.trim() || roleContent[role].prompts[0] || roleContent[role].welcome;
+    const nextMessage = input.trim() || activePrompts[0] || roleContent[role].welcome;
     void sendMessage(nextMessage);
   }
 
@@ -796,6 +857,9 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate }:
               </p>
             </div>
             <div className="flex items-center gap-2">
+              <button type="button" onClick={resetConversation} className="rounded-full bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/52 ring-1 ring-[#102c3d]/[0.08] transition hover:text-[#102c3d] hover:ring-[#159b8f]/20">
+                New conversation
+              </button>
               {role === "Employee" && selectedPreferredStandard ? (
                 <span className="hidden rounded-full bg-[#edf7f3] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#0b6f63] sm:inline-flex">
                   Preferred pathway: {selectedPreferredStandard.title}
@@ -862,7 +926,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate }:
 
         <aside className="border-t border-[#102c3d]/[0.07] bg-white p-5 xl:border-l xl:border-t-0">
           <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">Current purpose</p>
-          <p className="mt-3 text-sm leading-6 text-[#102c3d]/62">{roleContent[role].purpose}</p>
+          <p className="mt-3 text-sm leading-6 text-[#102c3d]/62">{activePurpose}</p>
           {role === "Employee" && selectedEmployee ? (
             <div className="mt-5 rounded-2xl bg-[#f8fbfa] p-4 ring-1 ring-[#102c3d]/[0.055]">
               <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#0b6f63]">Employee context</p>
@@ -870,7 +934,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate }:
               <p className="mt-1 text-xs leading-5 text-[#102c3d]/56">{selectedEmployee.jobTitle || selectedRoleRecord?.title || "Role to confirm"} - {selectedEmployee.department} - {selectedEmployee.site || "Site to confirm"}</p>
               <p className="mt-2 text-xs leading-5 text-[#102c3d]/56">Manager: {selectedManagerName}</p>
               <p className="mt-2 text-xs leading-5 text-[#102c3d]/56">Discovery stage: {selectedDevelopmentProfile?.stage === "future_capability" ? "Future capability" : selectedDevelopmentProfile?.stage === "recommendation_ready" ? "Recommendation ready" : "Role context"}</p>
-              {selectedApplication ? <p className="mt-2 text-xs font-semibold leading-5 text-[#0b6f63]">Current application: {getApprenticeshipStandard(selectedApplication.apprenticeshipStandardId)?.title ?? selectedApplication.apprenticeshipStandardId}</p> : null}
+              {selectedApplication ? <p className="mt-2 text-xs font-semibold leading-5 text-[#0b6f63]">Current application: {getApprenticeshipStandard(selectedApplication.apprenticeshipStandardId)?.title ?? selectedApplication.apprenticeshipStandardId} - {selectedApplication.status}</p> : null}
             </div>
           ) : null}
           {employeePrioritySummary.length ? (
@@ -889,7 +953,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate }:
           <div className="mt-5 border-t border-[#102c3d]/[0.07] pt-5">
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#0b6f63]">Try asking</p>
             <div className="mt-3 grid gap-2">
-              {roleContent[role].prompts.map((prompt) => (
+              {activePrompts.map((prompt) => (
                 <button key={prompt} type="button" onClick={() => void sendMessage(prompt)} disabled={loading || (role === "Employee" && !selectedEmployee)} className="rounded-xl bg-[#f8fbfa] px-3.5 py-3 text-left text-xs font-semibold leading-5 text-[#102c3d]/66 ring-1 ring-[#102c3d]/[0.055] transition hover:bg-white hover:text-[#102c3d] hover:ring-[#159b8f]/20 disabled:opacity-50">
                   {prompt}
                 </button>
