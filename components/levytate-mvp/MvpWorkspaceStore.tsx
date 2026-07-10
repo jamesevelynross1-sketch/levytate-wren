@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { ProviderCatalogueRecord, ProviderProgramme, RequestStatus } from "@/lib/levytate/domain";
 import type { LevyTateWorkspaceBootstrap, LevyTateWorkspaceMeta, LevyTateWorkspaceMutation } from "@/lib/levytate/mvp/api";
+import { hasMvpPermission, mvpMutationPermission, permissionsForMvpRole, type MvpPermission } from "@/lib/levytate/mvp/rbac";
 import {
   applicationOwnerForStatus,
   buildApplicationHistoryEntry,
@@ -31,6 +32,7 @@ type MvpWorkspaceStore = {
   data: MvpWorkspaceData;
   meta: LevyTateWorkspaceMeta | null;
   hydrated: boolean;
+  can: (permission: MvpPermission) => boolean;
   saveProfile: (profile: MvpWorkspaceProfile) => void;
   saveEmployee: (employee: MvpEmployee) => void;
   archiveEmployee: (id: string) => void;
@@ -195,6 +197,7 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
             organisationName: "LevyTate employer workspace",
             userEmail: "",
             userRole: "Employer Admin",
+            permissions: permissionsForMvpRole("Employer Admin"),
             storageMode: "local_fallback",
             warnings: [payload.message ?? "LevyTate workspace persistence is unavailable. Local fallback is active."],
           });
@@ -208,6 +211,7 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
             organisationName: "LevyTate employer workspace",
             userEmail: "",
             userRole: "Employer Admin",
+            permissions: permissionsForMvpRole("Employer Admin"),
             storageMode: "local_fallback",
             warnings: ["LevyTate workspace persistence is unavailable. Local fallback is active."],
           });
@@ -263,6 +267,14 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
   }, [meta?.storageMode]);
 
   const commitMutation = useCallback((mutation: LevyTateWorkspaceMutation, alreadyOptimistic = false) => {
+    const permission = mvpMutationPermission[mutation.type];
+    const permissions = meta?.permissions ?? permissionsForMvpRole(meta?.userRole);
+
+    if (!hasMvpPermission(permissions, permission)) {
+      setMeta((current) => appendWarning(current, `Your role cannot perform ${mutation.type}.`));
+      return;
+    }
+
     if (!alreadyOptimistic) {
       setData((current) => {
         const next = applyMutationLocally(current, mutation);
@@ -272,7 +284,7 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
     }
 
     syncMutation(mutation);
-  }, [syncMutation]);
+  }, [syncMutation, meta]);
 
   useEffect(() => {
     if (!hydrated || attemptedMigration.current || meta?.storageMode !== "supabase" || !isWorkspaceEmpty(data) || typeof window === "undefined") {
@@ -290,6 +302,7 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
     data,
     meta,
     hydrated,
+    can: (permission) => hasMvpPermission(meta?.permissions ?? permissionsForMvpRole(meta?.userRole), permission),
     saveProfile: (profile) => commitMutation({ type: "saveProfile", profile }),
     saveEmployee: (employee) => commitMutation({ type: "saveEmployee", employee }),
     archiveEmployee: (id) => commitMutation({ type: "archiveEmployee", id }),

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie, readLevyTateBetaSession } from "@/lib/levytate/config/beta-access";
 import type { LevyTateWorkspaceMutation } from "@/lib/levytate/mvp/api";
 import {
+  LevyTateWorkspacePermissionError,
   LevyTateWorkspacePersistenceError,
   applyWorkspaceMutationForSession,
   getWorkspaceBootstrapForSession,
@@ -41,7 +42,11 @@ export async function POST(request: Request) {
     const workspace = await applyWorkspaceMutationForSession(session, mutation);
     return NextResponse.json({ ok: true, workspace });
   } catch (error) {
-    const status = error instanceof LevyTateWorkspacePersistenceError ? 503 : 500;
+    const status = error instanceof LevyTateWorkspacePermissionError
+      ? 403
+      : error instanceof LevyTateWorkspacePersistenceError
+        ? 503
+        : 500;
     return NextResponse.json(
       { message: getMessage(error) },
       { status },

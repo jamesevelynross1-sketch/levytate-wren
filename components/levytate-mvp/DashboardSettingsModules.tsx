@@ -26,7 +26,7 @@ const importanceOptions: Array<{ value: MvpEmployerPriorityImportance; copy: str
 ];
 
 export function DashboardModule({ onNavigate }: { onNavigate: (module: string) => void }) {
-  const { data } = useMvpWorkspace();
+  const { data, can } = useMvpWorkspace();
   const notifications = buildNotifications(data);
   const support = employeesNeedingSupport(data);
   const enrolments = upcomingEnrolments(data);
@@ -41,6 +41,16 @@ export function DashboardModule({ onNavigate }: { onNavigate: (module: string) =
         : { label: "Open LevyTate Copilot", target: "LevyTate Copilot" };
 
   if (!data.profile.priorities.length) {
+    if (!can("settings:write")) {
+      return (
+        <MvpPanel title="Workspace setup required" eyebrow="Protected workspace">
+          <p className="text-sm leading-6 text-[#102c3d]/58">
+            Employer priorities have not been configured yet. A workspace admin needs to complete setup before role-specific operating signals appear.
+          </p>
+        </MvpPanel>
+      );
+    }
+
     return <EmployerPrioritiesSetup />;
   }
 

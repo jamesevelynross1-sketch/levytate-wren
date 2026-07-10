@@ -12,6 +12,7 @@ import type {
   MvpWorkspaceData,
   MvpWorkspaceProfile,
 } from "@/lib/levytate/mvp/workspace";
+import type { MvpPermission, MvpUserRole } from "@/lib/levytate/mvp/rbac";
 
 export type MvpWorkspaceStorageMode = "supabase" | "local_fallback";
 
@@ -19,7 +20,8 @@ export type LevyTateWorkspaceMeta = {
   organisationId: string;
   organisationName: string;
   userEmail: string;
-  userRole: "Platform Admin" | "Employer Admin" | "Apprenticeship Lead" | "Line Manager" | "Employee";
+  userRole: MvpUserRole;
+  permissions?: MvpPermission[];
   storageMode: MvpWorkspaceStorageMode;
   warnings: string[];
 };

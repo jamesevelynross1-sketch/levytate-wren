@@ -33,6 +33,11 @@ import {
   type MvpWorkspaceProfile,
 } from "@/lib/levytate/mvp/workspace";
 import {
+  canRunMvpMutation,
+  normaliseMvpUserRole,
+  permissionsForMvpRole,
+} from "@/lib/levytate/mvp/rbac";
+import {
   getLevyTateSupabaseConfig,
   supabaseDelete,
   supabaseInsert,
@@ -311,6 +316,13 @@ export class LevyTateWorkspacePersistenceError extends Error {
   }
 }
 
+export class LevyTateWorkspacePermissionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "LevyTateWorkspacePermissionError";
+  }
+}
+
 export async function getWorkspaceBootstrapForSession(session: LevyTateBetaSession): Promise<LevyTateWorkspaceBootstrap> {
   const config = getLevyTateSupabaseConfig();
 
@@ -333,7 +345,8 @@ export async function getWorkspaceBootstrapForSession(session: LevyTateBetaSessi
         organisationId: context.organisation.id,
         organisationName: context.organisation.name,
         userEmail: session.email,
-        userRole: context.user.role,
+        userRole: normaliseMvpUserRole(context.user.role),
+        permissions: permissionsForMvpRole(context.user.role),
         storageMode: "supabase",
         warnings: context.warnings,
       },
@@ -360,6 +373,7 @@ export async function applyWorkspaceMutationForSession(
 
   const context = await ensureWorkspaceContext(session);
   const organisationId = context.organisation.id;
+  assertMutationAllowed(context, mutation);
 
   switch (mutation.type) {
     case "saveProfile":
@@ -452,14 +466,24 @@ export async function applyWorkspaceMutationForSession(
 }
 
 function buildFallbackMeta(session: LevyTateBetaSession, warnings: string[]): LevyTateWorkspaceMeta {
+  const userRole = session.accessLevel === "beta_admin" ? "Platform Admin" : "Employer Admin";
   return {
     organisationId: "local-fallback",
     organisationName: session.accessLevel === "beta_admin" ? "LevyTate Internal" : "LevyTate employer workspace",
     userEmail: session.email,
-    userRole: session.accessLevel === "beta_admin" ? "Platform Admin" : "Employer Admin",
+    userRole,
+    permissions: permissionsForMvpRole(userRole),
     storageMode: "local_fallback",
     warnings,
   };
+}
+
+function assertMutationAllowed(context: WorkspaceContext, mutation: LevyTateWorkspaceMutation) {
+  if (canRunMvpMutation(context.user.role, mutation.type)) return;
+
+  throw new LevyTateWorkspacePermissionError(
+    `${normaliseMvpUserRole(context.user.role)} cannot perform ${mutation.type}.`,
+  );
 }
 
 async function ensureWorkspaceContext(session: LevyTateBetaSession): Promise<WorkspaceContext> {
@@ -491,11 +515,12 @@ async function ensureWorkspaceContext(session: LevyTateBetaSession): Promise<Wor
     }),
   );
 
+  const userRole = resolveSessionWorkspaceRole(session, seed.userRole, existingUser?.role);
   const nextUser: UserRow = existingUser
     ? {
         ...existingUser,
         organisation_id: organisation.id,
-        role: seed.userRole,
+        role: userRole,
         access_level: session.accessLevel,
         last_login_at: now,
         updated_at: now,
@@ -504,7 +529,7 @@ async function ensureWorkspaceContext(session: LevyTateBetaSession): Promise<Wor
         id: randomUUID(),
         organisation_id: organisation.id,
         email: session.email,
-        role: seed.userRole,
+        role: userRole,
         access_level: session.accessLevel,
         auth_subject: null,
         last_login_at: now,
@@ -535,6 +560,27 @@ async function ensureWorkspaceContext(session: LevyTateBetaSession): Promise<Wor
     user: savedUser,
     warnings: [],
   };
+}
+
+function resolveSessionWorkspaceRole(
+  session: LevyTateBetaSession,
+  seedRole: UserRow["role"],
+  existingRole?: string | null,
+): UserRow["role"] {
+  if (session.accessLevel === "beta_admin") {
+    return "Platform Admin";
+  }
+
+  if (!existingRole) {
+    return seedRole;
+  }
+
+  const normalisedExistingRole = normaliseMvpUserRole(existingRole);
+  if (normalisedExistingRole !== "Platform Admin") {
+    return normalisedExistingRole;
+  }
+
+  return seedRole;
 }
 
 async function deriveOrganisationSeed(session: LevyTateBetaSession) {

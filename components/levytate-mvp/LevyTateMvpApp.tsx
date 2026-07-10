@@ -12,7 +12,7 @@ import {
   UserRound,
   Users,
 } from "lucide-react";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { LevyTateLogo } from "@/components/levytate-demo/PlatformShell";
 import { ApplicationsModule } from "@/components/levytate-mvp/ApplicationsModule";
 import { AskLevyTateAiWorkspace } from "@/components/levytate-mvp/AskLevyTateAiWorkspace";
@@ -28,6 +28,7 @@ import { ProvidersModule } from "@/components/levytate-mvp/ProvidersModule";
 import { ReportsModule } from "@/components/levytate-mvp/ReportsModule";
 import { RolesModule } from "@/components/levytate-mvp/RolesModule";
 import type { LevyTateWorkspaceBootstrap } from "@/lib/levytate/mvp/api";
+import { hasMvpPermission, permissionsForMvpRole, type MvpPermission } from "@/lib/levytate/mvp/rbac";
 import { buildNotifications } from "@/lib/levytate/mvp/workspace-insights";
 
 const modules = [
@@ -44,6 +45,33 @@ type ModuleName = (typeof modules)[number]["name"];
 type PeopleView = "Employees" | "Roles" | "Applications" | "Enrolments";
 type ProviderView = "Programmes" | "Relationships";
 type SettingsView = "Workspace" | "Early Access";
+
+const modulePermissions = {
+  Home: "workspace:read",
+  People: "employees:read",
+  Providers: "providers:read",
+  Copilot: "copilot:use",
+  Knowledge: "knowledge:read",
+  Reports: "reports:read",
+  Settings: "settings:read",
+} as const satisfies Record<ModuleName, MvpPermission>;
+
+const peopleViewPermissions = {
+  Employees: "employees:read",
+  Roles: "roles:read",
+  Applications: "applications:read",
+  Enrolments: "enrolments:read",
+} as const satisfies Record<PeopleView, MvpPermission>;
+
+const providerViewPermissions = {
+  Programmes: "providers:read",
+  Relationships: "providerRelationships:read",
+} as const satisfies Record<ProviderView, MvpPermission>;
+
+const settingsViewPermissions = {
+  Workspace: "settings:read",
+  "Early Access": "earlyAccess:manage",
+} as const satisfies Record<SettingsView, MvpPermission>;
 
 const moduleCopy: Record<ModuleName, string> = {
   Home: "A short daily briefing showing what needs attention now.",
@@ -68,11 +96,37 @@ function MvpAppShell() {
   const [aiEmployeeId, setAiEmployeeId] = useState<string | null>(null);
 
   const notifications = useMemo(() => buildNotifications(data), [data]);
+  const permissions = meta?.permissions ?? permissionsForMvpRole(meta?.userRole);
+  const can = (permission: MvpPermission) => hasMvpPermission(permissions, permission);
+  const availableModules = modules.filter((module) => can(modulePermissions[module.name]));
+  const peopleItems = (["Employees", "Roles", "Applications", "Enrolments"] as PeopleView[]).filter((item) => can(peopleViewPermissions[item]));
+  const providerItems = (["Programmes", "Relationships"] as ProviderView[]).filter((item) => can(providerViewPermissions[item]));
+  const settingsItems = (["Workspace", "Early Access"] as SettingsView[]).filter((item) => can(settingsViewPermissions[item]));
   const moduleBadges = useMemo(() => ({
     People: notifications.filter((item) => item.module === "Applications" || item.module === "Enrolments").length,
     Providers: notifications.filter((item) => item.module === "Provider Relationships").length,
     Reports: notifications.length,
   }), [notifications]);
+
+  useEffect(() => {
+    if (availableModules.some((module) => module.name === activeModule)) return;
+    setActiveModule(availableModules[0]?.name ?? "Home");
+  }, [activeModule, availableModules]);
+
+  useEffect(() => {
+    if (peopleItems.includes(peopleView)) return;
+    setPeopleView(peopleItems[0] ?? "Employees");
+  }, [peopleItems, peopleView]);
+
+  useEffect(() => {
+    if (providerItems.includes(providerView)) return;
+    setProviderView(providerItems[0] ?? "Programmes");
+  }, [providerItems, providerView]);
+
+  useEffect(() => {
+    if (settingsItems.includes(settingsView)) return;
+    setSettingsView(settingsItems[0] ?? "Workspace");
+  }, [settingsItems, settingsView]);
 
   async function logout() {
     await fetch("/api/levytate-beta-logout", { method: "POST" });
@@ -80,6 +134,7 @@ function MvpAppShell() {
   }
 
   function openModule(module: ModuleName) {
+    if (!availableModules.some((item) => item.name === module)) return;
     setActiveModule(module);
   }
 
@@ -89,16 +144,19 @@ function MvpAppShell() {
       return;
     }
     if (target === "Employees" || target === "Roles" || target === "Applications" || target === "Enrolments") {
+      if (!peopleItems.includes(target as PeopleView)) return;
       setPeopleView(target as PeopleView);
       openModule("People");
       return;
     }
     if (target === "Provider Partners") {
+      if (!providerItems.includes("Programmes")) return;
       setProviderView("Programmes");
       openModule("Providers");
       return;
     }
     if (target === "Provider Relationships") {
+      if (!providerItems.includes("Relationships")) return;
       setProviderView("Relationships");
       openModule("Providers");
       return;
@@ -108,11 +166,13 @@ function MvpAppShell() {
       return;
     }
     if (target === "Early Access") {
+      if (!settingsItems.includes("Early Access")) return;
       setSettingsView("Early Access");
       openModule("Settings");
       return;
     }
     if (target === "Settings") {
+      if (!settingsItems.includes("Workspace")) return;
       setSettingsView("Workspace");
       openModule("Settings");
       return;
@@ -145,7 +205,7 @@ function MvpAppShell() {
           <div className="flex w-full min-w-0 items-center gap-2 sm:gap-3 lg:w-auto">
             <div className="min-w-0 flex-1 lg:hidden">
               <select value={activeModule} onChange={(event) => openModule(event.target.value as ModuleName)} className="h-11 w-full rounded-xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 text-sm font-semibold text-[#102c3d] shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
-                {modules.map((module) => <option key={module.name}>{module.name}</option>)}
+                {availableModules.map((module) => <option key={module.name}>{module.name}</option>)}
               </select>
             </div>
             <span className="hidden rounded-full border border-[#159b8f]/10 bg-[#edf7f3] px-3.5 py-2 text-xs font-semibold text-[#0b6f63] sm:inline-flex">
@@ -169,7 +229,7 @@ function MvpAppShell() {
 
             <div className="min-h-0 flex-1 overflow-y-auto pr-1">
               <nav className="grid gap-1" aria-label="MVP navigation">
-                {modules.map(({ name, icon: Icon }) => {
+                {availableModules.map(({ name, icon: Icon }) => {
                   const active = activeModule === name;
                   const badge = moduleBadges[name as keyof typeof moduleBadges];
                   return (
@@ -194,7 +254,7 @@ function MvpAppShell() {
                     <UserRound size={17} strokeWidth={1.8} aria-hidden="true" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">Platform admin</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">Current role</p>
                     <p className="mt-1 truncate text-sm font-semibold text-[#102c3d]">{meta?.userRole ?? "Workspace user"}</p>
                     <p className="mt-1 text-xs leading-5 text-[#102c3d]/52">People, providers and workspace setup.</p>
                   </div>
@@ -229,7 +289,7 @@ function MvpAppShell() {
             {activeModule === "Copilot" ? <AskLevyTateAiWorkspace initialEmployeeId={aiEmployeeId} onNavigate={navigateTo} /> : null}
             {activeModule === "Knowledge" ? <GuidanceCentreModule /> : null}
             {activeModule === "People" ? (
-              <ModuleStackNav items={["Employees", "Roles", "Applications", "Enrolments"]} active={peopleView} onSelect={(item) => setPeopleView(item as PeopleView)}>
+              <ModuleStackNav items={peopleItems} active={peopleView} onSelect={(item) => setPeopleView(item as PeopleView)}>
                 {peopleView === "Employees" ? <EmployeesModule onStartDiscovery={(employeeId) => { setAiEmployeeId(employeeId); openModule("Copilot"); }} /> : null}
                 {peopleView === "Roles" ? <RolesModule /> : null}
                 {peopleView === "Applications" ? <ApplicationsModule /> : null}
@@ -237,14 +297,14 @@ function MvpAppShell() {
               </ModuleStackNav>
             ) : null}
             {activeModule === "Providers" ? (
-              <ModuleStackNav items={["Programmes", "Relationships"]} active={providerView} onSelect={(item) => setProviderView(item as ProviderView)}>
+              <ModuleStackNav items={providerItems} active={providerView} onSelect={(item) => setProviderView(item as ProviderView)}>
                 {providerView === "Programmes" ? <ProvidersModule /> : null}
                 {providerView === "Relationships" ? <ProviderMatchingModule /> : null}
               </ModuleStackNav>
             ) : null}
             {activeModule === "Reports" ? <ReportsModule /> : null}
             {activeModule === "Settings" ? (
-              <ModuleStackNav items={["Workspace", "Early Access"]} active={settingsView} onSelect={(item) => setSettingsView(item as SettingsView)}>
+              <ModuleStackNav items={settingsItems} active={settingsView} onSelect={(item) => setSettingsView(item as SettingsView)}>
                 {settingsView === "Workspace" ? <SettingsModule /> : null}
                 {settingsView === "Early Access" ? <EarlyAccessModule /> : null}
               </ModuleStackNav>
