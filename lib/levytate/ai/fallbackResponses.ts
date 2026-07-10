@@ -58,7 +58,7 @@ function employeeCurrentStatus(request: LevyTateAiRequest) {
 }
 
 function employeeAction(label: string, type: LevyTateAiAction["type"], target?: string): LevyTateAiAction {
-  return { label, type, target, requiresConfirmation: type === "start_application" };
+  return { label, type, target, requiresConfirmation: false };
 }
 
 function employeeActionsForState(request: LevyTateAiRequest): LevyTateAiAction[] {
@@ -109,14 +109,185 @@ function employeeActionsForState(request: LevyTateAiRequest): LevyTateAiAction[]
   return [employeeAction("Track application", "open_my_applications", "My Application")];
 }
 
-function employeeApplicationWarningForState(request: LevyTateAiRequest) {
+function employeeApplicationWarningForState(request: LevyTateAiRequest, text: string) {
   const status = employeeCurrentStatus(request);
   if (!status) return null;
+  const attemptsNewApplication = /\b(start|apply|submit|create|new|second|another)\b.{0,40}\b(application|apprenticeship|request)\b|\b(application|apprenticeship|request)\b.{0,40}\b(start|apply|submit|create|new|second|another)\b/.test(text);
+  if (!attemptsNewApplication) return null;
   if (status === "Draft") return "You already have a draft application. Continue that draft rather than starting a second one.";
   if (status === "More information requested") return "Your current application is reopened only for the information your manager requested.";
   if (managerReviewStatuses.has(status)) return "Your current application is submitted and locked while your manager reviews it.";
   if (leadReviewStatuses.has(status)) return "Your current application is already in the final review stage.";
   if (status === "Approved for Enrolment") return "Your current application is approved for enrolment, so the next step is enrolment preparation.";
+  return null;
+}
+
+function employeePlatformTaskIntent(text: string) {
+  if (/\b(new conversation|start over|reset conversation|fresh conversation)\b/.test(text)) return "new_conversation";
+  if (/\b(show|open|view|take me to|go to)\b.{0,35}\b(current application|my application|submitted answers|submitted application|application)\b|\b(track|status)\b.{0,25}\b(application|request)\b/.test(text)) return "open_application";
+  if (/\b(show|open|view|take me to|go to)\b.{0,35}\b(programme|program|pathway|recommendation)\b/.test(text)) return "open_programme";
+  if (/\b(start|apply|submit|create)\b.{0,35}\b(application|apprenticeship|request)\b/.test(text)) return "start_application";
+  if (/\b(continue|resume|open)\b.{0,35}\b(draft|application)\b|\b(edit|update)\b.{0,35}\b(draft|application)\b/.test(text)) return "continue_application";
+  if (/\b(provide|submit|answer|respond|add)\b.{0,45}\b(requested information|information.*manager|manager requested|more information)\b/.test(text)) return "provide_information";
+  if (/\b(view|open|show)\b.{0,35}\b(enrolment|enrollment|enrolment details|provider details)\b/.test(text)) return "view_enrolment";
+  return null;
+}
+
+function employeeActionForPlatformTask(request: LevyTateAiRequest, type: LevyTateAiAction["type"], label: string, target: string) {
+  return [employeeAction(label, type, target)];
+}
+
+function employeePlatformTaskMessage(request: LevyTateAiRequest, text: string) {
+  const intent = employeePlatformTaskIntent(text);
+  if (!intent) return null;
+
+  const application = employeeContextApplication(request);
+  const status = application?.status ?? null;
+  const manager = employeeManagerName(request);
+  const programme = employeeProgrammeTitle(request);
+  const owner = employeeOwnerName(request);
+
+  if (intent === "new_conversation") {
+    if (!application) {
+      return {
+        message: `Starting a fresh conversation. You have not started an application yet, and ${programme} is the current recommendation I can help explain or turn into a draft.`,
+        actions: employeeActionsForState(request),
+        quickReplies: employeeQuickRepliesForState(request),
+      };
+    }
+    return {
+      message: `Starting a fresh conversation. Your ${programme} application is currently ${status}${managerReviewStatuses.has(status ?? "") ? ` with ${manager} for review` : ` with ${owner}`}. I can show the application, explain the status or help you prepare for the next step.`,
+      actions: employeeActionsForState(request),
+      quickReplies: employeeQuickRepliesForState(request),
+    };
+  }
+
+  if (intent === "open_application") {
+    if (!application) {
+      return {
+        message: "You do not have a current application to open yet. I can help you start one from your recommended programme.",
+        actions: employeeActionsForState(request),
+        quickReplies: [],
+      };
+    }
+    const label = managerReviewStatuses.has(status ?? "") ? "View submitted application" : status === "Draft" ? "Continue application" : "Open my application";
+    return {
+      message: managerReviewStatuses.has(status ?? "")
+        ? `Opening your submitted application. It is currently with ${manager} for manager review.`
+        : `Opening your current application. Its status is ${status}.`,
+      actions: employeeActionForPlatformTask(request, "open_my_applications", label, "My Application"),
+      quickReplies: [],
+      autoExecute: true,
+    };
+  }
+
+  if (intent === "open_programme") {
+    return {
+      message: `Opening your programme: ${programme}.`,
+      actions: employeeActionForPlatformTask(request, "open_pathway", "Open my programme", "My Programme"),
+      quickReplies: [],
+      autoExecute: true,
+    };
+  }
+
+  if (intent === "start_application") {
+    if (!application) {
+      return {
+        message: `Opening the application workflow for ${programme}.`,
+        actions: employeeActionForPlatformTask(request, "start_application", "Start application", "My Application"),
+        quickReplies: [],
+      };
+    }
+    if (status === "Draft") {
+      return {
+        message: "You already have a draft application. Opening that draft so you can continue it.",
+        actions: employeeActionForPlatformTask(request, "draft_application_reason", "Continue application", "My Application"),
+        quickReplies: [],
+        autoExecute: true,
+      };
+    }
+    if (status === "More information requested") {
+      return {
+        message: `${manager} has requested more information. Opening the reopened application section.`,
+        actions: employeeActionForPlatformTask(request, "draft_application_reason", "Provide requested information", "My Application"),
+        quickReplies: [],
+        autoExecute: true,
+      };
+    }
+    return {
+      message: `You already have an active application for ${programme}. It is currently ${status}, so you cannot start a second application right now.`,
+      actions: employeeActionForPlatformTask(request, "open_my_applications", "Open my application", "My Application"),
+      quickReplies: [],
+      autoExecute: true,
+    };
+  }
+
+  if (intent === "continue_application") {
+    if (status === "Draft") {
+      return {
+        message: "Opening your editable draft application.",
+        actions: employeeActionForPlatformTask(request, "draft_application_reason", "Continue application", "My Application"),
+        quickReplies: [],
+        autoExecute: true,
+      };
+    }
+    if (status === "More information requested") {
+      return {
+        message: `Opening your application so you can provide the information ${manager} requested.`,
+        actions: employeeActionForPlatformTask(request, "draft_application_reason", "Provide requested information", "My Application"),
+        quickReplies: [],
+        autoExecute: true,
+      };
+    }
+    if (application) {
+      return {
+        message: `Your application is already submitted and cannot be edited at this stage. It is currently ${status} with ${owner}.`,
+        actions: employeeActionForPlatformTask(request, "open_my_applications", "View submitted application", "My Application"),
+        quickReplies: [],
+        autoExecute: true,
+      };
+    }
+    return {
+      message: "You do not have a draft to continue yet. I can help you start an application from your recommended programme.",
+      actions: employeeActionsForState(request),
+      quickReplies: [],
+    };
+  }
+
+  if (intent === "provide_information") {
+    if (status === "More information requested") {
+      return {
+        message: `Opening your application so you can respond to ${manager}'s request for more information.`,
+        actions: employeeActionForPlatformTask(request, "draft_application_reason", "Provide requested information", "My Application"),
+        quickReplies: [],
+        autoExecute: true,
+      };
+    }
+    return {
+      message: application
+        ? `There is no current request for more information. Your application is ${status}.`
+        : "There is no application with a request for more information yet.",
+      actions: application ? employeeActionForPlatformTask(request, "open_my_applications", "Open my application", "My Application") : employeeActionsForState(request),
+      quickReplies: [],
+    };
+  }
+
+  if (intent === "view_enrolment") {
+    if (status === "Approved for Enrolment") {
+      return {
+        message: `Opening your enrolment details for ${programme}.`,
+        actions: employeeActionForPlatformTask(request, "open_my_applications", "View enrolment details", "My Application"),
+        quickReplies: [],
+        autoExecute: true,
+      };
+    }
+    return {
+      message: application ? `Your application is not at enrolment yet. Current status: ${status}.` : "You do not have an application at enrolment stage yet.",
+      actions: application ? employeeActionForPlatformTask(request, "open_my_applications", "Track application", "My Application") : employeeActionsForState(request),
+      quickReplies: [],
+    };
+  }
+
   return null;
 }
 
@@ -147,7 +318,15 @@ function employeeDirectMessage(request: LevyTateAiRequest) {
   const programme = employeeProgrammeTitle(request);
 
   if (/\b(another employee|someone else|other employee|nadia|rachel|show me .*employee)\b/.test(text)) {
-    return `I can only help with your own apprenticeship journey. Your current ${application ? `application is ${status} with ${owner}` : `recommended programme is ${programme}`}. I can show your application, explain its status or help you prepare for the next step.`;
+    return {
+      message: `I can only help with your own apprenticeship journey. Your current ${application ? `application is ${status} with ${owner}` : `recommended programme is ${programme}`}. I can show your application or explain its status.`,
+      actions: [
+        employeeAction("Open my application", "open_my_applications", "My Application"),
+        employeeAction("Explain current status", "ask_follow_up", status ?? "current status"),
+      ],
+      quickReplies: [],
+      suppressApplicationWarning: true,
+    };
   }
 
   if (/\b(explain|why).{0,25}(recommendation|programme|pathway|route)\b/.test(text)) {
@@ -159,6 +338,9 @@ function employeeDirectMessage(request: LevyTateAiRequest) {
     if (employeeEditableStatuses.has(status ?? "")) return `You can edit the current application because it is ${status}. When you submit it, the answers will lock for review.`;
     return `You cannot edit this application because it has already been submitted. The submitted version is locked to protect the review record, and the next action sits with ${owner}. Editing becomes available again only if ${manager} requests more information.`;
   }
+
+  const platformTask = employeePlatformTaskMessage(request, text);
+  if (platformTask) return platformTask;
 
   if (/\bwhat happens next\b|\bnext action\b|\bwho owns\b|\bowner\b/.test(text)) {
     if (!application) return `You own the next step. You can start an application for ${programme}, save it as a draft, or ask me to help draft the answers first.`;
@@ -209,13 +391,15 @@ function employeeWorkspaceFallback(request: LevyTateAiRequest): LevyTateAiRespon
   const text = request.userMessage.toLowerCase();
   const direct = employeeDirectMessage(request) ?? (!employeeContextApplication(request) ? employeeNoApplicationMessage(request, text) : null);
   if (!direct) return null;
-  const actions = employeeActionsForState(request);
+  const directMessage = typeof direct === "string" ? direct : direct.message;
+  const actions = typeof direct === "string" ? employeeActionsForState(request) : direct.actions;
+  const isPlatformTask = typeof direct !== "string";
   const status = employeeCurrentStatus(request);
   return {
     source: "mock",
-    assistantMessage: direct,
+    assistantMessage: directMessage,
     followUpQuestion: null,
-    quickReplies: employeeQuickRepliesForState(request),
+    quickReplies: typeof direct === "string" ? employeeQuickRepliesForState(request) : direct.quickReplies,
     shouldShowActions: true,
     shouldShowPathways: false,
     recommendedActions: actions,
@@ -230,8 +414,12 @@ function employeeWorkspaceFallback(request: LevyTateAiRequest): LevyTateAiRespon
     applicationDraft: null,
     providerMatchDraft: null,
     nextStep: actions[0]?.type ?? null,
-    safetyNotes: ["Employee Copilot response was grounded in the server-scoped employee record and current application state."],
-    applicationWarning: employeeApplicationWarningForState(request),
+    safetyNotes: [
+      "Employee Copilot response was grounded in the server-scoped employee record and current application state.",
+      ...(isPlatformTask ? ["Employee Copilot platform task intent was resolved deterministically."] : []),
+      ...(typeof direct !== "string" && "autoExecute" in direct && direct.autoExecute ? ["Employee Copilot platform task action may be executed immediately by the client."] : []),
+    ],
+    applicationWarning: typeof direct !== "string" && "suppressApplicationWarning" in direct && direct.suppressApplicationWarning ? null : employeeApplicationWarningForState(request, text),
     managerMessageDraft: `Hi ${employeeManagerName(request)}, I wanted to discuss my apprenticeship application and make sure I understand the next step. Could we review the programme fit, workload and support needed?`,
   };
 }

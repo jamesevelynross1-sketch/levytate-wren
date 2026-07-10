@@ -80,6 +80,8 @@ function normaliseActions(role: LevyTateRole, actions: LevyTateAiAction[]) {
 export function enforceLevyTateAiActions(request: LevyTateAiRequest, response: LevyTateAiResponse): LevyTateAiResponse {
   let actions = normaliseActions(request.role, response.recommendedActions);
   const activeApplication = request.currentApplication ?? request.contextData?.activeApplication ?? null;
+  const isEmployeePlatformTask = request.role === "Employee"
+    && response.safetyNotes.some((note) => note.includes("platform task intent"));
   const hasEmployeeProgrammeContext = Boolean(
     request.role === "Employee"
     && (
@@ -102,7 +104,7 @@ export function enforceLevyTateAiActions(request: LevyTateAiRequest, response: L
     if (!isEditable) {
       actions = actions.filter((action) => action.type !== "draft_application_reason");
     }
-    if (!actions.some((action) => action.type === "open_my_applications")) {
+    if (!isEmployeePlatformTask && !actions.some((action) => action.type === "open_my_applications")) {
       actions = [
         { label: isEditable ? "Continue application" : "View current application", type: "open_my_applications" as const, target: "My Application", requiresConfirmation: false },
         ...actions,
@@ -120,8 +122,6 @@ export function enforceLevyTateAiActions(request: LevyTateAiRequest, response: L
     applicationPrefill: activeApplication ? null : response.applicationPrefill,
     applicationDraft: activeApplication ? null : (response.applicationDraft ?? response.applicationPrefill),
     nextStep: activeApplication && request.role === "Employee" ? "open_my_applications" : response.nextStep,
-    applicationWarning: activeApplication && request.role === "Employee" && employeeActiveStatuses.has(activeApplication.status)
-      ? response.applicationWarning ?? "You already have an active apprenticeship application in progress. You can track this in My Applications."
-      : response.applicationWarning,
+    applicationWarning: response.applicationWarning,
   };
 }

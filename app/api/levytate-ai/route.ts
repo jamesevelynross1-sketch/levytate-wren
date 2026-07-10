@@ -137,7 +137,8 @@ function finaliseResponse(request: LevyTateAiRequest, response: LevyTateAiRespon
   const enforced = enforceLevyTateAiActions(request, applyLevyTateAiSafety(request, withProfile));
   const shouldShowActions = Boolean(enforced.applicationWarning) || enforced.shouldShowActions !== false;
   const shouldShowPathways = enforced.recommendationResult?.shouldRevealRecommendations === true;
-  const progressiveFollowUp = progressiveEmployeeFollowUp(request);
+  const deterministicEmployeeResponse = isDeterministicEmployeeStateResponse(request, enforced);
+  const progressiveFollowUp = deterministicEmployeeResponse ? null : progressiveEmployeeFollowUp(request);
 
   return {
     ...enforced,

@@ -398,6 +398,8 @@ async function main() {
 
   const organisation = await ensureOrganisation(config, betaOrganisation);
   const isolation = await ensureOrganisation(config, isolationOrganisation);
+  await resetValidationState(config, organisation.id, employees.map((employee) => employee.id));
+  await resetValidationState(config, isolation.id, isolationEmployees.map((employee) => employee.id));
 
   await upsert(config, "levytate_early_access_requests", users.map((user) => earlyAccessRow(user)), "email");
   await upsert(config, "levytate_early_access_requests", isolationUsers.map((user) => earlyAccessRow(user, isolationOrganisation.name)), "email");
@@ -568,6 +570,21 @@ async function ensureOrganisation(config, organisationSeed) {
   return inserted[0] ?? body;
 }
 
+async function resetValidationState(config, organisationId, employeeIds) {
+  if (!employeeIds.length) return;
+  const applicationsToRemove = await selectMany(config, "levytate_applications", new URLSearchParams({
+    select: "id",
+    organisation_id: `eq.${organisationId}`,
+    employee_id: `in.(${employeeIds.join(",")})`,
+  }));
+  const applicationIds = applicationsToRemove.map((row) => row.id).filter(Boolean);
+  for (const applicationId of applicationIds) {
+    await deleteRows(config, "levytate_application_history", `organisation_id=eq.${organisationId}&application_id=eq.${applicationId}`);
+    await deleteRows(config, "levytate_enrolments", `organisation_id=eq.${organisationId}&application_id=eq.${applicationId}`);
+    await deleteRows(config, "levytate_applications", `organisation_id=eq.${organisationId}&id=eq.${applicationId}`);
+  }
+}
+
 async function upsert(config, table, rows, onConflict, prefer = "resolution=merge-duplicates,return=minimal") {
   if (!rows.length) return [];
   const response = await supabaseFetch(config, `${table}?on_conflict=${encodeURIComponent(onConflict)}`, {
@@ -591,6 +608,24 @@ async function patch(config, table, query, body) {
   if (!response.ok) {
     throw new Error(`${table} patch failed: ${await response.text()}`);
   }
+}
+
+async function deleteRows(config, table, query) {
+  const response = await supabaseFetch(config, `${table}?${query}`, {
+    method: "DELETE",
+    headers: { Prefer: "return=minimal" },
+  });
+  if (!response.ok) {
+    throw new Error(`${table} delete failed: ${await response.text()}`);
+  }
+}
+
+async function selectMany(config, table, query) {
+  const response = await supabaseFetch(config, `${table}?${query.toString()}`);
+  if (!response.ok) {
+    throw new Error(`${table} select failed: ${await response.text()}`);
+  }
+  return response.json();
 }
 
 async function selectOne(config, table, query) {

@@ -146,7 +146,9 @@ function responseActions(response: LevyTateAiResponse) {
 }
 
 function targetForCopilotAction(action: LevyTateAiAction) {
-  if (action.type === "open_my_applications") return "Applications";
+  if (action.type === "open_my_applications") return action.target === "My Application" ? "My Application" : "Applications";
+  if (action.type === "start_application" || action.type === "draft_application_reason") return "My Application";
+  if (action.type === "open_pathway") return action.target === "My Programme" || /programme|pathway/i.test(action.label) ? "My Programme" : null;
   if (action.type === "open_review_queue") return "Applications";
   if (action.type === "open_final_approvals") return "Applications";
   if (action.type === "open_team_development") return "Employees";
@@ -156,6 +158,16 @@ function targetForCopilotAction(action: LevyTateAiAction) {
   if (action.type === "open_provider_relationships") return "Provider Relationships";
   if (action.type === "request_provider_matching") return "Provider Relationships";
   return null;
+}
+
+function isNewConversationRequest(value: string) {
+  return /\b(new conversation|start over|reset conversation|fresh conversation)\b/i.test(value);
+}
+
+function shouldAutoExecuteAction(response: LevyTateAiResponse, action: LevyTateAiAction | undefined) {
+  if (!action || action.requiresConfirmation) return false;
+  if (!targetForCopilotAction(action)) return false;
+  return response.safetyNotes.some((note) => note.includes("platform task action may be executed immediately"));
 }
 
 function toChatMessages(history: LevyTateConversationMessage[], fallback: string): ChatMessage[] {
@@ -438,7 +450,7 @@ function buildWorkspaceEmployeeResolution(
     roleRecord,
     developmentProfile,
     application,
-    managerName: manager?.name ?? "Line manager to confirm",
+    managerName: employee.managerName || manager?.name || "Line manager to confirm",
   };
 }
 
@@ -588,8 +600,13 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate }:
   }
 
   function resetConversation() {
+    const programme = selectedApplication
+      ? getApprenticeshipStandard(selectedApplication.apprenticeshipStandardId)?.title ?? selectedApplication.apprenticeshipStandardId
+      : selectedPreferredStandard?.title ?? "your recommended programme";
     const fallback = role === "Employee" && selectedEmployee
-      ? `Hi ${firstName(selectedEmployee.name)}. I can use your programme, application status and manager context to help with the next step.`
+      ? selectedApplication
+        ? `Your ${programme} application is currently ${selectedApplication.status}${selectedApplication.currentOwner === "Line Manager" ? ` with ${selectedManagerName} for review` : ""}. I can explain the status, show your submitted answers or help you prepare for the next step.`
+        : `Hi ${firstName(selectedEmployee.name)}. ${programme} is your current recommendation. I can explain it, help draft an application or open the programme view.`
       : roleContent[role].welcome;
     setConversations((current) => ({ ...current, [role]: [{ id: `reset-${role}-${messageId()}`, role: "assistant", content: fallback }] }));
     setInput("");
@@ -606,6 +623,11 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate }:
     const activeRole = role;
     if (activeRole === "Employee" && !selectedEmployee) {
       setError("Select an employee before starting the guided recommendation conversation.");
+      return;
+    }
+
+    if (activeRole === "Employee" && isNewConversationRequest(trimmed)) {
+      resetConversation();
       return;
     }
 
@@ -737,6 +759,11 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate }:
       setProfiles((current) => ({ ...current, [activeRole]: result.conversationProfile ?? current[activeRole] ?? null }));
       setRecommendationResults((current) => ({ ...current, [activeRole]: result.recommendationResult ?? current[activeRole] ?? null }));
 
+      const firstAction = responseActions(result)[0];
+      if (shouldAutoExecuteAction(result, firstAction)) {
+        executeCopilotAction(firstAction, true);
+      }
+
       if (shouldUpdateSelectedEmployeeProfile && selectedEmployee && developmentProfile) {
         const existing = selectedDevelopmentProfile ?? createEmployeeDevelopmentProfile(selectedEmployee.id);
         saveEmployeeDevelopmentProfile({
@@ -762,7 +789,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate }:
     void sendMessage(nextMessage);
   }
 
-  function chooseAction(action: LevyTateAiAction) {
+  function executeCopilotAction(action: LevyTateAiAction, automatic = false) {
     setActionStatus("");
     if (action.requiresConfirmation) {
       setPendingAction(action);
@@ -774,8 +801,12 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate }:
     const navigationTarget = targetForCopilotAction(action);
     if (navigationTarget && onNavigate) {
       onNavigate(navigationTarget);
-      setActionStatus(`Opened ${navigationTarget}.`);
+      setActionStatus(automatic ? `Opened ${navigationTarget}.` : `Opened ${navigationTarget}.`);
     }
+  }
+
+  function chooseAction(action: LevyTateAiAction) {
+    executeCopilotAction(action);
   }
 
   function confirmAction() {
