@@ -7,10 +7,15 @@ import { MvpModal, MvpPanel, StatusBadge, TableAction, TableBody, TableHead, Tab
 import {
   guidanceAuthorityLevels,
   guidanceCategories,
+  guidanceItemReviewStatuses,
   guidanceReviewStatuses,
   guidanceSourceStatuses,
   type GuidanceAuthorityLevel,
   type GuidanceCategory,
+  type GuidanceItem,
+  type GuidanceItemBody,
+  type GuidanceItemReviewStatus,
+  type GuidanceItemWithSources,
   type GuidanceReviewStatus,
   type GuidanceSource,
   type GuidanceSourceStatus,
@@ -101,8 +106,344 @@ export function GuidanceCentreModule() {
         </div>
       </MvpPanel>
 
+      <GuidanceItemsPanel isPlatformAdmin={isPlatformAdmin} />
       <GuidanceSourceRegistry isPlatformAdmin={isPlatformAdmin} />
     </div>
+  );
+}
+
+type GuidanceItemsPayload = {
+  ok?: boolean;
+  registry?: {
+    items: GuidanceItemWithSources[];
+    source: "supabase" | "seed_fallback";
+    warnings: string[];
+  };
+  message?: string;
+};
+
+function GuidanceItemsPanel({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
+  const [items, setItems] = useState<GuidanceItemWithSources[]>([]);
+  const [sources, setSources] = useState<GuidanceSource[]>([]);
+  const [warnings, setWarnings] = useState<string[]>([]);
+  const [editing, setEditing] = useState<GuidanceItemWithSources | null>(null);
+  const [savingId, setSavingId] = useState("");
+
+  async function loadItems() {
+    try {
+      const [itemsResponse, sourcesResponse] = await Promise.all([
+        fetch("/api/levytate-guidance-items", { cache: "no-store" }),
+        fetch("/api/levytate-guidance-sources", { cache: "no-store" }),
+      ]);
+      const itemsPayload = (await itemsResponse.json()) as GuidanceItemsPayload;
+      const sourcesPayload = (await sourcesResponse.json()) as RegistryPayload;
+      if (!itemsResponse.ok || !itemsPayload.registry) {
+        setWarnings([itemsPayload.message ?? "Guidance items are unavailable."]);
+        return;
+      }
+      setItems(itemsPayload.registry.items);
+      setWarnings(itemsPayload.registry.warnings);
+      if (sourcesPayload.registry) setSources(sourcesPayload.registry.sources);
+    } catch {
+      setWarnings(["Guidance items are unavailable."]);
+    }
+  }
+
+  useEffect(() => {
+    void loadItems();
+  }, []);
+
+  async function saveItem(item: GuidanceItem, sourceIds: string[]) {
+    if (!isPlatformAdmin) return;
+    setSavingId(item.id);
+    try {
+      const response = await fetch("/api/levytate-guidance-items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ item, sourceIds }),
+      });
+      const payload = (await response.json()) as GuidanceItemsPayload;
+      if (!response.ok || !payload.registry) {
+        setWarnings([payload.message ?? "Guidance item could not be saved."]);
+        return;
+      }
+      setItems(payload.registry.items);
+      setWarnings(payload.registry.warnings);
+      setEditing(null);
+    } catch {
+      setWarnings(["Guidance item could not be saved."]);
+    } finally {
+      setSavingId("");
+    }
+  }
+
+  async function patchItem(id: string, patch: { reviewStatus?: GuidanceItemReviewStatus; copilotApproved?: boolean }) {
+    if (!isPlatformAdmin) return;
+    setSavingId(id);
+    try {
+      const response = await fetch("/api/levytate-guidance-items", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, patch }),
+      });
+      const payload = (await response.json()) as GuidanceItemsPayload;
+      if (!response.ok || !payload.registry) {
+        setWarnings([payload.message ?? "Guidance item could not be updated."]);
+        return;
+      }
+      setItems(payload.registry.items);
+      setWarnings(payload.registry.warnings);
+    } catch {
+      setWarnings(["Guidance item could not be updated."]);
+    } finally {
+      setSavingId("");
+    }
+  }
+
+  const approvedCount = items.filter((item) => item.reviewStatus === "Approved").length;
+  const copilotCount = items.filter((item) => item.reviewStatus === "Approved" && item.copilotApproved).length;
+
+  return (
+    <MvpPanel
+      title="Approved Guidance Items"
+      eyebrow="Employer guidance"
+      actions={isPlatformAdmin ? (
+        <button type="button" onClick={() => setEditing(createBlankGuidanceItem())} className="h-10 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white">Create guidance item</button>
+      ) : <StatusBadge tone="green">Published guidance</StatusBadge>}
+    >
+      <div className="grid gap-4">
+        <div className="grid gap-3 md:grid-cols-3">
+          <Summary label="Guidance items" value={items.length} copy={isPlatformAdmin ? "Admin-visible records" : "Approved employer guidance"} />
+          <Summary label="Published" value={approvedCount} copy="Approved for employer view" />
+          <Summary label="Copilot safe" value={copilotCount} copy="Approved for retrieval" />
+        </div>
+
+        {warnings.length ? (
+          <div className="rounded-lg bg-[#fff7cf] px-3 py-2 text-xs font-semibold text-[#756000]">{warnings.join(" ")}</div>
+        ) : null}
+
+        <div className="grid gap-4 xl:grid-cols-2">
+          {items.map((item) => (
+            <article key={item.id} className="rounded-xl border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_14px_32px_rgba(16,44,61,0.045)]">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">{item.guidanceCategory}</p>
+                  <h3 className="mt-1 text-lg font-semibold text-[#102c3d]">{item.title}</h3>
+                  <p className="mt-2 text-sm leading-6 text-[#102c3d]/58">{item.summary}</p>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <StatusBadge tone={item.reviewStatus === "Approved" ? "green" : item.reviewStatus === "Review required" ? "yellow" : item.reviewStatus === "Archived" || item.reviewStatus === "Superseded" ? "red" : "neutral"}>{item.reviewStatus}</StatusBadge>
+                  <StatusBadge tone={item.copilotApproved ? "green" : "neutral"}>{item.copilotApproved ? "Copilot" : "No AI"}</StatusBadge>
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-3 text-sm text-[#102c3d]/68">
+                <GuidanceContent label="Plain English" value={item.body.plainEnglishExplanation} />
+                <GuidanceContent label="Employer action" value={item.body.employerAction} />
+                <GuidanceContent label="Common mistake" value={item.body.commonMistake} />
+                <div className="grid gap-2 rounded-lg bg-[#f8fbfa] p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/42">Checklist</p>
+                  <ul className="space-y-1.5">
+                    {item.body.practicalChecklist.map((step) => <li key={step}>- {step}</li>)}
+                  </ul>
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-2 rounded-lg border border-[#102c3d]/[0.07] bg-[#fbfcfb] p-3 text-xs text-[#102c3d]/56 sm:grid-cols-2">
+                <p><span className="font-semibold text-[#102c3d]/70">Funding year:</span> {item.body.applicableFundingYear}</p>
+                <p><span className="font-semibold text-[#102c3d]/70">Effective:</span> {formatDate(item.body.effectiveDate)}</p>
+                <p><span className="font-semibold text-[#102c3d]/70">Starts:</span> {formatDate(item.body.applicableStartDateFrom)} to {formatDate(item.body.applicableStartDateTo)}</p>
+                <p><span className="font-semibold text-[#102c3d]/70">Reviewed:</span> {formatDate(item.body.lastReviewedDate)}</p>
+              </div>
+
+              <div className="mt-4">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/42">Official sources</p>
+                <div className="mt-2 grid gap-2">
+                  {item.sources.map((source) => (
+                    <a key={source.id} href={source.sourceUrl} target="_blank" rel="noreferrer" className="rounded-lg border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-3 text-xs transition hover:border-[#159b8f]/30 hover:bg-white">
+                      <span className="flex items-start justify-between gap-3">
+                        <span>
+                          <span className="block font-semibold text-[#102c3d]">{source.title}</span>
+                          <span className="mt-1 block text-[#102c3d]/50">{source.publisher} · {source.authorityLevel}</span>
+                          <span className="mt-1 block text-[#102c3d]/48">Effective {formatDate(source.effectiveFrom)} · Checked {formatDate(source.lastCheckedAt)} · Reviewed {formatDate(source.lastReviewedAt)}</span>
+                        </span>
+                        <ExternalLink size={14} className="shrink-0 text-[#102c3d]/42" />
+                      </span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+
+              {isPlatformAdmin ? (
+                <div className="mt-4 flex flex-wrap gap-2 border-t border-[#102c3d]/[0.07] pt-4">
+                  <TableAction onClick={() => setEditing(item)}>Edit</TableAction>
+                  <TableAction onClick={() => patchItem(item.id, { reviewStatus: "Draft", copilotApproved: false })}>Draft</TableAction>
+                  <TableAction onClick={() => patchItem(item.id, { reviewStatus: "Review required", copilotApproved: false })}>Review required</TableAction>
+                  <TableAction onClick={() => patchItem(item.id, { reviewStatus: "Approved" })}>{savingId === item.id ? "Saving..." : "Approve"}</TableAction>
+                  <TableAction onClick={() => patchItem(item.id, { reviewStatus: "Approved", copilotApproved: true })}>Approve for Copilot</TableAction>
+                  <TableAction onClick={() => patchItem(item.id, { reviewStatus: "Superseded", copilotApproved: false })}>Supersede</TableAction>
+                  <TableAction danger onClick={() => patchItem(item.id, { reviewStatus: "Archived", copilotApproved: false })}>Archive</TableAction>
+                </div>
+              ) : null}
+            </article>
+          ))}
+        </div>
+      </div>
+
+      {editing ? (
+        <GuidanceItemEditModal
+          item={editing}
+          sources={sources.filter((source) => source.sourceStatus === "Active" && source.reviewStatus === "Approved" && source.copilotApproved)}
+          saving={savingId === editing.id}
+          onClose={() => setEditing(null)}
+          onSave={saveItem}
+        />
+      ) : null}
+    </MvpPanel>
+  );
+}
+
+function GuidanceContent({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/42">{label}</p>
+      <p className="mt-1 leading-6">{value}</p>
+    </div>
+  );
+}
+
+function createBlankGuidanceItem(): GuidanceItemWithSources {
+  const now = new Date().toISOString();
+  const today = now.slice(0, 10);
+  return {
+    id: `guidance-item-${Date.now()}`,
+    title: "New guidance item",
+    summary: "",
+    guidanceCategory: "Employer responsibilities",
+    reviewStatus: "Draft",
+    copilotApproved: false,
+    createdAt: now,
+    updatedAt: now,
+    sources: [],
+    body: {
+      plainEnglishExplanation: "",
+      whyItMatters: "",
+      employerAction: "",
+      practicalChecklist: [],
+      commonMistake: "",
+      applicableFundingYear: "2025-2026",
+      effectiveDate: today,
+      applicableStartDateFrom: "2025-08-01",
+      applicableStartDateTo: "2026-07-31",
+      lastReviewedDate: today,
+      reviewer: "LevyTate Platform Admin",
+      status: "Draft",
+    },
+  };
+}
+
+function GuidanceItemEditModal({
+  item,
+  sources,
+  saving,
+  onClose,
+  onSave,
+}: {
+  item: GuidanceItemWithSources;
+  sources: GuidanceSource[];
+  saving: boolean;
+  onClose: () => void;
+  onSave: (item: GuidanceItem, sourceIds: string[]) => void;
+}) {
+  const [title, setTitle] = useState(item.title);
+  const [summary, setSummary] = useState(item.summary);
+  const [guidanceCategory, setGuidanceCategory] = useState<GuidanceCategory>(item.guidanceCategory);
+  const [reviewStatus, setReviewStatus] = useState<GuidanceItemReviewStatus>(item.reviewStatus);
+  const [copilotApproved, setCopilotApproved] = useState(item.copilotApproved);
+  const [body, setBody] = useState<GuidanceItemBody>(item.body);
+  const [sourceIds, setSourceIds] = useState(item.sources.map((source) => source.id));
+  const [checklistText, setChecklistText] = useState(item.body.practicalChecklist.join("\n"));
+
+  function updateBody<K extends keyof GuidanceItemBody>(key: K, value: GuidanceItemBody[K]) {
+    setBody((current) => ({ ...current, [key]: value }));
+  }
+
+  return (
+    <MvpModal title={title || "Guidance item"} eyebrow="Guidance item workflow" onClose={onClose} wide>
+      <form
+        className="grid gap-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          onSave({
+            ...item,
+            title,
+            summary,
+            guidanceCategory,
+            reviewStatus,
+            copilotApproved,
+            body: {
+              ...body,
+              status: reviewStatus,
+              practicalChecklist: checklistText.split("\n").map((step) => step.trim()).filter(Boolean),
+            },
+          }, sourceIds);
+        }}
+      >
+        <div className="grid gap-4 md:grid-cols-2">
+          <TextInput label="Title" value={title} onChange={setTitle} />
+          <FilterSelect label="Category" value={guidanceCategory} options={guidanceCategories} onChange={(value) => setGuidanceCategory(value as GuidanceCategory)} />
+          <FilterSelect label="Status" value={reviewStatus} options={guidanceItemReviewStatuses} onChange={(value) => setReviewStatus(value as GuidanceItemReviewStatus)} />
+          <label className="flex items-center gap-3 self-end rounded-lg border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 py-2.5 text-xs font-semibold text-[#102c3d]/62">
+            <input type="checkbox" checked={copilotApproved} onChange={(event) => setCopilotApproved(event.target.checked)} className="h-4 w-4 accent-[#159b8f]" />
+            Approve for Copilot retrieval
+          </label>
+        </div>
+        <TextArea label="Summary" value={summary} onChange={setSummary} />
+        <TextArea label="Plain-English explanation" value={body.plainEnglishExplanation} onChange={(value) => updateBody("plainEnglishExplanation", value)} />
+        <TextArea label="Why it matters" value={body.whyItMatters} onChange={(value) => updateBody("whyItMatters", value)} />
+        <TextArea label="Employer action" value={body.employerAction} onChange={(value) => updateBody("employerAction", value)} />
+        <TextArea label="Practical checklist" value={checklistText} onChange={setChecklistText} />
+        <TextArea label="Common mistake" value={body.commonMistake} onChange={(value) => updateBody("commonMistake", value)} />
+        <div className="grid gap-4 md:grid-cols-2">
+          <TextInput label="Applicable funding year" value={body.applicableFundingYear} onChange={(value) => updateBody("applicableFundingYear", value)} />
+          <TextInput label="Effective date" value={body.effectiveDate} onChange={(value) => updateBody("effectiveDate", value)} />
+          <TextInput label="Apprentice start date from" value={body.applicableStartDateFrom} onChange={(value) => updateBody("applicableStartDateFrom", value)} />
+          <TextInput label="Apprentice start date to" value={body.applicableStartDateTo} onChange={(value) => updateBody("applicableStartDateTo", value)} />
+          <TextInput label="Last reviewed date" value={body.lastReviewedDate} onChange={(value) => updateBody("lastReviewedDate", value)} />
+          <TextInput label="Reviewer" value={body.reviewer} onChange={(value) => updateBody("reviewer", value)} />
+        </div>
+
+        <div className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4">
+          <p className="text-sm font-semibold text-[#102c3d]">Linked approved sources</p>
+          <p className="mt-1 text-xs leading-5 text-[#102c3d]/52">Only Active, Approved and Copilot-approved trusted sources are available for item links.</p>
+          <div className="mt-3 grid max-h-72 gap-2 overflow-y-auto pr-1">
+            {sources.map((source) => (
+              <label key={source.id} className="flex items-start gap-3 rounded-lg bg-white p-3 text-xs text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.07]">
+                <input type="checkbox" checked={sourceIds.includes(source.id)} onChange={(event) => setSourceIds((current) => event.target.checked ? [...current, source.id] : current.filter((id) => id !== source.id))} className="mt-0.5 h-4 w-4 accent-[#159b8f]" />
+                <span>
+                  <span className="block font-semibold text-[#102c3d]">{source.title}</span>
+                  <span className="mt-1 block">{source.publisher} · {source.authorityLevel}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 border-t border-[#102c3d]/[0.07] pt-4">
+          <button type="button" onClick={onClose} className="h-10 rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.1]">Cancel</button>
+          <button type="submit" className="h-10 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white">{saving ? "Saving..." : "Save guidance item"}</button>
+        </div>
+      </form>
+    </MvpModal>
+  );
+}
+
+function TextInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <label className="grid gap-1.5 text-xs font-semibold text-[#102c3d]/58">
+      {label}
+      <input value={value} onChange={(event) => onChange(event.target.value)} className="h-10 min-w-0 rounded-lg border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 text-sm font-medium text-[#102c3d] outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10" />
+    </label>
   );
 }
 

@@ -3,6 +3,7 @@ import {
   copilotGuidanceUnavailableMessage,
   retrieveCopilotSafeGuidanceSources,
   trustedGuidanceSources,
+  type GuidanceItemWithSources,
 } from "@/lib/levytate/guidance/source-registry";
 import { getLiveApprenticeshipStandards } from "@/lib/levytate/domain";
 import type { LevyTateAiRequest } from "@/lib/levytate/ai/types";
@@ -53,7 +54,7 @@ function pathwayContext(request: LevyTateAiRequest) {
   return supplied.filter((pathway) => !withdrawnManagementPattern.test(`${pathway.title} ${pathway.standard ?? ""}`)).slice(0, 24);
 }
 
-export function buildLevyTateAiContext(request: LevyTateAiRequest) {
+export function buildLevyTateAiContext(request: LevyTateAiRequest, guidanceItems: GuidanceItemWithSources[] = []) {
   const approvedGuidanceSources = retrieveCopilotSafeGuidanceSources(trustedGuidanceSources, {
     asOf: new Date().toISOString().slice(0, 10),
   }).slice(0, 12);
@@ -78,6 +79,28 @@ export function buildLevyTateAiContext(request: LevyTateAiRequest) {
       rule: "Only sources that are Active, Approved, Copilot approved, current for the relevant funding year or start date, and not superseded may be used as authoritative guidance.",
       fallbackMessage: copilotGuidanceUnavailableMessage,
       approvedSourceCount: approvedGuidanceSources.length,
+      approvedItemCount: guidanceItems.length,
+      approvedItems: guidanceItems.map((item) => ({
+        title: item.title,
+        summary: item.summary,
+        category: item.guidanceCategory,
+        fundingYear: item.body.applicableFundingYear,
+        effectiveDate: item.body.effectiveDate,
+        applicableStartDateFrom: item.body.applicableStartDateFrom,
+        applicableStartDateTo: item.body.applicableStartDateTo,
+        answer: item.body.plainEnglishExplanation,
+        employerAction: item.body.employerAction,
+        commonMistake: item.body.commonMistake,
+        sources: item.sources.map((source) => ({
+          title: source.title,
+          publisher: source.publisher,
+          sourceUrl: source.sourceUrl,
+          authorityLevel: source.authorityLevel,
+          effectiveFrom: source.effectiveFrom,
+          lastCheckedAt: source.lastCheckedAt,
+          lastReviewedAt: source.lastReviewedAt,
+        })),
+      })),
       approvedSources: approvedGuidanceSources.map((source) => ({
         title: source.title,
         publisher: source.publisher,

@@ -22,6 +22,7 @@ import {
   type LevyTateAiResponse,
 } from "@/lib/levytate/ai/types";
 import { applyLevyTateAiSafety } from "@/lib/levytate-ai/safety";
+import { getCopilotGuidanceItems } from "@/lib/server/levytate-guidance-sources";
 
 const requestWindowMs = 5 * 60 * 1000;
 const duplicateWindowMs = 1_500;
@@ -150,7 +151,10 @@ export async function POST(request: Request) {
       return NextResponse.json(finaliseResponse(parsedRequest, fallback));
     }
 
-    const groundedContext = buildLevyTateAiContext(parsedRequest);
+    const guidanceItems = await getCopilotGuidanceItems({
+      asOf: new Date().toISOString().slice(0, 10),
+    });
+    const groundedContext = buildLevyTateAiContext(parsedRequest, guidanceItems);
     const generated = await requestLevyTateOpenAI({
       request: parsedRequest,
       systemPrompt: buildLevyTateAiSystemPrompt(parsedRequest),
