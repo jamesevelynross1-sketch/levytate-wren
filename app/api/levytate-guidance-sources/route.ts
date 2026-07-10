@@ -20,6 +20,10 @@ export async function GET() {
     return NextResponse.json({ message: "Unauthorised." }, { status: 401 });
   }
 
+  if (session.accessLevel !== "beta_admin") {
+    return NextResponse.json({ message: "Forbidden." }, { status: 403 });
+  }
+
   return NextResponse.json({ ok: true, registry: await getGuidanceSources() });
 }
 

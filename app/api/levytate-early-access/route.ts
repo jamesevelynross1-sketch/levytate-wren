@@ -18,6 +18,10 @@ export async function GET() {
     return NextResponse.json({ message: "Unauthorised." }, { status: 401 });
   }
 
+  if (session.accessLevel !== "beta_admin") {
+    return NextResponse.json({ message: "Forbidden." }, { status: 403 });
+  }
+
   try {
     const leads = await listEarlyAccessRequests();
     return NextResponse.json({ ok: true, leads });

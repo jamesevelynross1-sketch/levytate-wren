@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 
 import { enforceLevyTateAiActions } from "@/lib/levytate/ai/actions";
 import { buildLevyTateAiContext } from "@/lib/levytate/ai/context";
@@ -20,8 +21,15 @@ import {
   parseLevyTateAiRequest,
   type LevyTateAiRequest,
   type LevyTateAiResponse,
+  type LevyTateRole,
+  type LevyTateWorkspaceEmployeeContext,
 } from "@/lib/levytate/ai/types";
 import { applyLevyTateAiSafety } from "@/lib/levytate-ai/safety";
+import { levytateBetaSessionCookie, readLevyTateBetaSession } from "@/lib/levytate/config/beta-access";
+import { getApprenticeshipStandard } from "@/lib/levytate/domain";
+import type { LevyTateWorkspaceBootstrap } from "@/lib/levytate/mvp/api";
+import type { MvpApplication, MvpEmployee, MvpEmployeeDevelopmentProfile, MvpRole } from "@/lib/levytate/mvp/workspace";
+import { getWorkspaceBootstrapForSession } from "@/lib/server/levytate-workspace";
 import { getCopilotGuidanceItems } from "@/lib/server/levytate-guidance-sources";
 
 const requestWindowMs = 5 * 60 * 1000;
@@ -135,10 +143,18 @@ export async function POST(request: Request) {
   let parsedRequest: LevyTateAiRequest | null = null;
 
   try {
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ message: "Unauthorised." }, { status: 401 });
+    }
+
     parsedRequest = parseLevyTateAiRequest(await request.json());
     if (!parsedRequest) {
       return NextResponse.json({ message: "Invalid LevyTate Copilot request payload." }, { status: 400 });
     }
+
+    const workspace = await getWorkspaceBootstrapForSession(session);
+    parsedRequest = sanitiseCopilotRequest(parsedRequest, workspace);
 
     parsedRequest = withConversationMemory(parsedRequest);
 
@@ -171,4 +187,276 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ message: "LevyTate Copilot could not process this request." }, { status: 500 });
   }
+}
+
+async function getSession() {
+  const cookieStore = await cookies();
+  return readLevyTateBetaSession(cookieStore.get(levytateBetaSessionCookie)?.value);
+}
+
+function allowedCopilotRole(requestedRole: LevyTateRole, workspace: LevyTateWorkspaceBootstrap): LevyTateRole {
+  if (workspace.meta.userRole === "Platform Admin") return requestedRole === "LevyTate Admin" ? requestedRole : "LevyTate Admin";
+  if (workspace.meta.userRole === "Apprenticeship Lead" || workspace.meta.userRole === "Employer Admin") return "Apprenticeship Lead";
+  if (workspace.meta.userRole === "Line Manager") return "Line Manager";
+  return "Employee";
+}
+
+function sanitiseCopilotRequest(request: LevyTateAiRequest, workspace: LevyTateWorkspaceBootstrap): LevyTateAiRequest {
+  const data = workspace.data;
+  const role = allowedCopilotRole(request.role, workspace);
+  const employee = resolveScopedEmployee(data.employees, request, role);
+  const roleRecord = employee ? data.roles.find((item) => item.id === employee.roleId) ?? null : null;
+  const application = employee ? latestApplicationForEmployee(data.applications, employee.id) : null;
+  const standardId = application?.apprenticeshipStandardId ?? roleRecord?.pathwayMappings[0]?.apprenticeshipStandardId;
+  const standard = standardId ? getApprenticeshipStandard(standardId) : null;
+  const employeeProfile = employee ? data.employeeDevelopmentProfiles.find((profile) => profile.employeeId === employee.id) ?? null : null;
+
+  return {
+    ...request,
+    role,
+    userRole: role,
+    selectedEmployee: employee?.name,
+    selectedSite: employee?.site || data.profile.defaultSite || "All sites",
+    employerContext: data.profile.employerName || workspace.meta.organisationName,
+    currentWorkspace: {
+      employerName: data.profile.employerName || workspace.meta.organisationName,
+      selectedSite: employee?.site || data.profile.defaultSite || "All sites",
+      activeModule: request.currentSection,
+    },
+    currentApplication: employee && application ? {
+      id: Math.max(1, data.applications.findIndex((item) => item.id === application.id) + 1),
+      name: employee.name,
+      role: employee.jobTitle || roleRecord?.title || "Role to confirm",
+      department: employee.department,
+      team: employee.department,
+      site: employee.site || "Site to confirm",
+      pathway: standard?.title ?? application.apprenticeshipStandardId,
+      manager: managerNameForEmployee(data.employees, employee),
+      status: application.status,
+      note: application.reason,
+      careerGoal: application.careerGoal,
+      supportRequired: application.supportRequired,
+      submittedDate: application.submittedAt.slice(0, 10),
+      decisionNotes: application.managerNote,
+    } : null,
+    roleMappings: roleRecord ? roleMappingContext(roleRecord) : [],
+    availablePathways: roleRecord ? pathwayContext(roleRecord) : [],
+    providerCatalogue: role === "Apprenticeship Lead" || role === "LevyTate Admin"
+      ? data.providers.filter((provider) => provider.status === "Active").slice(0, 16).map((provider) => ({
+          providerName: provider.providerName,
+          sectors: provider.sectors,
+          deliveryModels: provider.deliveryModels,
+          verificationStatus: provider.verificationStatus,
+        }))
+      : [],
+    employerPriorities: data.profile.priorities.map((priority) => ({ name: priority.name, importance: priority.importance })),
+    employeeDiscovery: employeeProfile && employee ? {
+      roleTitle: employee.jobTitle || roleRecord?.title || undefined,
+      department: employee.department,
+      responsibilities: employeeProfile.responsibilities,
+      currentSkills: employeeProfile.currentSkills,
+      businessFunctions: employeeProfile.businessFunctions,
+      currentCapabilities: employeeProfile.currentCapabilities,
+      apprenticeshipIndicators: employeeProfile.apprenticeshipIndicators,
+      aiOpportunities: employeeProfile.aiOpportunities,
+      dataOpportunities: employeeProfile.dataOpportunities,
+      automationOpportunities: employeeProfile.automationOpportunities,
+      futureCapabilities: employeeProfile.futureCapabilities,
+      stage: employeeProfile.stage,
+    } : undefined,
+    workspaceEmployeeContext: buildScopedEmployeeContext(data.employees, employee, roleRecord, application, employeeProfile ?? undefined, request),
+    preferredStandardId: employeeProfile?.preferredStandardId || standardId,
+    contextData: {
+      selectedPersona: employee ? {
+        name: employee.name,
+        role: employee.jobTitle || roleRecord?.title || "Role to confirm",
+        department: employee.department,
+        site: employee.site,
+        manager: managerNameForEmployee(data.employees, employee),
+        careerGoal: application?.careerGoal ?? "",
+        recommendedPathways: roleRecord?.pathwayMappings.length ?? 0,
+        savedOpportunities: 0,
+        passportActivities: 0,
+      } : undefined,
+      activeApplication: employee && application ? {
+        id: Math.max(1, data.applications.findIndex((item) => item.id === application.id) + 1),
+        name: employee.name,
+        role: employee.jobTitle || roleRecord?.title || "Role to confirm",
+        department: employee.department,
+        team: employee.department,
+        site: employee.site,
+        pathway: standard?.title ?? application.apprenticeshipStandardId,
+        manager: managerNameForEmployee(data.employees, employee),
+        status: application.status,
+        note: application.reason,
+        careerGoal: application.careerGoal,
+        supportRequired: application.supportRequired,
+        submittedDate: application.submittedAt.slice(0, 10),
+        decisionNotes: application.managerNote,
+      } : null,
+      requests: data.applications.slice(0, 30).flatMap((item, index) => {
+        const owner = data.employees.find((candidate) => candidate.id === item.employeeId);
+        if (!owner) return [];
+        return [{
+          id: index + 1,
+          name: owner.name,
+          role: owner.jobTitle || "Role to confirm",
+          department: owner.department,
+          team: owner.department,
+          site: owner.site,
+          pathway: getApprenticeshipStandard(item.apprenticeshipStandardId)?.title ?? item.apprenticeshipStandardId,
+          manager: managerNameForEmployee(data.employees, owner),
+          status: item.status,
+          note: item.reason,
+          careerGoal: item.careerGoal,
+          supportRequired: item.supportRequired,
+          submittedDate: item.submittedAt.slice(0, 10),
+          decisionNotes: item.managerNote,
+        }];
+      }),
+    },
+  };
+}
+
+function resolveScopedEmployee(employees: MvpEmployee[], request: LevyTateAiRequest, role: LevyTateRole) {
+  if (!employees.length) return null;
+  const selected = request.selectedEmployee?.trim().toLowerCase();
+  const bySelected = selected
+    ? employees.find((employee) => employee.id.toLowerCase() === selected || employee.name.toLowerCase() === selected)
+    : null;
+  if (bySelected) return bySelected;
+
+  const message = request.userMessage.toLowerCase();
+  const byMessage = employees.find((employee) => employee.name.toLowerCase().split(/\s+/).every((part) => message.includes(part)));
+  if (byMessage) return byMessage;
+
+  return role === "Employee" ? employees[0] : null;
+}
+
+function latestApplicationForEmployee(applications: MvpApplication[], employeeId: string) {
+  return applications
+    .filter((application) => application.employeeId === employeeId)
+    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0] ?? null;
+}
+
+function managerNameForEmployee(employees: MvpEmployee[], employee: MvpEmployee) {
+  return employees.find((item) => item.id === employee.managerId)?.name ?? "Line manager to confirm";
+}
+
+function roleMappingContext(roleRecord: MvpRole) {
+  const mappings = roleRecord.pathwayMappings.slice().sort((left, right) => left.priority - right.priority);
+  const primary = mappings.find((mapping) => mapping.recommendationType === "Primary") ?? mappings[0];
+  if (!primary) return [];
+  return [{
+    roleTitle: roleRecord.title,
+    primaryPathway: getApprenticeshipStandard(primary.apprenticeshipStandardId)?.title ?? primary.apprenticeshipStandardId,
+    alternativePathways: mappings.filter((mapping) => mapping.id !== primary.id).flatMap((mapping) => {
+      const standard = getApprenticeshipStandard(mapping.apprenticeshipStandardId);
+      return standard ? [standard.title] : [];
+    }),
+    businessRationale: primary.businessRationale,
+  }];
+}
+
+function pathwayContext(roleRecord: MvpRole) {
+  return roleRecord.pathwayMappings
+    .slice()
+    .sort((left, right) => left.priority - right.priority)
+    .flatMap((mapping) => {
+      const standard = getApprenticeshipStandard(mapping.apprenticeshipStandardId);
+      return standard ? [{
+        title: standard.title,
+        standard: `${standard.referenceCode} - Level ${standard.level}`,
+        status: standard.status,
+        deliveryModel: mapping.deliveryPreference,
+      }] : [];
+    });
+}
+
+function buildScopedEmployeeContext(
+  employees: MvpEmployee[],
+  employee: MvpEmployee | null,
+  roleRecord: MvpRole | null,
+  application: MvpApplication | null,
+  profile: MvpEmployeeDevelopmentProfile | undefined,
+  request: LevyTateAiRequest,
+): LevyTateWorkspaceEmployeeContext {
+  if (!employee) {
+    return {
+      resolution: request.selectedEmployee ? "not_found" : "none",
+      searchText: request.selectedEmployee,
+      missingData: ["employee record in your permitted scope"],
+      matchedEmployees: [],
+    };
+  }
+
+  const standard = application ? getApprenticeshipStandard(application.apprenticeshipStandardId) : null;
+  const topRecommendation = profile?.recommendationResult?.topRecommendation ?? profile?.recommendationResult?.recommendations[0] ?? null;
+
+  return {
+    resolution: "selected_employee",
+    missingData: [
+      !employee.jobTitle && !roleRecord?.title ? "job title" : "",
+      !employee.department ? "department" : "",
+      !employee.site ? "site" : "",
+      !roleRecord ? "assigned role" : "",
+      !application ? "application record" : "",
+    ].filter(Boolean),
+    employee: {
+      id: employee.id,
+      name: employee.name,
+      employeeNumber: employee.employeeNumber,
+      jobTitle: employee.jobTitle || roleRecord?.title || "",
+      department: employee.department,
+      manager: managerNameForEmployee(employees, employee),
+      location: employee.site,
+      platformRole: employee.platformRole,
+    },
+    role: roleRecord ? {
+      title: roleRecord.title,
+      businessArea: roleRecord.businessArea,
+      careerLevel: roleRecord.careerLevel,
+      skillsTags: roleRecord.skillsTags,
+      progression: roleRecord.progression,
+      preferredPathway: roleMappingContext(roleRecord)[0]?.primaryPathway,
+      alternativePathways: roleMappingContext(roleRecord)[0]?.alternativePathways,
+      businessRationale: roleMappingContext(roleRecord)[0]?.businessRationale,
+    } : undefined,
+    application: application ? {
+      id: application.id,
+      status: application.status,
+      currentOwner: application.currentOwner,
+      pathway: standard?.title ?? application.apprenticeshipStandardId,
+      submittedDate: application.submittedAt.slice(0, 10),
+      reason: application.reason,
+      careerGoal: application.careerGoal,
+      supportRequired: application.supportRequired,
+      managerNote: application.managerNote,
+      approvalHistory: application.history.map((entry) => `${entry.status}: ${entry.note}`).slice(-6),
+    } : null,
+    development: profile ? {
+      roleTitle: employee.jobTitle || roleRecord?.title || undefined,
+      department: employee.department,
+      responsibilities: profile.responsibilities,
+      currentSkills: profile.currentSkills,
+      businessFunctions: profile.businessFunctions,
+      currentCapabilities: profile.currentCapabilities,
+      apprenticeshipIndicators: profile.apprenticeshipIndicators,
+      aiOpportunities: profile.aiOpportunities,
+      dataOpportunities: profile.dataOpportunities,
+      automationOpportunities: profile.automationOpportunities,
+      futureCapabilities: profile.futureCapabilities,
+      stage: profile.stage,
+    } : undefined,
+    recommendation: topRecommendation ? {
+      topRecommendation: topRecommendation.title,
+      fitScore: topRecommendation.fitScore,
+      confidence: topRecommendation.confidence,
+      rationale: topRecommendation.rationale,
+      evidence: topRecommendation.evidence.map((item) => item.label).slice(0, 8),
+      currentCapabilityProfile: profile?.recommendationResult?.currentCapabilityProfile,
+      futureCapabilityProfile: profile?.recommendationResult?.futureCapabilityProfile,
+    } : null,
+    providerProgramme: null,
+  };
 }

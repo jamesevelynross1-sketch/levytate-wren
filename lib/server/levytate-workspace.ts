@@ -34,6 +34,7 @@ import {
 } from "@/lib/levytate/mvp/workspace";
 import {
   canRunMvpMutation,
+  hasMvpPermission,
   normaliseMvpUserRole,
   permissionsForMvpRole,
 } from "@/lib/levytate/mvp/rbac";
@@ -337,7 +338,7 @@ export async function getWorkspaceBootstrapForSession(session: LevyTateBetaSessi
 
   try {
     const context = await ensureWorkspaceContext(session);
-    const data = await loadWorkspaceData(context.organisation.id);
+    const data = await loadWorkspaceData(context);
 
     return {
       data,
@@ -373,7 +374,7 @@ export async function applyWorkspaceMutationForSession(
 
   const context = await ensureWorkspaceContext(session);
   const organisationId = context.organisation.id;
-  assertMutationAllowed(context, mutation);
+  await assertMutationAllowed(context, mutation);
 
   switch (mutation.type) {
     case "saveProfile":
@@ -478,12 +479,165 @@ function buildFallbackMeta(session: LevyTateBetaSession, warnings: string[]): Le
   };
 }
 
-function assertMutationAllowed(context: WorkspaceContext, mutation: LevyTateWorkspaceMutation) {
-  if (canRunMvpMutation(context.user.role, mutation.type)) return;
+async function assertMutationAllowed(context: WorkspaceContext, mutation: LevyTateWorkspaceMutation) {
+  if (!canRunMvpMutation(context.user.role, mutation.type)) {
+    throw new LevyTateWorkspacePermissionError(
+      `${normaliseMvpUserRole(context.user.role)} cannot perform ${mutation.type}.`,
+    );
+  }
 
-  throw new LevyTateWorkspacePermissionError(
-    `${normaliseMvpUserRole(context.user.role)} cannot perform ${mutation.type}.`,
+  const role = normaliseMvpUserRole(context.user.role);
+  if (role === "Platform Admin" || role === "Employer Admin" || role === "Apprenticeship Lead") return;
+
+  const employees = await selectMany<EmployeeRow>(
+    employeesTable,
+    context.organisation.id,
+    "id,email,manager_id,status,employee_number,name,job_title,role_id,department,site,platform_role,start_date,created_at,updated_at",
+    "name.asc",
   );
+  const visibleEmployeeIds = readableEmployeeIdsForUser(context.user.email, role, employees);
+
+  if (visibleEmployeeIds.size === 0) {
+    throw new LevyTateWorkspacePermissionError("Your user account is not linked to an active employee record.");
+  }
+
+  const assertCanAccessEmployee = (employeeId: string) => {
+    if (visibleEmployeeIds.has(employeeId)) return;
+    throw new LevyTateWorkspacePermissionError("You cannot access that employee record.");
+  };
+
+  switch (mutation.type) {
+    case "saveEmployeeDevelopmentProfile":
+      assertCanAccessEmployee(mutation.profile.employeeId);
+      return;
+    case "saveApplication":
+      assertCanAccessEmployee(mutation.application.employeeId);
+      return;
+    case "updateApplicationStatus": {
+      const application = await selectOne<ApplicationRow>(applicationsTable, new URLSearchParams({
+        select: "id,employee_id",
+        organisation_id: `eq.${context.organisation.id}`,
+        id: `eq.${mutation.id}`,
+        limit: "1",
+      }));
+      if (!application) {
+        throw new LevyTateWorkspacePermissionError("Application record was not found.");
+      }
+      assertCanAccessEmployee(application.employee_id);
+      return;
+    }
+    default:
+      return;
+  }
+}
+
+function readableEmployeeIdsForUser(userEmail: string, role: ReturnType<typeof normaliseMvpUserRole>, employees: EmployeeRow[]) {
+  const normalisedEmail = userEmail.trim().toLowerCase();
+  const currentEmployee = employees.find((employee) =>
+    employee.status === "Active" && employee.email.trim().toLowerCase() === normalisedEmail
+  );
+  const ids = new Set<string>();
+
+  if (!currentEmployee) return ids;
+
+  ids.add(currentEmployee.id);
+
+  if (role === "Line Manager") {
+    employees
+      .filter((employee) => employee.status === "Active" && employee.manager_id === currentEmployee.id)
+      .forEach((employee) => ids.add(employee.id));
+  }
+
+  return ids;
+}
+
+function scopedProfile(profile: MvpWorkspaceProfile, employees: MvpEmployee[], includeSettings: boolean): MvpWorkspaceProfile {
+  if (includeSettings) return profile;
+
+  return {
+    ...profile,
+    primaryContact: "",
+    contactEmail: "",
+    defaultSite: employees[0]?.site ?? "",
+    sites: [...new Set(employees.map((employee) => employee.site).filter(Boolean))],
+    departments: [...new Set(employees.map((employee) => employee.department).filter(Boolean))],
+  };
+}
+
+function scopeWorkspaceDataForContext(workspace: MvpWorkspaceData, context: WorkspaceContext) {
+  const role = normaliseMvpUserRole(context.user.role);
+  if (role === "Platform Admin" || role === "Employer Admin" || role === "Apprenticeship Lead") {
+    return workspace;
+  }
+
+  const visibleEmployeeIds = readableEmployeeIdsForUser(context.user.email, role, workspace.employees.map(employeeRecordToRow));
+  const visibleEmployees = workspace.employees.filter((employee) => visibleEmployeeIds.has(employee.id));
+  const visibleRoleIds = new Set(visibleEmployees.map((employee) => employee.roleId).filter(Boolean));
+  const visibleApplications = workspace.applications.filter((application) => visibleEmployeeIds.has(application.employeeId));
+  const visibleApplicationIds = new Set(visibleApplications.map((application) => application.id));
+  const visibleStandardIds = new Set([
+    ...visibleApplications.map((application) => application.apprenticeshipStandardId),
+    ...workspace.roles
+      .filter((roleRecord) => visibleRoleIds.has(roleRecord.id))
+      .flatMap((roleRecord) => roleRecord.pathwayMappings.map((mapping) => mapping.apprenticeshipStandardId)),
+  ].filter(Boolean));
+
+  const visibleRoles = workspace.roles
+    .filter((roleRecord) => visibleRoleIds.has(roleRecord.id))
+    .map((roleRecord) => ({
+      ...roleRecord,
+      pathwayMappings: roleRecord.pathwayMappings.filter((mapping) => visibleStandardIds.has(mapping.apprenticeshipStandardId)),
+    }));
+
+  const readProviders = hasMvpPermission(role, "providers:read");
+  const readProviderRelationships = hasMvpPermission(role, "providerRelationships:read");
+  const readProviderMatching = hasMvpPermission(role, "providerMatching:read");
+  const readEnrolments = hasMvpPermission(role, "enrolments:read");
+
+  return {
+    ...workspace,
+    profile: scopedProfile(workspace.profile, visibleEmployees, hasMvpPermission(role, "settings:read")),
+    employees: visibleEmployees,
+    employeeDevelopmentProfiles: workspace.employeeDevelopmentProfiles.filter((profile) => visibleEmployeeIds.has(profile.employeeId)),
+    roles: visibleRoles,
+    applications: visibleApplications,
+    providers: readProviders ? workspace.providers : [],
+    providerProgrammes: readProviders
+      ? workspace.providerProgrammes
+      : workspace.providerProgrammes.filter((programme) =>
+          visibleStandardIds.has(programme.linkedStandardId) || programme.linkedStandardIds.some((id) => visibleStandardIds.has(id))
+        ).map((programme) => ({
+          ...programme,
+          commercialNotes: "",
+          notes: "",
+          sourceUrl: "",
+        })),
+    providerRelationships: readProviderRelationships ? workspace.providerRelationships : [],
+    matchingRequests: readProviderMatching ? workspace.matchingRequests : [],
+    enrolments: readEnrolments ? workspace.enrolments : workspace.enrolments.filter((enrolment) =>
+      visibleEmployeeIds.has(enrolment.employeeId) || visibleApplicationIds.has(enrolment.applicationId)
+    ),
+  } satisfies MvpWorkspaceData;
+}
+
+function employeeRecordToRow(employee: MvpEmployee): EmployeeRow {
+  return {
+    organisation_id: "",
+    id: employee.id,
+    employee_number: employee.employeeNumber,
+    name: employee.name,
+    email: employee.email,
+    job_title: employee.jobTitle,
+    role_id: employee.roleId,
+    manager_id: employee.managerId,
+    department: employee.department,
+    site: employee.site,
+    platform_role: employee.platformRole,
+    status: employee.status,
+    start_date: employee.startDate,
+    created_at: employee.createdAt,
+    updated_at: employee.updatedAt,
+  };
 }
 
 async function ensureWorkspaceContext(session: LevyTateBetaSession): Promise<WorkspaceContext> {
@@ -770,7 +924,8 @@ async function seedOrganisationProviders(organisationId: string) {
   });
 }
 
-async function loadWorkspaceData(organisationId: string): Promise<MvpWorkspaceData> {
+async function loadWorkspaceData(context: WorkspaceContext): Promise<MvpWorkspaceData> {
+  const organisationId = context.organisation.id;
   const [
     organisation,
     employees,
@@ -819,7 +974,7 @@ async function loadWorkspaceData(organisationId: string): Promise<MvpWorkspaceDa
   workspace.matchingRequests = matchingRequests.map(matchingRequestRowToRecord);
   workspace.enrolments = enrolments.map(enrolmentRowToRecord);
 
-  return workspace;
+  return scopeWorkspaceDataForContext(workspace, context);
 }
 
 async function saveProfile(organisationId: string, profile: MvpWorkspaceProfile) {

@@ -400,7 +400,7 @@ function buildWorkspaceEmployeeResolution(
 }
 
 export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate }: { initialEmployeeId?: string | null; onNavigate?: (target: string) => void }) {
-  const { data, saveEmployeeDevelopmentProfile } = useMvpWorkspace();
+  const { data, meta, saveEmployeeDevelopmentProfile } = useMvpWorkspace();
   const [role, setRole] = useState<AssistantRole>("Employee");
   const [conversations, setConversations] = useState<Record<AssistantRole, ChatMessage[]>>(initialConversations);
   const [profiles, setProfiles] = useState<Record<AssistantRole, LevyTateConversationProfile | null>>(initialProfiles);
@@ -413,6 +413,17 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate }:
   const [revealedAction, setRevealedAction] = useState<LevyTateAiAction | null>(null);
   const [actionStatus, setActionStatus] = useState("");
   const loadedEmployeeRef = useRef("");
+  const availableAssistantRoles = useMemo(() => {
+    if (meta?.userRole === "Platform Admin") return ["LevyTate Admin"] as AssistantRole[];
+    if (meta?.userRole === "Employer Admin" || meta?.userRole === "Apprenticeship Lead") return ["Apprenticeship Lead"] as AssistantRole[];
+    if (meta?.userRole === "Line Manager") return ["Line Manager"] as AssistantRole[];
+    return ["Employee"] as AssistantRole[];
+  }, [meta?.userRole]);
+
+  useEffect(() => {
+    if (availableAssistantRoles.includes(role)) return;
+    setRole(availableAssistantRoles[0] ?? "Employee");
+  }, [availableAssistantRoles, role]);
 
   const employees = useMemo(
     () => data.employees.filter((employee) => employee.status === "Active"),
@@ -761,7 +772,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate }:
             ) : null}
           </div>
           <div className="grid gap-1 rounded-2xl bg-[#f5f8f6] p-1 sm:grid-cols-2 xl:grid-cols-4" aria-label="LevyTate Copilot role">
-            {assistantRoles.map((item) => (
+            {availableAssistantRoles.map((item) => (
               <button
                 key={item}
                 type="button"

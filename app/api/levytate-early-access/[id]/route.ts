@@ -21,6 +21,10 @@ export async function PATCH(
     return NextResponse.json({ message: "Unauthorised." }, { status: 401 });
   }
 
+  if (session.accessLevel !== "beta_admin") {
+    return NextResponse.json({ message: "Forbidden." }, { status: 403 });
+  }
+
   try {
     const body = (await request.json()) as PatchBody;
     if (!isEarlyAccessStatus(body.status)) {
