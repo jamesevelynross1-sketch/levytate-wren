@@ -147,12 +147,19 @@ async function seedGuidanceSourcesIfNeeded() {
   const config = getLevyTateSupabaseConfig();
   if (!config) return;
 
+  const query = new URLSearchParams();
+  query.set("select", "id");
+  const existingRows = await supabaseSelect<Pick<GuidanceSourceRow, "id">>(config, table, query);
+  const existingIds = new Set(existingRows.map((row) => row.id));
+  const missingSources = trustedGuidanceSources.filter((source) => !existingIds.has(source.id));
+  if (!missingSources.length) return;
+
   await supabaseInsert<GuidanceSourceRow>(
     config,
     table,
-    trustedGuidanceSources.map(guidanceSourceToRow),
+    missingSources.map(guidanceSourceToRow),
     {
-      prefer: "resolution=merge-duplicates,return=minimal",
+      prefer: "resolution=ignore-duplicates,return=minimal",
       query: "on_conflict=id",
     },
   );
