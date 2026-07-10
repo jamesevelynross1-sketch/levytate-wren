@@ -41,6 +41,8 @@ const users = [
   { id: "22000000-0000-4000-8000-000000000003", email: "apprenticeshiplead.demo@levytate.test", role: "Apprenticeship Lead", displayName: "Priya Shah", active: true },
   { id: "22000000-0000-4000-8000-000000000004", email: "inactive.demo@levytate.test", role: "Employee", displayName: "Inactive Demo User", active: false },
   { id: "22000000-0000-4000-8000-000000000005", email: "unmapped.employee.demo@levytate.test", role: "Employee", displayName: "Unmapped Demo User", active: true },
+  { id: "22000000-0000-4000-8000-000000000007", email: "employee.new.demo@levytate.test", role: "Employee", displayName: "Maya Reed", active: true },
+  { id: "22000000-0000-4000-8000-000000000008", email: "employee.draft.demo@levytate.test", role: "Employee", displayName: "Leo Turner", active: true },
 ];
 
 const isolationUsers = [
@@ -204,6 +206,34 @@ const employees = [
     status: "Active",
     start_date: "2023-11-13",
   },
+  {
+    id: "gc-rbac-employee-maya",
+    employee_number: "GC-RBAC-006",
+    name: "Maya Reed",
+    email: "employee.new.demo@levytate.test",
+    job_title: "Field Operations Coordinator",
+    role_id: "gc-rbac-role-field-coordinator",
+    manager_id: "gc-rbac-employee-morgan",
+    department: "Operations",
+    site: "Leeds Regional Hub",
+    platform_role: "Employee",
+    status: "Active",
+    start_date: "2025-09-08",
+  },
+  {
+    id: "gc-rbac-employee-leo",
+    employee_number: "GC-RBAC-007",
+    name: "Leo Turner",
+    email: "employee.draft.demo@levytate.test",
+    job_title: "Field Operations Coordinator",
+    role_id: "gc-rbac-role-field-coordinator",
+    manager_id: "gc-rbac-employee-morgan",
+    department: "Operations",
+    site: "Manchester Regional Hub",
+    platform_role: "Employee",
+    status: "Active",
+    start_date: "2024-10-21",
+  },
 ];
 
 const isolationEmployees = [
@@ -229,6 +259,8 @@ const profiles = [
   profile("gc-rbac-employee-owen", "Field Operations Coordinator", ["Supports daily work allocation", "Tracks job completion"], ["Operations admin", "Customer service"], ["Digital confidence"], "ST0118"),
   profile("gc-rbac-employee-priya", "Apprenticeship Lead", ["Manages apprenticeship demand", "Reviews provider relationships"], ["Apprenticeship governance", "Reporting"], ["Provider relationship management", "Workforce readiness"], "ST0562"),
   profile("gc-rbac-employee-nadia", "Finance Analyst", ["Prepares finance reports", "Supports monthly analysis"], ["Spreadsheets", "Reporting"], ["Data visualisation"], "ST0118"),
+  profile("gc-rbac-employee-maya", "Field Operations Coordinator", ["Supports job scheduling", "Updates operational records"], ["Operations admin", "Customer updates"], ["Reporting confidence", "Digital workflows"], "ST0118"),
+  profile("gc-rbac-employee-leo", "Field Operations Coordinator", ["Tracks field jobs", "Maintains weekly reports"], ["Spreadsheet updates", "Operations coordination"], ["Data confidence", "Workflow automation"], "ST0118"),
 ];
 
 const isolationProfiles = [
@@ -260,6 +292,19 @@ const applications = [
     support_required: "Support with project evidence and dashboard delivery.",
     manager_note: "Approved by the manager because the pathway supports finance reporting capability.",
     submitted_at: "2026-05-25T09:00:00.000Z",
+    updated_at: now,
+  },
+  {
+    id: "gc-rbac-app-leo-draft",
+    employee_id: "gc-rbac-employee-leo",
+    apprenticeship_standard_id: "ST0118",
+    status: "Draft",
+    current_owner: "Employee",
+    reason: "Leo wants to improve how operational reporting is prepared for regional field teams.",
+    career_goal: "",
+    support_required: "",
+    manager_note: "Draft note to discuss protected learning time with Morgan.",
+    submitted_at: "2026-07-01T09:00:00.000Z",
     updated_at: now,
   },
 ];
@@ -446,8 +491,20 @@ function userRow(user, organisationId) {
 }
 
 function applicationHistoryRows(items, organisationId) {
-  return items.flatMap((application) => [
-    {
+  return items.flatMap((application) => {
+    if (application.status === "Draft") {
+      return [{
+        organisation_id: organisationId,
+        id: `${application.id}-hist-draft`,
+        application_id: application.id,
+        status: "Draft",
+        owner: "Employee",
+        note: "Employee saved an application draft.",
+        created_at: application.updated_at,
+      }];
+    }
+    return [
+      {
       organisation_id: organisationId,
       id: `${application.id}-hist-submitted`,
       application_id: application.id,
@@ -465,7 +522,8 @@ function applicationHistoryRows(items, organisationId) {
       note: `Current validation status: ${application.status}.`,
       created_at: application.updated_at,
     },
-  ]);
+    ];
+  });
 }
 
 function withOrg(row, organisationId) {

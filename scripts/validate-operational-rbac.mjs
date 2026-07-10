@@ -9,6 +9,8 @@ const identities = {
   inactive: "inactive.demo@levytate.test",
   unmapped: "unmapped.employee.demo@levytate.test",
   isolation: "isolation.employee.demo@levytate.test",
+  employeeNew: "employee.new.demo@levytate.test",
+  employeeDraft: "employee.draft.demo@levytate.test",
 };
 
 const checks = [];
@@ -23,6 +25,8 @@ async function main() {
     lead: await loginOk("lead", identities.lead),
     admin: await loginOk("admin", identities.admin),
     isolation: await loginOk("isolation", identities.isolation),
+    employeeNew: await loginOk("employee new", identities.employeeNew),
+    employeeDraft: await loginOk("employee draft", identities.employeeDraft),
   };
 
   await loginBlocked("inactive login", identities.inactive, "Your Early Access request has been received");
@@ -38,12 +42,22 @@ async function main() {
   assert("employee cannot see provider management", employeeWorkspace.workspace.data.providers.length === 0);
   assert("employee has no employees:read permission", !employeeWorkspace.workspace.meta.permissions.includes("employees:read"));
 
+  const employeeNewWorkspace = await getWorkspaceJson(sessions.employeeNew.cookie);
+  await expectStatus("new employee app route loads", () => request("/levytate/app", sessions.employeeNew.cookie), 200);
+  assert("new employee sees no current application", employeeNewWorkspace.workspace.data.applications.length === 0);
+  assert("new employee identity is scoped to Maya", employeeNewWorkspace.workspace.data.employees.length === 1 && employeeNewWorkspace.workspace.data.employees[0].email === identities.employeeNew);
+
+  const employeeDraftWorkspace = await getWorkspaceJson(sessions.employeeDraft.cookie);
+  await expectStatus("draft employee app route loads", () => request("/levytate/app", sessions.employeeDraft.cookie), 200);
+  assert("draft employee sees draft application", employeeDraftWorkspace.workspace.data.applications.length === 1 && employeeDraftWorkspace.workspace.data.applications[0].status === "Draft");
+  assert("draft employee identity is scoped to Leo", employeeDraftWorkspace.workspace.data.employees.length === 1 && employeeDraftWorkspace.workspace.data.employees[0].email === identities.employeeDraft);
+
   const managerWorkspace = await getWorkspaceJson(sessions.manager.cookie);
   const managerEmployeeIds = managerWorkspace.workspace.data.employees.map((item) => item.id).sort();
   assert("manager role scoped", managerWorkspace.workspace.meta.userRole === "Line Manager");
-  assert("manager sees self and two direct reports", sameMembers(managerEmployeeIds, ["gc-rbac-employee-erin", "gc-rbac-employee-morgan", "gc-rbac-employee-owen"]));
+  assert("manager sees self and direct reports", sameMembers(managerEmployeeIds, ["gc-rbac-employee-erin", "gc-rbac-employee-leo", "gc-rbac-employee-maya", "gc-rbac-employee-morgan", "gc-rbac-employee-owen"]));
   assert("manager does not see outside employee", !managerEmployeeIds.includes("gc-rbac-employee-nadia"));
-  assert("manager applications are direct-report only", managerWorkspace.workspace.data.applications.every((item) => item.employeeId === "gc-rbac-employee-erin"));
+  assert("manager applications are direct-report only", managerWorkspace.workspace.data.applications.every((item) => ["gc-rbac-employee-erin", "gc-rbac-employee-leo"].includes(item.employeeId)));
 
   const leadWorkspace = await getWorkspaceJson(sessions.lead.cookie);
   assert("lead role scoped", leadWorkspace.workspace.meta.userRole === "Apprenticeship Lead");
