@@ -59,6 +59,40 @@ async function main() {
     type: "saveProvider",
     provider: { providerId: "rbac-denied", providerName: "Denied Provider" },
   }), 403);
+  await expectStatus("employee second active application denied", () => postWorkspace(sessions.employee.cookie, {
+    type: "saveApplication",
+    application: {
+      id: "gc-rbac-app-second-active-denied",
+      employeeId: "gc-rbac-employee-erin",
+      apprenticeshipStandardId: "ST0118",
+      status: "Draft",
+      currentOwner: "Employee",
+      reason: "This second active request should be blocked.",
+      careerGoal: "Validate one active application policy.",
+      supportRequired: "No support required.",
+      managerNote: "",
+      submittedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      history: [],
+    },
+  }), 403);
+  await expectStatus("employee self approval denied", () => postWorkspace(sessions.employee.cookie, {
+    type: "saveApplication",
+    application: {
+      id: "gc-rbac-app-erin",
+      employeeId: "gc-rbac-employee-erin",
+      apprenticeshipStandardId: "ST0118",
+      status: "Approved for Enrolment",
+      currentOwner: "Provider Partner",
+      reason: "Should not be employee editable.",
+      careerGoal: "Should not be employee editable.",
+      supportRequired: "Should not be employee editable.",
+      managerNote: "Should not be employee editable.",
+      submittedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      history: [],
+    },
+  }), 403);
   await expectStatus("manager outside application status denied", () => postWorkspace(sessions.manager.cookie, {
     type: "updateApplicationStatus",
     id: "gc-rbac-app-nadia",

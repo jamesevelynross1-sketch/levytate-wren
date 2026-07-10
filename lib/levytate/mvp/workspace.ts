@@ -71,6 +71,7 @@ export type MvpEmployee = {
   jobTitle: string;
   roleId: string;
   managerId: string;
+  managerName?: string;
   department: string;
   site: string;
   platformRole: "Employee" | "Line Manager" | "Department Head" | "Apprenticeship Lead";
@@ -705,6 +706,7 @@ export function activeApplicationStatuses(): RequestStatus[] {
     "Draft",
     "Submitted to Line Manager",
     "Awaiting Manager Review",
+    "More information requested",
     "Approved by Line Manager",
     "Submitted to Apprenticeship Lead",
     "Awaiting Final Approval",
@@ -716,6 +718,7 @@ export function applicationOwnerForStatus(status: RequestStatus): MvpApplication
   if (status === "Approved for Enrolment") return "Provider Partner";
   if (status === "Approved by Line Manager" || status === "Submitted to Apprenticeship Lead" || status === "Awaiting Final Approval") return "Apprenticeship Lead";
   if (status === "Submitted to Line Manager" || status === "Awaiting Manager Review") return "Line Manager";
+  if (status === "More information requested") return "Employee";
   if (status === "Completed" || status === "Cancelled") return "Completed";
   return "Employee";
 }

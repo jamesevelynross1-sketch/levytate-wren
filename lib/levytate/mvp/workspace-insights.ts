@@ -228,5 +228,5 @@ export function employeeName(data: MvpWorkspaceData, employeeId: string) {
 }
 
 export function managerName(data: MvpWorkspaceData, employee: MvpEmployee) {
-  return data.employees.find((item) => item.id === employee.managerId)?.name ?? "Manager not assigned";
+  return employee.managerName || data.employees.find((item) => item.id === employee.managerId)?.name || "Manager not assigned";
 }

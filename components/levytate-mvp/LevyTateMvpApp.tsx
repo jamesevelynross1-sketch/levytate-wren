@@ -3,8 +3,10 @@
 import type { LucideIcon } from "lucide-react";
 import {
   BellRing,
+  BookOpenCheck,
   Building2,
   ChartNoAxesCombined,
+  ClipboardCheck,
   LayoutDashboard,
   LogOut,
   Settings,
@@ -18,6 +20,7 @@ import { ApplicationsModule } from "@/components/levytate-mvp/ApplicationsModule
 import { AskLevyTateAiWorkspace } from "@/components/levytate-mvp/AskLevyTateAiWorkspace";
 import { DashboardModule, SettingsModule } from "@/components/levytate-mvp/DashboardSettingsModules";
 import { EarlyAccessModule } from "@/components/levytate-mvp/EarlyAccessModule";
+import { EmployeeApplicationModule, EmployeeHomeModule, EmployeeProgrammeModule } from "@/components/levytate-mvp/EmployeeExperienceModule";
 import { EmployeesModule } from "@/components/levytate-mvp/EmployeesModule";
 import { EnrolmentsModule } from "@/components/levytate-mvp/EnrolmentsModule";
 import { GuidanceCentreModule } from "@/components/levytate-mvp/GuidanceCentreModule";
@@ -33,6 +36,8 @@ import { buildNotifications } from "@/lib/levytate/mvp/workspace-insights";
 
 const modules = [
   { name: "Home", icon: LayoutDashboard },
+  { name: "My Programme", icon: BookOpenCheck },
+  { name: "My Application", icon: ClipboardCheck },
   { name: "People", icon: Users },
   { name: "Providers", icon: Building2 },
   { name: "Copilot", icon: Sparkles },
@@ -48,6 +53,8 @@ type SettingsView = "Workspace" | "Early Access";
 
 const modulePermissions = {
   Home: "workspace:read",
+  "My Programme": "workspace:read",
+  "My Application": "applications:read",
   People: "employees:read",
   Providers: "providers:read",
   Copilot: "copilot:use",
@@ -75,6 +82,8 @@ const settingsViewPermissions = {
 
 const moduleCopy: Record<ModuleName, string> = {
   Home: "A short daily briefing showing what needs attention now.",
+  "My Programme": "Understand your recommended programme, why it fits and what support you can expect.",
+  "My Application": "Start, save and track your current apprenticeship application.",
   People: "Employees, roles, applications and enrolments in one guided workspace.",
   Providers: "Programme-first matching, provider evidence and relationship coverage.",
   Copilot: "Use LevyTate Copilot to explain, find, guide and create work inside the platform.",
@@ -98,7 +107,12 @@ function MvpAppShell() {
   const notifications = useMemo(() => buildNotifications(data), [data]);
   const permissions = meta?.permissions ?? permissionsForMvpRole(meta?.userRole);
   const can = (permission: MvpPermission) => hasMvpPermission(permissions, permission);
-  const availableModules = modules.filter((module) => can(modulePermissions[module.name]));
+  const employeeModules: readonly ModuleName[] = ["Home", "My Programme", "My Application", "Copilot", "Knowledge"];
+  const availableModules = modules.filter((module) => {
+    if (meta?.userRole === "Employee" && !employeeModules.includes(module.name)) return false;
+    if (meta?.userRole !== "Employee" && (module.name === "My Programme" || module.name === "My Application")) return false;
+    return can(modulePermissions[module.name]);
+  });
   const peopleItems = (["Employees", "Roles", "Applications", "Enrolments"] as PeopleView[]).filter((item) => can(peopleViewPermissions[item]));
   const providerItems = (["Programmes", "Relationships"] as ProviderView[]).filter((item) => can(providerViewPermissions[item]));
   const settingsItems = (["Workspace", "Early Access"] as SettingsView[]).filter((item) => can(settingsViewPermissions[item]));
@@ -139,6 +153,14 @@ function MvpAppShell() {
   }
 
   function navigateTo(target: string) {
+    if (target === "My Programme" || target === "Programme") {
+      openModule("My Programme");
+      return;
+    }
+    if (target === "My Application" || target === "Application") {
+      openModule("My Application");
+      return;
+    }
     if (target === "Ask LevyTate AI" || target === "LevyTate Copilot" || target === "AI" || target === "Copilot") {
       openModule("Copilot");
       return;
@@ -285,7 +307,13 @@ function MvpAppShell() {
               <p className="mt-1.5 max-w-3xl text-sm leading-6 text-[#102c3d]/56">{moduleCopy[activeModule]}</p>
             </section>
 
-            {activeModule === "Home" ? <DashboardModule onNavigate={navigateTo} /> : null}
+            {activeModule === "Home" ? (
+              meta?.userRole === "Employee"
+                ? <EmployeeHomeModule onNavigate={(target) => navigateTo(target)} />
+                : <DashboardModule onNavigate={navigateTo} />
+            ) : null}
+            {activeModule === "My Programme" ? <EmployeeProgrammeModule onNavigate={(target) => navigateTo(target)} /> : null}
+            {activeModule === "My Application" ? <EmployeeApplicationModule /> : null}
             {activeModule === "Copilot" ? <AskLevyTateAiWorkspace initialEmployeeId={aiEmployeeId} onNavigate={navigateTo} /> : null}
             {activeModule === "Knowledge" ? <GuidanceCentreModule /> : null}
             {activeModule === "People" ? (

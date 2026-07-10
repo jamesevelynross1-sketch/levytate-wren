@@ -35,6 +35,7 @@ const requestStatuses: RequestStatus[] = [
   "Draft",
   "Submitted to Line Manager",
   "Awaiting Manager Review",
+  "More information requested",
   "Declined by Line Manager",
   "Approved by Line Manager",
   "Submitted to Apprenticeship Lead",

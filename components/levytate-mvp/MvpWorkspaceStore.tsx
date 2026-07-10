@@ -5,6 +5,7 @@ import type { ProviderCatalogueRecord, ProviderProgramme, RequestStatus } from "
 import type { LevyTateWorkspaceBootstrap, LevyTateWorkspaceMeta, LevyTateWorkspaceMutation } from "@/lib/levytate/mvp/api";
 import { hasMvpPermission, mvpMutationPermission, permissionsForMvpRole, type MvpPermission } from "@/lib/levytate/mvp/rbac";
 import {
+  activeApplicationStatuses,
   applicationOwnerForStatus,
   buildApplicationHistoryEntry,
   createEmptyMvpWorkspace,
@@ -275,6 +276,37 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
       return;
     }
 
+    if (mutation.type === "saveApplication") {
+      const activeStatuses = activeApplicationStatuses();
+      const anotherActiveApplication = data.applications.some((application) =>
+        application.employeeId === mutation.application.employeeId &&
+        application.id !== mutation.application.id &&
+        activeStatuses.includes(application.status) &&
+        activeStatuses.includes(mutation.application.status)
+      );
+
+      if (anotherActiveApplication) {
+        setMeta((current) => appendWarning(current, "This employee already has an active apprenticeship application."));
+        return;
+      }
+
+      if (meta?.userRole === "Employee") {
+        const existing = data.applications.find((application) => application.id === mutation.application.id);
+        const employeeSaveStatuses: RequestStatus[] = ["Draft", "Submitted to Line Manager", "Awaiting Manager Review"];
+        const employeeEditableStatuses: RequestStatus[] = ["Draft", "More information requested"];
+
+        if (!employeeSaveStatuses.includes(mutation.application.status)) {
+          setMeta((current) => appendWarning(current, "Employees can save drafts or submit applications to their line manager only."));
+          return;
+        }
+
+        if (existing && !employeeEditableStatuses.includes(existing.status)) {
+          setMeta((current) => appendWarning(current, "Submitted applications cannot be edited unless more information has been requested."));
+          return;
+        }
+      }
+    }
+
     if (!alreadyOptimistic) {
       setData((current) => {
         const next = applyMutationLocally(current, mutation);
@@ -284,7 +316,7 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
     }
 
     syncMutation(mutation);
-  }, [syncMutation, meta]);
+  }, [data.applications, syncMutation, meta]);
 
   useEffect(() => {
     if (!hydrated || attemptedMigration.current || meta?.storageMode !== "supabase" || !isWorkspaceEmpty(data) || typeof window === "undefined") {

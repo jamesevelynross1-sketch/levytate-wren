@@ -23,6 +23,7 @@ export function decisionNoteFor(status: RequestStatus) {
     Draft: "More information requested before this can progress.",
     "Submitted to Line Manager": "Submitted to line manager for review.",
     "Awaiting Manager Review": "Awaiting line manager review.",
+    "More information requested": "More information requested before the manager can make a decision.",
     "Declined by Line Manager": "Declined by line manager. Reason captured in review notes.",
     "Approved by Line Manager": "Approved by line manager and ready for apprenticeship lead review.",
     "Submitted to Apprenticeship Lead": "Approved by line manager and sent for final approval.",

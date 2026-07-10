@@ -12,6 +12,7 @@ import { mvpProviderCatalogue, mvpProviderProgrammes } from "@/lib/levytate/data
 import type { LevyTateBetaSession } from "@/lib/levytate/config/beta-access";
 import type { LevyTateWorkspaceBootstrap, LevyTateWorkspaceMeta, LevyTateWorkspaceMutation } from "@/lib/levytate/mvp/api";
 import {
+  activeApplicationStatuses,
   applicationOwnerForStatus,
   buildApplicationHistoryEntry,
   createEmptyMvpWorkspace,
@@ -494,6 +495,10 @@ async function assertMutationAllowed(context: WorkspaceContext, mutation: LevyTa
   }
 
   const role = normaliseMvpUserRole(context.user.role);
+  if (mutation.type === "saveApplication") {
+    await assertOneActiveApplication(context.organisation.id, mutation.application);
+  }
+
   if (role === "Platform Admin" || role === "Employer Admin" || role === "Apprenticeship Lead") return;
 
   const employees = await selectMany<EmployeeRow>(
@@ -519,6 +524,7 @@ async function assertMutationAllowed(context: WorkspaceContext, mutation: LevyTa
       return;
     case "saveApplication":
       assertCanAccessEmployee(mutation.application.employeeId);
+      await assertEmployeeCanSaveApplication(context.organisation.id, mutation.application, role, employees);
       return;
     case "updateApplicationStatus": {
       const application = await selectOne<ApplicationRow>(applicationsTable, new URLSearchParams({
@@ -535,6 +541,77 @@ async function assertMutationAllowed(context: WorkspaceContext, mutation: LevyTa
     }
     default:
       return;
+  }
+}
+
+async function assertOneActiveApplication(organisationId: string, application: MvpApplication) {
+  if (!activeApplicationStatuses().includes(application.status)) return;
+
+  const applications = await selectMany<ApplicationRow>(
+    applicationsTable,
+    organisationId,
+    "id,employee_id,status",
+    "updated_at.desc",
+  );
+
+  const existingActive = applications.find((item) =>
+    item.employee_id === application.employeeId &&
+    item.id !== application.id &&
+    activeApplicationStatuses().includes(item.status)
+  );
+
+  if (existingActive) {
+    throw new LevyTateWorkspacePermissionError("This employee already has an active apprenticeship application.");
+  }
+}
+
+async function assertEmployeeCanSaveApplication(
+  organisationId: string,
+  application: MvpApplication,
+  role: ReturnType<typeof normaliseMvpUserRole>,
+  employees: EmployeeRow[],
+) {
+  if (role !== "Employee") return;
+
+  const employeeEditableStatuses: RequestStatus[] = ["Draft", "More information requested"];
+  const employeeSaveStatuses: RequestStatus[] = ["Draft", "Submitted to Line Manager", "Awaiting Manager Review"];
+
+  if (!employeeSaveStatuses.includes(application.status)) {
+    throw new LevyTateWorkspacePermissionError("Employees can save drafts or submit applications to their line manager only.");
+  }
+
+  const existing = await selectOne<ApplicationRow>(
+    applicationsTable,
+    new URLSearchParams({
+      select: "id,employee_id,status",
+      organisation_id: `eq.${organisationId}`,
+      id: `eq.${application.id}`,
+      limit: "1",
+    }),
+  );
+
+  if (existing && !employeeEditableStatuses.includes(existing.status)) {
+    throw new LevyTateWorkspacePermissionError("Submitted applications cannot be edited unless more information has been requested.");
+  }
+
+  const employee = employees.find((item) => item.id === application.employeeId);
+  if (!employee?.role_id) {
+    throw new LevyTateWorkspacePermissionError("Your employee record is not linked to a role library entry.");
+  }
+
+  const mapping = await selectOne<RoleMappingRow>(
+    roleMappingsTable,
+    new URLSearchParams({
+      select: "id",
+      organisation_id: `eq.${organisationId}`,
+      role_id: `eq.${employee.role_id}`,
+      apprenticeship_standard_id: `eq.${application.apprenticeshipStandardId}`,
+      limit: "1",
+    }),
+  );
+
+  if (!mapping) {
+    throw new LevyTateWorkspacePermissionError("Employees can only apply for programmes mapped to their assigned role.");
   }
 }
 
@@ -578,7 +655,12 @@ function scopeWorkspaceDataForContext(workspace: MvpWorkspaceData, context: Work
   }
 
   const visibleEmployeeIds = readableEmployeeIdsForUser(context.user.email, role, workspace.employees.map(employeeRecordToRow));
-  const visibleEmployees = workspace.employees.filter((employee) => visibleEmployeeIds.has(employee.id));
+  const visibleEmployees = workspace.employees
+    .filter((employee) => visibleEmployeeIds.has(employee.id))
+    .map((employee) => ({
+      ...employee,
+      managerName: workspace.employees.find((manager) => manager.id === employee.managerId)?.name ?? employee.managerName ?? "",
+    }));
   const visibleRoleIds = new Set(visibleEmployees.map((employee) => employee.roleId).filter(Boolean));
   const visibleApplications = workspace.applications.filter((application) => visibleEmployeeIds.has(application.employeeId));
   const visibleApplicationIds = new Set(visibleApplications.map((application) => application.id));

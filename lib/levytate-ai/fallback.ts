@@ -15,6 +15,7 @@ const activeApplicationStatuses = new Set([
   "Draft",
   "Submitted to Line Manager",
   "Awaiting Manager Review",
+  "More information requested",
   "Approved by Line Manager",
   "Submitted to Apprenticeship Lead",
   "Awaiting Final Approval",
