@@ -14,7 +14,7 @@ export default async function LevyTateAppPage() {
   const cookieStore = await cookies();
   const session = await readLevyTateBetaSession(cookieStore.get(levytateBetaSessionCookie)?.value);
 
-  if (!session) redirect("/login");
+  if (!session) redirect("/levytate/login");
 
   try {
     const initialWorkspace = await getWorkspaceBootstrapForSession(session);
@@ -36,7 +36,7 @@ function AccountSetupRequired({ message }: { message: string }) {
         <h1 className="mt-3 text-3xl font-semibold tracking-[-0.035em]">Account setup required</h1>
         <p className="mt-4 text-sm leading-6 text-[#102c3d]/64">{message}</p>
         <a
-          href="/login"
+          href="/levytate/login"
           className="mt-6 inline-flex h-11 items-center justify-center rounded-full bg-[#102c3d] px-5 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(16,44,61,0.14)]"
         >
           Return to login

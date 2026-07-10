@@ -49,7 +49,7 @@ export function LevyTateLoginClient() {
       return;
     }
 
-    router.push("/app");
+    router.push(getSafeLevyTateReturnTo());
     router.refresh();
   }
 
@@ -83,6 +83,28 @@ export function LevyTateLoginClient() {
       </section>
     </main>
   );
+}
+
+function getSafeLevyTateReturnTo() {
+  const defaultDestination = "/levytate/app";
+
+  if (typeof window === "undefined") return defaultDestination;
+
+  const rawReturnTo = new URLSearchParams(window.location.search).get("returnTo");
+  if (!rawReturnTo || !rawReturnTo.startsWith("/") || rawReturnTo.startsWith("//")) return defaultDestination;
+
+  try {
+    const destination = new URL(rawReturnTo, window.location.origin);
+    const isSameOrigin = destination.origin === window.location.origin;
+    const isLevyTatePath = destination.pathname.startsWith("/levytate/");
+    const isLoginPath = destination.pathname === "/levytate/login";
+
+    if (!isSameOrigin || !isLevyTatePath || isLoginPath) return defaultDestination;
+
+    return `${destination.pathname}${destination.search}${destination.hash}`;
+  } catch {
+    return defaultDestination;
+  }
 }
 
 function readLocalLead(email: string) {

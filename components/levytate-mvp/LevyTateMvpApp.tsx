@@ -144,7 +144,7 @@ function MvpAppShell() {
 
   async function logout() {
     await fetch("/api/levytate-beta-logout", { method: "POST" });
-    window.location.href = "/login";
+    window.location.href = "/levytate/login";
   }
 
   function openModule(module: ModuleName) {
