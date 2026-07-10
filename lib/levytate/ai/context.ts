@@ -1,4 +1,9 @@
 import { mvpProviderCatalogue } from "@/lib/levytate/data/mvp";
+import {
+  copilotGuidanceUnavailableMessage,
+  retrieveCopilotSafeGuidanceSources,
+  trustedGuidanceSources,
+} from "@/lib/levytate/guidance/source-registry";
 import { getLiveApprenticeshipStandards } from "@/lib/levytate/domain";
 import type { LevyTateAiRequest } from "@/lib/levytate/ai/types";
 
@@ -17,6 +22,8 @@ const productRules = [
   "Provider records are catalogue candidates and must not be described as commercial partners unless that status is supplied explicitly.",
   "Never claim an apprenticeship is fully funded. Use potentially levy-funded or potentially funded through levy/co-investment.",
   "No application, approval, provider request or admin task is created until the user confirms the deterministic workflow action.",
+  "GOV.UK and Skills England define apprenticeship rules. LevyTate explains them using approved trusted sources.",
+  "When guidance is not backed by an Active, Approved and Copilot-approved trusted source, use the approved fallback wording and route to apprenticeship lead or LevyTate adviser review.",
 ];
 
 function catalogueContext(request: LevyTateAiRequest) {
@@ -47,6 +54,10 @@ function pathwayContext(request: LevyTateAiRequest) {
 }
 
 export function buildLevyTateAiContext(request: LevyTateAiRequest) {
+  const approvedGuidanceSources = retrieveCopilotSafeGuidanceSources(trustedGuidanceSources, {
+    asOf: new Date().toISOString().slice(0, 10),
+  }).slice(0, 12);
+
   return {
     workspace: request.currentWorkspace ?? {
       employerName: request.employerContext,
@@ -63,6 +74,19 @@ export function buildLevyTateAiContext(request: LevyTateAiRequest) {
     roleMappings: request.roleMappings?.slice(0, 20) ?? [],
     availablePathways: pathwayContext(request),
     providerCatalogue: catalogueContext(request),
+    trustedGuidance: {
+      rule: "Only sources that are Active, Approved, Copilot approved, current for the relevant funding year or start date, and not superseded may be used as authoritative guidance.",
+      fallbackMessage: copilotGuidanceUnavailableMessage,
+      approvedSourceCount: approvedGuidanceSources.length,
+      approvedSources: approvedGuidanceSources.map((source) => ({
+        title: source.title,
+        publisher: source.publisher,
+        sourceUrl: source.sourceUrl,
+        authorityLevel: source.authorityLevel,
+        categories: source.guidanceCategories,
+        fundingYear: source.fundingYear,
+      })),
+    },
     productRules,
   };
 }
