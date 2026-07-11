@@ -3,6 +3,16 @@ import { buildLevyTateRecommendations } from "@/lib/levytate/ai/recommendationEn
 import { groundControlImportSummary, groundControlOrganisationRows, groundControlPersonaImports, type GroundControlOrganisationRow, type GroundControlPersonaImport } from "@/lib/levytate/data/demo/ground-control-import";
 import type { LevyTateWorkspaceBootstrap } from "@/lib/levytate/mvp/api";
 import {
+  calculateLearnerProgressVariance,
+  createLearnerLifecycleEvent,
+  englandWorkingHoursDeclarationVersion,
+  englandWorkingHoursDeclarationWording,
+  type LearnerLifecycleCollections,
+  type LearnerLifecycleStatus,
+  type LearnerOperationalActionType,
+  type LearnerReviewType,
+} from "@/lib/levytate/mvp/learner-lifecycle";
+import {
   applicationOwnerForStatus,
   buildApplicationHistoryEntry,
   createEmptyMvpWorkspace,
@@ -320,6 +330,33 @@ function progressionFor(row: GroundControlOrganisationRow) {
   return ["Career progression", "Future specialist route"];
 }
 
+type LifecycleScenario = {
+  key: string;
+  title: string;
+  employeeIndex: number;
+  lifecycleStatus: LearnerLifecycleStatus;
+  employmentRoute: "existing_employee_upskill" | "recruited_as_apprentice" | "not_confirmed";
+  startOffsetDays: number;
+  durationMonths: number;
+  targetProgress: number;
+  actualProgress: number;
+  providerReviewDate: string;
+  landdCheckInDate: string;
+  notes: string;
+};
+
+const lifecycleScenarios: LifecycleScenario[] = [
+  { key: "pre-enrolment", title: "Pre-enrolment", employeeIndex: 0, lifecycleStatus: "pre_enrolment", employmentRoute: "existing_employee_upskill", startOffsetDays: 45, durationMonths: 18, targetProgress: 0, actualProgress: 0, providerReviewDate: "2026-08-05", landdCheckInDate: "2026-07-18", notes: "Awaiting HR and probation confirmation before provider enrolment." },
+  { key: "on-track", title: "Enrolled and on track", employeeIndex: 1, lifecycleStatus: "enrolled", employmentRoute: "existing_employee_upskill", startOffsetDays: -160, durationMonths: 18, targetProgress: 32, actualProgress: 36, providerReviewDate: "2026-06-24", landdCheckInDate: "2026-07-02", notes: "Learner is ahead of target and using workplace evidence from field reporting." },
+  { key: "behind-target", title: "Enrolled and behind target", employeeIndex: 2, lifecycleStatus: "enrolled", employmentRoute: "existing_employee_upskill", startOffsetDays: -210, durationMonths: 18, targetProgress: 44, actualProgress: 31, providerReviewDate: "2026-06-27", landdCheckInDate: "2026-07-04", notes: "Learner needs manager support to recover delayed off-the-job evidence." },
+  { key: "break", title: "Active break in learning", employeeIndex: 3, lifecycleStatus: "break_in_learning", employmentRoute: "existing_employee_upskill", startOffsetDays: -120, durationMonths: 18, targetProgress: 25, actualProgress: 22, providerReviewDate: "2026-05-29", landdCheckInDate: "2026-06-12", notes: "Temporary operational redeployment has paused learning activity." },
+  { key: "withdrawn", title: "Withdrawn", employeeIndex: 4, lifecycleStatus: "withdrawn", employmentRoute: "existing_employee_upskill", startOffsetDays: -260, durationMonths: 18, targetProgress: 52, actualProgress: 18, providerReviewDate: "2026-04-30", landdCheckInDate: "2026-05-10", notes: "Withdrawal recorded after role change and learner/provider discussion." },
+  { key: "assessment-prep", title: "Assessment preparation", employeeIndex: 5, lifecycleStatus: "assessment_preparation", employmentRoute: "recruited_as_apprentice", startOffsetDays: -430, durationMonths: 18, targetProgress: 88, actualProgress: 86, providerReviewDate: "2026-06-20", landdCheckInDate: "2026-06-26", notes: "Gateway evidence is being checked before readiness confirmation." },
+  { key: "in-assessment", title: "In assessment", employeeIndex: 6, lifecycleStatus: "in_assessment", employmentRoute: "existing_employee_upskill", startOffsetDays: -470, durationMonths: 18, targetProgress: 96, actualProgress: 97, providerReviewDate: "2026-06-14", landdCheckInDate: "2026-06-21", notes: "Assessment window is active and HR/manager EPA communication has been sent." },
+  { key: "achieved", title: "Achieved", employeeIndex: 7, lifecycleStatus: "achieved", employmentRoute: "existing_employee_upskill", startOffsetDays: -560, durationMonths: 18, targetProgress: 100, actualProgress: 100, providerReviewDate: "2026-05-15", landdCheckInDate: "2026-05-22", notes: "Achievement complete with certificate received and completion email sent." },
+  { key: "completed-without-achievement", title: "Completed without achievement", employeeIndex: 8, lifecycleStatus: "completed_without_achievement", employmentRoute: "existing_employee_upskill", startOffsetDays: -580, durationMonths: 18, targetProgress: 100, actualProgress: 100, providerReviewDate: "2026-05-08", landdCheckInDate: "2026-05-16", notes: "Learning completed but assessment was not achieved, with follow-up advice recorded." },
+];
+
 export const groundControlWorkspace: LevyTateWorkspaceBootstrap = {
   data: buildGroundControlWorkspace(),
   meta: {
@@ -341,6 +378,7 @@ function buildGroundControlWorkspace(): MvpWorkspaceData {
   const employees = spreadsheetEmployeeSeeds.map(toEmployee);
   const employeeDevelopmentProfiles = spreadsheetEmployeeSeeds.map(toDevelopmentProfile);
   const applications = spreadsheetEmployeeSeeds.flatMap(toApplication);
+  const lifecycle = learnerLifecycleData(applications);
 
   return sanitiseSeedValue({
     ...empty,
@@ -367,6 +405,7 @@ function buildGroundControlWorkspace(): MvpWorkspaceData {
     providerRelationships: providerRelationships(),
     matchingRequests: matchingRequests(),
     enrolments: enrolments(applications),
+    ...lifecycle,
   });
 }
 
@@ -760,6 +799,300 @@ function enrolments(applications: MvpApplication[]): MvpEnrolment[] {
     });
 }
 
+function learnerLifecycleData(applications: MvpApplication[]): LearnerLifecycleCollections {
+  const learnerRecords: LearnerLifecycleCollections["learnerRecords"] = [];
+  const eligibilityDeclarations: LearnerLifecycleCollections["eligibilityDeclarations"] = [];
+  const preEnrolmentChecks: LearnerLifecycleCollections["preEnrolmentChecks"] = [];
+  const breaksInLearning: LearnerLifecycleCollections["breaksInLearning"] = [];
+  const withdrawals: LearnerLifecycleCollections["withdrawals"] = [];
+  const learnerReviews: LearnerLifecycleCollections["learnerReviews"] = [];
+  const progressUpdates: LearnerLifecycleCollections["progressUpdates"] = [];
+  const assessmentReadiness: LearnerLifecycleCollections["assessmentReadiness"] = [];
+  const achievements: LearnerLifecycleCollections["achievements"] = [];
+  const operationalActions: LearnerLifecycleCollections["operationalActions"] = [];
+  const lifecycleEvents: LearnerLifecycleCollections["lifecycleEvents"] = [];
+
+  lifecycleScenarios.forEach((scenario, index) => {
+    const seed = spreadsheetEmployeeSeeds[scenario.employeeIndex] ?? spreadsheetEmployeeSeeds[index];
+    if (!seed) return;
+
+    const application = applications.find((item) => item.employeeId === seed.id);
+    const startDate = addDays("2026-07-01", scenario.startOffsetDays);
+    const expectedEndDate = addMonths(startDate, scenario.durationMonths);
+    const learnerRecordId = `gc-learner-${scenario.key}`;
+    const providerId = providerIdFor(seed.recommendation.provider);
+    const programmeId = programmeIdFor(seed.recommendation.standardId, providerId);
+
+    learnerRecords.push({
+      id: learnerRecordId,
+      organisationId: "demo-ground-control",
+      employeeId: seed.id,
+      applicationId: application?.id ?? `gc-app-lifecycle-${seed.id}`,
+      programmeId,
+      providerId,
+      enrolmentId: scenario.lifecycleStatus === "pre_enrolment" ? "" : `gc-enrol-lifecycle-${seed.id}`,
+      lifecycleStatus: scenario.lifecycleStatus,
+      employmentRoute: scenario.employmentRoute,
+      expectedStartDate: startDate,
+      actualStartDate: scenario.lifecycleStatus === "pre_enrolment" ? "" : startDate,
+      expectedEndDate,
+      actualEndDate: scenario.lifecycleStatus === "achieved" ? "2026-06-03" : "",
+      createdAt,
+      updatedAt,
+      createdBy: "LevyTate demo seed",
+      updatedBy: "LevyTate demo seed",
+      recordStatus: "Active",
+      demonstrationRecord: true,
+    });
+
+    eligibilityDeclarations.push({
+      id: `gc-eligibility-${scenario.key}`,
+      organisationId: "demo-ground-control",
+      learnerRecordId,
+      declarationType: "england_working_hours",
+      declarationWording: englandWorkingHoursDeclarationWording,
+      declarationVersion: englandWorkingHoursDeclarationVersion,
+      confirmed: scenario.lifecycleStatus !== "pre_enrolment",
+      confirmedByEmployee: scenario.lifecycleStatus === "pre_enrolment" ? "" : seed.name,
+      confirmedAt: scenario.lifecycleStatus === "pre_enrolment" ? "" : addDays(startDate, -8),
+      expectedEnglandWorkingHoursPercentage: 95,
+      verifiedBy: scenario.lifecycleStatus === "pre_enrolment" ? "" : "Ground Control L&D",
+      verifiedAt: scenario.lifecycleStatus === "pre_enrolment" ? "" : addDays(startDate, -5),
+      verificationStatus: scenario.lifecycleStatus === "pre_enrolment" ? "employee_confirmed" : "employer_verified",
+      notes: "Demonstration declaration based on expected working hours in England, not home address.",
+      createdAt,
+      updatedAt,
+    });
+
+    preEnrolmentChecks.push({
+      id: `gc-pre-enrolment-${scenario.key}`,
+      organisationId: "demo-ground-control",
+      learnerRecordId,
+      probationStatus: scenario.lifecycleStatus === "pre_enrolment" ? "awaiting_confirmation" : "passed",
+      probationPassedDate: scenario.lifecycleStatus === "pre_enrolment" ? "" : addDays(startDate, -20),
+      probationConfirmedBy: scenario.lifecycleStatus === "pre_enrolment" ? "" : "People team",
+      probationConfirmedAt: scenario.lifecycleStatus === "pre_enrolment" ? "" : addDays(startDate, -19),
+      probationNotes: scenario.lifecycleStatus === "pre_enrolment" ? "Awaiting manager confirmation." : "Probation evidence confirmed before enrolment.",
+      hrApprovalStatus: scenario.lifecycleStatus === "pre_enrolment" ? "awaiting_approval" : "approved",
+      hrApprovedDate: scenario.lifecycleStatus === "pre_enrolment" ? "" : addDays(startDate, -15),
+      hrApprovedBy: scenario.lifecycleStatus === "pre_enrolment" ? "" : "HR operations",
+      hrApprovalNotes: scenario.lifecycleStatus === "pre_enrolment" ? "Pending HR approval." : "HR approved the apprenticeship start.",
+      guidesSent: scenario.lifecycleStatus !== "pre_enrolment",
+      guidesSentDate: scenario.lifecycleStatus === "pre_enrolment" ? "" : addDays(startDate, -12),
+      guidesSentBy: scenario.lifecycleStatus === "pre_enrolment" ? "" : "L&D coordinator",
+      guidesVersion: "GC learner guide v1.0",
+      guidesNotes: "Learner, manager and HR guidance pack tracked as an auditable operational action.",
+      createdAt,
+      updatedAt,
+    });
+
+    learnerReviews.push(review(learnerRecordId, scenario, "provider_review", scenario.providerReviewDate, providerId, "Provider coach", scenario.notes));
+    learnerReviews.push(review(learnerRecordId, scenario, "l_and_d_check_in", scenario.landdCheckInDate, "", "Ground Control L&D", "L&D check-in confirmed support actions and next milestone."));
+    learnerReviews.push(review(learnerRecordId, scenario, "manager_check_in", addDays(scenario.landdCheckInDate, -7), "", "Line manager", "Manager confirmed workplace evidence and operational support."));
+
+    progressUpdates.push(progress(learnerRecordId, scenario, addDays(scenario.providerReviewDate, -28), Math.max(0, scenario.targetProgress - 8), Math.max(0, scenario.actualProgress - 7), "provider_report"));
+    progressUpdates.push(progress(learnerRecordId, scenario, scenario.providerReviewDate, scenario.targetProgress, scenario.actualProgress, "provider_review"));
+
+    if (scenario.lifecycleStatus === "break_in_learning") {
+      breaksInLearning.push({
+        id: "gc-break-active",
+        organisationId: "demo-ground-control",
+        learnerRecordId,
+        startDate: "2026-06-10",
+        expectedReturnDate: "2026-08-01",
+        actualReturnDate: "",
+        reasonCategory: "Operational redeployment",
+        reasonNotes: "Learner temporarily redeployed to support peak operational demand.",
+        status: "active",
+        recordedBy: "Ground Control L&D",
+        recordedAt: "2026-06-10T09:00:00.000Z",
+        updatedAt,
+      });
+    }
+
+    if (scenario.lifecycleStatus === "withdrawn") {
+      withdrawals.push({
+        id: "gc-withdrawal-demo",
+        organisationId: "demo-ground-control",
+        learnerRecordId,
+        withdrawalDate: "2026-05-20",
+        effectiveDate: "2026-05-31",
+        reasonCategory: "Role changed",
+        reasonNotes: "Employee moved into a role that no longer aligned with the programme evidence plan.",
+        initiatedBy: "Learner and manager",
+        providerNotified: true,
+        providerNotifiedDate: "2026-05-21",
+        employeeNotified: true,
+        employeeNotifiedDate: "2026-05-21",
+        recordedBy: "Ground Control L&D",
+        recordedAt: "2026-05-21T10:00:00.000Z",
+      });
+    }
+
+    if (["assessment_preparation", "in_assessment", "achieved", "completed_without_achievement"].includes(scenario.lifecycleStatus)) {
+      assessmentReadiness.push({
+        id: `gc-assessment-${scenario.key}`,
+        organisationId: "demo-ground-control",
+        learnerRecordId,
+        assessmentModel: "end_point_assessment",
+        expectedAssessmentReadinessDate: "2026-06-30",
+        actualAssessmentReadinessDate: scenario.lifecycleStatus === "assessment_preparation" ? "" : "2026-06-24",
+        gatewayDate: scenario.lifecycleStatus === "assessment_preparation" ? "2026-07-18" : "2026-06-24",
+        assessmentStatus: scenario.lifecycleStatus === "assessment_preparation"
+          ? "preparing"
+          : scenario.lifecycleStatus === "in_assessment"
+            ? "in_assessment"
+            : scenario.lifecycleStatus === "completed_without_achievement"
+              ? "unsuccessful"
+              : "completed",
+        assessmentOrganisation: "Independent assessment organisation to confirm",
+        assessmentNotes: scenario.lifecycleStatus === "assessment_preparation" ? "Gateway evidence being checked." : "Assessment readiness confirmed by provider and employer.",
+        createdAt,
+        updatedAt,
+      });
+    }
+
+    if (scenario.lifecycleStatus === "achieved") {
+      achievements.push({
+        id: "gc-achievement-demo",
+        organisationId: "demo-ground-control",
+        learnerRecordId,
+        expectedAchievementDate: "2026-06-30",
+        actualAchievementDate: "2026-06-03",
+        grade: "Distinction",
+        gradeType: "EPA grade",
+        certificateReceived: true,
+        certificateReceivedDate: "2026-06-18",
+        resultNotes: "Achievement recorded for demonstration reporting and completion workflow validation.",
+        recordedBy: "Ground Control L&D",
+        recordedAt: "2026-06-18T10:00:00.000Z",
+      });
+    }
+
+    operationalActions.push(action(learnerRecordId, "guides_sent", scenario.lifecycleStatus !== "pre_enrolment", scenario.lifecycleStatus === "pre_enrolment" ? "" : addDays(startDate, -12), "Learner, manager and HR guide pack."));
+    operationalActions.push(action(learnerRecordId, "hr_and_manager_assessment_email_sent", ["in_assessment", "achieved", "completed_without_achievement"].includes(scenario.lifecycleStatus), ["in_assessment", "achieved", "completed_without_achievement"].includes(scenario.lifecycleStatus) ? "2026-06-25" : "", "HR and manager assessment/EPA readiness email."));
+    operationalActions.push(action(learnerRecordId, "completion_email_sent", ["achieved", "completed_without_achievement"].includes(scenario.lifecycleStatus), ["achieved", "completed_without_achievement"].includes(scenario.lifecycleStatus) ? "2026-06-19" : "", "Completion email to learner, manager and HR."));
+
+    lifecycleEvents.push(createLearnerLifecycleEvent({
+      id: `gc-event-created-${scenario.key}`,
+      organisationId: "demo-ground-control",
+      learnerRecordId,
+      eventType: "learner_record_created",
+      previousStatus: "",
+      newStatus: scenario.lifecycleStatus,
+      eventDate: createdAt,
+      actorUserId: "demo-seed",
+      actorName: "LevyTate demo seed",
+      source: "ground_control_demo_seed",
+      summary: `${scenario.title} demonstration learner record created.`,
+      metadata: { scenario: scenario.key, demonstrationRecord: true },
+      createdAt,
+    }));
+  });
+
+  return {
+    learnerRecords,
+    eligibilityDeclarations,
+    preEnrolmentChecks,
+    breaksInLearning,
+    withdrawals,
+    learnerReviews,
+    progressUpdates,
+    assessmentReadiness,
+    achievements,
+    operationalActions,
+    lifecycleEvents,
+  };
+}
+
+function review(
+  learnerRecordId: string,
+  scenario: LifecycleScenario,
+  reviewType: LearnerReviewType,
+  reviewDate: string,
+  providerId: string,
+  reviewerName: string,
+  summary: string,
+) {
+  return {
+    id: `gc-review-${scenario.key}-${reviewType}`,
+    organisationId: "demo-ground-control",
+    learnerRecordId,
+    reviewType,
+    reviewDate,
+    nextReviewDate: addDays(reviewDate, 42),
+    reviewerName,
+    reviewerUserId: "",
+    providerId,
+    summary,
+    actions: scenario.actualProgress < scenario.targetProgress ? ["Agree catch-up evidence plan", "Manager to protect study time"] : ["Continue current evidence plan"],
+    supportRequired: scenario.actualProgress < scenario.targetProgress ? "Manager and L&D support required to recover progress variance." : "No additional support required beyond planned check-ins.",
+    status: scenario.actualProgress < scenario.targetProgress ? "action_required" : "completed",
+    createdAt,
+    updatedAt,
+  } satisfies LearnerLifecycleCollections["learnerReviews"][number];
+}
+
+function progress(
+  learnerRecordId: string,
+  scenario: LifecycleScenario,
+  updateDate: string,
+  targetProgressPercentage: number,
+  actualProgressPercentage: number,
+  progressSource: "provider_report" | "provider_review",
+) {
+  return {
+    id: `gc-progress-${scenario.key}-${updateDate}`,
+    organisationId: "demo-ground-control",
+    learnerRecordId,
+    updateDate,
+    targetProgressPercentage,
+    actualProgressPercentage,
+    variancePercentage: calculateLearnerProgressVariance(targetProgressPercentage, actualProgressPercentage),
+    progressSource,
+    sourceReference: `${scenario.title} demonstration ${progressSource.replace(/_/g, " ")}`,
+    updatedBy: progressSource === "provider_review" ? "Provider coach" : "L&D coordinator",
+    summary: scenario.notes,
+    supportAction: actualProgressPercentage < targetProgressPercentage ? "Create progress recovery plan with manager." : "Maintain current plan.",
+    createdAt,
+  } satisfies LearnerLifecycleCollections["progressUpdates"][number];
+}
+
+function action(
+  learnerRecordId: string,
+  actionType: LearnerOperationalActionType,
+  completed: boolean,
+  completedAt: string,
+  recipientSummary: string,
+) {
+  return {
+    id: `gc-action-${learnerRecordId}-${actionType}`,
+    organisationId: "demo-ground-control",
+    learnerRecordId,
+    actionType,
+    status: completed ? "completed" : "not_started",
+    completed,
+    completedAt,
+    completedBy: completed ? "Ground Control L&D" : "",
+    recipientSummary,
+    notes: completed ? "Completed in demonstration learner record." : "Pending future workflow.",
+    createdAt,
+    updatedAt,
+  } satisfies LearnerLifecycleCollections["operationalActions"][number];
+}
+
+function programmeIdFor(standardId: string, providerId: string) {
+  const lookup: Record<string, string> = {
+    "provider-qa:ST0118": "programme-qa-data-analyst",
+    "provider-qa:ST0117": "programme-qa-business-analyst",
+    "provider-apprentify:ST0192": "programme-apprentify-business-analyst",
+    "provider-learning-curve-group:ST0071": "programme-learning-curve-customer-service-specialist",
+    "provider-srscc:ST0810": "programme-srscc-procurement-supply-assistant",
+    "provider-rhg-consult:ST0550": "programme-rhg-she-tech",
+  };
+  return lookup[`${providerId}:${standardId}`] ?? `${providerId}-${standardId.toLowerCase()}`;
+}
+
 function providerIdFor(providerName: string) {
   const lookup: Record<string, string> = {
     Apprentify: "provider-apprentify",
@@ -771,6 +1104,18 @@ function providerIdFor(providerName: string) {
     "The Marketing Trainer": "provider-the-marketing-trainer",
   };
   return lookup[providerName] ?? "provider-qa";
+}
+
+function addDays(date: string, days: number) {
+  const value = new Date(`${date}T00:00:00.000Z`);
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0, 10);
+}
+
+function addMonths(date: string, months: number) {
+  const value = new Date(`${date}T00:00:00.000Z`);
+  value.setUTCMonth(value.getUTCMonth() + months);
+  return value.toISOString().slice(0, 10);
 }
 
 function compact(values: Array<string | undefined | null>) {

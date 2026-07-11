@@ -24,6 +24,8 @@ import type {
   LevyTateConversationProfile,
   LevyTateRecommendationResult,
 } from "@/lib/levytate/ai/types";
+import type { LearnerLifecycleCollections } from "@/lib/levytate/mvp/learner-lifecycle";
+import { emptyLearnerLifecycleCollections } from "@/lib/levytate/mvp/learner-lifecycle";
 import { mvpProviderCatalogue, mvpProviderProgrammes } from "@/lib/levytate/data/mvp";
 
 export type MvpRecordStatus = "Active" | "Archived";
@@ -216,7 +218,7 @@ export type MvpEnrolment = {
   updatedAt: string;
 };
 
-export type MvpWorkspaceData = {
+export type MvpWorkspaceData = LearnerLifecycleCollections & {
   version: 6;
   profile: MvpWorkspaceProfile;
   employees: MvpEmployee[];
@@ -257,6 +259,7 @@ export function createEmptyMvpWorkspace(): MvpWorkspaceData {
     providerRelationships: [],
     matchingRequests: [],
     enrolments: [],
+    ...emptyLearnerLifecycleCollections(),
   };
 }
 
@@ -680,6 +683,17 @@ function parseStoredWorkspace(raw: string | null, previousRaw: string | null, le
         ? current.matchingRequests.map((request) => normaliseMatchingRequest(request as Partial<MvpMatchingRequest> & { roleNeed: string; id?: string }))
         : [],
       enrolments: Array.isArray(current.enrolments) ? current.enrolments : [],
+      learnerRecords: Array.isArray(current.learnerRecords) ? current.learnerRecords : [],
+      eligibilityDeclarations: Array.isArray(current.eligibilityDeclarations) ? current.eligibilityDeclarations : [],
+      preEnrolmentChecks: Array.isArray(current.preEnrolmentChecks) ? current.preEnrolmentChecks : [],
+      breaksInLearning: Array.isArray(current.breaksInLearning) ? current.breaksInLearning : [],
+      withdrawals: Array.isArray(current.withdrawals) ? current.withdrawals : [],
+      learnerReviews: Array.isArray(current.learnerReviews) ? current.learnerReviews : [],
+      progressUpdates: Array.isArray(current.progressUpdates) ? current.progressUpdates : [],
+      assessmentReadiness: Array.isArray(current.assessmentReadiness) ? current.assessmentReadiness : [],
+      achievements: Array.isArray(current.achievements) ? current.achievements : [],
+      operationalActions: Array.isArray(current.operationalActions) ? current.operationalActions : [],
+      lifecycleEvents: Array.isArray(current.lifecycleEvents) ? current.lifecycleEvents : [],
     } satisfies MvpWorkspaceData;
   } catch {
     return createEmptyMvpWorkspace();

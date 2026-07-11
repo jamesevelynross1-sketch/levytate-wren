@@ -699,6 +699,17 @@ function scopeWorkspaceDataForContext(workspace: MvpWorkspaceData, context: Work
   const visibleRoleIds = new Set(visibleEmployees.map((employee) => employee.roleId).filter(Boolean));
   const visibleApplications = workspace.applications.filter((application) => visibleEmployeeIds.has(application.employeeId));
   const visibleApplicationIds = new Set(visibleApplications.map((application) => application.id));
+  const visibleEnrolmentIds = new Set(
+    workspace.enrolments
+      .filter((enrolment) => visibleEmployeeIds.has(enrolment.employeeId) || visibleApplicationIds.has(enrolment.applicationId))
+      .map((enrolment) => enrolment.id),
+  );
+  const visibleLearnerRecords = workspace.learnerRecords.filter((record) =>
+    visibleEmployeeIds.has(record.employeeId) ||
+    visibleApplicationIds.has(record.applicationId) ||
+    visibleEnrolmentIds.has(record.enrolmentId)
+  );
+  const visibleLearnerRecordIds = new Set(visibleLearnerRecords.map((record) => record.id));
   const visibleStandardIds = new Set([
     ...visibleApplications.map((application) => application.apprenticeshipStandardId),
     ...workspace.roles
@@ -741,6 +752,17 @@ function scopeWorkspaceDataForContext(workspace: MvpWorkspaceData, context: Work
     enrolments: readEnrolments ? workspace.enrolments : workspace.enrolments.filter((enrolment) =>
       visibleEmployeeIds.has(enrolment.employeeId) || visibleApplicationIds.has(enrolment.applicationId)
     ),
+    learnerRecords: visibleLearnerRecords,
+    eligibilityDeclarations: workspace.eligibilityDeclarations.filter((declaration) => visibleLearnerRecordIds.has(declaration.learnerRecordId)),
+    preEnrolmentChecks: workspace.preEnrolmentChecks.filter((checks) => visibleLearnerRecordIds.has(checks.learnerRecordId)),
+    breaksInLearning: workspace.breaksInLearning.filter((breakRecord) => visibleLearnerRecordIds.has(breakRecord.learnerRecordId)),
+    withdrawals: workspace.withdrawals.filter((withdrawal) => visibleLearnerRecordIds.has(withdrawal.learnerRecordId)),
+    learnerReviews: workspace.learnerReviews.filter((review) => visibleLearnerRecordIds.has(review.learnerRecordId)),
+    progressUpdates: workspace.progressUpdates.filter((update) => visibleLearnerRecordIds.has(update.learnerRecordId)),
+    assessmentReadiness: workspace.assessmentReadiness.filter((readiness) => visibleLearnerRecordIds.has(readiness.learnerRecordId)),
+    achievements: workspace.achievements.filter((achievement) => visibleLearnerRecordIds.has(achievement.learnerRecordId)),
+    operationalActions: workspace.operationalActions.filter((action) => visibleLearnerRecordIds.has(action.learnerRecordId)),
+    lifecycleEvents: workspace.lifecycleEvents.filter((event) => visibleLearnerRecordIds.has(event.learnerRecordId)),
   } satisfies MvpWorkspaceData;
 }
 

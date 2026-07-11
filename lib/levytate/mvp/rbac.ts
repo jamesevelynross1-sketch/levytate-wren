@@ -31,6 +31,9 @@ export type MvpPermission =
   | "enrolments:read"
   | "enrolments:write"
   | "enrolments:status"
+  | "learnerLifecycle:read"
+  | "learnerLifecycle:write"
+  | "learnerLifecycle:status"
   | "copilot:use"
   | "knowledge:read"
   | "knowledge:manage"
@@ -56,6 +59,18 @@ export type MvpWorkspaceMutationType =
   | "updateMatchingStatus"
   | "saveEnrolment"
   | "updateEnrolmentStatus"
+  | "createLearnerRecord"
+  | "updateLearnerLifecycleStatus"
+  | "recordEligibilityDeclaration"
+  | "updatePreEnrolmentChecks"
+  | "addLearnerReview"
+  | "addProgressUpdate"
+  | "startBreakInLearning"
+  | "returnFromBreak"
+  | "recordWithdrawal"
+  | "updateAssessmentReadiness"
+  | "recordAchievement"
+  | "completeOperationalAction"
   | "migrateWorkspaceSnapshot";
 
 const allPermissions = [
@@ -84,6 +99,9 @@ const allPermissions = [
   "enrolments:read",
   "enrolments:write",
   "enrolments:status",
+  "learnerLifecycle:read",
+  "learnerLifecycle:write",
+  "learnerLifecycle:status",
   "copilot:use",
   "knowledge:read",
   "knowledge:manage",
@@ -114,6 +132,9 @@ export const mvpRolePermissions = {
     "enrolments:read",
     "enrolments:write",
     "enrolments:status",
+    "learnerLifecycle:read",
+    "learnerLifecycle:write",
+    "learnerLifecycle:status",
     "copilot:use",
     "knowledge:read",
     "reports:read",
@@ -124,6 +145,7 @@ export const mvpRolePermissions = {
     "employeeDevelopment:write",
     "applications:read",
     "applications:status",
+    "learnerLifecycle:read",
     "copilot:use",
     "knowledge:read",
   ],
@@ -132,6 +154,7 @@ export const mvpRolePermissions = {
     "employeeDevelopment:write",
     "applications:read",
     "applications:write",
+    "learnerLifecycle:read",
     "copilot:use",
     "knowledge:read",
   ],
@@ -156,6 +179,18 @@ export const mvpMutationPermission = {
   updateMatchingStatus: "providerMatching:status",
   saveEnrolment: "enrolments:write",
   updateEnrolmentStatus: "enrolments:status",
+  createLearnerRecord: "learnerLifecycle:write",
+  updateLearnerLifecycleStatus: "learnerLifecycle:status",
+  recordEligibilityDeclaration: "learnerLifecycle:write",
+  updatePreEnrolmentChecks: "learnerLifecycle:write",
+  addLearnerReview: "learnerLifecycle:write",
+  addProgressUpdate: "learnerLifecycle:write",
+  startBreakInLearning: "learnerLifecycle:status",
+  returnFromBreak: "learnerLifecycle:status",
+  recordWithdrawal: "learnerLifecycle:status",
+  updateAssessmentReadiness: "learnerLifecycle:write",
+  recordAchievement: "learnerLifecycle:status",
+  completeOperationalAction: "learnerLifecycle:write",
   migrateWorkspaceSnapshot: "workspace:migrate",
 } as const satisfies Record<MvpWorkspaceMutationType, MvpPermission>;
 
