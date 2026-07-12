@@ -223,31 +223,33 @@ function buildLearnerOperationalItems(detail: LearnerRecordDetail, now: Date): O
     }
   }
 
-  (["provider", "lAndD", "manager"] as const).forEach((key) => {
-    const reviewType: LearnerReviewType = key === "provider" ? "provider_review" : key === "lAndD" ? "l_and_d_check_in" : "manager_check_in";
-    const review = detail.reviewSummaries[key];
-    const dueDate = review.nextDate;
-    const timing = dueTiming(dueDate, now);
-    const actionRequired = review.latest?.status === "action_required";
-    if (timing.daysUntil !== null && timing.daysUntil <= operationsPolicy.reviewApproachingDays || actionRequired) {
-      const reasonCode: PriorityReason = actionRequired ? "support_intervention" : timing.daysOverdue > 0 ? (reviewType === "provider_review" ? "provider_review_overdue" : "check_in_overdue") : "review_approaching";
-      const item = baseItem(
-        detail,
-        "reviews",
-        reasonCode,
-        actionRequired ? `${learnerReviewTypeLabels[reviewType]} requires action.` : `${learnerReviewTypeLabels[reviewType]} ${timing.label.toLowerCase()}.`,
-        "record_review",
-        dueDate,
-        now,
-        reviewType,
-      );
-      item.latestReviewDate = review.latest?.reviewDate ?? "";
-      items.push(item);
-      if (reviewType === "provider_review" && timing.daysOverdue > 0) {
-        items.push(baseItem(detail, "urgent", "provider_review_overdue", `Provider review is ${timing.daysOverdue} days overdue.`, "record_review", dueDate, now, reviewType));
+  if (learnerProgressReviewPolicy.reviewEligibleStatuses.includes(detail.lifecycleStatus)) {
+    (["provider", "lAndD", "manager"] as const).forEach((key) => {
+      const reviewType: LearnerReviewType = key === "provider" ? "provider_review" : key === "lAndD" ? "l_and_d_check_in" : "manager_check_in";
+      const review = detail.reviewSummaries[key];
+      const dueDate = review.nextDate;
+      const timing = dueTiming(dueDate, now);
+      const actionRequired = review.latest?.status === "action_required";
+      if (timing.daysUntil !== null && timing.daysUntil <= operationsPolicy.reviewApproachingDays || actionRequired) {
+        const reasonCode: PriorityReason = actionRequired ? "support_intervention" : timing.daysOverdue > 0 ? (reviewType === "provider_review" ? "provider_review_overdue" : "check_in_overdue") : "review_approaching";
+        const item = baseItem(
+          detail,
+          "reviews",
+          reasonCode,
+          actionRequired ? `${learnerReviewTypeLabels[reviewType]} requires action.` : `${learnerReviewTypeLabels[reviewType]} ${timing.label.toLowerCase()}.`,
+          "record_review",
+          dueDate,
+          now,
+          reviewType,
+        );
+        item.latestReviewDate = review.latest?.reviewDate ?? "";
+        items.push(item);
+        if (reviewType === "provider_review" && timing.daysOverdue > 0) {
+          items.push(baseItem(detail, "urgent", "provider_review_overdue", `Provider review is ${timing.daysOverdue} days overdue.`, "record_review", dueDate, now, reviewType));
+        }
       }
-    }
-  });
+    });
+  }
 
   if (learnerProgressReviewPolicy.progressEligibleStatuses.includes(detail.lifecycleStatus)) {
     const latestDate = detail.latestProgress?.updateDate ?? "";
