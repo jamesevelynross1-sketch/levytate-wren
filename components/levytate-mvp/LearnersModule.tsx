@@ -1,8 +1,8 @@
 "use client";
 
-import { ArrowLeft, ChevronDown, Search } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ChevronDown, Search } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { EmptyState, MvpPanel, StatusBadge, TableAction, TableBody, TableHead, TableShell } from "@/components/levytate-mvp/MvpUi";
+import { EmptyState, FormField, FormGrid, FormSection, FormSelect, FormTextArea, MvpPanel, StatusBadge, TableAction, TableBody, TableHead, TableShell } from "@/components/levytate-mvp/MvpUi";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { includesSearch, statusTone } from "@/components/levytate-mvp/module-utils";
 import {
@@ -23,6 +23,14 @@ type LearnerListResponse = {
 };
 
 type LearnerDetailResponse = {
+  ok?: boolean;
+  source?: string;
+  learner?: LearnerRecordDetail;
+  readiness?: LearnerRecordDetail["enrolmentReadiness"];
+  message?: string;
+};
+
+type LearnerMutationResponse = {
   ok?: boolean;
   source?: string;
   learner?: LearnerRecordDetail;
@@ -61,6 +69,7 @@ export function LearnersModule() {
   const [sortMode, setSortMode] = useState<SortMode>("Operational priority");
 
   const mayReadOrganisationLearners = can("learnerLifecycle:read") && (meta?.userRole === "Apprenticeship Lead" || meta?.userRole === "Employer Admin" || meta?.userRole === "Platform Admin");
+  const mayMutatePreEnrolment = can("learnerLifecycle:write") && can("learnerLifecycle:status") && (meta?.userRole === "Apprenticeship Lead" || meta?.userRole === "Employer Admin" || meta?.userRole === "Platform Admin");
 
   useEffect(() => {
     if (!mayReadOrganisationLearners) {
@@ -177,6 +186,11 @@ export function LearnersModule() {
           setSelectedId("");
           setError("");
         }}
+        mayMutatePreEnrolment={mayMutatePreEnrolment}
+        onDetailUpdated={(next) => {
+          setDetail(next);
+          setLearners((current) => current.map((learner) => learner.learnerRecordId === next.learnerRecordId ? next : learner));
+        }}
       />
     );
   }
@@ -276,7 +290,10 @@ export function LearnersModule() {
   );
 }
 
-function LearnerRecordView({ detail, loading, error, onBack }: { detail: LearnerRecordDetail | null; loading: boolean; error: string; onBack: () => void }) {
+function LearnerRecordView({ detail, loading, error, onBack, mayMutatePreEnrolment, onDetailUpdated }: { detail: LearnerRecordDetail | null; loading: boolean; error: string; onBack: () => void; mayMutatePreEnrolment: boolean; onDetailUpdated: (detail: LearnerRecordDetail) => void }) {
+  const [workflowOpen, setWorkflowOpen] = useState(false);
+  const [success, setSuccess] = useState("");
+
   if (loading) {
     return <div className="rounded-xl border border-[#102c3d]/[0.07] bg-white p-8 text-sm font-semibold text-[#102c3d]/56">Loading learner record.</div>;
   }
@@ -313,6 +330,12 @@ function LearnerRecordView({ detail, loading, error, onBack }: { detail: Learner
               <InfoBlock label="Provider" value={detail.programme.providerName} helper={detail.employmentRouteLabel} />
               <InfoBlock label="Dates" value={`${formatDate(detail.actualStartDate || detail.expectedStartDate) || "Start to confirm"}`} helper={`Expected end ${formatDate(detail.expectedEndDate) || "to confirm"}`} />
             </div>
+            {success ? <p className="mt-4 rounded-xl bg-[#e9f7f2] px-4 py-3 text-sm font-semibold text-[#0b6f63]">{success}</p> : null}
+            {mayMutatePreEnrolment && detail.lifecycleStatus === "pre_enrolment" ? (
+              <button type="button" onClick={() => { setWorkflowOpen(true); setSuccess(""); }} className="mt-5 inline-flex h-10 items-center justify-center rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white shadow-[0_8px_18px_rgba(16,44,61,0.12)] transition hover:-translate-y-0.5 hover:bg-[#17394d]">
+                Complete pre-enrolment
+              </button>
+            ) : null}
           </div>
           <div className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4">
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">Next action</p>
@@ -321,6 +344,22 @@ function LearnerRecordView({ detail, loading, error, onBack }: { detail: Learner
           </div>
         </div>
       </section>
+
+      {workflowOpen ? (
+        <PreEnrolmentWorkflow
+          detail={detail}
+          onCancel={() => setWorkflowOpen(false)}
+          onSaved={(next, message) => {
+            onDetailUpdated(next);
+            setSuccess(message);
+          }}
+          onEnrolled={(next) => {
+            onDetailUpdated(next);
+            setWorkflowOpen(false);
+            setSuccess("Learner marked as enrolled. The lifecycle record is now active.");
+          }}
+        />
+      ) : null}
 
       <RecordSection title="Eligibility and pre-enrolment" eyebrow="Checks">
         <div className="grid gap-3 lg:grid-cols-4">
@@ -495,6 +534,265 @@ function LearnerRecordView({ detail, loading, error, onBack }: { detail: Learner
         ) : <InlineEmpty copy="No lifecycle history has been recorded yet." />}
       </RecordSection>
     </div>
+  );
+}
+
+type PreEnrolmentForm = {
+  employmentRoute: string;
+  eligibilityVerificationStatus: string;
+  eligibilityNotes: string;
+  probationStatus: string;
+  probationPassedDate: string;
+  probationNotes: string;
+  hrApprovalStatus: string;
+  hrApprovedDate: string;
+  hrApprovalNotes: string;
+  programmeId: string;
+  providerId: string;
+  applicationId: string;
+  expectedStartDate: string;
+  actualStartDate: string;
+  expectedEndDate: string;
+  programmeChangeReason: string;
+  guidesSent: boolean;
+  guidesSentDate: string;
+  guidesVersion: string;
+  guidesRecipientSummary: string;
+  guidesNotes: string;
+};
+
+function PreEnrolmentWorkflow({ detail, onCancel, onSaved, onEnrolled }: { detail: LearnerRecordDetail; onCancel: () => void; onSaved: (detail: LearnerRecordDetail, message: string) => void; onEnrolled: (detail: LearnerRecordDetail) => void }) {
+  const [form, setForm] = useState<PreEnrolmentForm>(() => ({
+    employmentRoute: detail.employmentRoute === "not_confirmed" ? "existing_employee_upskill" : detail.employmentRoute,
+    eligibilityVerificationStatus: detail.eligibilityDeclaration?.verificationStatus === "employer_verified" ? "employer_verified" : detail.eligibilityDeclaration?.verificationStatus === "not_eligible" ? "not_eligible" : detail.eligibilityDeclaration?.verificationStatus === "needs_review" ? "needs_review" : "employer_verified",
+    eligibilityNotes: detail.eligibilityDeclaration?.notes ?? "",
+    probationStatus: detail.preEnrolmentChecks?.probationStatus ?? "awaiting_confirmation",
+    probationPassedDate: detail.preEnrolmentChecks?.probationPassedDate ?? "",
+    probationNotes: detail.preEnrolmentChecks?.probationNotes ?? "",
+    hrApprovalStatus: detail.preEnrolmentChecks?.hrApprovalStatus ?? "awaiting_approval",
+    hrApprovedDate: detail.preEnrolmentChecks?.hrApprovedDate ?? "",
+    hrApprovalNotes: detail.preEnrolmentChecks?.hrApprovalNotes ?? "",
+    programmeId: detail.programme.programmeId,
+    providerId: detail.programme.providerId,
+    applicationId: detail.programme.applicationReference,
+    expectedStartDate: detail.expectedStartDate,
+    actualStartDate: detail.actualStartDate,
+    expectedEndDate: detail.expectedEndDate,
+    programmeChangeReason: "",
+    guidesSent: Boolean(detail.preEnrolmentChecks?.guidesSent),
+    guidesSentDate: detail.preEnrolmentChecks?.guidesSentDate ?? "",
+    guidesVersion: detail.preEnrolmentChecks?.guidesVersion || "2026 learner and manager guide pack",
+    guidesRecipientSummary: "",
+    guidesNotes: detail.preEnrolmentChecks?.guidesNotes ?? "",
+  }));
+  const [saving, setSaving] = useState(false);
+  const [enrolling, setEnrolling] = useState(false);
+  const [error, setError] = useState("");
+  const readiness = detail.enrolmentReadiness;
+
+  function update<K extends keyof PreEnrolmentForm>(key: K, value: PreEnrolmentForm[K]) {
+    setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  async function saveProgress() {
+    setSaving(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/pre-enrolment`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          expectedUpdatedAt: detail.updatedAt,
+          employmentRoute: form.employmentRoute,
+          eligibilityVerification: {
+            verificationStatus: form.eligibilityVerificationStatus,
+            notes: form.eligibilityNotes,
+          },
+          probation: {
+            probationStatus: form.probationStatus,
+            probationPassedDate: form.probationPassedDate,
+            probationNotes: form.probationNotes,
+          },
+          hrApproval: {
+            hrApprovalStatus: form.hrApprovalStatus,
+            hrApprovedDate: form.hrApprovedDate,
+            hrApprovalNotes: form.hrApprovalNotes,
+          },
+          programme: {
+            programmeId: form.programmeId,
+            providerId: form.providerId,
+            applicationId: form.applicationId,
+            expectedStartDate: form.expectedStartDate,
+            actualStartDate: form.actualStartDate,
+            expectedEndDate: form.expectedEndDate,
+            changeReason: form.programmeChangeReason,
+          },
+          guides: {
+            guidesSent: form.guidesSent,
+            guidesSentDate: form.guidesSentDate,
+            guidesVersion: form.guidesVersion,
+            recipientSummary: form.guidesRecipientSummary,
+            guidesNotes: form.guidesNotes,
+          },
+        }),
+      });
+      const payload = (await response.json()) as LearnerMutationResponse;
+      if (!response.ok || !payload.learner) throw new Error(payload.message ?? "Pre-enrolment progress could not be saved.");
+      onSaved(payload.learner, "Pre-enrolment progress saved.");
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Pre-enrolment progress could not be saved.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function markEnrolled() {
+    setEnrolling(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/enrol`, { method: "POST" });
+      const payload = (await response.json()) as LearnerMutationResponse;
+      if (!response.ok || !payload.learner) throw new Error(payload.message ?? "Learner could not be marked as enrolled.");
+      onEnrolled(payload.learner);
+    } catch (enrolError) {
+      setError(enrolError instanceof Error ? enrolError.message : "Learner could not be marked as enrolled.");
+    } finally {
+      setEnrolling(false);
+    }
+  }
+
+  return (
+    <section className="rounded-xl border border-[#102c3d]/[0.075] bg-white shadow-[0_18px_46px_rgba(16,44,61,0.07)]">
+      <div className="flex flex-col gap-3 border-b border-[#102c3d]/[0.06] px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">Pre-enrolment workflow</p>
+          <h3 className="mt-0.5 text-xl font-semibold text-[#102c3d]">Complete pre-enrolment</h3>
+          <p className="mt-1 text-sm leading-6 text-[#102c3d]/56">Record the employer-controlled checks needed before {detail.learner.name} can become an active learner.</p>
+        </div>
+        <button type="button" onClick={onCancel} className="inline-flex h-10 w-fit items-center justify-center rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.1] transition hover:bg-[#f8fbfa]">
+          Return to read-only record
+        </button>
+      </div>
+
+      <div className="grid gap-5 p-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
+        <div className="grid gap-4">
+          <FormSection title="Employment route">
+            <FormGrid>
+              <FormSelect label="Employment route" value={form.employmentRoute} onChange={(value) => update("employmentRoute", value)} options={[
+                { value: "existing_employee_upskill", label: "Existing employee - upskill" },
+                { value: "recruited_as_apprentice", label: "Recruited as an apprentice" },
+              ]} />
+              <InfoBlock label="Current route" value={detail.employmentRouteLabel} helper="Saved on the learner record" />
+            </FormGrid>
+          </FormSection>
+
+          <FormSection title="England working-hours declaration" copy="The employee declaration is historical evidence and cannot be rewritten by the employer.">
+            <div className="mb-4 rounded-xl border border-[#102c3d]/[0.06] bg-white p-4 text-sm leading-6 text-[#102c3d]/66">
+              <p className="font-semibold text-[#102c3d]">Employee declaration wording</p>
+              <p className="mt-1">&ldquo;{detail.eligibilityDeclaration?.declarationWording || "I confirm that I expect to spend at least 50% of my working hours in England over the duration of the apprenticeship."}&rdquo;</p>
+              <div className="mt-3 grid gap-2 text-xs font-semibold text-[#102c3d]/52 sm:grid-cols-2">
+                <p>Status: {detail.eligibilityDeclaration?.confirmed ? "Employee confirmed" : "Not confirmed"}</p>
+                <p>Date: {formatDate(detail.eligibilityDeclaration?.confirmedAt) || "Not recorded"}</p>
+                <p>Expected England hours: {detail.eligibilityDeclaration?.expectedEnglandWorkingHoursPercentage ?? "Not recorded"}%</p>
+                <p>Version: {detail.eligibilityDeclaration?.declarationVersion || "Not recorded"}</p>
+              </div>
+            </div>
+            <FormGrid>
+              <FormSelect label="Employer verification status" value={form.eligibilityVerificationStatus} onChange={(value) => update("eligibilityVerificationStatus", value)} options={[
+                { value: "employer_verified", label: "Employer verified" },
+                { value: "needs_review", label: "Needs review" },
+                { value: "not_eligible", label: "Not eligible" },
+              ]} />
+              <FormTextArea label="Verification note" value={form.eligibilityNotes} onChange={(value) => update("eligibilityNotes", value)} rows={3} placeholder="Required for needs review or not eligible" />
+            </FormGrid>
+          </FormSection>
+
+          <FormSection title="Probation">
+            <FormGrid>
+              <FormSelect label="Probation status" value={form.probationStatus} onChange={(value) => update("probationStatus", value)} options={[
+                { value: "awaiting_confirmation", label: "Awaiting confirmation" },
+                { value: "passed", label: "Passed" },
+                { value: "not_passed", label: "Not passed" },
+                { value: "under_review", label: "Under review" },
+                { value: "not_required", label: "Not required" },
+              ]} />
+              <FormField label="Probation passed date" type="date" value={form.probationPassedDate} onChange={(value) => update("probationPassedDate", value)} />
+              <FormTextArea label="Probation note" value={form.probationNotes} onChange={(value) => update("probationNotes", value)} wide rows={3} />
+            </FormGrid>
+          </FormSection>
+
+          <FormSection title="HR approval">
+            <FormGrid>
+              <FormSelect label="HR approval status" value={form.hrApprovalStatus} onChange={(value) => update("hrApprovalStatus", value)} options={[
+                { value: "not_requested", label: "Not requested" },
+                { value: "awaiting_approval", label: "Awaiting approval" },
+                { value: "approved", label: "Approved" },
+                { value: "declined", label: "Declined" },
+                { value: "more_information_required", label: "More information required" },
+              ]} />
+              <FormField label="HR approval date" type="date" value={form.hrApprovedDate} onChange={(value) => update("hrApprovedDate", value)} />
+              <FormTextArea label="HR approval note" value={form.hrApprovalNotes} onChange={(value) => update("hrApprovalNotes", value)} wide rows={3} />
+            </FormGrid>
+          </FormSection>
+
+          <FormSection title="Programme, provider and dates" copy="Programme and provider are shown from the connected application or learner record. If these change, record why.">
+            <FormGrid>
+              <FormField label="Programme ID" value={form.programmeId} onChange={(value) => update("programmeId", value)} />
+              <FormField label="Provider ID" value={form.providerId} onChange={(value) => update("providerId", value)} />
+              <FormField label="Linked application" value={form.applicationId} onChange={(value) => update("applicationId", value)} />
+              <FormField label="Expected start date" type="date" value={form.expectedStartDate} onChange={(value) => update("expectedStartDate", value)} />
+              <FormField label="Actual start date" type="date" value={form.actualStartDate} onChange={(value) => update("actualStartDate", value)} />
+              <FormField label="Expected end date" type="date" value={form.expectedEndDate} onChange={(value) => update("expectedEndDate", value)} />
+              <FormTextArea label="Programme/provider change reason" value={form.programmeChangeReason} onChange={(value) => update("programmeChangeReason", value)} wide rows={3} />
+            </FormGrid>
+          </FormSection>
+
+          <FormSection title="Guides">
+            <FormGrid>
+              <label className="flex h-11 items-center gap-2 rounded-lg border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 text-sm font-semibold text-[#102c3d]/70">
+                <input type="checkbox" checked={form.guidesSent} onChange={(event) => update("guidesSent", event.target.checked)} className="h-4 w-4 accent-[#159b8f]" />
+                Guides sent
+              </label>
+              <FormField label="Guides sent date" type="date" value={form.guidesSentDate} onChange={(value) => update("guidesSentDate", value)} />
+              <FormField label="Guide version" value={form.guidesVersion} onChange={(value) => update("guidesVersion", value)} />
+              <FormField label="Recipient summary" value={form.guidesRecipientSummary} onChange={(value) => update("guidesRecipientSummary", value)} placeholder="Learner and line manager" />
+              <FormTextArea label="Guides note" value={form.guidesNotes} onChange={(value) => update("guidesNotes", value)} wide rows={3} />
+            </FormGrid>
+          </FormSection>
+        </div>
+
+        <aside className="grid content-start gap-4">
+          <section className="rounded-xl border border-[#102c3d]/[0.075] bg-[#f8fbfa] p-4">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">Enrolment readiness</p>
+            <h4 className="mt-2 text-lg font-semibold text-[#102c3d]">{readiness.readyForEnrolment ? "Ready for enrolment" : "Checks outstanding"}</h4>
+            <p className="mt-1 text-sm leading-6 text-[#102c3d]/56">{readiness.readyForEnrolment ? "All mandatory checks are complete." : `${readiness.blockingChecks.length} blocking check${readiness.blockingChecks.length === 1 ? "" : "s"} remain.`}</p>
+            <div className="mt-4 grid gap-2">
+              {readiness.checks.map((check) => (
+                <div key={check.id} className="rounded-lg border border-[#102c3d]/[0.06] bg-white p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="text-sm font-semibold text-[#102c3d]">{check.label}</p>
+                    <StatusBadge tone={statusTone(check.status)}>{check.status}</StatusBadge>
+                  </div>
+                  <p className="mt-1 text-xs leading-5 text-[#102c3d]/50">{check.message}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {error ? <p className="rounded-xl bg-[#fff0f2] px-4 py-3 text-sm font-semibold text-[#b13b51]">{error}</p> : null}
+
+          <div className="rounded-xl border border-[#102c3d]/[0.075] bg-white p-4">
+            <button type="button" onClick={saveProgress} disabled={saving || enrolling} className="flex h-11 w-full items-center justify-center rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white transition hover:bg-[#17394d] disabled:cursor-not-allowed disabled:opacity-55">
+              {saving ? "Saving progress" : "Save progress"}
+            </button>
+            <button type="button" onClick={markEnrolled} disabled={enrolling || saving || !readiness.readyForEnrolment} className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-full bg-[#159b8f] px-5 text-xs font-semibold text-white transition hover:bg-[#0f867b] disabled:cursor-not-allowed disabled:bg-[#102c3d]/18 disabled:text-[#102c3d]/42">
+              <CheckCircle2 size={15} /> {enrolling ? "Marking enrolled" : "Mark as enrolled"}
+            </button>
+            {!readiness.readyForEnrolment ? <p className="mt-3 text-xs leading-5 text-[#102c3d]/48">The server will also block enrolment until every mandatory readiness check is complete.</p> : null}
+          </div>
+        </aside>
+      </div>
+    </section>
   );
 }
 

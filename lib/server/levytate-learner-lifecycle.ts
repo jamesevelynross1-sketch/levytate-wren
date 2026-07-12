@@ -14,12 +14,16 @@ import {
   type LearnerAssessmentReadiness,
   type LearnerBreakInLearning,
   type LearnerEligibilityDeclaration,
+  type LearnerEligibilityVerificationStatus,
+  type LearnerEmploymentRoute,
   type LearnerLifecycleCollections,
   type LearnerLifecycleEvent,
   type LearnerLifecycleEventType,
   type LearnerLifecycleStatus,
+  type LearnerHrApprovalStatus,
   type LearnerOperationalAction,
   type LearnerPreEnrolmentChecks,
+  type LearnerProbationStatus,
   type LearnerProgressUpdate,
   type LearnerRecord,
   type LearnerReview,
@@ -27,6 +31,7 @@ import {
 } from "@/lib/levytate/mvp/learner-lifecycle";
 import {
   compareLearnerOperationalPriority,
+  deriveLearnerEnrolmentReadiness,
   deriveLearnerAttention,
   deriveProgressPosition,
   employmentRouteLabel,
@@ -333,6 +338,55 @@ export class LevyTateLearnerLifecyclePermissionError extends Error {
     this.name = "LevyTateLearnerLifecyclePermissionError";
   }
 }
+
+export class LevyTateLearnerLifecycleValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "LevyTateLearnerLifecycleValidationError";
+  }
+}
+
+export class LevyTateLearnerLifecycleConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "LevyTateLearnerLifecycleConflictError";
+  }
+}
+
+export type PreEnrolmentUpdateInput = {
+  expectedUpdatedAt?: string;
+  employmentRoute?: LearnerEmploymentRoute;
+  eligibilityVerification?: {
+    verificationStatus?: LearnerEligibilityVerificationStatus;
+    notes?: string;
+  };
+  probation?: {
+    probationStatus?: LearnerProbationStatus;
+    probationPassedDate?: string;
+    probationNotes?: string;
+  };
+  hrApproval?: {
+    hrApprovalStatus?: LearnerHrApprovalStatus;
+    hrApprovedDate?: string;
+    hrApprovalNotes?: string;
+  };
+  programme?: {
+    programmeId?: string;
+    providerId?: string;
+    applicationId?: string;
+    expectedStartDate?: string;
+    actualStartDate?: string;
+    expectedEndDate?: string;
+    changeReason?: string;
+  };
+  guides?: {
+    guidesSent?: boolean;
+    guidesSentDate?: string;
+    guidesVersion?: string;
+    recipientSummary?: string;
+    guidesNotes?: string;
+  };
+};
 
 export async function createLearnerRecord(
   session: LevyTateBetaSession,
@@ -768,10 +822,14 @@ export async function getOrganisationLearnerLifecycleRecordDetail(session: LevyT
   const collections = await loadLearnerLifecycleCollectionsForRecord(session, learnerRecordId);
   const lookups = await loadLearnerRecordLookups(context.organisation.id);
   const summary = buildLearnerOperationalSummary(record, collections, lookups);
+  const eligibilityDeclaration = collections.eligibilityDeclarations[0] ?? null;
+  const preEnrolmentChecks = collections.preEnrolmentChecks[0] ?? null;
   return {
     ...summary,
-    eligibilityDeclaration: collections.eligibilityDeclarations[0] ?? null,
-    preEnrolmentChecks: collections.preEnrolmentChecks[0] ?? null,
+    updatedAt: latestPreEnrolmentVersion(record, eligibilityDeclaration, preEnrolmentChecks),
+    eligibilityDeclaration,
+    preEnrolmentChecks,
+    enrolmentReadiness: readinessFor(record, eligibilityDeclaration, preEnrolmentChecks),
     progressHistory: [...collections.progressUpdates].sort((left, right) => right.updateDate.localeCompare(left.updateDate) || right.createdAt.localeCompare(left.createdAt)),
     reviewHistory: [...collections.learnerReviews].sort((left, right) => right.reviewDate.localeCompare(left.reviewDate) || right.createdAt.localeCompare(left.createdAt)),
     breaksInLearning: [...collections.breaksInLearning].sort((left, right) => right.startDate.localeCompare(left.startDate)),
@@ -789,6 +847,362 @@ export async function getOrganisationLearnerLifecycleRecordDetail(session: LevyT
       newStatus: event.newStatus,
     })),
   };
+}
+
+export async function updateLearnerPreEnrolmentProgress(
+  session: LevyTateBetaSession,
+  learnerRecordId: string,
+  input: PreEnrolmentUpdateInput,
+): Promise<LearnerRecordDetail> {
+  const context = await contextForSession(session);
+  assertPermission(context, "learnerLifecycle:write");
+  const record = await getScopedLearnerRecord(context, learnerRecordId, "write");
+  if (record.lifecycleStatus !== "pre_enrolment") {
+    throw new LevyTateLearnerLifecycleValidationError("Only pre-enrolment learner records can be updated through this workflow.");
+  }
+
+  const collections = await loadLearnerLifecycleCollectionsForRecord(session, learnerRecordId);
+  const existingEligibility = collections.eligibilityDeclarations[0] ?? null;
+  const existingChecks = collections.preEnrolmentChecks[0] ?? null;
+  assertFreshVersion(latestPreEnrolmentVersion(record, existingEligibility, existingChecks), input.expectedUpdatedAt);
+  const timestamp = nowIso();
+  const actor = context.user.email;
+
+  const recordPatch = buildLearnerRecordPatch(record, input, timestamp, actor);
+  if (recordPatch.changed) {
+    await patchLearnerRecord(context, record, recordPatch.next);
+    await emitRecordChangeEvents(context, record, recordPatch.next, input.programme?.changeReason);
+  }
+
+  if (input.eligibilityVerification) {
+    const nextEligibility = buildEligibilityVerification(context, record, existingEligibility, input.eligibilityVerification, timestamp);
+    await upsertEligibilityDeclaration(nextEligibility);
+    if (nextEligibility.verificationStatus !== existingEligibility?.verificationStatus || nextEligibility.notes !== existingEligibility?.notes) {
+      await recordLifecycleEvent(
+        context,
+        record.id,
+        eligibilityEventType(nextEligibility.verificationStatus),
+        "",
+        "",
+        eligibilityEventSummary(nextEligibility.verificationStatus),
+        { verificationStatus: nextEligibility.verificationStatus },
+      );
+    }
+  }
+
+  const checksInputSupplied = Boolean(input.probation || input.hrApproval || input.guides);
+  if (checksInputSupplied) {
+    const nextChecks = buildPreEnrolmentChecks(context, record, existingChecks, input, timestamp);
+    await upsertPreEnrolmentChecks(nextChecks);
+    if (input.probation && nextChecks.probationStatus !== existingChecks?.probationStatus) {
+      await recordLifecycleEvent(context, record.id, "probation_updated", "", "", `Probation status updated to ${nextChecks.probationStatus.replace(/_/g, " ")}.`, { probationStatus: nextChecks.probationStatus });
+    }
+    if (input.hrApproval && nextChecks.hrApprovalStatus !== existingChecks?.hrApprovalStatus) {
+      await recordLifecycleEvent(context, record.id, nextChecks.hrApprovalStatus === "approved" ? "hr_approved" : "hr_approval_updated", "", "", `HR approval status updated to ${nextChecks.hrApprovalStatus.replace(/_/g, " ")}.`, { hrApprovalStatus: nextChecks.hrApprovalStatus });
+    }
+    if (input.guides?.guidesSent && !existingChecks?.guidesSent) {
+      await upsertGuidesOperationalAction(context, record.id, nextChecks);
+      await recordLifecycleEvent(context, record.id, "guides_sent", "", "", "Learner and manager guides sent.", { guidesVersion: nextChecks.guidesVersion });
+    }
+  }
+
+  return getOrganisationLearnerLifecycleRecordDetail(session, learnerRecordId);
+}
+
+export async function markLearnerAsEnrolled(
+  session: LevyTateBetaSession,
+  learnerRecordId: string,
+): Promise<LearnerRecordDetail> {
+  const context = await contextForSession(session);
+  assertPermission(context, "learnerLifecycle:status");
+  const record = await getScopedLearnerRecord(context, learnerRecordId, "write");
+
+  if (record.lifecycleStatus === "enrolled") {
+    throw new LevyTateLearnerLifecycleConflictError("Learner is already enrolled.");
+  }
+  if (record.lifecycleStatus !== "pre_enrolment") {
+    throw new LevyTateLearnerLifecycleValidationError("Only pre-enrolment learner records can be marked as enrolled.");
+  }
+
+  const collections = await loadLearnerLifecycleCollectionsForRecord(session, learnerRecordId);
+  const readiness = readinessFor(record, collections.eligibilityDeclarations[0] ?? null, collections.preEnrolmentChecks[0] ?? null);
+  if (!readiness.readyForEnrolment) {
+    const ineligible = readiness.blockingChecks.find((check) => check.id === "employer-eligibility-verification" && check.status === "Needs review");
+    throw new LevyTateLearnerLifecycleValidationError(ineligible?.message ?? readiness.blockingChecks[0]?.message ?? "Pre-enrolment checks are incomplete.");
+  }
+
+  const timestamp = nowIso();
+  const next: LearnerRecord = {
+    ...record,
+    lifecycleStatus: "enrolled",
+    updatedAt: timestamp,
+    updatedBy: context.user.email,
+  };
+  await patchLearnerRecord(context, record, next);
+  await recordLifecycleEvent(context, record.id, "lifecycle_status_changed", "pre_enrolment", "enrolled", "Learner marked as enrolled.", { actualStartDate: next.actualStartDate });
+  await recordLifecycleEvent(context, record.id, "enrolment_completed", "pre_enrolment", "enrolled", "Learner marked as enrolled. The lifecycle record is now active.", { programmeId: next.programmeId, providerId: next.providerId });
+  return getOrganisationLearnerLifecycleRecordDetail(session, learnerRecordId);
+}
+
+function readinessFor(
+  record: LearnerRecord,
+  eligibilityDeclaration: LearnerEligibilityDeclaration | null,
+  preEnrolmentChecks: LearnerPreEnrolmentChecks | null,
+) {
+  return deriveLearnerEnrolmentReadiness({
+    employmentRoute: record.employmentRoute,
+    eligibilityDeclaration,
+    preEnrolmentChecks,
+    programmeId: record.programmeId,
+    providerId: record.providerId,
+    actualStartDate: record.actualStartDate,
+    expectedEndDate: record.expectedEndDate,
+  });
+}
+
+function assertFreshVersion(currentVersion: string, expectedUpdatedAt: string | undefined) {
+  if (!expectedUpdatedAt) return;
+  if (currentVersion === expectedUpdatedAt) return;
+  throw new LevyTateLearnerLifecycleConflictError("This learner record has changed since you opened it. Refresh the record before saving again.");
+}
+
+function latestPreEnrolmentVersion(
+  record: LearnerRecord,
+  eligibilityDeclaration: LearnerEligibilityDeclaration | null,
+  preEnrolmentChecks: LearnerPreEnrolmentChecks | null,
+) {
+  return latestIso([record.updatedAt, eligibilityDeclaration?.updatedAt ?? "", preEnrolmentChecks?.updatedAt ?? ""]);
+}
+
+function latestIso(values: string[]) {
+  return values
+    .filter(Boolean)
+    .sort((left, right) => new Date(right).getTime() - new Date(left).getTime())[0] ?? "";
+}
+
+function buildLearnerRecordPatch(
+  record: LearnerRecord,
+  input: PreEnrolmentUpdateInput,
+  timestamp: string,
+  actor: string,
+) {
+  const next: LearnerRecord = { ...record };
+  if (input.employmentRoute !== undefined) {
+    assertEnum(input.employmentRoute, ["existing_employee_upskill", "recruited_as_apprentice"], "employment route");
+    next.employmentRoute = input.employmentRoute;
+  }
+
+  const programme = input.programme;
+  if (programme) {
+    if (programme.programmeId !== undefined) next.programmeId = cleanText(programme.programmeId);
+    if (programme.providerId !== undefined) next.providerId = cleanText(programme.providerId);
+    if (programme.applicationId !== undefined) next.applicationId = cleanText(programme.applicationId);
+    if (programme.expectedStartDate !== undefined) next.expectedStartDate = cleanDate(programme.expectedStartDate, "expected start date");
+    if (programme.actualStartDate !== undefined) next.actualStartDate = cleanDate(programme.actualStartDate, "actual start date");
+    if (programme.expectedEndDate !== undefined) next.expectedEndDate = cleanDate(programme.expectedEndDate, "expected end date");
+    if ((next.programmeId !== record.programmeId || next.providerId !== record.providerId) && !cleanText(programme.changeReason)) {
+      throw new LevyTateLearnerLifecycleValidationError("Programme or provider changes require a reason.");
+    }
+  }
+
+  const changed = next.employmentRoute !== record.employmentRoute
+    || next.programmeId !== record.programmeId
+    || next.providerId !== record.providerId
+    || next.applicationId !== record.applicationId
+    || next.expectedStartDate !== record.expectedStartDate
+    || next.actualStartDate !== record.actualStartDate
+    || next.expectedEndDate !== record.expectedEndDate;
+
+  if (changed) {
+    next.updatedAt = timestamp;
+    next.updatedBy = actor;
+  }
+
+  return { next, changed };
+}
+
+async function patchLearnerRecord(
+  context: LifecycleContext,
+  previous: LearnerRecord,
+  next: LearnerRecord,
+  expectedUpdatedAt?: string,
+) {
+  const query = new URLSearchParams({
+    organisation_id: `eq.${context.organisation.id}`,
+    id: `eq.${previous.id}`,
+  });
+  if (expectedUpdatedAt) query.set("updated_at", `eq.${expectedUpdatedAt}`);
+  const rows = await supabaseUpdate<LearnerRecordRow>(assertSupabase(), learnerRecordsTable, query.toString(), learnerRecordToRow(next));
+  if (!rows.length) throw new LevyTateLearnerLifecycleConflictError("This learner record has changed since you opened it. Refresh the record before saving again.");
+}
+
+async function emitRecordChangeEvents(context: LifecycleContext, previous: LearnerRecord, next: LearnerRecord, changeReason?: string) {
+  if (previous.employmentRoute !== next.employmentRoute) {
+    await recordLifecycleEvent(context, previous.id, "employment_route_confirmed", "", "", `Employment route confirmed as ${employmentRouteLabel(next.employmentRoute)}.`, { employmentRoute: next.employmentRoute });
+  }
+  const programmeChanged = previous.programmeId !== next.programmeId || previous.providerId !== next.providerId || previous.applicationId !== next.applicationId;
+  const datesChanged = previous.expectedStartDate !== next.expectedStartDate || previous.actualStartDate !== next.actualStartDate || previous.expectedEndDate !== next.expectedEndDate;
+  if (programmeChanged || datesChanged) {
+    await recordLifecycleEvent(context, previous.id, "programme_provider_confirmed", "", "", "Programme, provider and enrolment dates confirmed.", {
+      programmeId: next.programmeId,
+      providerId: next.providerId,
+      applicationId: next.applicationId,
+      expectedStartDate: next.expectedStartDate,
+      actualStartDate: next.actualStartDate,
+      expectedEndDate: next.expectedEndDate,
+      changeReason: cleanText(changeReason),
+    });
+  }
+}
+
+function buildEligibilityVerification(
+  context: LifecycleContext,
+  record: LearnerRecord,
+  existing: LearnerEligibilityDeclaration | null,
+  input: NonNullable<PreEnrolmentUpdateInput["eligibilityVerification"]>,
+  timestamp: string,
+): LearnerEligibilityDeclaration {
+  const verificationStatus = cleanText(input.verificationStatus) as LearnerEligibilityVerificationStatus;
+  assertEnum(verificationStatus, ["employer_verified", "needs_review", "not_eligible"], "eligibility verification status");
+  const notes = cleanText(input.notes);
+  if ((verificationStatus === "needs_review" || verificationStatus === "not_eligible") && !notes) {
+    throw new LevyTateLearnerLifecycleValidationError("A reason is required when eligibility needs review or is not eligible.");
+  }
+
+  return {
+    id: existing?.id ?? `${record.id}-england-hours`,
+    organisationId: context.organisation.id,
+    learnerRecordId: record.id,
+    declarationType: existing?.declarationType ?? "england_working_hours",
+    declarationWording: existing?.declarationWording ?? englandWorkingHoursDeclarationWording,
+    declarationVersion: existing?.declarationVersion ?? englandWorkingHoursDeclarationVersion,
+    confirmed: existing?.confirmed ?? false,
+    confirmedByEmployee: existing?.confirmedByEmployee ?? "",
+    confirmedAt: existing?.confirmedAt ?? "",
+    expectedEnglandWorkingHoursPercentage: existing?.expectedEnglandWorkingHoursPercentage ?? null,
+    verifiedBy: context.user.email,
+    verifiedAt: timestamp,
+    verificationStatus,
+    notes,
+    createdAt: existing?.createdAt ?? timestamp,
+    updatedAt: timestamp,
+  };
+}
+
+function buildPreEnrolmentChecks(
+  context: LifecycleContext,
+  record: LearnerRecord,
+  existing: LearnerPreEnrolmentChecks | null,
+  input: PreEnrolmentUpdateInput,
+  timestamp: string,
+): LearnerPreEnrolmentChecks {
+  const next: LearnerPreEnrolmentChecks = {
+    id: existing?.id ?? `${record.id}-pre-enrolment`,
+    organisationId: context.organisation.id,
+    learnerRecordId: record.id,
+    probationStatus: existing?.probationStatus ?? "awaiting_confirmation",
+    probationPassedDate: existing?.probationPassedDate ?? "",
+    probationConfirmedBy: existing?.probationConfirmedBy ?? "",
+    probationConfirmedAt: existing?.probationConfirmedAt ?? "",
+    probationNotes: existing?.probationNotes ?? "",
+    hrApprovalStatus: existing?.hrApprovalStatus ?? "not_requested",
+    hrApprovedDate: existing?.hrApprovedDate ?? "",
+    hrApprovedBy: existing?.hrApprovedBy ?? "",
+    hrApprovalNotes: existing?.hrApprovalNotes ?? "",
+    guidesSent: existing?.guidesSent ?? false,
+    guidesSentDate: existing?.guidesSentDate ?? "",
+    guidesSentBy: existing?.guidesSentBy ?? "",
+    guidesVersion: existing?.guidesVersion ?? "",
+    guidesNotes: existing?.guidesNotes ?? "",
+    createdAt: existing?.createdAt ?? timestamp,
+    updatedAt: timestamp,
+  };
+
+  if (input.probation) {
+    const status = cleanText(input.probation.probationStatus) as LearnerProbationStatus;
+    assertEnum(status, ["awaiting_confirmation", "passed", "not_passed", "under_review", "not_required"], "probation status");
+    const notes = cleanText(input.probation.probationNotes);
+    const passedDate = cleanDate(input.probation.probationPassedDate ?? "", "probation passed date");
+    if (status === "passed" && !passedDate) throw new LevyTateLearnerLifecycleValidationError("Probation passed date is required when probation is passed.");
+    if ((status === "not_passed" || status === "under_review") && !notes) throw new LevyTateLearnerLifecycleValidationError("A note is required when probation is not passed or under review.");
+    next.probationStatus = status;
+    next.probationPassedDate = status === "passed" ? passedDate : "";
+    next.probationConfirmedBy = context.user.email;
+    next.probationConfirmedAt = timestamp;
+    next.probationNotes = notes;
+  }
+
+  if (input.hrApproval) {
+    const status = cleanText(input.hrApproval.hrApprovalStatus) as LearnerHrApprovalStatus;
+    assertEnum(status, ["not_requested", "awaiting_approval", "approved", "declined", "more_information_required"], "HR approval status");
+    const notes = cleanText(input.hrApproval.hrApprovalNotes);
+    const approvedDate = cleanDate(input.hrApproval.hrApprovedDate ?? "", "HR approval date");
+    if (status === "approved" && !approvedDate) throw new LevyTateLearnerLifecycleValidationError("HR approval date is required when HR approval is approved.");
+    if ((status === "declined" || status === "more_information_required") && !notes) throw new LevyTateLearnerLifecycleValidationError("A note is required when HR approval is declined or more information is required.");
+    next.hrApprovalStatus = status;
+    next.hrApprovedDate = status === "approved" ? approvedDate : "";
+    next.hrApprovedBy = context.user.email;
+    next.hrApprovalNotes = notes;
+  }
+
+  if (input.guides) {
+    next.guidesSent = Boolean(input.guides.guidesSent);
+    next.guidesSentDate = next.guidesSent ? cleanDate(input.guides.guidesSentDate ?? "", "guides sent date") : "";
+    if (next.guidesSent && !next.guidesSentDate) throw new LevyTateLearnerLifecycleValidationError("Guides sent date is required when guides are marked as sent.");
+    next.guidesSentBy = next.guidesSent ? context.user.email : "";
+    next.guidesVersion = cleanText(input.guides.guidesVersion);
+    next.guidesNotes = [cleanText(input.guides.recipientSummary), cleanText(input.guides.guidesNotes)].filter(Boolean).join(" - ");
+  }
+
+  return next;
+}
+
+async function upsertEligibilityDeclaration(next: LearnerEligibilityDeclaration) {
+  await supabaseInsert<LearnerEligibilityDeclarationRow>(assertSupabase(), eligibilityDeclarationsTable, [eligibilityDeclarationToRow(next)], {
+    query: "on_conflict=organisation_id,id",
+    prefer: "resolution=merge-duplicates,return=minimal",
+  });
+}
+
+async function upsertPreEnrolmentChecks(next: LearnerPreEnrolmentChecks) {
+  await supabaseInsert<LearnerPreEnrolmentChecksRow>(assertSupabase(), preEnrolmentChecksTable, [preEnrolmentChecksToRow(next)], {
+    query: "on_conflict=organisation_id,id",
+    prefer: "resolution=merge-duplicates,return=minimal",
+  });
+}
+
+async function upsertGuidesOperationalAction(context: LifecycleContext, learnerRecordId: string, checks: LearnerPreEnrolmentChecks) {
+  const timestamp = nowIso();
+  const action: LearnerOperationalAction = {
+    id: `${learnerRecordId}-guides-sent`,
+    organisationId: context.organisation.id,
+    learnerRecordId,
+    actionType: "guides_sent",
+    status: "completed",
+    completed: true,
+    completedAt: checks.guidesSentDate ? `${checks.guidesSentDate}T00:00:00.000Z` : timestamp,
+    completedBy: context.user.email,
+    recipientSummary: checks.guidesNotes,
+    notes: checks.guidesVersion,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+  await supabaseInsert<LearnerOperationalActionRow>(assertSupabase(), operationalActionsTable, [operationalActionToRow(action)], {
+    query: "on_conflict=organisation_id,id",
+    prefer: "resolution=merge-duplicates,return=minimal",
+  });
+}
+
+function eligibilityEventType(status: LearnerEligibilityVerificationStatus): LearnerLifecycleEventType {
+  if (status === "employer_verified") return "eligibility_employer_verified";
+  if (status === "not_eligible") return "eligibility_marked_not_eligible";
+  return "eligibility_marked_for_review";
+}
+
+function eligibilityEventSummary(status: LearnerEligibilityVerificationStatus) {
+  if (status === "employer_verified") return "England working-hours eligibility employer verified.";
+  if (status === "not_eligible") return "England working-hours eligibility marked not eligible.";
+  return "England working-hours eligibility marked for review.";
 }
 
 async function loadLearnerLifecycleCollectionsForOrganisation(
@@ -908,6 +1322,7 @@ function buildLearnerOperationalSummary(
     actualStartDate: record.actualStartDate,
     expectedEndDate: record.expectedEndDate,
     actualEndDate: record.actualEndDate,
+    updatedAt: record.updatedAt,
     latestProgress: lifecycleSummary?.latestProgress ?? null,
     progressPosition,
     latestProviderReview: lifecycleSummary?.latestProviderReview ?? null,
@@ -1541,6 +1956,25 @@ function stringArray(value: unknown) {
 function objectValue(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   return value as Record<string, unknown>;
+}
+
+function cleanText(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function cleanDate(value: unknown, fieldName: string): string {
+  const text = cleanText(value);
+  if (!text) return "";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    throw new LevyTateLearnerLifecycleValidationError(`${fieldName} must use YYYY-MM-DD format.`);
+  }
+  return text;
+}
+
+function assertEnum<T extends string>(value: unknown, allowed: readonly T[], label: string): asserts value is T {
+  if (typeof value !== "string" || !allowed.includes(value as T)) {
+    throw new LevyTateLearnerLifecycleValidationError(`Invalid ${label}.`);
+  }
 }
 
 function nullableDatabaseText(value: string): string {
