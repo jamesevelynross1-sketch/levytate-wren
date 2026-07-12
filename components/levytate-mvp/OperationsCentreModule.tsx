@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, ChevronDown, CircleAlert, Clock3, PauseCircle, Search, TrendingDown } from "lucide-react";
-import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { EmptyState, StatusBadge } from "@/components/levytate-mvp/MvpUi";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import {
@@ -32,6 +32,7 @@ export function OperationsCentreModule({ onOpenLearner }: { onOpenLearner: (targ
   const [owner, setOwner] = useState("All");
   const [dueStatus, setDueStatus] = useState<OperationalDueStatus | "All">("All");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({ urgent: true, ready_to_enrol: true });
+  const initialSynchronisationPending = useRef(true);
 
   useEffect(() => {
     if (!authorised) {
@@ -48,6 +49,10 @@ export function OperationsCentreModule({ onOpenLearner }: { onOpenLearner: (targ
       if (queue !== "All") params.set("queue", queue);
       if (owner !== "All") params.set("owner", owner);
       if (dueStatus !== "All") params.set("dueStatus", dueStatus);
+      if (initialSynchronisationPending.current) {
+        params.set("synchronise", "true");
+        initialSynchronisationPending.current = false;
+      }
       try {
         const response = await fetch(`/api/levytate-operations${params.size ? `?${params}` : ""}`, { cache: "no-store", signal: controller.signal });
         const payload = (await response.json()) as OperationsApiResponse;

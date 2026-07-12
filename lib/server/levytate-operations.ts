@@ -13,6 +13,7 @@ import {
   type OperationsResponse,
 } from "@/lib/levytate/mvp/operations-centre";
 import { listOrganisationLearnerLifecycleDetails } from "@/lib/server/levytate-learner-lifecycle";
+import { listOperationalActions, synchroniseOrganisationOperationalActions } from "@/lib/server/levytate-operational-actions";
 
 export type OperationsQuery = {
   priority?: string;
@@ -30,17 +31,34 @@ export type OperationsQuery = {
 export async function getOrganisationOperationsSummary(
   session: LevyTateBetaSession,
   query: OperationsQuery = {},
+  options: { synchronise?: boolean } = {},
 ): Promise<OperationsResponse> {
+  if (options.synchronise) await synchroniseOrganisationOperationalActions(session);
   const details = await listOrganisationLearnerLifecycleDetails(session);
   const derived = buildOrganisationOperationalItems(details);
-  const filtered = derived.items.filter((item) => matchesQuery(item, query));
+  const activeActions = await listOperationalActions(session);
+  const actionBySource = new Map(activeActions.map((action) => [action.sourceKey, action]));
+  const currentItems = derived.items.map((item) => {
+    const action = actionBySource.get(item.sourceKey);
+    if (!action) return item;
+    return {
+      ...item,
+      persistentActionId: action.id,
+      persistentActionStatus: action.status,
+      persistentDetectedAt: action.detectedAt,
+      persistentAcknowledgedAt: action.acknowledgedAt,
+      persistentDueDate: action.dueDate,
+      ownerType: action.ownerType,
+    };
+  });
+  const filtered = currentItems.filter((item) => matchesQuery(item, query));
   return {
     source: "supabase",
     generatedAt: new Date().toISOString(),
     summary: derived.summary,
     queues: groupOperationalQueues(filtered),
     recentActivity: derived.recentActivity,
-    filterOptions: buildFilterOptions(derived.items),
+    filterOptions: buildFilterOptions(currentItems),
     totalAttentionItems: filtered.length,
   };
 }

@@ -1,5 +1,11 @@
 import { learnerBreakPolicy, learnerProgressReviewPolicy, learnerReviewTypeLabels, type LearnerReviewType } from "@/lib/levytate/mvp/learner-lifecycle";
 import type { LearnerEnrolmentReadinessCheck, LearnerRecordDetail } from "@/lib/levytate/mvp/learner-record-view";
+import {
+  buildOperationalActionSourceKey,
+  type OperationalActionSourceType,
+  type OperationalActionStatus,
+  type PersistentOperationalActionType,
+} from "@/lib/levytate/mvp/operational-actions";
 
 export type OperationalPriorityLevel = "Critical" | "High" | "Medium" | "Low" | "Informational";
 export type OperationalOwnerType = "Employee" | "Line Manager" | "Apprenticeship Lead" | "HR" | "Provider" | "Shared";
@@ -65,6 +71,15 @@ export type OperationalItem = {
   expectedReturnDate?: string;
   daysOnBreak?: number;
   readinessSummary?: string;
+  sourceType: OperationalActionSourceType;
+  sourceCondition: string;
+  sourceKey: string;
+  persistentActionType: PersistentOperationalActionType;
+  persistentActionId?: string;
+  persistentActionStatus?: OperationalActionStatus;
+  persistentDetectedAt?: string;
+  persistentAcknowledgedAt?: string;
+  persistentDueDate?: string;
 };
 
 export type OperationalActivity = {
@@ -215,7 +230,9 @@ function buildLearnerOperationalItems(detail: LearnerRecordDetail, now: Date): O
       detail.enrolmentReadiness.blockingChecks.forEach((check) => items.push(blockerItem(detail, check, now)));
       if (detail.enrolmentReadiness.blockingChecks.length === 1) {
         const check = detail.enrolmentReadiness.blockingChecks[0];
-        items.push(baseItem(detail, "urgent", "single_enrolment_blocker", check.message, "complete_pre_enrolment", "", now));
+        const urgent = baseItem(detail, "urgent", "single_enrolment_blocker", check.message, "complete_pre_enrolment", "", now);
+        applyBlockerSource(urgent, check.id);
+        items.push(urgent);
       }
       if (!detail.preEnrolmentChecks?.guidesSent) {
         items.push(baseItem(detail, "pre_enrolment", "guides_outstanding", "Learner and manager guides have not been sent.", "complete_pre_enrolment", "", now));
@@ -276,6 +293,10 @@ function buildLearnerOperationalItems(detail: LearnerRecordDetail, now: Date): O
   } else if (detail.latestBreak?.status === "returned" && postReturnReviewRequired(detail, now)) {
     const dueDate = addDays(detail.latestBreak.actualReturnDate, learnerBreakPolicy.postReturnReviewDays);
     const item = baseItem(detail, "breaks", "check_in_overdue", "Post-return review is required.", "record_review", dueDate, now, "l_and_d_check_in");
+    item.sourceType = "break_in_learning";
+    item.sourceCondition = "post_return_review_required";
+    item.sourceKey = buildOperationalActionSourceKey(item.learnerRecordId, item.sourceCondition);
+    item.persistentActionType = "record_post_return_review";
     item.breakStartDate = detail.latestBreak.startDate;
     item.expectedReturnDate = detail.latestBreak.actualReturnDate;
     item.daysOnBreak = daysBetween(parseDate(detail.latestBreak.startDate), parseDate(detail.latestBreak.actualReturnDate));
@@ -297,6 +318,7 @@ function baseItem(
 ): OperationalItem {
   const timing = dueTiming(dueDate, now);
   const priorityLevel = deriveOperationalPriority(reasonCode, timing.daysOverdue);
+  const sourceCondition = sourceConditionFor(reasonCode, reviewType);
   return {
     id: `${queueType}:${detail.learnerRecordId}:${reasonCode}:${reviewType ?? "general"}`,
     queueType,
@@ -320,6 +342,10 @@ function baseItem(
     actionUrl: `/levytate/app?module=Learners&learner=${encodeURIComponent(detail.learnerRecordId)}&action=${actionType}`,
     secondaryActionUrl: `/levytate/app?module=Learners&learner=${encodeURIComponent(detail.learnerRecordId)}`,
     reviewType: reviewType ? learnerReviewTypeLabels[reviewType] : undefined,
+    sourceType: sourceTypeFor(reasonCode, reviewType),
+    sourceCondition,
+    sourceKey: buildOperationalActionSourceKey(detail.learnerRecordId, sourceCondition),
+    persistentActionType: persistentActionTypeFor(reasonCode, reviewType),
   };
 }
 
@@ -330,6 +356,7 @@ function blockerItem(detail: LearnerRecordDetail, check: LearnerEnrolmentReadine
   item.ownerType = owner;
   item.priorityLevel = detail.enrolmentReadiness.blockingChecks.length === 1 ? "High" : check.status === "Needs review" ? "High" : "Medium";
   item.priorityRank = operationalPriorityRanks[item.priorityLevel];
+  applyBlockerSource(item, check.id);
   return item;
 }
 
@@ -419,6 +446,60 @@ function blockerOwner(checkId: string): OperationalOwnerType {
   if (checkId === "hr-approval-complete") return "HR";
   if (checkId === "probation-complete") return "Line Manager";
   return "Apprenticeship Lead";
+}
+
+function applyBlockerSource(item: OperationalItem, checkId: string) {
+  item.sourceType = "pre_enrolment_readiness";
+  item.sourceCondition = `pre_enrolment:${checkId}`;
+  item.sourceKey = buildOperationalActionSourceKey(item.learnerRecordId, item.sourceCondition);
+  item.persistentActionType = blockerActionType(checkId);
+}
+
+function blockerActionType(checkId: string): PersistentOperationalActionType {
+  const actions: Record<string, PersistentOperationalActionType> = {
+    "employee-england-declaration": "complete_employee_declaration",
+    "employer-eligibility-verification": "verify_england_working_hours",
+    "probation-complete": "confirm_probation",
+    "hr-approval-complete": "obtain_hr_approval",
+    "programme-confirmed": "confirm_programme",
+    "provider-confirmed": "confirm_provider",
+  };
+  return actions[checkId] ?? "complete_pre_enrolment";
+}
+
+function sourceConditionFor(reason: PriorityReason, reviewType?: LearnerReviewType) {
+  if (reason === "support_intervention" && reviewType) return `support_intervention:${reviewType}`;
+  if (["provider_review_overdue", "check_in_overdue", "review_approaching"].includes(reason) && reviewType) return `review_due:${reviewType}`;
+  if (reason === "break_materially_overdue") return "return_date_overdue";
+  if (reason === "break_approaching" || reason === "routine") return "break_in_learning_active";
+  if (reason === "significantly_behind" || reason === "slightly_behind") return "progress_behind_target";
+  return reason;
+}
+
+function sourceTypeFor(reason: PriorityReason, reviewType?: LearnerReviewType): OperationalActionSourceType {
+  if (["eligibility_not_eligible", "hr_declined", "probation_not_passed", "single_enrolment_blocker", "ready_to_enrol"].includes(reason)) return "pre_enrolment_readiness";
+  if (["significantly_behind", "slightly_behind", "progress_overdue", "support_intervention"].includes(reason)) return "progress_exception";
+  if (["provider_review_overdue", "check_in_overdue", "review_approaching"].includes(reason) || reviewType) return "review_due";
+  if (["break_materially_overdue", "break_approaching", "routine"].includes(reason)) return "break_in_learning";
+  if (reason === "guides_outstanding") return "operational_communication";
+  return "lifecycle_rule";
+}
+
+function persistentActionTypeFor(reason: PriorityReason, reviewType?: LearnerReviewType): PersistentOperationalActionType {
+  if (reason === "eligibility_not_eligible") return "verify_england_working_hours";
+  if (reason === "hr_declined") return "obtain_hr_approval";
+  if (reason === "probation_not_passed") return "confirm_probation";
+  if (reason === "lifecycle_inconsistent") return "resolve_lifecycle_inconsistency";
+  if (reason === "ready_to_enrol") return "complete_enrolment";
+  if (reason === "guides_outstanding") return "send_guides";
+  if (["significantly_behind", "slightly_behind", "support_intervention"].includes(reason)) return "address_progress_exception";
+  if (reason === "progress_overdue") return "add_progress_update";
+  if (reason === "break_materially_overdue") return "return_learner";
+  if (reason === "break_approaching" || reason === "routine") return "manage_break_in_learning";
+  if (reviewType === "provider_review") return "record_provider_review";
+  if (reviewType === "manager_check_in") return "record_manager_check_in";
+  if (reviewType === "l_and_d_check_in") return "record_l_and_d_check_in";
+  return "complete_pre_enrolment";
 }
 
 function actionLabel(action: OperationalActionType) {

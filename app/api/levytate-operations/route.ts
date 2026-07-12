@@ -28,7 +28,9 @@ export async function GET(request: Request) {
   };
 
   try {
-    const operations = await getOrganisationOperationsSummary(session, query);
+    const operations = await getOrganisationOperationsSummary(session, query, {
+      synchronise: url.searchParams.get("synchronise") === "true",
+    });
     return NextResponse.json({ ok: true, ...operations });
   } catch (error) {
     const status = error instanceof LevyTateLearnerLifecyclePermissionError

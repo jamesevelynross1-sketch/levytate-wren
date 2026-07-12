@@ -317,10 +317,12 @@ type LearnerLifecycleEventRow = {
   created_at: string;
 };
 
-type LifecycleContext = {
+export type LearnerLifecycleServerContext = {
   organisation: OrganisationRow;
   user: UserRow;
 };
+
+type LifecycleContext = LearnerLifecycleServerContext;
 
 const organisationsTable = "levytate_organisations";
 const usersTable = "levytate_users";
@@ -1022,6 +1024,10 @@ export async function listOrganisationLearnerLifecycleDetails(session: LevyTateB
   return rows
     .map(learnerRecordFromRow)
     .map((record) => buildLearnerRecordDetail(record, scopedCollections(collections, record.id), lookups));
+}
+
+export async function getLearnerLifecycleServerContext(session: LevyTateBetaSession): Promise<LearnerLifecycleServerContext> {
+  return contextForSession(session);
 }
 
 export async function getOrganisationLearnerLifecycleRecordDetail(session: LevyTateBetaSession, learnerRecordId: string): Promise<LearnerRecordDetail> {
