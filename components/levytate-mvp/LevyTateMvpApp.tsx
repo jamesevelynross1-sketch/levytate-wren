@@ -25,6 +25,7 @@ import { EmployeeApplicationModule, EmployeeHomeModule, EmployeeProgrammeModule 
 import { EmployeesModule } from "@/components/levytate-mvp/EmployeesModule";
 import { GuidanceCentreModule } from "@/components/levytate-mvp/GuidanceCentreModule";
 import { LearnersModule } from "@/components/levytate-mvp/LearnersModule";
+import { OperationsCentreModule } from "@/components/levytate-mvp/OperationsCentreModule";
 import { LevyTateStandardsProvider } from "@/components/levytate-mvp/LevyTateStandardsProvider";
 import { MvpWorkspaceProvider, useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { ProviderMatchingModule } from "@/components/levytate-mvp/ProviderMatchingModule";
@@ -32,6 +33,7 @@ import { ProvidersModule } from "@/components/levytate-mvp/ProvidersModule";
 import { ReportsModule } from "@/components/levytate-mvp/ReportsModule";
 import { RolesModule } from "@/components/levytate-mvp/RolesModule";
 import type { LevyTateWorkspaceBootstrap } from "@/lib/levytate/mvp/api";
+import type { OperationalActionType } from "@/lib/levytate/mvp/operations-centre";
 import { hasMvpPermission, permissionsForMvpRole, type MvpPermission } from "@/lib/levytate/mvp/rbac";
 import { buildNotifications } from "@/lib/levytate/mvp/workspace-insights";
 
@@ -114,10 +116,12 @@ function MvpAppShell() {
   const [providerView, setProviderView] = useState<ProviderView>("Programmes");
   const [settingsView, setSettingsView] = useState<SettingsView>("Workspace");
   const [aiEmployeeId, setAiEmployeeId] = useState<string | null>(null);
+  const [learnerTarget, setLearnerTarget] = useState<{ learnerRecordId: string; actionType: OperationalActionType } | null>(null);
 
   const notifications = useMemo(() => buildNotifications(data), [data]);
   const permissions = meta?.permissions ?? permissionsForMvpRole(meta?.userRole);
   const can = (permission: MvpPermission) => hasMvpPermission(permissions, permission);
+  const isOperationsRole = meta?.userRole === "Apprenticeship Lead" || meta?.userRole === "Employer Admin" || meta?.userRole === "Platform Admin";
   const employeeModules: readonly ModuleName[] = ["Home", "My Programme", "My Application", "Copilot", "Knowledge"];
   const lineManagerModules: readonly ModuleName[] = ["Home", "My Team", "Approvals", "Copilot", "Knowledge"];
   const apprenticeshipLeadModules: readonly ModuleName[] = ["Home", "People", "Applications", "Learners", "Providers", "Reports", "Copilot", "Knowledge", "Settings"];
@@ -332,8 +336,8 @@ function MvpAppShell() {
           <div className="mx-auto max-w-[1540px] px-4 py-5 sm:px-6 lg:px-8">
             <section className="mb-5 border-b border-[#102c3d]/[0.07] pb-4">
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">Protected workspace</p>
-              <h1 className="mt-1 text-2xl font-semibold tracking-[-0.025em]">{activeModule}</h1>
-              <p className="mt-1.5 max-w-3xl text-sm leading-6 text-[#102c3d]/56">{moduleCopy[activeModule]}</p>
+              <h1 className="mt-1 text-2xl font-semibold tracking-[-0.025em]">{activeModule === "Home" && isOperationsRole ? "Operations Centre" : activeModule}</h1>
+              <p className="mt-1.5 max-w-3xl text-sm leading-6 text-[#102c3d]/56">{activeModule === "Home" && isOperationsRole ? "Prioritised learner operations showing what needs attention, why it matters and where to act next." : moduleCopy[activeModule]}</p>
             </section>
 
             {activeModule === "Home" ? (
@@ -341,7 +345,9 @@ function MvpAppShell() {
                 ? <EmployeeHomeModule onNavigate={(target) => navigateTo(target)} />
                 : meta?.userRole === "Line Manager"
                   ? <LineManagerHomeModule onNavigate={(target) => navigateTo(target)} />
-                : <DashboardModule onNavigate={navigateTo} />
+                : isOperationsRole
+                  ? <OperationsCentreModule onOpenLearner={(target) => { setLearnerTarget(target); openModule("Learners"); }} />
+                  : <DashboardModule onNavigate={navigateTo} />
             ) : null}
             {activeModule === "My Programme" ? <EmployeeProgrammeModule onNavigate={(target) => navigateTo(target)} /> : null}
             {activeModule === "My Application" ? <EmployeeApplicationModule /> : null}
@@ -350,7 +356,7 @@ function MvpAppShell() {
             {activeModule === "My Team" ? <EmployeesModule onStartDiscovery={(employeeId) => { setAiEmployeeId(employeeId); openModule("Copilot"); }} /> : null}
             {activeModule === "Approvals" ? <ApplicationsModule /> : null}
             {activeModule === "Applications" ? <ApplicationsModule /> : null}
-            {activeModule === "Learners" ? <LearnersModule /> : null}
+            {activeModule === "Learners" ? <LearnersModule initialLearnerRecordId={learnerTarget?.learnerRecordId} initialAction={learnerTarget?.actionType} onDeepLinkConsumed={() => setLearnerTarget(null)} /> : null}
             {activeModule === "People" ? (
               <ModuleStackNav items={peopleItems} active={peopleView} onSelect={(item) => setPeopleView(item as PeopleView)}>
                 {peopleView === "Employees" ? <EmployeesModule onStartDiscovery={(employeeId) => { setAiEmployeeId(employeeId); openModule("Copilot"); }} /> : null}

@@ -363,6 +363,20 @@ const lifecycleLearnerEmployees = [
     status: "Active",
     start_date: "2023-04-17",
   },
+  {
+    id: "gc-lifecycle-employee-jules",
+    employee_number: "GC-LC-010",
+    name: "Jules Mercer",
+    email: "jules.mercer.lifecycle.demo@levytate.test",
+    job_title: "Field Reporting Coordinator",
+    role_id: "gc-rbac-role-field-coordinator",
+    manager_id: "gc-rbac-employee-priya",
+    department: "Operations",
+    site: "Leeds Regional Hub",
+    platform_role: "Employee",
+    status: "Active",
+    start_date: "2024-09-16",
+  },
 ];
 
 const isolationEmployees = [
@@ -402,6 +416,7 @@ const lifecycleLearnerProfiles = [
   profile("gc-lifecycle-employee-grace", "Sustainability Coordinator", ["Maintains sustainability evidence", "Supports ESG reporting"], ["Sustainability reporting", "Stakeholder updates"], ["ESG delivery", "Data confidence"], "ST0934"),
   profile("gc-lifecycle-employee-harry", "Finance Analyst", ["Prepares finance reports", "Analyses operating costs"], ["Financial reporting", "Analysis"], ["Insight generation", "Dashboard reporting"], "ST0118"),
   profile("gc-lifecycle-employee-isobel", "Commercial Administrator", ["Supports bids and commercial administration", "Maintains opportunity records"], ["Administration", "Commercial support"], ["Bid coordination", "Process discipline"], "ST0056"),
+  profile("gc-lifecycle-employee-jules", "Field Reporting Coordinator", ["Maintains field reporting", "Coordinates operational data"], ["Reporting", "Operations coordination"], ["Data confidence", "Workflow automation"], "ST0795"),
 ];
 
 const isolationProfiles = [
@@ -460,6 +475,7 @@ const lifecycleApplications = [
   lifecycleApplication("gc-lifecycle-app-grace", "gc-lifecycle-employee-grace", "ST0934", "Approved for Enrolment", "Grace is in assessment for sustainability and responsibility capability."),
   lifecycleApplication("gc-lifecycle-app-harry", "gc-lifecycle-employee-harry", "ST0118", "Approved for Enrolment", "Harry has achieved the data analyst apprenticeship."),
   lifecycleApplication("gc-lifecycle-app-isobel", "gc-lifecycle-employee-isobel", "ST0056", "Approved for Enrolment", "Isobel completed learning activity but did not achieve the assessment outcome."),
+  lifecycleApplication("gc-lifecycle-app-jules", "gc-lifecycle-employee-jules", "ST0795", "Approved for Enrolment", "Jules is ready to begin a Data Technician programme supporting field reporting."),
 ];
 
 const isolationApplications = [
@@ -782,10 +798,11 @@ function lifecycleScenarios() {
       probationStatus: "passed",
       hrApprovalStatus: "approved",
       guidesSent: true,
+      break: { startDate: "2026-06-16", expectedReturnDate: "2026-07-10", actualReturnDate: "2026-07-10", reasonCategory: "temporary_role_or_workload_change", reasonNotes: "Short planned pause completed before returning to learning.", status: "returned" },
       assessment: null,
       achievement: null,
       actions: ["guides_sent"],
-      events: [["learner_record_created", "", "pre_enrolment", "Learner record created."], ["enrolled", "pre_enrolment", "enrolled", "Learner moved into active learning."]],
+      events: [["learner_record_created", "", "pre_enrolment", "Learner record created."], ["enrolled", "pre_enrolment", "enrolled", "Learner moved into active learning."], ["returned_from_break", "break_in_learning", "enrolled", "Learner returned from Break in Learning."]],
     },
     {
       key: "behind-target",
@@ -801,8 +818,8 @@ function lifecycleScenarios() {
       expectedEndDate: "2027-07-12",
       actualEndDate: "",
       progress: { target: 46, actual: 31, date: "2026-07-01", summary: "Progress is behind target due to limited project evidence from live reporting work.", supportAction: "Agree a recovery plan with the provider and line manager." },
-      providerReview: { date: "2026-06-27", next: "2026-07-27", summary: "Provider flagged evidence gaps in data visualisation units.", actions: ["Allocate a field planning report project", "Schedule manager evidence review"], support: "Manager needs to create clearer project evidence opportunities.", status: "action_required" },
-      lAndDCheckIn: { date: "2026-07-02", next: "2026-07-23", summary: "L&D asked for a short intervention with manager and provider.", actions: ["Book recovery call", "Review workload pressure"], support: "Short-term protected learning plan.", status: "action_required" },
+      providerReview: { date: "2026-05-27", next: "2026-06-27", summary: "Provider flagged evidence gaps in data visualisation units.", actions: ["Allocate a field planning report project", "Schedule manager evidence review"], support: "Manager needs to create clearer project evidence opportunities.", status: "action_required" },
+      lAndDCheckIn: { date: "2026-06-02", next: "2026-06-30", summary: "L&D asked for a short intervention with manager and provider.", actions: ["Book recovery call", "Review workload pressure"], support: "Short-term protected learning plan.", status: "action_required" },
       eligibilityConfirmed: true,
       eligibilityStatus: "employer_verified",
       workingHours: 88,
@@ -836,7 +853,7 @@ function lifecycleScenarios() {
       probationStatus: "passed",
       hrApprovalStatus: "approved",
       guidesSent: true,
-      break: { startDate: "2026-06-24", expectedReturnDate: "2026-08-05", actualReturnDate: "", reasonCategory: "Operational pause", reasonNotes: "Temporary break while operational cover is stabilised.", status: "active" },
+      break: { startDate: "2026-05-24", expectedReturnDate: "2026-06-20", actualReturnDate: "", reasonCategory: "temporary_role_or_workload_change", reasonNotes: "Temporary break while operational cover is stabilised.", status: "active" },
       assessment: null,
       achievement: null,
       actions: ["guides_sent"],
@@ -977,6 +994,33 @@ function lifecycleScenarios() {
       achievement: { expected: "2026-04-14", actual: "2026-04-30", grade: "Not achieved", gradeType: "outcome", certificateReceived: false, certificateDate: "", resultNotes: "Completed without achievement. Resit route under review." },
       actions: ["guides_sent", "hr_and_manager_assessment_email_sent"],
       events: [["learner_record_created", "", "pre_enrolment", "Learner record created."], ["enrolled", "pre_enrolment", "enrolled", "Learner enrolled with provider."], ["assessment_readiness_confirmed", "assessment_preparation", "in_assessment", "Assessment started."], ["achievement_recorded", "in_assessment", "completed_without_achievement", "Completed without achievement recorded."]],
+    },
+    {
+      key: "ready-to-enrol",
+      employeeId: "gc-lifecycle-employee-jules",
+      applicationId: "gc-lifecycle-app-jules",
+      programmeId: "programme-apprentify-data-technician",
+      providerId: "provider-apprentify",
+      enrolmentId: "",
+      lifecycleStatus: "pre_enrolment",
+      employmentRoute: "existing_employee_upskill",
+      expectedStartDate: "2026-09-14",
+      actualStartDate: "2026-09-14",
+      expectedEndDate: "2028-03-14",
+      actualEndDate: "",
+      progress: null,
+      providerReview: null,
+      lAndDCheckIn: null,
+      eligibilityConfirmed: true,
+      eligibilityStatus: "employer_verified",
+      workingHours: 95,
+      probationStatus: "passed",
+      hrApprovalStatus: "approved",
+      guidesSent: true,
+      assessment: null,
+      achievement: null,
+      actions: ["guides_sent"],
+      events: [["learner_record_created", "", "pre_enrolment", "Learner record created."], ["eligibility_employer_verified", "", "", "England working-hours eligibility employer verified."], ["hr_approved", "", "", "HR approval confirmed."], ["guides_sent", "", "", "Learner and manager guides sent."]],
     },
   ];
 }

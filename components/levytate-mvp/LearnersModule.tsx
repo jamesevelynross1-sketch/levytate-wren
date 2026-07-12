@@ -65,7 +65,9 @@ const progressOptions: Array<LearnerProgressPosition | typeof allOption> = [
   "No progress data",
 ];
 
-export function LearnersModule() {
+type LearnerDeepLinkAction = "open_learner" | "complete_pre_enrolment" | "complete_enrolment" | "record_review" | "add_progress" | "manage_break" | "return_learner";
+
+export function LearnersModule({ initialLearnerRecordId = "", initialAction = "open_learner", onDeepLinkConsumed }: { initialLearnerRecordId?: string; initialAction?: LearnerDeepLinkAction; onDeepLinkConsumed?: () => void }) {
   const { can, meta } = useMvpWorkspace();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -88,6 +90,10 @@ export function LearnersModule() {
   const mayReadOrganisationLearners = can("learnerLifecycle:read") && (meta?.userRole === "Apprenticeship Lead" || meta?.userRole === "Employer Admin" || meta?.userRole === "Platform Admin");
   const mayMutatePreEnrolment = can("learnerLifecycle:write") && can("learnerLifecycle:status") && (meta?.userRole === "Apprenticeship Lead" || meta?.userRole === "Employer Admin" || meta?.userRole === "Platform Admin");
   const mayMutateLearnerActivity = can("learnerLifecycle:write") && (meta?.userRole === "Apprenticeship Lead" || meta?.userRole === "Employer Admin" || meta?.userRole === "Platform Admin");
+
+  useEffect(() => {
+    if (initialLearnerRecordId) setSelectedId(initialLearnerRecordId);
+  }, [initialLearnerRecordId]);
 
   useEffect(() => {
     if (!mayReadOrganisationLearners) {
@@ -206,6 +212,8 @@ export function LearnersModule() {
         }}
         mayMutatePreEnrolment={mayMutatePreEnrolment}
         mayMutateLearnerActivity={mayMutateLearnerActivity}
+        initialAction={initialAction}
+        onDeepLinkConsumed={onDeepLinkConsumed}
         onDetailUpdated={(next) => {
           setDetail(next);
           setLearners((current) => current.map((learner) => learner.learnerRecordId === next.learnerRecordId ? next : learner));
@@ -312,12 +320,22 @@ export function LearnersModule() {
   );
 }
 
-function LearnerRecordView({ detail, loading, error, onBack, mayMutatePreEnrolment, mayMutateLearnerActivity, onDetailUpdated }: { detail: LearnerRecordDetail | null; loading: boolean; error: string; onBack: () => void; mayMutatePreEnrolment: boolean; mayMutateLearnerActivity: boolean; onDetailUpdated: (detail: LearnerRecordDetail) => void }) {
+function LearnerRecordView({ detail, loading, error, onBack, mayMutatePreEnrolment, mayMutateLearnerActivity, initialAction, onDeepLinkConsumed, onDetailUpdated }: { detail: LearnerRecordDetail | null; loading: boolean; error: string; onBack: () => void; mayMutatePreEnrolment: boolean; mayMutateLearnerActivity: boolean; initialAction: LearnerDeepLinkAction; onDeepLinkConsumed?: () => void; onDetailUpdated: (detail: LearnerRecordDetail) => void }) {
   const [workflowOpen, setWorkflowOpen] = useState(false);
   const [activityMode, setActivityMode] = useState<"progress" | "review" | "">("");
   const [reviewFilter, setReviewFilter] = useState<LearnerReviewType | "all">("all");
   const [success, setSuccess] = useState("");
   const [breakMode, setBreakMode] = useState<"start" | "manage" | "update" | "return" | "cancel" | "">("");
+
+  useEffect(() => {
+    if (!detail || initialAction === "open_learner") return;
+    if (initialAction === "complete_pre_enrolment" || initialAction === "complete_enrolment") setWorkflowOpen(true);
+    if (initialAction === "record_review") setActivityMode("review");
+    if (initialAction === "add_progress") setActivityMode("progress");
+    if (initialAction === "manage_break") setBreakMode("manage");
+    if (initialAction === "return_learner") setBreakMode("return");
+    onDeepLinkConsumed?.();
+  }, [detail, initialAction, onDeepLinkConsumed]);
 
   if (loading) {
     return <div className="rounded-xl border border-[#102c3d]/[0.07] bg-white p-8 text-sm font-semibold text-[#102c3d]/56">Loading learner record.</div>;

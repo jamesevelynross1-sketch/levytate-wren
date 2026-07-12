@@ -1010,11 +1010,33 @@ export async function listOrganisationLearnerLifecycleSummaries(session: LevyTat
     .sort(compareLearnerOperationalPriority);
 }
 
+export async function listOrganisationLearnerLifecycleDetails(session: LevyTateBetaSession): Promise<LearnerRecordDetail[]> {
+  const context = await contextForSession(session);
+  assertOrganisationLearnerReadPermission(context);
+  const organisationId = context.organisation.id;
+  const rows = await selectMany<LearnerRecordRow>(learnerRecordsTable, organisationId, "record_status=eq.Active", "updated_at.desc");
+  if (!rows.length) return [];
+
+  const collections = await loadLearnerLifecycleCollectionsForOrganisation(organisationId, rows);
+  const lookups = await loadLearnerRecordLookups(organisationId);
+  return rows
+    .map(learnerRecordFromRow)
+    .map((record) => buildLearnerRecordDetail(record, scopedCollections(collections, record.id), lookups));
+}
+
 export async function getOrganisationLearnerLifecycleRecordDetail(session: LevyTateBetaSession, learnerRecordId: string): Promise<LearnerRecordDetail> {
   const context = await contextForSession(session);
   const record = await getScopedLearnerRecord(context, learnerRecordId, "read");
   const collections = await loadLearnerLifecycleCollectionsForRecord(session, learnerRecordId);
   const lookups = await loadLearnerRecordLookups(context.organisation.id);
+  return buildLearnerRecordDetail(record, collections, lookups);
+}
+
+function buildLearnerRecordDetail(
+  record: LearnerRecord,
+  collections: LearnerLifecycleCollections,
+  lookups: Awaited<ReturnType<typeof loadLearnerRecordLookups>>,
+): LearnerRecordDetail {
   const summary = buildLearnerOperationalSummary(record, collections, lookups);
   const eligibilityDeclaration = collections.eligibilityDeclarations[0] ?? null;
   const preEnrolmentChecks = collections.preEnrolmentChecks[0] ?? null;
@@ -1041,6 +1063,22 @@ export async function getOrganisationLearnerLifecycleRecordDetail(session: LevyT
       previousStatus: event.previousStatus,
       newStatus: event.newStatus,
     })),
+  };
+}
+
+function scopedCollections(collections: LearnerLifecycleCollections, learnerRecordId: string): LearnerLifecycleCollections {
+  return {
+    learnerRecords: collections.learnerRecords.filter((record) => record.id === learnerRecordId),
+    eligibilityDeclarations: collections.eligibilityDeclarations.filter((item) => item.learnerRecordId === learnerRecordId),
+    preEnrolmentChecks: collections.preEnrolmentChecks.filter((item) => item.learnerRecordId === learnerRecordId),
+    breaksInLearning: collections.breaksInLearning.filter((item) => item.learnerRecordId === learnerRecordId),
+    withdrawals: collections.withdrawals.filter((item) => item.learnerRecordId === learnerRecordId),
+    learnerReviews: collections.learnerReviews.filter((item) => item.learnerRecordId === learnerRecordId),
+    progressUpdates: collections.progressUpdates.filter((item) => item.learnerRecordId === learnerRecordId),
+    assessmentReadiness: collections.assessmentReadiness.filter((item) => item.learnerRecordId === learnerRecordId),
+    achievements: collections.achievements.filter((item) => item.learnerRecordId === learnerRecordId),
+    operationalActions: collections.operationalActions.filter((item) => item.learnerRecordId === learnerRecordId),
+    lifecycleEvents: collections.lifecycleEvents.filter((item) => item.learnerRecordId === learnerRecordId),
   };
 }
 

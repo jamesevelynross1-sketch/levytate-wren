@@ -25,8 +25,8 @@ async function main() {
 
   assert("Apprenticeship Lead learner list is accessible", listResponse.status === 200, listPayload);
   assert("Learner list reads from Supabase", listPayload.source === "supabase", listPayload);
-  assert("Learner list contains nine seeded lifecycle records", listPayload.summary?.total === 9, listPayload.summary);
-  assert("Learner summary includes one pre-enrolment record", listPayload.summary?.preEnrolment === 1, listPayload.summary);
+  assert("Learner list contains ten seeded lifecycle records", listPayload.summary?.total === 10, listPayload.summary);
+  assert("Learner summary includes two pre-enrolment records", listPayload.summary?.preEnrolment === 2, listPayload.summary);
   assert("Learner summary includes active learners", listPayload.summary?.activeLearners === 5, listPayload.summary);
   assert("Learner summary includes one break in learning", listPayload.summary?.breakInLearning === 1, listPayload.summary);
   assert("Learner summary includes assessment-stage records", listPayload.summary?.assessmentStage === 2, listPayload.summary);
