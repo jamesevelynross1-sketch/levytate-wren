@@ -11,12 +11,15 @@ import {
   getLatestProviderReview as latestProviderReviewFromCollections,
   getLearnerLifecycleSummary as learnerLifecycleSummaryFromCollections,
   learnerProgressReviewPolicy,
+  learnerBreakPolicy,
+  learnerBreakReasonLabels,
   learnerProgressSourceLabels,
   learnerReviewStatusLabels,
   learnerReviewTypeLabels,
   type LearnerAchievement,
   type LearnerAssessmentReadiness,
   type LearnerBreakInLearning,
+  type LearnerBreakReasonCategory,
   type LearnerEligibilityDeclaration,
   type LearnerEligibilityVerificationStatus,
   type LearnerEmploymentRoute,
@@ -40,6 +43,7 @@ import {
   compareLearnerOperationalPriority,
   deriveLearnerEnrolmentReadiness,
   deriveLearnerAttention,
+  deriveBreakAttention,
   deriveProgressPosition,
   deriveReviewSummaries,
   employmentRouteLabel,
@@ -422,6 +426,70 @@ export type LearnerReviewInput = {
   status: LearnerReviewStatus;
 };
 
+export type StartBreakInLearningInput = {
+  expectedActivityVersion?: string;
+  idempotencyKey: string;
+  startDate: string;
+  expectedReturnDate?: string;
+  expectedReturnUnknown?: boolean;
+  reviewDate?: string;
+  reasonCategory: LearnerBreakReasonCategory;
+  reasonNotes?: string;
+  providerNotified: boolean;
+  providerNotifiedDate?: string;
+  employeeNotified: boolean;
+  employeeNotifiedDate?: string;
+  managerNotified: boolean;
+  managerNotifiedDate?: string;
+  returnPlanNotes?: string;
+  effectiveLifecycleDate: string;
+};
+
+export type UpdateBreakInLearningInput = {
+  expectedActivityVersion?: string;
+  expectedReturnDate?: string;
+  expectedReturnUnknown?: boolean;
+  reviewDate?: string;
+  reasonNotes?: string;
+  providerNotified?: boolean;
+  providerNotifiedDate?: string;
+  employeeNotified?: boolean;
+  employeeNotifiedDate?: string;
+  managerNotified?: boolean;
+  managerNotifiedDate?: string;
+  returnPlanNotes?: string;
+  correctedStartDate?: string;
+  startDateCorrectionReason?: string;
+};
+
+export type ReturnFromBreakInput = {
+  expectedActivityVersion?: string;
+  idempotencyKey: string;
+  actualReturnDate: string;
+  returnConfirmationNote: string;
+  programmeStillValidConfirmed: boolean;
+  providerReturnConfirmed: boolean;
+  managerReturnConfirmed: boolean;
+  learnerReturnConfirmed: boolean;
+  revisedExpectedEndDate?: string;
+  revisedReviewDate?: string;
+  immediateSupportAction?: string;
+  progressResetNote?: string;
+  firstCheckInDate?: string;
+};
+
+export type CancelBreakInput = {
+  expectedActivityVersion?: string;
+  idempotencyKey: string;
+  cancellationReason: string;
+};
+
+export type LearnerBreakMutationResult = {
+  record: LearnerBreakInLearning;
+  learner: LearnerRecordDetail;
+  created: boolean;
+};
+
 export type LearnerActivityMutationResult<T> = {
   record: T;
   learner: LearnerRecordDetail;
@@ -572,6 +640,9 @@ export async function addLearnerReview(session: LevyTateBetaSession, learnerReco
   assertPermission(context, "learnerLifecycle:write");
   const learnerRecord = await getScopedLearnerRecord(context, learnerRecordId, "write");
   assertReviewEligible(learnerRecord.lifecycleStatus);
+  if (learnerRecord.lifecycleStatus === "break_in_learning" && !["l_and_d_check_in", "manager_check_in"].includes(input.reviewType)) {
+    throw new LevyTateLearnerLifecycleValidationError("Only a support-oriented L&D or manager check-in can be recorded while a learner is on a break in learning.");
+  }
   const id = activityRecordId("learner-review", learnerRecordId, input.idempotencyKey);
   const existing = await selectOne<LearnerReviewRow>(reviewsTable, new URLSearchParams({ select: "*", organisation_id: `eq.${context.organisation.id}`, id: `eq.${id}`, limit: "1" }));
   if (existing) return { record: reviewFromRow(existing), learner: await getOrganisationLearnerLifecycleRecordDetail(session, learnerRecordId), created: false };
@@ -669,59 +740,116 @@ export async function addProgressUpdate(session: LevyTateBetaSession, learnerRec
   return { record: next, learner: await getOrganisationLearnerLifecycleRecordDetail(session, learnerRecordId), created: true };
 }
 
-export async function startBreakInLearning(
-  session: LevyTateBetaSession,
-  breakRecord: Omit<LearnerBreakInLearning, "id" | "organisationId" | "status" | "recordedBy" | "recordedAt" | "updatedAt"> & Partial<Pick<LearnerBreakInLearning, "id">>,
-) {
+export async function startBreakInLearning(session: LevyTateBetaSession, learnerRecordId: string, input: StartBreakInLearningInput): Promise<LearnerBreakMutationResult> {
   const context = await contextForSession(session);
-  const record = await updateLearnerLifecycleStatus(session, breakRecord.learnerRecordId, "break_in_learning", "Break in learning started.", { reasonCategory: breakRecord.reasonCategory });
+  assertPermission(context, "learnerLifecycle:status");
+  const learner = await getScopedLearnerRecord(context, learnerRecordId, "write");
+  const id = activityRecordId("learner-break", learnerRecordId, input.idempotencyKey);
+  const duplicate = await selectOne<LearnerBreakInLearningRow>(breaksTable, new URLSearchParams({ select: "*", organisation_id: `eq.${context.organisation.id}`, id: `eq.${id}`, limit: "1" }));
+  if (duplicate) return { record: breakFromRow(duplicate), learner: await getOrganisationLearnerLifecycleRecordDetail(session, learnerRecordId), created: false };
+  const active = await getActiveBreakRow(context.organisation.id, learnerRecordId);
+  if (active) throw new LevyTateLearnerLifecycleConflictError("This learner already has an active break in learning.");
+  if (!learnerBreakPolicy.eligibleStartStatuses.includes(learner.lifecycleStatus)) throw new LevyTateLearnerLifecycleValidationError("A break in learning can only be started for an enrolled learner or a learner preparing for assessment.");
+  const collections = await loadLearnerLifecycleCollectionsForRecord(session, learnerRecordId);
+  latestActivityVersionRequired(collections, learner, input.expectedActivityVersion);
+  validateBreakStartInput(learner, input);
   const timestamp = nowIso();
   const next: LearnerBreakInLearning = {
-    id: breakRecord.id ?? createMvpId("learner-break"),
-    organisationId: context.organisation.id,
-    learnerRecordId: breakRecord.learnerRecordId,
-    startDate: breakRecord.startDate,
-    expectedReturnDate: breakRecord.expectedReturnDate,
-    actualReturnDate: breakRecord.actualReturnDate,
-    reasonCategory: breakRecord.reasonCategory,
-    reasonNotes: breakRecord.reasonNotes,
-    status: "active",
-    recordedBy: context.user.email,
-    recordedAt: timestamp,
-    updatedAt: timestamp,
+    ...emptyBreakOperationalFields(), id, organisationId: context.organisation.id, learnerRecordId,
+    startDate: input.startDate, expectedReturnDate: cleanText(input.expectedReturnDate), actualReturnDate: "",
+    reasonCategory: input.reasonCategory, reasonNotes: cleanText(input.reasonNotes), previousLifecycleStatus: learner.lifecycleStatus as "enrolled" | "assessment_preparation",
+    expectedReturnUnknown: Boolean(input.expectedReturnUnknown), reviewDate: cleanText(input.reviewDate),
+    providerNotified: input.providerNotified, providerNotifiedDate: notificationDate(input.providerNotified, input.providerNotifiedDate, "Provider notified date"),
+    employeeNotified: input.employeeNotified, employeeNotifiedDate: notificationDate(input.employeeNotified, input.employeeNotifiedDate, "Employee notified date"),
+    managerNotified: input.managerNotified, managerNotifiedDate: notificationDate(input.managerNotified, input.managerNotifiedDate, "Manager notified date"),
+    returnPlanNotes: cleanText(input.returnPlanNotes), effectiveLifecycleDate: input.effectiveLifecycleDate,
+    status: "active", recordedBy: context.user.email, recordedAt: timestamp, updatedAt: timestamp,
   };
-
-  await supabaseInsert<LearnerBreakInLearningRow>(assertSupabase(), breaksTable, [breakToRow(next)], {
-    query: "on_conflict=organisation_id,id",
-    prefer: "resolution=merge-duplicates,return=minimal",
-  });
-  await recordLifecycleEvent(context, record.id, "break_started", "enrolled", "break_in_learning", "Break in learning record created.", { expectedReturnDate: next.expectedReturnDate });
-  return next;
+  await supabaseInsert<LearnerBreakInLearningRow>(assertSupabase(), breaksTable, [breakToRow(next)], { query: "on_conflict=organisation_id,id", prefer: "resolution=merge-duplicates,return=minimal" });
+  await persistLearnerStatus(context, learner, "break_in_learning");
+  await recordLifecycleEvent(context, learnerRecordId, "break_started", learner.lifecycleStatus, "break_in_learning", "Break in learning started.", { breakId: next.id, startDate: next.startDate, expectedReturnDate: next.expectedReturnDate, expectedReturnUnknown: next.expectedReturnUnknown, reasonCategory: next.reasonCategory, effectiveLifecycleDate: next.effectiveLifecycleDate });
+  return { record: next, learner: await getOrganisationLearnerLifecycleRecordDetail(session, learnerRecordId), created: true };
 }
 
-export async function returnFromBreak(
-  session: LevyTateBetaSession,
-  learnerRecordId: string,
-  actualReturnDate: string,
-  notes = "Learner returned from break in learning.",
-) {
+export async function updateBreakInLearning(session: LevyTateBetaSession, learnerRecordId: string, breakId: string, input: UpdateBreakInLearningInput): Promise<LearnerBreakMutationResult> {
   const context = await contextForSession(session);
-  const breakRecord = await selectOne<LearnerBreakInLearningRow>(breaksTable, new URLSearchParams({
-    select: "*",
-    organisation_id: `eq.${context.organisation.id}`,
-    learner_record_id: `eq.${learnerRecordId}`,
-    status: "eq.active",
-    limit: "1",
-  }));
-  if (!breakRecord) throw new LevyTateLearnerLifecycleError("No active break in learning was found.");
+  assertPermission(context, "learnerLifecycle:status");
+  const learner = await getScopedLearnerRecord(context, learnerRecordId, "write");
+  if (learner.lifecycleStatus !== "break_in_learning") throw new LevyTateLearnerLifecycleValidationError("Break details can only be updated while the learner is on a break in learning.");
+  const currentRow = await getBreakRow(context.organisation.id, learnerRecordId, breakId);
+  if (!currentRow) throw new LevyTateLearnerLifecycleError("Break in learning record was not found.");
+  const current = breakFromRow(currentRow);
+  if (current.status !== "active") throw new LevyTateLearnerLifecycleValidationError("Only an active break in learning can be updated.");
+  const collections = await loadLearnerLifecycleCollectionsForRecord(session, learnerRecordId);
+  latestActivityVersionRequired(collections, learner, input.expectedActivityVersion);
+  const correctedStartDate = cleanText(input.correctedStartDate);
+  if (correctedStartDate && correctedStartDate !== current.startDate) {
+    requiredText(input.startDateCorrectionReason, "Start date correction reason");
+    assertBreakStartDate(learner, correctedStartDate);
+  }
+  const next: LearnerBreakInLearning = {
+    ...current,
+    startDate: correctedStartDate || current.startDate,
+    expectedReturnDate: input.expectedReturnDate === undefined ? current.expectedReturnDate : cleanText(input.expectedReturnDate),
+    expectedReturnUnknown: input.expectedReturnUnknown ?? current.expectedReturnUnknown,
+    reviewDate: input.reviewDate === undefined ? current.reviewDate : cleanText(input.reviewDate),
+    reasonNotes: input.reasonNotes === undefined ? current.reasonNotes : cleanText(input.reasonNotes),
+    providerNotified: input.providerNotified ?? current.providerNotified,
+    providerNotifiedDate: input.providerNotified === undefined && input.providerNotifiedDate === undefined ? current.providerNotifiedDate : notificationDate(input.providerNotified ?? current.providerNotified, input.providerNotifiedDate ?? current.providerNotifiedDate, "Provider notified date"),
+    employeeNotified: input.employeeNotified ?? current.employeeNotified,
+    employeeNotifiedDate: input.employeeNotified === undefined && input.employeeNotifiedDate === undefined ? current.employeeNotifiedDate : notificationDate(input.employeeNotified ?? current.employeeNotified, input.employeeNotifiedDate ?? current.employeeNotifiedDate, "Employee notified date"),
+    managerNotified: input.managerNotified ?? current.managerNotified,
+    managerNotifiedDate: input.managerNotified === undefined && input.managerNotifiedDate === undefined ? current.managerNotifiedDate : notificationDate(input.managerNotified ?? current.managerNotified, input.managerNotifiedDate ?? current.managerNotifiedDate, "Manager notified date"),
+    returnPlanNotes: input.returnPlanNotes === undefined ? current.returnPlanNotes : cleanText(input.returnPlanNotes),
+    startDateCorrectionReason: correctedStartDate && correctedStartDate !== current.startDate ? requiredText(input.startDateCorrectionReason, "Start date correction reason") : current.startDateCorrectionReason,
+    updatedAt: nowIso(),
+  };
+  validateBreakReturnPlanning(next);
+  await updateBreakRow(context.organisation.id, next);
+  await recordLifecycleEvent(context, learnerRecordId, "break_details_updated", "break_in_learning", "break_in_learning", "Break in learning details updated.", { breakId, expectedReturnDate: next.expectedReturnDate, reviewDate: next.reviewDate });
+  if (current.expectedReturnDate !== next.expectedReturnDate) await recordLifecycleEvent(context, learnerRecordId, "break_expected_return_changed", "break_in_learning", "break_in_learning", "Expected return date changed.", { breakId, previousExpectedReturnDate: current.expectedReturnDate, expectedReturnDate: next.expectedReturnDate });
+  if (current.startDate !== next.startDate) await recordLifecycleEvent(context, learnerRecordId, "break_start_date_corrected", "break_in_learning", "break_in_learning", "Break start date corrected.", { breakId, previousStartDate: current.startDate, startDate: next.startDate, correctionReason: next.startDateCorrectionReason });
+  return { record: next, learner: await getOrganisationLearnerLifecycleRecordDetail(session, learnerRecordId), created: false };
+}
 
-  await updateLearnerLifecycleStatus(session, learnerRecordId, "enrolled", notes);
-  await supabaseUpdate(assertSupabase(), breaksTable, organisationQuery(context.organisation.id, { id: breakRecord.id }), {
-    actual_return_date: actualReturnDate,
-    status: "returned",
-    updated_at: nowIso(),
-  }, { prefer: "return=minimal" });
-  await recordLifecycleEvent(context, learnerRecordId, "returned_from_break", "break_in_learning", "enrolled", notes, { actualReturnDate });
+export async function returnFromBreak(session: LevyTateBetaSession, learnerRecordId: string, breakId: string, input: ReturnFromBreakInput): Promise<LearnerBreakMutationResult> {
+  const context = await contextForSession(session);
+  assertPermission(context, "learnerLifecycle:status");
+  const learner = await getScopedLearnerRecord(context, learnerRecordId, "write");
+  const row = await getBreakRow(context.organisation.id, learnerRecordId, breakId);
+  if (!row) throw new LevyTateLearnerLifecycleError("Break in learning record was not found.");
+  const current = breakFromRow(row);
+  if (current.status === "returned" && current.actualReturnDate === cleanText(input.actualReturnDate)) return { record: current, learner: await getOrganisationLearnerLifecycleRecordDetail(session, learnerRecordId), created: false };
+  if (learner.lifecycleStatus !== "break_in_learning" || current.status !== "active") throw new LevyTateLearnerLifecycleValidationError("Only an active break in learning can be returned to active learning.");
+  const collections = await loadLearnerLifecycleCollectionsForRecord(session, learnerRecordId);
+  latestActivityVersionRequired(collections, learner, input.expectedActivityVersion);
+  validateBreakReturnInput(current, input);
+  const next: LearnerBreakInLearning = { ...current, actualReturnDate: input.actualReturnDate, returnConfirmationNote: requiredText(input.returnConfirmationNote, "Return confirmation note"), programmeStillValidConfirmed: input.programmeStillValidConfirmed, providerReturnConfirmed: input.providerReturnConfirmed, managerReturnConfirmed: input.managerReturnConfirmed, learnerReturnConfirmed: input.learnerReturnConfirmed, revisedExpectedEndDate: cleanText(input.revisedExpectedEndDate), revisedReviewDate: cleanText(input.revisedReviewDate), immediateSupportAction: cleanText(input.immediateSupportAction), progressResetNote: cleanText(input.progressResetNote), firstCheckInDate: cleanText(input.firstCheckInDate), status: "returned", updatedAt: nowIso() };
+  await updateBreakRow(context.organisation.id, next);
+  const learnerWithDates = { ...learner, expectedEndDate: next.revisedExpectedEndDate || learner.expectedEndDate };
+  await persistLearnerStatus(context, learnerWithDates, "enrolled");
+  await recordLifecycleEvent(context, learnerRecordId, "returned_from_break", "break_in_learning", "enrolled", "Learner returned from break in learning.", { breakId, actualReturnDate: next.actualReturnDate, revisedExpectedEndDate: next.revisedExpectedEndDate, revisedReviewDate: next.revisedReviewDate, immediateSupportAction: next.immediateSupportAction, firstCheckInDate: next.firstCheckInDate });
+  return { record: next, learner: await getOrganisationLearnerLifecycleRecordDetail(session, learnerRecordId), created: true };
+}
+
+export async function cancelBreakInLearning(session: LevyTateBetaSession, learnerRecordId: string, breakId: string, input: CancelBreakInput): Promise<LearnerBreakMutationResult> {
+  const context = await contextForSession(session);
+  assertPermission(context, "learnerLifecycle:status");
+  const learner = await getScopedLearnerRecord(context, learnerRecordId, "write");
+  const row = await getBreakRow(context.organisation.id, learnerRecordId, breakId);
+  if (!row) throw new LevyTateLearnerLifecycleError("Break in learning record was not found.");
+  const current = breakFromRow(row);
+  if (current.status === "cancelled") return { record: current, learner: await getOrganisationLearnerLifecycleRecordDetail(session, learnerRecordId), created: false };
+  if (learner.lifecycleStatus !== "break_in_learning" || current.status !== "active") throw new LevyTateLearnerLifecycleValidationError("Only an active break entered incorrectly can be cancelled.");
+  const collections = await loadLearnerLifecycleCollectionsForRecord(session, learnerRecordId);
+  latestActivityVersionRequired(collections, learner, input.expectedActivityVersion);
+  const cancellationReason = requiredText(input.cancellationReason, "Cancellation reason");
+  const timestamp = nowIso();
+  const next = { ...current, status: "cancelled" as const, cancellationReason, cancelledBy: context.user.email, cancelledAt: timestamp, updatedAt: timestamp };
+  await updateBreakRow(context.organisation.id, next);
+  await persistLearnerStatus(context, learner, current.previousLifecycleStatus);
+  await recordLifecycleEvent(context, learnerRecordId, "break_cancelled", "break_in_learning", current.previousLifecycleStatus, "Break in learning record cancelled.", { breakId, cancellationReason });
+  return { record: next, learner: await getOrganisationLearnerLifecycleRecordDetail(session, learnerRecordId), created: true };
 }
 
 export async function recordWithdrawal(
@@ -884,16 +1012,7 @@ export async function listOrganisationLearnerLifecycleSummaries(session: LevyTat
 
 export async function getOrganisationLearnerLifecycleRecordDetail(session: LevyTateBetaSession, learnerRecordId: string): Promise<LearnerRecordDetail> {
   const context = await contextForSession(session);
-  assertOrganisationLearnerReadPermission(context);
-  const recordRow = await selectOne<LearnerRecordRow>(learnerRecordsTable, new URLSearchParams({
-    select: "*",
-    organisation_id: `eq.${context.organisation.id}`,
-    id: `eq.${learnerRecordId}`,
-    limit: "1",
-  }));
-  if (!recordRow) throw new LevyTateLearnerLifecycleError("Learner record was not found.");
-
-  const record = learnerRecordFromRow(recordRow);
+  const record = await getScopedLearnerRecord(context, learnerRecordId, "read");
   const collections = await loadLearnerLifecycleCollectionsForRecord(session, learnerRecordId);
   const lookups = await loadLearnerRecordLookups(context.organisation.id);
   const summary = buildLearnerOperationalSummary(record, collections, lookups);
@@ -1055,8 +1174,9 @@ function latestActivityVersion(record: LearnerRecord, collections: LearnerLifecy
     record.updatedAt,
     ...collections.progressUpdates.map((update) => update.createdAt),
     ...collections.learnerReviews.map((review) => review.updatedAt || review.createdAt),
+    ...collections.breaksInLearning.map((breakRecord) => breakRecord.updatedAt || breakRecord.recordedAt),
   ]);
-  return `${timestamp}:${collections.progressUpdates.length}:${collections.learnerReviews.length}`;
+  return `${timestamp}:${collections.progressUpdates.length}:${collections.learnerReviews.length}:${collections.breaksInLearning.length}`;
 }
 
 function latestIso(values: string[]) {
@@ -1124,6 +1244,88 @@ function activityRecordId(prefix: string, learnerRecordId: string, idempotencyKe
   const key = requiredText(idempotencyKey, "Idempotency key");
   if (!/^[a-zA-Z0-9_-]{8,80}$/.test(key)) throw new LevyTateLearnerLifecycleValidationError("Invalid idempotency key.");
   return `${prefix}-${learnerRecordId}-${key}`;
+}
+
+async function persistLearnerStatus(context: LifecycleContext, record: LearnerRecord, lifecycleStatus: LearnerLifecycleStatus) {
+  const next = { ...record, lifecycleStatus, updatedAt: nowIso(), updatedBy: context.user.email };
+  await upsertLearnerRecord(next);
+  return next;
+}
+
+async function getActiveBreakRow(organisationId: string, learnerRecordId: string) {
+  return selectOne<LearnerBreakInLearningRow>(breaksTable, new URLSearchParams({ select: "*", organisation_id: `eq.${organisationId}`, learner_record_id: `eq.${learnerRecordId}`, status: "eq.active", limit: "1" }));
+}
+
+async function getBreakRow(organisationId: string, learnerRecordId: string, breakId: string) {
+  return selectOne<LearnerBreakInLearningRow>(breaksTable, new URLSearchParams({ select: "*", organisation_id: `eq.${organisationId}`, learner_record_id: `eq.${learnerRecordId}`, id: `eq.${breakId}`, limit: "1" }));
+}
+
+async function updateBreakRow(organisationId: string, record: LearnerBreakInLearning) {
+  await supabaseUpdate(assertSupabase(), breaksTable, organisationQuery(organisationId, { id: record.id }), breakToRow(record), { prefer: "return=minimal" });
+}
+
+function validateBreakStartInput(learner: LearnerRecord, input: StartBreakInLearningInput) {
+  assertAllowedValue(input.reasonCategory, learnerBreakReasonLabels, "break reason category");
+  assertBreakStartDate(learner, input.startDate);
+  assertOperationalDate(input.effectiveLifecycleDate, "Effective lifecycle date");
+  if (learnerBreakPolicy.detailRequiredReasons.includes(input.reasonCategory)) requiredText(input.reasonNotes, "Reason details");
+  validateBreakReturnPlanning({ startDate: input.startDate, expectedReturnDate: cleanText(input.expectedReturnDate), expectedReturnUnknown: Boolean(input.expectedReturnUnknown), reviewDate: cleanText(input.reviewDate) });
+}
+
+function validateBreakReturnPlanning(input: Pick<LearnerBreakInLearning, "startDate" | "expectedReturnDate" | "expectedReturnUnknown" | "reviewDate">) {
+  if (input.expectedReturnUnknown) {
+    if (input.expectedReturnDate) throw new LevyTateLearnerLifecycleValidationError("Remove the expected return date when it is marked as unknown.");
+    const reviewDate = assertValidDate(input.reviewDate, "Review date");
+    assertDateAfter(reviewDate, input.startDate, "Review date", "break start date", true);
+    return;
+  }
+  const expected = assertValidDate(input.expectedReturnDate, "Expected return date");
+  assertDateAfter(expected, input.startDate, "Expected return date", "break start date");
+  assertPlanningDate(expected, "Expected return date");
+  if (input.reviewDate) assertValidDate(input.reviewDate, "Review date");
+}
+
+function validateBreakReturnInput(current: LearnerBreakInLearning, input: ReturnFromBreakInput) {
+  assertOperationalDate(input.actualReturnDate, "Actual return date");
+  assertDateAfter(input.actualReturnDate, current.startDate, "Actual return date", "break start date", true);
+  requiredText(input.returnConfirmationNote, "Return confirmation note");
+  if (!input.programmeStillValidConfirmed || !input.providerReturnConfirmed || !input.managerReturnConfirmed || !input.learnerReturnConfirmed) throw new LevyTateLearnerLifecycleValidationError("Confirm the programme, provider, manager and learner return arrangements before returning the learner to active learning.");
+  if (input.revisedExpectedEndDate) {
+    assertValidDate(input.revisedExpectedEndDate, "Revised expected end date");
+    assertDateAfter(input.revisedExpectedEndDate, input.actualReturnDate, "Revised expected end date", "actual return date");
+  }
+  if (input.revisedReviewDate) {
+    assertValidDate(input.revisedReviewDate, "Revised review date");
+    assertDateAfter(input.revisedReviewDate, input.actualReturnDate, "Revised review date", "actual return date", true);
+  }
+  if (input.firstCheckInDate) {
+    assertValidDate(input.firstCheckInDate, "First check-in date");
+    assertDateAfter(input.firstCheckInDate, input.actualReturnDate, "First check-in date", "actual return date", true);
+  }
+}
+
+function assertBreakStartDate(learner: LearnerRecord, value: string) {
+  assertOperationalDate(value, "Break start date");
+  if (learner.actualStartDate) assertDateAfter(value, learner.actualStartDate, "Break start date", "learner actual start date", true);
+}
+
+function assertDateAfter(value: string, boundary: string, valueLabel: string, boundaryLabel: string, allowEqual = false) {
+  if (!boundary) return;
+  const valid = allowEqual ? value >= boundary : value > boundary;
+  if (!valid) throw new LevyTateLearnerLifecycleValidationError(`${valueLabel} must be ${allowEqual ? "on or " : ""}after the ${boundaryLabel}.`);
+}
+
+function assertPlanningDate(value: string, label: string) {
+  const maximum = new Date();
+  maximum.setUTCFullYear(maximum.getUTCFullYear() + 3);
+  if (new Date(`${value}T00:00:00Z`).getTime() > maximum.getTime()) throw new LevyTateLearnerLifecycleValidationError(`${label} is implausibly far in the future.`);
+}
+
+function notificationDate(notified: boolean, value: unknown, label: string) {
+  if (!notified) return "";
+  const date = requiredText(value, label);
+  assertOperationalDate(date, label);
+  return date;
 }
 
 async function assertProviderInOrganisation(context: LifecycleContext, providerId: string) {
@@ -1443,6 +1645,8 @@ function buildLearnerOperationalSummary(
   const lifecycleSummary = learnerLifecycleSummaryFromCollections(collections, record.id);
   const progressPosition = deriveProgressPosition(lifecycleSummary?.latestProgress ?? null);
   const reviewHistory = collections.learnerReviews.filter((review) => review.learnerRecordId === record.id);
+  const breakHistory = collections.breaksInLearning.filter((breakRecord) => breakRecord.learnerRecordId === record.id).sort((left, right) => right.startDate.localeCompare(left.startDate));
+  const latestBreak = breakHistory[0] ?? null;
   const reviewSummaries = deriveReviewSummaries(reviewHistory);
   const operationalActions = collections.operationalActions.filter((action) => action.learnerRecordId === record.id);
   const attention = deriveLearnerAttention({
@@ -1455,6 +1659,8 @@ function buildLearnerOperationalSummary(
     latestManagerCheckIn: lifecycleSummary?.latestManagerCheckIn ?? null,
     reviewSummaries,
     activeBreak: lifecycleSummary?.activeBreak ?? null,
+    latestBreak,
+    reviewHistory,
     assessmentReadiness: lifecycleSummary?.assessmentReadiness ?? null,
     operationalActions,
   });
@@ -1497,6 +1703,8 @@ function buildLearnerOperationalSummary(
     latestManagerCheckIn: lifecycleSummary?.latestManagerCheckIn ?? null,
     reviewSummaries,
     activeBreak: lifecycleSummary?.activeBreak ?? null,
+    latestBreak,
+    breakAttention: deriveBreakAttention(lifecycleSummary?.activeBreak ?? null, latestBreak, reviewHistory),
     attention,
   };
 }
@@ -1839,7 +2047,35 @@ function breakToRow(record: LearnerBreakInLearning): LearnerBreakInLearningRow {
     expected_return_date: nullableDatabaseText(record.expectedReturnDate),
     actual_return_date: nullableDatabaseText(record.actualReturnDate),
     reason_category: record.reasonCategory,
-    reason_notes: record.reasonNotes,
+    reason_notes: JSON.stringify({
+      schemaVersion: 1,
+      reasonNotes: record.reasonNotes,
+      previousLifecycleStatus: record.previousLifecycleStatus,
+      expectedReturnUnknown: record.expectedReturnUnknown,
+      reviewDate: record.reviewDate,
+      providerNotified: record.providerNotified,
+      providerNotifiedDate: record.providerNotifiedDate,
+      employeeNotified: record.employeeNotified,
+      employeeNotifiedDate: record.employeeNotifiedDate,
+      managerNotified: record.managerNotified,
+      managerNotifiedDate: record.managerNotifiedDate,
+      returnPlanNotes: record.returnPlanNotes,
+      effectiveLifecycleDate: record.effectiveLifecycleDate,
+      returnConfirmationNote: record.returnConfirmationNote,
+      programmeStillValidConfirmed: record.programmeStillValidConfirmed,
+      providerReturnConfirmed: record.providerReturnConfirmed,
+      managerReturnConfirmed: record.managerReturnConfirmed,
+      learnerReturnConfirmed: record.learnerReturnConfirmed,
+      revisedExpectedEndDate: record.revisedExpectedEndDate,
+      revisedReviewDate: record.revisedReviewDate,
+      immediateSupportAction: record.immediateSupportAction,
+      progressResetNote: record.progressResetNote,
+      firstCheckInDate: record.firstCheckInDate,
+      cancellationReason: record.cancellationReason,
+      cancelledBy: record.cancelledBy,
+      cancelledAt: record.cancelledAt,
+      startDateCorrectionReason: record.startDateCorrectionReason,
+    }),
     status: record.status,
     recorded_by: record.recordedBy,
     recorded_at: record.recordedAt,
@@ -1848,20 +2084,74 @@ function breakToRow(record: LearnerBreakInLearning): LearnerBreakInLearningRow {
 }
 
 function breakFromRow(row: LearnerBreakInLearningRow): LearnerBreakInLearning {
+  const metadata = breakMetadata(row.reason_notes);
   return {
+    ...emptyBreakOperationalFields(),
     id: row.id,
     organisationId: row.organisation_id,
     learnerRecordId: row.learner_record_id,
     startDate: row.start_date,
     expectedReturnDate: row.expected_return_date ?? "",
     actualReturnDate: row.actual_return_date ?? "",
-    reasonCategory: row.reason_category,
-    reasonNotes: row.reason_notes,
+    reasonCategory: normaliseBreakReason(row.reason_category),
+    reasonNotes: stringField(metadata, "reasonNotes", row.reason_notes),
+    previousLifecycleStatus: stringField(metadata, "previousLifecycleStatus", "enrolled") === "assessment_preparation" ? "assessment_preparation" : "enrolled",
+    expectedReturnUnknown: booleanField(metadata, "expectedReturnUnknown"),
+    reviewDate: stringField(metadata, "reviewDate"),
+    providerNotified: booleanField(metadata, "providerNotified"),
+    providerNotifiedDate: stringField(metadata, "providerNotifiedDate"),
+    employeeNotified: booleanField(metadata, "employeeNotified"),
+    employeeNotifiedDate: stringField(metadata, "employeeNotifiedDate"),
+    managerNotified: booleanField(metadata, "managerNotified"),
+    managerNotifiedDate: stringField(metadata, "managerNotifiedDate"),
+    returnPlanNotes: stringField(metadata, "returnPlanNotes"),
+    effectiveLifecycleDate: stringField(metadata, "effectiveLifecycleDate", row.start_date),
+    returnConfirmationNote: stringField(metadata, "returnConfirmationNote"),
+    programmeStillValidConfirmed: booleanField(metadata, "programmeStillValidConfirmed"),
+    providerReturnConfirmed: booleanField(metadata, "providerReturnConfirmed"),
+    managerReturnConfirmed: booleanField(metadata, "managerReturnConfirmed"),
+    learnerReturnConfirmed: booleanField(metadata, "learnerReturnConfirmed"),
+    revisedExpectedEndDate: stringField(metadata, "revisedExpectedEndDate"),
+    revisedReviewDate: stringField(metadata, "revisedReviewDate"),
+    immediateSupportAction: stringField(metadata, "immediateSupportAction"),
+    progressResetNote: stringField(metadata, "progressResetNote"),
+    firstCheckInDate: stringField(metadata, "firstCheckInDate"),
+    cancellationReason: stringField(metadata, "cancellationReason"),
+    cancelledBy: stringField(metadata, "cancelledBy"),
+    cancelledAt: stringField(metadata, "cancelledAt"),
+    startDateCorrectionReason: stringField(metadata, "startDateCorrectionReason"),
     status: row.status,
     recordedBy: row.recorded_by,
     recordedAt: row.recorded_at,
     updatedAt: row.updated_at,
   };
+}
+
+function emptyBreakOperationalFields(): Omit<LearnerBreakInLearning, "id" | "organisationId" | "learnerRecordId" | "startDate" | "expectedReturnDate" | "actualReturnDate" | "reasonCategory" | "reasonNotes" | "status" | "recordedBy" | "recordedAt" | "updatedAt"> {
+  return { previousLifecycleStatus: "enrolled", expectedReturnUnknown: false, reviewDate: "", providerNotified: false, providerNotifiedDate: "", employeeNotified: false, employeeNotifiedDate: "", managerNotified: false, managerNotifiedDate: "", returnPlanNotes: "", effectiveLifecycleDate: "", returnConfirmationNote: "", programmeStillValidConfirmed: false, providerReturnConfirmed: false, managerReturnConfirmed: false, learnerReturnConfirmed: false, revisedExpectedEndDate: "", revisedReviewDate: "", immediateSupportAction: "", progressResetNote: "", firstCheckInDate: "", cancellationReason: "", cancelledBy: "", cancelledAt: "", startDateCorrectionReason: "" };
+}
+
+function breakMetadata(value: string) {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) && (parsed as { schemaVersion?: unknown }).schemaVersion === 1 ? parsed as Record<string, unknown> : {};
+  } catch {
+    return {};
+  }
+}
+
+function stringField(value: Record<string, unknown>, key: string, fallback = "") {
+  return typeof value[key] === "string" ? value[key] as string : fallback;
+}
+
+function booleanField(value: Record<string, unknown>, key: string) {
+  return value[key] === true;
+}
+
+function normaliseBreakReason(value: string): LearnerBreakReasonCategory {
+  if (Object.prototype.hasOwnProperty.call(learnerBreakReasonLabels, value)) return value as LearnerBreakReasonCategory;
+  const match = Object.entries(learnerBreakReasonLabels).find(([, label]) => label.toLowerCase() === value.toLowerCase());
+  return match ? match[0] as LearnerBreakReasonCategory : "personal_circumstances";
 }
 
 function withdrawalToRow(record: LearnerWithdrawal): LearnerWithdrawalRow {

@@ -77,6 +77,44 @@ export type LearnerBreakStatus =
   | "converted_to_withdrawal"
   | "cancelled";
 
+export type LearnerBreakReasonCategory =
+  | "health_or_wellbeing"
+  | "parental_leave"
+  | "caring_responsibilities"
+  | "bereavement"
+  | "temporary_role_or_workload_change"
+  | "extended_authorised_absence"
+  | "provider_or_programme_disruption"
+  | "personal_circumstances"
+  | "other";
+
+export const learnerBreakReasonLabels = {
+  health_or_wellbeing: "Health or wellbeing",
+  parental_leave: "Maternity, paternity or parental leave",
+  caring_responsibilities: "Caring responsibilities",
+  bereavement: "Bereavement",
+  temporary_role_or_workload_change: "Temporary role or workload change",
+  extended_authorised_absence: "Extended authorised absence",
+  provider_or_programme_disruption: "Provider or programme disruption",
+  personal_circumstances: "Personal circumstances",
+  other: "Other",
+} as const satisfies Record<LearnerBreakReasonCategory, string>;
+
+export const learnerBreakStatusLabels = {
+  active: "Active",
+  returned: "Returned",
+  converted_to_withdrawal: "Converted to withdrawal",
+  cancelled: "Cancelled",
+} as const satisfies Record<LearnerBreakStatus, string>;
+
+export const learnerBreakPolicy = {
+  eligibleStartStatuses: ["enrolled", "assessment_preparation"] as LearnerLifecycleStatus[],
+  returnDateApproachingDays: 14,
+  postReturnReviewDays: 14,
+  maximumFutureEffectiveDateDays: 7,
+  detailRequiredReasons: ["other", "provider_or_programme_disruption", "temporary_role_or_workload_change"] as LearnerBreakReasonCategory[],
+} as const;
+
 export type LearnerReviewType =
   | "provider_review"
   | "l_and_d_check_in"
@@ -200,7 +238,11 @@ export type LearnerLifecycleEventType =
   | "enrolled"
   | "enrolment_completed"
   | "break_started"
+  | "break_details_updated"
+  | "break_expected_return_changed"
+  | "break_start_date_corrected"
   | "returned_from_break"
+  | "break_cancelled"
   | "withdrawn"
   | "provider_review_recorded"
   | "l_and_d_check_in_recorded"
@@ -284,8 +326,33 @@ export type LearnerBreakInLearning = {
   startDate: string;
   expectedReturnDate: string;
   actualReturnDate: string;
-  reasonCategory: string;
+  reasonCategory: LearnerBreakReasonCategory;
   reasonNotes: string;
+  previousLifecycleStatus: "enrolled" | "assessment_preparation";
+  expectedReturnUnknown: boolean;
+  reviewDate: string;
+  providerNotified: boolean;
+  providerNotifiedDate: string;
+  employeeNotified: boolean;
+  employeeNotifiedDate: string;
+  managerNotified: boolean;
+  managerNotifiedDate: string;
+  returnPlanNotes: string;
+  effectiveLifecycleDate: string;
+  returnConfirmationNote: string;
+  programmeStillValidConfirmed: boolean;
+  providerReturnConfirmed: boolean;
+  managerReturnConfirmed: boolean;
+  learnerReturnConfirmed: boolean;
+  revisedExpectedEndDate: string;
+  revisedReviewDate: string;
+  immediateSupportAction: string;
+  progressResetNote: string;
+  firstCheckInDate: string;
+  cancellationReason: string;
+  cancelledBy: string;
+  cancelledAt: string;
+  startDateCorrectionReason: string;
   status: LearnerBreakStatus;
   recordedBy: string;
   recordedAt: string;

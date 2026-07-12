@@ -2,6 +2,7 @@ import {
   learnerEmploymentRouteLabels,
   learnerLifecycleStatusLabels,
   learnerOperationalActionLabels,
+  learnerBreakPolicy,
   learnerProgressReviewPolicy,
   type LearnerAssessmentReadiness,
   type LearnerBreakInLearning,
@@ -62,6 +63,8 @@ export type LearnerOperationalSummary = {
   latestManagerCheckIn: LearnerReview | null;
   reviewSummaries: LearnerReviewSummaries;
   activeBreak: LearnerBreakInLearning | null;
+  latestBreak: LearnerBreakInLearning | null;
+  breakAttention: LearnerBreakAttention;
   attention: LearnerAttentionState;
 };
 
@@ -114,6 +117,14 @@ export type LearnerAttentionState = {
   severity: LearnerAttentionSeverity;
   reasons: string[];
   needsAttention: boolean;
+};
+
+export type LearnerBreakAttention = {
+  label: string;
+  state: "none" | "active" | "approaching" | "overdue" | "unknown" | "confirmations" | "post_return_review";
+  daysOnBreak: number;
+  daysUntilReturn: number | null;
+  reasons: string[];
 };
 
 export type LearnerReviewSummary = {
@@ -236,6 +247,8 @@ export function deriveLearnerAttention(input: {
   latestManagerCheckIn: LearnerReview | null;
   reviewSummaries: LearnerReviewSummaries;
   activeBreak: LearnerBreakInLearning | null;
+  latestBreak?: LearnerBreakInLearning | null;
+  reviewHistory?: LearnerReview[];
   assessmentReadiness: LearnerAssessmentReadiness | null;
   operationalActions: LearnerOperationalAction[];
   today?: string;
@@ -244,6 +257,7 @@ export function deriveLearnerAttention(input: {
   const reasons: string[] = [];
   const progressPosition = deriveProgressPosition(input.latestProgress);
   const reviewSummaries = input.reviewSummaries;
+  const breakAttention = deriveBreakAttention(input.activeBreak, input.latestBreak ?? input.activeBreak, input.reviewHistory ?? [], today);
 
   if (input.lifecycleStatus === "pre_enrolment") {
     if (!input.eligibilityDeclaration?.confirmed || input.eligibilityDeclaration.verificationStatus !== "employer_verified") reasons.push("Confirm England working-hours eligibility");
@@ -252,9 +266,7 @@ export function deriveLearnerAttention(input: {
     if (!input.preEnrolmentChecks?.guidesSent) reasons.push("Send learner and manager guides");
   }
 
-  if (input.activeBreak) {
-    reasons.push("Learner is currently on a break in learning");
-  }
+  reasons.push(...breakAttention.reasons);
 
   if (progressPosition === "Significantly behind") reasons.push("Significantly behind target");
   if (reviewSummaries.provider.overdue) reasons.push("Provider review overdue");
@@ -280,7 +292,7 @@ export function deriveLearnerAttention(input: {
   }
 
   const orderedReasons = orderAttentionReasons(reasons);
-  const severity: LearnerAttentionSeverity = input.activeBreak || input.lifecycleStatus === "withdrawn" || orderedReasons.some((reason) => /significantly|provider review overdue|HR approval|eligibility/i.test(reason))
+  const severity: LearnerAttentionSeverity = breakAttention.state === "overdue" || breakAttention.state === "unknown" || input.lifecycleStatus === "withdrawn" || orderedReasons.some((reason) => /significantly|provider review overdue|HR approval|eligibility/i.test(reason))
     ? "high"
     : orderedReasons.length
       ? "medium"
@@ -292,6 +304,45 @@ export function deriveLearnerAttention(input: {
     reasons: orderedReasons,
     needsAttention: orderedReasons.length > 0,
   };
+}
+
+export function deriveBreakAttention(
+  activeBreak: LearnerBreakInLearning | null,
+  latestBreak: LearnerBreakInLearning | null,
+  reviews: LearnerReview[],
+  today = new Date().toISOString().slice(0, 10),
+): LearnerBreakAttention {
+  if (activeBreak) {
+    const daysOnBreak = Math.max(0, dateDifferenceDays(activeBreak.startDate, today));
+    if (activeBreak.expectedReturnUnknown || !activeBreak.expectedReturnDate) {
+      return { label: "Return date not confirmed", state: "unknown", daysOnBreak, daysUntilReturn: null, reasons: ["Return date not confirmed", "Learner currently on a break in learning"] };
+    }
+    const daysUntilReturn = dateDifferenceDays(today, activeBreak.expectedReturnDate);
+    if (daysUntilReturn < 0) {
+      return { label: "Return date overdue", state: "overdue", daysOnBreak, daysUntilReturn, reasons: ["Return date overdue", "Learner currently on a break in learning"] };
+    }
+    const confirmations = [
+      !activeBreak.providerReturnConfirmed && "Provider return confirmation outstanding",
+      !activeBreak.managerReturnConfirmed && "Manager return confirmation outstanding",
+      !activeBreak.learnerReturnConfirmed && "Learner return confirmation outstanding",
+    ].filter(Boolean) as string[];
+    if (daysUntilReturn <= learnerBreakPolicy.returnDateApproachingDays && confirmations.length) {
+      return { label: confirmations[0], state: "confirmations", daysOnBreak, daysUntilReturn, reasons: [...confirmations, "Return date approaching", "Learner currently on a break in learning"] };
+    }
+    if (daysUntilReturn <= learnerBreakPolicy.returnDateApproachingDays) {
+      return { label: "Return date approaching", state: "approaching", daysOnBreak, daysUntilReturn, reasons: ["Return date approaching", "Learner currently on a break in learning"] };
+    }
+    return { label: "Learner currently on a break in learning", state: "active", daysOnBreak, daysUntilReturn, reasons: ["Learner currently on a break in learning"] };
+  }
+
+  if (latestBreak?.status === "returned" && latestBreak.actualReturnDate) {
+    const daysSinceReturn = dateDifferenceDays(latestBreak.actualReturnDate, today);
+    const reviewedAfterReturn = reviews.some((review) => ["provider_review", "l_and_d_check_in", "manager_check_in"].includes(review.reviewType) && review.reviewDate >= latestBreak.actualReturnDate);
+    if (daysSinceReturn >= 0 && daysSinceReturn <= learnerBreakPolicy.postReturnReviewDays && !reviewedAfterReturn) {
+      return { label: "Post-return review required", state: "post_return_review", daysOnBreak: 0, daysUntilReturn: null, reasons: ["Post-return review required"] };
+    }
+  }
+  return { label: "No break action required", state: "none", daysOnBreak: 0, daysUntilReturn: null, reasons: [] };
 }
 
 export function buildLearnerListSummary(records: LearnerOperationalSummary[]): LearnerListSummary {
@@ -344,6 +395,14 @@ function progressIsOverdue(progress: LearnerProgressUpdate | null, today: string
 
 function orderAttentionReasons(reasons: string[]) {
   const priority = [
+    "Return date overdue",
+    "Return date not confirmed",
+    "Provider return confirmation outstanding",
+    "Manager return confirmation outstanding",
+    "Learner return confirmation outstanding",
+    "Return date approaching",
+    "Learner currently on a break in learning",
+    "Post-return review required",
     "Significantly behind target",
     "Provider review overdue",
     "Support action outstanding",
@@ -361,6 +420,13 @@ function orderAttentionReasons(reasons: string[]) {
     if (rightIndex === -1) return -1;
     return leftIndex - rightIndex;
   });
+}
+
+function dateDifferenceDays(from: string, to: string) {
+  const fromTime = new Date(`${from}T00:00:00Z`).getTime();
+  const toTime = new Date(`${to}T00:00:00Z`).getTime();
+  if (!Number.isFinite(fromTime) || !Number.isFinite(toTime)) return 0;
+  return Math.floor((toTime - fromTime) / 86_400_000);
 }
 
 function eligibilityVerificationCheck(declaration: LearnerEligibilityDeclaration | null): LearnerEnrolmentReadinessCheck {

@@ -110,7 +110,7 @@ async function main() {
   assert("Manager check-in saves", managerResult.response.status === 200 && managerResult.body.record?.reviewType === "manager_check_in", managerResult.body);
 
   const breakReview = await postJson(() => addReview(lead.cookie, ids.break, reviewInput(initialBreak.activityVersion, "op4b2b-break-support-v1", {
-    reviewType: "other",
+    reviewType: "l_and_d_check_in",
     reviewerName: "Priya Shah",
     providerId: "",
     summary: "Historical support note recorded while the learner remains on an agreed break.",

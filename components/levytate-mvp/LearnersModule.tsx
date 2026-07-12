@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, CheckCircle2, ChevronDown, Plus, Search } from "lucide-react";
+import { ArrowLeft, CalendarClock, CheckCircle2, ChevronDown, Plus, Search, XCircle } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { EmptyState, FormField, FormGrid, FormSection, FormSelect, FormTagInput, FormTextArea, MvpModal, MvpPanel, StatusBadge, TableAction, TableBody, TableHead, TableShell } from "@/components/levytate-mvp/MvpUi";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
@@ -16,6 +16,9 @@ import {
 } from "@/lib/levytate/mvp/learner-record-view";
 import {
   learnerProgressReviewPolicy,
+  learnerBreakPolicy,
+  learnerBreakReasonLabels,
+  learnerBreakStatusLabels,
   learnerProgressSourceLabels,
   learnerReviewStatusLabels,
   learnerReviewTypeLabels,
@@ -24,6 +27,7 @@ import {
   type LearnerReviewStatus,
   type LearnerReviewType,
   type LearnerSupportActionType,
+  type LearnerBreakReasonCategory,
 } from "@/lib/levytate/mvp/learner-lifecycle";
 
 type LearnerListResponse = {
@@ -275,7 +279,10 @@ export function LearnersModule() {
                     <p className="mt-1 text-xs text-[#102c3d]/48">{learner.programme.providerName}</p>
                     <p className="mt-1 text-xs text-[#102c3d]/42">{learner.employmentRouteLabel}</p>
                   </td>
-                  <td className="px-4 py-3"><StatusBadge tone={statusTone(learner.lifecycleStatusLabel)}>{learner.lifecycleStatusLabel}</StatusBadge></td>
+                  <td className="px-4 py-3">
+                    <StatusBadge tone={statusTone(learner.lifecycleStatusLabel)}>{learner.lifecycleStatusLabel}</StatusBadge>
+                    {learner.activeBreak ? <div className="mt-2 text-xs leading-5 text-[#102c3d]/52"><p>Expected return: {learner.activeBreak.expectedReturnUnknown ? "Not confirmed" : formatDate(learner.activeBreak.expectedReturnDate)}</p><p>{learner.breakAttention.daysOnBreak} days on break</p><p>{learnerBreakReasonLabels[learner.activeBreak.reasonCategory]}</p></div> : null}
+                  </td>
                   <td className="px-4 py-3">
                     <ProgressMini learner={learner} />
                   </td>
@@ -310,6 +317,7 @@ function LearnerRecordView({ detail, loading, error, onBack, mayMutatePreEnrolme
   const [activityMode, setActivityMode] = useState<"progress" | "review" | "">("");
   const [reviewFilter, setReviewFilter] = useState<LearnerReviewType | "all">("all");
   const [success, setSuccess] = useState("");
+  const [breakMode, setBreakMode] = useState<"start" | "manage" | "update" | "return" | "cancel" | "">("");
 
   if (loading) {
     return <div className="rounded-xl border border-[#102c3d]/[0.07] bg-white p-8 text-sm font-semibold text-[#102c3d]/56">Loading learner record.</div>;
@@ -328,6 +336,7 @@ function LearnerRecordView({ detail, loading, error, onBack, mayMutatePreEnrolme
 
   const progressEntryAllowed = mayMutateLearnerActivity && learnerProgressReviewPolicy.progressEligibleStatuses.includes(detail.lifecycleStatus);
   const reviewEntryAllowed = mayMutateLearnerActivity && learnerProgressReviewPolicy.reviewEligibleStatuses.includes(detail.lifecycleStatus);
+  const breakStartAllowed = mayMutatePreEnrolment && learnerBreakPolicy.eligibleStartStatuses.includes(detail.lifecycleStatus);
 
   return (
     <div className="grid min-w-0 gap-5">
@@ -356,6 +365,8 @@ function LearnerRecordView({ detail, loading, error, onBack, mayMutatePreEnrolme
                 Complete pre-enrolment
               </button>
             ) : null}
+            {breakStartAllowed ? <button type="button" onClick={() => { setBreakMode("start"); setSuccess(""); }} className="mt-5 inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white shadow-[0_8px_18px_rgba(16,44,61,0.12)] transition hover:-translate-y-0.5 hover:bg-[#17394d]"><CalendarClock size={15} />Start break in learning</button> : null}
+            {detail.activeBreak && mayMutatePreEnrolment ? <button type="button" onClick={() => { setBreakMode("manage"); setSuccess(""); }} className="mt-5 inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white shadow-[0_8px_18px_rgba(16,44,61,0.12)] transition hover:-translate-y-0.5 hover:bg-[#17394d]"><CalendarClock size={15} />Manage break in learning</button> : null}
           </div>
           <div className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4">
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">Next action</p>
@@ -364,6 +375,10 @@ function LearnerRecordView({ detail, loading, error, onBack, mayMutatePreEnrolme
           </div>
         </div>
       </section>
+
+      {detail.activeBreak ? <ActiveBreakBanner detail={detail} /> : null}
+
+      {breakMode ? <BreakManagementWorkflow detail={detail} mode={breakMode} onModeChange={setBreakMode} onClose={() => setBreakMode("")} onSaved={(next, message) => { onDetailUpdated(next); setSuccess(message); setBreakMode(next.activeBreak ? "manage" : ""); }} /> : null}
 
       {workflowOpen ? (
         <PreEnrolmentWorkflow
@@ -470,6 +485,7 @@ function LearnerRecordView({ detail, loading, error, onBack, mayMutatePreEnrolme
       ) : null}
 
       <RecordSection title="Progress" eyebrow="Pace">
+        {detail.lifecycleStatus === "break_in_learning" ? <p className="mb-4 rounded-xl border border-[#b89220]/15 bg-[#fff9e7] px-4 py-3 text-sm font-semibold text-[#756000]">Progress is paused while the learner is on a break in learning.</p> : null}
         {detail.latestProgress ? (
           <div className="grid min-w-0 gap-4 lg:grid-cols-[0.8fr_1.2fr]">
             <div className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4">
@@ -530,10 +546,12 @@ function LearnerRecordView({ detail, loading, error, onBack, mayMutatePreEnrolme
                 ["Start date", formatDate(breakRecord.startDate) || "Not recorded"],
                 ["Expected return", formatDate(breakRecord.expectedReturnDate) || "Not recorded"],
                 ["Actual return", formatDate(breakRecord.actualReturnDate) || "Not recorded"],
-                ["Reason", breakRecord.reasonCategory],
-                ["Status", humanise(breakRecord.status)],
+                ["Reason", learnerBreakReasonLabels[breakRecord.reasonCategory]],
+                ["Status", learnerBreakStatusLabels[breakRecord.status]],
                 ["Recorded by", breakRecord.recordedBy],
-                ["Notes", breakRecord.reasonNotes || "No notes recorded"],
+                ["Duration", breakDurationLabel(breakRecord)],
+                ["Outcome", breakOutcome(breakRecord)],
+                ["Notes", breakRecord.reasonNotes || "No concise reason notes recorded"],
               ]} />
             ))}
             {detail.withdrawal ? <InfoGroup title="Withdrawal" rows={[
@@ -545,7 +563,7 @@ function LearnerRecordView({ detail, loading, error, onBack, mayMutatePreEnrolme
               ["Recorded by", detail.withdrawal.recordedBy],
             ]} /> : null}
           </div>
-        ) : <InlineEmpty copy="No break in learning or withdrawal has been recorded." />}
+        ) : <InlineEmpty copy="No breaks in learning have been recorded." />}
       </RecordSection>
 
       <RecordSection title="Assessment and gateway" eyebrow="Completion path">
@@ -722,12 +740,13 @@ type ReviewFormState = {
 
 function ReviewEntryForm({ detail, onClose, onSaved }: { detail: LearnerRecordDetail; onClose: () => void; onSaved: (detail: LearnerRecordDetail, message: string) => void }) {
   const [idempotencyKey] = useState(activityKey);
+  const onBreak = detail.lifecycleStatus === "break_in_learning";
   const [form, setForm] = useState<ReviewFormState>({
-    reviewType: "provider_review",
+    reviewType: onBreak ? "l_and_d_check_in" : "provider_review",
     reviewDate: todayDate(),
     nextReviewDate: "",
-    reviewerName: "Provider Skills Coach",
-    providerId: detail.programme.providerId,
+    reviewerName: onBreak ? "Priya Shah" : "Provider Skills Coach",
+    providerId: onBreak ? "" : detail.programme.providerId,
     summary: "",
     actions: [],
     supportRequired: "",
@@ -770,7 +789,7 @@ function ReviewEntryForm({ detail, onClose, onSaved }: { detail: LearnerRecordDe
       <form onSubmit={submit} className="grid gap-4">
         <FormSection title="Review details">
           <FormGrid>
-            <FormSelect label="Review type" value={form.reviewType} onChange={(value) => changeReviewType(value as LearnerReviewType)} options={Object.entries(learnerReviewTypeLabels).map(([value, label]) => ({ value, label }))} required />
+            <FormSelect label="Review type" value={form.reviewType} onChange={(value) => changeReviewType(value as LearnerReviewType)} options={Object.entries(learnerReviewTypeLabels).filter(([value]) => !onBreak || value === "l_and_d_check_in" || value === "manager_check_in").map(([value, label]) => ({ value, label }))} required />
             <FormSelect label="Status" value={form.status} onChange={(value) => update("status", value as LearnerReviewStatus)} options={Object.entries(learnerReviewStatusLabels).map(([value, label]) => ({ value, label }))} required />
             <FormField label={form.reviewType === "manager_check_in" ? "Check-in date" : "Review date"} type="date" value={form.reviewDate} onChange={(value) => update("reviewDate", value)} required />
             <FormField label={form.reviewType === "manager_check_in" || form.reviewType === "l_and_d_check_in" ? "Next check-in date" : "Next review date"} type="date" value={form.nextReviewDate} onChange={(value) => update("nextReviewDate", value)} />
@@ -795,6 +814,124 @@ function ReviewEntryForm({ detail, onClose, onSaved }: { detail: LearnerRecordDe
     </MvpModal>
   );
 }
+
+type BreakMode = "start" | "manage" | "update" | "return" | "cancel";
+
+function BreakManagementWorkflow({ detail, mode, onModeChange, onClose, onSaved }: { detail: LearnerRecordDetail; mode: BreakMode; onModeChange: (mode: BreakMode) => void; onClose: () => void; onSaved: (detail: LearnerRecordDetail, message: string) => void }) {
+  const active = detail.activeBreak;
+  if (mode === "manage" && active) {
+    return (
+      <RecordSection title="Manage break in learning" eyebrow="Controlled lifecycle action">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <InfoBlock label="Started" value={formatDate(active.startDate)} helper={`${detail.breakAttention.daysOnBreak} days on break`} />
+            <InfoBlock label="Expected return" value={active.expectedReturnUnknown ? "Not confirmed" : formatDate(active.expectedReturnDate)} helper={detail.breakAttention.label} />
+            <InfoBlock label="Reason" value={learnerBreakReasonLabels[active.reasonCategory]} helper={active.reasonNotes || "Concise operational detail only"} />
+            <InfoBlock label="Next review" value={formatDate(active.reviewDate) || "Not scheduled"} helper={active.returnPlanNotes || "No return plan has been recorded."} />
+          </div>
+          <div className="flex flex-wrap gap-2 xl:max-w-[18rem] xl:justify-end">
+            <SecondaryRecordAction onClick={() => onModeChange("update")}>Update break details</SecondaryRecordAction>
+            <PrimaryRecordAction onClick={() => onModeChange("return")}>Return learner to active learning</PrimaryRecordAction>
+            <button type="button" onClick={() => onModeChange("cancel")} className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-white px-4 text-xs font-semibold text-[#b13b51] ring-1 ring-[#b13b51]/20 transition hover:bg-[#fff0f2]"><XCircle size={14} />Cancel break record</button>
+          </div>
+        </div>
+        <button type="button" onClick={onClose} className="mt-4 text-xs font-semibold text-[#102c3d]/48 hover:text-[#102c3d]">Close break management</button>
+      </RecordSection>
+    );
+  }
+  if (mode === "return" && active) return <ReturnFromBreakForm detail={detail} onBack={() => onModeChange("manage")} onSaved={onSaved} />;
+  if (mode === "cancel" && active) return <CancelBreakForm detail={detail} onBack={() => onModeChange("manage")} onSaved={onSaved} />;
+  return <BreakDetailsForm detail={detail} update={mode === "update"} onBack={() => active ? onModeChange("manage") : onClose()} onSaved={onSaved} />;
+}
+
+type BreakDetailsState = {
+  startDate: string; expectedReturnDate: string; expectedReturnUnknown: boolean; reviewDate: string;
+  reasonCategory: LearnerBreakReasonCategory; reasonNotes: string;
+  providerNotified: boolean; providerNotifiedDate: string; employeeNotified: boolean; employeeNotifiedDate: string; managerNotified: boolean; managerNotifiedDate: string;
+  returnPlanNotes: string; effectiveLifecycleDate: string; correctedStartDate: string; startDateCorrectionReason: string;
+};
+
+function BreakDetailsForm({ detail, update: updating, onBack, onSaved }: { detail: LearnerRecordDetail; update: boolean; onBack: () => void; onSaved: (detail: LearnerRecordDetail, message: string) => void }) {
+  const active = detail.activeBreak;
+  const [idempotencyKey] = useState(activityKey);
+  const [form, setForm] = useState<BreakDetailsState>({
+    startDate: active?.startDate || todayDate(), expectedReturnDate: active?.expectedReturnDate || "", expectedReturnUnknown: active?.expectedReturnUnknown || false, reviewDate: active?.reviewDate || "",
+    reasonCategory: active?.reasonCategory || "personal_circumstances", reasonNotes: active?.reasonNotes || "",
+    providerNotified: active?.providerNotified || false, providerNotifiedDate: active?.providerNotifiedDate || "", employeeNotified: active?.employeeNotified || false, employeeNotifiedDate: active?.employeeNotifiedDate || "", managerNotified: active?.managerNotified || false, managerNotifiedDate: active?.managerNotifiedDate || "",
+    returnPlanNotes: active?.returnPlanNotes || "", effectiveLifecycleDate: active?.effectiveLifecycleDate || todayDate(), correctedStartDate: active?.startDate || "", startDateCorrectionReason: "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  function set<K extends keyof BreakDetailsState>(key: K, value: BreakDetailsState[K]) { setForm((current) => ({ ...current, [key]: value })); }
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setSaving(true); setError("");
+    try {
+      const url = updating && active ? `/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/breaks/${encodeURIComponent(active.id)}` : `/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/breaks`;
+      const body = updating ? { ...form, startDate: undefined, reasonCategory: undefined, effectiveLifecycleDate: undefined, expectedActivityVersion: detail.activityVersion } : { ...form, correctedStartDate: undefined, startDateCorrectionReason: undefined, expectedActivityVersion: detail.activityVersion, idempotencyKey };
+      const response = await fetch(url, { method: updating ? "PATCH" : "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      const payload = await response.json() as LearnerMutationResponse;
+      if (!response.ok || !payload.learner) throw new Error(payload.message || "Break in learning could not be saved.");
+      onSaved(payload.learner, payload.message || (updating ? "Break in learning details updated." : "Break in learning started."));
+    } catch (caught) { setError(caught instanceof Error ? caught.message : "Break in learning could not be saved."); } finally { setSaving(false); }
+  }
+  return (
+    <MvpModal title={updating ? "Update break details" : "Start break in learning"} eyebrow="Learner lifecycle" onClose={onBack}>
+      <form onSubmit={submit} className="grid gap-4">
+        <FormSection title="Dates and reason" copy="Record concise operational context. Do not include unnecessary medical detail.">
+          <FormGrid>
+            {updating ? <FormField label="Corrected break start date" type="date" value={form.correctedStartDate} onChange={(value) => set("correctedStartDate", value)} /> : <FormField label="Break start date" type="date" value={form.startDate} onChange={(value) => set("startDate", value)} required />}
+            {!updating ? <FormField label="Effective lifecycle date" type="date" value={form.effectiveLifecycleDate} onChange={(value) => set("effectiveLifecycleDate", value)} required /> : null}
+            <FormSelect label="Reason category" value={form.reasonCategory} onChange={(value) => set("reasonCategory", value as LearnerBreakReasonCategory)} options={Object.entries(learnerBreakReasonLabels).map(([value, label]) => ({ value, label }))} required />
+            <FormTextArea label="Reason details" value={form.reasonNotes} onChange={(value) => set("reasonNotes", value)} wide rows={3} placeholder="Concise operational context only" />
+            {updating && form.correctedStartDate !== active?.startDate ? <FormTextArea label="Start date correction reason" value={form.startDateCorrectionReason} onChange={(value) => set("startDateCorrectionReason", value)} wide rows={2} required /> : null}
+          </FormGrid>
+        </FormSection>
+        <FormSection title="Expected return">
+          <FormGrid>
+            <BreakCheckbox label="Expected return date unknown" checked={form.expectedReturnUnknown} onChange={(checked) => { set("expectedReturnUnknown", checked); if (checked) set("expectedReturnDate", ""); }} />
+            {!form.expectedReturnUnknown ? <FormField label="Expected return date" type="date" value={form.expectedReturnDate} onChange={(value) => set("expectedReturnDate", value)} required /> : <FormField label="Review date" type="date" value={form.reviewDate} onChange={(value) => set("reviewDate", value)} required />}
+            {!form.expectedReturnUnknown ? <FormField label="Return-plan review date" type="date" value={form.reviewDate} onChange={(value) => set("reviewDate", value)} /> : null}
+            <FormTextArea label="Support or return-plan notes" value={form.returnPlanNotes} onChange={(value) => set("returnPlanNotes", value)} wide rows={3} />
+          </FormGrid>
+        </FormSection>
+        <FormSection title="People informed">
+          <div className="grid gap-3 lg:grid-cols-3">
+            <NotificationFields label="Provider notified" checked={form.providerNotified} date={form.providerNotifiedDate} onChecked={(value) => set("providerNotified", value)} onDate={(value) => set("providerNotifiedDate", value)} />
+            <NotificationFields label="Learner notified" checked={form.employeeNotified} date={form.employeeNotifiedDate} onChecked={(value) => set("employeeNotified", value)} onDate={(value) => set("employeeNotifiedDate", value)} />
+            <NotificationFields label="Manager notified" checked={form.managerNotified} date={form.managerNotifiedDate} onChecked={(value) => set("managerNotified", value)} onDate={(value) => set("managerNotifiedDate", value)} />
+          </div>
+        </FormSection>
+        <FormActions error={error} saving={saving} submit={updating ? "Save break details" : "Start break in learning"} onCancel={onBack} />
+      </form>
+    </MvpModal>
+  );
+}
+
+function ReturnFromBreakForm({ detail, onBack, onSaved }: { detail: LearnerRecordDetail; onBack: () => void; onSaved: (detail: LearnerRecordDetail, message: string) => void }) {
+  const active = detail.activeBreak!;
+  const [idempotencyKey] = useState(activityKey);
+  const [form, setForm] = useState({ actualReturnDate: todayDate(), returnConfirmationNote: "", programmeStillValidConfirmed: false, providerReturnConfirmed: false, managerReturnConfirmed: false, learnerReturnConfirmed: false, revisedExpectedEndDate: "", revisedReviewDate: "", immediateSupportAction: "", progressResetNote: "", firstCheckInDate: "" });
+  const [saving, setSaving] = useState(false); const [error, setError] = useState("");
+  function set(key: keyof typeof form, value: string | boolean) { setForm((current) => ({ ...current, [key]: value })); }
+  async function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setSaving(true); setError(""); try { const response = await fetch(`/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/breaks/${encodeURIComponent(active.id)}/return`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...form, expectedActivityVersion: detail.activityVersion, idempotencyKey }) }); const payload = await response.json() as LearnerMutationResponse; if (!response.ok || !payload.learner) throw new Error(payload.message || "Learner could not be returned to active learning."); onSaved(payload.learner, payload.message || "Learner returned to active learning."); } catch (caught) { setError(caught instanceof Error ? caught.message : "Learner could not be returned to active learning."); } finally { setSaving(false); } }
+  return <MvpModal title="Return learner to active learning" eyebrow="Break in learning" onClose={onBack}><form onSubmit={submit} className="grid gap-4"><FormSection title="Return confirmation"><FormGrid><FormField label="Actual return date" type="date" value={form.actualReturnDate} onChange={(value) => set("actualReturnDate", value)} required /><FormTextArea label="Return confirmation note" value={form.returnConfirmationNote} onChange={(value) => set("returnConfirmationNote", value)} wide rows={3} required /><BreakCheckbox label="Current programme remains valid" checked={form.programmeStillValidConfirmed} onChange={(value) => set("programmeStillValidConfirmed", value)} /><BreakCheckbox label="Provider return confirmed" checked={form.providerReturnConfirmed} onChange={(value) => set("providerReturnConfirmed", value)} /><BreakCheckbox label="Manager informed" checked={form.managerReturnConfirmed} onChange={(value) => set("managerReturnConfirmed", value)} /><BreakCheckbox label="Learner informed" checked={form.learnerReturnConfirmed} onChange={(value) => set("learnerReturnConfirmed", value)} /></FormGrid></FormSection><FormSection title="Revised plan"><FormGrid><FormField label="Revised expected end date" type="date" value={form.revisedExpectedEndDate} onChange={(value) => set("revisedExpectedEndDate", value)} /><FormField label="Revised review date" type="date" value={form.revisedReviewDate} onChange={(value) => set("revisedReviewDate", value)} /><FormField label="First check-in after return" type="date" value={form.firstCheckInDate} onChange={(value) => set("firstCheckInDate", value)} /><FormTextArea label="Immediate support action" value={form.immediateSupportAction} onChange={(value) => set("immediateSupportAction", value)} wide rows={2} /><FormTextArea label="Progress reset note" value={form.progressResetNote} onChange={(value) => set("progressResetNote", value)} wide rows={2} /></FormGrid></FormSection><FormActions error={error} saving={saving} submit="Return learner to active learning" onCancel={onBack} /></form></MvpModal>;
+}
+
+function CancelBreakForm({ detail, onBack, onSaved }: { detail: LearnerRecordDetail; onBack: () => void; onSaved: (detail: LearnerRecordDetail, message: string) => void }) {
+  const active = detail.activeBreak!; const [reason, setReason] = useState(""); const [idempotencyKey] = useState(activityKey); const [saving, setSaving] = useState(false); const [error, setError] = useState("");
+  async function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setSaving(true); setError(""); try { const response = await fetch(`/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/breaks/${encodeURIComponent(active.id)}/cancel`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ cancellationReason: reason, expectedActivityVersion: detail.activityVersion, idempotencyKey }) }); const payload = await response.json() as LearnerMutationResponse; if (!response.ok || !payload.learner) throw new Error(payload.message || "Break record could not be cancelled."); onSaved(payload.learner, payload.message || "Break in learning record cancelled."); } catch (caught) { setError(caught instanceof Error ? caught.message : "Break record could not be cancelled."); } finally { setSaving(false); } }
+  return <MvpModal title="Cancel break record" eyebrow="Incorrect record only" onClose={onBack}><form onSubmit={submit} className="grid gap-4"><p className="rounded-xl border border-[#b13b51]/15 bg-[#fff0f2] p-4 text-sm leading-6 text-[#8f3043]">Use this only when the learner did not genuinely pause learning. The cancelled record remains in the lifecycle history.</p><FormTextArea label="Cancellation reason" value={reason} onChange={setReason} rows={4} required /><FormActions error={error} saving={saving} submit="Cancel break record" onCancel={onBack} danger /></form></MvpModal>;
+}
+
+function ActiveBreakBanner({ detail }: { detail: LearnerRecordDetail }) {
+  const active = detail.activeBreak!;
+  const returnCopy = active.expectedReturnUnknown ? "An expected return date has not yet been confirmed." : detail.breakAttention.state === "overdue" ? `Expected return was ${formatDate(active.expectedReturnDate)} and is now overdue.` : `Expected return ${formatDate(active.expectedReturnDate)}.`;
+  return <section className="rounded-xl border border-[#b89220]/20 bg-[#fff9e7] px-5 py-4"><div className="flex items-start gap-3"><CalendarClock className="mt-0.5 shrink-0 text-[#8a6b00]" size={20} /><div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8a6b00]">Break in learning</p><p className="mt-1 text-base font-semibold leading-6 text-[#102c3d]">On a break in learning since {formatDate(active.startDate)}. {returnCopy}</p><p className="mt-1 text-sm leading-6 text-[#102c3d]/58">Next action: {detail.breakAttention.label}.</p></div></div></section>;
+}
+
+function NotificationFields({ label, checked, date, onChecked, onDate }: { label: string; checked: boolean; date: string; onChecked: (value: boolean) => void; onDate: (value: string) => void }) { return <div className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-3"><BreakCheckbox label={label} checked={checked} onChange={onChecked} />{checked ? <div className="mt-3"><FormField label="Notification date" type="date" value={date} onChange={onDate} required /></div> : null}</div>; }
+function BreakCheckbox({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) { return <label className="flex min-h-11 items-center gap-2 rounded-lg border border-[#102c3d]/[0.08] bg-white px-3 text-sm font-semibold text-[#102c3d]/70"><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="h-4 w-4 accent-[#159b8f]" />{label}</label>; }
+function FormActions({ error, saving, submit, onCancel, danger = false }: { error: string; saving: boolean; submit: string; onCancel: () => void; danger?: boolean }) { return <div>{error ? <p className="mb-4 rounded-xl bg-[#fff0f2] px-4 py-3 text-sm font-semibold text-[#b13b51]">{error}</p> : null}<div className="flex flex-wrap justify-end gap-2 border-t border-[#102c3d]/[0.07] pt-4"><button type="button" onClick={onCancel} className="h-10 rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.1]">Back</button><button disabled={saving} className={`h-10 rounded-full px-5 text-xs font-semibold text-white disabled:opacity-55 ${danger ? "bg-[#b13b51]" : "bg-[#102c3d]"}`}>{saving ? "Saving" : submit}</button></div></div>; }
 
 type PreEnrolmentForm = {
   employmentRoute: string;
@@ -1076,6 +1213,7 @@ function CompactSelect({ label, value, options, onChange }: { label: string; val
 }
 
 function ProgressMini({ learner }: { learner: LearnerOperationalSummary }) {
+  if (learner.activeBreak) return <div className="min-w-[9rem] text-xs leading-5 text-[#756000]"><p className="font-semibold">Progress paused</p><p>{learner.breakAttention.label}</p></div>;
   if (!learner.latestProgress) return <p className="text-xs text-[#102c3d]/46">No progress data</p>;
   return (
     <div className="min-w-[9rem]">
@@ -1198,12 +1336,25 @@ function SecondaryRecordAction({ children, onClick }: { children: ReactNode; onC
 }
 
 function nextActionNarrative(detail: LearnerRecordDetail) {
+  if (detail.activeBreak) return `The learner is on a break in learning. ${detail.breakAttention.reasons.join(". ")}.`;
   if (detail.latestProgress && detail.latestProgress.variancePercentage < -2) {
     return `Actual progress is ${formatProgressVariance(detail.latestProgress.variancePercentage).toLowerCase()} A learner support check-in is recommended.`;
   }
-  if (detail.activeBreak) return "The learner is currently on a break in learning. Confirm return planning and support before activity resumes.";
   if (detail.attention.needsAttention) return detail.attention.reasons.join(". ") + ".";
   return "Eligibility, progress and operational checks do not show an immediate priority.";
+}
+
+function breakDurationLabel(record: LearnerRecordDetail["breaksInLearning"][number]) {
+  const end = record.actualReturnDate || record.cancelledAt?.slice(0, 10) || todayDate();
+  const days = Math.max(0, Math.floor((new Date(`${end}T00:00:00Z`).getTime() - new Date(`${record.startDate}T00:00:00Z`).getTime()) / 86_400_000));
+  return `${days} day${days === 1 ? "" : "s"}`;
+}
+
+function breakOutcome(record: LearnerRecordDetail["breaksInLearning"][number]) {
+  if (record.status === "returned") return record.returnConfirmationNote || "Learner returned to active learning.";
+  if (record.status === "cancelled") return record.cancellationReason || "Break record cancelled.";
+  if (record.status === "converted_to_withdrawal") return "Converted to withdrawal.";
+  return record.returnPlanNotes || "No return plan has been recorded.";
 }
 
 function probationStatus(detail: LearnerRecordDetail) {
