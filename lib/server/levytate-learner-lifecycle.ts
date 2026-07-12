@@ -10,6 +10,10 @@ import {
   getLatestLearnerProgress as latestLearnerProgressFromCollections,
   getLatestProviderReview as latestProviderReviewFromCollections,
   getLearnerLifecycleSummary as learnerLifecycleSummaryFromCollections,
+  learnerProgressReviewPolicy,
+  learnerProgressSourceLabels,
+  learnerReviewStatusLabels,
+  learnerReviewTypeLabels,
   type LearnerAchievement,
   type LearnerAssessmentReadiness,
   type LearnerBreakInLearning,
@@ -25,8 +29,11 @@ import {
   type LearnerPreEnrolmentChecks,
   type LearnerProbationStatus,
   type LearnerProgressUpdate,
+  type LearnerProgressSource,
   type LearnerRecord,
   type LearnerReview,
+  type LearnerReviewStatus,
+  type LearnerReviewType,
   type LearnerWithdrawal,
 } from "@/lib/levytate/mvp/learner-lifecycle";
 import {
@@ -34,6 +41,7 @@ import {
   deriveLearnerEnrolmentReadiness,
   deriveLearnerAttention,
   deriveProgressPosition,
+  deriveReviewSummaries,
   employmentRouteLabel,
   lifecycleStatusLabel,
   type LearnerOperationalSummary,
@@ -388,6 +396,38 @@ export type PreEnrolmentUpdateInput = {
   };
 };
 
+export type ProgressUpdateInput = {
+  expectedActivityVersion?: string;
+  idempotencyKey: string;
+  updateDate: string;
+  targetProgressPercentage: number;
+  actualProgressPercentage: number;
+  progressSource: LearnerProgressSource;
+  sourceReference?: string;
+  summary?: string;
+  supportAction?: string;
+};
+
+export type LearnerReviewInput = {
+  expectedActivityVersion?: string;
+  idempotencyKey: string;
+  reviewType: LearnerReviewType;
+  reviewDate: string;
+  nextReviewDate?: string;
+  reviewerName: string;
+  providerId?: string;
+  summary?: string;
+  actions?: string[];
+  supportRequired?: string;
+  status: LearnerReviewStatus;
+};
+
+export type LearnerActivityMutationResult<T> = {
+  record: T;
+  learner: LearnerRecordDetail;
+  created: boolean;
+};
+
 export async function createLearnerRecord(
   session: LevyTateBetaSession,
   input: Omit<LearnerRecord, "id" | "organisationId" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy" | "recordStatus"> & Partial<Pick<LearnerRecord, "id" | "recordStatus">>,
@@ -527,29 +567,51 @@ export async function updatePreEnrolmentChecks(
   return next;
 }
 
-export async function addLearnerReview(
-  session: LevyTateBetaSession,
-  review: Omit<LearnerReview, "id" | "organisationId" | "createdAt" | "updatedAt"> & Partial<Pick<LearnerReview, "id">>,
-) {
+export async function addLearnerReview(session: LevyTateBetaSession, learnerRecordId: string, input: LearnerReviewInput): Promise<LearnerActivityMutationResult<LearnerReview>> {
   const context = await contextForSession(session);
   assertPermission(context, "learnerLifecycle:write");
-  await getScopedLearnerRecord(context, review.learnerRecordId, "write");
+  const learnerRecord = await getScopedLearnerRecord(context, learnerRecordId, "write");
+  assertReviewEligible(learnerRecord.lifecycleStatus);
+  const id = activityRecordId("learner-review", learnerRecordId, input.idempotencyKey);
+  const existing = await selectOne<LearnerReviewRow>(reviewsTable, new URLSearchParams({ select: "*", organisation_id: `eq.${context.organisation.id}`, id: `eq.${id}`, limit: "1" }));
+  if (existing) return { record: reviewFromRow(existing), learner: await getOrganisationLearnerLifecycleRecordDetail(session, learnerRecordId), created: false };
+
+  const collections = await loadLearnerLifecycleCollectionsForRecord(session, learnerRecordId);
+  latestActivityVersionRequired(collections, learnerRecord, input.expectedActivityVersion);
+  assertAllowedValue(input.reviewType, learnerReviewTypeLabels, "review type");
+  assertAllowedValue(input.status, learnerReviewStatusLabels, "review status");
+  assertOperationalDate(input.reviewDate, "Review date");
+  if (input.nextReviewDate) assertValidDate(input.nextReviewDate, "Next review date");
+  const reviewerName = requiredText(input.reviewerName, "Reviewer name");
+  const actions = stringArray(input.actions).map((value) => value.trim()).filter(Boolean);
+  const summary = cleanText(input.summary);
+  const supportRequired = cleanText(input.supportRequired);
+  if (input.status === "cancelled" && !summary && !supportRequired) throw new LevyTateLearnerLifecycleValidationError("A cancellation reason is required.");
+  if (input.status === "action_required" && !actions.length && !supportRequired) throw new LevyTateLearnerLifecycleValidationError("Record an agreed action or the support required when review action is required.");
+
+  let providerId = cleanText(input.providerId);
+  if (input.reviewType === "provider_review") {
+    providerId = requiredText(providerId || learnerRecord.providerId, "Provider");
+    await assertProviderInOrganisation(context, providerId);
+  } else if (providerId) {
+    await assertProviderInOrganisation(context, providerId);
+  }
 
   const timestamp = nowIso();
   const next: LearnerReview = {
-    id: review.id ?? createMvpId("learner-review"),
+    id,
     organisationId: context.organisation.id,
-    learnerRecordId: review.learnerRecordId,
-    reviewType: review.reviewType,
-    reviewDate: review.reviewDate,
-    nextReviewDate: review.nextReviewDate,
-    reviewerName: review.reviewerName,
-    reviewerUserId: review.reviewerUserId,
-    providerId: review.providerId,
-    summary: review.summary,
-    actions: review.actions,
-    supportRequired: review.supportRequired,
-    status: review.status,
+    learnerRecordId,
+    reviewType: input.reviewType,
+    reviewDate: input.reviewDate,
+    nextReviewDate: cleanText(input.nextReviewDate),
+    reviewerName,
+    reviewerUserId: context.user.id,
+    providerId,
+    summary,
+    actions,
+    supportRequired,
+    status: input.status,
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -558,31 +620,42 @@ export async function addLearnerReview(
     query: "on_conflict=organisation_id,id",
     prefer: "resolution=merge-duplicates,return=minimal",
   });
-  await recordLifecycleEvent(context, next.learnerRecordId, "provider_review_recorded", "", "", `${next.reviewType} recorded.`, { reviewType: next.reviewType, reviewDate: next.reviewDate });
-  return next;
+  const eventType = reviewEventType(next.reviewType);
+  await recordLifecycleEvent(context, learnerRecordId, eventType, "", "", `${learnerReviewTypeLabels[next.reviewType]} recorded.`, { reviewId: next.id, reviewType: next.reviewType, reviewDate: next.reviewDate, nextReviewDate: next.nextReviewDate, status: next.status });
+  if (next.status === "action_required") await recordLifecycleEvent(context, learnerRecordId, "review_action_required", "", "", `${learnerReviewTypeLabels[next.reviewType]} requires action.`, { reviewId: next.id, actions: next.actions, supportRequired: next.supportRequired });
+  return { record: next, learner: await getOrganisationLearnerLifecycleRecordDetail(session, learnerRecordId), created: true };
 }
 
-export async function addProgressUpdate(
-  session: LevyTateBetaSession,
-  update: Omit<LearnerProgressUpdate, "id" | "organisationId" | "variancePercentage" | "createdAt"> & Partial<Pick<LearnerProgressUpdate, "id">>,
-) {
+export async function addProgressUpdate(session: LevyTateBetaSession, learnerRecordId: string, input: ProgressUpdateInput): Promise<LearnerActivityMutationResult<LearnerProgressUpdate>> {
   const context = await contextForSession(session);
   assertPermission(context, "learnerLifecycle:write");
-  await getScopedLearnerRecord(context, update.learnerRecordId, "write");
+  const learnerRecord = await getScopedLearnerRecord(context, learnerRecordId, "write");
+  assertProgressEligible(learnerRecord.lifecycleStatus);
+  const id = activityRecordId("learner-progress", learnerRecordId, input.idempotencyKey);
+  const existing = await selectOne<LearnerProgressUpdateRow>(progressTable, new URLSearchParams({ select: "*", organisation_id: `eq.${context.organisation.id}`, id: `eq.${id}`, limit: "1" }));
+  if (existing) return { record: progressUpdateFromRow(existing), learner: await getOrganisationLearnerLifecycleRecordDetail(session, learnerRecordId), created: false };
+
+  const collections = await loadLearnerLifecycleCollectionsForRecord(session, learnerRecordId);
+  latestActivityVersionRequired(collections, learnerRecord, input.expectedActivityVersion);
+  assertOperationalDate(input.updateDate, "Update date");
+  assertAllowedValue(input.progressSource, learnerProgressSourceLabels, "progress source");
+  assertProgressPercentage(input.targetProgressPercentage, "Target progress percentage");
+  assertProgressPercentage(input.actualProgressPercentage, "Actual progress percentage");
+  const variance = calculateLearnerProgressVariance(input.targetProgressPercentage, input.actualProgressPercentage);
 
   const next: LearnerProgressUpdate = {
-    id: update.id ?? createMvpId("learner-progress"),
+    id,
     organisationId: context.organisation.id,
-    learnerRecordId: update.learnerRecordId,
-    updateDate: update.updateDate,
-    targetProgressPercentage: update.targetProgressPercentage,
-    actualProgressPercentage: update.actualProgressPercentage,
-    variancePercentage: calculateLearnerProgressVariance(update.targetProgressPercentage, update.actualProgressPercentage),
-    progressSource: update.progressSource,
-    sourceReference: update.sourceReference,
-    updatedBy: update.updatedBy,
-    summary: update.summary,
-    supportAction: update.supportAction,
+    learnerRecordId,
+    updateDate: input.updateDate,
+    targetProgressPercentage: input.targetProgressPercentage,
+    actualProgressPercentage: input.actualProgressPercentage,
+    variancePercentage: variance,
+    progressSource: input.progressSource,
+    sourceReference: cleanText(input.sourceReference),
+    updatedBy: context.user.email,
+    summary: cleanText(input.summary),
+    supportAction: cleanText(input.supportAction) || "No support required",
     createdAt: nowIso(),
   };
 
@@ -590,8 +663,10 @@ export async function addProgressUpdate(
     query: "on_conflict=organisation_id,id",
     prefer: "resolution=merge-duplicates,return=minimal",
   });
-  await recordLifecycleEvent(context, next.learnerRecordId, "progress_updated", "", "", "Learner progress updated.", { target: next.targetProgressPercentage, actual: next.actualProgressPercentage, variance: next.variancePercentage });
-  return next;
+  const position = deriveProgressPosition(next);
+  await recordLifecycleEvent(context, learnerRecordId, "progress_updated", "", "", `Progress update recorded: ${next.actualProgressPercentage}% actual against ${next.targetProgressPercentage}% target.`, { progressId: next.id, target: next.targetProgressPercentage, actual: next.actualProgressPercentage, variance: next.variancePercentage, progressPosition: position, supportAction: next.supportAction });
+  if (position === "Slightly behind" || position === "Significantly behind") await recordLifecycleEvent(context, learnerRecordId, "learner_identified_behind_target", "", "", `Learner identified as ${position.toLowerCase()} by ${Math.abs(next.variancePercentage)} percentage points.`, { progressId: next.id, variance: next.variancePercentage, progressPosition: position });
+  return { record: next, learner: await getOrganisationLearnerLifecycleRecordDetail(session, learnerRecordId), created: true };
 }
 
 export async function startBreakInLearning(
@@ -827,6 +902,7 @@ export async function getOrganisationLearnerLifecycleRecordDetail(session: LevyT
   return {
     ...summary,
     updatedAt: latestPreEnrolmentVersion(record, eligibilityDeclaration, preEnrolmentChecks),
+    activityVersion: latestActivityVersion(record, collections),
     eligibilityDeclaration,
     preEnrolmentChecks,
     enrolmentReadiness: readinessFor(record, eligibilityDeclaration, preEnrolmentChecks),
@@ -974,10 +1050,97 @@ function latestPreEnrolmentVersion(
   return latestIso([record.updatedAt, eligibilityDeclaration?.updatedAt ?? "", preEnrolmentChecks?.updatedAt ?? ""]);
 }
 
+function latestActivityVersion(record: LearnerRecord, collections: LearnerLifecycleCollections) {
+  const timestamp = latestIso([
+    record.updatedAt,
+    ...collections.progressUpdates.map((update) => update.createdAt),
+    ...collections.learnerReviews.map((review) => review.updatedAt || review.createdAt),
+  ]);
+  return `${timestamp}:${collections.progressUpdates.length}:${collections.learnerReviews.length}`;
+}
+
 function latestIso(values: string[]) {
   return values
     .filter(Boolean)
     .sort((left, right) => new Date(right).getTime() - new Date(left).getTime())[0] ?? "";
+}
+
+function latestActivityVersionRequired(collections: LearnerLifecycleCollections, record: LearnerRecord, expected: string | undefined) {
+  const value = requiredText(expected, "Activity version");
+  assertFreshVersion(latestActivityVersion(record, collections), value);
+}
+
+function assertProgressEligible(status: LearnerLifecycleStatus) {
+  if (!learnerProgressReviewPolicy.progressEligibleStatuses.includes(status)) {
+    throw new LevyTateLearnerLifecycleValidationError("Progress updates can only be recorded for enrolled learners or learners preparing for or completing assessment.");
+  }
+}
+
+function assertReviewEligible(status: LearnerLifecycleStatus) {
+  if (!learnerProgressReviewPolicy.reviewEligibleStatuses.includes(status)) {
+    throw new LevyTateLearnerLifecycleValidationError("Reviews can only be recorded for enrolled learners, learners on a break, or learners preparing for or completing assessment.");
+  }
+}
+
+function assertAllowedValue<T extends string>(value: unknown, labels: Record<T, string>, label: string): asserts value is T {
+  if (typeof value !== "string" || !Object.prototype.hasOwnProperty.call(labels, value)) {
+    throw new LevyTateLearnerLifecycleValidationError(`Invalid ${label}.`);
+  }
+}
+
+function requiredText(value: unknown, label: string) {
+  const text = cleanText(value);
+  if (!text) throw new LevyTateLearnerLifecycleValidationError(`${label} is required.`);
+  return text;
+}
+
+function assertValidDate(value: string, label: string) {
+  const date = cleanDate(value, label.toLowerCase());
+  const [year, month, day] = date.split("-").map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) {
+    throw new LevyTateLearnerLifecycleValidationError(`${label} is not a valid date.`);
+  }
+  return date;
+}
+
+function assertOperationalDate(value: string, label: string) {
+  const date = assertValidDate(value, label);
+  const maximum = new Date();
+  maximum.setUTCHours(0, 0, 0, 0);
+  maximum.setUTCDate(maximum.getUTCDate() + learnerProgressReviewPolicy.maximumFutureDateDays);
+  if (new Date(`${date}T00:00:00Z`).getTime() > maximum.getTime()) {
+    throw new LevyTateLearnerLifecycleValidationError(`${label} cannot be more than ${learnerProgressReviewPolicy.maximumFutureDateDays} days in the future.`);
+  }
+}
+
+function assertProgressPercentage(value: number, label: string) {
+  if (!Number.isFinite(value) || value < 0 || value > 100) {
+    throw new LevyTateLearnerLifecycleValidationError(`${label} must be between 0 and 100.`);
+  }
+}
+
+function activityRecordId(prefix: string, learnerRecordId: string, idempotencyKey: string) {
+  const key = requiredText(idempotencyKey, "Idempotency key");
+  if (!/^[a-zA-Z0-9_-]{8,80}$/.test(key)) throw new LevyTateLearnerLifecycleValidationError("Invalid idempotency key.");
+  return `${prefix}-${learnerRecordId}-${key}`;
+}
+
+async function assertProviderInOrganisation(context: LifecycleContext, providerId: string) {
+  const provider = await selectOne<ProviderViewRow>("levytate_providers", new URLSearchParams({
+    select: "provider_id,provider_name",
+    organisation_id: `eq.${context.organisation.id}`,
+    provider_id: `eq.${providerId}`,
+    limit: "1",
+  }));
+  if (!provider) throw new LevyTateLearnerLifecycleValidationError("The selected provider is not available in this organisation.");
+}
+
+function reviewEventType(reviewType: LearnerReviewType): LearnerLifecycleEventType {
+  if (reviewType === "provider_review") return "provider_review_recorded";
+  if (reviewType === "l_and_d_check_in") return "l_and_d_check_in_recorded";
+  if (reviewType === "manager_check_in") return "manager_check_in_recorded";
+  return "other_review_recorded";
 }
 
 function buildLearnerRecordPatch(
@@ -1279,6 +1442,8 @@ function buildLearnerOperationalSummary(
   const standard = standardId ? getApprenticeshipStandard(standardId) : undefined;
   const lifecycleSummary = learnerLifecycleSummaryFromCollections(collections, record.id);
   const progressPosition = deriveProgressPosition(lifecycleSummary?.latestProgress ?? null);
+  const reviewHistory = collections.learnerReviews.filter((review) => review.learnerRecordId === record.id);
+  const reviewSummaries = deriveReviewSummaries(reviewHistory);
   const operationalActions = collections.operationalActions.filter((action) => action.learnerRecordId === record.id);
   const attention = deriveLearnerAttention({
     lifecycleStatus: record.lifecycleStatus,
@@ -1287,6 +1452,8 @@ function buildLearnerOperationalSummary(
     latestProgress: lifecycleSummary?.latestProgress ?? null,
     latestProviderReview: lifecycleSummary?.latestProviderReview ?? null,
     latestLAndDCheckIn: lifecycleSummary?.latestLAndDCheckIn ?? null,
+    latestManagerCheckIn: lifecycleSummary?.latestManagerCheckIn ?? null,
+    reviewSummaries,
     activeBreak: lifecycleSummary?.activeBreak ?? null,
     assessmentReadiness: lifecycleSummary?.assessmentReadiness ?? null,
     operationalActions,
@@ -1328,6 +1495,7 @@ function buildLearnerOperationalSummary(
     latestProviderReview: lifecycleSummary?.latestProviderReview ?? null,
     latestLAndDCheckIn: lifecycleSummary?.latestLAndDCheckIn ?? null,
     latestManagerCheckIn: lifecycleSummary?.latestManagerCheckIn ?? null,
+    reviewSummaries,
     activeBreak: lifecycleSummary?.activeBreak ?? null,
     attention,
   };

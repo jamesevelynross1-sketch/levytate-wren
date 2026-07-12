@@ -2,6 +2,7 @@ import {
   learnerEmploymentRouteLabels,
   learnerLifecycleStatusLabels,
   learnerOperationalActionLabels,
+  learnerProgressReviewPolicy,
   type LearnerAssessmentReadiness,
   type LearnerBreakInLearning,
   type LearnerEligibilityDeclaration,
@@ -12,10 +13,11 @@ import {
   type LearnerPreEnrolmentChecks,
   type LearnerProgressUpdate,
   type LearnerReview,
+  type LearnerReviewType,
   type LearnerWithdrawal,
 } from "@/lib/levytate/mvp/learner-lifecycle";
 
-export type LearnerProgressPosition = "Ahead of target" | "On target" | "Behind target" | "No progress data";
+export type LearnerProgressPosition = "Ahead of target" | "On target" | "Slightly behind" | "Significantly behind" | "No progress data";
 export type LearnerAttentionSeverity = "none" | "low" | "medium" | "high";
 
 export type LearnerPersonSnapshot = {
@@ -58,11 +60,13 @@ export type LearnerOperationalSummary = {
   latestProviderReview: LearnerReview | null;
   latestLAndDCheckIn: LearnerReview | null;
   latestManagerCheckIn: LearnerReview | null;
+  reviewSummaries: LearnerReviewSummaries;
   activeBreak: LearnerBreakInLearning | null;
   attention: LearnerAttentionState;
 };
 
 export type LearnerRecordDetail = LearnerOperationalSummary & {
+  activityVersion: string;
   eligibilityDeclaration: LearnerEligibilityDeclaration | null;
   preEnrolmentChecks: LearnerPreEnrolmentChecks | null;
   progressHistory: LearnerProgressUpdate[];
@@ -110,6 +114,18 @@ export type LearnerAttentionState = {
   severity: LearnerAttentionSeverity;
   reasons: string[];
   needsAttention: boolean;
+};
+
+export type LearnerReviewSummary = {
+  latest: LearnerReview | null;
+  nextDate: string;
+  overdue: boolean;
+};
+
+export type LearnerReviewSummaries = {
+  provider: LearnerReviewSummary;
+  lAndD: LearnerReviewSummary;
+  manager: LearnerReviewSummary;
 };
 
 export type LearnerListSummary = {
@@ -184,9 +200,22 @@ export function deriveLearnerEnrolmentReadiness(input: {
 
 export function deriveProgressPosition(progress: LearnerProgressUpdate | null): LearnerProgressPosition {
   if (!progress) return "No progress data";
-  if (progress.variancePercentage < -2) return "Behind target";
-  if (progress.variancePercentage > 2) return "Ahead of target";
+  return deriveProgressPositionFromVariance(progress.variancePercentage);
+}
+
+export function deriveProgressPositionFromVariance(variance: number): Exclude<LearnerProgressPosition, "No progress data"> {
+  if (variance >= 3) return "Ahead of target";
+  if (variance <= -8) return "Significantly behind";
+  if (variance <= -3) return "Slightly behind";
   return "On target";
+}
+
+export function deriveReviewSummaries(reviews: LearnerReview[], today = new Date().toISOString().slice(0, 10)): LearnerReviewSummaries {
+  return {
+    provider: reviewSummary(reviews, "provider_review", today),
+    lAndD: reviewSummary(reviews, "l_and_d_check_in", today),
+    manager: reviewSummary(reviews, "manager_check_in", today),
+  };
 }
 
 export function formatProgressVariance(variance: number) {
@@ -204,6 +233,8 @@ export function deriveLearnerAttention(input: {
   latestProgress: LearnerProgressUpdate | null;
   latestProviderReview: LearnerReview | null;
   latestLAndDCheckIn: LearnerReview | null;
+  latestManagerCheckIn: LearnerReview | null;
+  reviewSummaries: LearnerReviewSummaries;
   activeBreak: LearnerBreakInLearning | null;
   assessmentReadiness: LearnerAssessmentReadiness | null;
   operationalActions: LearnerOperationalAction[];
@@ -211,38 +242,28 @@ export function deriveLearnerAttention(input: {
 }): LearnerAttentionState {
   const today = input.today ?? new Date().toISOString().slice(0, 10);
   const reasons: string[] = [];
+  const progressPosition = deriveProgressPosition(input.latestProgress);
+  const reviewSummaries = input.reviewSummaries;
 
-  if (!input.eligibilityDeclaration?.confirmed || input.eligibilityDeclaration.verificationStatus !== "employer_verified") {
-    reasons.push("Confirm England working-hours eligibility");
-  }
-
-  if (!input.preEnrolmentChecks || input.preEnrolmentChecks.hrApprovalStatus === "awaiting_approval" || input.preEnrolmentChecks.hrApprovalStatus === "not_requested") {
-    reasons.push("Awaiting HR approval");
-  }
-
-  if (!input.preEnrolmentChecks || input.preEnrolmentChecks.probationStatus === "awaiting_confirmation") {
-    reasons.push("Confirm probation status");
-  }
-
-  if (!input.preEnrolmentChecks?.guidesSent) {
-    reasons.push("Send learner and manager guides");
+  if (input.lifecycleStatus === "pre_enrolment") {
+    if (!input.eligibilityDeclaration?.confirmed || input.eligibilityDeclaration.verificationStatus !== "employer_verified") reasons.push("Confirm England working-hours eligibility");
+    if (!input.preEnrolmentChecks || input.preEnrolmentChecks.hrApprovalStatus === "awaiting_approval" || input.preEnrolmentChecks.hrApprovalStatus === "not_requested") reasons.push("Awaiting HR approval");
+    if (!input.preEnrolmentChecks || input.preEnrolmentChecks.probationStatus === "awaiting_confirmation") reasons.push("Confirm probation status");
+    if (!input.preEnrolmentChecks?.guidesSent) reasons.push("Send learner and manager guides");
   }
 
   if (input.activeBreak) {
     reasons.push("Learner is currently on a break in learning");
   }
 
-  if (input.latestProgress && input.latestProgress.variancePercentage < -2) {
-    reasons.push("Actual progress is behind target");
-  }
-
-  if (input.latestProviderReview?.nextReviewDate && input.latestProviderReview.nextReviewDate < today) {
-    reasons.push("Provider review overdue");
-  }
-
-  if (input.latestLAndDCheckIn?.nextReviewDate && input.latestLAndDCheckIn.nextReviewDate < today) {
-    reasons.push("L&D check-in overdue");
-  }
+  if (progressPosition === "Significantly behind") reasons.push("Significantly behind target");
+  if (reviewSummaries.provider.overdue) reasons.push("Provider review overdue");
+  if (input.latestProgress?.supportAction && !/^no support required$/i.test(input.latestProgress.supportAction)) reasons.push("Support action outstanding");
+  if (input.latestProviderReview?.status === "action_required" || input.latestLAndDCheckIn?.status === "action_required" || input.latestManagerCheckIn?.status === "action_required") reasons.push("Review action outstanding");
+  if (reviewSummaries.lAndD.overdue) reasons.push("L&D check-in overdue");
+  if (reviewSummaries.manager.overdue) reasons.push("Manager check-in overdue");
+  if (progressPosition === "Slightly behind") reasons.push("Slightly behind target");
+  if (progressIsOverdue(input.latestProgress, today) && ["enrolled", "assessment_preparation", "in_assessment"].includes(input.lifecycleStatus)) reasons.push("Progress update overdue");
 
   if (input.lifecycleStatus === "assessment_preparation") {
     reasons.push("Prepare for assessment readiness");
@@ -258,17 +279,18 @@ export function deriveLearnerAttention(input: {
     reasons.push("Send completion email");
   }
 
-  const severity: LearnerAttentionSeverity = input.activeBreak || input.lifecycleStatus === "withdrawn" || reasons.some((reason) => /overdue|behind|HR approval|eligibility/i.test(reason))
+  const orderedReasons = orderAttentionReasons(reasons);
+  const severity: LearnerAttentionSeverity = input.activeBreak || input.lifecycleStatus === "withdrawn" || orderedReasons.some((reason) => /significantly|provider review overdue|HR approval|eligibility/i.test(reason))
     ? "high"
-    : reasons.length
+    : orderedReasons.length
       ? "medium"
       : "none";
 
   return {
-    label: reasons[0] ?? "No immediate action required",
+    label: orderedReasons[0] ?? "No immediate action required",
     severity,
-    reasons,
-    needsAttention: reasons.length > 0,
+    reasons: orderedReasons,
+    needsAttention: orderedReasons.length > 0,
   };
 }
 
@@ -298,10 +320,47 @@ function learnerPriorityScore(record: LearnerOperationalSummary) {
   let score = 0;
   if (record.attention.needsAttention) score += 100;
   if (record.lifecycleStatus === "break_in_learning") score += 40;
-  if (record.progressPosition === "Behind target") score += 30;
+  if (record.progressPosition === "Significantly behind") score += 35;
+  if (record.progressPosition === "Slightly behind") score += 20;
   if (record.attention.severity === "high") score += 20;
   if (record.attention.severity === "medium") score += 10;
   return score;
+}
+
+function reviewSummary(reviews: LearnerReview[], reviewType: LearnerReviewType, today: string): LearnerReviewSummary {
+  const latest = reviews
+    .filter((review) => review.reviewType === reviewType)
+    .sort((left, right) => right.reviewDate.localeCompare(left.reviewDate) || right.createdAt.localeCompare(left.createdAt))[0] ?? null;
+  const nextDate = latest?.nextReviewDate ?? "";
+  return { latest, nextDate, overdue: Boolean(nextDate && nextDate < today && latest?.status !== "cancelled") };
+}
+
+function progressIsOverdue(progress: LearnerProgressUpdate | null, today: string) {
+  if (!progress) return true;
+  const last = new Date(`${progress.updateDate}T00:00:00Z`).getTime();
+  const current = new Date(`${today}T00:00:00Z`).getTime();
+  return Number.isFinite(last) && Number.isFinite(current) && current - last > learnerProgressReviewPolicy.progressUpdateOverdueDays * 24 * 60 * 60 * 1000;
+}
+
+function orderAttentionReasons(reasons: string[]) {
+  const priority = [
+    "Significantly behind target",
+    "Provider review overdue",
+    "Support action outstanding",
+    "Review action outstanding",
+    "L&D check-in overdue",
+    "Manager check-in overdue",
+    "Slightly behind target",
+    "Progress update overdue",
+  ];
+  return Array.from(new Set(reasons)).sort((left, right) => {
+    const leftIndex = priority.indexOf(left);
+    const rightIndex = priority.indexOf(right);
+    if (leftIndex === -1 && rightIndex === -1) return 0;
+    if (leftIndex === -1) return 1;
+    if (rightIndex === -1) return -1;
+    return leftIndex - rightIndex;
+  });
 }
 
 function eligibilityVerificationCheck(declaration: LearnerEligibilityDeclaration | null): LearnerEnrolmentReadinessCheck {

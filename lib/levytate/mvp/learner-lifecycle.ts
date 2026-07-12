@@ -83,11 +83,25 @@ export type LearnerReviewType =
   | "manager_check_in"
   | "other";
 
+export const learnerReviewTypeLabels = {
+  provider_review: "Provider review",
+  l_and_d_check_in: "L&D check-in",
+  manager_check_in: "Manager check-in",
+  other: "Other",
+} as const satisfies Record<LearnerReviewType, string>;
+
 export type LearnerReviewStatus =
   | "completed"
   | "scheduled"
   | "cancelled"
   | "action_required";
+
+export const learnerReviewStatusLabels = {
+  completed: "Completed",
+  scheduled: "Scheduled",
+  cancelled: "Cancelled",
+  action_required: "Action required",
+} as const satisfies Record<LearnerReviewStatus, string>;
 
 export type LearnerProgressSource =
   | "provider_report"
@@ -95,6 +109,42 @@ export type LearnerProgressSource =
   | "manual_l_and_d_update"
   | "integration"
   | "other";
+
+export const learnerProgressSourceLabels = {
+  provider_report: "Provider report",
+  provider_review: "Provider review",
+  manual_l_and_d_update: "Manual L&D update",
+  integration: "Integration",
+  other: "Other",
+} as const satisfies Record<LearnerProgressSource, string>;
+
+export type LearnerSupportActionType =
+  | "no_support_required"
+  | "monitor_progress"
+  | "manager_support_required"
+  | "provider_action_required"
+  | "l_and_d_check_in_required"
+  | "role_or_workplace_opportunity_required"
+  | "escalation_required"
+  | "other";
+
+export const learnerSupportActionLabels = {
+  no_support_required: "No support required",
+  monitor_progress: "Monitor progress",
+  manager_support_required: "Manager support required",
+  provider_action_required: "Provider action required",
+  l_and_d_check_in_required: "L&D check-in required",
+  role_or_workplace_opportunity_required: "Role or workplace opportunity required",
+  escalation_required: "Escalation required",
+  other: "Other",
+} as const satisfies Record<LearnerSupportActionType, string>;
+
+export const learnerProgressReviewPolicy = {
+  progressEligibleStatuses: ["enrolled", "assessment_preparation", "in_assessment"] as LearnerLifecycleStatus[],
+  reviewEligibleStatuses: ["enrolled", "break_in_learning", "assessment_preparation", "in_assessment"] as LearnerLifecycleStatus[],
+  progressUpdateOverdueDays: 60,
+  maximumFutureDateDays: 7,
+} as const;
 
 export type LearnerAssessmentModel =
   | "end_point_assessment"
@@ -153,7 +203,12 @@ export type LearnerLifecycleEventType =
   | "returned_from_break"
   | "withdrawn"
   | "provider_review_recorded"
+  | "l_and_d_check_in_recorded"
+  | "manager_check_in_recorded"
+  | "other_review_recorded"
+  | "review_action_required"
   | "progress_updated"
+  | "learner_identified_behind_target"
   | "assessment_readiness_updated"
   | "assessment_readiness_confirmed"
   | "achievement_recorded"

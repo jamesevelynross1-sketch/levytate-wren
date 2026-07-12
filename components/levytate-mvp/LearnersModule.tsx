@@ -1,18 +1,30 @@
 "use client";
 
-import { ArrowLeft, CheckCircle2, ChevronDown, Search } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { EmptyState, FormField, FormGrid, FormSection, FormSelect, FormTextArea, MvpPanel, StatusBadge, TableAction, TableBody, TableHead, TableShell } from "@/components/levytate-mvp/MvpUi";
+import { ArrowLeft, CheckCircle2, ChevronDown, Plus, Search } from "lucide-react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { EmptyState, FormField, FormGrid, FormSection, FormSelect, FormTagInput, FormTextArea, MvpModal, MvpPanel, StatusBadge, TableAction, TableBody, TableHead, TableShell } from "@/components/levytate-mvp/MvpUi";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { includesSearch, statusTone } from "@/components/levytate-mvp/module-utils";
 import {
   formatProgressVariance,
+  deriveProgressPositionFromVariance,
   operationalActionLabel,
   type LearnerListSummary,
   type LearnerOperationalSummary,
   type LearnerProgressPosition,
   type LearnerRecordDetail,
 } from "@/lib/levytate/mvp/learner-record-view";
+import {
+  learnerProgressReviewPolicy,
+  learnerProgressSourceLabels,
+  learnerReviewStatusLabels,
+  learnerReviewTypeLabels,
+  learnerSupportActionLabels,
+  type LearnerProgressSource,
+  type LearnerReviewStatus,
+  type LearnerReviewType,
+  type LearnerSupportActionType,
+} from "@/lib/levytate/mvp/learner-lifecycle";
 
 type LearnerListResponse = {
   ok?: boolean;
@@ -44,7 +56,8 @@ const progressOptions: Array<LearnerProgressPosition | typeof allOption> = [
   allOption,
   "Ahead of target",
   "On target",
-  "Behind target",
+  "Slightly behind",
+  "Significantly behind",
   "No progress data",
 ];
 
@@ -70,6 +83,7 @@ export function LearnersModule() {
 
   const mayReadOrganisationLearners = can("learnerLifecycle:read") && (meta?.userRole === "Apprenticeship Lead" || meta?.userRole === "Employer Admin" || meta?.userRole === "Platform Admin");
   const mayMutatePreEnrolment = can("learnerLifecycle:write") && can("learnerLifecycle:status") && (meta?.userRole === "Apprenticeship Lead" || meta?.userRole === "Employer Admin" || meta?.userRole === "Platform Admin");
+  const mayMutateLearnerActivity = can("learnerLifecycle:write") && (meta?.userRole === "Apprenticeship Lead" || meta?.userRole === "Employer Admin" || meta?.userRole === "Platform Admin");
 
   useEffect(() => {
     if (!mayReadOrganisationLearners) {
@@ -187,6 +201,7 @@ export function LearnersModule() {
           setError("");
         }}
         mayMutatePreEnrolment={mayMutatePreEnrolment}
+        mayMutateLearnerActivity={mayMutateLearnerActivity}
         onDetailUpdated={(next) => {
           setDetail(next);
           setLearners((current) => current.map((learner) => learner.learnerRecordId === next.learnerRecordId ? next : learner));
@@ -196,7 +211,7 @@ export function LearnersModule() {
   }
 
   return (
-    <div className="grid gap-5">
+    <div className="grid min-w-0 gap-5">
       <section className="grid gap-3 md:grid-cols-3 xl:grid-cols-7">
         <SummaryTile label="Total records" value={summary?.total ?? 0} />
         <SummaryTile label="Pre-enrolment" value={summary?.preEnrolment ?? 0} />
@@ -290,8 +305,10 @@ export function LearnersModule() {
   );
 }
 
-function LearnerRecordView({ detail, loading, error, onBack, mayMutatePreEnrolment, onDetailUpdated }: { detail: LearnerRecordDetail | null; loading: boolean; error: string; onBack: () => void; mayMutatePreEnrolment: boolean; onDetailUpdated: (detail: LearnerRecordDetail) => void }) {
+function LearnerRecordView({ detail, loading, error, onBack, mayMutatePreEnrolment, mayMutateLearnerActivity, onDetailUpdated }: { detail: LearnerRecordDetail | null; loading: boolean; error: string; onBack: () => void; mayMutatePreEnrolment: boolean; mayMutateLearnerActivity: boolean; onDetailUpdated: (detail: LearnerRecordDetail) => void }) {
   const [workflowOpen, setWorkflowOpen] = useState(false);
+  const [activityMode, setActivityMode] = useState<"progress" | "review" | "">("");
+  const [reviewFilter, setReviewFilter] = useState<LearnerReviewType | "all">("all");
   const [success, setSuccess] = useState("");
 
   if (loading) {
@@ -309,15 +326,18 @@ function LearnerRecordView({ detail, loading, error, onBack, mayMutatePreEnrolme
     );
   }
 
+  const progressEntryAllowed = mayMutateLearnerActivity && learnerProgressReviewPolicy.progressEligibleStatuses.includes(detail.lifecycleStatus);
+  const reviewEntryAllowed = mayMutateLearnerActivity && learnerProgressReviewPolicy.reviewEligibleStatuses.includes(detail.lifecycleStatus);
+
   return (
-    <div className="grid gap-5">
+    <div className="grid min-w-0 gap-5">
       <button type="button" onClick={onBack} className="inline-flex w-fit items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-semibold text-[#102c3d]/68 ring-1 ring-[#102c3d]/[0.08] transition hover:bg-[#f8fbfa] hover:text-[#102c3d]">
         <ArrowLeft size={15} /> Back to learners
       </button>
 
-      <section className="rounded-xl border border-[#102c3d]/[0.075] bg-white p-5 shadow-[0_14px_36px_rgba(16,44,61,0.045)]">
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(280px,0.55fr)]">
-          <div>
+      <section className="min-w-0 rounded-xl border border-[#102c3d]/[0.075] bg-white p-5 shadow-[0_14px_36px_rgba(16,44,61,0.045)]">
+        <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(280px,0.55fr)]">
+          <div className="min-w-0">
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">Learner record</p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <h2 className="text-2xl font-semibold tracking-[-0.025em] text-[#102c3d]">{detail.learner.name}</h2>
@@ -357,6 +377,30 @@ function LearnerRecordView({ detail, loading, error, onBack, mayMutatePreEnrolme
             onDetailUpdated(next);
             setWorkflowOpen(false);
             setSuccess("Learner marked as enrolled. The lifecycle record is now active.");
+          }}
+        />
+      ) : null}
+
+      {activityMode === "progress" ? (
+        <ProgressUpdateForm
+          detail={detail}
+          onClose={() => setActivityMode("")}
+          onSaved={(next, message) => {
+            onDetailUpdated(next);
+            setActivityMode("");
+            setSuccess(message);
+          }}
+        />
+      ) : null}
+
+      {activityMode === "review" ? (
+        <ReviewEntryForm
+          detail={detail}
+          onClose={() => setActivityMode("")}
+          onSaved={(next, message) => {
+            onDetailUpdated(next);
+            setActivityMode("");
+            setSuccess(message);
           }}
         />
       ) : null}
@@ -410,16 +454,31 @@ function LearnerRecordView({ detail, loading, error, onBack, mayMutatePreEnrolme
         </details>
       </RecordSection>
 
+      {(progressEntryAllowed || reviewEntryAllowed) ? (
+        <RecordSection title="Progress and reviews" eyebrow="Learner support">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+            <div>
+              <p className="text-sm font-semibold text-[#102c3d]">Where the learner should be, where they are now and what support comes next.</p>
+              <p className="mt-1 text-sm leading-6 text-[#102c3d]/54">Updates are retained as history and refresh the learner&apos;s attention state from persisted data.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {progressEntryAllowed ? <PrimaryRecordAction onClick={() => { setActivityMode("progress"); setSuccess(""); }}>Add progress update</PrimaryRecordAction> : null}
+              {reviewEntryAllowed ? <SecondaryRecordAction onClick={() => { setActivityMode("review"); setSuccess(""); }}>Record review or check-in</SecondaryRecordAction> : null}
+            </div>
+          </div>
+        </RecordSection>
+      ) : null}
+
       <RecordSection title="Progress" eyebrow="Pace">
         {detail.latestProgress ? (
-          <div className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
+          <div className="grid min-w-0 gap-4 lg:grid-cols-[0.8fr_1.2fr]">
             <div className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4">
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">Latest snapshot</p>
               <div className="mt-3 grid grid-cols-2 gap-3">
                 <InfoBlock label="Target" value={`${detail.latestProgress.targetProgressPercentage}%`} />
                 <InfoBlock label="Actual" value={`${detail.latestProgress.actualProgressPercentage}%`} />
               </div>
-              <p className="mt-3 text-sm font-semibold text-[#102c3d]">{formatProgressVariance(detail.latestProgress.variancePercentage)}</p>
+              <div className="mt-3 flex flex-wrap items-center gap-2"><StatusBadge tone={detail.progressPosition === "Significantly behind" ? "red" : detail.progressPosition === "Slightly behind" ? "yellow" : "green"}>{detail.progressPosition}</StatusBadge><p className="text-sm font-semibold text-[#102c3d]">Variance: {detail.latestProgress.variancePercentage > 0 ? "+" : ""}{detail.latestProgress.variancePercentage} percentage points</p></div>
               <p className="mt-2 text-sm leading-6 text-[#102c3d]/58">{detail.latestProgress.summary}</p>
               {detail.latestProgress.supportAction ? <p className="mt-2 text-sm leading-6 text-[#0b6f63]">{detail.latestProgress.supportAction}</p> : null}
             </div>
@@ -427,30 +486,40 @@ function LearnerRecordView({ detail, loading, error, onBack, mayMutatePreEnrolme
               formatDate(progress.updateDate) || "Not recorded",
               `${progress.targetProgressPercentage}%`,
               `${progress.actualProgressPercentage}%`,
-              formatProgressVariance(progress.variancePercentage),
+              `${progress.variancePercentage > 0 ? "+" : ""}${progress.variancePercentage} percentage points`,
+              deriveProgressPositionFromVariance(progress.variancePercentage),
               humanise(progress.progressSource),
-            ])} empty="No progress update has been recorded yet." headings={["Date", "Target", "Actual", "Variance", "Source"]} />
+            ])} empty="No progress update has been recorded yet." headings={["Date", "Target", "Actual", "Variance", "Position", "Source"]} />
           </div>
-        ) : <InlineEmpty copy="No progress update has been recorded yet." />}
+        ) : progressEntryAllowed ? <ActionEmpty copy="No progress update has been recorded yet." action="Add progress update" onAction={() => setActivityMode("progress")} /> : <InlineEmpty copy="No progress update has been recorded yet." />}
       </RecordSection>
 
       <RecordSection title="Reviews and check-ins" eyebrow="Support">
         <div className="grid gap-3 lg:grid-cols-3">
-          <ReviewCard title="Provider review" review={detail.latestProviderReview} />
-          <ReviewCard title="L&D check-in" review={detail.latestLAndDCheckIn} />
-          <ReviewCard title="Manager check-in" review={detail.latestManagerCheckIn} />
+          <ReviewCard title="Provider review" review={detail.reviewSummaries.provider.latest} overdue={detail.reviewSummaries.provider.overdue} empty="No provider review has been recorded yet." />
+          <ReviewCard title="L&D check-in" review={detail.reviewSummaries.lAndD.latest} overdue={detail.reviewSummaries.lAndD.overdue} empty="No L&D check-in has been recorded yet." />
+          <ReviewCard title="Manager check-in" review={detail.reviewSummaries.manager.latest} overdue={detail.reviewSummaries.manager.overdue} empty="No manager check-in has been recorded yet." />
         </div>
-        {detail.reviewHistory.length ? (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <FormSelect label="Filter review history" value={reviewFilter} onChange={(value) => setReviewFilter(value as LearnerReviewType | "all")} options={[
+            { value: "all", label: "All review types" },
+            ...Object.entries(learnerReviewTypeLabels).map(([value, label]) => ({ value, label })),
+          ]} />
+          {reviewEntryAllowed ? <SecondaryRecordAction onClick={() => setActivityMode("review")}>Record review or check-in</SecondaryRecordAction> : null}
+        </div>
+        {detail.reviewHistory.some((review) => reviewFilter === "all" || review.reviewType === reviewFilter) ? (
           <div className="mt-4">
-            <HistoryTable rows={detail.reviewHistory.map((review) => [
+            <HistoryTable rows={detail.reviewHistory.filter((review) => reviewFilter === "all" || review.reviewType === reviewFilter).map((review) => [
               formatDate(review.reviewDate) || "Not recorded",
-              humanise(review.reviewType),
+              learnerReviewTypeLabels[review.reviewType],
               review.reviewerName || "Reviewer not recorded",
+              learnerReviewStatusLabels[review.status],
               review.summary || "No summary recorded",
-              review.actions.length ? review.actions.join(", ") : "No actions recorded",
-            ])} headings={["Date", "Type", "Reviewer", "Summary", "Actions"]} empty="No provider or L&D reviews have been recorded yet." />
+              review.nextReviewDate ? formatDate(review.nextReviewDate) : "Not scheduled",
+              review.supportRequired || (review.actions.length ? review.actions.join(", ") : "No support required"),
+            ])} headings={["Date", "Type", "Reviewer", "Status", "Summary", "Next", "Support / actions"]} empty="No reviews or check-ins match this filter." />
           </div>
-        ) : <InlineEmpty copy="No provider or L&D reviews have been recorded yet." />}
+        ) : reviewEntryAllowed ? <ActionEmpty copy="No review or check-in has been recorded yet." action="Record review or check-in" onAction={() => setActivityMode("review")} /> : <InlineEmpty copy="No review or check-in has been recorded yet." />}
       </RecordSection>
 
       <RecordSection title="Breaks and withdrawals" eyebrow="Exceptions">
@@ -534,6 +603,196 @@ function LearnerRecordView({ detail, loading, error, onBack, mayMutatePreEnrolme
         ) : <InlineEmpty copy="No lifecycle history has been recorded yet." />}
       </RecordSection>
     </div>
+  );
+}
+
+type ProgressFormState = {
+  updateDate: string;
+  target: string;
+  actual: string;
+  source: LearnerProgressSource;
+  sourceReference: string;
+  summary: string;
+  supportType: LearnerSupportActionType;
+  supportSummary: string;
+};
+
+function ProgressUpdateForm({ detail, onClose, onSaved }: { detail: LearnerRecordDetail; onClose: () => void; onSaved: (detail: LearnerRecordDetail, message: string) => void }) {
+  const [idempotencyKey] = useState(activityKey);
+  const [form, setForm] = useState<ProgressFormState>({
+    updateDate: todayDate(),
+    target: String(detail.latestProgress?.targetProgressPercentage ?? ""),
+    actual: String(detail.latestProgress?.actualProgressPercentage ?? ""),
+    source: "provider_report",
+    sourceReference: "",
+    summary: "",
+    supportType: "no_support_required",
+    supportSummary: "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const target = Number(form.target);
+  const actual = Number(form.actual);
+  const hasNumbers = Number.isFinite(target) && Number.isFinite(actual) && form.target !== "" && form.actual !== "";
+  const variance = hasNumbers ? Math.round((actual - target) * 10) / 10 : 0;
+  const position = hasNumbers ? deriveProgressPositionFromVariance(variance) : "No progress data";
+
+  function update<K extends keyof ProgressFormState>(key: K, value: ProgressFormState[K]) {
+    setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+    try {
+      const supportAction = form.supportType === "no_support_required"
+        ? learnerSupportActionLabels.no_support_required
+        : `${learnerSupportActionLabels[form.supportType]}${form.supportSummary.trim() ? `: ${form.supportSummary.trim()}` : ""}`;
+      const response = await fetch(`/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/progress`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          expectedActivityVersion: detail.activityVersion,
+          idempotencyKey,
+          updateDate: form.updateDate,
+          targetProgressPercentage: target,
+          actualProgressPercentage: actual,
+          progressSource: form.source,
+          sourceReference: form.sourceReference,
+          summary: form.summary,
+          supportAction,
+        }),
+      });
+      const payload = await response.json() as LearnerMutationResponse;
+      if (!response.ok || !payload.learner) throw new Error(payload.message ?? "Progress update could not be recorded.");
+      onSaved(payload.learner, payload.message ?? "Progress update recorded.");
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "Progress update could not be recorded.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <MvpModal title="Add progress update" eyebrow="Progress and reviews" onClose={onClose}>
+      <form onSubmit={submit} className="grid gap-4">
+        <FormSection title="Progress position" copy="Variance and position are recalculated by the server when this update is saved.">
+          <FormGrid>
+            <FormField label="Update date" type="date" value={form.updateDate} onChange={(value) => update("updateDate", value)} required />
+            <FormSelect label="Progress source" value={form.source} onChange={(value) => update("source", value as LearnerProgressSource)} options={Object.entries(learnerProgressSourceLabels).map(([value, label]) => ({ value, label }))} required />
+            <FormField label="Target progress percentage" type="number" value={form.target} onChange={(value) => update("target", value)} required />
+            <FormField label="Actual progress percentage" type="number" value={form.actual} onChange={(value) => update("actual", value)} required />
+          </FormGrid>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <InfoBlock label="Variance" value={hasNumbers ? `${variance > 0 ? "+" : ""}${variance} percentage points` : "Enter progress values"} />
+            <InfoBlock label="Position" value={position} />
+            <InfoBlock label="Latest saved update" value={formatDate(detail.latestProgress?.updateDate) || "No previous update"} />
+          </div>
+        </FormSection>
+        <FormSection title="Evidence and support">
+          <FormGrid>
+            <FormField label="Source reference" value={form.sourceReference} onChange={(value) => update("sourceReference", value)} placeholder="Provider report or review reference" />
+            <FormSelect label="Support action" value={form.supportType} onChange={(value) => update("supportType", value as LearnerSupportActionType)} options={Object.entries(learnerSupportActionLabels).map(([value, label]) => ({ value, label }))} />
+            <FormTextArea label="Progress summary" value={form.summary} onChange={(value) => update("summary", value)} wide rows={3} placeholder="Concise learner progress summary" />
+            {form.supportType !== "no_support_required" ? <FormTextArea label="Support summary" value={form.supportSummary} onChange={(value) => update("supportSummary", value)} wide rows={3} placeholder="What needs to happen next?" /> : null}
+          </FormGrid>
+        </FormSection>
+        {error ? <p className="rounded-xl bg-[#fff0f2] px-4 py-3 text-sm font-semibold text-[#b13b51]">{error}</p> : null}
+        <div className="flex justify-end gap-2 border-t border-[#102c3d]/[0.07] pt-4">
+          <button type="button" onClick={onClose} className="h-10 rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.1]">Cancel</button>
+          <button disabled={saving} className="h-10 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white disabled:opacity-55">{saving ? "Recording update" : "Record progress update"}</button>
+        </div>
+      </form>
+    </MvpModal>
+  );
+}
+
+type ReviewFormState = {
+  reviewType: LearnerReviewType;
+  reviewDate: string;
+  nextReviewDate: string;
+  reviewerName: string;
+  providerId: string;
+  summary: string;
+  actions: string[];
+  supportRequired: string;
+  status: LearnerReviewStatus;
+};
+
+function ReviewEntryForm({ detail, onClose, onSaved }: { detail: LearnerRecordDetail; onClose: () => void; onSaved: (detail: LearnerRecordDetail, message: string) => void }) {
+  const [idempotencyKey] = useState(activityKey);
+  const [form, setForm] = useState<ReviewFormState>({
+    reviewType: "provider_review",
+    reviewDate: todayDate(),
+    nextReviewDate: "",
+    reviewerName: "Provider Skills Coach",
+    providerId: detail.programme.providerId,
+    summary: "",
+    actions: [],
+    supportRequired: "",
+    status: "completed",
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  function update<K extends keyof ReviewFormState>(key: K, value: ReviewFormState[K]) {
+    setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  function changeReviewType(value: LearnerReviewType) {
+    const reviewerName = value === "provider_review" ? "Provider Skills Coach" : value === "manager_check_in" ? detail.learner.managerName : value === "l_and_d_check_in" ? "Priya Shah" : "";
+    setForm((current) => ({ ...current, reviewType: value, reviewerName, providerId: value === "provider_review" ? detail.programme.providerId : "" }));
+  }
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/reviews`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ...form, expectedActivityVersion: detail.activityVersion, idempotencyKey }),
+      });
+      const payload = await response.json() as LearnerMutationResponse;
+      if (!response.ok || !payload.learner) throw new Error(payload.message ?? "Review or check-in could not be recorded.");
+      onSaved(payload.learner, payload.message ?? `${learnerReviewTypeLabels[form.reviewType]} recorded.`);
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "Review or check-in could not be recorded.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <MvpModal title="Record review or check-in" eyebrow="Progress and reviews" onClose={onClose}>
+      <form onSubmit={submit} className="grid gap-4">
+        <FormSection title="Review details">
+          <FormGrid>
+            <FormSelect label="Review type" value={form.reviewType} onChange={(value) => changeReviewType(value as LearnerReviewType)} options={Object.entries(learnerReviewTypeLabels).map(([value, label]) => ({ value, label }))} required />
+            <FormSelect label="Status" value={form.status} onChange={(value) => update("status", value as LearnerReviewStatus)} options={Object.entries(learnerReviewStatusLabels).map(([value, label]) => ({ value, label }))} required />
+            <FormField label={form.reviewType === "manager_check_in" ? "Check-in date" : "Review date"} type="date" value={form.reviewDate} onChange={(value) => update("reviewDate", value)} required />
+            <FormField label={form.reviewType === "manager_check_in" || form.reviewType === "l_and_d_check_in" ? "Next check-in date" : "Next review date"} type="date" value={form.nextReviewDate} onChange={(value) => update("nextReviewDate", value)} />
+            <FormField label={form.reviewType === "manager_check_in" ? "Manager" : "Reviewer name"} value={form.reviewerName} onChange={(value) => update("reviewerName", value)} required />
+            {form.reviewType === "provider_review" ? <FormField label="Provider ID" value={form.providerId} onChange={(value) => update("providerId", value)} required /> : null}
+          </FormGrid>
+          {form.reviewType === "provider_review" ? <p className="mt-3 text-xs leading-5 text-[#102c3d]/48">Defaults to {detail.programme.providerName}. Provider ownership is validated by the server.</p> : null}
+        </FormSection>
+        <FormSection title={form.reviewType === "manager_check_in" ? "Workplace application and support" : "Summary and agreed action"}>
+          <FormGrid>
+            <FormTextArea label={form.reviewType === "manager_check_in" ? "Workplace application" : form.reviewType === "l_and_d_check_in" ? "Learner progress summary" : "Summary"} value={form.summary} onChange={(value) => update("summary", value)} wide rows={3} />
+            <FormTagInput label="Agreed actions" values={form.actions} onChange={(value) => update("actions", value)} wide placeholder="Type an action and press Enter" />
+            <FormTextArea label={form.reviewType === "manager_check_in" ? "Support available, concerns or blockers" : "Support required"} value={form.supportRequired} onChange={(value) => update("supportRequired", value)} wide rows={3} />
+          </FormGrid>
+        </FormSection>
+        {error ? <p className="rounded-xl bg-[#fff0f2] px-4 py-3 text-sm font-semibold text-[#b13b51]">{error}</p> : null}
+        <div className="flex justify-end gap-2 border-t border-[#102c3d]/[0.07] pt-4">
+          <button type="button" onClick={onClose} className="h-10 rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.1]">Cancel</button>
+          <button disabled={saving} className="h-10 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white disabled:opacity-55">{saving ? "Recording review" : "Record review or check-in"}</button>
+        </div>
+      </form>
+    </MvpModal>
   );
 }
 
@@ -825,21 +1084,21 @@ function ProgressMini({ learner }: { learner: LearnerOperationalSummary }) {
         <span>{learner.progressPosition}</span>
       </div>
       <div className="mt-2 h-2 rounded-full bg-[#edf3ef]">
-        <div className={`h-2 rounded-full ${learner.latestProgress.variancePercentage < -2 ? "bg-[#c95568]" : "bg-[#159b8f]"}`} style={{ width: `${Math.min(100, Math.max(0, learner.latestProgress.actualProgressPercentage))}%` }} />
+        <div className={`h-2 rounded-full ${learner.latestProgress.variancePercentage <= -3 ? "bg-[#c95568]" : "bg-[#159b8f]"}`} style={{ width: `${Math.min(100, Math.max(0, learner.latestProgress.actualProgressPercentage))}%` }} />
       </div>
-      <p className="mt-1 text-xs text-[#102c3d]/42">Target {learner.latestProgress.targetProgressPercentage}%</p>
+      <p className="mt-1 text-xs text-[#102c3d]/42">Target {learner.latestProgress.targetProgressPercentage}% · {learner.latestProgress.variancePercentage > 0 ? "+" : ""}{learner.latestProgress.variancePercentage} pts</p>
     </div>
   );
 }
 
 function RecordSection({ title, eyebrow, children }: { title: string; eyebrow: string; children: ReactNode }) {
   return (
-    <section className="rounded-xl border border-[#102c3d]/[0.075] bg-white shadow-[0_14px_36px_rgba(16,44,61,0.045)]">
+    <section className="min-w-0 rounded-xl border border-[#102c3d]/[0.075] bg-white shadow-[0_14px_36px_rgba(16,44,61,0.045)]">
       <div className="border-b border-[#102c3d]/[0.06] px-5 py-4">
         <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">{eyebrow}</p>
         <h3 className="mt-0.5 text-lg font-semibold text-[#102c3d]">{title}</h3>
       </div>
-      <div className="p-5">{children}</div>
+      <div className="min-w-0 p-5">{children}</div>
     </section>
   );
 }
@@ -868,10 +1127,10 @@ function CheckCard({ title, status, lines }: { title: string; status: string; li
   );
 }
 
-function ReviewCard({ title, review }: { title: string; review: LearnerRecordDetail["latestProviderReview"] }) {
+function ReviewCard({ title, review, overdue, empty }: { title: string; review: LearnerRecordDetail["latestProviderReview"]; overdue?: boolean; empty: string }) {
   return (
     <div className="rounded-xl border border-[#102c3d]/[0.06] bg-[#fbfcfb] p-4">
-      <h4 className="text-sm font-semibold text-[#102c3d]">{title}</h4>
+      <div className="flex items-start justify-between gap-3"><h4 className="text-sm font-semibold text-[#102c3d]">{title}</h4>{overdue ? <StatusBadge tone="red">Overdue</StatusBadge> : null}</div>
       {review ? (
         <div className="mt-3 grid gap-1.5 text-xs leading-5 text-[#102c3d]/56">
           <p>Latest: {formatDate(review.reviewDate)}</p>
@@ -881,7 +1140,7 @@ function ReviewCard({ title, review }: { title: string; review: LearnerRecordDet
           <p className="pt-1 text-sm leading-6 text-[#102c3d]/68">{review.summary}</p>
           {review.supportRequired ? <p className="font-semibold text-[#0b6f63]">{review.supportRequired}</p> : null}
         </div>
-      ) : <p className="mt-3 text-xs leading-5 text-[#102c3d]/46">No review has been recorded yet.</p>}
+      ) : <p className="mt-3 text-xs leading-5 text-[#102c3d]/46">{empty}</p>}
     </div>
   );
 }
@@ -926,6 +1185,18 @@ function InlineEmpty({ copy }: { copy: string }) {
   return <div className="rounded-xl border border-dashed border-[#102c3d]/[0.14] bg-[#f8fbfa] px-4 py-6 text-sm font-medium text-[#102c3d]/52">{copy}</div>;
 }
 
+function ActionEmpty({ copy, action, onAction }: { copy: string; action: string; onAction: () => void }) {
+  return <div className="mt-4 flex flex-col items-start justify-between gap-3 rounded-xl border border-dashed border-[#102c3d]/[0.14] bg-[#f8fbfa] px-4 py-5 sm:flex-row sm:items-center"><p className="text-sm font-medium text-[#102c3d]/52">{copy}</p><SecondaryRecordAction onClick={onAction}>{action}</SecondaryRecordAction></div>;
+}
+
+function PrimaryRecordAction({ children, onClick }: { children: ReactNode; onClick: () => void }) {
+  return <button type="button" onClick={onClick} className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white shadow-[0_8px_18px_rgba(16,44,61,0.12)] transition hover:-translate-y-0.5 hover:bg-[#17394d]"><Plus size={14} />{children}</button>;
+}
+
+function SecondaryRecordAction({ children, onClick }: { children: ReactNode; onClick: () => void }) {
+  return <button type="button" onClick={onClick} className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/68 ring-1 ring-[#102c3d]/[0.1] transition hover:bg-[#f8fbfa] hover:text-[#102c3d]"><Plus size={14} />{children}</button>;
+}
+
 function nextActionNarrative(detail: LearnerRecordDetail) {
   if (detail.latestProgress && detail.latestProgress.variancePercentage < -2) {
     return `Actual progress is ${formatProgressVariance(detail.latestProgress.variancePercentage).toLowerCase()} A learner support check-in is recommended.`;
@@ -963,6 +1234,16 @@ function formatDate(value: string | undefined | null) {
   const date = new Date(`${value}T00:00:00`);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(date);
+}
+
+function todayDate() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function activityKey() {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID().replace(/-/g, "")
+    : `${Date.now()}${Math.random().toString(36).slice(2)}`;
 }
 
 function formatDateTime(value: string | undefined | null) {

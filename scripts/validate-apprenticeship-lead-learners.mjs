@@ -38,7 +38,7 @@ async function main() {
     assert(`Learner list includes ${status}`, learners.some((learner) => learner.lifecycleStatus === status), learners.map((learner) => learner.lifecycleStatus));
   }
 
-  assert("Behind-target learner is visible", learners.some((learner) => learner.learner?.name === "Cara Hughes" && learner.progressPosition === "Behind target"), learners);
+  assert("Behind-target learner is visible", learners.some((learner) => learner.learner?.name === "Cara Hughes" && learner.progressPosition === "Significantly behind"), learners);
   assert("Pre-enrolment learner has eligibility next action", learners.some((learner) => learner.learner?.name === "Avery Collins" && /eligibility/i.test(learner.attention?.label ?? "")), learners);
   assert("Achieved learner has completion action recorded or no action required", learners.some((learner) => learner.learner?.name === "Harry Newton" && learner.lifecycleStatus === "achieved"), learners);
 
