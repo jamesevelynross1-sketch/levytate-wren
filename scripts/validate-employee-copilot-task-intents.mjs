@@ -1,5 +1,6 @@
 const baseUrl = (process.argv[2] ?? process.env.LEVYTATE_VALIDATION_BASE_URL ?? "http://localhost:3000").replace(/\/$/, "");
 const betaCode = process.env.LEVYTATE_BETA_CODE?.trim() || "LEVYTATE-BETA";
+let validationRequestCount = 0;
 
 const legacyPhrases = [
   "That adds something useful",
@@ -281,10 +282,12 @@ async function ask(cookie, selectedEmployee, userMessage) {
 }
 
 function request(pathName, cookie = "", init = {}) {
+  validationRequestCount += 1;
   return fetch(`${baseUrl}${pathName}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
+      "x-forwarded-for": `203.0.113.${validationRequestCount}`,
       ...(cookie ? { Cookie: cookie } : {}),
       ...(init.headers ?? {}),
     },

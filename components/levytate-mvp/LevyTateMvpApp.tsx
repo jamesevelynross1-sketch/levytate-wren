@@ -7,6 +7,7 @@ import {
   Building2,
   ChartNoAxesCombined,
   ClipboardCheck,
+  GraduationCap,
   LayoutDashboard,
   LogOut,
   Settings,
@@ -22,8 +23,8 @@ import { DashboardModule, LineManagerHomeModule, SettingsModule } from "@/compon
 import { EarlyAccessModule } from "@/components/levytate-mvp/EarlyAccessModule";
 import { EmployeeApplicationModule, EmployeeHomeModule, EmployeeProgrammeModule } from "@/components/levytate-mvp/EmployeeExperienceModule";
 import { EmployeesModule } from "@/components/levytate-mvp/EmployeesModule";
-import { EnrolmentsModule } from "@/components/levytate-mvp/EnrolmentsModule";
 import { GuidanceCentreModule } from "@/components/levytate-mvp/GuidanceCentreModule";
+import { LearnersModule } from "@/components/levytate-mvp/LearnersModule";
 import { LevyTateStandardsProvider } from "@/components/levytate-mvp/LevyTateStandardsProvider";
 import { MvpWorkspaceProvider, useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { ProviderMatchingModule } from "@/components/levytate-mvp/ProviderMatchingModule";
@@ -40,7 +41,9 @@ const modules = [
   { name: "My Application", icon: ClipboardCheck },
   { name: "My Team", icon: Users },
   { name: "Approvals", icon: ClipboardCheck },
+  { name: "Applications", icon: ClipboardCheck },
   { name: "People", icon: Users },
+  { name: "Learners", icon: GraduationCap },
   { name: "Providers", icon: Building2 },
   { name: "Copilot", icon: Sparkles },
   { name: "Knowledge", icon: BellRing },
@@ -49,7 +52,7 @@ const modules = [
 ] as const satisfies ReadonlyArray<{ name: string; icon: LucideIcon }>;
 
 type ModuleName = (typeof modules)[number]["name"];
-type PeopleView = "Employees" | "Roles" | "Applications" | "Enrolments";
+type PeopleView = "Employees" | "Roles";
 type ProviderView = "Programmes" | "Relationships";
 type SettingsView = "Workspace" | "Early Access";
 
@@ -59,7 +62,9 @@ const modulePermissions = {
   "My Application": "applications:read",
   "My Team": "employees:read",
   Approvals: "applications:read",
+  Applications: "applications:read",
   People: "employees:read",
+  Learners: "learnerLifecycle:read",
   Providers: "providers:read",
   Copilot: "copilot:use",
   Knowledge: "knowledge:read",
@@ -70,8 +75,6 @@ const modulePermissions = {
 const peopleViewPermissions = {
   Employees: "employees:read",
   Roles: "roles:read",
-  Applications: "applications:read",
-  Enrolments: "enrolments:read",
 } as const satisfies Record<PeopleView, MvpPermission>;
 
 const providerViewPermissions = {
@@ -90,7 +93,9 @@ const moduleCopy: Record<ModuleName, string> = {
   "My Application": "Start, save and track your current apprenticeship application.",
   "My Team": "Direct reports, development status and current application activity.",
   Approvals: "Review direct-report apprenticeship applications and record fair manager decisions.",
-  People: "Employees, roles, applications and enrolments in one guided workspace.",
+  Applications: "Organisation application flow, final approval work and learner handoff readiness.",
+  People: "Employee and role records that shape workforce development decisions.",
+  Learners: "Read-only lifecycle records covering eligibility, enrolment, progress, reviews and completion.",
   Providers: "Programme-first matching, provider evidence and relationship coverage.",
   Copilot: "Use LevyTate Copilot to explain, find, guide and create work inside the platform.",
   Knowledge: "Trusted guidance for funding, readiness, provider selection and future skills.",
@@ -115,14 +120,17 @@ function MvpAppShell() {
   const can = (permission: MvpPermission) => hasMvpPermission(permissions, permission);
   const employeeModules: readonly ModuleName[] = ["Home", "My Programme", "My Application", "Copilot", "Knowledge"];
   const lineManagerModules: readonly ModuleName[] = ["Home", "My Team", "Approvals", "Copilot", "Knowledge"];
+  const apprenticeshipLeadModules: readonly ModuleName[] = ["Home", "People", "Applications", "Learners", "Providers", "Reports", "Copilot", "Knowledge", "Settings"];
   const availableModules = modules.filter((module) => {
     if (meta?.userRole === "Employee" && !employeeModules.includes(module.name)) return false;
     if (meta?.userRole === "Line Manager" && !lineManagerModules.includes(module.name)) return false;
+    if (meta?.userRole === "Apprenticeship Lead" && !apprenticeshipLeadModules.includes(module.name)) return false;
     if (meta?.userRole !== "Employee" && (module.name === "My Programme" || module.name === "My Application")) return false;
     if (meta?.userRole !== "Line Manager" && (module.name === "My Team" || module.name === "Approvals")) return false;
+    if ((meta?.userRole === "Employee" || meta?.userRole === "Line Manager") && (module.name === "Applications" || module.name === "Learners")) return false;
     return can(modulePermissions[module.name]);
   });
-  const peopleItems = (["Employees", "Roles", "Applications", "Enrolments"] as PeopleView[]).filter((item) => can(peopleViewPermissions[item]));
+  const peopleItems = (["Employees", "Roles"] as PeopleView[]).filter((item) => can(peopleViewPermissions[item]));
   const providerItems = (["Programmes", "Relationships"] as ProviderView[]).filter((item) => can(providerViewPermissions[item]));
   const settingsItems = (["Workspace", "Early Access"] as SettingsView[]).filter((item) => can(settingsViewPermissions[item]));
   const moduleBadges = useMemo(() => ({
@@ -174,14 +182,22 @@ function MvpAppShell() {
       openModule("Copilot");
       return;
     }
-    if (target === "Employees" || target === "Roles" || target === "Applications" || target === "Enrolments") {
+    if (target === "Employees" || target === "Roles") {
       if (meta?.userRole === "Line Manager") {
-        openModule(target === "Applications" ? "Approvals" : "My Team");
+        openModule("My Team");
         return;
       }
       if (!peopleItems.includes(target as PeopleView)) return;
       setPeopleView(target as PeopleView);
       openModule("People");
+      return;
+    }
+    if (target === "Applications" || target === "Enrolments") {
+      openModule(meta?.userRole === "Line Manager" ? "Approvals" : "Applications");
+      return;
+    }
+    if (target === "Learners") {
+      openModule("Learners");
       return;
     }
     if (target === "Provider Partners") {
@@ -333,12 +349,12 @@ function MvpAppShell() {
             {activeModule === "Knowledge" ? <GuidanceCentreModule /> : null}
             {activeModule === "My Team" ? <EmployeesModule onStartDiscovery={(employeeId) => { setAiEmployeeId(employeeId); openModule("Copilot"); }} /> : null}
             {activeModule === "Approvals" ? <ApplicationsModule /> : null}
+            {activeModule === "Applications" ? <ApplicationsModule /> : null}
+            {activeModule === "Learners" ? <LearnersModule /> : null}
             {activeModule === "People" ? (
               <ModuleStackNav items={peopleItems} active={peopleView} onSelect={(item) => setPeopleView(item as PeopleView)}>
                 {peopleView === "Employees" ? <EmployeesModule onStartDiscovery={(employeeId) => { setAiEmployeeId(employeeId); openModule("Copilot"); }} /> : null}
                 {peopleView === "Roles" ? <RolesModule /> : null}
-                {peopleView === "Applications" ? <ApplicationsModule /> : null}
-                {peopleView === "Enrolments" ? <EnrolmentsModule /> : null}
               </ModuleStackNav>
             ) : null}
             {activeModule === "Providers" ? (

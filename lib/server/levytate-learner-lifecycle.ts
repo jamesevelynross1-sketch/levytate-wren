@@ -1,4 +1,5 @@
 import type { LevyTateBetaSession } from "@/lib/levytate/config/beta-access";
+import { getApprenticeshipStandard } from "@/lib/levytate/domain";
 import {
   assertLearnerLifecycleTransition,
   calculateLearnerProgressVariance,
@@ -24,6 +25,15 @@ import {
   type LearnerReview,
   type LearnerWithdrawal,
 } from "@/lib/levytate/mvp/learner-lifecycle";
+import {
+  compareLearnerOperationalPriority,
+  deriveLearnerAttention,
+  deriveProgressPosition,
+  employmentRouteLabel,
+  lifecycleStatusLabel,
+  type LearnerOperationalSummary,
+  type LearnerRecordDetail,
+} from "@/lib/levytate/mvp/learner-record-view";
 import {
   createMvpId,
   nowIso,
@@ -57,6 +67,47 @@ type EmployeeRow = {
   email: string;
   manager_id: string;
   status: string;
+};
+
+type EmployeeViewRow = {
+  id: string;
+  name: string;
+  email: string;
+  job_title: string;
+  role_id: string;
+  manager_id: string;
+  department: string;
+  site: string;
+  status: string;
+};
+
+type ApplicationViewRow = {
+  id: string;
+  employee_id: string;
+  apprenticeship_standard_id: string;
+};
+
+type ProviderViewRow = {
+  provider_id: string;
+  provider_name: string;
+};
+
+type ProviderProgrammeViewRow = {
+  id: string;
+  provider_id: string;
+  programme_name: string;
+  apprenticeship_standard_id: string;
+  linked_standard_id: string | null;
+  linked_standard_ids: unknown;
+  linked_standard_name: string;
+};
+
+type EnrolmentViewRow = {
+  id: string;
+  application_id: string;
+  employee_id: string;
+  provider_id: string;
+  apprenticeship_standard_id: string;
 };
 
 type LearnerRecordRow = {
@@ -685,6 +736,193 @@ export async function getLatestLAndDCheckIn(session: LevyTateBetaSession, learne
 export async function getLearnerLifecycleSummary(session: LevyTateBetaSession, learnerRecordId: string) {
   const collections = await loadLearnerLifecycleCollectionsForRecord(session, learnerRecordId);
   return learnerLifecycleSummaryFromCollections(collections, learnerRecordId);
+}
+
+export async function listOrganisationLearnerLifecycleSummaries(session: LevyTateBetaSession): Promise<LearnerOperationalSummary[]> {
+  const context = await contextForSession(session);
+  assertOrganisationLearnerReadPermission(context);
+  const organisationId = context.organisation.id;
+  const records = await selectMany<LearnerRecordRow>(learnerRecordsTable, organisationId, "record_status=eq.Active", "updated_at.desc");
+  if (!records.length) return [];
+
+  const collections = await loadLearnerLifecycleCollectionsForOrganisation(organisationId, records);
+  const lookups = await loadLearnerRecordLookups(organisationId);
+  return records
+    .map(learnerRecordFromRow)
+    .map((record) => buildLearnerOperationalSummary(record, collections, lookups))
+    .sort(compareLearnerOperationalPriority);
+}
+
+export async function getOrganisationLearnerLifecycleRecordDetail(session: LevyTateBetaSession, learnerRecordId: string): Promise<LearnerRecordDetail> {
+  const context = await contextForSession(session);
+  assertOrganisationLearnerReadPermission(context);
+  const recordRow = await selectOne<LearnerRecordRow>(learnerRecordsTable, new URLSearchParams({
+    select: "*",
+    organisation_id: `eq.${context.organisation.id}`,
+    id: `eq.${learnerRecordId}`,
+    limit: "1",
+  }));
+  if (!recordRow) throw new LevyTateLearnerLifecycleError("Learner record was not found.");
+
+  const record = learnerRecordFromRow(recordRow);
+  const collections = await loadLearnerLifecycleCollectionsForRecord(session, learnerRecordId);
+  const lookups = await loadLearnerRecordLookups(context.organisation.id);
+  const summary = buildLearnerOperationalSummary(record, collections, lookups);
+  return {
+    ...summary,
+    eligibilityDeclaration: collections.eligibilityDeclarations[0] ?? null,
+    preEnrolmentChecks: collections.preEnrolmentChecks[0] ?? null,
+    progressHistory: [...collections.progressUpdates].sort((left, right) => right.updateDate.localeCompare(left.updateDate) || right.createdAt.localeCompare(left.createdAt)),
+    reviewHistory: [...collections.learnerReviews].sort((left, right) => right.reviewDate.localeCompare(left.reviewDate) || right.createdAt.localeCompare(left.createdAt)),
+    breaksInLearning: [...collections.breaksInLearning].sort((left, right) => right.startDate.localeCompare(left.startDate)),
+    withdrawal: collections.withdrawals[0] ?? null,
+    assessmentReadiness: collections.assessmentReadiness[0] ?? null,
+    achievement: collections.achievements[0] ?? null,
+    operationalActions: collections.operationalActions,
+    lifecycleTimeline: collections.lifecycleEvents.map((event) => ({
+      id: event.id,
+      eventType: event.eventType,
+      eventDate: event.eventDate,
+      actorName: event.actorName,
+      summary: event.summary,
+      previousStatus: event.previousStatus,
+      newStatus: event.newStatus,
+    })),
+  };
+}
+
+async function loadLearnerLifecycleCollectionsForOrganisation(
+  organisationId: string,
+  records: LearnerRecordRow[],
+): Promise<LearnerLifecycleCollections> {
+  const recordIds = records.map((record) => record.id);
+  const inFilter = `in.(${recordIds.join(",")})`;
+  const [
+    eligibilityDeclarations,
+    preEnrolmentChecks,
+    breaksInLearning,
+    withdrawals,
+    learnerReviews,
+    progressUpdates,
+    assessmentReadiness,
+    achievements,
+    operationalActions,
+    lifecycleEvents,
+  ] = await Promise.all([
+    selectMany<LearnerEligibilityDeclarationRow>(eligibilityDeclarationsTable, organisationId, `learner_record_id=${inFilter}`, "created_at.desc"),
+    selectMany<LearnerPreEnrolmentChecksRow>(preEnrolmentChecksTable, organisationId, `learner_record_id=${inFilter}`, "updated_at.desc"),
+    selectMany<LearnerBreakInLearningRow>(breaksTable, organisationId, `learner_record_id=${inFilter}`, "start_date.desc"),
+    selectMany<LearnerWithdrawalRow>(withdrawalsTable, organisationId, `learner_record_id=${inFilter}`, "recorded_at.desc"),
+    selectMany<LearnerReviewRow>(reviewsTable, organisationId, `learner_record_id=${inFilter}`, "review_date.desc"),
+    selectMany<LearnerProgressUpdateRow>(progressTable, organisationId, `learner_record_id=${inFilter}`, "update_date.desc"),
+    selectMany<LearnerAssessmentReadinessRow>(assessmentReadinessTable, organisationId, `learner_record_id=${inFilter}`, "updated_at.desc"),
+    selectMany<LearnerAchievementRow>(achievementsTable, organisationId, `learner_record_id=${inFilter}`, "recorded_at.desc"),
+    selectMany<LearnerOperationalActionRow>(operationalActionsTable, organisationId, `learner_record_id=${inFilter}`, "updated_at.desc"),
+    selectMany<LearnerLifecycleEventRow>(lifecycleEventsTable, organisationId, `learner_record_id=${inFilter}`, "created_at.asc"),
+  ]);
+
+  return {
+    learnerRecords: records.map(learnerRecordFromRow),
+    eligibilityDeclarations: eligibilityDeclarations.map(eligibilityDeclarationFromRow),
+    preEnrolmentChecks: preEnrolmentChecks.map(preEnrolmentChecksFromRow),
+    breaksInLearning: breaksInLearning.map(breakFromRow),
+    withdrawals: withdrawals.map(withdrawalFromRow),
+    learnerReviews: learnerReviews.map(reviewFromRow),
+    progressUpdates: progressUpdates.map(progressUpdateFromRow),
+    assessmentReadiness: assessmentReadiness.map(assessmentReadinessFromRow),
+    achievements: achievements.map(achievementFromRow),
+    operationalActions: operationalActions.map(operationalActionFromRow),
+    lifecycleEvents: lifecycleEvents.map(lifecycleEventFromRow),
+  };
+}
+
+async function loadLearnerRecordLookups(organisationId: string) {
+  const [employees, applications, providers, programmes, enrolments] = await Promise.all([
+    selectMany<EmployeeViewRow>(employeesTable, organisationId, "select=id,name,email,job_title,role_id,manager_id,department,site,status", "name.asc"),
+    selectMany<ApplicationViewRow>("levytate_applications", organisationId, "select=id,employee_id,apprenticeship_standard_id", "submitted_at.desc"),
+    selectMany<ProviderViewRow>("levytate_providers", organisationId, "select=provider_id,provider_name", "provider_name.asc"),
+    selectMany<ProviderProgrammeViewRow>("levytate_provider_programmes", organisationId, "select=id,provider_id,programme_name,apprenticeship_standard_id,linked_standard_id,linked_standard_ids,linked_standard_name", "programme_name.asc"),
+    selectMany<EnrolmentViewRow>("levytate_enrolments", organisationId, "select=id,application_id,employee_id,provider_id,apprenticeship_standard_id", "created_at.desc"),
+  ]);
+
+  return { employees, applications, providers, programmes, enrolments };
+}
+
+function buildLearnerOperationalSummary(
+  record: LearnerRecord,
+  collections: LearnerLifecycleCollections,
+  lookups: Awaited<ReturnType<typeof loadLearnerRecordLookups>>,
+): LearnerOperationalSummary {
+  const employee = lookups.employees.find((item) => item.id === record.employeeId);
+  const manager = employee?.manager_id ? lookups.employees.find((item) => item.id === employee.manager_id) : undefined;
+  const application = lookups.applications.find((item) => item.id === record.applicationId);
+  const enrolment = lookups.enrolments.find((item) => item.id === record.enrolmentId || item.application_id === record.applicationId);
+  const programme = lookups.programmes.find((item) => item.id === record.programmeId);
+  const provider = lookups.providers.find((item) => item.provider_id === (record.providerId || programme?.provider_id || enrolment?.provider_id));
+  const standardId = record.programmeId && programme
+    ? programme.linked_standard_id ?? programme.apprenticeship_standard_id ?? stringArray(programme.linked_standard_ids)[0] ?? application?.apprenticeship_standard_id ?? enrolment?.apprenticeship_standard_id ?? ""
+    : application?.apprenticeship_standard_id ?? enrolment?.apprenticeship_standard_id ?? "";
+  const standard = standardId ? getApprenticeshipStandard(standardId) : undefined;
+  const lifecycleSummary = learnerLifecycleSummaryFromCollections(collections, record.id);
+  const progressPosition = deriveProgressPosition(lifecycleSummary?.latestProgress ?? null);
+  const operationalActions = collections.operationalActions.filter((action) => action.learnerRecordId === record.id);
+  const attention = deriveLearnerAttention({
+    lifecycleStatus: record.lifecycleStatus,
+    eligibilityDeclaration: lifecycleSummary?.eligibilityDeclaration ?? null,
+    preEnrolmentChecks: lifecycleSummary?.preEnrolmentChecks ?? null,
+    latestProgress: lifecycleSummary?.latestProgress ?? null,
+    latestProviderReview: lifecycleSummary?.latestProviderReview ?? null,
+    latestLAndDCheckIn: lifecycleSummary?.latestLAndDCheckIn ?? null,
+    activeBreak: lifecycleSummary?.activeBreak ?? null,
+    assessmentReadiness: lifecycleSummary?.assessmentReadiness ?? null,
+    operationalActions,
+  });
+
+  return {
+    learnerRecordId: record.id,
+    learner: {
+      id: employee?.id ?? record.employeeId,
+      name: employee?.name ?? "Unknown learner",
+      email: employee?.email ?? "",
+      jobTitle: employee?.job_title ?? "Role not confirmed",
+      department: employee?.department ?? "Department not confirmed",
+      team: employee?.department ?? "Team not confirmed",
+      site: employee?.site ?? "Site not confirmed",
+      managerName: manager?.name ?? "Line manager not confirmed",
+    },
+    programme: {
+      programmeId: record.programmeId,
+      programmeName: programme?.programme_name ?? standard?.title ?? "Programme not confirmed",
+      apprenticeshipStandardId: standardId,
+      apprenticeshipStandardTitle: programme?.linked_standard_name || standard?.title || standardId || "Standard not confirmed",
+      apprenticeshipStandardReference: standard?.referenceCode ?? standardId,
+      providerId: provider?.provider_id ?? record.providerId,
+      providerName: provider?.provider_name ?? "Provider not confirmed",
+      applicationReference: application?.id ?? record.applicationId,
+    },
+    lifecycleStatus: record.lifecycleStatus,
+    lifecycleStatusLabel: lifecycleStatusLabel(record.lifecycleStatus),
+    employmentRoute: record.employmentRoute,
+    employmentRouteLabel: employmentRouteLabel(record.employmentRoute),
+    expectedStartDate: record.expectedStartDate,
+    actualStartDate: record.actualStartDate,
+    expectedEndDate: record.expectedEndDate,
+    actualEndDate: record.actualEndDate,
+    latestProgress: lifecycleSummary?.latestProgress ?? null,
+    progressPosition,
+    latestProviderReview: lifecycleSummary?.latestProviderReview ?? null,
+    latestLAndDCheckIn: lifecycleSummary?.latestLAndDCheckIn ?? null,
+    latestManagerCheckIn: lifecycleSummary?.latestManagerCheckIn ?? null,
+    activeBreak: lifecycleSummary?.activeBreak ?? null,
+    attention,
+  };
+}
+
+function assertOrganisationLearnerReadPermission(context: LifecycleContext) {
+  assertPermission(context, "learnerLifecycle:read");
+  const role = normaliseMvpUserRole(context.user.role);
+  if (role === "Platform Admin" || role === "Employer Admin" || role === "Apprenticeship Lead") return;
+  throw new LevyTateLearnerLifecyclePermissionError(`${role} cannot access organisation-wide learner records.`);
 }
 
 async function loadLearnerLifecycleCollectionsForRecord(session: LevyTateBetaSession, learnerRecordId: string): Promise<LearnerLifecycleCollections> {
