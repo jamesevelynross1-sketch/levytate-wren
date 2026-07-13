@@ -1,5 +1,5 @@
 create table if not exists public.levytate_operational_actions (
-  organisation_id text not null,
+  organisation_id uuid not null,
   id text not null,
   learner_record_id text not null,
   application_id text not null default '',
@@ -77,7 +77,7 @@ before update on public.levytate_operational_actions
 for each row execute function public.set_current_timestamp_updated_at();
 
 create table if not exists public.levytate_operational_action_events (
-  organisation_id text not null,
+  organisation_id uuid not null,
   id text not null,
   operational_action_id text not null,
   event_type text not null,
