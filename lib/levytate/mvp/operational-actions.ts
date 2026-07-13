@@ -7,6 +7,7 @@ export const operationalActionSourceTypes = [
   "progress_exception",
   "review_due",
   "break_in_learning",
+  "assessment_readiness",
   "operational_communication",
   "manual_system_correction",
 ] as const;
@@ -33,6 +34,14 @@ export const persistentOperationalActionTypes = [
   "record_post_return_review",
   "send_guides",
   "resolve_lifecycle_inconsistency",
+  "confirm_assessment_model",
+  "confirm_assessment_organisation",
+  "complete_assessment_readiness",
+  "obtain_provider_readiness_confirmation",
+  "obtain_manager_readiness_confirmation",
+  "obtain_learner_readiness_confirmation",
+  "record_gateway",
+  "move_learner_to_assessment",
 ] as const;
 
 export type PersistentOperationalActionType = typeof persistentOperationalActionTypes[number];

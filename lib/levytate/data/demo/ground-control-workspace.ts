@@ -960,9 +960,12 @@ function learnerLifecycleData(applications: MvpApplication[]): LearnerLifecycleC
         organisationId: "demo-ground-control",
         learnerRecordId,
         assessmentModel: "end_point_assessment",
+        assessmentModelExplanation: "",
         expectedAssessmentReadinessDate: "2026-06-30",
         actualAssessmentReadinessDate: scenario.lifecycleStatus === "assessment_preparation" ? "" : "2026-06-24",
         gatewayDate: scenario.lifecycleStatus === "assessment_preparation" ? "2026-07-18" : "2026-06-24",
+        expectedAssessmentStartDate: "2026-07-01",
+        assessmentStartDate: scenario.lifecycleStatus === "in_assessment" ? "2026-07-01" : "",
         assessmentStatus: scenario.lifecycleStatus === "assessment_preparation"
           ? "preparing"
           : scenario.lifecycleStatus === "in_assessment"
@@ -971,7 +974,19 @@ function learnerLifecycleData(applications: MvpApplication[]): LearnerLifecycleC
               ? "unsuccessful"
               : "completed",
         assessmentOrganisation: "Independent assessment organisation to confirm",
+        assessmentContact: "",
+        assessmentReference: "",
         assessmentNotes: scenario.lifecycleStatus === "assessment_preparation" ? "Gateway evidence being checked." : "Assessment readiness confirmed by provider and employer.",
+        confirmations: {
+          provider: { type: "provider", status: "confirmed", confirmedDate: "2026-06-20", confirmedBy: "Provider reviewer", recordedOnBehalfOf: "", note: "", evidenceReference: "", updatedBy: "Ground Control L&D", updatedAt },
+          learner: { type: "learner", status: "confirmed", confirmedDate: "2026-06-21", confirmedBy: "Learner", recordedOnBehalfOf: "", note: "", evidenceReference: "", updatedBy: "Ground Control L&D", updatedAt },
+          line_manager: { type: "line_manager", status: "confirmed", confirmedDate: "2026-06-22", confirmedBy: "Line manager", recordedOnBehalfOf: "", note: "", evidenceReference: "", updatedBy: "Ground Control L&D", updatedAt },
+          employer: { type: "employer", status: "confirmed", confirmedDate: "2026-06-23", confirmedBy: "Ground Control L&D", recordedOnBehalfOf: "", note: "", evidenceReference: "", updatedBy: "Ground Control L&D", updatedAt },
+        },
+        readinessConfirmedBy: scenario.lifecycleStatus === "assessment_preparation" ? "" : "Ground Control L&D",
+        readinessConfirmedAt: scenario.lifecycleStatus === "assessment_preparation" ? "" : updatedAt,
+        updatedBy: "Ground Control L&D",
+        version: 1,
         createdAt,
         updatedAt,
       });

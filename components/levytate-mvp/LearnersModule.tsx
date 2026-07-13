@@ -6,6 +6,16 @@ import { EmptyState, FormField, FormGrid, FormSection, FormSelect, FormTagInput,
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { includesSearch, statusTone } from "@/components/levytate-mvp/module-utils";
 import {
+  assessmentConfirmationStatusLabels,
+  assessmentConfirmationTypeLabels,
+  assessmentConfirmationTypes,
+  assessmentModelLabels,
+  assessmentModelUsesGateway,
+  emptyAssessmentReadinessConfirmations,
+  type AssessmentConfirmationStatus,
+  type AssessmentConfirmationType,
+} from "@/lib/levytate/mvp/assessment-readiness";
+import {
   formatProgressVariance,
   deriveProgressPositionFromVariance,
   operationalActionLabel,
@@ -28,6 +38,7 @@ import {
   type LearnerReviewType,
   type LearnerSupportActionType,
   type LearnerBreakReasonCategory,
+  type LearnerAssessmentModel,
 } from "@/lib/levytate/mvp/learner-lifecycle";
 
 type LearnerListResponse = {
@@ -65,7 +76,7 @@ const progressOptions: Array<LearnerProgressPosition | typeof allOption> = [
   "No progress data",
 ];
 
-type LearnerDeepLinkAction = "open_learner" | "complete_pre_enrolment" | "complete_enrolment" | "record_review" | "add_progress" | "manage_break" | "return_learner";
+type LearnerDeepLinkAction = "open_learner" | "complete_pre_enrolment" | "complete_enrolment" | "record_review" | "add_progress" | "manage_break" | "return_learner" | "manage_assessment";
 
 export function LearnersModule({ initialLearnerRecordId = "", initialAction = "open_learner", onDeepLinkConsumed }: { initialLearnerRecordId?: string; initialAction?: LearnerDeepLinkAction; onDeepLinkConsumed?: () => void }) {
   const { can, meta } = useMvpWorkspace();
@@ -326,6 +337,7 @@ function LearnerRecordView({ detail, loading, error, onBack, mayMutatePreEnrolme
   const [reviewFilter, setReviewFilter] = useState<LearnerReviewType | "all">("all");
   const [success, setSuccess] = useState("");
   const [breakMode, setBreakMode] = useState<"start" | "manage" | "update" | "return" | "cancel" | "">("");
+  const [assessmentOpen, setAssessmentOpen] = useState(false);
 
   useEffect(() => {
     if (!detail || initialAction === "open_learner") return;
@@ -334,6 +346,7 @@ function LearnerRecordView({ detail, loading, error, onBack, mayMutatePreEnrolme
     if (initialAction === "add_progress") setActivityMode("progress");
     if (initialAction === "manage_break") setBreakMode("manage");
     if (initialAction === "return_learner") setBreakMode("return");
+    if (initialAction === "manage_assessment") setAssessmentOpen(true);
     onDeepLinkConsumed?.();
   }, [detail, initialAction, onDeepLinkConsumed]);
 
@@ -584,29 +597,14 @@ function LearnerRecordView({ detail, loading, error, onBack, mayMutatePreEnrolme
         ) : <InlineEmpty copy="No breaks in learning have been recorded." />}
       </RecordSection>
 
-      <RecordSection title="Assessment and gateway" eyebrow="Completion path">
-        {detail.assessmentReadiness ? (
-          <div className="grid gap-3 lg:grid-cols-2">
-            <InfoGroup title="Assessment readiness" rows={[
-              ["Assessment model", humanise(detail.assessmentReadiness.assessmentModel)],
-              ["Assessment status", humanise(detail.assessmentReadiness.assessmentStatus)],
-              ["Expected readiness", formatDate(detail.assessmentReadiness.expectedAssessmentReadinessDate) || "Not recorded"],
-              ["Actual readiness", formatDate(detail.assessmentReadiness.actualAssessmentReadinessDate) || "Not recorded"],
-              ["Gateway date", formatDate(detail.assessmentReadiness.gatewayDate) || "Not recorded"],
-              ["Assessment organisation", detail.assessmentReadiness.assessmentOrganisation || "Not confirmed"],
-              ["Notes", detail.assessmentReadiness.assessmentNotes || "No notes recorded"],
-            ]} />
-            {detail.achievement ? <InfoGroup title="Achievement" rows={[
-              ["Expected achievement", formatDate(detail.achievement.expectedAchievementDate) || "Not recorded"],
-              ["Actual achievement", formatDate(detail.achievement.actualAchievementDate) || "Not recorded"],
-              ["Grade", detail.achievement.grade || "No grade recorded"],
-              ["Grade type", detail.achievement.gradeType || "Not recorded"],
-              ["Certificate received", detail.achievement.certificateReceived ? `Yes, ${formatDate(detail.achievement.certificateReceivedDate)}` : "No"],
-              ["Notes", detail.achievement.resultNotes || "No notes recorded"],
-            ]} /> : <InlineEmpty copy="Achievement has not yet been recorded." />}
-          </div>
-        ) : <InlineEmpty copy="Assessment readiness has not yet been recorded." />}
-      </RecordSection>
+      <AssessmentReadinessSection
+        detail={detail}
+        mayMutate={mayMutatePreEnrolment}
+        onManage={() => { setAssessmentOpen(true); setSuccess(""); }}
+        onSaved={(next, message) => { onDetailUpdated(next); setSuccess(message); }}
+      />
+
+      {assessmentOpen ? <AssessmentReadinessWorkflow detail={detail} onClose={() => setAssessmentOpen(false)} onSaved={(next, message) => { onDetailUpdated(next); setSuccess(message); setAssessmentOpen(false); }} /> : null}
 
       <RecordSection title="Operational actions" eyebrow="Communications">
         {detail.operationalActions.length ? (
@@ -640,6 +638,193 @@ function LearnerRecordView({ detail, loading, error, onBack, mayMutatePreEnrolme
       </RecordSection>
     </div>
   );
+}
+
+function AssessmentReadinessSection({ detail, mayMutate, onManage, onSaved }: { detail: LearnerRecordDetail; mayMutate: boolean; onManage: () => void; onSaved: (detail: LearnerRecordDetail, message: string) => void }) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const readiness = detail.assessmentReadiness;
+  const result = detail.assessmentReadinessResult;
+  const eligible = detail.lifecycleStatus === "enrolled" || detail.lifecycleStatus === "assessment_preparation";
+  const nextAction = detail.lifecycleStatus === "enrolled"
+    ? { label: "Move to assessment preparation", route: "assessment-preparation" }
+    : detail.lifecycleStatus === "assessment_preparation" && readiness?.assessmentStatus === "readiness_confirmed"
+      ? { label: "Mark as in assessment", route: "start-assessment" }
+      : detail.lifecycleStatus === "assessment_preparation" && result.readyForAssessment
+        ? { label: "Confirm assessment readiness", route: "confirm-assessment-readiness" }
+        : null;
+
+  async function runAction(route: string) {
+    setSaving(true);
+    setError("");
+    try {
+      const body: Record<string, string> = { expectedActivityVersion: detail.activityVersion, idempotencyKey: activityKey() };
+      if (route === "confirm-assessment-readiness") {
+        body.gatewayDate = readiness?.gatewayDate ?? "";
+      }
+      if (route === "start-assessment") body.assessmentStartDate = readiness?.expectedAssessmentStartDate || todayDate();
+      const response = await fetch(`/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/${route}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      const payload = await response.json() as LearnerMutationResponse;
+      if (!response.ok || !payload.learner) throw new Error(payload.message || "Assessment readiness could not be updated.");
+      onSaved(payload.learner, payload.message || "Assessment readiness updated.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Assessment readiness could not be updated.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <RecordSection title="Assessment and gateway" eyebrow="Completion path">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,0.72fr)_minmax(0,1.28fr)]">
+        <div className="grid content-start gap-3">
+          <div className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">Current assessment status</p>
+                <h4 className="mt-1.5 text-lg font-semibold text-[#102c3d]">{humanise(readiness?.assessmentStatus || "not_started")}</h4>
+              </div>
+              <StatusBadge tone={result.readyForAssessment ? "green" : result.blockingChecks.length ? "red" : "yellow"}>{result.readyForAssessment ? "Ready" : `${result.blockingChecks.length + result.outstandingChecks.length} outstanding`}</StatusBadge>
+            </div>
+            <dl className="mt-4 grid gap-2 text-sm">
+              <AssessmentSummaryRow label="Model" value={readiness ? assessmentModelLabels[readiness.assessmentModel] : "Not yet confirmed"} />
+              <AssessmentSummaryRow label="Organisation" value={readiness?.assessmentOrganisation || "Not recorded"} />
+              <AssessmentSummaryRow label="Expected readiness" value={formatDate(readiness?.expectedAssessmentReadinessDate) || "Not recorded"} />
+              <AssessmentSummaryRow label="Gateway" value={formatDate(readiness?.gatewayDate) || (readiness && !assessmentModelUsesGateway(readiness.assessmentModel) ? "Not required" : "Not recorded")} />
+              <AssessmentSummaryRow label="Assessment start" value={formatDate(readiness?.assessmentStartDate || readiness?.expectedAssessmentStartDate) || "Not recorded"} />
+            </dl>
+          </div>
+          {mayMutate && eligible ? (
+            <div className="rounded-xl border border-[#102c3d]/[0.07] bg-white p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#102c3d]/42">Next action</p>
+              <p className="mt-2 text-sm leading-6 text-[#102c3d]/60">{nextAction ? nextAction.label : "Complete the outstanding readiness checks."}</p>
+              {nextAction ? <button type="button" disabled={saving} onClick={() => void runAction(nextAction.route)} className="mt-3 h-10 w-full rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white transition hover:bg-[#17394d] disabled:opacity-50">{saving ? "Updating" : nextAction.label}</button> : <button type="button" onClick={onManage} className="mt-3 h-10 w-full rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white transition hover:bg-[#17394d]">Complete readiness checks</button>}
+              {nextAction ? <button type="button" onClick={onManage} className="mt-2 h-9 w-full rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/66 ring-1 ring-[#102c3d]/[0.1]">Review readiness details</button> : null}
+              {error ? <p className="mt-3 rounded-lg bg-[#fff0f2] px-3 py-2 text-xs font-semibold text-[#b13b51]">{error}</p> : null}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="grid gap-3">
+          <div className="grid gap-2 sm:grid-cols-2">
+            {result.checks.map((check) => (
+              <div key={check.id} className="rounded-xl border border-[#102c3d]/[0.06] bg-[#fbfcfb] p-3.5">
+                <div className="flex items-start justify-between gap-3"><p className="text-sm font-semibold text-[#102c3d]">{check.label}</p><StatusBadge tone={readinessCheckTone(check.status)}>{check.status}</StatusBadge></div>
+                <p className="mt-1.5 text-xs leading-5 text-[#102c3d]/52">{check.message}</p>
+              </div>
+            ))}
+          </div>
+          {readiness ? (
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+              {assessmentConfirmationTypes.map((type) => {
+                const confirmation = readiness.confirmations[type];
+                return <div key={type} className="rounded-xl border border-[#102c3d]/[0.06] bg-white p-3"><p className="text-xs font-semibold text-[#102c3d]">{assessmentConfirmationTypeLabels[type]}</p><div className="mt-2"><StatusBadge tone={confirmation.status === "confirmed" ? "green" : confirmation.status === "not_confirmed" || confirmation.status === "more_information_required" ? "red" : "yellow"}>{assessmentConfirmationStatusLabels[confirmation.status]}</StatusBadge></div><p className="mt-2 text-xs leading-5 text-[#102c3d]/48">{confirmation.confirmedBy || confirmation.recordedOnBehalfOf || "No confirmer recorded"}</p></div>;
+              })}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </RecordSection>
+  );
+}
+
+type ConfirmationForm = { status: AssessmentConfirmationStatus; confirmedDate: string; confirmedBy: string; recordedOnBehalfOf: string; note: string; evidenceReference: string };
+type AssessmentReadinessFormState = {
+  assessmentModel: LearnerAssessmentModel;
+  assessmentModelExplanation: string;
+  assessmentOrganisation: string;
+  assessmentContact: string;
+  assessmentReference: string;
+  assessmentNotes: string;
+  expectedAssessmentReadinessDate: string;
+  gatewayDate: string;
+  expectedAssessmentStartDate: string;
+  confirmations: Record<AssessmentConfirmationType, ConfirmationForm>;
+};
+
+function AssessmentReadinessWorkflow({ detail, onClose, onSaved }: { detail: LearnerRecordDetail; onClose: () => void; onSaved: (detail: LearnerRecordDetail, message: string) => void }) {
+  const readiness = detail.assessmentReadiness;
+  const empty = emptyAssessmentReadinessConfirmations();
+  const [form, setForm] = useState<AssessmentReadinessFormState>({
+    assessmentModel: readiness?.assessmentModel ?? "not_confirmed",
+    assessmentModelExplanation: readiness?.assessmentModelExplanation ?? "",
+    assessmentOrganisation: readiness?.assessmentOrganisation ?? "",
+    assessmentContact: readiness?.assessmentContact ?? "",
+    assessmentReference: readiness?.assessmentReference ?? "",
+    assessmentNotes: readiness?.assessmentNotes ?? "",
+    expectedAssessmentReadinessDate: readiness?.expectedAssessmentReadinessDate ?? "",
+    gatewayDate: readiness?.gatewayDate ?? "",
+    expectedAssessmentStartDate: readiness?.expectedAssessmentStartDate ?? "",
+    confirmations: Object.fromEntries(assessmentConfirmationTypes.map((type) => {
+      const source = readiness?.confirmations[type] ?? empty[type];
+      return [type, { status: source.status, confirmedDate: source.confirmedDate, confirmedBy: source.confirmedBy, recordedOnBehalfOf: source.recordedOnBehalfOf, note: source.note, evidenceReference: source.evidenceReference }];
+    })) as Record<AssessmentConfirmationType, ConfirmationForm>,
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  function update<K extends keyof Omit<AssessmentReadinessFormState, "confirmations">>(key: K, value: AssessmentReadinessFormState[K]) {
+    setForm((current) => ({ ...current, [key]: value }));
+  }
+  function updateConfirmation<K extends keyof ConfirmationForm>(type: AssessmentConfirmationType, key: K, value: ConfirmationForm[K]) {
+    setForm((current) => ({ ...current, confirmations: { ...current.confirmations, [type]: { ...current.confirmations[type], [key]: value } } }));
+  }
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/assessment-readiness`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...form, expectedActivityVersion: detail.activityVersion }) });
+      const payload = await response.json() as LearnerMutationResponse;
+      if (!response.ok || !payload.learner) throw new Error(payload.message || "Assessment readiness could not be saved.");
+      onSaved(payload.learner, payload.message || "Assessment readiness record saved.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Assessment readiness could not be saved.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <MvpModal title="Manage assessment readiness" eyebrow="Assessment and gateway" onClose={onClose} wide>
+      <form onSubmit={submit} className="grid gap-4">
+        <FormSection title="Assessment route" copy="Confirm the assessment model, organisation and readiness plan. Gateway is required only for end-point assessment.">
+          <FormGrid>
+            <FormSelect label="Assessment model" value={form.assessmentModel} onChange={(value) => update("assessmentModel", value as LearnerAssessmentModel)} options={Object.entries(assessmentModelLabels).map(([value, label]) => ({ value, label }))} required />
+            {form.assessmentModel === "other" ? <FormField label="Other assessment model" value={form.assessmentModelExplanation} onChange={(value) => update("assessmentModelExplanation", value)} required /> : <FormField label="Assessment organisation" value={form.assessmentOrganisation} onChange={(value) => update("assessmentOrganisation", value)} />}
+            {form.assessmentModel === "other" ? <FormField label="Assessment organisation" value={form.assessmentOrganisation} onChange={(value) => update("assessmentOrganisation", value)} /> : null}
+            <FormField label="Assessment contact" value={form.assessmentContact} onChange={(value) => update("assessmentContact", value)} />
+            <FormField label="Registration or reference" value={form.assessmentReference} onChange={(value) => update("assessmentReference", value)} />
+            <FormField label="Expected assessment-readiness date" type="date" value={form.expectedAssessmentReadinessDate} onChange={(value) => update("expectedAssessmentReadinessDate", value)} />
+            {assessmentModelUsesGateway(form.assessmentModel) ? <FormField label="Gateway date" type="date" value={form.gatewayDate} onChange={(value) => update("gatewayDate", value)} /> : null}
+            <FormField label="Expected assessment start date" type="date" value={form.expectedAssessmentStartDate} onChange={(value) => update("expectedAssessmentStartDate", value)} />
+            <FormTextArea label="Assessment notes" value={form.assessmentNotes} onChange={(value) => update("assessmentNotes", value)} wide rows={3} />
+          </FormGrid>
+        </FormSection>
+        <FormSection title="Readiness confirmations" copy="Recording a confirmation on someone else's behalf does not give that person platform access.">
+          <div className="grid gap-3 lg:grid-cols-2">
+            {assessmentConfirmationTypes.map((type) => {
+              const confirmation = form.confirmations[type];
+              return <div key={type} className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4"><p className="mb-3 text-sm font-semibold text-[#102c3d]">{assessmentConfirmationTypeLabels[type]}</p><div className="grid gap-3 sm:grid-cols-2"><FormSelect label="Status" value={confirmation.status} onChange={(value) => updateConfirmation(type, "status", value as AssessmentConfirmationStatus)} options={Object.entries(assessmentConfirmationStatusLabels).map(([value, label]) => ({ value, label }))} /><FormField label="Confirmation date" type="date" value={confirmation.confirmedDate} onChange={(value) => updateConfirmation(type, "confirmedDate", value)} /><FormField label="Confirmed by" value={confirmation.confirmedBy} onChange={(value) => updateConfirmation(type, "confirmedBy", value)} /><FormField label="Recorded on behalf of" value={confirmation.recordedOnBehalfOf} onChange={(value) => updateConfirmation(type, "recordedOnBehalfOf", value)} /><FormField label="Evidence reference" value={confirmation.evidenceReference} onChange={(value) => updateConfirmation(type, "evidenceReference", value)} /><FormTextArea label="Note or reason" value={confirmation.note} onChange={(value) => updateConfirmation(type, "note", value)} rows={2} /></div></div>;
+            })}
+          </div>
+        </FormSection>
+        <FormActions error={error} saving={saving} submit="Save readiness record" onCancel={onClose} />
+      </form>
+    </MvpModal>
+  );
+}
+
+function AssessmentSummaryRow({ label, value }: { label: string; value: string }) {
+  return <div className="grid grid-cols-[8rem_minmax(0,1fr)] gap-3 border-t border-[#102c3d]/[0.05] pt-2 first:border-0 first:pt-0"><dt className="text-xs font-semibold text-[#102c3d]/42">{label}</dt><dd className="text-sm font-semibold text-[#102c3d]/72">{value}</dd></div>;
+}
+
+function readinessCheckTone(status: string) {
+  if (status === "Complete") return "green" as const;
+  if (status === "Blocking") return "red" as const;
+  if (status === "Warning") return "yellow" as const;
+  return "blue" as const;
 }
 
 type ProgressFormState = {

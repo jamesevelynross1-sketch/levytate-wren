@@ -1,4 +1,5 @@
 import { createMvpId, nowIso } from "@/lib/levytate/mvp/workspace";
+import type { AssessmentReadinessConfirmations } from "@/lib/levytate/mvp/assessment-readiness";
 
 export type LearnerLifecycleRecordStatus = "Active" | "Archived";
 
@@ -252,7 +253,17 @@ export type LearnerLifecycleEventType =
   | "progress_updated"
   | "learner_identified_behind_target"
   | "assessment_readiness_updated"
+  | "assessment_model_confirmed"
+  | "assessment_organisation_recorded"
+  | "expected_assessment_readiness_recorded"
+  | "provider_readiness_confirmed"
+  | "learner_readiness_confirmed"
+  | "line_manager_readiness_confirmed"
+  | "employer_readiness_confirmed"
+  | "moved_to_assessment_preparation"
   | "assessment_readiness_confirmed"
+  | "gateway_recorded"
+  | "learner_entered_assessment"
   | "achievement_recorded"
   | "operational_action_completed";
 
@@ -415,12 +426,22 @@ export type LearnerAssessmentReadiness = {
   organisationId: string;
   learnerRecordId: string;
   assessmentModel: LearnerAssessmentModel;
+  assessmentModelExplanation: string;
   expectedAssessmentReadinessDate: string;
   actualAssessmentReadinessDate: string;
   gatewayDate: string;
+  expectedAssessmentStartDate: string;
+  assessmentStartDate: string;
   assessmentStatus: LearnerAssessmentStatus;
   assessmentOrganisation: string;
+  assessmentContact: string;
+  assessmentReference: string;
   assessmentNotes: string;
+  confirmations: AssessmentReadinessConfirmations;
+  readinessConfirmedBy: string;
+  readinessConfirmedAt: string;
+  updatedBy: string;
+  version: number;
   createdAt: string;
   updatedAt: string;
 };

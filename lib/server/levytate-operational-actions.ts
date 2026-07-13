@@ -823,6 +823,7 @@ function workflowActionForAction(actionType: PersistentOperationalAction["action
   if (["add_progress_update", "address_progress_exception"].includes(actionType)) return "add_progress";
   if (actionType === "return_learner") return "return_learner";
   if (["manage_break_in_learning", "confirm_return_date"].includes(actionType)) return "manage_break";
+  if (["confirm_assessment_model", "confirm_assessment_organisation", "complete_assessment_readiness", "obtain_provider_readiness_confirmation", "obtain_manager_readiness_confirmation", "obtain_learner_readiness_confirmation", "record_gateway", "move_learner_to_assessment"].includes(actionType)) return "manage_assessment";
   return "complete_pre_enrolment";
 }
 
@@ -836,6 +837,7 @@ function workflowLabelForAction(actionType: PersistentOperationalAction["actionT
     add_progress: "Add progress update",
     manage_break: "Manage break",
     return_learner: "Return learner",
+    manage_assessment: "Manage assessment readiness",
   }[action];
 }
 
@@ -877,6 +879,14 @@ function actionTitle(item: OperationalItem) {
     record_post_return_review: "Record post-return review",
     send_guides: "Send learner and manager guides",
     resolve_lifecycle_inconsistency: "Resolve lifecycle inconsistency",
+    confirm_assessment_model: "Confirm assessment model",
+    confirm_assessment_organisation: "Confirm assessment organisation",
+    complete_assessment_readiness: "Complete assessment readiness",
+    obtain_provider_readiness_confirmation: "Obtain provider readiness confirmation",
+    obtain_manager_readiness_confirmation: "Obtain manager readiness confirmation",
+    obtain_learner_readiness_confirmation: "Obtain learner readiness confirmation",
+    record_gateway: "Record gateway",
+    move_learner_to_assessment: "Move learner to assessment",
   };
   return `${labels[item.persistentActionType]} for ${item.learnerName}`;
 }

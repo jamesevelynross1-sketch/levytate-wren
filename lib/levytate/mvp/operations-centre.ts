@@ -1,5 +1,6 @@
 import { learnerBreakPolicy, learnerProgressReviewPolicy, learnerReviewTypeLabels, type LearnerReviewType } from "@/lib/levytate/mvp/learner-lifecycle";
 import type { LearnerEnrolmentReadinessCheck, LearnerRecordDetail } from "@/lib/levytate/mvp/learner-record-view";
+import { assessmentModelUsesGateway, assessmentReadinessPolicy, type AssessmentConfirmationType } from "@/lib/levytate/mvp/assessment-readiness";
 import {
   buildOperationalActionSourceKey,
   type OperationalActionSourceType,
@@ -9,9 +10,9 @@ import {
 
 export type OperationalPriorityLevel = "Critical" | "High" | "Medium" | "Low" | "Informational";
 export type OperationalOwnerType = "Employee" | "Line Manager" | "Apprenticeship Lead" | "HR" | "Provider" | "Shared";
-export type OperationalQueueType = "urgent" | "ready_to_enrol" | "reviews" | "progress" | "breaks" | "pre_enrolment";
+export type OperationalQueueType = "urgent" | "ready_to_enrol" | "reviews" | "progress" | "breaks" | "pre_enrolment" | "assessment";
 export type OperationalDueStatus = "Overdue" | "Due today" | "Due soon" | "No due date";
-export type OperationalActionType = "open_learner" | "complete_pre_enrolment" | "complete_enrolment" | "record_review" | "add_progress" | "manage_break" | "return_learner";
+export type OperationalActionType = "open_learner" | "complete_pre_enrolment" | "complete_enrolment" | "record_review" | "add_progress" | "manage_break" | "return_learner" | "manage_assessment";
 
 export const operationsPolicy = {
   reviewApproachingDays: 14,
@@ -29,6 +30,7 @@ export const operationalQueueLabels: Record<OperationalQueueType, string> = {
   progress: "Progress exceptions",
   breaks: "Breaks in Learning",
   pre_enrolment: "Pre-enrolment blockers",
+  assessment: "Assessment readiness",
 };
 
 export const operationalPriorityRanks: Record<OperationalPriorityLevel, number> = {
@@ -142,13 +144,23 @@ type PriorityReason =
   | "review_approaching"
   | "guides_outstanding"
   | "ready_to_enrol"
+  | "assessment_model_missing"
+  | "assessment_organisation_missing"
+  | "assessment_confirmation_outstanding"
+  | "assessment_readiness_approaching"
+  | "assessment_readiness_overdue"
+  | "gateway_approaching"
+  | "ready_for_assessment"
+  | "assessment_start_overdue"
   | "routine";
 
 export function deriveOperationalPriority(reason: PriorityReason, daysOverdue = 0): OperationalPriorityLevel {
   if (["eligibility_not_eligible", "hr_declined", "probation_not_passed", "lifecycle_inconsistent"].includes(reason)) return "Critical";
   if (reason === "break_materially_overdue") return daysOverdue > operationsPolicy.materiallyOverdueBreakReturnDays ? "Critical" : "High";
   if (["significantly_behind", "provider_review_overdue", "support_intervention", "single_enrolment_blocker"].includes(reason)) return "High";
+  if (["assessment_readiness_overdue", "assessment_start_overdue"].includes(reason)) return "High";
   if (["slightly_behind", "check_in_overdue", "progress_overdue", "break_approaching"].includes(reason)) return "Medium";
+  if (["assessment_model_missing", "assessment_organisation_missing", "assessment_confirmation_outstanding", "assessment_readiness_approaching", "gateway_approaching", "ready_for_assessment"].includes(reason)) return "Medium";
   if (["review_approaching", "guides_outstanding"].includes(reason)) return "Low";
   return reason === "ready_to_enrol" ? "Medium" : "Informational";
 }
@@ -201,6 +213,7 @@ export function groupOperationalQueues(items: OperationalItem[]): Record<Operati
     progress: items.filter((item) => item.queueType === "progress"),
     breaks: items.filter((item) => item.queueType === "breaks"),
     pre_enrolment: items.filter((item) => item.queueType === "pre_enrolment"),
+    assessment: items.filter((item) => item.queueType === "assessment"),
   };
 }
 
@@ -306,6 +319,10 @@ function buildLearnerOperationalItems(detail: LearnerRecordDetail, now: Date): O
     items.push(item);
   }
 
+  if (assessmentReadinessPolicy.eligibleStatuses.includes(detail.lifecycleStatus)) {
+    items.push(...buildAssessmentOperationalItems(detail, now));
+  }
+
   return deduplicate(items);
 }
 
@@ -374,6 +391,73 @@ function progressItem(detail: LearnerRecordDetail, queue: "urgent" | "progress",
   item.actualProgress = latest?.actualProgressPercentage;
   item.variance = latest?.variancePercentage;
   item.supportAction = latest?.supportAction ?? "";
+  return item;
+}
+
+function buildAssessmentOperationalItems(detail: LearnerRecordDetail, now: Date) {
+  const items: OperationalItem[] = [];
+  const readiness = detail.assessmentReadiness;
+  if (!readiness || readiness.assessmentModel === "not_confirmed") {
+    items.push(assessmentItem(detail, "assessment_model_missing", "Confirm the assessment model.", "confirm_assessment_model", "assessment-model-confirmed", "", now));
+  }
+  const organisationCheck = detail.assessmentReadinessResult.checks.find((check) => check.id === "assessment-organisation-recorded");
+  if (organisationCheck?.status === "Blocking") {
+    items.push(assessmentItem(detail, "assessment_organisation_missing", organisationCheck.message, "confirm_assessment_organisation", "assessment-organisation-recorded", "", now));
+  }
+
+  const confirmationActions: Record<AssessmentConfirmationType, PersistentOperationalActionType> = {
+    provider: "obtain_provider_readiness_confirmation",
+    learner: "obtain_learner_readiness_confirmation",
+    line_manager: "obtain_manager_readiness_confirmation",
+    employer: "complete_assessment_readiness",
+  };
+  (["provider", "learner", "line_manager", "employer"] as AssessmentConfirmationType[]).forEach((type) => {
+    const confirmation = readiness?.confirmations[type];
+    if (confirmation?.status === "confirmed") return;
+    const label = type === "line_manager" ? "Line Manager" : type[0].toUpperCase() + type.slice(1);
+    items.push(assessmentItem(detail, "assessment_confirmation_outstanding", `${label} readiness confirmation is outstanding.`, confirmationActions[type], `${type}-readiness-confirmation`, readiness?.expectedAssessmentReadinessDate ?? "", now));
+  });
+
+  const readinessDate = readiness?.expectedAssessmentReadinessDate ?? "";
+  if (readinessDate && readiness?.assessmentStatus !== "readiness_confirmed" && readiness?.assessmentStatus !== "in_assessment") {
+    const timing = operationalDueTiming(readinessDate, now);
+    if (timing.daysOverdue > 0 || timing.daysUntil !== null && timing.daysUntil <= assessmentReadinessPolicy.readinessDateApproachingDays) {
+      items.push(assessmentItem(detail, timing.daysOverdue > 0 ? "assessment_readiness_overdue" : "assessment_readiness_approaching", timing.daysOverdue > 0 ? `Assessment readiness is ${timing.daysOverdue} days overdue.` : `Assessment readiness is due ${timing.label.toLowerCase()}.`, "complete_assessment_readiness", "assessment-readiness-date", readinessDate, now));
+    }
+  }
+
+  const gatewayDate = readiness?.gatewayDate ?? "";
+  if (gatewayDate && assessmentModelUsesGateway(readiness?.assessmentModel ?? "not_confirmed") && readiness?.assessmentStatus !== "readiness_confirmed" && readiness?.assessmentStatus !== "in_assessment") {
+    const timing = operationalDueTiming(gatewayDate, now);
+    if (timing.daysOverdue > 0 || timing.daysUntil !== null && timing.daysUntil <= assessmentReadinessPolicy.gatewayDateApproachingDays) {
+      items.push(assessmentItem(detail, timing.daysOverdue > 0 ? "assessment_readiness_overdue" : "gateway_approaching", timing.daysOverdue > 0 ? `Gateway is ${timing.daysOverdue} days overdue.` : `Gateway is due ${timing.label.toLowerCase()}.`, "record_gateway", "gateway-date", gatewayDate, now));
+    }
+  }
+
+  if (detail.lifecycleStatus === "assessment_preparation" && readiness?.assessmentStatus === "readiness_confirmed") {
+    items.push(assessmentItem(detail, "ready_for_assessment", "Readiness is confirmed. Move the learner into assessment.", "move_learner_to_assessment", "ready-to-enter-assessment", readiness.expectedAssessmentStartDate, now));
+  }
+  if (readiness?.expectedAssessmentStartDate && detail.lifecycleStatus !== "in_assessment" && readiness.assessmentStatus === "readiness_confirmed") {
+    const timing = operationalDueTiming(readiness.expectedAssessmentStartDate, now);
+    if (timing.daysOverdue > 0) items.push(assessmentItem(detail, "assessment_start_overdue", `Assessment start is ${timing.daysOverdue} days overdue.`, "move_learner_to_assessment", "assessment-start-overdue", readiness.expectedAssessmentStartDate, now));
+  }
+  return items;
+}
+
+function assessmentItem(
+  detail: LearnerRecordDetail,
+  reasonCode: PriorityReason,
+  reason: string,
+  persistentActionType: PersistentOperationalActionType,
+  sourceCondition: string,
+  dueDate: string,
+  now: Date,
+) {
+  const item = baseItem(detail, "assessment", reasonCode, reason, "manage_assessment", dueDate, now);
+  item.sourceType = "assessment_readiness";
+  item.sourceCondition = `assessment:${sourceCondition}`;
+  item.sourceKey = buildOperationalActionSourceKey(item.learnerRecordId, item.sourceCondition);
+  item.persistentActionType = persistentActionType;
   return item;
 }
 
@@ -514,6 +598,7 @@ function actionLabel(action: OperationalActionType) {
     add_progress: "Add progress update",
     manage_break: "Manage break",
     return_learner: "Return learner",
+    manage_assessment: "Manage assessment readiness",
   };
   return labels[action];
 }

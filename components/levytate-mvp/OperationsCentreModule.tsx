@@ -20,7 +20,7 @@ import {
 type OperationsApiResponse = Partial<OperationsResponse> & { ok?: boolean; message?: string };
 type LearnerAction = { learnerRecordId: string; actionType: OperationalActionType };
 
-const queueOrder: OperationalQueueType[] = ["urgent", "ready_to_enrol", "reviews", "progress", "breaks", "pre_enrolment"];
+const queueOrder: OperationalQueueType[] = ["urgent", "ready_to_enrol", "assessment", "reviews", "progress", "breaks", "pre_enrolment"];
 const dueStatuses: Array<OperationalDueStatus | "All"> = ["All", "Overdue", "Due today", "Due soon", "No due date"];
 
 export function OperationsCentreModule({ onOpenLearner }: { onOpenLearner: (target: LearnerAction) => void }) {
@@ -273,6 +273,7 @@ function queueDescription(queue: OperationalQueueType) {
     progress: "Learners behind target or missing a recent progress update.",
     breaks: "Active breaks, return dates and post-return support.",
     pre_enrolment: "Clear owners and next actions for incomplete enrolment checks.",
+    assessment: "Assessment models, readiness confirmations, gateway dates and entry into assessment.",
   };
   return descriptions[queue];
 }

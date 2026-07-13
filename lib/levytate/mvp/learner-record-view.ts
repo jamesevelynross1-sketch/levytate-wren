@@ -17,6 +17,7 @@ import {
   type LearnerReviewType,
   type LearnerWithdrawal,
 } from "@/lib/levytate/mvp/learner-lifecycle";
+import type { AssessmentReadinessResult } from "@/lib/levytate/mvp/assessment-readiness";
 
 export type LearnerProgressPosition = "Ahead of target" | "On target" | "Slightly behind" | "Significantly behind" | "No progress data";
 export type LearnerAttentionSeverity = "none" | "low" | "medium" | "high";
@@ -77,6 +78,7 @@ export type LearnerRecordDetail = LearnerOperationalSummary & {
   breaksInLearning: LearnerBreakInLearning[];
   withdrawal: LearnerWithdrawal | null;
   assessmentReadiness: LearnerAssessmentReadiness | null;
+  assessmentReadinessResult: AssessmentReadinessResult;
   achievement: {
     expectedAchievementDate: string;
     actualAchievementDate: string;

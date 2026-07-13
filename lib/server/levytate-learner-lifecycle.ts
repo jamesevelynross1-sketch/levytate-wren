@@ -1,6 +1,21 @@
 import type { LevyTateBetaSession } from "@/lib/levytate/config/beta-access";
 import { getApprenticeshipStandard } from "@/lib/levytate/domain";
 import {
+  assessmentConfirmationStatuses,
+  assessmentConfirmationTypes,
+  assessmentModelLabels,
+  assessmentModelUsesGateway,
+  assessmentOrganisationRequired,
+  assessmentReadinessPolicy,
+  deriveAssessmentReadiness,
+  emptyAssessmentReadinessConfirmations,
+  normaliseAssessmentReadinessConfirmations,
+  type AssessmentConfirmationStatus,
+  type AssessmentConfirmationType,
+  type AssessmentReadinessConfirmation,
+  type AssessmentReadinessResult,
+} from "@/lib/levytate/mvp/assessment-readiness";
+import {
   assertLearnerLifecycleTransition,
   calculateLearnerProgressVariance,
   createLearnerLifecycleEvent,
@@ -261,14 +276,31 @@ type LearnerAssessmentReadinessRow = {
   id: string;
   learner_record_id: string;
   assessment_model: LearnerAssessmentReadiness["assessmentModel"];
+  assessment_model_explanation: string;
   expected_assessment_readiness_date: string;
   actual_assessment_readiness_date: string;
   gateway_date: string;
+  expected_assessment_start_date: string;
+  assessment_start_date: string;
   assessment_status: LearnerAssessmentReadiness["assessmentStatus"];
   assessment_organisation: string;
+  assessment_contact: string;
+  assessment_reference: string;
   assessment_notes: string;
+  confirmations: unknown;
+  readiness_confirmed_by: string;
+  readiness_confirmed_at: string;
+  updated_by: string;
+  version: number;
   created_at: string;
   updated_at: string;
+};
+
+type CriticalOperationalActionRow = {
+  source_type: string;
+  description: string;
+  priority: string;
+  status: string;
 };
 
 type LearnerAchievementRow = {
@@ -338,6 +370,7 @@ const assessmentReadinessTable = "levytate_learner_assessment_readiness";
 const achievementsTable = "levytate_learner_achievements";
 const operationalActionsTable = "levytate_learner_operational_actions";
 const lifecycleEventsTable = "levytate_learner_lifecycle_events";
+const persistentOperationalActionsTable = "levytate_operational_actions";
 
 export class LevyTateLearnerLifecycleError extends Error {
   constructor(message: string) {
@@ -496,6 +529,34 @@ export type LearnerActivityMutationResult<T> = {
   record: T;
   learner: LearnerRecordDetail;
   created: boolean;
+};
+
+export type AssessmentReadinessUpdateInput = {
+  expectedActivityVersion?: string;
+  assessmentModel?: LearnerAssessmentReadiness["assessmentModel"];
+  assessmentModelExplanation?: string;
+  assessmentOrganisation?: string;
+  assessmentContact?: string;
+  assessmentReference?: string;
+  assessmentNotes?: string;
+  expectedAssessmentReadinessDate?: string;
+  gatewayDate?: string;
+  expectedAssessmentStartDate?: string;
+  confirmations?: Partial<Record<AssessmentConfirmationType, Partial<AssessmentReadinessConfirmation>>>;
+};
+
+export type AssessmentTransitionInput = {
+  expectedActivityVersion?: string;
+  idempotencyKey: string;
+};
+
+export type ConfirmAssessmentReadinessInput = AssessmentTransitionInput & {
+  actualAssessmentReadinessDate?: string;
+  gatewayDate?: string;
+};
+
+export type StartAssessmentInput = AssessmentTransitionInput & {
+  assessmentStartDate?: string;
 };
 
 export async function createLearnerRecord(
@@ -884,36 +945,124 @@ export async function recordWithdrawal(
   return next;
 }
 
-export async function updateAssessmentReadiness(
+export async function updateAssessmentReadinessDetails(
   session: LevyTateBetaSession,
-  readiness: Omit<LearnerAssessmentReadiness, "id" | "organisationId" | "createdAt" | "updatedAt"> & Partial<Pick<LearnerAssessmentReadiness, "id" | "createdAt">>,
-) {
+  learnerRecordId: string,
+  input: AssessmentReadinessUpdateInput,
+): Promise<LearnerRecordDetail> {
   const context = await contextForSession(session);
   assertPermission(context, "learnerLifecycle:write");
-  await getScopedLearnerRecord(context, readiness.learnerRecordId, "write");
+  const learner = await getScopedLearnerRecord(context, learnerRecordId, "write");
+  assertAssessmentManagementEligible(learner.lifecycleStatus);
+  const collections = await loadLearnerLifecycleCollectionsForRecord(session, learnerRecordId);
+  latestActivityVersionRequired(collections, learner, input.expectedActivityVersion);
+  const current = collections.assessmentReadiness[0] ?? null;
+  const next = buildAssessmentReadinessUpdate(context, learner, current, input);
+  await persistAssessmentReadiness(context, current, next);
+  await emitAssessmentUpdateEvents(context, current, next);
+  await synchroniseLearnerOperationalActions(session, learnerRecordId);
+  return getOrganisationLearnerLifecycleRecordDetail(session, learnerRecordId);
+}
 
+export async function moveLearnerToAssessmentPreparation(
+  session: LevyTateBetaSession,
+  learnerRecordId: string,
+  input: AssessmentTransitionInput,
+): Promise<{ learner: LearnerRecordDetail; created: boolean }> {
+  activityRecordId("assessment-preparation", learnerRecordId, input.idempotencyKey);
+  const context = await contextForSession(session);
+  assertPermission(context, "learnerLifecycle:status");
+  const learner = await getScopedLearnerRecord(context, learnerRecordId, "write");
+  if (learner.lifecycleStatus === "assessment_preparation") {
+    return { learner: await getOrganisationLearnerLifecycleRecordDetail(session, learnerRecordId), created: false };
+  }
+  if (learner.lifecycleStatus !== "enrolled") {
+    throw new LevyTateLearnerLifecycleValidationError("Only an enrolled learner can move to assessment preparation.");
+  }
+  const collections = await loadLearnerLifecycleCollectionsForRecord(session, learnerRecordId);
+  latestActivityVersionRequired(collections, learner, input.expectedActivityVersion);
+  const blockers = await criticalOperationalBlockers(context, learnerRecordId);
+  if (blockers.length) throw new LevyTateLearnerLifecycleValidationError(`Assessment preparation is blocked: ${blockers[0]}`);
+  const current = collections.assessmentReadiness[0] ?? null;
   const timestamp = nowIso();
-  const next: LearnerAssessmentReadiness = {
-    id: readiness.id ?? createMvpId("learner-assessment"),
-    organisationId: context.organisation.id,
-    learnerRecordId: readiness.learnerRecordId,
-    assessmentModel: readiness.assessmentModel,
-    expectedAssessmentReadinessDate: readiness.expectedAssessmentReadinessDate,
-    actualAssessmentReadinessDate: readiness.actualAssessmentReadinessDate,
-    gatewayDate: readiness.gatewayDate,
-    assessmentStatus: readiness.assessmentStatus,
-    assessmentOrganisation: readiness.assessmentOrganisation,
-    assessmentNotes: readiness.assessmentNotes,
-    createdAt: readiness.createdAt ?? timestamp,
-    updatedAt: timestamp,
-  };
+  const next = { ...emptyAssessmentRecord(context, learner, current, timestamp), assessmentStatus: "preparing" as const, updatedBy: context.user.email, updatedAt: timestamp, version: (current?.version ?? 0) + 1 };
+  await persistAssessmentReadiness(context, current, next);
+  await persistLearnerStatus(context, learner, "assessment_preparation");
+  await recordLifecycleEvent(context, learnerRecordId, "moved_to_assessment_preparation", "enrolled", "assessment_preparation", "Learner moved to assessment preparation.", { assessmentStatus: "preparing" });
+  await synchroniseLearnerOperationalActions(session, learnerRecordId);
+  return { learner: await getOrganisationLearnerLifecycleRecordDetail(session, learnerRecordId), created: true };
+}
 
-  await supabaseInsert<LearnerAssessmentReadinessRow>(assertSupabase(), assessmentReadinessTable, [assessmentReadinessToRow(next)], {
-    query: "on_conflict=organisation_id,id",
-    prefer: "resolution=merge-duplicates,return=minimal",
-  });
-  await recordLifecycleEvent(context, next.learnerRecordId, "assessment_readiness_updated", "", "", "Assessment readiness updated.", { assessmentStatus: next.assessmentStatus, gatewayDate: next.gatewayDate });
-  return next;
+export async function confirmLearnerAssessmentReadiness(
+  session: LevyTateBetaSession,
+  learnerRecordId: string,
+  input: ConfirmAssessmentReadinessInput,
+): Promise<{ learner: LearnerRecordDetail; created: boolean }> {
+  activityRecordId("assessment-readiness-confirmation", learnerRecordId, input.idempotencyKey);
+  const context = await contextForSession(session);
+  assertPermission(context, "learnerLifecycle:status");
+  const learner = await getScopedLearnerRecord(context, learnerRecordId, "write");
+  const collections = await loadLearnerLifecycleCollectionsForRecord(session, learnerRecordId);
+  const current = collections.assessmentReadiness[0] ?? null;
+  if (learner.lifecycleStatus === "assessment_preparation" && current?.assessmentStatus === "readiness_confirmed") {
+    return { learner: await getOrganisationLearnerLifecycleRecordDetail(session, learnerRecordId), created: false };
+  }
+  if (learner.lifecycleStatus !== "assessment_preparation") {
+    throw new LevyTateLearnerLifecycleValidationError("Assessment readiness can only be confirmed during assessment preparation.");
+  }
+  latestActivityVersionRequired(collections, learner, input.expectedActivityVersion);
+  if (!current) throw new LevyTateLearnerLifecycleValidationError("Complete the assessment readiness record before confirming readiness.");
+  const timestamp = nowIso();
+  const gatewayDate = input.gatewayDate === undefined ? current.gatewayDate : cleanDate(input.gatewayDate, "gateway date");
+  const actualDate = cleanDate(input.actualAssessmentReadinessDate, "actual assessment-readiness date")
+    || (assessmentModelUsesGateway(current.assessmentModel) && gatewayDate ? gatewayDate : timestamp.slice(0, 10));
+  const candidate: LearnerAssessmentReadiness = { ...current, actualAssessmentReadinessDate: actualDate, gatewayDate, updatedBy: context.user.email, updatedAt: timestamp, version: current.version + 1 };
+  validateAssessmentDates(learner, candidate);
+  const blockers = await criticalOperationalBlockers(context, learnerRecordId);
+  const result = assessmentResultFor(learner, collections, candidate, blockers);
+  if (!result.readyForAssessment) {
+    const issue = result.blockingChecks[0] ?? result.outstandingChecks[0];
+    throw new LevyTateLearnerLifecycleValidationError(issue?.message ?? "Assessment readiness checks are incomplete.");
+  }
+  candidate.assessmentStatus = "readiness_confirmed";
+  candidate.readinessConfirmedBy = context.user.email;
+  candidate.readinessConfirmedAt = timestamp;
+  await persistAssessmentReadiness(context, current, candidate);
+  if (gatewayDate && gatewayDate !== current.gatewayDate) await recordLifecycleEvent(context, learnerRecordId, "gateway_recorded", "", "", `Gateway recorded for ${gatewayDate}.`, { gatewayDate });
+  await recordLifecycleEvent(context, learnerRecordId, "assessment_readiness_confirmed", "assessment_preparation", "assessment_preparation", "Assessment readiness confirmed.", { actualAssessmentReadinessDate: actualDate, gatewayDate, assessmentStatus: "readiness_confirmed" });
+  await synchroniseLearnerOperationalActions(session, learnerRecordId);
+  return { learner: await getOrganisationLearnerLifecycleRecordDetail(session, learnerRecordId), created: true };
+}
+
+export async function startLearnerAssessment(
+  session: LevyTateBetaSession,
+  learnerRecordId: string,
+  input: StartAssessmentInput,
+): Promise<{ learner: LearnerRecordDetail; created: boolean }> {
+  activityRecordId("assessment-start", learnerRecordId, input.idempotencyKey);
+  const context = await contextForSession(session);
+  assertPermission(context, "learnerLifecycle:status");
+  const learner = await getScopedLearnerRecord(context, learnerRecordId, "write");
+  if (learner.lifecycleStatus === "in_assessment") throw new LevyTateLearnerLifecycleConflictError("Learner has already entered assessment.");
+  if (learner.lifecycleStatus !== "assessment_preparation") throw new LevyTateLearnerLifecycleValidationError("Only a learner in assessment preparation can enter assessment.");
+  const collections = await loadLearnerLifecycleCollectionsForRecord(session, learnerRecordId);
+  latestActivityVersionRequired(collections, learner, input.expectedActivityVersion);
+  const current = collections.assessmentReadiness[0] ?? null;
+  if (!current || current.assessmentStatus !== "readiness_confirmed") throw new LevyTateLearnerLifecycleValidationError("Confirm assessment readiness before moving the learner into assessment.");
+  if (current.assessmentModel === "not_confirmed") throw new LevyTateLearnerLifecycleValidationError("Confirm the assessment model before moving the learner into assessment.");
+  if (assessmentModelUsesGateway(current.assessmentModel) && !current.gatewayDate) throw new LevyTateLearnerLifecycleValidationError("Record the gateway date before moving the learner into assessment.");
+  if (assessmentOrganisationRequired(current.assessmentModel) && !current.assessmentOrganisation) throw new LevyTateLearnerLifecycleValidationError("Record the assessment organisation before moving the learner into assessment.");
+  const blockers = await criticalOperationalBlockers(context, learnerRecordId);
+  if (blockers.length) throw new LevyTateLearnerLifecycleValidationError(`Assessment entry is blocked: ${blockers[0]}`);
+  const timestamp = nowIso();
+  const assessmentStartDate = cleanDate(input.assessmentStartDate, "assessment start date") || timestamp.slice(0, 10);
+  const next: LearnerAssessmentReadiness = { ...current, assessmentStatus: "in_assessment", assessmentStartDate, updatedBy: context.user.email, updatedAt: timestamp, version: current.version + 1 };
+  validateAssessmentDates(learner, next);
+  await persistAssessmentReadiness(context, current, next);
+  await persistLearnerStatus(context, learner, "in_assessment");
+  await recordLifecycleEvent(context, learnerRecordId, "learner_entered_assessment", "assessment_preparation", "in_assessment", "Learner marked as in assessment.", { assessmentStartDate, assessmentStatus: "in_assessment" });
+  await synchroniseLearnerOperationalActions(session, learnerRecordId);
+  return { learner: await getOrganisationLearnerLifecycleRecordDetail(session, learnerRecordId), created: true };
 }
 
 export async function recordAchievement(
@@ -1035,7 +1184,9 @@ export async function getOrganisationLearnerLifecycleRecordDetail(session: LevyT
   const record = await getScopedLearnerRecord(context, learnerRecordId, "read");
   const collections = await loadLearnerLifecycleCollectionsForRecord(session, learnerRecordId);
   const lookups = await loadLearnerRecordLookups(context.organisation.id);
-  return buildLearnerRecordDetail(record, collections, lookups);
+  const detail = buildLearnerRecordDetail(record, collections, lookups);
+  detail.assessmentReadinessResult = assessmentResultFor(record, collections, collections.assessmentReadiness[0] ?? null, await criticalOperationalBlockers(context, learnerRecordId));
+  return detail;
 }
 
 function buildLearnerRecordDetail(
@@ -1058,6 +1209,7 @@ function buildLearnerRecordDetail(
     breaksInLearning: [...collections.breaksInLearning].sort((left, right) => right.startDate.localeCompare(left.startDate)),
     withdrawal: collections.withdrawals[0] ?? null,
     assessmentReadiness: collections.assessmentReadiness[0] ?? null,
+    assessmentReadinessResult: assessmentResultFor(record, collections, collections.assessmentReadiness[0] ?? null, []),
     achievement: collections.achievements[0] ?? null,
     operationalActions: collections.operationalActions,
     lifecycleTimeline: collections.lifecycleEvents.map((event) => ({
@@ -1199,6 +1351,218 @@ function readinessFor(
   });
 }
 
+function assessmentResultFor(
+  record: LearnerRecord,
+  collections: LearnerLifecycleCollections,
+  readiness: LearnerAssessmentReadiness | null,
+  criticalOperationalBlockers: string[],
+): AssessmentReadinessResult {
+  return deriveAssessmentReadiness({
+    lifecycleStatus: record.lifecycleStatus,
+    activeBreak: Boolean(collections.breaksInLearning.find((item) => item.status === "active")),
+    programmeId: record.programmeId,
+    providerId: record.providerId,
+    readiness,
+    latestProgress: latestLearnerProgressFromCollections(collections.progressUpdates, record.id),
+    latestProviderReview: latestProviderReviewFromCollections(collections.learnerReviews, record.id),
+    criticalOperationalBlockers,
+  });
+}
+
+function assertAssessmentManagementEligible(status: LearnerLifecycleStatus) {
+  if (!assessmentReadinessPolicy.eligibleStatuses.includes(status)) {
+    throw new LevyTateLearnerLifecycleValidationError("Assessment readiness can only be managed for enrolled learners or learners in assessment preparation.");
+  }
+}
+
+function emptyAssessmentRecord(
+  context: LifecycleContext,
+  learner: LearnerRecord,
+  current: LearnerAssessmentReadiness | null,
+  timestamp: string,
+): LearnerAssessmentReadiness {
+  return current ?? {
+    id: `${learner.id}-assessment-readiness`,
+    organisationId: context.organisation.id,
+    learnerRecordId: learner.id,
+    assessmentModel: "not_confirmed",
+    assessmentModelExplanation: "",
+    expectedAssessmentReadinessDate: "",
+    actualAssessmentReadinessDate: "",
+    gatewayDate: "",
+    expectedAssessmentStartDate: "",
+    assessmentStartDate: "",
+    assessmentStatus: "not_started",
+    assessmentOrganisation: "",
+    assessmentContact: "",
+    assessmentReference: "",
+    assessmentNotes: "",
+    confirmations: emptyAssessmentReadinessConfirmations(),
+    readinessConfirmedBy: "",
+    readinessConfirmedAt: "",
+    updatedBy: context.user.email,
+    version: 0,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+}
+
+function buildAssessmentReadinessUpdate(
+  context: LifecycleContext,
+  learner: LearnerRecord,
+  current: LearnerAssessmentReadiness | null,
+  input: AssessmentReadinessUpdateInput,
+) {
+  const timestamp = nowIso();
+  const base = emptyAssessmentRecord(context, learner, current, timestamp);
+  const next: LearnerAssessmentReadiness = {
+    ...base,
+    assessmentModel: input.assessmentModel === undefined ? base.assessmentModel : input.assessmentModel,
+    assessmentModelExplanation: input.assessmentModelExplanation === undefined ? base.assessmentModelExplanation : cleanText(input.assessmentModelExplanation),
+    assessmentOrganisation: input.assessmentOrganisation === undefined ? base.assessmentOrganisation : cleanText(input.assessmentOrganisation),
+    assessmentContact: input.assessmentContact === undefined ? base.assessmentContact : cleanText(input.assessmentContact),
+    assessmentReference: input.assessmentReference === undefined ? base.assessmentReference : cleanText(input.assessmentReference),
+    assessmentNotes: input.assessmentNotes === undefined ? base.assessmentNotes : cleanText(input.assessmentNotes),
+    expectedAssessmentReadinessDate: input.expectedAssessmentReadinessDate === undefined ? base.expectedAssessmentReadinessDate : cleanDate(input.expectedAssessmentReadinessDate, "expected assessment-readiness date"),
+    gatewayDate: input.gatewayDate === undefined ? base.gatewayDate : cleanDate(input.gatewayDate, "gateway date"),
+    expectedAssessmentStartDate: input.expectedAssessmentStartDate === undefined ? base.expectedAssessmentStartDate : cleanDate(input.expectedAssessmentStartDate, "expected assessment start date"),
+    confirmations: input.confirmations ? updateAssessmentConfirmations(context, base.confirmations, input.confirmations, timestamp) : base.confirmations,
+    updatedBy: context.user.email,
+    updatedAt: timestamp,
+    version: base.version + 1,
+  };
+  assertAllowedValue(next.assessmentModel, assessmentModelLabels, "assessment model");
+  if (next.assessmentModel === "other" && !next.assessmentModelExplanation) {
+    throw new LevyTateLearnerLifecycleValidationError("Explain the assessment model when Other is selected.");
+  }
+  validateAssessmentDates(learner, next);
+  return next;
+}
+
+function updateAssessmentConfirmations(
+  context: LifecycleContext,
+  current: LearnerAssessmentReadiness["confirmations"],
+  updates: NonNullable<AssessmentReadinessUpdateInput["confirmations"]>,
+  timestamp: string,
+) {
+  const next = normaliseAssessmentReadinessConfirmations(current);
+  assessmentConfirmationTypes.forEach((type) => {
+    const update = updates[type];
+    if (!update) return;
+    const status = (update.status ?? next[type].status) as AssessmentConfirmationStatus;
+    if (!assessmentConfirmationStatuses.includes(status)) throw new LevyTateLearnerLifecycleValidationError(`Invalid ${type.replace("_", " ")} readiness confirmation status.`);
+    const confirmation: AssessmentReadinessConfirmation = {
+      ...next[type],
+      status,
+      confirmedDate: update.confirmedDate === undefined ? next[type].confirmedDate : cleanDate(update.confirmedDate, `${type} confirmation date`),
+      confirmedBy: update.confirmedBy === undefined ? next[type].confirmedBy : cleanText(update.confirmedBy),
+      recordedOnBehalfOf: update.recordedOnBehalfOf === undefined ? next[type].recordedOnBehalfOf : cleanText(update.recordedOnBehalfOf),
+      note: update.note === undefined ? next[type].note : cleanText(update.note),
+      evidenceReference: update.evidenceReference === undefined ? next[type].evidenceReference : cleanText(update.evidenceReference),
+      updatedBy: context.user.email,
+      updatedAt: timestamp,
+    };
+    if (status === "confirmed") {
+      if (!confirmation.confirmedDate) throw new LevyTateLearnerLifecycleValidationError(`${type.replace("_", " ")} confirmation date is required.`);
+      if (!confirmation.confirmedBy && !confirmation.recordedOnBehalfOf) throw new LevyTateLearnerLifecycleValidationError(`Record who confirmed ${type.replace("_", " ")} readiness or who it was recorded on behalf of.`);
+      assertOperationalDate(confirmation.confirmedDate, `${type.replace("_", " ")} confirmation date`);
+    }
+    if ((status === "not_confirmed" || status === "more_information_required") && !confirmation.note) {
+      throw new LevyTateLearnerLifecycleValidationError(`A reason is required when ${type.replace("_", " ")} readiness is not confirmed or needs more information.`);
+    }
+    next[type] = confirmation;
+  });
+  return next;
+}
+
+function validateAssessmentDates(learner: LearnerRecord, readiness: LearnerAssessmentReadiness) {
+  const dates: Array<[string, string]> = [
+    [readiness.expectedAssessmentReadinessDate, "Expected assessment-readiness date"],
+    [readiness.actualAssessmentReadinessDate, "Actual assessment-readiness date"],
+    [readiness.gatewayDate, "Gateway date"],
+    [readiness.expectedAssessmentStartDate, "Expected assessment start date"],
+    [readiness.assessmentStartDate, "Assessment start date"],
+  ];
+  dates.forEach(([value, label]) => {
+    if (!value) return;
+    assertValidDate(value, label);
+    assertPlanningDate(value, label);
+    if (learner.actualStartDate) assertDateAfter(value, learner.actualStartDate, label, "actual apprenticeship start date", true);
+  });
+  const latestConfirmationDate = assessmentConfirmationTypes
+    .map((type) => readiness.confirmations[type].status === "confirmed" ? readiness.confirmations[type].confirmedDate : "")
+    .filter(Boolean)
+    .sort()
+    .at(-1) ?? "";
+  const readinessEvidenceDate = [readiness.actualAssessmentReadinessDate, latestConfirmationDate].filter(Boolean).sort().at(-1) ?? "";
+  if (readiness.gatewayDate && readinessEvidenceDate) assertDateAfter(readiness.gatewayDate, readinessEvidenceDate, "Gateway date", "latest readiness evidence date", true);
+  const readinessConfirmationDate = readiness.actualAssessmentReadinessDate || readiness.expectedAssessmentReadinessDate;
+  if (readiness.expectedAssessmentStartDate && readinessConfirmationDate) assertDateAfter(readiness.expectedAssessmentStartDate, readinessConfirmationDate, "Expected assessment start date", "readiness confirmation date", true);
+  if (readiness.assessmentStartDate && readiness.actualAssessmentReadinessDate) assertDateAfter(readiness.assessmentStartDate, readiness.actualAssessmentReadinessDate, "Assessment start date", "actual assessment-readiness date", true);
+}
+
+async function persistAssessmentReadiness(
+  context: LifecycleContext,
+  current: LearnerAssessmentReadiness | null,
+  next: LearnerAssessmentReadiness,
+) {
+  if (!current) {
+    await supabaseInsert<LearnerAssessmentReadinessRow>(assertSupabase(), assessmentReadinessTable, [assessmentReadinessToRow(next)], {
+      query: "on_conflict=organisation_id,id",
+      prefer: "resolution=merge-duplicates,return=minimal",
+    });
+    return;
+  }
+  const query = new URLSearchParams({
+    organisation_id: `eq.${context.organisation.id}`,
+    id: `eq.${current.id}`,
+    version: `eq.${current.version}`,
+  }).toString();
+  const rows = await supabaseUpdate<LearnerAssessmentReadinessRow>(assertSupabase(), assessmentReadinessTable, query, assessmentReadinessToRow(next));
+  if (!rows.length) throw new LevyTateLearnerLifecycleConflictError("This assessment readiness record changed before your update was saved. Refresh and try again.");
+}
+
+async function emitAssessmentUpdateEvents(
+  context: LifecycleContext,
+  current: LearnerAssessmentReadiness | null,
+  next: LearnerAssessmentReadiness,
+) {
+  if (next.assessmentModel !== current?.assessmentModel && next.assessmentModel !== "not_confirmed") {
+    await recordLifecycleEvent(context, next.learnerRecordId, "assessment_model_confirmed", "", "", `Assessment model confirmed as ${assessmentModelLabels[next.assessmentModel]}.`, { assessmentModel: next.assessmentModel });
+  }
+  if (next.assessmentOrganisation && next.assessmentOrganisation !== current?.assessmentOrganisation) {
+    await recordLifecycleEvent(context, next.learnerRecordId, "assessment_organisation_recorded", "", "", `Assessment organisation recorded as ${next.assessmentOrganisation}.`, { assessmentOrganisation: next.assessmentOrganisation });
+  }
+  if (next.expectedAssessmentReadinessDate && next.expectedAssessmentReadinessDate !== current?.expectedAssessmentReadinessDate) {
+    await recordLifecycleEvent(context, next.learnerRecordId, "expected_assessment_readiness_recorded", "", "", `Expected assessment-readiness date recorded for ${next.expectedAssessmentReadinessDate}.`, { expectedAssessmentReadinessDate: next.expectedAssessmentReadinessDate });
+  }
+  if (next.gatewayDate && next.gatewayDate !== current?.gatewayDate) {
+    await recordLifecycleEvent(context, next.learnerRecordId, "gateway_recorded", "", "", `Gateway recorded for ${next.gatewayDate}.`, { gatewayDate: next.gatewayDate });
+  }
+  const eventTypes: Record<AssessmentConfirmationType, LearnerLifecycleEventType> = {
+    provider: "provider_readiness_confirmed",
+    learner: "learner_readiness_confirmed",
+    line_manager: "line_manager_readiness_confirmed",
+    employer: "employer_readiness_confirmed",
+  };
+  for (const type of assessmentConfirmationTypes) {
+    if (next.confirmations[type].status === "confirmed" && current?.confirmations[type].status !== "confirmed") {
+      await recordLifecycleEvent(context, next.learnerRecordId, eventTypes[type], "", "", `${type === "line_manager" ? "Line Manager" : type[0].toUpperCase() + type.slice(1)} readiness confirmed.`, { confirmationType: type, confirmedDate: next.confirmations[type].confirmedDate });
+    }
+  }
+  await recordLifecycleEvent(context, next.learnerRecordId, "assessment_readiness_updated", "", "", "Assessment readiness record updated.", { assessmentStatus: next.assessmentStatus });
+}
+
+async function criticalOperationalBlockers(context: LifecycleContext, learnerRecordId: string) {
+  const rows = await selectMany<CriticalOperationalActionRow>(persistentOperationalActionsTable, context.organisation.id, `learner_record_id=eq.${encodeURIComponent(learnerRecordId)}&priority=eq.Critical&status=in.(open,acknowledged,in_progress)`, "updated_at.desc");
+  return rows.filter((row) => row.source_type !== "assessment_readiness").map((row) => row.description).filter(Boolean);
+}
+
+async function synchroniseLearnerOperationalActions(session: LevyTateBetaSession, learnerRecordId: string) {
+  const { resolveActionsForLearnerConditionChange } = await import("@/lib/server/levytate-operational-actions");
+  await resolveActionsForLearnerConditionChange(session, learnerRecordId);
+}
+
 function assertFreshVersion(currentVersion: string, expectedUpdatedAt: string | undefined) {
   if (!expectedUpdatedAt) return;
   if (currentVersion === expectedUpdatedAt) return;
@@ -1219,6 +1583,7 @@ function latestActivityVersion(record: LearnerRecord, collections: LearnerLifecy
     ...collections.progressUpdates.map((update) => update.createdAt),
     ...collections.learnerReviews.map((review) => review.updatedAt || review.createdAt),
     ...collections.breaksInLearning.map((breakRecord) => breakRecord.updatedAt || breakRecord.recordedAt),
+    ...collections.assessmentReadiness.map((readiness) => readiness.updatedAt),
   ]);
   return `${timestamp}:${collections.progressUpdates.length}:${collections.learnerReviews.length}:${collections.breaksInLearning.length}`;
 }
@@ -2318,12 +2683,22 @@ function assessmentReadinessToRow(readiness: LearnerAssessmentReadiness): Learne
     id: readiness.id,
     learner_record_id: readiness.learnerRecordId,
     assessment_model: readiness.assessmentModel,
+    assessment_model_explanation: readiness.assessmentModelExplanation,
     expected_assessment_readiness_date: nullableDatabaseText(readiness.expectedAssessmentReadinessDate),
     actual_assessment_readiness_date: nullableDatabaseText(readiness.actualAssessmentReadinessDate),
     gateway_date: nullableDatabaseText(readiness.gatewayDate),
+    expected_assessment_start_date: nullableDatabaseText(readiness.expectedAssessmentStartDate),
+    assessment_start_date: nullableDatabaseText(readiness.assessmentStartDate),
     assessment_status: readiness.assessmentStatus,
     assessment_organisation: readiness.assessmentOrganisation,
+    assessment_contact: readiness.assessmentContact,
+    assessment_reference: readiness.assessmentReference,
     assessment_notes: readiness.assessmentNotes,
+    confirmations: readiness.confirmations,
+    readiness_confirmed_by: readiness.readinessConfirmedBy,
+    readiness_confirmed_at: nullableDatabaseText(readiness.readinessConfirmedAt),
+    updated_by: readiness.updatedBy,
+    version: readiness.version,
     created_at: readiness.createdAt,
     updated_at: readiness.updatedAt,
   };
@@ -2335,12 +2710,22 @@ function assessmentReadinessFromRow(row: LearnerAssessmentReadinessRow): Learner
     organisationId: row.organisation_id,
     learnerRecordId: row.learner_record_id,
     assessmentModel: row.assessment_model,
+    assessmentModelExplanation: row.assessment_model_explanation ?? "",
     expectedAssessmentReadinessDate: row.expected_assessment_readiness_date ?? "",
     actualAssessmentReadinessDate: row.actual_assessment_readiness_date ?? "",
     gatewayDate: row.gateway_date ?? "",
+    expectedAssessmentStartDate: row.expected_assessment_start_date ?? "",
+    assessmentStartDate: row.assessment_start_date ?? "",
     assessmentStatus: row.assessment_status,
     assessmentOrganisation: row.assessment_organisation,
+    assessmentContact: row.assessment_contact ?? "",
+    assessmentReference: row.assessment_reference ?? "",
     assessmentNotes: row.assessment_notes,
+    confirmations: normaliseAssessmentReadinessConfirmations(row.confirmations),
+    readinessConfirmedBy: row.readiness_confirmed_by ?? "",
+    readinessConfirmedAt: row.readiness_confirmed_at ?? "",
+    updatedBy: row.updated_by ?? "",
+    version: Number(row.version ?? 1),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
