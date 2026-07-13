@@ -4,6 +4,7 @@ import { AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, ChevronDown, Ci
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { EmptyState, StatusBadge } from "@/components/levytate-mvp/MvpUi";
 import { OperationalActionDetail } from "@/components/levytate-mvp/OperationalActionDetail";
+import { OperationalGovernanceView } from "@/components/levytate-mvp/OperationalGovernanceView";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { operationalActionStatusLabels, type OperationalActionStatus } from "@/lib/levytate/mvp/operational-actions";
 import {
@@ -40,6 +41,7 @@ export function OperationsCentreModule({ onOpenLearner }: { onOpenLearner: (targ
   const [assignment, setAssignment] = useState<"all" | "mine" | "unassigned" | "shared">("all");
   const [moreFilters, setMoreFilters] = useState(false);
   const [selectedActionId, setSelectedActionId] = useState("");
+  const [workspaceView, setWorkspaceView] = useState<"active" | "closed">("active");
   const [refreshKey, setRefreshKey] = useState(0);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({ urgent: true, ready_to_enrol: true });
   const initialSynchronisationPending = useRef(true);
@@ -100,8 +102,13 @@ export function OperationsCentreModule({ onOpenLearner }: { onOpenLearner: (targ
     return <OperationalActionDetail actionId={selectedActionId} onBack={() => setSelectedActionId("")} onOpenAction={setSelectedActionId} onOpenLearner={onOpenLearner} onChanged={() => setRefreshKey((current) => current + 1)} />;
   }
 
+  if (workspaceView === "closed") {
+    return <div className="grid min-w-0 gap-4"><OperationsModeTabs value={workspaceView} onChange={setWorkspaceView} /><OperationalGovernanceView onOpenAction={setSelectedActionId} /></div>;
+  }
+
   return (
     <div className="grid min-w-0 gap-5" data-testid="operations-centre">
+      <OperationsModeTabs value={workspaceView} onChange={setWorkspaceView} />
       <section className="rounded-2xl border border-[#102c3d]/[0.075] bg-white p-5 shadow-[0_16px_42px_rgba(16,44,61,0.045)] sm:p-6">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div className="max-w-2xl">
@@ -165,6 +172,10 @@ export function OperationsCentreModule({ onOpenLearner }: { onOpenLearner: (targ
       ) : null}
     </div>
   );
+}
+
+function OperationsModeTabs({ value, onChange }: { value: "active" | "closed"; onChange: (value: "active" | "closed") => void }) {
+  return <nav className="flex w-fit gap-1 rounded-xl border border-[#102c3d]/[0.07] bg-[#f3f7f5] p-1" aria-label="Operations Centre views">{([['active', 'Active work'], ['closed', 'Closed actions']] as const).map(([id, label]) => <button key={id} type="button" onClick={() => onChange(id)} aria-current={value === id ? "page" : undefined} className={`rounded-lg px-4 py-2 text-xs font-semibold transition ${value === id ? "bg-white text-[#102c3d] shadow-[0_5px_14px_rgba(16,44,61,0.08)]" : "text-[#102c3d]/52 hover:text-[#0b6f63]"}`}>{label}</button>)}</nav>;
 }
 
 function QueueSection({ queue, items, expanded, onToggle, onOpenLearner, onOpenAction }: { queue: OperationalQueueType; items: OperationalItem[]; expanded: boolean; onToggle: () => void; onOpenLearner: (target: LearnerAction) => void; onOpenAction: (actionId: string) => void }) {
