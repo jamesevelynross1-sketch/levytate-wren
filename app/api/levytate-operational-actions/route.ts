@@ -6,6 +6,7 @@ import {
   listOperationalActions,
   synchroniseOrganisationOperationalActions,
 } from "@/lib/server/levytate-operational-actions";
+import { logLevyTateServerError, operationalActionsRefreshError } from "@/lib/server/levytate-safe-api-error";
 
 async function sessionFromCookie() {
   const cookieStore = await cookies();
@@ -40,5 +41,9 @@ export async function POST() {
 
 function actionErrorResponse(error: unknown) {
   const status = error instanceof LevyTateLearnerLifecyclePermissionError ? 403 : 500;
-  return NextResponse.json({ message: status === 403 ? "You do not have access to organisation operational actions." : error instanceof Error ? error.message : "Operational actions are unavailable." }, { status });
+  if (status === 500) {
+    logLevyTateServerError("operational-actions", error);
+    return NextResponse.json(operationalActionsRefreshError, { status });
+  }
+  return NextResponse.json({ message: "You do not have access to organisation operational actions." }, { status });
 }

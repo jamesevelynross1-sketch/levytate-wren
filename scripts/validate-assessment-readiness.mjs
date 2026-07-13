@@ -1,7 +1,7 @@
 const baseUrl = (process.argv[2] ?? "http://localhost:3060").replace(/\/$/, "");
 const betaCode = process.env.LEVYTATE_BETA_CODE || "LEVYTATE-BETA";
-const learnerId = "gc-lifecycle-record-on-track";
-const breakLearnerId = "gc-lifecycle-record-break";
+const learnerId = process.env.LEVYTATE_ASSESSMENT_VALIDATION_LEARNER_ID || "gc-lifecycle-record-on-track";
+const breakLearnerId = process.env.LEVYTATE_ASSESSMENT_VALIDATION_BREAK_LEARNER_ID || "gc-lifecycle-record-break";
 const checks = [];
 const today = dateOffset(0);
 const assessmentStart = dateOffset(7);

@@ -5,6 +5,7 @@ import {
   LevyTateLearnerLifecyclePermissionError,
   LevyTateLearnerLifecycleValidationError,
 } from "@/lib/server/levytate-learner-lifecycle";
+import { logLevyTateServerError } from "@/lib/server/levytate-safe-api-error";
 
 export function lifecycleErrorResponse(error: unknown) {
   const status = error instanceof LevyTateLearnerLifecyclePermissionError
@@ -16,6 +17,11 @@ export function lifecycleErrorResponse(error: unknown) {
         : error instanceof LevyTateLearnerLifecycleError
           ? 404
           : 500;
+
+  if (status === 500) {
+    logLevyTateServerError("learner-lifecycle", error);
+    return NextResponse.json({ error: "learner_lifecycle_update_failed", message: "The learner record could not be updated. Please try again." }, { status });
+  }
 
   const message = status === 403
     ? "You do not have permission to update this learner record."

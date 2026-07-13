@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, ChevronDown, CircleAlert, Clock3, PauseCircle, Search, TrendingDown } from "lucide-react";
+import { AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, ChevronDown, CircleAlert, Clock3, PauseCircle, RefreshCw, Search, TrendingDown } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { EmptyState, StatusBadge } from "@/components/levytate-mvp/MvpUi";
 import { OperationalActionDetail } from "@/components/levytate-mvp/OperationalActionDetail";
@@ -17,7 +17,7 @@ import {
   type OperationsResponse,
 } from "@/lib/levytate/mvp/operations-centre";
 
-type OperationsApiResponse = Partial<OperationsResponse> & { ok?: boolean; message?: string };
+type OperationsApiResponse = Partial<OperationsResponse> & { ok?: boolean; error?: string; message?: string };
 type LearnerAction = { learnerRecordId: string; actionType: OperationalActionType };
 
 const queueOrder: OperationalQueueType[] = ["urgent", "ready_to_enrol", "assessment", "reviews", "progress", "breaks", "pre_enrolment"];
@@ -94,6 +94,11 @@ export function OperationsCentreModule({ onOpenLearner }: { onOpenLearner: (targ
   const hasFilters = Boolean(search.trim()) || priority !== "All" || queue !== "All" || owner !== "All" || dueStatus !== "All" || status !== "All" || actionType !== "All" || learner !== "All" || programme !== "All" || assignment !== "all";
   const nextUpcoming = useMemo(() => data ? queueOrder.flatMap((key) => data.queues[key]).find((item) => item.dueStatus === "Due soon") : undefined, [data]);
 
+  function retryOperations() {
+    initialSynchronisationPending.current = true;
+    setRefreshKey((current) => current + 1);
+  }
+
   if (!authorised) {
     return <EmptyState title="Operations Centre is not available for this role" copy="Organisation-wide learner operations are restricted to Apprenticeship Leads and authorised platform administrators." actionLabel="Return home" onAction={() => window.scrollTo({ top: 0, behavior: "smooth" })} />;
   }
@@ -122,14 +127,14 @@ export function OperationsCentreModule({ onOpenLearner }: { onOpenLearner: (targ
           </div>
         </div>
 
-        <div className="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
-          <SummaryButton label="Needs attention now" value={data?.summary.needsAttentionNow ?? 0} icon={CircleAlert} tone="red" onClick={() => focusQueue("urgent", setQueue, setExpanded)} />
-          <SummaryButton label="Ready to enrol" value={data?.summary.readyToEnrol ?? 0} icon={CheckCircle2} tone="green" onClick={() => focusQueue("ready_to_enrol", setQueue, setExpanded)} />
-          <SummaryButton label="Reviews overdue" value={data?.summary.reviewsOverdue ?? 0} icon={Clock3} tone="yellow" onClick={() => focusQueue("reviews", setQueue, setExpanded)} />
-          <SummaryButton label="Behind target" value={data?.summary.behindTarget ?? 0} icon={TrendingDown} tone="red" onClick={() => focusQueue("progress", setQueue, setExpanded)} />
-          <SummaryButton label="Active breaks" value={data?.summary.activeBreaks ?? 0} icon={PauseCircle} tone="blue" onClick={() => focusQueue("breaks", setQueue, setExpanded)} />
-          <SummaryButton label="Approaching completion" value={data?.summary.approachingAssessmentCompletion ?? 0} icon={CalendarClock} tone="blue" onClick={() => { setQueue("All"); document.getElementById("operations-queues")?.scrollIntoView({ behavior: "smooth" }); }} />
-        </div>
+        {data ? <div className="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
+          <SummaryButton label="Needs attention now" value={data.summary.needsAttentionNow} icon={CircleAlert} tone="red" onClick={() => focusQueue("urgent", setQueue, setExpanded)} />
+          <SummaryButton label="Ready to enrol" value={data.summary.readyToEnrol} icon={CheckCircle2} tone="green" onClick={() => focusQueue("ready_to_enrol", setQueue, setExpanded)} />
+          <SummaryButton label="Reviews overdue" value={data.summary.reviewsOverdue} icon={Clock3} tone="yellow" onClick={() => focusQueue("reviews", setQueue, setExpanded)} />
+          <SummaryButton label="Behind target" value={data.summary.behindTarget} icon={TrendingDown} tone="red" onClick={() => focusQueue("progress", setQueue, setExpanded)} />
+          <SummaryButton label="Active breaks" value={data.summary.activeBreaks} icon={PauseCircle} tone="blue" onClick={() => focusQueue("breaks", setQueue, setExpanded)} />
+          <SummaryButton label="Approaching completion" value={data.summary.approachingAssessmentCompletion} icon={CalendarClock} tone="blue" onClick={() => { setQueue("All"); document.getElementById("operations-queues")?.scrollIntoView({ behavior: "smooth" }); }} />
+        </div> : null}
       </section>
 
       <section className="rounded-2xl border border-[#102c3d]/[0.075] bg-white p-4 shadow-[0_14px_34px_rgba(16,44,61,0.035)]" aria-label="Operations filters">
@@ -150,7 +155,7 @@ export function OperationsCentreModule({ onOpenLearner }: { onOpenLearner: (targ
         {hasFilters ? <button type="button" onClick={() => { setSearch(""); setPriority("All"); setQueue("All"); setOwner("All"); setDueStatus("All"); setStatus("All"); setActionType("All"); setLearner("All"); setProgramme("All"); setAssignment("all"); }} className="mt-3 text-xs font-semibold text-[#0b6f63] hover:text-[#102c3d]">Clear filters</button> : null}
       </section>
 
-      {error ? <div className="rounded-xl border border-[#b13b51]/10 bg-[#fff0f2] px-4 py-3 text-sm font-semibold text-[#b13b51]">{error}</div> : null}
+      {error ? <div className="flex flex-col gap-3 rounded-xl border border-[#b13b51]/10 bg-[#fff0f2] px-4 py-3 sm:flex-row sm:items-center sm:justify-between" role="alert"><p className="text-sm font-semibold text-[#b13b51]">{error}</p><button type="button" onClick={retryOperations} disabled={loading} className="inline-flex h-9 w-fit items-center justify-center gap-2 rounded-full bg-white px-4 text-xs font-semibold text-[#b13b51] shadow-[0_6px_16px_rgba(177,59,81,0.08)] ring-1 ring-[#b13b51]/10 transition hover:bg-[#fff8f9] disabled:cursor-wait disabled:opacity-60"><RefreshCw size={14} className={loading ? "animate-spin" : ""} aria-hidden="true" />Retry</button></div> : null}
       {loading && !data ? <div className="rounded-2xl border border-[#102c3d]/[0.07] bg-white px-5 py-12 text-center text-sm font-semibold text-[#102c3d]/52">Prioritising live learner records.</div> : null}
 
       {data ? (

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie, readLevyTateBetaSession } from "@/lib/levytate/config/beta-access";
 import { LevyTateLearnerLifecycleError, LevyTateLearnerLifecyclePermissionError } from "@/lib/server/levytate-learner-lifecycle";
 import { getOrganisationOperationsSummary, type OperationsQuery } from "@/lib/server/levytate-operations";
+import { logLevyTateServerError, operationalActionsRefreshError } from "@/lib/server/levytate-safe-api-error";
 
 async function getSession() {
   const cookieStore = await cookies();
@@ -41,11 +42,13 @@ export async function GET(request: Request) {
       : error instanceof LevyTateLearnerLifecycleError
         ? 404
         : 500;
+    if (status === 500) {
+      logLevyTateServerError("operations-summary", error);
+      return NextResponse.json(operationalActionsRefreshError, { status });
+    }
     const message = status === 403
       ? "You do not have access to organisation operations."
-      : status === 404
-        ? "Operations data was not found."
-        : error instanceof Error ? error.message : "Operations data is temporarily unavailable.";
+      : "Operations data was not found.";
     return NextResponse.json({ message }, { status });
   }
 }

@@ -18,6 +18,7 @@ import {
   type OperationalActionCancellationKind,
   type OperationalActionDismissalKind,
 } from "@/lib/server/levytate-operational-actions";
+import { logLevyTateServerError } from "@/lib/server/levytate-safe-api-error";
 
 type RouteContext = { params: Promise<{ actionId: string }> };
 
@@ -89,5 +90,14 @@ function actionErrorResponse(error: unknown) {
       : error instanceof LevyTateOperationalActionError
         ? 400
         : 500;
-  return NextResponse.json({ message: status === 403 ? "You do not have access to that operational action." : error instanceof Error ? error.message : "Operational action update failed." }, { status });
+  if (status === 500) {
+    logLevyTateServerError("operational-action-detail", error);
+    return NextResponse.json({ error: "operational_action_update_failed", message: "The operational action could not be updated. Please try again." }, { status });
+  }
+  const message = status === 403
+    ? "You do not have access to that operational action."
+    : error instanceof Error
+      ? error.message
+      : "Operational action update failed.";
+  return NextResponse.json({ message }, { status });
 }
