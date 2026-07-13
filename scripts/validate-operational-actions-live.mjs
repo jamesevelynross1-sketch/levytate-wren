@@ -24,15 +24,47 @@ async function main() {
   check("Ground Control learner seed exists", Boolean(seedRecord));
 
   try {
+    const today = new Date().toISOString().slice(0, 10);
+    const expectedEnd = new Date();
+    expectedEnd.setUTCFullYear(expectedEnd.getUTCFullYear() + 1);
     await insert("levytate_learner_records", {
       ...without(seedRecord, ["id", "application_id", "enrolment_id", "created_at", "updated_at"]),
       id: testId,
       application_id: `${testId}-application`,
       enrolment_id: `${testId}-enrolment`,
-      lifecycle_status: "break_in_learning",
+      lifecycle_status: "pre_enrolment",
+      employment_route: "existing_employee_upskill",
+      expected_start_date: today,
+      actual_start_date: today,
+      expected_end_date: expectedEnd.toISOString().slice(0, 10),
       created_by: leadUser.id,
       updated_by: leadUser.id,
       demonstration_record: true,
+    });
+    await insert("levytate_learner_eligibility_declarations", {
+      organisation_id: leadUser.organisation_id,
+      id: `${testId}-eligibility`,
+      learner_record_id: testId,
+      declaration_wording: "Temporary operational actions validation declaration.",
+      declaration_version: "validation-v1",
+      confirmed: true,
+      confirmed_by_employee: seedRecord.employee_id,
+      confirmed_at: new Date().toISOString(),
+      expected_england_working_hours_percentage: 100,
+      verified_by: leadUser.id,
+      verified_at: new Date().toISOString(),
+      verification_status: "employer_verified",
+    });
+    await insert("levytate_learner_pre_enrolment_checks", {
+      organisation_id: leadUser.organisation_id,
+      id: `${testId}-checks`,
+      learner_record_id: testId,
+      probation_status: "passed",
+      probation_passed_date: today,
+      probation_confirmed_by: leadUser.id,
+      probation_confirmed_at: new Date().toISOString(),
+      hr_approval_status: "awaiting_approval",
+      guides_sent: false,
     });
 
     const [syncOne, syncTwo] = await Promise.all([
@@ -41,15 +73,51 @@ async function main() {
     ]);
     check("Simultaneous synchronisation succeeds", syncOne.status === 200 && syncTwo.status === 200, { syncOne: syncOne.body, syncTwo: syncTwo.body });
 
-    const initial = await listForLearner(leadCookie, testId, true);
-    const activeInitial = initial.filter((action) => ["open", "acknowledged", "in_progress"].includes(action.status));
-    check("Database uniqueness permits one active source action", activeInitial.length === 1, initial);
-    check("Lifecycle inconsistency produces the expected action", activeInitial[0]?.actionType === "resolve_lifecycle_inconsistency", activeInitial[0]);
+    const preEnrolmentInitial = await listForLearner(leadCookie, testId, true);
+    const initialKeys = preEnrolmentInitial.filter((action) => ["open", "acknowledged", "in_progress"].includes(action.status)).map((action) => action.sourceKey);
+    check("Database uniqueness permits one active action per source", new Set(initialKeys).size === initialKeys.length, preEnrolmentInitial);
+    check("HR approval outstanding creates a durable action", preEnrolmentInitial.some((action) => action.actionType === "obtain_hr_approval"), preEnrolmentInitial);
+    check("Guides outstanding creates a durable action", preEnrolmentInitial.some((action) => action.actionType === "send_guides"), preEnrolmentInitial);
 
     const repeat = await requestJson("/api/levytate-operational-actions", leadCookie, { method: "POST" });
     check("Repeated synchronisation creates no duplicate", repeat.status === 200 && repeat.body.result?.created === 0, repeat.body);
 
-    const action = activeInitial[0];
+    await update("levytate_learner_pre_enrolment_checks", { organisation_id: `eq.${leadUser.organisation_id}`, learner_record_id: `eq.${testId}` }, {
+      hr_approval_status: "approved",
+      hr_approved_date: today,
+      hr_approved_by: leadUser.id,
+      guides_sent: true,
+      guides_sent_date: today,
+      guides_sent_by: leadUser.id,
+      guides_version: "validation-v1",
+    });
+    const readinessSync = await requestJson("/api/levytate-operational-actions", leadCookie, { method: "POST" });
+    check("Pre-enrolment resolution synchronises successfully", readinessSync.status === 200, readinessSync.body);
+    const readyActions = await listForLearner(leadCookie, testId, true);
+    check("Resolved HR and Guides actions complete automatically", ["obtain_hr_approval", "send_guides"].every((type) => readyActions.some((action) => action.actionType === type && action.status === "completed")), readyActions);
+    const readyAction = readyActions.find((action) => action.actionType === "complete_enrolment" && action.status === "open");
+    check("Ready to enrol creates one durable action", Boolean(readyAction), readyActions);
+
+    await update("levytate_learner_records", { organisation_id: `eq.${leadUser.organisation_id}`, id: `eq.${testId}` }, {
+      lifecycle_status: "enrolled",
+      updated_by: leadUser.id,
+    });
+    const enrolledSync = await requestJson("/api/levytate-operational-actions", leadCookie, { method: "POST" });
+    check("Enrolment resolution synchronises successfully", enrolledSync.status === 200, enrolledSync.body);
+    const enrolledActions = await listForLearner(leadCookie, testId, true);
+    check("Ready-to-enrol action completes after enrolment", enrolledActions.some((action) => action.id === readyAction.id && action.status === "completed"), enrolledActions);
+
+    await update("levytate_learner_records", { organisation_id: `eq.${leadUser.organisation_id}`, id: `eq.${testId}` }, {
+      lifecycle_status: "break_in_learning",
+      updated_by: leadUser.id,
+    });
+    const inconsistencySync = await requestJson("/api/levytate-operational-actions", leadCookie, { method: "POST" });
+    check("Lifecycle inconsistency synchronises successfully", inconsistencySync.status === 200, inconsistencySync.body);
+    const initial = await listForLearner(leadCookie, testId, true);
+    const activeInitial = initial.filter((action) => ["open", "acknowledged", "in_progress"].includes(action.status));
+    const action = activeInitial.find((item) => item.actionType === "resolve_lifecycle_inconsistency");
+    check("Lifecycle inconsistency produces the expected action", Boolean(action), initial);
+
     const acknowledged = await patchAction(leadCookie, action.id, { command: "acknowledge", expectedVersion: action.version });
     check("Acknowledgement persists actor-derived state", acknowledged.status === 200 && acknowledged.body.action?.status === "acknowledged", acknowledged.body);
     const duplicateAcknowledgement = await patchAction(leadCookie, action.id, { command: "acknowledge", expectedVersion: action.version });

@@ -8,7 +8,14 @@ async function main() {
   const body = await safeJson(response);
   check("Apprenticeship Lead can read Operations Centre", response.status === 200, body);
   check("Operations source is live Supabase", body.source === "supabase", body);
-  check("Ready-to-enrol queue contains Jules Mercer", body.queues?.ready_to_enrol?.some((item) => item.learnerName === "Jules Mercer" && item.actionType === "complete_enrolment"), body.queues?.ready_to_enrol);
+  const readyToEnrol = body.queues?.ready_to_enrol ?? [];
+  const readyLearners = new Set(readyToEnrol.map((item) => item.learnerRecordId));
+  check(
+    "Ready-to-enrol summary matches current lifecycle conditions",
+    body.summary?.readyToEnrol === readyLearners.size
+      && readyToEnrol.every((item) => item.actionType === "complete_enrolment" && item.sourceCondition === "ready_to_enrol"),
+    { summary: body.summary, readyToEnrol },
+  );
   check("HR blocker is visible for Avery Collins", body.queues?.pre_enrolment?.some((item) => item.learnerName === "Avery Collins" && item.ownerType === "HR" && /HR approval/i.test(item.reason)), body.queues?.pre_enrolment);
   check("Significantly behind learner is prioritised", body.queues?.urgent?.some((item) => item.learnerName === "Cara Hughes" && item.priorityLevel === "High"), body.queues?.urgent);
   check("Provider review overdue is visible", body.queues?.reviews?.some((item) => item.learnerName === "Cara Hughes" && item.reviewType === "Provider review" && item.dueStatus === "Overdue"), body.queues?.reviews);
@@ -17,7 +24,7 @@ async function main() {
   check("Post-return review is visible", body.queues?.breaks?.some((item) => item.learnerName === "Ben Marshall" && /Post-return review/i.test(item.reason)), body.queues?.breaks);
   check("Recent activity is bounded and meaningful", Array.isArray(body.recentActivity) && body.recentActivity.length <= 12 && body.recentActivity.every((item) => item.learnerName && item.action && item.eventDate), body.recentActivity);
   check("Urgent queue is priority ordered", isPriorityOrdered(body.queues?.urgent ?? []), body.queues?.urgent);
-  check("Operational items contain the server contract", Object.values(body.queues ?? {}).flat().every((item) => ["priorityLevel", "priorityRank", "reason", "dueDate", "daysOverdue", "ownerType", "actionType", "actionUrl"].every((key) => key in item)), body.queues);
+  check("Operational items contain the server contract", Object.values(body.queues ?? {}).flat().every((item) => ["priorityLevel", "priorityRank", "reason", "dueDate", "daysOverdue", "ownerType", "actionType", "actionUrl", "sourceKey", "sourceCondition", "persistentActionId", "persistentActionStatus"].every((key) => key in item)), body.queues);
   check("Operational response does not expose sensitive break notes", !JSON.stringify(body).includes("Temporary break while operational cover is stabilised"), body.queues?.breaks);
   check("Every primary action links to an existing learner workflow", Object.values(body.queues ?? {}).flat().every((item) => item.actionUrl?.startsWith("/levytate/app?module=Learners&learner=")), body.queues);
 
