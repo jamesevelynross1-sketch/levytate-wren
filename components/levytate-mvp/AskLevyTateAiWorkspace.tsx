@@ -49,13 +49,15 @@ const roleContent: Record<AssistantRole, { purpose: string; welcome: string; pro
     ],
   },
   "Apprenticeship Lead": {
-    purpose: "Review approvals, explain programme fit and prepare controlled provider matching work.",
-    welcome: "I can help you explain recommendations, compare provider relationships, review final approvals and prepare controlled provider matching requests using LevyTate data.",
+    purpose: "Understand programme activity, investigate learner exceptions and take the next authorised operational action.",
+    welcome: "Ask a programme question and I will answer from current LevyTate learner, review, readiness and operational-action records.",
     prompts: [
-      "Show final approvals",
-      "Help me add Primary Goal",
-      "Find AI programmes",
-      "Generate a provider matching summary",
+      "Show learners behind target",
+      "Which reviews are overdue?",
+      "Who is ready to enrol?",
+      "What needs my attention today?",
+      "Which learners are approaching assessment?",
+      "Show my open actions",
     ],
   },
   "LevyTate Admin": {
@@ -738,6 +740,9 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate }:
         : undefined,
       workspaceEmployeeContext: resolvedContext.workspaceEmployeeContext,
       preferredStandardId: developmentProfile?.preferredStandardId || (activeRole === "Employee" ? selectedDevelopmentProfile?.preferredStandardId || undefined : undefined),
+      operationalContext: activeRole === "Apprenticeship Lead" || activeRole === "LevyTate Admin"
+        ? latestResponse?.operationalContext
+        : undefined,
     };
 
     setConversations((current) => ({ ...current, [activeRole]: nextMessages }));
@@ -901,7 +906,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate }:
                 </span>
               ) : null}
               <span className="rounded-full bg-[#edf7f3] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#0b6f63]">
-                {latestResponse?.source === "openai" ? "Live Copilot" : "Guided mode"}
+                {latestResponse?.structuredResult ? "Live LevyTate data" : latestResponse?.source === "openai" ? "Live Copilot" : "Guided mode"}
               </span>
             </div>
           </div>
@@ -909,7 +914,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate }:
           <div className="flex-1 space-y-4 overflow-y-auto bg-[#f8fbfa] px-4 py-5 sm:px-5" aria-live="polite">
             {messages.map((message) => (
               <article key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[92%] rounded-2xl px-4 py-3 text-sm leading-6 shadow-[0_8px_20px_rgba(16,44,61,0.04)] sm:max-w-[82%] ${message.role === "user" ? "bg-[#102c3d] text-white" : "bg-white text-[#102c3d]/72 ring-1 ring-[#102c3d]/[0.06]"}`}>
+                <div className={`${message.response?.structuredResult ? "w-full max-w-full" : "max-w-[92%] sm:max-w-[82%]"} rounded-2xl px-4 py-3 text-sm leading-6 shadow-[0_8px_20px_rgba(16,44,61,0.04)] ${message.role === "user" ? "bg-[#102c3d] text-white" : "bg-white text-[#102c3d]/72 ring-1 ring-[#102c3d]/[0.06]"}`}>
                   <p className="whitespace-pre-wrap">{message.content}</p>
                   {message.response ? (
                     <InlineResponse
@@ -1195,12 +1200,14 @@ function InlineResponse({
   const showActions = (response.shouldShowActions ?? true) && actions.length > 0;
   const showQuickReplies = Boolean(response.quickReplies?.length);
   const showWarning = Boolean(response.applicationWarning);
+  const showStructuredResult = Boolean(response.structuredResult);
 
-  if (!showPathways && !showActions && !showQuickReplies && !showWarning) return null;
+  if (!showPathways && !showActions && !showQuickReplies && !showWarning && !showStructuredResult) return null;
 
   return (
     <div className="mt-4 grid gap-3 border-t border-[#102c3d]/[0.07] pt-4">
       {showWarning ? <p className="rounded-xl bg-[#fff9dc] px-3 py-2 text-xs leading-5 text-[#765f00]">{response.applicationWarning}</p> : null}
+      {response.structuredResult ? <CopilotStructuredResultView result={response.structuredResult} /> : null}
       {showPathways ? (
         <InlineRecommendationTrust
           response={response}
@@ -1226,6 +1233,74 @@ function InlineResponse({
           ))}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function CopilotStructuredResultView({ result }: { result: NonNullable<LevyTateAiResponse["structuredResult"]> }) {
+  const hasRows = result.rows.length > 0;
+  const evaluated = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(result.evaluatedAt));
+  return (
+    <section className="overflow-hidden rounded-xl bg-[#f8fbfa] ring-1 ring-[#102c3d]/[0.07]" aria-label={result.title}>
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#102c3d]/[0.06] px-3 py-3">
+        <div>
+          <p className="text-xs font-semibold text-[#102c3d]">{result.title}</p>
+          <p className="mt-1 text-[11px] leading-4 text-[#102c3d]/48">{result.totalCount} result{result.totalCount === 1 ? "" : "s"}{result.truncated ? `, showing ${result.rows.length}` : ""}</p>
+        </div>
+        <div className="text-right">
+          <span className="inline-flex rounded-full bg-[#e8f6f1] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#0b6f63]">{result.dataLabel}</span>
+          <p className="mt-1 text-[10px] text-[#102c3d]/38">As of {evaluated}</p>
+        </div>
+      </div>
+      {hasRows ? (
+        <>
+          <div className="hidden max-w-full overflow-x-auto md:block">
+            <table className="w-full min-w-[720px] border-collapse text-left text-xs">
+              <thead className="bg-white text-[10px] font-semibold uppercase tracking-[0.1em] text-[#102c3d]/42">
+                <tr>{result.columns.map((column) => <th key={column.key} className={`px-3 py-2.5 ${column.align === "right" ? "text-right" : "text-left"}`}>{column.label}</th>)}<th className="px-3 py-2.5 text-right">Action</th></tr>
+              </thead>
+              <tbody className="divide-y divide-[#102c3d]/[0.055]">
+                {result.rows.map((row) => (
+                  <tr key={row.key} className="bg-[#f8fbfa] align-top">
+                    {result.columns.map((column) => <td key={column.key} className={`max-w-[240px] px-3 py-3 leading-5 text-[#102c3d]/66 ${column.align === "right" ? "text-right font-semibold text-[#102c3d]" : "text-left"}`}>{row.cells[column.key] ?? "Not recorded"}</td>)}
+                    <td className="px-3 py-3 text-right"><ResultActions actions={row.actions} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="grid gap-2 p-3 md:hidden">
+            {result.rows.map((row) => (
+              <article key={row.key} className="rounded-xl bg-white p-3 ring-1 ring-[#102c3d]/[0.06]">
+                <dl className="grid gap-2">
+                  {result.columns.map((column) => (
+                    <div key={column.key} className="grid grid-cols-[110px_minmax(0,1fr)] gap-3 text-xs leading-5">
+                      <dt className="font-semibold text-[#102c3d]/42">{column.label}</dt>
+                      <dd className="min-w-0 break-words text-[#102c3d]/68">{row.cells[column.key] ?? "Not recorded"}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <div className="mt-3"><ResultActions actions={row.actions} /></div>
+              </article>
+            ))}
+          </div>
+        </>
+      ) : <p className="px-3 py-4 text-xs leading-5 text-[#102c3d]/58">{result.emptyMessage}</p>}
+      {result.interpretation || result.viewAllUrl ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#102c3d]/[0.06] bg-white px-3 py-3">
+          {result.interpretation ? <p className="max-w-2xl text-[11px] leading-5 text-[#102c3d]/50">{result.interpretation}</p> : <span />}
+          {result.viewAllUrl ? <a href={result.viewAllUrl} className="text-xs font-semibold text-[#0b6f63] hover:underline">View all results</a> : null}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function ResultActions({ actions }: { actions: Array<{ label: string; url: string }> | undefined }) {
+  if (!actions?.length) return <span className="text-[11px] text-[#102c3d]/36">No action</span>;
+  return (
+    <div className="flex flex-wrap justify-end gap-2">
+      {actions.slice(0, 2).map((action) => <a key={`${action.label}-${action.url}`} href={action.url} className="inline-flex rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-[#0b6f63] ring-1 ring-[#159b8f]/[0.16] transition hover:bg-[#edf7f3]">{action.label}</a>)}
     </div>
   );
 }

@@ -235,6 +235,85 @@ export type LevyTateCapabilityFit = {
   weighting: number;
 };
 
+export type LevyTateOperationalCopilotIntent =
+  | "learners_behind_target"
+  | "learners_without_recent_progress"
+  | "learners_ending_before"
+  | "overdue_reviews"
+  | "ready_to_enrol"
+  | "pre_enrolment_blockers"
+  | "active_breaks"
+  | "assessment_readiness"
+  | "operational_actions"
+  | "provider_operational_summary"
+  | "programme_operational_summary"
+  | "access_boundary";
+
+export type LevyTateOperationalCopilotFilters = {
+  progressPosition?: "Slightly behind" | "Significantly behind";
+  dateBefore?: string;
+  reviewType?: "provider_review" | "l_and_d_check_in" | "manager_check_in";
+  provider?: string;
+  programme?: string;
+  owner?: string;
+  status?: string;
+  priority?: string;
+  dueState?: string;
+  actionType?: string;
+  blocker?: string;
+  assessmentState?: "approaching" | "ready" | "all";
+};
+
+export type LevyTateOperationalCopilotContext = {
+  activeIntent: LevyTateOperationalCopilotIntent;
+  filters: LevyTateOperationalCopilotFilters;
+  evaluatedAt: string;
+};
+
+export type LevyTateCopilotResultType =
+  | "learner_results"
+  | "provider_results"
+  | "programme_results"
+  | "operational_action_results"
+  | "summary_metrics"
+  | "no_results"
+  | "clarification_required"
+  | "access_boundary"
+  | "data_unavailable";
+
+export type LevyTateCopilotResultColumn = {
+  key: string;
+  label: string;
+  align?: "left" | "right";
+};
+
+export type LevyTateCopilotResultRow = {
+  key: string;
+  cells: Record<string, string | number | null>;
+  actions?: Array<{ label: string; url: string }>;
+};
+
+export type LevyTateCopilotStructuredResult = {
+  type: LevyTateCopilotResultType;
+  title: string;
+  columns: LevyTateCopilotResultColumn[];
+  rows: LevyTateCopilotResultRow[];
+  totalCount: number;
+  truncated: boolean;
+  interpretation?: string;
+  emptyMessage?: string;
+  viewAllUrl?: string;
+  dataSource: "supabase";
+  dataLabel: "Live LevyTate data";
+  evaluatedAt: string;
+  timings: {
+    intentClassificationMs: number;
+    dataRetrievalMs: number;
+    responsePreparationMs: number;
+    totalMs: number;
+  };
+};
+
 export type LevyTateCareerStage =
   | "Entry"
   | "Operational"
@@ -564,6 +643,7 @@ export type LevyTateAiRequest = {
   employeeDiscovery?: LevyTateEmployeeDiscoveryContext;
   workspaceEmployeeContext?: LevyTateWorkspaceEmployeeContext;
   preferredStandardId?: string;
+  operationalContext?: LevyTateOperationalCopilotContext;
   contextData?: {
     selectedPersona?: PersonaSummary;
     activeApplication?: RequestSummary | null;
@@ -595,6 +675,9 @@ export type LevyTateAiResponse = {
   conversationProfile?: LevyTateConversationProfile;
   messageClassification?: LevyTateMessageClassification;
   recommendationResult?: LevyTateRecommendationResult;
+  executionMode?: "deterministic" | "model_assisted" | "fallback";
+  structuredResult?: LevyTateCopilotStructuredResult;
+  operationalContext?: LevyTateOperationalCopilotContext;
 };
 
 function isConversationMessage(value: unknown): value is LevyTateConversationMessage {
@@ -636,6 +719,58 @@ function cleanStringArray(value: unknown, limit = 8) {
         .slice(0, limit)
         .map((item) => item.trim().slice(0, 180))
     : undefined;
+}
+
+const operationalIntents: LevyTateOperationalCopilotIntent[] = [
+  "learners_behind_target",
+  "learners_without_recent_progress",
+  "learners_ending_before",
+  "overdue_reviews",
+  "ready_to_enrol",
+  "pre_enrolment_blockers",
+  "active_breaks",
+  "assessment_readiness",
+  "operational_actions",
+  "provider_operational_summary",
+  "programme_operational_summary",
+  "access_boundary",
+];
+
+function parseOperationalContext(value: unknown): LevyTateOperationalCopilotContext | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const candidate = value as Partial<LevyTateOperationalCopilotContext>;
+  if (!candidate.activeIntent || !operationalIntents.includes(candidate.activeIntent)) return undefined;
+  const filters = candidate.filters && typeof candidate.filters === "object"
+    ? candidate.filters as LevyTateOperationalCopilotFilters
+    : {};
+  const progressPosition = filters.progressPosition === "Slightly behind" || filters.progressPosition === "Significantly behind"
+    ? filters.progressPosition
+    : undefined;
+  const reviewType = filters.reviewType === "provider_review" || filters.reviewType === "l_and_d_check_in" || filters.reviewType === "manager_check_in"
+    ? filters.reviewType
+    : undefined;
+  const assessmentState = filters.assessmentState === "approaching" || filters.assessmentState === "ready" || filters.assessmentState === "all"
+    ? filters.assessmentState
+    : undefined;
+  const clean = (item: unknown, limit = 160) => typeof item === "string" ? item.trim().slice(0, limit) || undefined : undefined;
+  return {
+    activeIntent: candidate.activeIntent,
+    filters: {
+      progressPosition,
+      dateBefore: clean(filters.dateBefore, 10),
+      reviewType,
+      provider: clean(filters.provider),
+      programme: clean(filters.programme),
+      owner: clean(filters.owner),
+      status: clean(filters.status),
+      priority: clean(filters.priority),
+      dueState: clean(filters.dueState),
+      actionType: clean(filters.actionType),
+      blocker: clean(filters.blocker),
+      assessmentState,
+    },
+    evaluatedAt: typeof candidate.evaluatedAt === "string" ? candidate.evaluatedAt.slice(0, 40) : "",
+  };
 }
 
 const levyTateRoleFamilies: LevyTateRoleFamily[] = [
@@ -1251,6 +1386,7 @@ export function parseLevyTateAiRequest(payload: unknown): LevyTateAiRequest | nu
     employeeDiscovery: parseEmployeeDiscovery(candidate.employeeDiscovery),
     workspaceEmployeeContext: parseWorkspaceEmployeeContext(candidate.workspaceEmployeeContext),
     preferredStandardId: typeof candidate.preferredStandardId === "string" ? candidate.preferredStandardId.trim().slice(0, 120) : undefined,
+    operationalContext: parseOperationalContext(candidate.operationalContext),
     contextData,
   };
 }

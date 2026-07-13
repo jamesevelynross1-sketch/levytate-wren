@@ -31,6 +31,7 @@ import type { LevyTateWorkspaceBootstrap } from "@/lib/levytate/mvp/api";
 import type { MvpApplication, MvpEmployee, MvpEmployeeDevelopmentProfile, MvpRole } from "@/lib/levytate/mvp/workspace";
 import { getWorkspaceBootstrapForSession } from "@/lib/server/levytate-workspace";
 import { getCopilotGuidanceItems } from "@/lib/server/levytate-guidance-sources";
+import { routeOperationalCopilotQuery } from "@/lib/server/levytate-copilot-tools";
 
 const requestWindowMs = 5 * 60 * 1000;
 const duplicateWindowMs = 1_500;
@@ -165,14 +166,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Invalid LevyTate Copilot request payload." }, { status: 400 });
     }
 
+    if (isRateLimited(rateLimitKey(request), parsedRequest.userMessage)) {
+      return NextResponse.json({ message: "Please wait a moment before asking another question." }, { status: 429 });
+    }
+
+    const operationalResponse = await routeOperationalCopilotQuery(session, parsedRequest);
+    if (operationalResponse) return NextResponse.json(operationalResponse);
+
     const workspace = await getWorkspaceBootstrapForSession(session);
     parsedRequest = sanitiseCopilotRequest(parsedRequest, workspace);
 
     parsedRequest = withConversationMemory(parsedRequest);
-
-    if (isRateLimited(rateLimitKey(request), parsedRequest.userMessage)) {
-      return NextResponse.json({ message: "Please wait a moment before asking another question." }, { status: 429 });
-    }
 
     const fallback = buildGroundedFallback(parsedRequest);
     if (isDeterministicEmployeeStateResponse(parsedRequest, fallback)) {
