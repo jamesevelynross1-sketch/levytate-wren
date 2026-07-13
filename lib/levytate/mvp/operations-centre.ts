@@ -80,6 +80,8 @@ export type OperationalItem = {
   persistentDetectedAt?: string;
   persistentAcknowledgedAt?: string;
   persistentDueDate?: string;
+  persistentOwnerUserId?: string;
+  persistentOwnerDisplayName?: string;
 };
 
 export type OperationalActivity = {
@@ -110,6 +112,7 @@ export type OperationsFilterOptions = {
   sites: string[];
   departments: string[];
   owners: string[];
+  actionTypes: string[];
 };
 
 export type OperationsResponse = {
@@ -245,7 +248,7 @@ function buildLearnerOperationalItems(detail: LearnerRecordDetail, now: Date): O
       const reviewType: LearnerReviewType = key === "provider" ? "provider_review" : key === "lAndD" ? "l_and_d_check_in" : "manager_check_in";
       const review = detail.reviewSummaries[key];
       const dueDate = review.nextDate;
-      const timing = dueTiming(dueDate, now);
+      const timing = operationalDueTiming(dueDate, now);
       const actionRequired = review.latest?.status === "action_required";
       if (timing.daysUntil !== null && timing.daysUntil <= operationsPolicy.reviewApproachingDays || actionRequired) {
         const reasonCode: PriorityReason = actionRequired ? "support_intervention" : timing.daysOverdue > 0 ? (reviewType === "provider_review" ? "provider_review_overdue" : "check_in_overdue") : "review_approaching";
@@ -280,7 +283,7 @@ function buildLearnerOperationalItems(detail: LearnerRecordDetail, now: Date): O
 
   const activeBreak = detail.activeBreak;
   if (activeBreak) {
-    const due = dueTiming(activeBreak.expectedReturnDate, now);
+    const due = operationalDueTiming(activeBreak.expectedReturnDate, now);
     const materiallyOverdue = due.daysOverdue > operationsPolicy.materiallyOverdueBreakReturnDays;
     const reasonCode: PriorityReason = due.daysOverdue > 0 ? "break_materially_overdue" : due.daysUntil !== null && due.daysUntil <= learnerBreakPolicy.returnDateApproachingDays ? "break_approaching" : "routine";
     const action: OperationalActionType = due.daysOverdue > 0 ? "return_learner" : "manage_break";
@@ -316,7 +319,7 @@ function baseItem(
   now = new Date(),
   reviewType?: LearnerReviewType,
 ): OperationalItem {
-  const timing = dueTiming(dueDate, now);
+  const timing = operationalDueTiming(dueDate, now);
   const priorityLevel = deriveOperationalPriority(reasonCode, timing.daysOverdue);
   const sourceCondition = sourceConditionFor(reasonCode, reviewType);
   return {
@@ -515,7 +518,7 @@ function actionLabel(action: OperationalActionType) {
   return labels[action];
 }
 
-function dueTiming(value: string, now: Date) {
+export function operationalDueTiming(value: string, now = new Date()) {
   if (!value) return { status: "No due date" as const, daysUntil: null as number | null, daysOverdue: 0, label: "No due date" };
   const daysUntil = daysBetween(startOfDay(now), parseDate(value));
   if (daysUntil < 0) return { status: "Overdue" as const, daysUntil, daysOverdue: Math.abs(daysUntil), label: `${Math.abs(daysUntil)} days overdue` };

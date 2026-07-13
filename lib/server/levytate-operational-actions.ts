@@ -18,6 +18,7 @@ import {
   type OperationalOwnerType,
 } from "@/lib/levytate/mvp/operations-centre";
 import { hasMvpPermission, normaliseMvpUserRole } from "@/lib/levytate/mvp/rbac";
+import type { LearnerRecordDetail } from "@/lib/levytate/mvp/learner-record-view";
 import { createMvpId } from "@/lib/levytate/mvp/workspace";
 import {
   getLearnerLifecycleServerContext,
@@ -87,7 +88,7 @@ type OperationalActionEventRow = {
   created_at: string;
 };
 
-type ActionContext = Awaited<ReturnType<typeof getLearnerLifecycleServerContext>>;
+type ActionContext = Awaited<ReturnType<typeof getLearnerLifecycleServerContext>> & { actorDisplayName: string };
 
 export class LevyTateOperationalActionError extends Error {
   constructor(message: string) {
@@ -108,6 +109,34 @@ export type OperationalActionListQuery = {
   status?: OperationalActionStatus;
   sourceKey?: string;
   includeTerminal?: boolean;
+};
+
+export type OperationalActionOwnerOption = {
+  ownerType: OperationalOwnerType;
+  ownerUserId: string;
+  label: string;
+  accessNote: string;
+};
+
+export type OperationalActionManagementDetail = {
+  action: PersistentOperationalAction;
+  history: OperationalActionEvent[];
+  previousOccurrences: PersistentOperationalAction[];
+  context: {
+    learnerName: string;
+    jobTitle: string;
+    department: string;
+    site: string;
+    managerName: string;
+    programmeName: string;
+    providerName: string;
+    sourceReason: string;
+    sourceFacts: Array<{ label: string; value: string }>;
+    workflowLabel: string;
+    workflowActionType: OperationalItem["actionType"];
+    dueDateOrigin: "Source workflow" | "Manual override" | "No source date";
+  };
+  ownerOptions: OperationalActionOwnerOption[];
 };
 
 export type OperationalActionSynchronisationResult = {
@@ -200,6 +229,45 @@ export async function getOperationalAction(session: LevyTateBetaSession, actionI
   return requireScopedAction(context, actionId);
 }
 
+export async function getOperationalActionManagementDetail(
+  session: LevyTateBetaSession,
+  actionId: string,
+): Promise<OperationalActionManagementDetail> {
+  const context = await requireOperationalActionContext(session, "read");
+  const action = await requireScopedAction(context, actionId);
+  const [details, history, occurrences, ownerOptions] = await Promise.all([
+    listOrganisationLearnerLifecycleDetails(session),
+    selectActionHistory(context.organisation.id, actionId),
+    selectActions(context.organisation.id, { sourceKey: action.sourceKey, includeTerminal: true }),
+    buildOwnerOptions(context, action),
+  ]);
+  const learner = details.find((item) => item.learnerRecordId === action.learnerRecordId);
+  if (!learner) throw new LevyTateOperationalActionError("The learner context for this action was not found.");
+  const derived = buildOrganisationOperationalItems(details).items.find((item) => item.sourceKey === action.sourceKey);
+  const sourceFacts = sourceFactsForAction(action, learner);
+  const dueOverride = action.metadata.dueDateOverride;
+  return {
+    action,
+    history,
+    previousOccurrences: occurrences.filter((item) => item.id !== action.id && isOperationalActionTerminal(item.status)),
+    context: {
+      learnerName: learner.learner.name,
+      jobTitle: learner.learner.jobTitle,
+      department: learner.learner.department,
+      site: learner.learner.site,
+      managerName: learner.learner.managerName,
+      programmeName: learner.programme.programmeName,
+      providerName: learner.programme.providerName,
+      sourceReason: derived?.reason ?? action.description,
+      sourceFacts,
+      workflowLabel: derived?.actionLabel ?? workflowLabelForAction(action.actionType),
+      workflowActionType: derived?.actionType ?? workflowActionForAction(action.actionType),
+      dueDateOrigin: dueOverride?.date ? "Manual override" : derived?.dueDate ? "Source workflow" : "No source date",
+    },
+    ownerOptions,
+  };
+}
+
 export async function acknowledgeOperationalAction(session: LevyTateBetaSession, actionId: string, expectedVersion: number) {
   return transitionAction(session, actionId, expectedVersion, "acknowledged", {});
 }
@@ -213,6 +281,7 @@ export async function completeOperationalAction(
   actionId: string,
   expectedVersion: number,
   completionNote = "",
+  resolvedOutsideLevyTate = false,
 ) {
   const context = await requireOperationalActionContext(session, "write");
   const action = await requireScopedAction(context, actionId);
@@ -223,13 +292,19 @@ export async function completeOperationalAction(
   if (currentKeys.has(action.sourceKey)) {
     throw new LevyTateOperationalActionError("The underlying learner condition is still active. Resolve it in the learner workflow before completing this action.");
   }
+  const cleanNote = completionNote.trim();
+  if (!resolvedOutsideLevyTate) throw new LevyTateOperationalActionError("Confirm that the issue was resolved outside LevyTate before manually completing this action.");
+  if (cleanNote.length < 12) throw new LevyTateOperationalActionError("A completion note of at least 12 characters is required.");
   return transitionScopedAction(context, action, "completed", {
     completion_method: "user_completed",
-    completion_note: completionNote.trim(),
+    completion_note: cleanNote,
   });
 }
 
-export type OperationalActionDismissalKind = "not_applicable" | "duplicate_administrative_warning" | "managed_outside_levytate";
+export type OperationalActionDismissalKind = "not_applicable" | "duplicate_administrative_warning" | "managed_outside_levytate" | "incorrect_source_data" | "no_action_required" | "other";
+export type OperationalActionCancellationKind = "duplicate_legacy_action" | "invalidly_generated" | "superseded_administrative_action";
+const operationalActionDismissalKinds: OperationalActionDismissalKind[] = ["not_applicable", "duplicate_administrative_warning", "managed_outside_levytate", "incorrect_source_data", "no_action_required", "other"];
+const operationalActionCancellationKinds: OperationalActionCancellationKind[] = ["duplicate_legacy_action", "invalidly_generated", "superseded_administrative_action"];
 
 export async function assignOperationalActionOwner(
   session: LevyTateBetaSession,
@@ -241,28 +316,105 @@ export async function assignOperationalActionOwner(
   const action = await requireScopedAction(context, actionId);
   assertVersion(action, expectedVersion);
   if (isOperationalActionTerminal(action.status)) throw new LevyTateOperationalActionError("Terminal actions cannot be reassigned.");
-  const ownerUserId = owner.ownerUserId?.trim() ?? "";
-  let ownerDisplayName = owner.ownerDisplayName?.trim() || owner.ownerType;
-  if (ownerUserId) {
-    if (owner.ownerType === "Provider") throw new LevyTateOperationalActionError("Provider ownership does not grant provider platform access.");
-    const config = requireConfig();
-    const users = await supabaseSelect<{ id: string; email: string }>(config, "levytate_users", new URLSearchParams({
-      select: "id,email",
-      organisation_id: `eq.${context.organisation.id}`,
-      id: `eq.${ownerUserId}`,
-      limit: "1",
-    }));
-    if (!users.length) throw new LevyTateOperationalActionError("The selected owner is not an active member of this organisation.");
-    ownerDisplayName = users[0].email;
-  }
+  const validOwnerTypes: OperationalOwnerType[] = ["Employee", "Line Manager", "Apprenticeship Lead", "HR", "Provider", "Shared"];
+  if (!validOwnerTypes.includes(owner.ownerType)) throw new LevyTateOperationalActionError("A supported owner type is required.");
+  const options = await buildOwnerOptions(context, action);
+  const requestedUserId = owner.ownerUserId?.trim() ?? "";
+  const selected = options.find((option) => option.ownerType === owner.ownerType && option.ownerUserId === requestedUserId);
+  if (!selected) throw new LevyTateOperationalActionError("The selected owner is not valid for this action or organisation.");
+  const ownerUserId = selected.ownerUserId;
+  const ownerDisplayName = selected.label;
   if (action.ownerType === owner.ownerType && action.ownerUserId === ownerUserId && action.ownerDisplayName === ownerDisplayName) return action;
   const updated = await versionedUpdate(context, action, {
     owner_type: owner.ownerType,
     owner_user_id: ownerUserId,
     owner_display_name: ownerDisplayName,
+    metadata: {
+      ...action.metadata,
+      ownershipOverride: {
+        ownerType: owner.ownerType,
+        ownerUserId,
+        ownerDisplayName,
+        assignedAt: new Date().toISOString(),
+        assignedBy: context.user.id,
+      },
+    },
   });
   await recordEvent(context, updated, "owner_changed", action.status, action.status, `Action reassigned to ${ownerDisplayName}.`);
   return updated;
+}
+
+export async function updateOperationalActionDueDate(
+  session: LevyTateBetaSession,
+  actionId: string,
+  expectedVersion: number,
+  dueDate: string,
+  reason = "",
+) {
+  const context = await requireOperationalActionContext(session, "write");
+  const action = await requireScopedAction(context, actionId);
+  assertVersion(action, expectedVersion);
+  if (isOperationalActionTerminal(action.status)) throw new LevyTateOperationalActionError("Terminal actions cannot have their due date changed.");
+  const cleanDate = dueDate.trim();
+  if (cleanDate && !/^\d{4}-\d{2}-\d{2}$/.test(cleanDate)) throw new LevyTateOperationalActionError("Enter a valid due date.");
+  const details = await listOrganisationLearnerLifecycleDetails(session);
+  const derived = buildOrganisationOperationalItems(details).items.find((item) => item.sourceKey === action.sourceKey);
+  const sourceDate = derived?.dueDate ?? "";
+  const cleanReason = reason.trim();
+  if (sourceDate && cleanDate !== sourceDate && cleanReason.length < 12) {
+    throw new LevyTateOperationalActionError("Explain why the source-derived due date is being overridden.");
+  }
+  if (sourceDate && cleanDate && cleanDate < sourceDate) {
+    throw new LevyTateOperationalActionError("The manual due date cannot be earlier than the source workflow date.");
+  }
+  if (action.dueDate === cleanDate && (!action.metadata.dueDateOverride || action.metadata.dueDateOverride.reason === cleanReason)) return action;
+  const now = new Date().toISOString();
+  const metadata: OperationalActionMetadata = { ...action.metadata };
+  if (cleanDate && cleanDate !== sourceDate) {
+    metadata.dueDateOverride = { date: cleanDate, reason: cleanReason, sourceDate, setAt: now, setBy: context.user.id };
+  } else {
+    delete metadata.dueDateOverride;
+  }
+  const updated = await versionedUpdate(context, action, { due_date: cleanDate || null, metadata });
+  await recordEvent(
+    context,
+    updated,
+    "due_date_changed",
+    action.status,
+    action.status,
+    cleanDate ? `Due date changed to ${cleanDate}${cleanReason ? `: ${cleanReason}` : "."}` : "Manual due date removed.",
+  );
+  return updated;
+}
+
+export async function cancelOperationalAction(
+  session: LevyTateBetaSession,
+  actionId: string,
+  expectedVersion: number,
+  reason: string,
+  category: OperationalActionCancellationKind,
+) {
+  const context = await requireOperationalActionContext(session, "write");
+  const action = await requireScopedAction(context, actionId);
+  if (action.status === "cancelled") return action;
+  assertVersion(action, expectedVersion);
+  if (!operationalActionCancellationKinds.includes(category)) throw new LevyTateOperationalActionError("A supported cancellation category is required.");
+  const cleanReason = reason.trim();
+  if (cleanReason.length < 12) throw new LevyTateOperationalActionError("A cancellation reason of at least 12 characters is required.");
+  if (isCriticalOperationalBlocker(action.metadata.sourceCondition ?? action.sourceKey, action.priority)) {
+    throw new LevyTateOperationalActionError("Critical compliance blockers cannot be cancelled. Resolve the underlying learner condition.");
+  }
+  const now = new Date().toISOString();
+  return transitionScopedAction(context, action, "cancelled", {
+    completed_at: now,
+    completed_by: context.user.id,
+    completion_method: "system_cancelled",
+    completion_note: cleanReason,
+    metadata: {
+      ...action.metadata,
+      cancellation: { category, reason: cleanReason, cancelledAt: now, cancelledBy: context.user.id },
+    },
+  });
 }
 
 export async function dismissOperationalAction(
@@ -276,6 +428,7 @@ export async function dismissOperationalAction(
   const action = await requireScopedAction(context, actionId);
   if (action.status === "dismissed") return action;
   assertVersion(action, expectedVersion);
+  if (!operationalActionDismissalKinds.includes(dismissalKind)) throw new LevyTateOperationalActionError("A supported dismissal category is required.");
   const cleanReason = reason.trim();
   if (cleanReason.length < 12) throw new LevyTateOperationalActionError("A clear dismissal reason of at least 12 characters is required.");
   if (isCriticalOperationalBlocker(action.metadata.sourceCondition ?? action.sourceKey, action.priority)) {
@@ -291,10 +444,14 @@ export async function dismissOperationalAction(
 export async function getOperationalActionHistory(session: LevyTateBetaSession, actionId: string) {
   const context = await requireOperationalActionContext(session, "read");
   await requireScopedAction(context, actionId);
+  return selectActionHistory(context.organisation.id, actionId);
+}
+
+async function selectActionHistory(organisationId: string, actionId: string) {
   const config = requireConfig();
   const rows = await supabaseSelect<OperationalActionEventRow>(config, eventsTable, new URLSearchParams({
     select: "*",
-    organisation_id: `eq.${context.organisation.id}`,
+    organisation_id: `eq.${organisationId}`,
     operational_action_id: `eq.${actionId}`,
     order: "event_date.asc",
   }));
@@ -353,16 +510,26 @@ async function updateActionFromDerivedCondition(context: ActionContext, action: 
     changes.priority_rank = item.priorityRank;
     events.push({ type: "priority_changed", summary: `Priority updated from ${action.priority} to ${item.priorityLevel}.` });
   }
-  if (action.ownerType !== item.ownerType) {
+  if (!action.metadata.ownershipOverride && action.ownerType !== item.ownerType) {
     changes.owner_type = item.ownerType;
     changes.owner_display_name = item.ownerType;
     changes.owner_user_id = "";
     events.push({ type: "owner_changed", summary: `Owner updated from ${action.ownerType} to ${item.ownerType}.` });
   }
-  const dueDate = persistentDueDate(item, action.detectedAt);
+  const sourceDueDate = persistentDueDate(item, action.detectedAt);
+  const override = action.metadata.dueDateOverride;
+  const overrideRemainsValid = Boolean(override?.date && (!sourceDueDate || override.date >= sourceDueDate));
+  const dueDate = overrideRemainsValid ? override!.date : sourceDueDate;
   if ((action.dueDate || null) !== dueDate) {
     changes.due_date = dueDate;
     events.push({ type: "due_date_changed", summary: dueDate ? `Due date updated to ${dueDate}.` : "Due date removed because the source workflow no longer supplies one." });
+  }
+  if (override && !overrideRemainsValid) {
+    const metadata = { ...action.metadata };
+    delete metadata.dueDateOverride;
+    changes.metadata = metadata;
+  } else if (override && override.sourceDate !== (sourceDueDate ?? "")) {
+    changes.metadata = { ...action.metadata, dueDateOverride: { ...override, sourceDate: sourceDueDate ?? "" } };
   }
   if (action.title !== actionTitle(item) || action.description !== item.reason || action.sourceUrl !== item.actionUrl || action.actionType !== item.persistentActionType) {
     changes.title = actionTitle(item);
@@ -537,7 +704,137 @@ async function requireOperationalActionContext(session: LevyTateBetaSession, acc
   if (!hasMvpPermission(context.user.role, permission)) {
     throw new LevyTateLearnerLifecyclePermissionError(`${normaliseMvpUserRole(context.user.role)} cannot access organisation operational actions.`);
   }
-  return context;
+  const config = requireConfig();
+  const actors = await supabaseSelect<{ name: string }>(config, "levytate_employees", new URLSearchParams({
+    select: "name",
+    organisation_id: `eq.${context.organisation.id}`,
+    email: `eq.${context.user.email}`,
+    limit: "1",
+  }));
+  return { ...context, actorDisplayName: actors[0]?.name || context.user.email };
+}
+
+type ActionEmployeeRow = {
+  id: string;
+  name: string;
+  email: string;
+  manager_id: string;
+  department: string;
+  platform_role: string;
+  status: string;
+};
+
+type ActionUserRow = { id: string; email: string; role: string };
+
+async function buildOwnerOptions(context: ActionContext, action: PersistentOperationalAction): Promise<OperationalActionOwnerOption[]> {
+  const config = requireConfig();
+  const [employees, users, learnerRows] = await Promise.all([
+    supabaseSelect<ActionEmployeeRow>(config, "levytate_employees", new URLSearchParams({
+      select: "id,name,email,manager_id,department,platform_role,status",
+      organisation_id: `eq.${context.organisation.id}`,
+      status: "eq.Active",
+      limit: "5000",
+    })),
+    supabaseSelect<ActionUserRow>(config, "levytate_users", new URLSearchParams({
+      select: "id,email,role",
+      organisation_id: `eq.${context.organisation.id}`,
+      limit: "5000",
+    })),
+    supabaseSelect<{ provider_id: string }>(config, "levytate_learner_records", new URLSearchParams({
+      select: "provider_id",
+      organisation_id: `eq.${context.organisation.id}`,
+      id: `eq.${action.learnerRecordId}`,
+      limit: "1",
+    })),
+  ]);
+  const userByEmail = new Map(users.map((user) => [user.email.toLowerCase(), user]));
+  const employee = employees.find((item) => item.id === action.employeeId);
+  const manager = employee?.manager_id ? employees.find((item) => item.id === employee.manager_id) : undefined;
+  const providerId = learnerRows[0]?.provider_id ?? "";
+  const providerRows = providerId ? await supabaseSelect<{ provider_name: string }>(config, "levytate_providers", new URLSearchParams({
+    select: "provider_name",
+    organisation_id: `eq.${context.organisation.id}`,
+    provider_id: `eq.${providerId}`,
+    limit: "1",
+  })) : [];
+  const options: OperationalActionOwnerOption[] = [];
+  if (employee) {
+    const user = userByEmail.get(employee.email.toLowerCase());
+    options.push({ ownerType: "Employee", ownerUserId: user?.id ?? "", label: employee.name, accessNote: user ? "Platform user" : "Accountability only, no platform account" });
+  }
+  if (manager) {
+    const user = userByEmail.get(manager.email.toLowerCase());
+    options.push({ ownerType: "Line Manager", ownerUserId: user?.id ?? "", label: manager.name, accessNote: user ? "Platform user" : "Accountability only, no platform account" });
+  }
+  for (const user of users.filter((item) => ["Apprenticeship Lead", "Employer Admin", "Platform Admin"].includes(normaliseMvpUserRole(item.role)))) {
+    const person = employees.find((item) => item.email.toLowerCase() === user.email.toLowerCase());
+    options.push({ ownerType: "Apprenticeship Lead", ownerUserId: user.id, label: person?.name || user.email, accessNote: "Authorised organisation user" });
+  }
+  const hrPeople = employees.filter((item) => /^(hr|people)/i.test(item.department));
+  if (hrPeople.length) {
+    for (const person of hrPeople) {
+      const user = userByEmail.get(person.email.toLowerCase());
+      options.push({ ownerType: "HR", ownerUserId: user?.id ?? "", label: person.name, accessNote: user ? "Platform user" : "Accountability only, no platform account" });
+    }
+  } else {
+    options.push({ ownerType: "HR", ownerUserId: "", label: "HR", accessNote: "Accountability label, no platform access implied" });
+  }
+  options.push({ ownerType: "Provider", ownerUserId: "", label: providerRows[0]?.provider_name || "Approved delivery partner", accessNote: "Accountability label, no provider access implied" });
+  options.push({ ownerType: "Shared", ownerUserId: "", label: "Shared", accessNote: "Shared organisation accountability" });
+  return options.filter((option, index, all) => all.findIndex((item) => item.ownerType === option.ownerType && item.ownerUserId === option.ownerUserId && item.label === option.label) === index);
+}
+
+function sourceFactsForAction(action: PersistentOperationalAction, detail: LearnerRecordDetail) {
+  const facts: Array<{ label: string; value: string }> = [];
+  const add = (label: string, value: string | number | null | undefined, suffix = "") => {
+    if (value === undefined || value === null || value === "") return;
+    facts.push({ label, value: `${value}${suffix}` });
+  };
+  if (action.actionType === "record_provider_review") {
+    add("Latest provider review", detail.latestProviderReview?.reviewDate);
+    add("Expected next review", detail.reviewSummaries.provider.nextDate);
+    add("Provider", detail.programme.providerName);
+  } else if (["add_progress_update", "address_progress_exception"].includes(action.actionType)) {
+    add("Target progress", detail.latestProgress?.targetProgressPercentage, "%");
+    add("Actual progress", detail.latestProgress?.actualProgressPercentage, "%");
+    add("Variance", detail.latestProgress?.variancePercentage, " percentage points");
+    add("Latest update", detail.latestProgress?.updateDate);
+    add("Support action", detail.latestProgress?.supportAction);
+  } else if (["manage_break_in_learning", "confirm_return_date", "return_learner", "record_post_return_review"].includes(action.actionType)) {
+    add("Break started", detail.latestBreak?.startDate);
+    add("Expected return", detail.latestBreak?.expectedReturnDate);
+    add("Actual return", detail.latestBreak?.actualReturnDate);
+    add("Days on break", detail.breakAttention.daysOnBreak, " days");
+    add("Confirmation status", detail.breakAttention.label);
+  } else if (["complete_employee_declaration", "verify_england_working_hours", "confirm_probation", "obtain_hr_approval", "confirm_programme", "confirm_provider", "complete_pre_enrolment", "complete_enrolment", "send_guides"].includes(action.actionType)) {
+    add("Outstanding check", action.title.replace(/ for .+$/, ""));
+    add("Current position", action.description);
+    add("Responsible owner", action.ownerDisplayName || action.ownerType);
+  }
+  if (!facts.length) add("Current position", action.description);
+  return facts;
+}
+
+function workflowActionForAction(actionType: PersistentOperationalAction["actionType"]): OperationalItem["actionType"] {
+  if (actionType === "complete_enrolment") return "complete_enrolment";
+  if (["record_provider_review", "record_l_and_d_check_in", "record_manager_check_in", "record_post_return_review"].includes(actionType)) return "record_review";
+  if (["add_progress_update", "address_progress_exception"].includes(actionType)) return "add_progress";
+  if (actionType === "return_learner") return "return_learner";
+  if (["manage_break_in_learning", "confirm_return_date"].includes(actionType)) return "manage_break";
+  return "complete_pre_enrolment";
+}
+
+function workflowLabelForAction(actionType: PersistentOperationalAction["actionType"]) {
+  const action = workflowActionForAction(actionType);
+  return {
+    open_learner: "Open learner record",
+    complete_pre_enrolment: actionType === "send_guides" ? "Send guides record" : "Complete pre-enrolment",
+    complete_enrolment: "Complete enrolment",
+    record_review: actionType === "record_provider_review" ? "Record provider review" : "Record check-in",
+    add_progress: "Add progress update",
+    manage_break: "Manage break",
+    return_learner: "Return learner",
+  }[action];
 }
 
 function uniqueSourceItems(items: OperationalItem[]) {
@@ -608,7 +905,7 @@ function requireConfig() {
 }
 
 function actorName(context: ActionContext) {
-  return context.user.email;
+  return context.actorDisplayName;
 }
 
 function actionFromRow(row: OperationalActionRow): PersistentOperationalAction {

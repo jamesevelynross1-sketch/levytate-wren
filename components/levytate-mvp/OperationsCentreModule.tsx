@@ -3,7 +3,9 @@
 import { AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, ChevronDown, CircleAlert, Clock3, PauseCircle, Search, TrendingDown } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { EmptyState, StatusBadge } from "@/components/levytate-mvp/MvpUi";
+import { OperationalActionDetail } from "@/components/levytate-mvp/OperationalActionDetail";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
+import { operationalActionStatusLabels, type OperationalActionStatus } from "@/lib/levytate/mvp/operational-actions";
 import {
   operationalQueueLabels,
   type OperationalActionType,
@@ -31,6 +33,14 @@ export function OperationsCentreModule({ onOpenLearner }: { onOpenLearner: (targ
   const [queue, setQueue] = useState<OperationalQueueType | "All">("All");
   const [owner, setOwner] = useState("All");
   const [dueStatus, setDueStatus] = useState<OperationalDueStatus | "All">("All");
+  const [status, setStatus] = useState<OperationalActionStatus | "All">("All");
+  const [actionType, setActionType] = useState("All");
+  const [learner, setLearner] = useState("All");
+  const [programme, setProgramme] = useState("All");
+  const [assignment, setAssignment] = useState<"all" | "mine" | "unassigned" | "shared">("all");
+  const [moreFilters, setMoreFilters] = useState(false);
+  const [selectedActionId, setSelectedActionId] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({ urgent: true, ready_to_enrol: true });
   const initialSynchronisationPending = useRef(true);
 
@@ -49,6 +59,11 @@ export function OperationsCentreModule({ onOpenLearner }: { onOpenLearner: (targ
       if (queue !== "All") params.set("queue", queue);
       if (owner !== "All") params.set("owner", owner);
       if (dueStatus !== "All") params.set("dueStatus", dueStatus);
+      if (status !== "All") params.set("status", status);
+      if (actionType !== "All") params.set("actionType", actionType);
+      if (learner !== "All") params.set("learner", learner);
+      if (programme !== "All") params.set("programme", programme);
+      if (assignment !== "all") params.set("assignment", assignment);
       if (initialSynchronisationPending.current) {
         params.set("synchronise", "true");
         initialSynchronisationPending.current = false;
@@ -72,13 +87,17 @@ export function OperationsCentreModule({ onOpenLearner }: { onOpenLearner: (targ
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [authorised, dueStatus, owner, priority, queue, search]);
+  }, [actionType, assignment, authorised, dueStatus, learner, owner, priority, programme, queue, refreshKey, search, status]);
 
-  const hasFilters = Boolean(search.trim()) || priority !== "All" || queue !== "All" || owner !== "All" || dueStatus !== "All";
+  const hasFilters = Boolean(search.trim()) || priority !== "All" || queue !== "All" || owner !== "All" || dueStatus !== "All" || status !== "All" || actionType !== "All" || learner !== "All" || programme !== "All" || assignment !== "all";
   const nextUpcoming = useMemo(() => data ? queueOrder.flatMap((key) => data.queues[key]).find((item) => item.dueStatus === "Due soon") : undefined, [data]);
 
   if (!authorised) {
     return <EmptyState title="Operations Centre is not available for this role" copy="Organisation-wide learner operations are restricted to Apprenticeship Leads and authorised platform administrators." actionLabel="Return home" onAction={() => window.scrollTo({ top: 0, behavior: "smooth" })} />;
+  }
+
+  if (selectedActionId) {
+    return <OperationalActionDetail actionId={selectedActionId} onBack={() => setSelectedActionId("")} onOpenLearner={onOpenLearner} onChanged={() => setRefreshKey((current) => current + 1)} />;
   }
 
   return (
@@ -107,17 +126,21 @@ export function OperationsCentreModule({ onOpenLearner }: { onOpenLearner: (targ
       </section>
 
       <section className="rounded-2xl border border-[#102c3d]/[0.075] bg-white p-4 shadow-[0_14px_34px_rgba(16,44,61,0.035)]" aria-label="Operations filters">
-        <div className="grid gap-2 xl:grid-cols-[minmax(260px,1.5fr)_repeat(3,minmax(150px,0.65fr))_auto]">
+        <div className="flex flex-wrap gap-2 border-b border-[#102c3d]/[0.06] pb-3" aria-label="Action ownership">
+          {([['all', 'All actions'], ['mine', 'My actions'], ['unassigned', 'Unassigned'], ['shared', 'Shared actions']] as const).map(([value, label]) => <button key={value} type="button" onClick={() => setAssignment(value)} className={`rounded-full px-3.5 py-2 text-xs font-semibold transition ${assignment === value ? "bg-[#102c3d] text-white shadow-[0_8px_18px_rgba(16,44,61,0.12)]" : "bg-[#f5f8f6] text-[#102c3d]/58 hover:bg-[#edf7f3] hover:text-[#0b6f63]"}`}>{label}</button>)}
+        </div>
+        <div className="mt-3 grid gap-2 xl:grid-cols-[minmax(260px,1.4fr)_repeat(3,minmax(140px,0.6fr))_auto]">
           <label className="flex h-11 min-w-0 items-center gap-2 rounded-xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 focus-within:border-[#159b8f] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#159b8f]/10">
             <Search size={16} className="shrink-0 text-[#102c3d]/38" aria-hidden="true" />
-            <input value={search} onChange={(event) => setSearch(event.target.value)} className="min-w-0 flex-1 bg-transparent text-sm text-[#102c3d] outline-none placeholder:text-[#102c3d]/34" placeholder="Search learner, programme, provider, site" aria-label="Search operations" />
+            <input value={search} onChange={(event) => setSearch(event.target.value)} className="min-w-0 flex-1 bg-transparent text-sm text-[#102c3d] outline-none placeholder:text-[#102c3d]/34" placeholder="Search action, learner, programme, provider or owner" aria-label="Search operations" />
           </label>
+          <FilterSelect label="Status" value={status} options={["All", "open", "acknowledged", "in_progress"]} optionLabel={(value) => value === "All" ? "All statuses" : operationalActionStatusLabels[value as OperationalActionStatus]} onChange={(value) => setStatus(value as OperationalActionStatus | "All")} />
           <FilterSelect label="Priority" value={priority} options={["All", ...(data?.filterOptions.priorities ?? [])]} onChange={setPriority} />
-          <FilterSelect label="Queue" value={queue} options={["All", ...(data?.filterOptions.queues.map((item) => item.value) ?? [])]} optionLabel={(value) => value === "All" ? "All queues" : operationalQueueLabels[value as OperationalQueueType]} onChange={(value) => setQueue(value as OperationalQueueType | "All")} />
-          <FilterSelect label="Owner" value={owner} options={["All", ...(data?.filterOptions.owners ?? [])]} onChange={setOwner} />
           <FilterSelect label="Due" value={dueStatus} options={dueStatuses} onChange={(value) => setDueStatus(value as OperationalDueStatus | "All")} />
+          <button type="button" onClick={() => setMoreFilters((current) => !current)} className="h-11 rounded-xl border border-[#102c3d]/[0.09] bg-white px-4 text-xs font-semibold text-[#102c3d]/62 transition hover:bg-[#f8fbfa] hover:text-[#102c3d]">{moreFilters ? "Fewer filters" : "More filters"}</button>
         </div>
-        {hasFilters ? <button type="button" onClick={() => { setSearch(""); setPriority("All"); setQueue("All"); setOwner("All"); setDueStatus("All"); }} className="mt-3 text-xs font-semibold text-[#0b6f63] hover:text-[#102c3d]">Clear filters</button> : null}
+        {moreFilters ? <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-5"><FilterSelect label="Queue" value={queue} options={["All", ...(data?.filterOptions.queues.map((item) => item.value) ?? [])]} optionLabel={(value) => value === "All" ? "All queues" : operationalQueueLabels[value as OperationalQueueType]} onChange={(value) => setQueue(value as OperationalQueueType | "All")} /><FilterSelect label="Owner" value={owner} options={["All", ...(data?.filterOptions.owners ?? [])]} onChange={setOwner} /><FilterSelect label="Action" value={actionType} options={["All", ...(data?.filterOptions.actionTypes ?? [])]} optionLabel={(value) => value === "All" ? "All action types" : sentenceCase(value)} onChange={setActionType} /><FilterSelect label="Learner" value={learner} options={["All", ...(data?.filterOptions.learners ?? [])]} onChange={setLearner} /><FilterSelect label="Programme" value={programme} options={["All", ...(data?.filterOptions.programmes ?? [])]} onChange={setProgramme} /></div> : null}
+        {hasFilters ? <button type="button" onClick={() => { setSearch(""); setPriority("All"); setQueue("All"); setOwner("All"); setDueStatus("All"); setStatus("All"); setActionType("All"); setLearner("All"); setProgramme("All"); setAssignment("all"); }} className="mt-3 text-xs font-semibold text-[#0b6f63] hover:text-[#102c3d]">Clear filters</button> : null}
       </section>
 
       {error ? <div className="rounded-xl border border-[#b13b51]/10 bg-[#fff0f2] px-4 py-3 text-sm font-semibold text-[#b13b51]">{error}</div> : null}
@@ -126,13 +149,13 @@ export function OperationsCentreModule({ onOpenLearner }: { onOpenLearner: (targ
       {data ? (
         <div id="operations-queues" className="grid gap-4">
           {queueOrder.filter((key) => queue === "All" || queue === key).map((key) => (
-            <QueueSection key={key} queue={key} items={data.queues[key]} expanded={Boolean(expanded[key])} onToggle={() => setExpanded((current) => ({ ...current, [key]: !current[key] }))} onOpenLearner={onOpenLearner} />
+            <QueueSection key={key} queue={key} items={data.queues[key]} expanded={Boolean(expanded[key])} onToggle={() => setExpanded((current) => ({ ...current, [key]: !current[key] }))} onOpenLearner={onOpenLearner} onOpenAction={setSelectedActionId} />
           ))}
 
           {!data.totalAttentionItems ? (
             <section className="rounded-2xl border border-[#159b8f]/15 bg-[#f4fbf8] p-6 text-center">
               <CheckCircle2 className="mx-auto text-[#159b8f]" size={28} aria-hidden="true" />
-              <h3 className="mt-3 text-lg font-semibold text-[#102c3d]">No urgent learner actions currently require your attention.</h3>
+              <h3 className="mt-3 text-lg font-semibold text-[#102c3d]">{assignment === "mine" ? "You do not currently own any active actions." : hasFilters ? "No actions match the selected filters." : "No active operational actions currently require attention."}</h3>
               <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[#102c3d]/56">{nextUpcoming ? `${nextUpcoming.learnerName}: ${nextUpcoming.reason}` : data.recentActivity[0] ? `Most recent completion: ${data.recentActivity[0].action}` : "New reviews and lifecycle changes will appear here as they are recorded."}</p>
             </section>
           ) : null}
@@ -144,7 +167,7 @@ export function OperationsCentreModule({ onOpenLearner }: { onOpenLearner: (targ
   );
 }
 
-function QueueSection({ queue, items, expanded, onToggle, onOpenLearner }: { queue: OperationalQueueType; items: OperationalItem[]; expanded: boolean; onToggle: () => void; onOpenLearner: (target: LearnerAction) => void }) {
+function QueueSection({ queue, items, expanded, onToggle, onOpenLearner, onOpenAction }: { queue: OperationalQueueType; items: OperationalItem[]; expanded: boolean; onToggle: () => void; onOpenLearner: (target: LearnerAction) => void; onOpenAction: (actionId: string) => void }) {
   const visible = expanded ? items.slice(0, 12) : [];
   return (
     <section id={`operations-${queue}`} className="overflow-hidden rounded-2xl border border-[#102c3d]/[0.075] bg-white shadow-[0_14px_34px_rgba(16,44,61,0.035)]">
@@ -160,7 +183,7 @@ function QueueSection({ queue, items, expanded, onToggle, onOpenLearner }: { que
       </button>
       {expanded ? (
         <div className="border-t border-[#102c3d]/[0.06]">
-          {visible.length ? visible.map((item) => <OperationalRow key={item.id} item={item} onOpenLearner={onOpenLearner} />) : <p className="px-5 py-6 text-sm text-[#102c3d]/50">No current items in this queue.</p>}
+          {visible.length ? visible.map((item) => <OperationalRow key={item.id} item={item} onOpenLearner={onOpenLearner} onOpenAction={onOpenAction} />) : <p className="px-5 py-6 text-sm text-[#102c3d]/50">No current items in this queue.</p>}
           {items.length > visible.length ? <button type="button" onClick={onToggle} className="m-4 text-xs font-semibold text-[#0b6f63]">Show all {items.length}</button> : null}
         </div>
       ) : null}
@@ -168,13 +191,16 @@ function QueueSection({ queue, items, expanded, onToggle, onOpenLearner }: { que
   );
 }
 
-function OperationalRow({ item, onOpenLearner }: { item: OperationalItem; onOpenLearner: (target: LearnerAction) => void }) {
+function OperationalRow({ item, onOpenLearner, onOpenAction }: { item: OperationalItem; onOpenLearner: (target: LearnerAction) => void; onOpenAction: (actionId: string) => void }) {
+  const status = item.persistentActionStatus ?? "open";
+  const primaryLabel = status === "open" ? "Acknowledge" : status === "acknowledged" ? "Start work" : status === "in_progress" ? "Update action" : "View history";
   return (
     <article className="grid gap-3 border-b border-[#102c3d]/[0.055] px-5 py-4 last:border-b-0 lg:grid-cols-[minmax(0,1.3fr)_minmax(190px,0.7fr)_auto] lg:items-center">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" onClick={() => onOpenLearner({ learnerRecordId: item.learnerRecordId, actionType: "open_learner" })} className="truncate text-left text-sm font-semibold text-[#102c3d] hover:text-[#0b6f63]">{item.learnerName}</button>
           <StatusBadge tone={priorityTone(item.priorityLevel)}>{item.priorityLevel}</StatusBadge>
+          <StatusBadge tone={status === "in_progress" ? "blue" : status === "acknowledged" ? "yellow" : "neutral"}>{operationalActionStatusLabels[status]}</StatusBadge>
           <span className="text-xs font-semibold text-[#102c3d]/42">{item.lifecycleStatus}</span>
         </div>
         <p className="mt-1 truncate text-xs font-semibold text-[#102c3d]/54">{item.programmeName}</p>
@@ -182,13 +208,14 @@ function OperationalRow({ item, onOpenLearner }: { item: OperationalItem; onOpen
         {item.targetProgress !== undefined ? <p className="mt-1 text-xs text-[#102c3d]/48">Target {item.targetProgress}% · Actual {item.actualProgress}% · Variance {item.variance}%</p> : null}
       </div>
       <div className="grid gap-1 text-xs text-[#102c3d]/52">
-        <span><strong className="font-semibold text-[#102c3d]/70">Owner:</strong> {item.ownerType}</span>
+        <span><strong className="font-semibold text-[#102c3d]/70">Owner:</strong> {item.persistentOwnerDisplayName || item.ownerType}</span>
         <span className={item.dueStatus === "Overdue" ? "font-semibold text-[#b13b51]" : ""}>{item.timingLabel}</span>
+        {item.persistentDetectedAt ? <span>Detected {formatDate(item.persistentDetectedAt)}</span> : null}
         <span className="truncate">{item.providerName}</span>
       </div>
       <div className="flex flex-wrap gap-2 lg:justify-end">
-        <button type="button" onClick={() => onOpenLearner({ learnerRecordId: item.learnerRecordId, actionType: item.actionType })} className="inline-flex h-9 items-center justify-center gap-2 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#17394d]">{item.actionLabel}<ArrowRight size={14} /></button>
-        {item.actionType !== "open_learner" ? <button type="button" onClick={() => onOpenLearner({ learnerRecordId: item.learnerRecordId, actionType: "open_learner" })} className="inline-flex h-9 items-center justify-center rounded-full border border-[#102c3d]/[0.09] bg-white px-4 text-xs font-semibold text-[#102c3d]/64 transition hover:bg-[#f8fbfa] hover:text-[#102c3d]">Open learner</button> : null}
+        <button type="button" onClick={() => item.persistentActionId ? onOpenAction(item.persistentActionId) : onOpenLearner({ learnerRecordId: item.learnerRecordId, actionType: item.actionType })} className="inline-flex h-9 items-center justify-center gap-2 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#17394d]">{primaryLabel}<ArrowRight size={14} /></button>
+        <button type="button" onClick={() => onOpenLearner({ learnerRecordId: item.learnerRecordId, actionType: item.actionType })} className="inline-flex h-9 items-center justify-center rounded-full border border-[#102c3d]/[0.09] bg-white px-4 text-xs font-semibold text-[#102c3d]/64 transition hover:bg-[#f8fbfa] hover:text-[#102c3d]">{item.actionLabel}</button>
       </div>
     </article>
   );
@@ -252,4 +279,12 @@ function formatTime(value: string) {
 
 function formatDateTime(value: string) {
   return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" }).format(new Date(value));
+}
+
+function sentenceCase(value: string) {
+  return value.replace(/_/g, " ").replace(/^\w/, (letter) => letter.toUpperCase());
 }

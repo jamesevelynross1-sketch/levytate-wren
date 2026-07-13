@@ -24,6 +24,9 @@ export async function GET(request: Request) {
     department: value(url, "department"),
     owner: value(url, "owner"),
     dueStatus: value(url, "dueStatus"),
+    status: value(url, "status"),
+    actionType: value(url, "actionType"),
+    assignment: assignmentValue(url),
     search: value(url, "search"),
   };
 
@@ -49,4 +52,9 @@ export async function GET(request: Request) {
 
 function value(url: URL, key: string) {
   return url.searchParams.get(key)?.trim() || undefined;
+}
+
+function assignmentValue(url: URL) {
+  const value = url.searchParams.get("assignment")?.trim();
+  return value === "mine" || value === "unassigned" || value === "shared" || value === "all" ? value : undefined;
 }

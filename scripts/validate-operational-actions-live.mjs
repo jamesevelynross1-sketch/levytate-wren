@@ -79,8 +79,63 @@ async function main() {
     check("HR approval outstanding creates a durable action", preEnrolmentInitial.some((action) => action.actionType === "obtain_hr_approval"), preEnrolmentInitial);
     check("Guides outstanding creates a durable action", preEnrolmentInitial.some((action) => action.actionType === "send_guides"), preEnrolmentInitial);
 
+    let hrAction = preEnrolmentInitial.find((action) => action.actionType === "obtain_hr_approval");
+    const guidesAction = preEnrolmentInitial.find((action) => action.actionType === "send_guides");
+    const managementDetail = await requestJson(`/api/levytate-operational-actions/${hrAction.id}?management=true`, leadCookie);
+    check("Focused action detail returns source context", managementDetail.status === 200 && managementDetail.body.context?.learnerName && managementDetail.body.context?.sourceFacts?.length, managementDetail.body);
+    check("Focused action detail returns history and valid owner options", Array.isArray(managementDetail.body.history) && managementDetail.body.ownerOptions?.some((option) => option.label === "Priya Shah"), managementDetail.body);
+
+    const priyaOwner = managementDetail.body.ownerOptions.find((option) => option.label === "Priya Shah");
+    const assigned = await patchAction(leadCookie, hrAction.id, { command: "assign", expectedVersion: hrAction.version, ownerType: priyaOwner.ownerType, ownerUserId: priyaOwner.ownerUserId });
+    check("Controlled assignment persists the selected organisation owner", assigned.status === 200 && assigned.body.action?.ownerDisplayName === "Priya Shah", assigned.body);
+    hrAction = assigned.body.action;
+
+    const manualDueDate = isoDateFromNow(5);
+    const dueChanged = await patchAction(leadCookie, hrAction.id, { command: "due_date", expectedVersion: hrAction.version, dueDate: manualDueDate });
+    check("Manual due date persists", dueChanged.status === 200 && dueChanged.body.action?.dueDate === manualDueDate, dueChanged.body);
+    hrAction = dueChanged.body.action;
+
+    const hrAcknowledged = await patchAction(leadCookie, hrAction.id, { command: "acknowledge", expectedVersion: hrAction.version });
+    check("Managed action acknowledgement persists", hrAcknowledged.status === 200 && hrAcknowledged.body.action?.status === "acknowledged", hrAcknowledged.body);
+    const duplicateManagedAcknowledgement = await patchAction(leadCookie, hrAction.id, { command: "acknowledge", expectedVersion: hrAction.version });
+    check("Managed action duplicate acknowledgement is idempotent", duplicateManagedAcknowledgement.status === 200 && duplicateManagedAcknowledgement.body.action?.version === hrAcknowledged.body.action.version, duplicateManagedAcknowledgement.body);
+    const started = await patchAction(leadCookie, hrAction.id, { command: "start", expectedVersion: hrAcknowledged.body.action.version });
+    check("Managed action starts work", started.status === 200 && started.body.action?.status === "in_progress", started.body);
+    const duplicateStart = await patchAction(leadCookie, hrAction.id, { command: "start", expectedVersion: hrAcknowledged.body.action.version });
+    check("Managed action duplicate start is idempotent", duplicateStart.status === 200 && duplicateStart.body.action?.version === started.body.action.version, duplicateStart.body);
+    hrAction = started.body.action;
+
+    const managedRepeat = await requestJson("/api/levytate-operational-actions", leadCookie, { method: "POST" });
+    check("Synchronisation preserves managed status and owner", managedRepeat.status === 200, managedRepeat.body);
+    const afterManagedRepeat = await listForLearner(leadCookie, testId, true);
+    const persistedManaged = afterManagedRepeat.find((action) => action.id === hrAction.id);
+    check("Managed ownership, due date and status survive synchronisation", persistedManaged?.ownerDisplayName === "Priya Shah" && persistedManaged?.dueDate === manualDueDate && persistedManaged?.status === "in_progress", persistedManaged);
+
+    const dismissed = await patchAction(leadCookie, guidesAction.id, {
+      command: "dismiss",
+      expectedVersion: guidesAction.version,
+      dismissalKind: "managed_outside_levytate",
+      dismissalReason: "The guide pack was issued through the controlled HR process.",
+    });
+    check("Permitted informational action dismissal persists", dismissed.status === 200 && dismissed.body.action?.status === "dismissed", dismissed.body);
+    const duplicateDismissal = await patchAction(leadCookie, guidesAction.id, {
+      command: "dismiss",
+      expectedVersion: guidesAction.version,
+      dismissalKind: "managed_outside_levytate",
+      dismissalReason: "The guide pack was issued through the controlled HR process.",
+    });
+    check("Duplicate dismissal is idempotent", duplicateDismissal.status === 200 && duplicateDismissal.body.action?.version === dismissed.body.action.version, duplicateDismissal.body);
+    const checksBeforeResolution = await selectOne("levytate_learner_pre_enrolment_checks", { organisation_id: `eq.${leadUser.organisation_id}`, learner_record_id: `eq.${testId}` });
+    check("Dismissal leaves source lifecycle truth unchanged", checksBeforeResolution.guides_sent === false, checksBeforeResolution);
+
+    const mine = await requestJson("/api/levytate-operations?assignment=mine", leadCookie);
+    check("My actions filter includes Priya's assigned action", mine.status === 200 && Object.values(mine.body.queues ?? {}).flat().some((item) => item.persistentActionId === hrAction.id), mine.body);
+
     const repeat = await requestJson("/api/levytate-operational-actions", leadCookie, { method: "POST" });
     check("Repeated synchronisation creates no duplicate", repeat.status === 200 && repeat.body.result?.created === 0, repeat.body);
+
+    const activeManualCompletion = await patchAction(leadCookie, hrAction.id, { command: "complete", expectedVersion: hrAction.version, completionNote: "Resolved through the approved external HR control.", resolvedOutsideLevyTate: true });
+    check("Manual completion is blocked while the source condition remains active", activeManualCompletion.status === 400, activeManualCompletion.body);
 
     await update("levytate_learner_pre_enrolment_checks", { organisation_id: `eq.${leadUser.organisation_id}`, learner_record_id: `eq.${testId}` }, {
       hr_approval_status: "approved",
@@ -91,12 +146,33 @@ async function main() {
       guides_sent_by: leadUser.id,
       guides_version: "validation-v1",
     });
+    const manualCompletion = await patchAction(leadCookie, hrAction.id, { command: "complete", expectedVersion: hrAction.version, completionNote: "Resolved through the approved external HR control.", resolvedOutsideLevyTate: true });
+    check("Manual completion succeeds only after source truth is resolved", manualCompletion.status === 200 && manualCompletion.body.action?.status === "completed" && manualCompletion.body.action?.completionMethod === "user_completed", manualCompletion.body);
     const readinessSync = await requestJson("/api/levytate-operational-actions", leadCookie, { method: "POST" });
     check("Pre-enrolment resolution synchronises successfully", readinessSync.status === 200, readinessSync.body);
     const readyActions = await listForLearner(leadCookie, testId, true);
-    check("Resolved HR and Guides actions complete automatically", ["obtain_hr_approval", "send_guides"].every((type) => readyActions.some((action) => action.actionType === type && action.status === "completed")), readyActions);
+    check("Resolved HR action remains completed after synchronisation", readyActions.some((action) => action.actionType === "obtain_hr_approval" && action.status === "completed"), readyActions);
+    check("Dismissed Guides action remains terminal with its lifecycle truth later cleared", readyActions.some((action) => action.id === guidesAction.id && action.status === "dismissed" && action.metadata?.conditionClearedAt), readyActions);
+    const hrHistory = await requestJson(`/api/levytate-operational-actions/${hrAction.id}?history=true`, leadCookie);
+    check("Managed action history retains assignment, due date, acknowledgement, start and completion", ["owner_changed", "due_date_changed", "acknowledged", "started", "completed"].every((event) => hrHistory.body.history?.some((item) => item.eventType === event)), hrHistory.body.history);
+    check("Duplicate state retries create only one acknowledgement and start event", hrHistory.body.history?.filter((item) => item.eventType === "acknowledged").length === 1 && hrHistory.body.history?.filter((item) => item.eventType === "started").length === 1, hrHistory.body.history);
     const readyAction = readyActions.find((action) => action.actionType === "complete_enrolment" && action.status === "open");
     check("Ready to enrol creates one durable action", Boolean(readyAction), readyActions);
+
+    const cancelledReady = await patchAction(leadCookie, readyAction.id, {
+      command: "cancel",
+      expectedVersion: readyAction.version,
+      cancellationKind: "invalidly_generated",
+      cancellationReason: "Validation confirms this administrative occurrence is no longer valid.",
+    });
+    check("Administrative cancellation persists where permitted", cancelledReady.status === 200 && cancelledReady.body.action?.status === "cancelled", cancelledReady.body);
+    const duplicateCancellation = await patchAction(leadCookie, readyAction.id, {
+      command: "cancel",
+      expectedVersion: readyAction.version,
+      cancellationKind: "invalidly_generated",
+      cancellationReason: "Validation confirms this administrative occurrence is no longer valid.",
+    });
+    check("Duplicate cancellation is idempotent", duplicateCancellation.status === 200 && duplicateCancellation.body.action?.version === cancelledReady.body.action.version, duplicateCancellation.body);
 
     await update("levytate_learner_records", { organisation_id: `eq.${leadUser.organisation_id}`, id: `eq.${testId}` }, {
       lifecycle_status: "enrolled",
@@ -105,7 +181,7 @@ async function main() {
     const enrolledSync = await requestJson("/api/levytate-operational-actions", leadCookie, { method: "POST" });
     check("Enrolment resolution synchronises successfully", enrolledSync.status === 200, enrolledSync.body);
     const enrolledActions = await listForLearner(leadCookie, testId, true);
-    check("Ready-to-enrol action completes after enrolment", enrolledActions.some((action) => action.id === readyAction.id && action.status === "completed"), enrolledActions);
+    check("Cancelled occurrence remains terminal after source resolution", enrolledActions.some((action) => action.id === readyAction.id && action.status === "cancelled"), enrolledActions);
 
     await update("levytate_learner_records", { organisation_id: `eq.${leadUser.organisation_id}`, id: `eq.${testId}` }, {
       lifecycle_status: "break_in_learning",
@@ -162,6 +238,8 @@ async function main() {
     const recurrence = await listForLearner(leadCookie, testId, true);
     const recurrentActive = recurrence.find((item) => !["completed", "dismissed", "cancelled"].includes(item.status));
     check("Recurrence creates a new occurrence", Boolean(recurrentActive && recurrentActive.id !== action.id && recurrentActive.metadata?.priorActionId === action.id), recurrence);
+    const recurrenceDetail = await requestJson(`/api/levytate-operational-actions/${recurrentActive.id}?management=true`, leadCookie);
+    check("Action detail keeps prior occurrences separate", recurrenceDetail.status === 200 && recurrenceDetail.body.previousOccurrences?.some((item) => item.id === action.id && item.status === "completed"), recurrenceDetail.body);
 
     const relogged = await login("apprenticeshiplead.demo@levytate.test");
     const persisted = await listForLearner(relogged, testId, true);
@@ -249,6 +327,12 @@ async function remove(table, filters) {
 
 function without(source, keys) {
   return Object.fromEntries(Object.entries(source).filter(([key]) => !keys.includes(key)));
+}
+
+function isoDateFromNow(days) {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
 }
 
 function loadEnv(file, overwrite = true) {

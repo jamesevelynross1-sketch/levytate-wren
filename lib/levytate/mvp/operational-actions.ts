@@ -65,6 +65,26 @@ export type OperationalActionMetadata = {
   priorActionId?: string;
   conditionClearedAt?: string;
   dismissalSuppressesUntilConditionClears?: boolean;
+  dueDateOverride?: {
+    date: string;
+    reason: string;
+    sourceDate: string;
+    setAt: string;
+    setBy: string;
+  };
+  ownershipOverride?: {
+    ownerType: OperationalOwnerType;
+    ownerUserId: string;
+    ownerDisplayName: string;
+    assignedAt: string;
+    assignedBy: string;
+  };
+  cancellation?: {
+    category: string;
+    reason: string;
+    cancelledAt: string;
+    cancelledBy: string;
+  };
   [key: string]: unknown;
 };
 

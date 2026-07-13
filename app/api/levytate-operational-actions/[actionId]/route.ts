@@ -5,13 +5,17 @@ import { LevyTateLearnerLifecyclePermissionError } from "@/lib/server/levytate-l
 import {
   acknowledgeOperationalAction,
   assignOperationalActionOwner,
+  cancelOperationalAction,
   completeOperationalAction,
   dismissOperationalAction,
   getOperationalAction,
+  getOperationalActionManagementDetail,
   getOperationalActionHistory,
   LevyTateOperationalActionConflictError,
   LevyTateOperationalActionError,
   startOperationalAction,
+  updateOperationalActionDueDate,
+  type OperationalActionCancellationKind,
   type OperationalActionDismissalKind,
 } from "@/lib/server/levytate-operational-actions";
 
@@ -27,6 +31,10 @@ export async function GET(request: Request, context: RouteContext) {
   if (!session) return NextResponse.json({ message: "Unauthorised." }, { status: 401 });
   const { actionId } = await context.params;
   try {
+    if (new URL(request.url).searchParams.get("management") === "true") {
+      const detail = await getOperationalActionManagementDetail(session, actionId);
+      return NextResponse.json({ ok: true, ...detail });
+    }
     const action = await getOperationalAction(session, actionId);
     const history = new URL(request.url).searchParams.get("history") === "true" ? await getOperationalActionHistory(session, actionId) : undefined;
     return NextResponse.json({ ok: true, action, ...(history ? { history } : {}) });
@@ -41,9 +49,10 @@ export async function PATCH(request: Request, context: RouteContext) {
   const { actionId } = await context.params;
   try {
     const body = await request.json() as {
-      command?: "acknowledge" | "start" | "complete" | "dismiss" | "assign";
+      command?: "acknowledge" | "start" | "complete" | "dismiss" | "assign" | "due_date" | "cancel";
       expectedVersion?: number;
       completionNote?: string;
+      resolvedOutsideLevyTate?: boolean;
       dismissalReason?: string;
       dismissalKind?: OperationalActionDismissalKind;
       organisationId?: string;
@@ -51,14 +60,20 @@ export async function PATCH(request: Request, context: RouteContext) {
       ownerType?: "Employee" | "Line Manager" | "Apprenticeship Lead" | "HR" | "Provider" | "Shared";
       ownerUserId?: string;
       ownerDisplayName?: string;
+      dueDate?: string;
+      dueDateReason?: string;
+      cancellationReason?: string;
+      cancellationKind?: OperationalActionCancellationKind;
     };
     if (!Number.isInteger(body.expectedVersion)) throw new LevyTateOperationalActionError("A valid expectedVersion is required.");
     let action;
     if (body.command === "acknowledge") action = await acknowledgeOperationalAction(session, actionId, body.expectedVersion!);
     else if (body.command === "start") action = await startOperationalAction(session, actionId, body.expectedVersion!);
-    else if (body.command === "complete") action = await completeOperationalAction(session, actionId, body.expectedVersion!, body.completionNote);
+    else if (body.command === "complete") action = await completeOperationalAction(session, actionId, body.expectedVersion!, body.completionNote, body.resolvedOutsideLevyTate);
     else if (body.command === "dismiss" && body.dismissalKind) action = await dismissOperationalAction(session, actionId, body.expectedVersion!, body.dismissalReason ?? "", body.dismissalKind);
     else if (body.command === "assign" && body.ownerType) action = await assignOperationalActionOwner(session, actionId, body.expectedVersion!, { ownerType: body.ownerType, ownerUserId: body.ownerUserId, ownerDisplayName: body.ownerDisplayName });
+    else if (body.command === "due_date") action = await updateOperationalActionDueDate(session, actionId, body.expectedVersion!, body.dueDate ?? "", body.dueDateReason);
+    else if (body.command === "cancel" && body.cancellationKind) action = await cancelOperationalAction(session, actionId, body.expectedVersion!, body.cancellationReason ?? "", body.cancellationKind);
     else throw new LevyTateOperationalActionError("A supported action command is required.");
     return NextResponse.json({ ok: true, action });
   } catch (error) {

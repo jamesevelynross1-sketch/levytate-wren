@@ -15,6 +15,10 @@ const requiredFunctions = [
   "startOperationalAction",
   "completeOperationalAction",
   "dismissOperationalAction",
+  "cancelOperationalAction",
+  "assignOperationalActionOwner",
+  "updateOperationalActionDueDate",
+  "getOperationalActionManagementDetail",
   "getOperationalActionHistory",
   "resolveActionsForLearnerConditionChange",
 ];
@@ -49,10 +53,14 @@ assertIncludes(migration, "auth.role() = 'service_role'", "Service-role policy")
 assertIncludes(server, "version: `eq.${action.version}`", "Optimistic concurrency control");
 assertIncludes(server, "source_condition_resolved", "Automatic completion");
 assertIncludes(server, "dismissalSuppressesUntilConditionClears", "Dismissal recurrence policy");
+assertIncludes(server, "ownershipOverride", "Managed ownership persistence");
+assertIncludes(server, "dueDateOverride", "Controlled due-date override");
+assertIncludes(server, "buildOwnerOptions", "Organisation-scoped owner options");
 assertIncludes(server, "/duplicate|23505/i", "Concurrent insertion recovery");
 assertIncludes(api, "expectedVersion", "Mutation version contract");
 assertIncludes(api, "organisationId?: string", "Client organisation input is accepted only as ignored input");
 assertIncludes(api, "actorUserId?: string", "Client actor input is accepted only as ignored input");
+assertIncludes(api, 'command?: "acknowledge" | "start" | "complete" | "dismiss" | "assign" | "due_date" | "cancel"', "Narrow action-management commands");
 
 console.log(JSON.stringify({
   ok: true,

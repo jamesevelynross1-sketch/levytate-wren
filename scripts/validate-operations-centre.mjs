@@ -4,7 +4,7 @@ const checks = [];
 
 async function main() {
   const leadCookie = await login("apprenticeshiplead.demo@levytate.test");
-  const response = await authedFetch("/api/levytate-operations", leadCookie);
+  const response = await authedFetch("/api/levytate-operations?synchronise=true", leadCookie);
   const body = await safeJson(response);
   check("Apprenticeship Lead can read Operations Centre", response.status === 200, body);
   check("Operations source is live Supabase", body.source === "supabase", body);
