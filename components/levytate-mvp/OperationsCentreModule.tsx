@@ -97,7 +97,7 @@ export function OperationsCentreModule({ onOpenLearner }: { onOpenLearner: (targ
   }
 
   if (selectedActionId) {
-    return <OperationalActionDetail actionId={selectedActionId} onBack={() => setSelectedActionId("")} onOpenLearner={onOpenLearner} onChanged={() => setRefreshKey((current) => current + 1)} />;
+    return <OperationalActionDetail actionId={selectedActionId} onBack={() => setSelectedActionId("")} onOpenAction={setSelectedActionId} onOpenLearner={onOpenLearner} onChanged={() => setRefreshKey((current) => current + 1)} />;
   }
 
   return (

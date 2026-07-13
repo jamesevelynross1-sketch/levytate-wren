@@ -207,6 +207,8 @@ async function main() {
       dismissalReason: "Validation confirms this critical action cannot be hidden.",
     });
     check("Critical lifecycle inconsistency cannot be dismissed", criticalDismissal.status === 400, criticalDismissal.body);
+    const protectedDetail = await requestJson(`/api/levytate-operational-actions/${action.id}?management=true`, leadCookie);
+    check("Action detail exposes central terminal protection", protectedDetail.status === 200 && protectedDetail.body.context?.terminalProtection === true, protectedDetail.body);
     const crossOrganisationOwner = await patchAction(leadCookie, action.id, {
       command: "assign",
       expectedVersion: acknowledged.body.action.version,

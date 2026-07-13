@@ -135,6 +135,7 @@ export type OperationalActionManagementDetail = {
     workflowLabel: string;
     workflowActionType: OperationalItem["actionType"];
     dueDateOrigin: "Source workflow" | "Manual override" | "No source date";
+    terminalProtection: boolean;
   };
   ownerOptions: OperationalActionOwnerOption[];
 };
@@ -263,6 +264,7 @@ export async function getOperationalActionManagementDetail(
       workflowLabel: derived?.actionLabel ?? workflowLabelForAction(action.actionType),
       workflowActionType: derived?.actionType ?? workflowActionForAction(action.actionType),
       dueDateOrigin: dueOverride?.date ? "Manual override" : derived?.dueDate ? "Source workflow" : "No source date",
+      terminalProtection: isCriticalOperationalBlocker(action.metadata.sourceCondition ?? action.sourceKey, action.priority),
     },
     ownerOptions,
   };
