@@ -267,6 +267,7 @@ export type LevyTateOperationalCopilotFilters = {
 export type LevyTateOperationalCopilotContext = {
   activeIntent: LevyTateOperationalCopilotIntent;
   filters: LevyTateOperationalCopilotFilters;
+  resultKeys?: string[];
   evaluatedAt: string;
 };
 
@@ -769,6 +770,7 @@ function parseOperationalContext(value: unknown): LevyTateOperationalCopilotCont
       blocker: clean(filters.blocker),
       assessmentState,
     },
+    resultKeys: cleanStringArray(candidate.resultKeys, 25),
     evaluatedAt: typeof candidate.evaluatedAt === "string" ? candidate.evaluatedAt.slice(0, 40) : "",
   };
 }

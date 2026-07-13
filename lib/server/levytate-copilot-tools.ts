@@ -26,6 +26,7 @@ type ClassifiedQuery = {
   intent: LevyTateOperationalCopilotIntent;
   filters: LevyTateOperationalCopilotFilters;
   direct: boolean;
+  contextResultKeys?: string[];
 };
 
 type ToolPayload = {
@@ -142,7 +143,7 @@ export function classifyOperationalCopilotQuery(
     return { intent: "access_boundary", filters: {}, direct: true };
   }
   if (/\b(which providers?|providers?)\b/.test(text) && /\b(they|them|those|these learners?)\b/.test(text) && prior) {
-    return { intent: "provider_operational_summary", filters: { ...priorFilters, actionType: `context:${prior}` }, direct: true };
+    return { intent: "provider_operational_summary", filters: { ...priorFilters, actionType: `context:${prior}` }, direct: true, contextResultKeys: previous?.resultKeys };
   }
   if (/\b(only|just)\b.*\bsignificantly behind\b|\bsignificantly behind\b/.test(text) && prior === "learners_behind_target") {
     return { intent: "learners_behind_target", filters: { ...priorFilters, progressPosition: "Significantly behind" }, direct: true };
@@ -214,7 +215,7 @@ async function executeTool(session: LevyTateBetaSession, query: ClassifiedQuery)
     case "active_breaks": return getActiveBreaksInLearning(session, query.filters);
     case "assessment_readiness": return getAssessmentReadiness(session, query.filters);
     case "operational_actions": return getOperationalActions(session, query.filters);
-    case "provider_operational_summary": return getProviderOperationalSummary(session, query.filters);
+    case "provider_operational_summary": return getProviderOperationalSummary(session, query.filters, query.contextResultKeys);
     case "programme_operational_summary": return getProgrammeOperationalSummary(session);
     case "access_boundary": throw new Error("Access boundary is handled before tool execution.");
   }
@@ -414,8 +415,8 @@ export async function getOperationalActions(session: LevyTateBetaSession, filter
   });
 }
 
-export async function getProviderOperationalSummary(session: LevyTateBetaSession, filters: LevyTateOperationalCopilotFilters = {}): Promise<ToolPayload> {
-  const details = await contextLearners(session, filters);
+export async function getProviderOperationalSummary(session: LevyTateBetaSession, filters: LevyTateOperationalCopilotFilters = {}, contextResultKeys?: string[]): Promise<ToolPayload> {
+  const details = await contextLearners(session, filters, contextResultKeys);
   const grouped = groupBy(details, (detail) => detail.programme.providerName || "Provider not recorded");
   let rows = Array.from(grouped.entries()).map(([provider, learners]) => {
     const behind = learners.filter((detail) => detail.progressPosition === "Slightly behind" || detail.progressPosition === "Significantly behind").length;
@@ -488,6 +489,7 @@ function responseForPayload(
   const operationalContext: LevyTateOperationalCopilotContext = {
     activeIntent: query.intent,
     filters: query.filters,
+    resultKeys: visibleRows.map((row) => row.key),
     evaluatedAt,
   };
   return {
@@ -578,18 +580,22 @@ function payloadFromRows(payload: ToolPayload): ToolPayload {
   return { ...payload, totalCount: payload.rows.length };
 }
 
-async function contextLearners(session: LevyTateBetaSession, filters: LevyTateOperationalCopilotFilters) {
+async function contextLearners(session: LevyTateBetaSession, filters: LevyTateOperationalCopilotFilters, contextResultKeys?: string[]) {
   const details = await listOrganisationLearnerLifecycleDetails(session);
   if (!filters.actionType?.startsWith("context:")) return details;
   const prior = filters.actionType.slice("context:".length);
+  const scopedKeys = contextResultKeys?.length
+    ? new Set(contextResultKeys.map((key) => key.split(":")[0]))
+    : null;
   if (prior === "learners_behind_target") {
     return details.filter((detail) =>
       (detail.progressPosition === "Slightly behind" || detail.progressPosition === "Significantly behind")
       && (!filters.progressPosition || detail.progressPosition === filters.progressPosition)
+      && (!scopedKeys || scopedKeys.has(detail.learnerRecordId))
     );
   }
-  if (prior === "overdue_reviews") return details.filter((detail) => detail.reviewSummaries.provider.overdue);
-  return details;
+  if (prior === "overdue_reviews") return details.filter((detail) => detail.reviewSummaries.provider.overdue && (!scopedKeys || scopedKeys.has(detail.learnerRecordId)));
+  return scopedKeys ? details.filter((detail) => scopedKeys.has(detail.learnerRecordId)) : details;
 }
 
 function directAnswer(intent: LevyTateOperationalCopilotIntent, count: number, filters: LevyTateOperationalCopilotFilters) {
