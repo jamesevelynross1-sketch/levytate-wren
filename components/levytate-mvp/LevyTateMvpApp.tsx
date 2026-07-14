@@ -15,7 +15,7 @@ import {
   UserRound,
   Users,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { LevyTateLogo } from "@/components/levytate-demo/PlatformShell";
 import { ApplicationsModule } from "@/components/levytate-mvp/ApplicationsModule";
 import { AskLevyTateAiWorkspace } from "@/components/levytate-mvp/AskLevyTateAiWorkspace";
@@ -117,6 +117,7 @@ function MvpAppShell() {
   const [settingsView, setSettingsView] = useState<SettingsView>("Workspace");
   const [aiEmployeeId, setAiEmployeeId] = useState<string | null>(null);
   const [learnerTarget, setLearnerTarget] = useState<{ learnerRecordId: string; actionType: OperationalActionType } | null>(null);
+  const deepLinkHandled = useRef(false);
 
   const notifications = useMemo(() => buildNotifications(data), [data]);
   const permissions = meta?.permissions ?? permissionsForMvpRole(meta?.userRole);
@@ -147,6 +148,13 @@ function MvpAppShell() {
     if (availableModules.some((module) => module.name === activeModule)) return;
     setActiveModule(availableModules[0]?.name ?? "Home");
   }, [activeModule, availableModules]);
+
+  useEffect(() => {
+    if (!hydrated || deepLinkHandled.current) return;
+    const requested = new URLSearchParams(window.location.search).get("module") as ModuleName | null;
+    if (requested && availableModules.some((module) => module.name === requested)) setActiveModule(requested);
+    deepLinkHandled.current = true;
+  }, [availableModules, hydrated]);
 
   useEffect(() => {
     if (peopleItems.includes(peopleView)) return;

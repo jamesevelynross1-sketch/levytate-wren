@@ -236,10 +236,17 @@ export type LevyTateCapabilityFit = {
 };
 
 export type LevyTateOperationalCopilotIntent =
+  | "applications_awaiting_review"
+  | "applications_returned"
+  | "applications_approved"
+  | "application_status"
   | "learners_behind_target"
   | "learners_without_recent_progress"
   | "learners_ending_before"
   | "overdue_reviews"
+  | "manager_check_ins"
+  | "employee_review_status"
+  | "employee_support"
   | "ready_to_enrol"
   | "pre_enrolment_blockers"
   | "active_breaks"
@@ -247,6 +254,7 @@ export type LevyTateOperationalCopilotIntent =
   | "operational_actions"
   | "provider_operational_summary"
   | "programme_operational_summary"
+  | "team_summary"
   | "access_boundary";
 
 export type LevyTateOperationalCopilotFilters = {
@@ -261,7 +269,10 @@ export type LevyTateOperationalCopilotFilters = {
   dueState?: string;
   actionType?: string;
   blocker?: string;
-  assessmentState?: "approaching" | "ready" | "all";
+  assessmentState?: "approaching" | "ready" | "preparation" | "in_assessment" | "all";
+  employeeName?: string;
+  applicationState?: "awaiting_review" | "returned" | "approved" | "active";
+  reviewDueState?: "overdue" | "due_soon" | "latest";
 };
 
 export type LevyTateOperationalCopilotContext = {
@@ -273,6 +284,7 @@ export type LevyTateOperationalCopilotContext = {
 
 export type LevyTateCopilotResultType =
   | "learner_results"
+  | "application_results"
   | "provider_results"
   | "programme_results"
   | "operational_action_results"
@@ -309,6 +321,7 @@ export type LevyTateCopilotStructuredResult = {
   evaluatedAt: string;
   timings: {
     intentClassificationMs: number;
+    managerScopeResolutionMs?: number;
     dataRetrievalMs: number;
     responsePreparationMs: number;
     totalMs: number;
@@ -723,10 +736,17 @@ function cleanStringArray(value: unknown, limit = 8) {
 }
 
 const operationalIntents: LevyTateOperationalCopilotIntent[] = [
+  "applications_awaiting_review",
+  "applications_returned",
+  "applications_approved",
+  "application_status",
   "learners_behind_target",
   "learners_without_recent_progress",
   "learners_ending_before",
   "overdue_reviews",
+  "manager_check_ins",
+  "employee_review_status",
+  "employee_support",
   "ready_to_enrol",
   "pre_enrolment_blockers",
   "active_breaks",
@@ -734,6 +754,7 @@ const operationalIntents: LevyTateOperationalCopilotIntent[] = [
   "operational_actions",
   "provider_operational_summary",
   "programme_operational_summary",
+  "team_summary",
   "access_boundary",
 ];
 
@@ -750,7 +771,7 @@ function parseOperationalContext(value: unknown): LevyTateOperationalCopilotCont
   const reviewType = filters.reviewType === "provider_review" || filters.reviewType === "l_and_d_check_in" || filters.reviewType === "manager_check_in"
     ? filters.reviewType
     : undefined;
-  const assessmentState = filters.assessmentState === "approaching" || filters.assessmentState === "ready" || filters.assessmentState === "all"
+  const assessmentState = filters.assessmentState === "approaching" || filters.assessmentState === "ready" || filters.assessmentState === "preparation" || filters.assessmentState === "in_assessment" || filters.assessmentState === "all"
     ? filters.assessmentState
     : undefined;
   const clean = (item: unknown, limit = 160) => typeof item === "string" ? item.trim().slice(0, limit) || undefined : undefined;
@@ -769,6 +790,9 @@ function parseOperationalContext(value: unknown): LevyTateOperationalCopilotCont
       actionType: clean(filters.actionType),
       blocker: clean(filters.blocker),
       assessmentState,
+      employeeName: clean(filters.employeeName, 120),
+      applicationState: filters.applicationState === "awaiting_review" || filters.applicationState === "returned" || filters.applicationState === "approved" || filters.applicationState === "active" ? filters.applicationState : undefined,
+      reviewDueState: filters.reviewDueState === "overdue" || filters.reviewDueState === "due_soon" || filters.reviewDueState === "latest" ? filters.reviewDueState : undefined,
     },
     resultKeys: cleanStringArray(candidate.resultKeys, 25),
     evaluatedAt: typeof candidate.evaluatedAt === "string" ? candidate.evaluatedAt.slice(0, 40) : "",

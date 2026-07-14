@@ -1,4 +1,7 @@
+import { createHash } from "node:crypto";
+
 import type { LevyTateBetaSession } from "@/lib/levytate/config/beta-access";
+import { getApprenticeshipStandard } from "@/lib/levytate/domain";
 import type {
   LevyTateAiRequest,
   LevyTateAiResponse,
@@ -11,12 +14,31 @@ import type {
 } from "@/lib/levytate/ai/types";
 import type { LearnerRecordDetail } from "@/lib/levytate/mvp/learner-record-view";
 import type { LearnerReviewType } from "@/lib/levytate/mvp/learner-lifecycle";
+import { buildOrganisationOperationalItems, type OperationalItem } from "@/lib/levytate/mvp/operations-centre";
 import { normaliseMvpUserRole } from "@/lib/levytate/mvp/rbac";
-import { listOrganisationLearnerLifecycleDetails, getLearnerLifecycleServerContext } from "@/lib/server/levytate-learner-lifecycle";
+import { activeApplicationStatuses } from "@/lib/levytate/mvp/workspace";
+import {
+  listOrganisationLearnerLifecycleDetails,
+  listManagerDirectReportLearnerLifecycleDetails,
+  getLearnerLifecycleServerContext,
+  type LearnerLifecycleServerContext,
+} from "@/lib/server/levytate-learner-lifecycle";
+import { recordCopilotQueryAudit } from "@/lib/server/levytate-copilot-audit";
+import {
+  getManagerDirectReportContext,
+  listManagerDirectReportApplications,
+  type ManagerDirectReport,
+  type ManagerDirectReportApplication,
+  type ManagerDirectReportContext,
+} from "@/lib/server/levytate-manager-scope";
 import { getOrganisationOperationsSummary } from "@/lib/server/levytate-operations";
 
 const resultLimit = 25;
-const operationalRoles = new Set(["Apprenticeship Lead", "Employer Admin", "Platform Admin"]);
+const operationalRoles = new Set(["Line Manager", "Apprenticeship Lead", "Employer Admin", "Platform Admin"]);
+const managerOnlyIntents = new Set<LevyTateOperationalCopilotIntent>([
+  "applications_awaiting_review", "applications_returned", "applications_approved", "application_status",
+  "manager_check_ins", "employee_review_status", "employee_support", "team_summary",
+]);
 const monthNumbers: Record<string, number> = {
   january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
   july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
@@ -38,6 +60,10 @@ type ToolPayload = {
   interpretation?: string;
   emptyMessage: string;
   viewAllUrl?: string;
+  assistantMessage?: string;
+  followUpQuestion?: string | null;
+  quickReplies?: string[];
+  toolName?: string;
 };
 
 export async function routeOperationalCopilotQuery(
@@ -51,9 +77,10 @@ export async function routeOperationalCopilotQuery(
   if (!classification) return null;
 
   let role: ReturnType<typeof normaliseMvpUserRole>;
+  let serverContext: LearnerLifecycleServerContext;
   try {
-    const context = await getLearnerLifecycleServerContext(session);
-    role = normaliseMvpUserRole(context.user.role);
+    serverContext = await getLearnerLifecycleServerContext(session);
+    role = normaliseMvpUserRole(serverContext.user.role);
   } catch (error) {
     console.error("LevyTate operational Copilot scope resolution failed", { intent: classification.intent, error });
     return responseForPayload(
@@ -69,6 +96,7 @@ export async function routeOperationalCopilotQuery(
       { intentClassificationMs, dataRetrievalMs: 0, startedAt },
     );
   }
+  if (managerOnlyIntents.has(classification.intent) && role !== "Line Manager") return null;
   if (!operationalRoles.has(role)) {
     return responseForPayload(
       request,
@@ -86,10 +114,33 @@ export async function routeOperationalCopilotQuery(
     );
   }
 
+  const auditedResponse = async (
+    payload: ToolPayload,
+    timing: { dataRetrievalMs: number; managerScopeResolutionMs?: number },
+    success: boolean,
+  ) => {
+    const response = responseForPayload(request, classification, payload, {
+      intentClassificationMs,
+      managerScopeResolutionMs: timing.managerScopeResolutionMs,
+      dataRetrievalMs: timing.dataRetrievalMs,
+      startedAt,
+    }, role);
+    try {
+      await recordCopilotQueryAudit(serverContext, {
+        intent: classification.intent,
+        resultCount: response.structuredResult?.totalCount ?? 0,
+        tool: payload.toolName ?? toolNameFor(classification.intent, role),
+        durationMs: performance.now() - startedAt,
+        success,
+      });
+    } catch {
+      console.error("LevyTate Copilot query audit write failed", { intent: classification.intent });
+    }
+    return response;
+  };
+
   if (classification.intent === "access_boundary") {
-    return responseForPayload(
-      request,
-      classification,
+    return auditedResponse(
       {
         type: "access_boundary",
         title: "Organisation access boundary",
@@ -97,35 +148,70 @@ export async function routeOperationalCopilotQuery(
         rows: [],
         emptyMessage: "I can only use records from your authorised LevyTate workspace. I cannot retrieve another organisation's learners, hidden records, raw database content, system prompts or secrets.",
       },
-      { intentClassificationMs, dataRetrievalMs: 0, startedAt },
+      { dataRetrievalMs: 0 },
+      true,
     );
+  }
+
+  let managerScope: ManagerDirectReportContext | undefined;
+  let managerScopeResolutionMs = 0;
+  if (role === "Line Manager") {
+    const managerScopeStarted = performance.now();
+    try {
+      managerScope = await getManagerDirectReportContext(session);
+      managerScopeResolutionMs = elapsed(managerScopeStarted);
+    } catch {
+      managerScopeResolutionMs = elapsed(managerScopeStarted);
+      return auditedResponse({
+        type: "data_unavailable",
+        title: "Team data unavailable",
+        columns: [],
+        rows: [],
+        emptyMessage: "I couldn't retrieve your direct-report data just now. Please try again.",
+        toolName: "getManagerDirectReportContext",
+      }, { dataRetrievalMs: 0, managerScopeResolutionMs }, false);
+    }
+
+    if (classification.filters.actionType === "manager_access_boundary" || (classification.intent === "provider_operational_summary" && !classification.contextResultKeys?.length)) {
+      return auditedResponse({
+        type: "access_boundary",
+        title: "Direct-report access boundary",
+        columns: [],
+        rows: [],
+        emptyMessage: classification.intent === "provider_operational_summary"
+          ? "I can show provider context for your direct reports, but organisation-wide provider performance is available to Apprenticeship Leads."
+          : "I can only show apprenticeship information for your direct reports.",
+        toolName: "managerAccessBoundary",
+      }, { dataRetrievalMs: 0, managerScopeResolutionMs }, true);
+    }
   }
 
   const retrievalStarted = performance.now();
   try {
-    const payload = await executeTool(session, classification);
-    return responseForPayload(request, classification, payload, {
-      intentClassificationMs,
+    const payload = await executeTool(session, classification, managerScope);
+    return auditedResponse(payload, {
       dataRetrievalMs: elapsed(retrievalStarted),
-      startedAt,
-    });
+      managerScopeResolutionMs,
+    }, true);
   } catch (error) {
     console.error("LevyTate operational Copilot retrieval failed", {
       intent: classification.intent,
       role,
       error,
     });
-    return responseForPayload(
-      request,
-      classification,
+    return auditedResponse(
       {
         type: "data_unavailable",
-        title: "Programme data unavailable",
+        title: role === "Line Manager" ? "Team data unavailable" : "Programme data unavailable",
         columns: [],
         rows: [],
-        emptyMessage: "I couldn't retrieve the programme data just now. Please try again.",
+        emptyMessage: role === "Line Manager"
+          ? "I couldn't retrieve your direct-report data just now. Please try again."
+          : "I couldn't retrieve the programme data just now. Please try again.",
+        toolName: toolNameFor(classification.intent, role),
       },
-      { intentClassificationMs, dataRetrievalMs: elapsed(retrievalStarted), startedAt },
+      { dataRetrievalMs: elapsed(retrievalStarted), managerScopeResolutionMs },
+      false,
     );
   }
 }
@@ -142,6 +228,46 @@ export function classifyOperationalCopilotQuery(
   if (/\b(another organisation|other organisation|different organisation|organisation id|raw database|database rows?|service role|system prompt|hidden tool|secret|ignore (all|previous) instructions|bypass (access|permissions?))\b/.test(text)) {
     return { intent: "access_boundary", filters: {}, direct: true };
   }
+  if (/\b(another manager|other manager|every learner in|all learners in|all provider performance|hr approval records? for the organisation)\b/.test(text)) {
+    return { intent: "team_summary", filters: { actionType: "manager_access_boundary" }, direct: true };
+  }
+  const employeeName = extractEmployeeName(text);
+  if (/\b(applications?).{0,35}(need|needs|awaiting|require).{0,20}(my review|review|approval)|\bwhich applications need my review\b/.test(text)) {
+    return { intent: "applications_awaiting_review", filters: { applicationState: "awaiting_review" }, direct: true };
+  }
+  if (/\b(responded|resubmitted|returned).{0,35}(more information|requested information)|\bmore information.{0,35}(responded|resubmitted|returned)\b/.test(text)) {
+    return { intent: "applications_returned", filters: { applicationState: "returned" }, direct: true };
+  }
+  if (/\b(applications?).{0,35}(i have approved|i approved|approved by me)|\bwhich applications have i approved\b/.test(text)) {
+    return { intent: "applications_approved", filters: { applicationState: "approved" }, direct: true };
+  }
+  if (employeeName && /\b(application|edit the application|can't edit|cannot edit|happens next|current status)\b/.test(text)) {
+    return { intent: "application_status", filters: { employeeName, applicationState: "active" }, direct: true };
+  }
+  if (employeeName && /\b(latest review|next provider review|review status|last review)\b/.test(text)) {
+    return { intent: "employee_review_status", filters: { employeeName, reviewDueState: /next provider/.test(text) ? "due_soon" : "latest" }, direct: true };
+  }
+  if (employeeName && /\b(need from me|needs from me|support.*need|what.*support)\b/.test(text)) {
+    return { intent: "employee_support", filters: { employeeName }, direct: true };
+  }
+  if (/\b(summarise|summarize).{0,40}(activity|apprenticeship).{0,20}(my team|team)|\bhow many direct reports.{0,35}(applications?|enrolled)|\bactivity in my team\b/.test(text)) {
+    return { intent: "team_summary", filters: {}, direct: true };
+  }
+  if (/\b(which programmes?|programmes?).{0,30}(represented|in my team|team)\b/.test(text)) {
+    return { intent: "programme_operational_summary", filters: { actionType: "team_programmes" }, direct: true };
+  }
+  if (/\b(manager check.?ins?|check.?ins?).{0,30}(need|needed|due|overdue|soon)|\bwho needs a manager check.?in\b/.test(text)) {
+    return {
+      intent: "manager_check_ins",
+      filters: {
+        reviewType: "manager_check_in",
+        reviewDueState: /due soon|approaching/.test(text) ? "due_soon" : /overdue|late/.test(text) ? "overdue" : undefined,
+        actionType: prior ? `context:${prior}` : undefined,
+      },
+      direct: true,
+      contextResultKeys: previous?.resultKeys,
+    };
+  }
   if (/\b(which providers?|providers?)\b/.test(text) && /\b(they|them|those|these learners?)\b/.test(text) && prior) {
     return { intent: "provider_operational_summary", filters: { ...priorFilters, actionType: `context:${prior}` }, direct: true, contextResultKeys: previous?.resultKeys };
   }
@@ -154,8 +280,9 @@ export function classifyOperationalCopilotQuery(
   if (/\b(behind schedule|behind target|behind their target|progress behind|significantly behind)\b/.test(text)) {
     return {
       intent: "learners_behind_target",
-      filters: { progressPosition: /significantly/.test(text) ? "Significantly behind" : undefined },
+      filters: { progressPosition: /significantly/.test(text) ? "Significantly behind" : undefined, employeeName },
       direct: true,
+      contextResultKeys: prior === "learners_behind_target" ? previous?.resultKeys : undefined,
     };
   }
   if (/\b(provider reviews?|l&d check.?ins?|manager check.?ins?|reviews?)\b.*\b(overdue|late)\b|\b(overdue|late)\b.*\b(provider reviews?|reviews?)\b|\bproviders?\b.*\b(overdue|late)\b.*\breviews?\b/.test(text)) {
@@ -174,6 +301,9 @@ export function classifyOperationalCopilotQuery(
   if (/\b(overdue return|return date.{0,20}overdue|overdue.{0,20}return)\b/.test(text)) {
     return { intent: "active_breaks", filters: { dueState: "overdue" }, direct: true };
   }
+  if (/\b(return|returning).{0,25}(soon|due soon|next)\b/.test(text)) {
+    return { intent: "active_breaks", filters: { dueState: "due_soon" }, direct: true };
+  }
   if (/\b(break in learning|on a break|active breaks?)\b/.test(text)) {
     return { intent: "active_breaks", filters: {}, direct: true };
   }
@@ -183,11 +313,26 @@ export function classifyOperationalCopilotQuery(
   if (/\b(approaching assessment|assessment readiness|gateway)\b/.test(text)) {
     return { intent: "assessment_readiness", filters: { assessmentState: "approaching" }, direct: true };
   }
+  if (/\b(assessment preparation|in assessment preparation)\b/.test(text)) {
+    return { intent: "assessment_readiness", filters: { assessmentState: "preparation" }, direct: true };
+  }
+  if (/\b(already in assessment|currently in assessment|who is in assessment)\b/.test(text)) {
+    return { intent: "assessment_readiness", filters: { assessmentState: "in_assessment" }, direct: true };
+  }
+  if (/\b(readiness checks?).{0,25}(involve me|need me|line manager)\b/.test(text)) {
+    return { intent: "assessment_readiness", filters: { assessmentState: "all", actionType: "line_manager_readiness" }, direct: true };
+  }
   if (/\b(ending|end|finish|finishing|complete|completion)\b.*\b(before|by|next|soon|within)\b/.test(text)) {
     return { intent: "learners_ending_before", filters: { dateBefore: extractDateBefore(text) }, direct: true };
   }
   if (/\b(actions?|tasks?)\b.*\b(assigned to me|my|mine)\b/.test(text)) {
     return { intent: "operational_actions", filters: { owner: "mine", status: "open" }, direct: true };
+  }
+  if (/\b(actions?|tasks?)\b.*\b(overdue|late)\b|\b(overdue|late)\b.*\b(actions?|tasks?)\b/.test(text)) {
+    return { intent: "operational_actions", filters: { owner: "mine", status: "open", dueState: "overdue" }, direct: true };
+  }
+  if (/\bsupport actions?.{0,25}(my team|team|direct reports?)\b/.test(text)) {
+    return { intent: "operational_actions", filters: { status: "open", actionType: "team_support" }, direct: true };
   }
   if (/\bcritical\b.*\b(actions?|tasks?)\b|\b(actions?|tasks?)\b.*\bcritical\b/.test(text)) {
     return { intent: "operational_actions", filters: { priority: "Critical", status: "open" }, direct: true };
@@ -204,8 +349,22 @@ export function classifyOperationalCopilotQuery(
   return null;
 }
 
-async function executeTool(session: LevyTateBetaSession, query: ClassifiedQuery): Promise<ToolPayload> {
+async function executeTool(
+  session: LevyTateBetaSession,
+  query: ClassifiedQuery,
+  managerScope?: ManagerDirectReportContext,
+): Promise<ToolPayload> {
+  if (managerScope) return executeManagerTool(session, query, managerScope);
   switch (query.intent) {
+    case "applications_awaiting_review":
+    case "applications_returned":
+    case "applications_approved":
+    case "application_status":
+    case "manager_check_ins":
+    case "employee_review_status":
+    case "employee_support":
+    case "team_summary":
+      throw new Error("Manager tools require a verified manager scope.");
     case "learners_behind_target": return getLearnersBehindTarget(session, query.filters);
     case "learners_without_recent_progress": return getLearnersWithoutRecentProgress(session);
     case "learners_ending_before": return getLearnersEndingBefore(session, query.filters.dateBefore ?? defaultDateBefore());
@@ -221,8 +380,45 @@ async function executeTool(session: LevyTateBetaSession, query: ClassifiedQuery)
   }
 }
 
-export async function getLearnersBehindTarget(session: LevyTateBetaSession, filters: LevyTateOperationalCopilotFilters = {}): Promise<ToolPayload> {
-  const details = await listOrganisationLearnerLifecycleDetails(session);
+async function executeManagerTool(
+  session: LevyTateBetaSession,
+  query: ClassifiedQuery,
+  scope: ManagerDirectReportContext,
+): Promise<ToolPayload> {
+  switch (query.intent) {
+    case "applications_awaiting_review": return getManagerApplications(session, scope, "awaiting_review", query.filters.employeeName);
+    case "applications_returned": return getManagerApplications(session, scope, "returned", query.filters.employeeName);
+    case "applications_approved": return getManagerApplications(session, scope, "approved", query.filters.employeeName);
+    case "application_status": return getManagerApplications(session, scope, "active", query.filters.employeeName);
+    case "learners_behind_target": return getLearnersBehindTarget(session, query.filters, scope, query.contextResultKeys);
+    case "learners_without_recent_progress": return getLearnersWithoutRecentProgress(session, scope);
+    case "learners_ending_before": return getLearnersEndingBefore(session, query.filters.dateBefore ?? defaultDateBefore(), scope);
+    case "overdue_reviews": return getOverdueReviews(session, query.filters, scope);
+    case "manager_check_ins": return getManagerCheckIns(session, query.filters, scope, query.contextResultKeys);
+    case "employee_review_status": return getManagerEmployeeReviewStatus(session, query.filters, scope);
+    case "employee_support": return getManagerEmployeeSupport(session, query.filters, scope);
+    case "active_breaks": return getActiveBreaksInLearning(session, query.filters, scope);
+    case "assessment_readiness": return getAssessmentReadiness(session, query.filters, scope);
+    case "operational_actions": return getManagerOperationalActions(session, query.filters, scope);
+    case "provider_operational_summary": return getProviderOperationalSummary(session, query.filters, query.contextResultKeys, scope);
+    case "programme_operational_summary": return getProgrammeOperationalSummary(session, scope);
+    case "team_summary": return getManagerTeamSummary(session, scope);
+    case "ready_to_enrol":
+    case "pre_enrolment_blockers":
+      return managerAccessBoundary("This enrolment workflow is managed by the Apprenticeship Lead.");
+    case "access_boundary": return managerAccessBoundary("I can only show apprenticeship information for your direct reports.");
+  }
+}
+
+export async function getLearnersBehindTarget(
+  session: LevyTateBetaSession,
+  filters: LevyTateOperationalCopilotFilters = {},
+  managerScope?: ManagerDirectReportContext,
+  contextResultKeys?: string[],
+): Promise<ToolPayload> {
+  const scoped = await managerDetailsForQuery(session, managerScope, filters.employeeName, contextResultKeys);
+  if (scoped.payload) return scoped.payload;
+  const details = scoped.details;
   const matches = details.filter((detail) =>
     (detail.progressPosition === "Slightly behind" || detail.progressPosition === "Significantly behind")
     && (!filters.progressPosition || detail.progressPosition === filters.progressPosition)
@@ -250,13 +446,17 @@ export async function getLearnersBehindTarget(session: LevyTateBetaSession, filt
     filters.progressPosition ? "No learners are currently significantly behind target." : "No learners are currently behind target.",
     "/levytate/app?module=Learners",
     "Add progress update",
+    managerScope,
   );
 }
 
-export async function getLearnersWithoutRecentProgress(session: LevyTateBetaSession): Promise<ToolPayload> {
-  const details = await listOrganisationLearnerLifecycleDetails(session);
-  const operations = await getOrganisationOperationsSummary(session);
-  const missingIds = new Set(operations.queues.progress.filter((item) => item.sourceCondition === "progress_overdue").map((item) => item.learnerRecordId));
+export async function getLearnersWithoutRecentProgress(session: LevyTateBetaSession, managerScope?: ManagerDirectReportContext): Promise<ToolPayload> {
+  const details = managerScope
+    ? await listManagerDirectReportLearnerLifecycleDetails(session, managerScope)
+    : await listOrganisationLearnerLifecycleDetails(session);
+  const missingIds = managerScope
+    ? new Set(buildOrganisationOperationalItems(details).items.filter((item) => item.sourceCondition === "progress_overdue").map((item) => item.learnerRecordId))
+    : new Set((await getOrganisationOperationsSummary(session)).queues.progress.filter((item) => item.sourceCondition === "progress_overdue").map((item) => item.learnerRecordId));
   const matches = details.filter((detail) => missingIds.has(detail.learnerRecordId));
   return learnerPayload(
     "Learners without a recent progress update",
@@ -267,11 +467,14 @@ export async function getLearnersWithoutRecentProgress(session: LevyTateBetaSess
     "Every active learner has a recent progress update.",
     "/levytate/app?module=Learners",
     "Add progress update",
+    managerScope,
   );
 }
 
-export async function getLearnersEndingBefore(session: LevyTateBetaSession, dateBefore: string): Promise<ToolPayload> {
-  const details = await listOrganisationLearnerLifecycleDetails(session);
+export async function getLearnersEndingBefore(session: LevyTateBetaSession, dateBefore: string, managerScope?: ManagerDirectReportContext): Promise<ToolPayload> {
+  const details = managerScope
+    ? await listManagerDirectReportLearnerLifecycleDetails(session, managerScope)
+    : await listOrganisationLearnerLifecycleDetails(session);
   const matches = details.filter((detail) => detail.expectedEndDate && detail.expectedEndDate < dateBefore);
   const payload = learnerPayload(
     `Learners ending before ${displayDate(dateBefore)}`,
@@ -281,12 +484,16 @@ export async function getLearnersEndingBefore(session: LevyTateBetaSession, date
     "Results use each learner's current expected programme end date.",
     `No apprentices are expected to end before ${displayDate(dateBefore)}.`,
     "/levytate/app?module=Learners",
+    undefined,
+    managerScope,
   );
   return payload;
 }
 
-export async function getOverdueReviews(session: LevyTateBetaSession, filters: LevyTateOperationalCopilotFilters = {}): Promise<ToolPayload> {
-  const details = await listOrganisationLearnerLifecycleDetails(session);
+export async function getOverdueReviews(session: LevyTateBetaSession, filters: LevyTateOperationalCopilotFilters = {}, managerScope?: ManagerDirectReportContext): Promise<ToolPayload> {
+  const details = managerScope
+    ? await listManagerDirectReportLearnerLifecycleDetails(session, managerScope)
+    : await listOrganisationLearnerLifecycleDetails(session);
   const reviewTypes: Array<{ key: "provider" | "lAndD" | "manager"; type: LearnerReviewType; label: string }> = [
     { key: "provider", type: "provider_review", label: "Provider review" },
     { key: "lAndD", type: "l_and_d_check_in", label: "L&D check-in" },
@@ -297,7 +504,9 @@ export async function getOverdueReviews(session: LevyTateBetaSession, filters: L
     const summary = detail.reviewSummaries[key];
     if (!summary.overdue) return [];
     return [{
-      key: `${detail.learnerRecordId}:${type}`,
+      key: managerScope
+        ? authorisedManagerResultKey(managerScope, "review", `${detail.learnerRecordId}:${type}`)
+        : `${detail.learnerRecordId}:${type}`,
       cells: {
         learner: detail.learner.name,
         programme: detail.programme.programmeName,
@@ -307,7 +516,7 @@ export async function getOverdueReviews(session: LevyTateBetaSession, filters: L
         expectedReview: displayDate(summary.nextDate),
         daysOverdue: daysOverdue(summary.nextDate),
       },
-      actions: learnerActions(detail, "Record review"),
+      actions: learnerActions(detail, "Record review", managerScope),
     }];
   }));
   return payloadFromRows({
@@ -317,7 +526,8 @@ export async function getOverdueReviews(session: LevyTateBetaSession, filters: L
     columns: [col("learner", "Learner"), col("programme", "Programme"), col("provider", "Provider"), col("reviewType", "Review type"), col("lastReview", "Last review"), col("expectedReview", "Expected"), col("daysOverdue", "Days overdue", "right")],
     interpretation: "The most overdue reviews should be addressed first, particularly where support actions are already open.",
     emptyMessage: filters.reviewType === "provider_review" ? "No provider reviews are currently overdue." : "No reviews or check-ins are currently overdue.",
-    viewAllUrl: "/levytate/app?module=Learners",
+    viewAllUrl: managerScope ? "/levytate/app?module=My%20Team" : "/levytate/app?module=Learners",
+    toolName: managerScope ? "getManagerOverdueReviews" : "getOverdueReviews",
   });
 }
 
@@ -349,10 +559,13 @@ export async function getPreEnrolmentBlockers(session: LevyTateBetaSession, filt
   );
 }
 
-export async function getActiveBreaksInLearning(session: LevyTateBetaSession, filters: LevyTateOperationalCopilotFilters = {}): Promise<ToolPayload> {
-  const details = await listOrganisationLearnerLifecycleDetails(session);
+export async function getActiveBreaksInLearning(session: LevyTateBetaSession, filters: LevyTateOperationalCopilotFilters = {}, managerScope?: ManagerDirectReportContext): Promise<ToolPayload> {
+  const details = managerScope
+    ? await listManagerDirectReportLearnerLifecycleDetails(session, managerScope)
+    : await listOrganisationLearnerLifecycleDetails(session);
   const matches = details.filter((detail) => detail.activeBreak)
-    .filter((detail) => filters.dueState !== "overdue" || detail.breakAttention.state === "overdue");
+    .filter((detail) => filters.dueState !== "overdue" || detail.breakAttention.state === "overdue")
+    .filter((detail) => filters.dueState !== "due_soon" || detail.breakAttention.state === "approaching");
   return learnerPayload(
     filters.dueState === "overdue" ? "Overdue Break in Learning returns" : "Active Breaks in Learning",
     matches,
@@ -362,16 +575,22 @@ export async function getActiveBreaksInLearning(session: LevyTateBetaSession, fi
     filters.dueState === "overdue" ? "No Break in Learning return dates are currently overdue." : "No learners are currently on a Break in Learning.",
     "/levytate/app?module=Learners",
     "Manage break",
+    managerScope,
   );
 }
 
-export async function getAssessmentReadiness(session: LevyTateBetaSession, filters: LevyTateOperationalCopilotFilters = {}): Promise<ToolPayload> {
-  const details = await listOrganisationLearnerLifecycleDetails(session);
+export async function getAssessmentReadiness(session: LevyTateBetaSession, filters: LevyTateOperationalCopilotFilters = {}, managerScope?: ManagerDirectReportContext): Promise<ToolPayload> {
+  const details = managerScope
+    ? await listManagerDirectReportLearnerLifecycleDetails(session, managerScope)
+    : await listOrganisationLearnerLifecycleDetails(session);
   const cutoff = addDays(toDate(new Date()), 60);
   const matches = details.filter((detail) => {
     const readiness = detail.assessmentReadiness;
     if (!readiness) return false;
     if (filters.assessmentState === "ready") return detail.lifecycleStatus === "assessment_preparation" && readiness.assessmentStatus === "readiness_confirmed";
+    if (filters.assessmentState === "preparation") return detail.lifecycleStatus === "assessment_preparation";
+    if (filters.assessmentState === "in_assessment") return detail.lifecycleStatus === "in_assessment";
+    if (filters.actionType === "line_manager_readiness") return ["awaiting_confirmation", "more_information_required", "not_confirmed"].includes(readiness.confirmations.line_manager.status);
     if (filters.assessmentState === "approaching") {
       const date = readiness.expectedAssessmentReadinessDate || readiness.gatewayDate;
       return Boolean(date && date <= cutoff && readiness.assessmentStatus !== "in_assessment");
@@ -387,6 +606,7 @@ export async function getAssessmentReadiness(session: LevyTateBetaSession, filte
     filters.assessmentState === "ready" ? "No learners are currently ready to enter assessment." : "No learners are approaching assessment within the next 60 days.",
     "/levytate/app?module=Learners",
     "Manage assessment",
+    managerScope,
   );
 }
 
@@ -415,8 +635,8 @@ export async function getOperationalActions(session: LevyTateBetaSession, filter
   });
 }
 
-export async function getProviderOperationalSummary(session: LevyTateBetaSession, filters: LevyTateOperationalCopilotFilters = {}, contextResultKeys?: string[]): Promise<ToolPayload> {
-  const details = await contextLearners(session, filters, contextResultKeys);
+export async function getProviderOperationalSummary(session: LevyTateBetaSession, filters: LevyTateOperationalCopilotFilters = {}, contextResultKeys?: string[], managerScope?: ManagerDirectReportContext): Promise<ToolPayload> {
+  const details = await contextLearners(session, filters, contextResultKeys, managerScope);
   const grouped = groupBy(details, (detail) => detail.programme.providerName || "Provider not recorded");
   let rows = Array.from(grouped.entries()).map(([provider, learners]) => {
     const behind = learners.filter((detail) => detail.progressPosition === "Slightly behind" || detail.progressPosition === "Significantly behind").length;
@@ -426,7 +646,7 @@ export async function getProviderOperationalSummary(session: LevyTateBetaSession
     return {
       key: provider,
       cells: { provider, activeLearners: learners.filter(isActiveLearner).length, behindTarget: behind, overdueReviews: overdue, latestActivity: displayDate(latest), upcomingReview: displayDate(upcoming) },
-      actions: [{ label: "Open providers", url: "/levytate/app?module=Providers" }],
+      actions: managerScope ? [{ label: "Open team view", url: "/levytate/app?module=My%20Team" }] : [{ label: "Open providers", url: "/levytate/app?module=Providers" }],
     };
   }).sort((left, right) => Number(right.cells.overdueReviews) - Number(left.cells.overdueReviews) || Number(right.cells.behindTarget) - Number(left.cells.behindTarget));
   if (filters.reviewType === "provider_review") rows = rows.filter((row) => Number(row.cells.overdueReviews) > 0);
@@ -437,12 +657,15 @@ export async function getProviderOperationalSummary(session: LevyTateBetaSession
     columns: [col("provider", "Provider"), col("activeLearners", "Active learners", "right"), col("behindTarget", "Behind target", "right"), col("overdueReviews", "Overdue reviews", "right"), col("latestActivity", "Latest activity"), col("upcomingReview", "Upcoming review")],
     interpretation: "Provider figures reflect current learner progress and provider-review records, not a predictive performance score.",
     emptyMessage: "No provider activity matches the current query.",
-    viewAllUrl: "/levytate/app?module=Providers",
+    viewAllUrl: managerScope ? "/levytate/app?module=My%20Team" : "/levytate/app?module=Providers",
+    toolName: managerScope ? "getManagerDirectReportProviderContext" : "getProviderOperationalSummary",
   });
 }
 
-export async function getProgrammeOperationalSummary(session: LevyTateBetaSession): Promise<ToolPayload> {
-  const details = await listOrganisationLearnerLifecycleDetails(session);
+export async function getProgrammeOperationalSummary(session: LevyTateBetaSession, managerScope?: ManagerDirectReportContext): Promise<ToolPayload> {
+  const details = managerScope
+    ? await listManagerDirectReportLearnerLifecycleDetails(session, managerScope)
+    : await listOrganisationLearnerLifecycleDetails(session);
   const grouped = groupBy(details, (detail) => detail.programme.programmeName || "Programme not recorded");
   const rows = Array.from(grouped.entries()).map(([programme, learners]) => ({
     key: programme,
@@ -455,35 +678,315 @@ export async function getProgrammeOperationalSummary(session: LevyTateBetaSessio
       assessmentStage: learners.filter((detail) => detail.lifecycleStatus === "assessment_preparation" || detail.lifecycleStatus === "in_assessment").length,
       achieved: learners.filter((detail) => detail.lifecycleStatus === "achieved").length,
     },
-    actions: [{ label: "Open learners", url: "/levytate/app?module=Learners" }],
+    actions: [{ label: managerScope ? "Open team view" : "Open learners", url: managerScope ? "/levytate/app?module=My%20Team" : "/levytate/app?module=Learners" }],
   })).sort((left, right) => Number(right.cells.activeLearners) - Number(left.cells.activeLearners));
   return payloadFromRows({
     type: "programme_results",
-    title: "Programme operational summary",
+    title: managerScope ? "Programmes represented in your team" : "Programme operational summary",
     rows,
     columns: [col("programme", "Programme"), col("activeLearners", "Active", "right"), col("preEnrolment", "Pre-enrolment", "right"), col("behindTarget", "Behind target", "right"), col("activeBreaks", "Breaks", "right"), col("assessmentStage", "Assessment", "right"), col("achieved", "Achieved", "right")],
-    interpretation: "Programmes are ranked by active learner volume.",
-    emptyMessage: "No programme activity is currently recorded.",
-    viewAllUrl: "/levytate/app?module=Learners",
+    interpretation: managerScope ? "Programme activity includes only your current direct reports." : "Programmes are ranked by active learner volume.",
+    emptyMessage: managerScope ? "No direct reports currently have learner programme activity." : "No programme activity is currently recorded.",
+    viewAllUrl: managerScope ? "/levytate/app?module=My%20Team" : "/levytate/app?module=Learners",
+    toolName: managerScope ? "getManagerTeamProgrammeSummary" : "getProgrammeOperationalSummary",
   });
+}
+
+async function getManagerApplications(
+  session: LevyTateBetaSession,
+  scope: ManagerDirectReportContext,
+  state: "awaiting_review" | "returned" | "approved" | "active",
+  employeeName?: string,
+): Promise<ToolPayload> {
+  const employeeResolution = resolveManagerEmployee(scope, employeeName);
+  if (employeeResolution.payload) return employeeResolution.payload;
+  const applications = await listManagerDirectReportApplications(session, scope);
+  const matches = applications
+    .filter((application) => !employeeResolution.employee || application.employee.id === employeeResolution.employee.id)
+    .filter((application) => managerApplicationMatches(application, state));
+  const rows = matches.map((application) => ({
+    key: authorisedManagerResultKey(scope, "application", application.id),
+    cells: {
+      employee: application.employee.name,
+      programme: standardTitle(application.apprenticeshipStandardId),
+      status: application.status,
+      submittedDate: displayDate(application.submittedAt),
+      currentOwner: application.currentOwner,
+      actionRequired: managerApplicationAction(application),
+    },
+    actions: [{ label: state === "awaiting_review" || state === "returned" ? "Review application" : "View application", url: "/levytate/app?module=Approvals" }],
+  }));
+  const named = employeeResolution.employee?.name;
+  const title = state === "awaiting_review" ? "Applications awaiting your review"
+    : state === "returned" ? "Applications returned after more information"
+      : state === "approved" ? "Applications approved by you"
+        : named ? `${named}'s current application` : "Current direct-report applications";
+  const emptyMessage = state === "awaiting_review" ? "No applications from your direct reports currently need your review."
+    : state === "returned" ? "No direct reports have resubmitted an application after a request for more information."
+      : state === "approved" ? "No direct-report applications are currently recorded as approved by you."
+        : named ? `${named} does not currently have an active apprenticeship application.` : "No direct reports currently have an active apprenticeship application.";
+
+  return payloadFromRows({
+    type: "application_results",
+    title,
+    rows,
+    columns: [col("employee", "Employee"), col("programme", "Programme"), col("status", "Status"), col("submittedDate", "Submitted"), col("currentOwner", "Current owner"), col("actionRequired", "Action required")],
+    interpretation: state === "awaiting_review"
+      ? "Review each application and decide whether to approve, request more information or decline."
+      : named ? applicationInterpretation(matches[0]) : "Only applications belonging to your current direct reports are included.",
+    emptyMessage,
+    viewAllUrl: "/levytate/app?module=Approvals",
+    assistantMessage: named && matches[0] ? applicationDirectAnswer(matches[0]) : undefined,
+    quickReplies: rows.length ? ["What needs my attention today?"] : ["Summarise apprenticeship activity in my team"],
+    toolName: state === "awaiting_review" ? "getManagerApplicationsAwaitingReview" : state === "returned" ? "getManagerReturnedApplications" : state === "approved" ? "getManagerApprovedApplications" : "getManagerApplicationStatus",
+  });
+}
+
+async function getManagerCheckIns(
+  session: LevyTateBetaSession,
+  filters: LevyTateOperationalCopilotFilters,
+  scope: ManagerDirectReportContext,
+  contextResultKeys?: string[],
+): Promise<ToolPayload> {
+  const details = await listManagerDirectReportLearnerLifecycleDetails(session, scope);
+  const authorisedKeys = contextResultKeys?.length ? new Set(contextResultKeys) : null;
+  const cutoff = addDays(today(), 14);
+  const matches = details.filter((detail) => {
+    const key = authorisedManagerResultKey(scope, "learner", detail.learnerRecordId);
+    if (authorisedKeys && !authorisedKeys.has(key)) return false;
+    const review = detail.reviewSummaries.manager;
+    if (filters.reviewDueState === "overdue") return review.overdue;
+    if (filters.reviewDueState === "due_soon") return Boolean(review.nextDate && review.nextDate >= today() && review.nextDate <= cutoff);
+    return review.overdue || review.latest?.status === "action_required" || Boolean(review.nextDate && review.nextDate <= cutoff);
+  });
+  return learnerPayload(
+    filters.reviewDueState === "overdue" ? "Overdue manager check-ins" : filters.reviewDueState === "due_soon" ? "Manager check-ins due soon" : "Direct reports needing a manager check-in",
+    matches,
+    [col("learner", "Learner"), col("programme", "Programme"), col("lastCheckIn", "Last check-in"), col("nextCheckIn", "Next due"), col("status", "Status"), col("managerAction", "Manager action")],
+    (detail) => ({
+      learner: detail.learner.name,
+      programme: detail.programme.programmeName,
+      lastCheckIn: displayDate(detail.reviewSummaries.manager.latest?.reviewDate),
+      nextCheckIn: displayDate(detail.reviewSummaries.manager.nextDate),
+      status: detail.reviewSummaries.manager.overdue ? "Overdue" : detail.reviewSummaries.manager.latest?.status === "action_required" ? "Action required" : "Due soon",
+      managerAction: "Discuss workplace support and record a manager check-in where appropriate.",
+    }),
+    "These results use the manager check-in schedule and action status recorded for your direct reports.",
+    filters.reviewDueState === "overdue" ? "No manager check-ins are overdue." : "No direct reports currently need a manager check-in.",
+    "/levytate/app?module=My%20Team",
+    undefined,
+    scope,
+  );
+}
+
+async function getManagerEmployeeReviewStatus(session: LevyTateBetaSession, filters: LevyTateOperationalCopilotFilters, scope: ManagerDirectReportContext): Promise<ToolPayload> {
+  const scoped = await managerDetailsForQuery(session, scope, filters.employeeName);
+  if (scoped.payload) return scoped.payload;
+  const detail = scoped.details[0];
+  if (!detail) return payloadFromRows({ type: "learner_results", title: "Review status", rows: [], columns: [], emptyMessage: "No learner review record is available for this direct report.", toolName: "getManagerEmployeeReviewStatus" });
+  const latest = [...detail.reviewHistory].sort((left, right) => right.reviewDate.localeCompare(left.reviewDate))[0];
+  return learnerPayload(
+    `${detail.learner.name}'s review status`,
+    [detail],
+    [col("learner", "Learner"), col("latestReview", "Latest review"), col("reviewType", "Review type"), col("nextProviderReview", "Next provider review"), col("managerCheckIn", "Manager check-in"), col("action", "Action")],
+    () => ({
+      learner: detail.learner.name,
+      latestReview: displayDate(latest?.reviewDate),
+      reviewType: latest ? reviewTypeLabel(latest.reviewType) : "Not recorded",
+      nextProviderReview: displayDate(detail.reviewSummaries.provider.nextDate),
+      managerCheckIn: detail.reviewSummaries.manager.overdue ? "Overdue" : displayDate(detail.reviewSummaries.manager.nextDate),
+      action: detail.reviewSummaries.manager.overdue ? "Arrange and record a manager check-in." : "No immediate manager review action is recorded.",
+    }),
+    "Review dates come from the live learner review record.",
+    `No review history is recorded for ${detail.learner.name}.`,
+    "/levytate/app?module=My%20Team",
+    undefined,
+    scope,
+  );
+}
+
+async function getManagerEmployeeSupport(session: LevyTateBetaSession, filters: LevyTateOperationalCopilotFilters, scope: ManagerDirectReportContext): Promise<ToolPayload> {
+  const scoped = await managerDetailsForQuery(session, scope, filters.employeeName);
+  if (scoped.payload) return scoped.payload;
+  const detail = scoped.details[0];
+  if (!detail) return payloadFromRows({ type: "learner_results", title: "Support needed", rows: [], columns: [], emptyMessage: "No active learner record is available for this direct report.", toolName: "getManagerEmployeeSupport" });
+  const support = detail.latestProgress?.supportAction || detail.attention.reasons[0] || "No specific support action is recorded.";
+  return learnerPayload(
+    `Support needed for ${detail.learner.name}`,
+    [detail],
+    [col("learner", "Learner"), col("programme", "Programme"), col("progress", "Progress"), col("support", "Recorded support"), col("managerAction", "What you can do")],
+    () => ({ learner: detail.learner.name, programme: detail.programme.programmeName, progress: detail.progressPosition, support, managerAction: "Discuss workplace support and record a manager check-in where appropriate." }),
+    "This answer uses the learner's latest progress, review and attention records.",
+    `No support information is recorded for ${detail.learner.name}.`,
+    "/levytate/app?module=My%20Team",
+    undefined,
+    scope,
+  );
+}
+
+async function getManagerOperationalActions(session: LevyTateBetaSession, filters: LevyTateOperationalCopilotFilters, scope: ManagerDirectReportContext): Promise<ToolPayload> {
+  const details = await listManagerDirectReportLearnerLifecycleDetails(session, scope);
+  let items = buildOrganisationOperationalItems(details).items.filter((item) => managerRelevantAction(item, filters));
+  if (filters.dueState === "attention_today") items = items.filter((item) => item.queueType === "urgent" || item.dueStatus === "Overdue" || item.dueStatus === "Due today");
+  if (filters.dueState === "overdue") items = items.filter((item) => item.dueStatus === "Overdue");
+  items = items.filter((item, index, all) => all.findIndex((candidate) => candidate.sourceKey === item.sourceKey) === index);
+  const rows = items.map((item) => ({
+    key: authorisedManagerResultKey(scope, "action", item.sourceKey),
+    cells: { action: item.actionLabel, learner: item.learnerName, priority: item.priorityLevel, status: "Open", owner: item.ownerType, dueDate: displayDate(item.dueDate), managerAction: managerActionForOperationalItem(item) },
+    actions: [{ label: "Open team view", url: "/levytate/app?module=My%20Team" }],
+  }));
+  return payloadFromRows({
+    type: "operational_action_results",
+    title: filters.dueState === "overdue" ? "Overdue actions for your direct reports" : filters.actionType === "team_support" ? "Support actions for your team" : "Actions requiring your attention",
+    rows,
+    columns: [col("action", "Action"), col("learner", "Learner"), col("priority", "Priority"), col("status", "Status"), col("owner", "Owner"), col("dueDate", "Due"), col("managerAction", "What you can do")],
+    interpretation: "Only manager-owned or direct-report support actions are included. Lifecycle-controlled changes remain with the authorised operational owner.",
+    emptyMessage: filters.dueState === "overdue" ? "No manager-relevant actions are currently overdue." : "No manager-relevant actions currently require attention.",
+    viewAllUrl: "/levytate/app?module=My%20Team",
+    toolName: "getManagerOperationalActions",
+  });
+}
+
+async function getManagerTeamSummary(session: LevyTateBetaSession, scope: ManagerDirectReportContext): Promise<ToolPayload> {
+  const [applications, details] = await Promise.all([
+    listManagerDirectReportApplications(session, scope),
+    listManagerDirectReportLearnerLifecycleDetails(session, scope),
+  ]);
+  const activeApplications = applications.filter((application) => activeApplicationStatuses().includes(application.status));
+  const activeLearners = details.filter(isActiveLearner);
+  const programmes = Array.from(new Set(activeLearners.map((detail) => detail.programme.programmeName).filter(Boolean)));
+  const metrics = [
+    ["Direct reports", scope.directReports.length, "Current active employees who report directly to you."],
+    ["Active applications", activeApplications.length, "Direct-report applications currently moving through the workflow."],
+    ["Active learners", activeLearners.length, "Direct reports currently enrolled, on break or in assessment."],
+    ["Breaks in Learning", details.filter((detail) => Boolean(detail.activeBreak)).length, "Direct reports currently on an active Break in Learning."],
+    ["Assessment stage", details.filter((detail) => detail.lifecycleStatus === "assessment_preparation" || detail.lifecycleStatus === "in_assessment").length, "Direct reports preparing for or already in assessment."],
+    ["Programmes represented", programmes.length, programmes.join(", ") || "No active learner programmes recorded."],
+  ] as const;
+  return payloadFromRows({
+    type: "summary_metrics",
+    title: "Apprenticeship activity in your team",
+    rows: metrics.map(([metric, value, meaning]) => ({ key: authorisedManagerResultKey(scope, "summary", metric), cells: { metric, value, meaning }, actions: [{ label: "Open team view", url: "/levytate/app?module=My%20Team" }] })),
+    columns: [col("metric", "Measure"), col("value", "Current", "right"), col("meaning", "What it means")],
+    interpretation: "This summary is limited to employees who currently report directly to you.",
+    emptyMessage: "No direct-report apprenticeship activity is currently recorded.",
+    assistantMessage: `Your team has ${activeApplications.length} active application${plural(activeApplications.length)}, ${activeLearners.length} active learner${plural(activeLearners.length)} and ${programmes.length} programme${plural(programmes.length)} represented.`,
+    quickReplies: ["Which applications need my review?", "Show me learners behind target"],
+    viewAllUrl: "/levytate/app?module=My%20Team",
+    toolName: "getManagerTeamSummary",
+  });
+}
+
+async function managerDetailsForQuery(
+  session: LevyTateBetaSession,
+  scope: ManagerDirectReportContext | undefined,
+  employeeName?: string,
+  contextResultKeys?: string[],
+): Promise<{ details: LearnerRecordDetail[]; payload?: undefined } | { details: []; payload: ToolPayload }> {
+  if (!scope) return { details: await listOrganisationLearnerLifecycleDetails(session) };
+  const resolution = resolveManagerEmployee(scope, employeeName);
+  if (resolution.payload) return { details: [], payload: resolution.payload };
+  let details = await listManagerDirectReportLearnerLifecycleDetails(session, scope);
+  if (resolution.employee) details = details.filter((detail) => detail.learner.id === resolution.employee?.id);
+  if (contextResultKeys?.length) {
+    const keys = new Set(contextResultKeys);
+    details = details.filter((detail) => keys.has(authorisedManagerResultKey(scope, "learner", detail.learnerRecordId)));
+  }
+  return { details };
+}
+
+function resolveManagerEmployee(scope: ManagerDirectReportContext, query?: string): { employee?: ManagerDirectReport; payload?: ToolPayload } {
+  if (!query?.trim()) return {};
+  const value = normalise(query).replace(/'s$/, "");
+  const matches = scope.directReports.filter((employee) => {
+    const name = normalise(employee.name);
+    return name === value || name.startsWith(`${value} `) || name.split(" ")[0] === value;
+  });
+  if (matches.length === 1) return { employee: matches[0] };
+  if (matches.length > 1) {
+    return { payload: payloadFromRows({
+      type: "clarification_required",
+      title: "Which direct report do you mean?",
+      rows: matches.map((employee) => ({ key: authorisedManagerResultKey(scope, "employee", employee.id), cells: { employee: employee.name, role: employee.jobTitle } })),
+      columns: [col("employee", "Employee"), col("role", "Role")],
+      emptyMessage: "Please choose the direct report you mean.",
+      assistantMessage: `I found ${matches.length} direct reports with a similar name. Which one do you mean?`,
+      toolName: "resolveManagerDirectReport",
+    }) };
+  }
+  return { payload: managerAccessBoundary("I can only show apprenticeship information for your direct reports.") };
+}
+
+function managerAccessBoundary(message: string): ToolPayload {
+  return { type: "access_boundary", title: "Direct-report access boundary", rows: [], columns: [], emptyMessage: message, toolName: "managerAccessBoundary" };
+}
+
+function managerApplicationMatches(application: ManagerDirectReportApplication, state: "awaiting_review" | "returned" | "approved" | "active") {
+  if (state === "awaiting_review") return ["Submitted to Line Manager", "Awaiting Manager Review"].includes(application.status);
+  if (state === "returned") return ["Submitted to Line Manager", "Awaiting Manager Review"].includes(application.status) && application.history.some((entry) => entry.status === "More information requested");
+  if (state === "approved") return application.status === "Approved by Line Manager" || application.history.some((entry) => entry.status === "Approved by Line Manager");
+  return activeApplicationStatuses().includes(application.status);
+}
+
+function managerApplicationAction(application: ManagerDirectReportApplication) {
+  if (["Submitted to Line Manager", "Awaiting Manager Review"].includes(application.status)) return "Review and decide whether to approve, request more information or decline.";
+  if (application.status === "More information requested") return "Waiting for the employee to provide more information.";
+  if (["Approved by Line Manager", "Submitted to Apprenticeship Lead", "Awaiting Final Approval"].includes(application.status)) return "The Apprenticeship Lead owns the next review.";
+  if (application.status === "Approved for Enrolment") return "No manager decision is currently required.";
+  return "Review the recorded application outcome.";
+}
+
+function applicationInterpretation(application?: ManagerDirectReportApplication) {
+  return application ? managerApplicationAction(application) : "Only applications belonging to your current direct reports are included.";
+}
+
+function applicationDirectAnswer(application: ManagerDirectReportApplication) {
+  const next = managerApplicationAction(application);
+  return `${application.employee.name}'s ${standardTitle(application.apprenticeshipStandardId)} application is ${application.status}. ${next}`;
+}
+
+function managerRelevantAction(item: OperationalItem, filters: LevyTateOperationalCopilotFilters) {
+  if (filters.actionType === "team_support") return item.sourceType === "progress_exception" || item.sourceType === "review_due" || item.sourceCondition === "support_intervention";
+  return item.ownerType === "Line Manager" || item.sourceCondition.includes("manager_check_in") || item.sourceCondition.includes("line_manager") || item.sourceCondition === "support_intervention";
+}
+
+function managerActionForOperationalItem(item: OperationalItem) {
+  if (item.reviewType === "Manager check-in" || item.sourceCondition.includes("manager_check_in")) return "Discuss workplace support and record a manager check-in where appropriate.";
+  if (item.sourceType === "progress_exception") return "Discuss progress and agree practical workplace support.";
+  if (item.sourceType === "break_in_learning") return "Confirm the expected return plan with the Apprenticeship Lead.";
+  if (item.sourceType === "assessment_readiness") return "Review whether the learner has suitable workplace support and evidence.";
+  return item.ownerType === "Line Manager" ? item.actionLabel : "Support the learner and coordinate with the Apprenticeship Lead.";
+}
+
+function standardTitle(standardId: string) {
+  return getApprenticeshipStandard(standardId)?.title ?? standardId;
+}
+
+function reviewTypeLabel(type: LearnerReviewType) {
+  return type === "provider_review" ? "Provider review" : type === "l_and_d_check_in" ? "L&D check-in" : type === "manager_check_in" ? "Manager check-in" : "Review";
+}
+
+function authorisedManagerResultKey(scope: ManagerDirectReportContext, kind: string, value: string) {
+  return createHash("sha256").update(`${scope.organisation.id}:${scope.user.id}:${kind}:${value}`).digest("hex").slice(0, 24);
 }
 
 function responseForPayload(
   request: LevyTateAiRequest,
   query: ClassifiedQuery,
   payload: ToolPayload,
-  timing: { intentClassificationMs: number; dataRetrievalMs: number; startedAt: number },
+  timing: { intentClassificationMs: number; managerScopeResolutionMs?: number; dataRetrievalMs: number; startedAt: number },
+  role?: ReturnType<typeof normaliseMvpUserRole>,
 ): LevyTateAiResponse {
   const responseStarted = performance.now();
   const evaluatedAt = new Date().toISOString();
   const visibleRows = payload.rows.slice(0, resultLimit);
   const totalCount = payload.totalCount ?? payload.rows.length;
   const empty = totalCount === 0;
-  const assistantMessage = payload.type === "access_boundary" || payload.type === "data_unavailable"
+  const assistantMessage = payload.assistantMessage ?? (payload.type === "access_boundary" || payload.type === "data_unavailable"
     ? payload.emptyMessage
     : empty
       ? payload.emptyMessage
-      : directAnswer(query.intent, totalCount, query.filters);
+      : directAnswer(query.intent, totalCount, query.filters, role));
   const structuredType = empty && payload.type !== "access_boundary" && payload.type !== "data_unavailable" ? "no_results" : payload.type;
   const responsePreparationMs = elapsed(responseStarted);
   const operationalContext: LevyTateOperationalCopilotContext = {
@@ -496,8 +999,8 @@ function responseForPayload(
     source: "mock",
     executionMode: "deterministic",
     assistantMessage,
-    followUpQuestion: followUpFor(query.intent, query.filters, empty),
-    quickReplies: payload.type === "data_unavailable" ? ["Retry"] : quickRepliesFor(query.intent, query.filters, empty),
+    followUpQuestion: payload.followUpQuestion ?? followUpFor(query.intent, query.filters, empty),
+    quickReplies: payload.type === "data_unavailable" ? ["Retry"] : payload.quickReplies ?? quickRepliesFor(query.intent, query.filters, empty),
     shouldShowPathways: false,
     shouldShowActions: false,
     recommendedActions: [],
@@ -507,7 +1010,9 @@ function responseForPayload(
     providerMatchDraft: null,
     nextStep: payload.viewAllUrl ? "Open the relevant LevyTate workspace for the underlying record." : null,
     safetyNotes: [
-      "Operational data was retrieved through organisation-scoped LevyTate server contracts.",
+      role === "Line Manager"
+        ? "Operational data was retrieved through manager-scoped direct-report server contracts."
+        : "Operational data was retrieved through organisation-scoped LevyTate server contracts.",
       "Deterministic operational routing was used; no model generated or reordered the records.",
     ],
     applicationWarning: null,
@@ -528,6 +1033,7 @@ function responseForPayload(
       evaluatedAt,
       timings: {
         intentClassificationMs: round(timing.intentClassificationMs),
+        managerScopeResolutionMs: timing.managerScopeResolutionMs === undefined ? undefined : round(timing.managerScopeResolutionMs),
         dataRetrievalMs: round(timing.dataRetrievalMs),
         responsePreparationMs: round(responsePreparationMs),
         totalMs: round(performance.now() - timing.startedAt),
@@ -545,15 +1051,21 @@ function learnerPayload(
   emptyMessage: string,
   viewAllUrl: string,
   secondaryAction?: string,
+  managerScope?: ManagerDirectReportContext,
 ): ToolPayload {
   return payloadFromRows({
     type: "learner_results",
     title,
-    rows: details.map((detail) => ({ key: detail.learnerRecordId, cells: cells(detail), actions: learnerActions(detail, secondaryAction) })),
+    rows: details.map((detail) => ({
+      key: managerScope ? authorisedManagerResultKey(managerScope, "learner", detail.learnerRecordId) : detail.learnerRecordId,
+      cells: cells(detail),
+      actions: learnerActions(detail, secondaryAction, managerScope),
+    })),
     columns,
     interpretation,
     emptyMessage,
-    viewAllUrl,
+    viewAllUrl: managerScope ? "/levytate/app?module=My%20Team" : viewAllUrl,
+    toolName: managerScope ? "getManagerDirectReportLearners" : undefined,
   });
 }
 
@@ -580,30 +1092,46 @@ function payloadFromRows(payload: ToolPayload): ToolPayload {
   return { ...payload, totalCount: payload.rows.length };
 }
 
-async function contextLearners(session: LevyTateBetaSession, filters: LevyTateOperationalCopilotFilters, contextResultKeys?: string[]) {
-  const details = await listOrganisationLearnerLifecycleDetails(session);
+async function contextLearners(session: LevyTateBetaSession, filters: LevyTateOperationalCopilotFilters, contextResultKeys?: string[], managerScope?: ManagerDirectReportContext) {
+  const details = managerScope
+    ? await listManagerDirectReportLearnerLifecycleDetails(session, managerScope)
+    : await listOrganisationLearnerLifecycleDetails(session);
   if (!filters.actionType?.startsWith("context:")) return details;
   const prior = filters.actionType.slice("context:".length);
   const scopedKeys = contextResultKeys?.length
-    ? new Set(contextResultKeys.map((key) => key.split(":")[0]))
+    ? new Set(contextResultKeys)
     : null;
+  const authorised = (detail: LearnerRecordDetail) => !scopedKeys || scopedKeys.has(
+    managerScope ? authorisedManagerResultKey(managerScope, "learner", detail.learnerRecordId) : detail.learnerRecordId,
+  );
   if (prior === "learners_behind_target") {
     return details.filter((detail) =>
       (detail.progressPosition === "Slightly behind" || detail.progressPosition === "Significantly behind")
       && (!filters.progressPosition || detail.progressPosition === filters.progressPosition)
-      && (!scopedKeys || scopedKeys.has(detail.learnerRecordId))
+      && authorised(detail)
     );
   }
-  if (prior === "overdue_reviews") return details.filter((detail) => detail.reviewSummaries.provider.overdue && (!scopedKeys || scopedKeys.has(detail.learnerRecordId)));
-  return scopedKeys ? details.filter((detail) => scopedKeys.has(detail.learnerRecordId)) : details;
+  if (prior === "overdue_reviews") return details.filter((detail) => {
+    if (!detail.reviewSummaries.provider.overdue) return false;
+    if (!scopedKeys) return true;
+    return managerScope
+      ? scopedKeys.has(authorisedManagerResultKey(managerScope, "review", `${detail.learnerRecordId}:provider_review`))
+      : scopedKeys.has(`${detail.learnerRecordId}:provider_review`);
+  });
+  return scopedKeys ? details.filter(authorised) : details;
 }
 
-function directAnswer(intent: LevyTateOperationalCopilotIntent, count: number, filters: LevyTateOperationalCopilotFilters) {
+function directAnswer(intent: LevyTateOperationalCopilotIntent, count: number, filters: LevyTateOperationalCopilotFilters, role?: ReturnType<typeof normaliseMvpUserRole>) {
   const singular = count === 1;
-  if (intent === "learners_behind_target") return `${count} learner${singular ? "" : "s"} ${singular ? "is" : "are"} currently ${filters.progressPosition === "Significantly behind" ? "significantly " : ""}behind target.`;
+  const learnerSubject = role === "Line Manager" ? `of your direct reports ${singular ? "is" : "are"}` : `learner${singular ? " is" : "s are"}`;
+  if (intent === "applications_awaiting_review") return `${count} application${singular ? "" : "s"} from your direct reports ${singular ? "needs" : "need"} your review.`;
+  if (intent === "applications_returned") return `${count} direct-report application${singular ? " has" : "s have"} been returned after more information was requested.`;
+  if (intent === "applications_approved") return `${count} direct-report application${singular ? " has" : "s have"} been approved by you.`;
+  if (intent === "learners_behind_target") return `${count} ${learnerSubject} currently ${filters.progressPosition === "Significantly behind" ? "significantly " : ""}behind target.`;
   if (intent === "learners_without_recent_progress") return `${count} learner${singular ? " has" : "s have"} no recent progress update.`;
   if (intent === "learners_ending_before") return `${count} apprentice${singular ? " is" : "s are"} expected to end before the selected date.`;
   if (intent === "overdue_reviews") return `${count} review${singular ? " is" : "s are"} currently overdue.`;
+  if (intent === "manager_check_ins") return `${count} manager check-in${singular ? " requires" : "s require"} your attention.`;
   if (intent === "ready_to_enrol") return `${count} learner${singular ? " is" : "s are"} ready to enrol.`;
   if (intent === "pre_enrolment_blockers") return `${count} pre-enrolment blocker${singular ? " is" : "s are"} currently open.`;
   if (intent === "active_breaks") return `${count} learner${singular ? " is" : "s are"} ${filters.dueState === "overdue" ? "past the expected Break in Learning return date" : "currently on a Break in Learning"}.`;
@@ -618,6 +1146,7 @@ function followUpFor(intent: LevyTateOperationalCopilotIntent, filters: LevyTate
   if (intent === "learners_behind_target" && !filters.progressPosition && !empty) return "Would you like me to show only the significantly behind learners?";
   if (intent === "provider_operational_summary" && !empty) return "Would you like to open a provider record or review the affected learners?";
   if (intent === "learners_ending_before" && !empty) return "Would you like me to narrow this by programme or provider?";
+  if (intent === "applications_awaiting_review" && !empty) return "Would you like to see what else needs your attention today?";
   return null;
 }
 
@@ -628,10 +1157,12 @@ function quickRepliesFor(intent: LevyTateOperationalCopilotIntent, filters: Levy
   }
   if (intent === "learners_behind_target" && !filters.progressPosition) return ["Only show significantly behind learners", "Which providers are they with?"];
   if (intent === "overdue_reviews") return ["Which providers have overdue reviews?"];
+  if (intent === "manager_check_ins") return ["Show me learners behind target"];
   return [];
 }
 
-function learnerActions(detail: LearnerRecordDetail, secondaryLabel?: string) {
+function learnerActions(detail: LearnerRecordDetail, secondaryLabel?: string, managerScope?: ManagerDirectReportContext) {
+  if (managerScope) return [{ label: "Open team view", url: "/levytate/app?module=My%20Team" }];
   const url = `/levytate/app?module=Learners&learner=${encodeURIComponent(detail.learnerRecordId)}`;
   const action = secondaryLabel === "Add progress update" ? "add_progress" : secondaryLabel === "Manage break" ? "manage_break" : secondaryLabel === "Manage assessment" ? "manage_assessment" : "record_review";
   return [{ label: "Open learner", url }, ...(secondaryLabel ? [{ label: secondaryLabel, url: `${url}&action=${action}` }] : [])];
@@ -656,7 +1187,20 @@ function groupBy<T>(items: T[], key: (item: T) => string) {
   return result;
 }
 
+function extractEmployeeName(text: string) {
+  const possessive = text.match(/\b([a-z][a-z'-]+)'s\b/);
+  if (possessive) return possessive[1];
+  const direct = text.match(/\b(?:is|does|can|can't|cannot|was)\s+([a-z][a-z'-]+)\s+(?:behind|need|needs|edit|current|latest|application)/);
+  return direct?.[1];
+}
+
+function toolNameFor(intent: LevyTateOperationalCopilotIntent, role: ReturnType<typeof normaliseMvpUserRole>) {
+  const prefix = role === "Line Manager" ? "manager" : "organisation";
+  return `${prefix}:${intent}`.slice(0, 120);
+}
+
 function normalise(value: string) {
+  value = value.replace(/[\u2018\u2019]/g, "'");
   return value.trim().toLowerCase().replace(/[’']/g, "'").replace(/\s+/g, " ");
 }
 

@@ -54,10 +54,21 @@ async function main() {
 
   const managerWorkspace = await getWorkspaceJson(sessions.manager.cookie);
   const managerEmployeeIds = managerWorkspace.workspace.data.employees.map((item) => item.id).sort();
+  const expectedManagerReportIds = [
+    "gc-rbac-employee-erin",
+    "gc-rbac-employee-leo",
+    "gc-rbac-employee-maya",
+    "gc-rbac-employee-owen",
+    "gc-lifecycle-employee-ben",
+    "gc-lifecycle-employee-cara",
+    "gc-lifecycle-employee-daniel",
+    "gc-lifecycle-employee-finley",
+    "gc-lifecycle-employee-grace",
+  ];
   assert("manager role scoped", managerWorkspace.workspace.meta.userRole === "Line Manager");
-  assert("manager sees self and direct reports", sameMembers(managerEmployeeIds, ["gc-rbac-employee-erin", "gc-rbac-employee-leo", "gc-rbac-employee-maya", "gc-rbac-employee-morgan", "gc-rbac-employee-owen"]));
+  assert("manager sees self and direct reports", sameMembers(managerEmployeeIds, ["gc-rbac-employee-morgan", ...expectedManagerReportIds]));
   assert("manager does not see outside employee", !managerEmployeeIds.includes("gc-rbac-employee-nadia"));
-  assert("manager applications are direct-report only", managerWorkspace.workspace.data.applications.every((item) => ["gc-rbac-employee-erin", "gc-rbac-employee-leo"].includes(item.employeeId)));
+  assert("manager applications are direct-report only", managerWorkspace.workspace.data.applications.every((item) => expectedManagerReportIds.includes(item.employeeId)));
 
   const leadWorkspace = await getWorkspaceJson(sessions.lead.cookie);
   assert("lead role scoped", leadWorkspace.workspace.meta.userRole === "Apprenticeship Lead");

@@ -39,13 +39,17 @@ const roleContent: Record<AssistantRole, { purpose: string; welcome: string; pro
     ],
   },
   "Line Manager": {
-    purpose: "Find review work, explain recommendations and draft manager decision notes.",
-    welcome: "I can help you review direct-report applications, understand recommendation evidence and prepare a decision rationale without making the decision for you.",
+    purpose: "Understand your team's apprenticeship activity, review learner progress and identify where your support is needed.",
+    welcome: "Ask about your direct reports and I will answer from current applications, learner progress, reviews, breaks, assessment and manager-relevant actions.",
     prompts: [
-      "Show everyone awaiting approval",
-      "What should I ask before approving this?",
-      "Explain the business benefit for this request",
-      "Generate an approval note",
+      "Which applications need my review?",
+      "Show me learners behind target",
+      "Who needs a manager check-in?",
+      "Which reviews are overdue?",
+      "Who is currently on a Break in Learning?",
+      "Which learners are approaching assessment?",
+      "What actions require my attention?",
+      "Summarise apprenticeship activity in my team",
     ],
   },
   "Apprenticeship Lead": {
@@ -740,7 +744,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate }:
         : undefined,
       workspaceEmployeeContext: resolvedContext.workspaceEmployeeContext,
       preferredStandardId: developmentProfile?.preferredStandardId || (activeRole === "Employee" ? selectedDevelopmentProfile?.preferredStandardId || undefined : undefined),
-      operationalContext: activeRole === "Apprenticeship Lead" || activeRole === "LevyTate Admin"
+      operationalContext: activeRole === "Line Manager" || activeRole === "Apprenticeship Lead" || activeRole === "LevyTate Admin"
         ? latestResponse?.operationalContext
         : undefined,
     };
@@ -906,7 +910,9 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate }:
                 </span>
               ) : null}
               <span className="rounded-full bg-[#edf7f3] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#0b6f63]">
-                {latestResponse?.structuredResult ? "Live LevyTate data" : latestResponse?.source === "openai" ? "Live Copilot" : "Guided mode"}
+                {role === "Line Manager"
+                  ? latestResponse?.structuredResult ? "Live direct-report data" : "Direct-report scope"
+                  : latestResponse?.structuredResult ? "Live LevyTate data" : latestResponse?.source === "openai" ? "Live Copilot" : "Guided mode"}
               </span>
             </div>
           </div>

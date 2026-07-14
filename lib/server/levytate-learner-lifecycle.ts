@@ -81,6 +81,11 @@ import {
   supabaseSelect,
   supabaseUpdate,
 } from "@/lib/server/levytate-supabase";
+import {
+  assertScopeMatchesSession,
+  getManagerDirectReportContext,
+  type ManagerDirectReportContext,
+} from "@/lib/server/levytate-manager-scope";
 
 type OrganisationRow = {
   id: string;
@@ -1175,6 +1180,29 @@ export async function listOrganisationLearnerLifecycleDetails(session: LevyTateB
     .map((record) => buildLearnerRecordDetail(record, scopedCollections(collections, record.id), lookups));
 }
 
+export async function listManagerDirectReportLearnerLifecycleDetails(
+  session: LevyTateBetaSession,
+  providedScope?: ManagerDirectReportContext,
+): Promise<LearnerRecordDetail[]> {
+  const scope = providedScope ?? await getManagerDirectReportContext(session);
+  assertScopeMatchesSession(session, scope);
+  if (!scope.directReports.length) return [];
+
+  const rows = await selectMany<LearnerRecordRow>(
+    learnerRecordsTable,
+    scope.organisation.id,
+    `employee_id=in.(${scope.directReports.map((employee) => employee.id).join(",")})&record_status=eq.Active`,
+    "updated_at.desc",
+  );
+  if (!rows.length) return [];
+
+  const collections = await loadLearnerLifecycleCollectionsForOrganisation(scope.organisation.id, rows);
+  const lookups = await loadLearnerRecordLookupsForManagerScope(scope, rows);
+  return rows
+    .map(learnerRecordFromRow)
+    .map((record) => buildLearnerRecordDetail(record, scopedCollections(collections, record.id), lookups));
+}
+
 export async function getLearnerLifecycleServerContext(session: LevyTateBetaSession): Promise<LearnerLifecycleServerContext> {
   return contextForSession(session);
 }
@@ -2032,6 +2060,34 @@ async function loadLearnerRecordLookups(organisationId: string) {
     selectMany<ProviderProgrammeViewRow>("levytate_provider_programmes", organisationId, "select=id,provider_id,programme_name,apprenticeship_standard_id,linked_standard_id,linked_standard_ids,linked_standard_name", "programme_name.asc"),
     selectMany<EnrolmentViewRow>("levytate_enrolments", organisationId, "select=id,application_id,employee_id,provider_id,apprenticeship_standard_id", "created_at.desc"),
   ]);
+
+  return { employees, applications, providers, programmes, enrolments };
+}
+
+async function loadLearnerRecordLookupsForManagerScope(
+  scope: ManagerDirectReportContext,
+  records: LearnerRecordRow[],
+): Promise<Awaited<ReturnType<typeof loadLearnerRecordLookups>>> {
+  const organisationId = scope.organisation.id;
+  const employeeIds = [...scope.directReports.map((employee) => employee.id), scope.manager.id];
+  const learnerEmployeeIds = scope.directReports.map((employee) => employee.id);
+  const programmeIds = Array.from(new Set(records.map((record) => record.programme_id).filter(Boolean)));
+  const [employees, applications, enrolments, programmes] = await Promise.all([
+    selectMany<EmployeeViewRow>(employeesTable, organisationId, `select=id,name,email,job_title,role_id,manager_id,department,site,status&id=in.(${employeeIds.join(",")})`, "name.asc"),
+    selectMany<ApplicationViewRow>("levytate_applications", organisationId, `select=id,employee_id,apprenticeship_standard_id&employee_id=in.(${learnerEmployeeIds.join(",")})`, "submitted_at.desc"),
+    selectMany<EnrolmentViewRow>("levytate_enrolments", organisationId, `select=id,application_id,employee_id,provider_id,apprenticeship_standard_id&employee_id=in.(${learnerEmployeeIds.join(",")})`, "created_at.desc"),
+    programmeIds.length
+      ? selectMany<ProviderProgrammeViewRow>("levytate_provider_programmes", organisationId, `select=id,provider_id,programme_name,apprenticeship_standard_id,linked_standard_id,linked_standard_ids,linked_standard_name&id=in.(${programmeIds.join(",")})`, "programme_name.asc")
+      : Promise.resolve([]),
+  ]);
+  const providerIds = Array.from(new Set([
+    ...records.map((record) => record.provider_id),
+    ...programmes.map((programme) => programme.provider_id),
+    ...enrolments.map((enrolment) => enrolment.provider_id),
+  ].filter(Boolean)));
+  const providers = providerIds.length
+    ? await selectMany<ProviderViewRow>("levytate_providers", organisationId, `select=provider_id,provider_name&provider_id=in.(${providerIds.join(",")})`, "provider_name.asc")
+    : [];
 
   return { employees, applications, providers, programmes, enrolments };
 }

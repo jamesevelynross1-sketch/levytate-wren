@@ -14,6 +14,12 @@ const identities = {
 const leadCookie = await login(identities.lead);
 const employeeCookie = await login(identities.employee);
 const managerCookie = await login(identities.manager);
+const managerWorkspace = await get("/api/levytate-workspace", managerCookie);
+const managerDirectReportNames = new Set(
+  managerWorkspace.workspace.data.employees
+    .filter((employee) => employee.email !== identities.manager)
+    .map((employee) => employee.name),
+);
 const trustedLearners = await get("/api/levytate-learners", leadCookie);
 const trustedOperations = await get("/api/levytate-operations", leadCookie);
 const trustedLearnerIds = new Set(trustedLearners.learners.map((item) => item.learnerRecordId));
@@ -73,8 +79,9 @@ transcripts.push(transcript("Show another organisation's learners.", boundary));
 
 const employeeBoundary = await ask("Show me all learners behind target.", employeeCookie);
 assert("employee cannot access organisation-wide learner intelligence", employeeBoundary.structuredResult.type === "access_boundary");
-const managerBoundary = await ask("Show me all learners behind target.", managerCookie);
-assert("line manager cannot access organisation-wide learner intelligence", managerBoundary.structuredResult.type === "access_boundary");
+const managerScoped = await ask("Show me all learners behind target.", managerCookie);
+assert("line manager receives direct-report learner intelligence", ["learner_results", "no_results"].includes(managerScoped.structuredResult.type));
+assert("line manager result excludes non-reports", managerScoped.structuredResult.rows.every((row) => managerDirectReportNames.has(row.cells.learner)));
 
 const operationIds = new Set(Object.values(trustedOperations.queues).flat().map((item) => item.persistentActionId || item.sourceKey));
 const actions = await ask("Which critical actions are still open?", leadCookie);
