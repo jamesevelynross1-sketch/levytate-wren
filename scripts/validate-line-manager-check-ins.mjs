@@ -104,7 +104,7 @@ assert("another manager's terminal learner remains outside scope", terminalAttem
 
 const invalidDate = await postCheckIn(ids.routine, manager.cookie, payload({ idempotencyKey: "ops7c2-invalid-date-v1", checkInDate, nextCheckInDate: checkInDate }));
 assert("invalid next check-in date is rejected", invalidDate.status === 400 && /must be after/i.test(invalidDate.body.message));
-const invalidEnum = await postCheckIn(ids.routine, manager.cookie, { ...routinePayload, idempotencyKey: "ops7c2-invalid-enum-v1", discussionPurpose: "provider_review" });
+const invalidEnum = await postCheckIn(ids.routine, manager.cookie, { ...routinePayload, idempotencyKey: "ops7c2-invalid-enum-v1", expectedActivityVersion: "", discussionPurpose: "provider_review" });
 assert("invalid controlled value is rejected", invalidEnum.status === 400 && /Invalid discussion purpose/i.test(invalidEnum.body.message));
 const staleVersion = await postCheckIn(ids.routine, manager.cookie, { ...routinePayload, idempotencyKey: "ops7c2-stale-v1", expectedActivityVersion: "stale-version" });
 assert("stale activity version fails safely", staleVersion.status === 409 && !JSON.stringify(staleVersion.body).match(/supabase|constraint|organisation_id/i));
