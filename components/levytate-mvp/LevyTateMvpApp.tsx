@@ -25,6 +25,7 @@ import { EmployeeApplicationModule, EmployeeHomeModule, EmployeeProgrammeModule 
 import { EmployeesModule } from "@/components/levytate-mvp/EmployeesModule";
 import { GuidanceCentreModule } from "@/components/levytate-mvp/GuidanceCentreModule";
 import { LearnersModule } from "@/components/levytate-mvp/LearnersModule";
+import { ManagerDirectReportDetail } from "@/components/levytate-mvp/ManagerDirectReportDetail";
 import { OperationsCentreModule } from "@/components/levytate-mvp/OperationsCentreModule";
 import { LevyTateStandardsProvider } from "@/components/levytate-mvp/LevyTateStandardsProvider";
 import { MvpWorkspaceProvider, useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
@@ -33,6 +34,7 @@ import { ProvidersModule } from "@/components/levytate-mvp/ProvidersModule";
 import { ReportsModule } from "@/components/levytate-mvp/ReportsModule";
 import { RolesModule } from "@/components/levytate-mvp/RolesModule";
 import type { LevyTateWorkspaceBootstrap } from "@/lib/levytate/mvp/api";
+import type { ManagerDirectReportLearnerDetail } from "@/lib/levytate/mvp/manager-learner-detail";
 import type { OperationalActionType } from "@/lib/levytate/mvp/operations-centre";
 import { hasMvpPermission, permissionsForMvpRole, type MvpPermission } from "@/lib/levytate/mvp/rbac";
 import { buildNotifications } from "@/lib/levytate/mvp/workspace-insights";
@@ -105,18 +107,23 @@ const moduleCopy: Record<ModuleName, string> = {
   Settings: "Workspace setup, business priorities and beta access controls.",
 };
 
-export function LevyTateMvpApp({ initialWorkspace, persistLocal = true }: { initialWorkspace?: LevyTateWorkspaceBootstrap | null; persistLocal?: boolean }) {
-  return <LevyTateStandardsProvider><MvpWorkspaceProvider initialWorkspace={initialWorkspace} persistLocal={persistLocal}><MvpAppShell /></MvpWorkspaceProvider></LevyTateStandardsProvider>;
+export function LevyTateMvpApp({ initialWorkspace, persistLocal = true, initialManagerDirectReportDetail = null }: {
+  initialWorkspace?: LevyTateWorkspaceBootstrap | null;
+  persistLocal?: boolean;
+  initialManagerDirectReportDetail?: ManagerDirectReportLearnerDetail | null;
+}) {
+  return <LevyTateStandardsProvider><MvpWorkspaceProvider initialWorkspace={initialWorkspace} persistLocal={persistLocal}><MvpAppShell initialManagerDirectReportDetail={initialManagerDirectReportDetail} /></MvpWorkspaceProvider></LevyTateStandardsProvider>;
 }
 
-function MvpAppShell() {
+function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirectReportDetail: ManagerDirectReportLearnerDetail | null }) {
   const { data, meta, hydrated } = useMvpWorkspace();
-  const [activeModule, setActiveModule] = useState<ModuleName>("Home");
+  const [activeModule, setActiveModule] = useState<ModuleName>(initialManagerDirectReportDetail ? "My Team" : "Home");
   const [peopleView, setPeopleView] = useState<PeopleView>("Employees");
   const [providerView, setProviderView] = useState<ProviderView>("Programmes");
   const [settingsView, setSettingsView] = useState<SettingsView>("Workspace");
   const [aiEmployeeId, setAiEmployeeId] = useState<string | null>(null);
   const [learnerTarget, setLearnerTarget] = useState<{ learnerRecordId: string; actionType: OperationalActionType } | null>(null);
+  const [managerDirectReportDetail, setManagerDirectReportDetail] = useState(initialManagerDirectReportDetail);
   const deepLinkHandled = useRef(false);
 
   const notifications = useMemo(() => buildNotifications(data), [data]);
@@ -178,7 +185,20 @@ function MvpAppShell() {
 
   function openModule(module: ModuleName) {
     if (!availableModules.some((item) => item.name === module)) return;
+    if (managerDirectReportDetail) {
+      setManagerDirectReportDetail(null);
+      window.history.replaceState(null, "", `/levytate/app?module=${encodeURIComponent(module)}`);
+    }
     setActiveModule(module);
+  }
+
+  function openDirectReport(employeeId: string) {
+    window.location.assign(`/levytate/app/my-team/${encodeURIComponent(employeeId)}`);
+  }
+
+  function closeDirectReport() {
+    setManagerDirectReportDetail(null);
+    window.history.replaceState(null, "", "/levytate/app?module=My%20Team");
   }
 
   function navigateTo(target: string) {
@@ -361,8 +381,12 @@ function MvpAppShell() {
             {activeModule === "My Application" ? <EmployeeApplicationModule /> : null}
             {activeModule === "Copilot" ? <AskLevyTateAiWorkspace initialEmployeeId={aiEmployeeId} onNavigate={navigateTo} /> : null}
             {activeModule === "Knowledge" ? <GuidanceCentreModule /> : null}
-            {activeModule === "My Team" ? <EmployeesModule onStartDiscovery={(employeeId) => { setAiEmployeeId(employeeId); openModule("Copilot"); }} /> : null}
-            {activeModule === "Approvals" ? <ApplicationsModule /> : null}
+            {activeModule === "My Team" ? (
+              managerDirectReportDetail
+                ? <ManagerDirectReportDetail detail={managerDirectReportDetail} onBack={closeDirectReport} />
+                : <EmployeesModule onOpenDirectReport={openDirectReport} onStartDiscovery={(employeeId) => { setAiEmployeeId(employeeId); openModule("Copilot"); }} />
+            ) : null}
+            {activeModule === "Approvals" ? <ApplicationsModule onOpenDirectReport={openDirectReport} /> : null}
             {activeModule === "Applications" ? <ApplicationsModule /> : null}
             {activeModule === "Learners" ? <LearnersModule initialLearnerRecordId={learnerTarget?.learnerRecordId} initialAction={learnerTarget?.actionType} onDeepLinkConsumed={() => setLearnerTarget(null)} /> : null}
             {activeModule === "People" ? (

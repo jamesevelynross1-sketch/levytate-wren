@@ -31,7 +31,10 @@ import {
   type MvpEmployee,
 } from "@/lib/levytate/mvp/workspace";
 
-export function EmployeesModule({ onStartDiscovery }: { onStartDiscovery?: (employeeId: string) => void }) {
+export function EmployeesModule({ onStartDiscovery, onOpenDirectReport }: {
+  onStartDiscovery?: (employeeId: string) => void;
+  onOpenDirectReport?: (employeeId: string) => void;
+}) {
   const { data, saveEmployee, archiveEmployee, can, meta } = useMvpWorkspace();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("Active");
@@ -218,12 +221,20 @@ export function EmployeesModule({ onStartDiscovery }: { onStartDiscovery?: (empl
                 ) : null}
 
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#102c3d]/[0.06] pt-4">
-                  <button type="button" onClick={() => application ? setSelectedEmployeeId(employee.id) : onStartDiscovery?.(employee.id)} className="rounded-full bg-[#102c3d] px-4 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5">
-                    {primaryAction}
-                  </button>
-                  <button type="button" onClick={() => setSelectedEmployeeId(employee.id)} className="rounded-full bg-[#f5f7f3] px-4 py-2 text-xs font-semibold text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.07] transition hover:text-[#102c3d]">
-                    Details
-                  </button>
+                  {isLineManager ? (
+                    <button type="button" onClick={() => onOpenDirectReport?.(employee.id)} className="rounded-full bg-[#102c3d] px-4 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5">
+                      View apprenticeship journey
+                    </button>
+                  ) : (
+                    <>
+                      <button type="button" onClick={() => application ? setSelectedEmployeeId(employee.id) : onStartDiscovery?.(employee.id)} className="rounded-full bg-[#102c3d] px-4 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5">
+                        {primaryAction}
+                      </button>
+                      <button type="button" onClick={() => setSelectedEmployeeId(employee.id)} className="rounded-full bg-[#f5f7f3] px-4 py-2 text-xs font-semibold text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.07] transition hover:text-[#102c3d]">
+                        Details
+                      </button>
+                    </>
+                  )}
                 </div>
               </article>
             );

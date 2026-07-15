@@ -50,7 +50,7 @@ const requestStatuses: RequestStatus[] = [
 const reviewableManagerStatuses: RequestStatus[] = ["Submitted to Line Manager", "Awaiting Manager Review"];
 const reviewableLeadStatuses: RequestStatus[] = ["Approved by Line Manager", "Submitted to Apprenticeship Lead", "Awaiting Final Approval"];
 
-export function ApplicationsModule() {
+export function ApplicationsModule({ onOpenDirectReport }: { onOpenDirectReport?: (employeeId: string) => void } = {}) {
   const { data, saveApplication, updateApplicationStatus, meta } = useMvpWorkspace();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("All");
@@ -62,7 +62,7 @@ export function ApplicationsModule() {
   const activeSet = useMemo(() => new Set(activeApplicationStatuses()), []);
 
   if (meta?.userRole === "Line Manager") {
-    return <LineManagerApprovalsModule />;
+    return <LineManagerApprovalsModule onOpenDirectReport={onOpenDirectReport} />;
   }
   const visible = data.applications.filter((application) => {
     const employee = data.employees.find((item) => item.id === application.employeeId);
@@ -307,7 +307,7 @@ export function ApplicationsModule() {
   );
 }
 
-function LineManagerApprovalsModule() {
+function LineManagerApprovalsModule({ onOpenDirectReport }: { onOpenDirectReport?: (employeeId: string) => void }) {
   const { data, updateApplicationStatus, meta } = useMvpWorkspace();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const manager = data.employees.find((employee) =>
@@ -353,9 +353,12 @@ function LineManagerApprovalsModule() {
                       <p className="mt-1 line-clamp-2 text-sm leading-6 text-[#102c3d]/58">{application.reason || "No reason recorded yet."}</p>
                       <p className="mt-2 text-xs font-medium text-[#102c3d]/42">Submitted {application.submittedAt.slice(0, 10)}</p>
                     </div>
-                    <button type="button" onClick={() => setSelectedId(application.id)} className="h-10 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white transition hover:-translate-y-0.5">
-                      Review application
-                    </button>
+                    <div className="flex flex-col items-stretch gap-2">
+                      <button type="button" onClick={() => setSelectedId(application.id)} className="h-10 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white transition hover:-translate-y-0.5">
+                        Review application
+                      </button>
+                      {employee ? <button type="button" onClick={() => onOpenDirectReport?.(employee.id)} className="px-2 py-1 text-xs font-semibold text-[#0b766b] transition hover:text-[#102c3d]">View apprenticeship journey</button> : null}
+                    </div>
                   </div>
                 </article>
               );

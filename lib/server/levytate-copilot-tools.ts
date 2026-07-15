@@ -714,7 +714,10 @@ async function getManagerApplications(
       currentOwner: application.currentOwner,
       actionRequired: managerApplicationAction(application),
     },
-    actions: [{ label: state === "awaiting_review" || state === "returned" ? "Review application" : "View application", url: "/levytate/app?module=Approvals" }],
+    actions: [
+      { label: state === "awaiting_review" || state === "returned" ? "Review application" : "View application", url: "/levytate/app?module=Approvals" },
+      { label: `Open ${firstName(application.employee.name)}'s record`, url: managerEmployeeUrl(application.employee.id) },
+    ],
   }));
   const named = employeeResolution.employee?.name;
   const title = state === "awaiting_review" ? "Applications awaiting your review"
@@ -830,11 +833,14 @@ async function getManagerOperationalActions(session: LevyTateBetaSession, filter
   if (filters.dueState === "attention_today") items = items.filter((item) => item.queueType === "urgent" || item.dueStatus === "Overdue" || item.dueStatus === "Due today");
   if (filters.dueState === "overdue") items = items.filter((item) => item.dueStatus === "Overdue");
   items = items.filter((item, index, all) => all.findIndex((candidate) => candidate.sourceKey === item.sourceKey) === index);
-  const rows = items.map((item) => ({
-    key: authorisedManagerResultKey(scope, "action", item.sourceKey),
-    cells: { action: item.actionLabel, learner: item.learnerName, priority: item.priorityLevel, status: "Open", owner: item.ownerType, dueDate: displayDate(item.dueDate), managerAction: managerActionForOperationalItem(item) },
-    actions: [{ label: "Open team view", url: "/levytate/app?module=My%20Team" }],
-  }));
+  const rows = items.map((item) => {
+    const detail = details.find((candidate) => candidate.learnerRecordId === item.learnerRecordId);
+    return {
+      key: authorisedManagerResultKey(scope, "action", item.sourceKey),
+      cells: { action: item.actionLabel, learner: item.learnerName, priority: item.priorityLevel, status: "Open", owner: item.ownerType, dueDate: displayDate(item.dueDate), managerAction: managerActionForOperationalItem(item) },
+      actions: detail ? managerLearnerActions(detail) : [],
+    };
+  });
   return payloadFromRows({
     type: "operational_action_results",
     title: filters.dueState === "overdue" ? "Overdue actions for your direct reports" : filters.actionType === "team_support" ? "Support actions for your team" : "Actions requiring your attention",
@@ -1162,10 +1168,25 @@ function quickRepliesFor(intent: LevyTateOperationalCopilotIntent, filters: Levy
 }
 
 function learnerActions(detail: LearnerRecordDetail, secondaryLabel?: string, managerScope?: ManagerDirectReportContext) {
-  if (managerScope) return [{ label: "Open team view", url: "/levytate/app?module=My%20Team" }];
+  if (managerScope) return managerLearnerActions(detail);
   const url = `/levytate/app?module=Learners&learner=${encodeURIComponent(detail.learnerRecordId)}`;
   const action = secondaryLabel === "Add progress update" ? "add_progress" : secondaryLabel === "Manage break" ? "manage_break" : secondaryLabel === "Manage assessment" ? "manage_assessment" : "record_review";
   return [{ label: "Open learner", url }, ...(secondaryLabel ? [{ label: secondaryLabel, url: `${url}&action=${action}` }] : [])];
+}
+
+function managerLearnerActions(detail: LearnerRecordDetail) {
+  return [{
+    label: `Open ${firstName(detail.learner.name)}'s record`,
+    url: managerEmployeeUrl(detail.learner.id),
+  }];
+}
+
+function managerEmployeeUrl(employeeId: string) {
+  return `/levytate/app/my-team/${encodeURIComponent(employeeId)}`;
+}
+
+function firstName(name: string) {
+  return name.trim().split(/\s+/)[0] || "learner";
 }
 
 function assessmentStatus(detail: LearnerRecordDetail) {

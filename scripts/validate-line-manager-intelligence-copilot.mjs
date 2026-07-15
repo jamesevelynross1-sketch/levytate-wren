@@ -37,7 +37,8 @@ assertResult("applications awaiting review", applications, "application_results"
 const expectedApplicationIds = trustedManagerApplications.filter((application) => ["Submitted to Line Manager", "Awaiting Manager Review"].includes(application.status)).map((application) => application.id);
 assertSet("application keys match trusted manager scope", rowKeys(applications), expectedApplicationIds.map((id) => opaqueKey(trustedManager, "application", id)));
 assert("application rows are direct reports only", rowNames(applications, "employee").every((name) => directReportNames.has(name)));
-assert("application links open manager approvals", actions(applications).every((action) => action.url === "/levytate/app?module=Approvals"));
+assert("application links retain manager approvals", applications.structuredResult.rows.every((row) => row.actions.some((action) => action.url === "/levytate/app?module=Approvals")));
+assert("application links include authorised direct-report records", applications.structuredResult.rows.every((row) => row.actions.some((action) => action.url.startsWith("/levytate/app/my-team/"))));
 record("Which applications need my review?", applications);
 
 const behind = await ask("Show me learners behind target.", managerCookie);
@@ -81,7 +82,7 @@ record("Who is approaching assessment?", assessment);
 const actionsResult = await ask("What needs my attention today?", managerCookie);
 assertOneOf("manager actions", actionsResult, ["operational_action_results", "no_results"]);
 assert("manager action rows are direct reports only", rowNames(actionsResult).every((name) => directReportNames.has(name)));
-assert("manager action links stay in My Team", actions(actionsResult).every((action) => action.url === "/levytate/app?module=My%20Team"));
+assert("manager action links open authorised direct-report records", actions(actionsResult).every((action) => action.url.startsWith("/levytate/app/my-team/")));
 record("What needs my attention today?", actionsResult);
 
 const summary = await ask("Summarise apprenticeship activity in my team.", managerCookie);
