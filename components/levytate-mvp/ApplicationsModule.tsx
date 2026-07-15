@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import type { RequestStatus } from "@/lib/levytate/domain";
 import { getApprenticeshipStandard } from "@/lib/levytate/domain";
 import {
@@ -50,7 +50,17 @@ const requestStatuses: RequestStatus[] = [
 const reviewableManagerStatuses: RequestStatus[] = ["Submitted to Line Manager", "Awaiting Manager Review"];
 const reviewableLeadStatuses: RequestStatus[] = ["Approved by Line Manager", "Submitted to Apprenticeship Lead", "Awaiting Final Approval"];
 
-export function ApplicationsModule({ onOpenDirectReport }: { onOpenDirectReport?: (employeeId: string) => void } = {}) {
+type ApplicationsModuleProps = {
+  onOpenDirectReport?: (employeeId: string) => void;
+  initialApplicationId?: string | null;
+  onApplicationSelectionChange?: (applicationId: string | null) => void;
+};
+
+export function ApplicationsModule({
+  onOpenDirectReport,
+  initialApplicationId = null,
+  onApplicationSelectionChange,
+}: ApplicationsModuleProps = {}) {
   const { data, saveApplication, updateApplicationStatus, meta } = useMvpWorkspace();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("All");
@@ -62,7 +72,7 @@ export function ApplicationsModule({ onOpenDirectReport }: { onOpenDirectReport?
   const activeSet = useMemo(() => new Set(activeApplicationStatuses()), []);
 
   if (meta?.userRole === "Line Manager") {
-    return <LineManagerApprovalsModule onOpenDirectReport={onOpenDirectReport} />;
+    return <LineManagerApprovalsModule onOpenDirectReport={onOpenDirectReport} initialApplicationId={initialApplicationId} onApplicationSelectionChange={onApplicationSelectionChange} />;
   }
   const visible = data.applications.filter((application) => {
     const employee = data.employees.find((item) => item.id === application.employeeId);
@@ -307,9 +317,19 @@ export function ApplicationsModule({ onOpenDirectReport }: { onOpenDirectReport?
   );
 }
 
-function LineManagerApprovalsModule({ onOpenDirectReport }: { onOpenDirectReport?: (employeeId: string) => void }) {
+function LineManagerApprovalsModule({ onOpenDirectReport, initialApplicationId, onApplicationSelectionChange }: ApplicationsModuleProps) {
   const { data, updateApplicationStatus, meta } = useMvpWorkspace();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialApplicationId ?? null);
+
+  useEffect(() => {
+    setSelectedId(initialApplicationId ?? null);
+  }, [initialApplicationId]);
+
+  function selectApplication(applicationId: string | null) {
+    setSelectedId(applicationId);
+    onApplicationSelectionChange?.(applicationId);
+  }
+
   const manager = data.employees.find((employee) =>
     employee.status === "Active" && employee.email.trim().toLowerCase() === (meta?.userEmail ?? "").trim().toLowerCase()
   );
@@ -325,6 +345,7 @@ function LineManagerApprovalsModule({ onOpenDirectReport }: { onOpenDirectReport
     directReportIds.has(application.employeeId) && application.status === "More information requested"
   ).length;
   const selectedApplication = selectedId ? queue.find((application) => application.id === selectedId) ?? null : null;
+  const selectionFailed = Boolean(selectedId && !selectedApplication);
 
   return (
     <div className="grid gap-5">
@@ -335,6 +356,11 @@ function LineManagerApprovalsModule({ onOpenDirectReport }: { onOpenDirectReport
       </section>
 
       <MvpPanel title="Approvals" eyebrow="Line manager review">
+        {selectionFailed ? (
+          <div role="alert" className="mb-4 rounded-xl border border-[#bf4159]/[0.12] bg-[#fff4f5] px-4 py-3 text-sm leading-6 text-[#9d344b]">
+            This application could not be opened. Refresh the page and try again.
+          </div>
+        ) : null}
         {queue.length ? (
           <div className="grid gap-3">
             {queue.map((application) => {
@@ -354,7 +380,7 @@ function LineManagerApprovalsModule({ onOpenDirectReport }: { onOpenDirectReport
                       <p className="mt-2 text-xs font-medium text-[#102c3d]/42">Submitted {application.submittedAt.slice(0, 10)}</p>
                     </div>
                     <div className="flex flex-col items-stretch gap-2">
-                      <button type="button" onClick={() => setSelectedId(application.id)} className="h-10 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white transition hover:-translate-y-0.5">
+                      <button type="button" onClick={() => selectApplication(application.id)} className="h-10 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/15">
                         Review application
                       </button>
                       {employee ? <button type="button" onClick={() => onOpenDirectReport?.(employee.id)} className="px-2 py-1 text-xs font-semibold text-[#0b766b] transition hover:text-[#102c3d]">View apprenticeship journey</button> : null}
@@ -376,7 +402,7 @@ function LineManagerApprovalsModule({ onOpenDirectReport }: { onOpenDirectReport
         <ManagerReviewModal
           application={selectedApplication}
           managerName={manager?.name ?? "Line Manager"}
-          onClose={() => setSelectedId(null)}
+          onClose={() => selectApplication(null)}
           onDecision={(status, note) => updateApplicationStatus(selectedApplication.id, status, note)}
         />
       ) : null}

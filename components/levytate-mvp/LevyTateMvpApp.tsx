@@ -124,6 +124,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
   const [aiEmployeeId, setAiEmployeeId] = useState<string | null>(null);
   const [learnerTarget, setLearnerTarget] = useState<{ learnerRecordId: string; actionType: OperationalActionType } | null>(null);
   const [managerDirectReportDetail, setManagerDirectReportDetail] = useState(initialManagerDirectReportDetail);
+  const [managerReviewApplicationId, setManagerReviewApplicationId] = useState<string | null>(null);
   const deepLinkHandled = useRef(false);
 
   const notifications = useMemo(() => buildNotifications(data), [data]);
@@ -158,8 +159,12 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
 
   useEffect(() => {
     if (!hydrated || deepLinkHandled.current) return;
-    const requested = new URLSearchParams(window.location.search).get("module") as ModuleName | null;
-    if (requested && availableModules.some((module) => module.name === requested)) setActiveModule(requested);
+    const searchParams = new URLSearchParams(window.location.search);
+    const requested = searchParams.get("module") as ModuleName | null;
+    if (requested && availableModules.some((module) => module.name === requested)) {
+      setActiveModule(requested);
+      setManagerReviewApplicationId(requested === "Approvals" ? searchParams.get("application") : null);
+    }
     deepLinkHandled.current = true;
   }, [availableModules, hydrated]);
 
@@ -185,11 +190,29 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
 
   function openModule(module: ModuleName) {
     if (!availableModules.some((item) => item.name === module)) return;
-    if (managerDirectReportDetail) {
-      setManagerDirectReportDetail(null);
-      window.history.replaceState(null, "", `/levytate/app?module=${encodeURIComponent(module)}`);
-    }
+    setManagerDirectReportDetail(null);
+    setManagerReviewApplicationId(null);
+    window.history.replaceState(null, "", `/levytate/app?module=${encodeURIComponent(module)}`);
     setActiveModule(module);
+  }
+
+  function openApplicationReview(applicationId: string) {
+    if (meta?.userRole !== "Line Manager" || !availableModules.some((item) => item.name === "Approvals")) return;
+    setManagerDirectReportDetail(null);
+    setManagerReviewApplicationId(applicationId);
+    setActiveModule("Approvals");
+    window.history.replaceState(null, "", `/levytate/app?module=Approvals&application=${encodeURIComponent(applicationId)}`);
+  }
+
+  function updateApplicationReviewSelection(applicationId: string | null) {
+    setManagerReviewApplicationId(applicationId);
+    window.history.replaceState(
+      null,
+      "",
+      applicationId
+        ? `/levytate/app?module=Approvals&application=${encodeURIComponent(applicationId)}`
+        : "/levytate/app?module=Approvals",
+    );
   }
 
   function openDirectReport(employeeId: string) {
@@ -202,6 +225,11 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
   }
 
   function navigateTo(target: string) {
+    const exactModule = availableModules.find((module) => module.name === target);
+    if (exactModule) {
+      openModule(exactModule.name);
+      return;
+    }
     if (target === "My Programme" || target === "Programme") {
       openModule("My Programme");
       return;
@@ -372,7 +400,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
               meta?.userRole === "Employee"
                 ? <EmployeeHomeModule onNavigate={(target) => navigateTo(target)} />
                 : meta?.userRole === "Line Manager"
-                  ? <LineManagerHomeModule onNavigate={(target) => navigateTo(target)} />
+                  ? <LineManagerHomeModule onNavigate={(target) => navigateTo(target)} onOpenApplicationReview={openApplicationReview} />
                 : isOperationsRole
                   ? <OperationsCentreModule onOpenLearner={(target) => { setLearnerTarget(target); openModule("Learners"); }} />
                   : <DashboardModule onNavigate={navigateTo} />
@@ -386,7 +414,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
                 ? <ManagerDirectReportDetail detail={managerDirectReportDetail} onBack={closeDirectReport} />
                 : <EmployeesModule onOpenDirectReport={openDirectReport} onStartDiscovery={(employeeId) => { setAiEmployeeId(employeeId); openModule("Copilot"); }} />
             ) : null}
-            {activeModule === "Approvals" ? <ApplicationsModule onOpenDirectReport={openDirectReport} /> : null}
+            {activeModule === "Approvals" ? <ApplicationsModule onOpenDirectReport={openDirectReport} initialApplicationId={managerReviewApplicationId} onApplicationSelectionChange={updateApplicationReviewSelection} /> : null}
             {activeModule === "Applications" ? <ApplicationsModule /> : null}
             {activeModule === "Learners" ? <LearnersModule initialLearnerRecordId={learnerTarget?.learnerRecordId} initialAction={learnerTarget?.actionType} onDeepLinkConsumed={() => setLearnerTarget(null)} /> : null}
             {activeModule === "People" ? (

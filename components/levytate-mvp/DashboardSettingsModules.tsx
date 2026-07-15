@@ -118,7 +118,10 @@ export function DashboardModule({ onNavigate }: { onNavigate: (module: string) =
   );
 }
 
-export function LineManagerHomeModule({ onNavigate }: { onNavigate: (module: string) => void }) {
+export function LineManagerHomeModule({ onNavigate, onOpenApplicationReview }: {
+  onNavigate: (module: string) => void;
+  onOpenApplicationReview: (applicationId: string) => void;
+}) {
   const { data, meta } = useMvpWorkspace();
   const manager = data.employees.find((employee) =>
     employee.status === "Active" && employee.email.trim().toLowerCase() === (meta?.userEmail ?? "").trim().toLowerCase()
@@ -149,7 +152,7 @@ export function LineManagerHomeModule({ onNavigate }: { onNavigate: (module: str
                 : "No direct-report applications are awaiting review right now."}
             </p>
           </div>
-          <button type="button" onClick={() => onNavigate(awaitingReview.length ? "Approvals" : "My Team")} className="h-11 self-start rounded-full bg-[#ffde59] px-5 text-sm font-semibold text-[#102c3d] transition hover:-translate-y-0.5 xl:self-center">
+          <button type="button" onClick={() => nextApplication ? onOpenApplicationReview(nextApplication.id) : onNavigate("My Team")} className="h-11 self-start rounded-full bg-[#ffde59] px-5 text-sm font-semibold text-[#102c3d] transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#ffde59]/35 xl:self-center">
             {awaitingReview.length ? "Review application" : "View my team"}
           </button>
         </div>
@@ -158,7 +161,7 @@ export function LineManagerHomeModule({ onNavigate }: { onNavigate: (module: str
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
         <MvpPanel title="Next manager decision" eyebrow="Approval review">
           {nextApplication && nextEmployee ? (
-            <button type="button" onClick={() => onNavigate("Approvals")} className="w-full rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4 text-left transition hover:border-[#159b8f]/18 hover:bg-white">
+            <button type="button" aria-label={`Open review for ${nextEmployee.name}`} onClick={() => onOpenApplicationReview(nextApplication.id)} className="w-full rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4 text-left transition hover:border-[#159b8f]/18 hover:bg-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/15">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="text-base font-semibold text-[#102c3d]">{nextEmployee.name}</p>
@@ -184,7 +187,7 @@ export function LineManagerHomeModule({ onNavigate }: { onNavigate: (module: str
               <p className="text-2xl font-semibold text-[#102c3d]">{needingSupport.length}</p>
               <p className="mt-1 text-sm leading-6 text-[#102c3d]/56">Direct reports with draft, returned or no active application state.</p>
             </div>
-            <button type="button" onClick={() => onNavigate("My Team")} className="h-10 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white transition hover:-translate-y-0.5">
+            <button type="button" onClick={() => onNavigate("My Team")} className="h-10 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/15">
               View my team
             </button>
           </div>
