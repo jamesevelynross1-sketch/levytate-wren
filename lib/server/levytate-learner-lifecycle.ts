@@ -1,6 +1,11 @@
 import type { LevyTateBetaSession } from "@/lib/levytate/config/beta-access";
 import { getApprenticeshipStandard } from "@/lib/levytate/domain";
 import {
+  managerCheckInActionSummaries,
+  managerCheckInStorageEnvelope,
+  parseManagerCheckInDetails,
+} from "@/lib/levytate/mvp/manager-check-in";
+import {
   assessmentConfirmationStatuses,
   assessmentConfirmationTypes,
   assessmentModelLabels,
@@ -1191,7 +1196,7 @@ export async function listManagerDirectReportLearnerLifecycleDetails(
   const rows = await selectMany<LearnerRecordRow>(
     learnerRecordsTable,
     scope.organisation.id,
-    `employee_id=in.(${scope.directReports.map((employee) => employee.id).join(",")})&record_status=eq.Active`,
+    `employee_id=in.(${scope.directReports.map((employee) => employee.id).join(",")})`,
     "updated_at.desc",
   );
   if (!rows.length) return [];
@@ -2669,7 +2674,7 @@ function reviewToRow(review: LearnerReview): LearnerReviewRow {
     reviewer_user_id: review.reviewerUserId,
     provider_id: review.providerId,
     summary: review.summary,
-    actions: review.actions,
+    actions: review.managerCheckIn ? managerCheckInStorageEnvelope(review.managerCheckIn) : review.actions,
     support_required: review.supportRequired,
     status: review.status,
     created_at: review.createdAt,
@@ -2678,6 +2683,7 @@ function reviewToRow(review: LearnerReview): LearnerReviewRow {
 }
 
 function reviewFromRow(row: LearnerReviewRow): LearnerReview {
+  const managerCheckIn = parseManagerCheckInDetails(row.actions);
   return {
     id: row.id,
     organisationId: row.organisation_id,
@@ -2689,9 +2695,10 @@ function reviewFromRow(row: LearnerReviewRow): LearnerReview {
     reviewerUserId: row.reviewer_user_id,
     providerId: row.provider_id,
     summary: row.summary,
-    actions: stringArray(row.actions),
+    actions: managerCheckIn ? managerCheckInActionSummaries(managerCheckIn) : stringArray(row.actions),
     supportRequired: row.support_required,
     status: row.status,
+    managerCheckIn,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

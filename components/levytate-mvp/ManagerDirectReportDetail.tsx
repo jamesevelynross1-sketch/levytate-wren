@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { ManagerCheckInForm } from "@/components/levytate-mvp/ManagerCheckInForm";
 import {
   ArrowLeft,
   BookOpenCheck,
@@ -19,14 +21,46 @@ import type {
   ManagerDirectReportLearnerDetail,
   ManagerSafeReview,
 } from "@/lib/levytate/mvp/manager-learner-detail";
+import {
+  managerActionOwnerLabels,
+  managerCheckInPurposeLabels,
+  managerConcernLabels,
+  managerSupportAvailableLabels,
+  managerSupportRequiredLabels,
+  managerWorkplaceApplicationLabels,
+} from "@/lib/levytate/mvp/manager-check-in";
 
 export function ManagerDirectReportDetail({
-  detail,
+  detail: initialDetail,
   onBack,
 }: {
   detail: ManagerDirectReportLearnerDetail;
   onBack: () => void;
 }) {
+  const [detail, setDetail] = useState(initialDetail);
+  const [showCheckIn, setShowCheckIn] = useState(false);
+  const [success, setSuccess] = useState("");
+
+  useEffect(() => setDetail(initialDetail), [initialDetail]);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("action") === "manager-check-in" && initialDetail.managerCheckIn.canRecord) setShowCheckIn(true);
+  }, [initialDetail.managerCheckIn.canRecord]);
+
+  function openCheckIn() {
+    if (!detail.managerCheckIn.canRecord) return;
+    setShowCheckIn(true);
+    const url = new URL(window.location.href);
+    url.searchParams.set("action", "manager-check-in");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  }
+
+  function closeCheckIn() {
+    setShowCheckIn(false);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("action");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  }
+
   const firstName = detail.employee.name.split(" ")[0] || "The employee";
   const progressSummary = detail.progress
     ? `${firstName} is ${detail.progress.varianceLabel.toLowerCase()} ${detail.managerSupport.nextAction}`
@@ -34,6 +68,9 @@ export function ManagerDirectReportDetail({
 
   return (
     <div className="grid gap-5">
+      {success ? <div role="status" className="flex items-center gap-2 rounded-xl bg-[#e8f6f2] px-4 py-3 text-sm font-semibold text-[#0b766b] ring-1 ring-[#159b8f]/14"><CheckCircle2 size={16} />{success}</div> : null}
+      {showCheckIn ? <ManagerCheckInForm detail={detail} onClose={closeCheckIn} onSaved={(nextDetail) => { setDetail(nextDetail); setSuccess("Manager check-in recorded."); closeCheckIn(); }} /> : null}
+
       <button type="button" onClick={onBack} className="flex w-fit items-center gap-2 text-sm font-semibold text-[#102c3d]/58 transition hover:text-[#102c3d]">
         <ArrowLeft size={16} aria-hidden="true" />
         Back to My Team
@@ -63,10 +100,14 @@ export function ManagerDirectReportDetail({
             <h3 className="mt-2 text-lg font-semibold text-[#102c3d]">{detail.managerSupport.title}</h3>
             <p className="mt-2 text-sm leading-6 text-[#102c3d]/62">{progressSummary}</p>
             {detail.managerSupport.relevantDate ? <p className="mt-3 flex items-center gap-2 text-xs font-medium text-[#102c3d]/50"><CalendarDays size={14} aria-hidden="true" /> Relevant date {displayDate(detail.managerSupport.relevantDate)}</p> : null}
-            {detail.managerSupport.destination ? (
-              <a href={detail.managerSupport.destination} className="mt-4 inline-flex h-10 items-center rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#173f55]">
-                {detail.managerSupport.destinationLabel}
-              </a>
+            {detail.managerCheckIn.canRecord ? (
+              <button type="button" onClick={openCheckIn} className="mt-4 inline-flex h-10 items-center rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#173f55]">
+                Record manager check-in
+              </button>
+            ) : detail.managerSupport.destination ? (
+              <a href={detail.managerSupport.destination} className="mt-4 inline-flex h-10 items-center rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#173f55]">{detail.managerSupport.destinationLabel}</a>
+            ) : detail.managerCheckIn.unavailableReason ? (
+              <p className="mt-3 text-xs leading-5 text-[#102c3d]/45">{detail.managerCheckIn.unavailableReason}</p>
             ) : null}
           </div>
         </div>
@@ -231,7 +272,29 @@ function ReviewSummary({ label, review }: { label: string; review: ManagerSafeRe
 }
 
 function ReviewHistory({ review }: { review: ManagerSafeReview }) {
-  return <article className="rounded-lg bg-[#f8fbfa] p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-semibold text-[#102c3d]">{review.typeLabel}</p><time className="text-[11px] text-[#102c3d]/42">{displayDate(review.date)}</time></div><p className="mt-1.5 text-xs leading-5 text-[#102c3d]/56">{review.summary || "No summary recorded."}</p>{review.agreedActions.length ? <p className="mt-1.5 text-[11px] leading-5 text-[#102c3d]/48">Agreed actions: {review.agreedActions.join("; ")}</p> : null}{review.supportRequired ? <p className="mt-1 text-[11px] leading-5 text-[#102c3d]/48">Support: {review.supportRequired}</p> : null}</article>;
+  const checkIn = review.managerCheckIn;
+  return <article className="rounded-lg bg-[#f8fbfa] p-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-xs font-semibold text-[#102c3d]">{review.typeLabel}</p><p className="mt-0.5 text-[11px] text-[#102c3d]/42">{review.reviewerName || "Manager"}</p></div><time className="text-[11px] text-[#102c3d]/42">{displayDate(review.date)}</time></div><p className="mt-1.5 text-xs leading-5 text-[#102c3d]/56">{review.summary || "No summary recorded."}</p>{checkIn ? (
+    <details className="mt-3 rounded-lg bg-white ring-1 ring-[#102c3d]/[0.06]">
+      <summary className="cursor-pointer list-none px-3 py-2.5 text-[11px] font-semibold text-[#0b766b]">Open check-in detail</summary>
+      <div className="grid gap-3 border-t border-[#102c3d]/[0.06] px-3 py-3 text-xs leading-5 text-[#102c3d]/58 sm:grid-cols-2">
+        <ReviewDetail label="Purpose" value={managerCheckInPurposeLabels[checkIn.discussionPurpose]} />
+        <ReviewDetail label="Workplace application" value={managerWorkplaceApplicationLabels[checkIn.workplaceApplication]} />
+        <ReviewDetail label="Support available" value={checkIn.supportAvailable.map((item) => managerSupportAvailableLabels[item]).join(", ")} />
+        <ReviewDetail label="Concerns" value={checkIn.concerns.map((item) => `${managerConcernLabels[item.type]}${item.detail ? `: ${item.detail}` : ""}`).join("; ")} />
+        <ReviewDetail label="Support required" value={checkIn.supportRequired.map((item) => managerSupportRequiredLabels[item]).join(", ")} />
+        <ReviewDetail label="Next check-in" value={displayDate(review.nextDate)} />
+        {checkIn.learningApplied ? <ReviewDetail label="Learning applied" value={checkIn.learningApplied} /> : null}
+        {checkIn.workplaceOpportunityAvailable ? <ReviewDetail label="Opportunity available" value={checkIn.workplaceOpportunityAvailable} /> : null}
+        {checkIn.workplaceOpportunityNeeded ? <ReviewDetail label="Opportunity needed" value={checkIn.workplaceOpportunityNeeded} /> : null}
+        {checkIn.agreedActions.length ? <div className="sm:col-span-2"><p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#102c3d]/38">Agreed actions</p><ul className="mt-1.5 grid gap-1">{checkIn.agreedActions.map((action, index) => <li key={`${action.description}-${index}`}>{action.description} · {managerActionOwnerLabels[action.responsibleParty]}{action.targetDate ? ` · ${displayDate(action.targetDate)}` : ""}</li>)}</ul></div> : null}
+        {checkIn.note ? <div className="sm:col-span-2"><ReviewDetail label="Note" value={checkIn.note} /></div> : null}
+      </div>
+    </details>
+  ) : <>{review.agreedActions.length ? <p className="mt-1.5 text-[11px] leading-5 text-[#102c3d]/48">Agreed actions: {review.agreedActions.join("; ")}</p> : null}{review.supportRequired ? <p className="mt-1 text-[11px] leading-5 text-[#102c3d]/48">Support: {review.supportRequired}</p> : null}</>}</article>;
+}
+
+function ReviewDetail({ label, value }: { label: string; value: string }) {
+  return <div><p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#102c3d]/38">{label}</p><p className="mt-0.5 break-words">{value || "Not recorded"}</p></div>;
 }
 
 function HeaderFact({ label, value }: { label: string; value: string }) {

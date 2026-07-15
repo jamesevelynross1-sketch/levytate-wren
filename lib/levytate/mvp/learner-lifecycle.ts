@@ -1,5 +1,6 @@
 import { createMvpId, nowIso } from "@/lib/levytate/mvp/workspace";
 import type { AssessmentReadinessConfirmations } from "@/lib/levytate/mvp/assessment-readiness";
+import type { ManagerCheckInDetails } from "@/lib/levytate/mvp/manager-check-in";
 
 export type LearnerLifecycleRecordStatus = "Active" | "Archived";
 
@@ -401,6 +402,7 @@ export type LearnerReview = {
   actions: string[];
   supportRequired: string;
   status: LearnerReviewStatus;
+  managerCheckIn?: ManagerCheckInDetails | null;
   createdAt: string;
   updatedAt: string;
 };

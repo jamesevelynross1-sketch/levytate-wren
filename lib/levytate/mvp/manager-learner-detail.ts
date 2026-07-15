@@ -1,4 +1,8 @@
 import type { RequestStatus } from "@/lib/levytate/domain";
+import {
+  managerCheckInHasOutstandingSupport,
+  type ManagerCheckInDetails,
+} from "@/lib/levytate/mvp/manager-check-in";
 import type {
   LearnerAssessmentStatus,
   LearnerLifecycleStatus,
@@ -117,6 +121,13 @@ export type ManagerDirectReportLearnerDetail = {
     outstandingManagerCheck: string;
     expectedStartDate: string;
   } | null;
+  managerCheckIn: {
+    canRecord: boolean;
+    destination: string;
+    submitUrl: string;
+    formVersion: string;
+    unavailableReason: string;
+  };
   managerSupport: ManagerSupportSummary;
   actions: Array<{
     title: string;
@@ -143,6 +154,8 @@ export type ManagerSafeReview = {
   summary: string;
   agreedActions: string[];
   supportRequired: string;
+  reviewerName: string;
+  managerCheckIn: ManagerCheckInDetails | null;
 };
 
 export type ManagerSupportInput = {
@@ -161,6 +174,8 @@ export type ManagerSupportInput = {
     overdue: boolean;
     nextDate: string;
     status: LearnerReviewStatus | null;
+    latestDate: string;
+    details: ManagerCheckInDetails | null;
   };
   activeBreak: {
     expectedReturnDate: string;
@@ -189,6 +204,24 @@ export function deriveManagerSupportSummary(input: ManagerSupportInput): Manager
     };
   }
 
+  if (
+    input.managerReview.latestDate &&
+    !input.managerReview.overdue &&
+    managerCheckInHasOutstandingSupport(input.managerReview.details, input.managerReview.status ?? "completed")
+  ) {
+    return {
+      state: "manager_check_in",
+      title: "Manager check-in recorded, but workplace support is still required",
+      whyItMatters: "The conversation is recorded, while the agreed support or action remains visible for follow-up.",
+      nextAction: input.managerReview.nextDate
+        ? `Complete the agreed support and review progress at the next check-in on ${formatManagerDate(input.managerReview.nextDate)}.`
+        : "Complete the agreed support and review progress with the learner.",
+      relevantDate: input.managerReview.latestDate,
+      destination: "",
+      destinationLabel: "",
+    };
+  }
+
   if (input.activeBreak && !input.activeBreak.managerReturnConfirmed) {
     return {
       state: "break_return",
@@ -208,6 +241,22 @@ export function deriveManagerSupportSummary(input: ManagerSupportInput): Manager
       whyItMatters: "Manager confirmation helps demonstrate that the learner has suitable workplace evidence and support.",
       nextAction: "Review workplace readiness with the learner and Apprenticeship Lead.",
       relevantDate: input.assessment.expectedReadinessDate,
+      destination: "",
+      destinationLabel: "",
+    };
+  }
+
+  if (input.managerReview.latestDate && !input.managerReview.overdue) {
+    return {
+      state: "no_action",
+      title: `Manager check-in completed on ${formatManagerDate(input.managerReview.latestDate)}`,
+      whyItMatters: input.managerReview.nextDate
+        ? `The next agreed check-in is ${formatManagerDate(input.managerReview.nextDate)}.`
+        : "The latest workplace-support conversation is complete and no additional support was recorded.",
+      nextAction: input.managerReview.nextDate
+        ? "Continue the agreed workplace support until the next check-in."
+        : "Continue normal workplace support.",
+      relevantDate: input.managerReview.nextDate || input.managerReview.latestDate,
       destination: "",
       destinationLabel: "",
     };
@@ -266,6 +315,12 @@ export function isManagerRelevantOperationalAction(item: OperationalItem) {
     || item.sourceCondition.includes("manager_check_in")
     || item.sourceCondition.includes("line_manager")
     || item.sourceCondition === "support_intervention";
+}
+
+function formatManagerDate(value: string) {
+  if (!value) return "the agreed date";
+  const date = new Date(`${value.slice(0, 10)}T12:00:00Z`);
+  return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(date);
 }
 
 export function progressSourceLabel(source: LearnerProgressSource) {

@@ -22,9 +22,11 @@ import type { LearnerRecordDetail } from "@/lib/levytate/mvp/learner-record-view
 import { createMvpId } from "@/lib/levytate/mvp/workspace";
 import {
   getLearnerLifecycleServerContext,
+  listManagerDirectReportLearnerLifecycleDetails,
   listOrganisationLearnerLifecycleDetails,
   LevyTateLearnerLifecyclePermissionError,
 } from "@/lib/server/levytate-learner-lifecycle";
+import { getManagerDirectReportContext } from "@/lib/server/levytate-manager-scope";
 import {
   getLevyTateSupabaseConfig,
   LevyTateSupabaseError,
@@ -463,6 +465,42 @@ async function selectActionHistory(organisationId: string, actionId: string) {
 export async function resolveActionsForLearnerConditionChange(session: LevyTateBetaSession, learnerRecordId: string) {
   const result = await synchroniseOrganisationOperationalActions(session);
   return result.actions.filter((action) => action.learnerRecordId === learnerRecordId);
+}
+
+export async function resolveManagerCheckInActionsForDirectReport(
+  session: LevyTateBetaSession,
+  employeeId: string,
+  learnerRecordId: string,
+) {
+  const scope = await getManagerDirectReportContext(session);
+  if (!scope.directReports.some((employee) => employee.id === employeeId)) {
+    throw new LevyTateLearnerLifecyclePermissionError("This employee is no longer within your direct-report scope.");
+  }
+  const lifecycleContext = await getLearnerLifecycleServerContext(session);
+  if (lifecycleContext.organisation.id !== scope.organisation.id) {
+    throw new LevyTateLearnerLifecyclePermissionError("This employee is no longer within your direct-report scope.");
+  }
+  const details = await listManagerDirectReportLearnerLifecycleDetails(session, scope);
+  const detail = details.find((item) => item.learnerRecordId === learnerRecordId && item.learner.id === employeeId);
+  if (!detail) throw new LevyTateLearnerLifecyclePermissionError("This employee is no longer within your direct-report scope.");
+
+  const activeSourceKeys = new Set(
+    buildOrganisationOperationalItems([detail]).items
+      .filter((item) => item.ownerType === "Line Manager" && item.persistentActionType === "record_manager_check_in")
+      .map((item) => item.sourceKey),
+  );
+  const actions = await selectActions(scope.organisation.id, { learnerRecordId, includeTerminal: true });
+  const context: ActionContext = { ...lifecycleContext, actorDisplayName: scope.manager.name };
+  const now = new Date().toISOString();
+  const resolved: PersistentOperationalAction[] = [];
+
+  for (const action of actions) {
+    if (isOperationalActionTerminal(action.status)) continue;
+    if (action.ownerType !== "Line Manager" || action.actionType !== "record_manager_check_in") continue;
+    if (activeSourceKeys.has(action.sourceKey)) continue;
+    resolved.push(await transitionSystemResolvedAction(context, action, now));
+  }
+  return resolved;
 }
 
 async function transitionAction(

@@ -1,5 +1,6 @@
 import type { LevyTateBetaSession } from "@/lib/levytate/config/beta-access";
 import { getApprenticeshipStandard } from "@/lib/levytate/domain";
+import { managerCheckInEligibleLifecycleStatuses } from "@/lib/levytate/mvp/manager-check-in";
 import {
   assessmentStatusLabel,
   deriveManagerSupportSummary,
@@ -98,6 +99,7 @@ export async function getManagerDirectReportLearnerDetail(
   const activeBreak = learner?.activeBreak ?? null;
   const latestBreak = activeBreak ?? learner?.latestBreak ?? null;
   const assessment = learner?.assessmentReadiness ?? null;
+  const latestManagerReview = learner?.reviewSummaries.manager.latest ?? null;
 
   const managerSupport = deriveManagerSupportSummary({
     application: application ? {
@@ -111,6 +113,8 @@ export async function getManagerDirectReportLearnerDetail(
       overdue: learner?.reviewSummaries.manager.overdue ?? false,
       nextDate: learner?.reviewSummaries.manager.nextDate ?? "",
       status: learner?.reviewSummaries.manager.latest?.status ?? null,
+      latestDate: latestManagerReview?.reviewDate ?? "",
+      details: latestManagerReview?.managerCheckIn ?? null,
     },
     activeBreak: activeBreak ? {
       expectedReturnDate: activeBreak.expectedReturnDate,
@@ -122,6 +126,13 @@ export async function getManagerDirectReportLearnerDetail(
     } : null,
     actions: operationalItems,
   });
+
+  const canRecordManagerCheckIn = Boolean(learner && managerCheckInEligibleLifecycleStatuses.includes(learner.lifecycleStatus as (typeof managerCheckInEligibleLifecycleStatuses)[number]));
+  const managerCheckInDestination = `/levytate/app/my-team/${encodeURIComponent(employee.id)}?action=manager-check-in`;
+  if (canRecordManagerCheckIn && ["manager_check_in", "workplace_opportunity", "progress_support", "break_return", "assessment_readiness"].includes(managerSupport.state)) {
+    managerSupport.destination = managerCheckInDestination;
+    managerSupport.destinationLabel = "Record manager check-in";
+  }
 
   return {
     employee: {
@@ -194,6 +205,13 @@ export async function getManagerDirectReportLearnerDetail(
         : "Confirm that suitable workplace evidence and manager support are in place.",
       expectedStartDate: assessment.expectedAssessmentStartDate,
     } : null,
+    managerCheckIn: {
+      canRecord: canRecordManagerCheckIn,
+      destination: canRecordManagerCheckIn ? managerCheckInDestination : "",
+      submitUrl: canRecordManagerCheckIn ? `/api/levytate-manager/direct-reports/${encodeURIComponent(employee.id)}/check-ins` : "",
+      formVersion: learner?.activityVersion ?? "",
+      unavailableReason: learner && !canRecordManagerCheckIn ? "New manager check-ins are unavailable for this completed or closed journey." : learner ? "" : "A learner record is required before a manager check-in can be recorded.",
+    },
     managerSupport,
     actions: operationalItems.map((item) => ({
       title: item.actionLabel,
@@ -281,6 +299,8 @@ function safeReview(review: LearnerReview | null): ManagerSafeReview | null {
     summary: review.summary,
     agreedActions: review.actions.filter(Boolean),
     supportRequired: review.supportRequired,
+    reviewerName: review.reviewerName,
+    managerCheckIn: review.managerCheckIn ?? null,
   };
 }
 

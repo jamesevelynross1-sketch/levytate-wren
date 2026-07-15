@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 import type { LevyTateBetaSession } from "@/lib/levytate/config/beta-access";
 import { getApprenticeshipStandard } from "@/lib/levytate/domain";
+import { managerCheckInEligibleLifecycleStatuses } from "@/lib/levytate/mvp/manager-check-in";
 import type {
   LevyTateAiRequest,
   LevyTateAiResponse,
@@ -777,7 +778,7 @@ async function getManagerCheckIns(
     "These results use the manager check-in schedule and action status recorded for your direct reports.",
     filters.reviewDueState === "overdue" ? "No manager check-ins are overdue." : "No direct reports currently need a manager check-in.",
     "/levytate/app?module=My%20Team",
-    undefined,
+    "Record manager check-in",
     scope,
   );
 }
@@ -822,7 +823,7 @@ async function getManagerEmployeeSupport(session: LevyTateBetaSession, filters: 
     "This answer uses the learner's latest progress, review and attention records.",
     `No support information is recorded for ${detail.learner.name}.`,
     "/levytate/app?module=My%20Team",
-    undefined,
+    "Record manager check-in",
     scope,
   );
 }
@@ -838,7 +839,7 @@ async function getManagerOperationalActions(session: LevyTateBetaSession, filter
     return {
       key: authorisedManagerResultKey(scope, "action", item.sourceKey),
       cells: { action: item.actionLabel, learner: item.learnerName, priority: item.priorityLevel, status: "Open", owner: item.ownerType, dueDate: displayDate(item.dueDate), managerAction: managerActionForOperationalItem(item) },
-      actions: detail ? managerLearnerActions(detail) : [],
+      actions: detail ? managerLearnerActions(detail, item.persistentActionType === "record_manager_check_in" ? "Record manager check-in" : undefined) : [],
     };
   });
   return payloadFromRows({
@@ -1168,17 +1169,22 @@ function quickRepliesFor(intent: LevyTateOperationalCopilotIntent, filters: Levy
 }
 
 function learnerActions(detail: LearnerRecordDetail, secondaryLabel?: string, managerScope?: ManagerDirectReportContext) {
-  if (managerScope) return managerLearnerActions(detail);
+  if (managerScope) return managerLearnerActions(detail, secondaryLabel);
   const url = `/levytate/app?module=Learners&learner=${encodeURIComponent(detail.learnerRecordId)}`;
   const action = secondaryLabel === "Add progress update" ? "add_progress" : secondaryLabel === "Manage break" ? "manage_break" : secondaryLabel === "Manage assessment" ? "manage_assessment" : "record_review";
   return [{ label: "Open learner", url }, ...(secondaryLabel ? [{ label: secondaryLabel, url: `${url}&action=${action}` }] : [])];
 }
 
-function managerLearnerActions(detail: LearnerRecordDetail) {
-  return [{
+function managerLearnerActions(detail: LearnerRecordDetail, secondaryLabel?: string) {
+  const url = managerEmployeeUrl(detail.learner.id);
+  const actions = [{
     label: `Open ${firstName(detail.learner.name)}'s record`,
-    url: managerEmployeeUrl(detail.learner.id),
+    url,
   }];
+  if (secondaryLabel === "Record manager check-in" && managerCheckInEligibleLifecycleStatuses.includes(detail.lifecycleStatus as (typeof managerCheckInEligibleLifecycleStatuses)[number])) {
+    actions.push({ label: secondaryLabel, url: `${url}?action=manager-check-in` });
+  }
+  return actions;
 }
 
 function managerEmployeeUrl(employeeId: string) {
