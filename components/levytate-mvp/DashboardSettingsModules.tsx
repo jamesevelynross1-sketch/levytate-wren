@@ -131,7 +131,10 @@ export function LineManagerHomeModule({ onNavigate, onOpenApplicationReview }: {
   const awaitingReview = data.applications
     .filter((application) => directReportIds.has(application.employeeId) && managerReviewStatuses.includes(application.status as typeof managerReviewStatuses[number]))
     .sort((a, b) => a.submittedAt.localeCompare(b.submittedAt));
+  const operationalSummaries = new Map((meta?.directReportOperationalSummaries ?? []).map((summary) => [summary.employeeId, summary]));
   const needingSupport = directReports.filter((employee) => {
+    const operationalSummary = operationalSummaries.get(employee.id);
+    if (operationalSummary) return operationalSummary.managerSupportState !== "no_action";
     const application = employeeCurrentApplication(data, employee.id);
     return !application || application.status === "More information requested" || application.status === "Draft";
   });
@@ -185,7 +188,7 @@ export function LineManagerHomeModule({ onNavigate, onOpenApplicationReview }: {
           <div className="grid gap-3">
             <div className="rounded-xl bg-[#f8fbfa] px-4 py-3 ring-1 ring-[#102c3d]/[0.055]">
               <p className="text-2xl font-semibold text-[#102c3d]">{needingSupport.length}</p>
-              <p className="mt-1 text-sm leading-6 text-[#102c3d]/56">Direct reports with draft, returned or no active application state.</p>
+              <p className="mt-1 text-sm leading-6 text-[#102c3d]/56">Direct reports with a current application or learner support action.</p>
             </div>
             <button type="button" onClick={() => onNavigate("My Team")} className="h-10 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/15">
               View my team

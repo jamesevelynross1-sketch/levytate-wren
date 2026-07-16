@@ -12,6 +12,7 @@ import type {
 } from "@/lib/levytate/mvp/learner-lifecycle";
 import type { LearnerProgressPosition } from "@/lib/levytate/mvp/learner-record-view";
 import type { OperationalItem } from "@/lib/levytate/mvp/operations-centre";
+import type { EmployeeOperationalDisplaySummary } from "@/lib/levytate/mvp/employee-operational-summary";
 
 export type ManagerSupportState =
   | "application_decision"
@@ -50,6 +51,7 @@ export type ManagerDirectReportLearnerDetail = {
     programmeTitle: string;
     canReview: boolean;
   } | null;
+  operationalSummary: EmployeeOperationalDisplaySummary;
   journey: {
     hasActivity: boolean;
     stage: string;

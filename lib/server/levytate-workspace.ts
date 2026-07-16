@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { listManagerDirectReportOperationalSummaries } from "@/lib/server/levytate-manager-operational-summaries";
 import type {
   ProviderCatalogueRecord,
   ProviderProgramme,
@@ -345,6 +346,17 @@ export async function getWorkspaceBootstrapForSession(session: LevyTateBetaSessi
     const context = await ensureWorkspaceContext(session);
     await assertWorkspaceReadAllowed(context);
     const data = await loadWorkspaceData(context);
+    const userRole = normaliseMvpUserRole(context.user.role);
+    const warnings = [...context.warnings];
+    let directReportOperationalSummaries;
+    if (userRole === "Line Manager") {
+      try {
+        directReportOperationalSummaries = await listManagerDirectReportOperationalSummaries(session, data);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown direct-report summary error.";
+        warnings.push(`Current learner summaries could not be loaded. ${message}`);
+      }
+    }
 
     return {
       data,
@@ -352,10 +364,11 @@ export async function getWorkspaceBootstrapForSession(session: LevyTateBetaSessi
         organisationId: context.organisation.id,
         organisationName: context.organisation.name,
         userEmail: session.email,
-        userRole: normaliseMvpUserRole(context.user.role),
+        userRole,
         permissions: permissionsForMvpRole(context.user.role),
+        directReportOperationalSummaries,
         storageMode: "supabase",
-        warnings: context.warnings,
+        warnings,
       },
     };
   } catch (error) {

@@ -1,4 +1,5 @@
 import type { ProviderCatalogueRecord, ProviderProgramme, RequestStatus } from "@/lib/levytate/domain";
+import type { EmployeeOperationalSummary } from "@/lib/levytate/mvp/employee-operational-summary";
 import type {
   MvpApplication,
   MvpEmployee,
@@ -22,6 +23,7 @@ export type LevyTateWorkspaceMeta = {
   userEmail: string;
   userRole: MvpUserRole;
   permissions?: MvpPermission[];
+  directReportOperationalSummaries?: EmployeeOperationalSummary[];
   storageMode: MvpWorkspaceStorageMode;
   warnings: string[];
 };

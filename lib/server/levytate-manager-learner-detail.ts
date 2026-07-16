@@ -1,5 +1,6 @@
 import type { LevyTateBetaSession } from "@/lib/levytate/config/beta-access";
 import { getApprenticeshipStandard } from "@/lib/levytate/domain";
+import { deriveEmployeeOperationalSummary, toEmployeeOperationalDisplaySummary } from "@/lib/levytate/mvp/employee-operational-summary";
 import { managerCheckInEligibleLifecycleStatuses } from "@/lib/levytate/mvp/manager-check-in";
 import {
   assessmentStatusLabel,
@@ -66,12 +67,7 @@ export async function getManagerDirectReportLearnerDetail(
   const application = currentApplication(employeeApplications);
   const learner = lifecycleDetails.find((detail) => detail.learner.id === employee.id) ?? null;
   const programmeMetadata = learner ? await loadProgrammeMetadata(scope, learner) : null;
-  const operationalItems = learner
-    ? buildOrganisationOperationalItems([learner]).items
-      .filter(isManagerRelevantOperationalAction)
-      .filter((item) => !item.persistentActionStatus || !["completed", "dismissed", "cancelled"].includes(item.persistentActionStatus))
-      .filter((item, index, items) => items.findIndex((candidate) => candidate.sourceKey === item.sourceKey) === index)
-    : [];
+  const { operationalItems, managerSupport } = deriveManagerOperationalContext(application, learner);
 
   const progress = learner?.latestProgress ? {
     position: learner.progressPosition,
@@ -99,33 +95,6 @@ export async function getManagerDirectReportLearnerDetail(
   const activeBreak = learner?.activeBreak ?? null;
   const latestBreak = activeBreak ?? learner?.latestBreak ?? null;
   const assessment = learner?.assessmentReadiness ?? null;
-  const latestManagerReview = learner?.reviewSummaries.manager.latest ?? null;
-
-  const managerSupport = deriveManagerSupportSummary({
-    application: application ? {
-      status: application.status,
-      submittedAt: application.submittedAt,
-      informationWasRequested: application.history.some((entry) => entry.status === "More information requested"),
-    } : null,
-    lifecycleStatus: learner?.lifecycleStatus ?? null,
-    progress: progress ? { position: progress.position, updatedAt: progress.updatedAt, supportAction: progress.supportAction } : null,
-    managerReview: {
-      overdue: learner?.reviewSummaries.manager.overdue ?? false,
-      nextDate: learner?.reviewSummaries.manager.nextDate ?? "",
-      status: learner?.reviewSummaries.manager.latest?.status ?? null,
-      latestDate: latestManagerReview?.reviewDate ?? "",
-      details: latestManagerReview?.managerCheckIn ?? null,
-    },
-    activeBreak: activeBreak ? {
-      expectedReturnDate: activeBreak.expectedReturnDate,
-      managerReturnConfirmed: activeBreak.managerReturnConfirmed,
-    } : null,
-    assessment: assessment ? {
-      expectedReadinessDate: assessment.expectedAssessmentReadinessDate,
-      managerConfirmationStatus: assessment.confirmations.line_manager.status,
-    } : null,
-    actions: operationalItems,
-  });
 
   const canRecordManagerCheckIn = Boolean(learner && managerCheckInEligibleLifecycleStatuses.includes(learner.lifecycleStatus as (typeof managerCheckInEligibleLifecycleStatuses)[number]));
   const managerCheckInDestination = `/levytate/app/my-team/${encodeURIComponent(employee.id)}?action=manager-check-in`;
@@ -151,6 +120,24 @@ export async function getManagerDirectReportLearnerDetail(
       programmeTitle: getApprenticeshipStandard(application.apprenticeshipStandardId)?.title ?? application.apprenticeshipStandardId,
       canReview: ["Submitted to Line Manager", "Awaiting Manager Review"].includes(application.status),
     } : null,
+    operationalSummary: toEmployeeOperationalDisplaySummary(deriveEmployeeOperationalSummary({
+      employeeId: employee.id,
+      learner: learner ? {
+        lifecycleStatus: learner.lifecycleStatus,
+        programme: learner.programme.programmeName,
+        progressPosition: learner.progressPosition,
+        managerSupportSummary: managerSupport.title,
+        managerSupportState: managerSupport.state,
+        nextAction: managerSupport.nextAction,
+        expectedEndDate: learner.expectedEndDate,
+      } : null,
+      application: application ? {
+        status: application.status,
+        programme: getApprenticeshipStandard(application.apprenticeshipStandardId)?.title ?? application.apprenticeshipStandardId,
+        nextAction: managerSupport.nextAction,
+      } : null,
+      development: null,
+    })),
     journey: buildJourney(application, learner),
     programme: learner ? {
       programmeName: learner.programme.programmeName,
@@ -223,6 +210,50 @@ export async function getManagerDirectReportLearnerDetail(
     })),
     timeline: buildSafeTimeline(application, learner),
   };
+}
+
+export function deriveManagerOperationalContext(
+  application: ManagerDirectReportApplication | null,
+  learner: LearnerRecordDetail | null,
+) {
+  const operationalItems = learner
+    ? buildOrganisationOperationalItems([learner]).items
+      .filter(isManagerRelevantOperationalAction)
+      .filter((item) => !item.persistentActionStatus || !["completed", "dismissed", "cancelled"].includes(item.persistentActionStatus))
+      .filter((item, index, items) => items.findIndex((candidate) => candidate.sourceKey === item.sourceKey) === index)
+    : [];
+  const latestManagerReview = learner?.reviewSummaries.manager.latest ?? null;
+  const managerSupport = deriveManagerSupportSummary({
+    application: application && !learner ? {
+      status: application.status,
+      submittedAt: application.submittedAt,
+      informationWasRequested: application.history.some((entry) => entry.status === "More information requested"),
+    } : null,
+    lifecycleStatus: learner?.lifecycleStatus ?? null,
+    progress: learner?.latestProgress ? {
+      position: learner.progressPosition,
+      updatedAt: learner.latestProgress.updateDate,
+      supportAction: learner.latestProgress.supportAction,
+    } : null,
+    managerReview: {
+      overdue: learner?.reviewSummaries.manager.overdue ?? false,
+      nextDate: learner?.reviewSummaries.manager.nextDate ?? "",
+      status: learner?.reviewSummaries.manager.latest?.status ?? null,
+      latestDate: latestManagerReview?.reviewDate ?? "",
+      details: latestManagerReview?.managerCheckIn ?? null,
+    },
+    activeBreak: learner?.activeBreak ? {
+      expectedReturnDate: learner.activeBreak.expectedReturnDate,
+      managerReturnConfirmed: learner.activeBreak.managerReturnConfirmed,
+    } : null,
+    assessment: learner?.assessmentReadiness ? {
+      expectedReadinessDate: learner.assessmentReadiness.expectedAssessmentReadinessDate,
+      managerConfirmationStatus: learner.assessmentReadiness.confirmations.line_manager.status,
+    } : null,
+    actions: operationalItems,
+  });
+
+  return { operationalItems, managerSupport };
 }
 
 function currentApplication(applications: ManagerDirectReportApplication[]) {

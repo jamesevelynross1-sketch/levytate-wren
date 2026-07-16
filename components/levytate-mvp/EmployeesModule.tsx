@@ -18,6 +18,7 @@ import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { includesSearch, statusTone } from "@/components/levytate-mvp/module-utils";
 import type { LevyTateRecommendationResult } from "@/lib/levytate/ai/types";
 import { getApprenticeshipStandard } from "@/lib/levytate/domain";
+import { deriveEmployeeOperationalSummary } from "@/lib/levytate/mvp/employee-operational-summary";
 import {
   employeeCurrentApplication,
   employeeDevelopmentInterests,
@@ -91,6 +92,10 @@ export function EmployeesModule({ onStartDiscovery, onOpenDirectReport }: {
     : null;
   const canWriteEmployees = can("employees:write");
   const isLineManager = meta?.userRole === "Line Manager";
+  const operationalSummaries = useMemo(
+    () => new Map((meta?.directReportOperationalSummaries ?? []).map((summary) => [summary.employeeId, summary])),
+    [meta?.directReportOperationalSummaries],
+  );
 
   function blankEmployee(): MvpEmployee {
     const now = nowIso();
@@ -187,6 +192,20 @@ export function EmployeesModule({ onStartDiscovery, onOpenDirectReport }: {
               : profile
                 ? "Discovery in progress"
                 : "Needs discovery";
+            const operationalSummary = isLineManager
+              ? operationalSummaries.get(employee.id) ?? deriveEmployeeOperationalSummary({
+                employeeId: employee.id,
+                application: application ? {
+                  status: application.status,
+                  programme: getApprenticeshipStandard(application.apprenticeshipStandardId)?.title ?? application.apprenticeshipStandardId,
+                } : null,
+                development: {
+                  status: statusLabel,
+                  programme: routeOutcome?.title,
+                  nextAction: profile ? "Continue the employee's development conversation." : "Discuss development goals at the next one-to-one.",
+                },
+              })
+              : null;
             const primaryAction = application
               ? "Review"
               : routeOutcome
@@ -200,19 +219,30 @@ export function EmployeesModule({ onStartDiscovery, onOpenDirectReport }: {
                     <p className="truncate text-base font-semibold text-[#102c3d]">{employee.name}</p>
                     <p className="mt-1 text-sm leading-6 text-[#102c3d]/58">{employee.jobTitle || role?.title || "Role to confirm"}</p>
                   </div>
-                  <StatusBadge tone={application ? statusTone(application.status) : routeOutcome ? routeOutcome.tone : profile ? "yellow" : "neutral"}>
-                    {application?.status ?? statusLabel}
+                  <StatusBadge tone={operationalSummary ? statusTone(operationalSummary.primaryStatus) : application ? statusTone(application.status) : routeOutcome ? routeOutcome.tone : profile ? "yellow" : "neutral"}>
+                    {operationalSummary?.primaryStatus ?? application?.status ?? statusLabel}
                   </StatusBadge>
                 </div>
 
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <DecisionFact label="Manager" value={managerName(data, employee)} />
-                  <DecisionFact label="Team" value={employee.department || "Department to confirm"} />
-                  <DecisionFact label="Development status" value={statusLabel} />
-                  <DecisionFact label="AI confidence" value={routeOutcome?.isStrategicDiscussion ? "Adviser review" : routeOutcome ? "High" : profile ? "Building" : "Not started"} />
+                  {isLineManager && operationalSummary ? (
+                    <>
+                      <DecisionFact label="Programme" value={operationalSummary.programme} />
+                      <DecisionFact label="Progress" value={operationalSummary.progressPosition} />
+                      <DecisionFact label="Manager support" value={operationalSummary.managerSupportSummary} />
+                      <DecisionFact label="Team" value={employee.department || "Department to confirm"} />
+                    </>
+                  ) : (
+                    <>
+                      <DecisionFact label="Manager" value={managerName(data, employee)} />
+                      <DecisionFact label="Team" value={employee.department || "Department to confirm"} />
+                      <DecisionFact label="Development status" value={statusLabel} />
+                      <DecisionFact label="AI confidence" value={routeOutcome?.isStrategicDiscussion ? "Adviser review" : routeOutcome ? "High" : profile ? "Building" : "Not started"} />
+                    </>
+                  )}
                 </div>
 
-                {routeOutcome ? (
+                {routeOutcome && !operationalSummary?.hasLearnerLifecycle ? (
                   <div className="mt-4 rounded-xl bg-[#f8fbfa] px-4 py-3 ring-1 ring-[#102c3d]/[0.055]">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">{routeOutcome.label}</p>
                     <p className="mt-1 text-sm font-semibold text-[#102c3d]">{routeOutcome.title}</p>
@@ -430,7 +460,7 @@ function DecisionFact({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-[#f8fbfa] px-3.5 py-3 ring-1 ring-[#102c3d]/[0.055]">
       <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#102c3d]/38">{label}</p>
-      <p className="mt-1 truncate text-sm font-semibold text-[#102c3d]/72">{value}</p>
+      <p className="mt-1 line-clamp-2 text-sm font-semibold leading-5 text-[#102c3d]/72">{value}</p>
     </div>
   );
 }

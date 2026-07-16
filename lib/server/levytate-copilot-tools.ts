@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 import type { LevyTateBetaSession } from "@/lib/levytate/config/beta-access";
 import { getApprenticeshipStandard } from "@/lib/levytate/domain";
+import { deriveEmployeeOperationalSummary } from "@/lib/levytate/mvp/employee-operational-summary";
 import { managerCheckInEligibleLifecycleStatuses } from "@/lib/levytate/mvp/manager-check-in";
 import type {
   LevyTateAiRequest,
@@ -32,6 +33,7 @@ import {
   type ManagerDirectReportApplication,
   type ManagerDirectReportContext,
 } from "@/lib/server/levytate-manager-scope";
+import { deriveManagerOperationalContext } from "@/lib/server/levytate-manager-learner-detail";
 import { getOrganisationOperationsSummary } from "@/lib/server/levytate-operations";
 
 const resultLimit = 25;
@@ -242,7 +244,10 @@ export function classifyOperationalCopilotQuery(
   if (/\b(applications?).{0,35}(i have approved|i approved|approved by me)|\bwhich applications have i approved\b/.test(text)) {
     return { intent: "applications_approved", filters: { applicationState: "approved" }, direct: true };
   }
-  if (employeeName && /\b(application|edit the application|can't edit|cannot edit|happens next|current status)\b/.test(text)) {
+  if (employeeName && /\b(current status|current stage|where.*apprenticeship journey)\b/.test(text)) {
+    return { intent: "application_status", filters: { employeeName, actionType: "operational_status" }, direct: true };
+  }
+  if (employeeName && /\b(application|edit the application|can't edit|cannot edit|happens next)\b/.test(text)) {
     return { intent: "application_status", filters: { employeeName, applicationState: "active" }, direct: true };
   }
   if (employeeName && /\b(latest review|next provider review|review status|last review)\b/.test(text)) {
@@ -390,7 +395,9 @@ async function executeManagerTool(
     case "applications_awaiting_review": return getManagerApplications(session, scope, "awaiting_review", query.filters.employeeName);
     case "applications_returned": return getManagerApplications(session, scope, "returned", query.filters.employeeName);
     case "applications_approved": return getManagerApplications(session, scope, "approved", query.filters.employeeName);
-    case "application_status": return getManagerApplications(session, scope, "active", query.filters.employeeName);
+    case "application_status": return query.filters.actionType === "operational_status"
+      ? getManagerEmployeeOperationalStatus(session, query.filters, scope)
+      : getManagerApplications(session, scope, "active", query.filters.employeeName);
     case "learners_behind_target": return getLearnersBehindTarget(session, query.filters, scope, query.contextResultKeys);
     case "learners_without_recent_progress": return getLearnersWithoutRecentProgress(session, scope);
     case "learners_ending_before": return getLearnersEndingBefore(session, query.filters.dateBefore ?? defaultDateBefore(), scope);
@@ -783,7 +790,65 @@ async function getManagerCheckIns(
   );
 }
 
+async function getManagerEmployeeOperationalStatus(session: LevyTateBetaSession, filters: LevyTateOperationalCopilotFilters, scope: ManagerDirectReportContext): Promise<ToolPayload> {
+  const resolution = resolveManagerEmployee(scope, filters.employeeName);
+  if (resolution.payload) return resolution.payload;
+  const employee = resolution.employee;
+  if (!employee) return managerAccessBoundary("Choose one of your direct reports to view their current apprenticeship status.");
+
+  const [applications, details] = await Promise.all([
+    listManagerDirectReportApplications(session, scope),
+    listManagerDirectReportLearnerLifecycleDetails(session, scope),
+  ]);
+  const employeeApplications = applications.filter((item) => item.employee.id === employee.id);
+  const application = employeeApplications.find((item) => activeApplicationStatuses().includes(item.status)) ?? employeeApplications[0] ?? null;
+  const learner = details.find((item) => item.learner.id === employee.id) ?? null;
+  const { managerSupport } = deriveManagerOperationalContext(application, learner);
+  const applicationProgramme = application ? standardTitle(application.apprenticeshipStandardId) : "";
+  const summary = deriveEmployeeOperationalSummary({
+    employeeId: employee.id,
+    learner: learner ? {
+      lifecycleStatus: learner.lifecycleStatus,
+      programme: learner.programme.programmeName,
+      progressPosition: learner.progressPosition,
+      managerSupportSummary: managerSupport.title,
+      managerSupportState: managerSupport.state,
+      nextAction: managerSupport.nextAction,
+      expectedEndDate: learner.expectedEndDate,
+    } : null,
+    application: application ? {
+      status: application.status,
+      programme: applicationProgramme,
+      nextAction: managerSupport.nextAction,
+    } : null,
+    development: { status: "No active apprenticeship journey" },
+  });
+
+  return payloadFromRows({
+    type: "learner_results",
+    title: `${employee.name}'s current apprenticeship status`,
+    rows: [{
+      key: authorisedManagerResultKey(scope, "employee", employee.id),
+      cells: {
+        learner: employee.name,
+        currentStage: summary.primaryStatus,
+        progress: summary.progressPosition,
+        programme: summary.programme,
+        managerSupport: summary.managerSupportSummary,
+        applicationOutcome: summary.applicationOutcome,
+      },
+      actions: learner ? managerLearnerActions(learner) : [{ label: `Open ${firstName(employee.name)}'s record`, url: managerEmployeeUrl(employee.id) }],
+    }],
+    columns: [col("learner", "Learner"), col("currentStage", "Current stage"), col("progress", "Progress"), col("programme", "Programme"), col("managerSupport", "Manager support"), col("applicationOutcome", "Application outcome")],
+    interpretation: learner ? "Current learner lifecycle state takes priority. The application outcome is retained as historical context." : "No learner lifecycle record exists, so the current application state is shown.",
+    emptyMessage: "No apprenticeship journey is recorded for this direct report.",
+    viewAllUrl: "/levytate/app?module=My%20Team",
+    toolName: "getManagerEmployeeOperationalStatus",
+  });
+}
+
 async function getManagerEmployeeReviewStatus(session: LevyTateBetaSession, filters: LevyTateOperationalCopilotFilters, scope: ManagerDirectReportContext): Promise<ToolPayload> {
+
   const scoped = await managerDetailsForQuery(session, scope, filters.employeeName);
   if (scoped.payload) return scoped.payload;
   const detail = scoped.details[0];
@@ -814,12 +879,24 @@ async function getManagerEmployeeSupport(session: LevyTateBetaSession, filters: 
   if (scoped.payload) return scoped.payload;
   const detail = scoped.details[0];
   if (!detail) return payloadFromRows({ type: "learner_results", title: "Support needed", rows: [], columns: [], emptyMessage: "No active learner record is available for this direct report.", toolName: "getManagerEmployeeSupport" });
-  const support = detail.latestProgress?.supportAction || detail.attention.reasons[0] || "No specific support action is recorded.";
+  const { managerSupport } = deriveManagerOperationalContext(null, detail);
+  const summary = deriveEmployeeOperationalSummary({
+    employeeId: detail.learner.id,
+    learner: {
+      lifecycleStatus: detail.lifecycleStatus,
+      programme: detail.programme.programmeName,
+      progressPosition: detail.progressPosition,
+      managerSupportSummary: managerSupport.title,
+      managerSupportState: managerSupport.state,
+      nextAction: managerSupport.nextAction,
+      expectedEndDate: detail.expectedEndDate,
+    },
+  });
   return learnerPayload(
     `Support needed for ${detail.learner.name}`,
     [detail],
     [col("learner", "Learner"), col("programme", "Programme"), col("progress", "Progress"), col("support", "Recorded support"), col("managerAction", "What you can do")],
-    () => ({ learner: detail.learner.name, programme: detail.programme.programmeName, progress: detail.progressPosition, support, managerAction: "Discuss workplace support and record a manager check-in where appropriate." }),
+    () => ({ learner: detail.learner.name, programme: summary.programme, progress: summary.progressPosition, support: summary.managerSupportSummary, managerAction: summary.nextAction }),
     "This answer uses the learner's latest progress, review and attention records.",
     `No support information is recorded for ${detail.learner.name}.`,
     "/levytate/app?module=My%20Team",
@@ -1215,8 +1292,14 @@ function groupBy<T>(items: T[], key: (item: T) => string) {
 }
 
 function extractEmployeeName(text: string) {
-  const possessive = text.match(/\b([a-z][a-z'-]+)'s\b/);
-  if (possessive) return possessive[1];
+  const possessive = text.match(/\b([a-z][a-z'-]+(?:\s+[a-z][a-z'-]+)?)'s\b/);
+  if (possessive) {
+    const parts = possessive[1].split(" ");
+    const leadingContextWords = new Set(["about", "can", "does", "for", "is", "on", "through", "was", "with"]);
+    return parts.length > 1 && leadingContextWords.has(parts[0])
+      ? parts.slice(1).join(" ")
+      : possessive[1];
+  }
   const direct = text.match(/\b(?:is|does|can|can't|cannot|was)\s+([a-z][a-z'-]+)\s+(?:behind|need|needs|edit|current|latest|application)/);
   return direct?.[1];
 }

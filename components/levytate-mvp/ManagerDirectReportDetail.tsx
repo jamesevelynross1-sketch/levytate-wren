@@ -80,18 +80,20 @@ export function ManagerDirectReportDetail({
         <div className="grid gap-5 px-5 py-5 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(300px,0.62fr)] lg:items-start lg:px-7 lg:py-6">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <StatusBadge tone={detail.journey.hasActivity ? statusTone(detail.application?.status ?? detail.journey.lifecycleStatusLabel) : "neutral"}>
-                {detail.journey.stage}
+              <StatusBadge tone={detail.journey.hasActivity ? statusTone(detail.operationalSummary.primaryStatus) : "neutral"}>
+                {detail.operationalSummary.primaryStatus}
               </StatusBadge>
               {detail.progress ? <StatusBadge tone={progressTone(detail.progress.position)}>{detail.progress.position}</StatusBadge> : null}
             </div>
             <h2 className="mt-4 text-2xl font-semibold tracking-[-0.025em] text-[#102c3d] sm:text-3xl">{detail.employee.name}</h2>
             <p className="mt-1.5 text-sm leading-6 text-[#102c3d]/58">{detail.employee.jobTitle} · {detail.employee.department} · {detail.employee.site}</p>
-            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <HeaderFact label="Manager" value={detail.employee.managerName} />
-              <HeaderFact label="Programme" value={detail.programme?.programmeName ?? "No programme recorded"} />
-              <HeaderFact label="Application" value={detail.application?.status ?? "No current application"} />
-              <HeaderFact label="Expected end" value={displayDate(detail.journey.expectedEndDate)} />
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <HeaderFact label="Current stage" value={detail.operationalSummary.primaryStatus} />
+              <HeaderFact label="Progress position" value={detail.operationalSummary.progressPosition} />
+              <HeaderFact label="Programme" value={detail.operationalSummary.programme} />
+              <HeaderFact label="Expected end" value={displayDate(detail.operationalSummary.expectedEndDate)} />
+              <HeaderFact label="Manager support" value={detail.operationalSummary.managerSupportSummary} />
+              <HeaderFact label="Application outcome" value={detail.operationalSummary.applicationOutcome} secondary />
             </div>
           </div>
 
@@ -297,8 +299,8 @@ function ReviewDetail({ label, value }: { label: string; value: string }) {
   return <div><p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#102c3d]/38">{label}</p><p className="mt-0.5 break-words">{value || "Not recorded"}</p></div>;
 }
 
-function HeaderFact({ label, value }: { label: string; value: string }) {
-  return <div><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/38">{label}</p><p className="mt-1 line-clamp-2 text-sm font-semibold leading-5 text-[#102c3d]">{value}</p></div>;
+function HeaderFact({ label, value, secondary = false }: { label: string; value: string; secondary?: boolean }) {
+  return <div className={secondary ? "opacity-60" : ""}><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/38">{label}</p><p className="mt-1 line-clamp-2 text-sm font-semibold leading-5 text-[#102c3d]">{value}</p></div>;
 }
 
 function Fact({ label, value, icon: Icon }: { label: string; value: string; icon: typeof UserRound }) {
