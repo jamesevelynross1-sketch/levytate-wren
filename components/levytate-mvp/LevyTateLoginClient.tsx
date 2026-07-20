@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { LevyTateLogo } from "@/components/levytate-demo/PlatformShell";
 import {
@@ -11,7 +10,6 @@ import {
 } from "@/lib/levytate/early-access/domain";
 
 export function LevyTateLoginClient() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
@@ -49,8 +47,7 @@ export function LevyTateLoginClient() {
       return;
     }
 
-    router.push(getSafeLevyTateReturnTo());
-    router.refresh();
+    window.location.assign(getSafeLevyTateReturnTo());
   }
 
   return (
@@ -128,4 +125,3 @@ function readApprovalToken(email: string) {
     return "";
   }
 }
-

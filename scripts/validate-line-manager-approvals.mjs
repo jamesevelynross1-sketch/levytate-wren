@@ -16,7 +16,7 @@ async function main() {
   await scenarioRequestMoreInformation();
   await scenarioDecline();
   await scenarioSafeguards();
-  resetSeed();
+  resetFixture();
 
   console.log(JSON.stringify({
     ok: checks.every((check) => check.ok),
@@ -34,12 +34,12 @@ async function main() {
 }
 
 async function scenarioApprove() {
-  resetSeed();
+  resetFixture();
   const manager = await loginOk("manager approve scenario", identities.manager);
   const lead = await loginOk("lead approve scenario", identities.lead);
   const workspace = await getWorkspaceJson(manager.cookie);
   const queue = managerReviewQueue(workspace);
-  assert("manager approval queue has Erin awaiting review", queue.some((item) => item.id === "gc-rbac-app-erin"));
+  assert("manager approval queue has exactly one known fixture", queue.length === 1 && queue[0].id === "gc-rbac-app-erin", queue);
 
   const response = await postWorkspaceJson(manager.cookie, {
     type: "updateApplicationStatus",
@@ -64,7 +64,7 @@ async function scenarioApprove() {
 }
 
 async function scenarioRequestMoreInformation() {
-  resetSeed();
+  resetFixture();
   const manager = await loginOk("manager request-info scenario", identities.manager);
   const employee = await loginOk("employee request-info scenario", identities.employee);
 
@@ -100,7 +100,7 @@ async function scenarioRequestMoreInformation() {
 }
 
 async function scenarioDecline() {
-  resetSeed();
+  resetFixture();
   const manager = await loginOk("manager decline scenario", identities.manager);
   const employee = await loginOk("employee decline scenario", identities.employee);
 
@@ -120,7 +120,7 @@ async function scenarioDecline() {
 }
 
 async function scenarioSafeguards() {
-  resetSeed();
+  resetFixture();
   const manager = await loginOk("manager safeguard scenario", identities.manager);
 
   await expectStatus("manager cannot decide outside reporting scope", () => postWorkspace(manager.cookie, {
@@ -159,8 +159,8 @@ async function scenarioSafeguards() {
   }), 403);
 }
 
-function resetSeed() {
-  execFileSync("node", ["scripts/seed-operational-rbac-test-identities.mjs"], {
+function resetFixture() {
+  execFileSync(process.execPath, ["scripts/prepare-line-manager-smoke-fixture.mjs"], {
     cwd: process.cwd(),
     stdio: "pipe",
     env: process.env,
