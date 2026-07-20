@@ -8,7 +8,7 @@ const checks = [];
 await main();
 
 async function main() {
-  resetSeed();
+  resetFixture();
 
   const manager = await login("manager.demo@levytate.test");
   const employee = await login("employee.demo@levytate.test");
@@ -49,7 +49,7 @@ async function main() {
   assert("invalid selected applications show safe copy", approvals.includes("This application could not be opened. Refresh the page and try again."));
   assert("Approvals reauthorises requested IDs against its scoped queue", approvals.includes("queue.find((application) => application.id === selectedId)"));
 
-  resetSeed();
+  resetFixture();
   console.log(JSON.stringify({
     ok: true,
     baseUrl,
@@ -118,8 +118,8 @@ function assert(label, condition) {
   checks.push(label);
 }
 
-function resetSeed() {
-  execFileSync("node", ["scripts/seed-operational-rbac-test-identities.mjs"], {
+function resetFixture() {
+  execFileSync(process.execPath, ["scripts/prepare-line-manager-smoke-fixture.mjs"], {
     cwd: process.cwd(),
     stdio: "pipe",
     env: process.env,
