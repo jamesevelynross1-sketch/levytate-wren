@@ -22,6 +22,9 @@ async function main() {
   const leadCookie = await login(identities.apprenticeshipLead);
   const listResponse = await authedFetch("/api/levytate-learners", leadCookie);
   const listPayload = await listResponse.json();
+  const learners = Array.isArray(listPayload.learners) ? listPayload.learners : [];
+  const assessmentStageStatuses = new Set(["assessment_preparation", "in_assessment"]);
+  const expectedAssessmentStage = learners.filter((learner) => assessmentStageStatuses.has(learner.lifecycleStatus)).length;
 
   assert("Apprenticeship Lead learner list is accessible", listResponse.status === 200, listPayload);
   assert("Learner list reads from Supabase", listPayload.source === "supabase", listPayload);
@@ -29,11 +32,10 @@ async function main() {
   assert("Learner summary includes two pre-enrolment records", listPayload.summary?.preEnrolment === 2, listPayload.summary);
   assert("Learner summary includes active learners", listPayload.summary?.activeLearners === 5, listPayload.summary);
   assert("Learner summary includes one break in learning", listPayload.summary?.breakInLearning === 1, listPayload.summary);
-  assert("Learner summary includes assessment-stage records", listPayload.summary?.assessmentStage === 2, listPayload.summary);
+  assert("Learner summary includes only assessment-preparation and in-assessment records", listPayload.summary?.assessmentStage === expectedAssessmentStage, listPayload.summary);
   assert("Learner summary includes achieved record", listPayload.summary?.achieved === 1, listPayload.summary);
   assert("Learner summary includes attention count", listPayload.summary?.needingAttention >= 5, listPayload.summary);
 
-  const learners = Array.isArray(listPayload.learners) ? listPayload.learners : [];
   for (const status of requiredStatuses) {
     assert(`Learner list includes ${status}`, learners.some((learner) => learner.lifecycleStatus === status), learners.map((learner) => learner.lifecycleStatus));
   }

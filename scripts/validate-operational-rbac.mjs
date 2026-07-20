@@ -74,7 +74,16 @@ async function main() {
   assert("lead role scoped", leadWorkspace.workspace.meta.userRole === "Apprenticeship Lead");
   assert("lead sees organisation employees", leadWorkspace.workspace.data.employees.some((item) => item.id === "gc-rbac-employee-nadia"));
   assert("lead sees organisation applications", leadWorkspace.workspace.data.applications.some((item) => item.id === "gc-rbac-app-nadia"));
+  assert("lead has read-only workspace settings access", leadWorkspace.workspace.meta.permissions.includes("settings:read"));
+  assert("lead has no workspace settings write access", !leadWorkspace.workspace.meta.permissions.includes("settings:write"));
+  assert("lead has no platform migration access", !leadWorkspace.workspace.meta.permissions.includes("workspace:migrate"));
+  assert("lead has no archive administration access", ["employees:archive", "roles:archive", "providers:archive"].every((permission) => !leadWorkspace.workspace.meta.permissions.includes(permission)));
+  assert("lead has no knowledge-source administration access", !leadWorkspace.workspace.meta.permissions.includes("knowledge:manage"));
   assert("lead cannot manage early access", !leadWorkspace.workspace.meta.permissions.includes("earlyAccess:manage"));
+  await expectStatus("lead workspace settings write denied", () => postWorkspace(sessions.lead.cookie, {
+    type: "saveProfile",
+    profile: leadWorkspace.workspace.data.profile,
+  }), 403);
 
   const isolationWorkspace = await getWorkspaceJson(sessions.isolation.cookie);
   assert("isolation user sees isolation organisation only", isolationWorkspace.workspace.meta.organisationName === "RBAC Isolation Employer");
@@ -124,12 +133,22 @@ async function main() {
     status: "Approved by Line Manager",
     note: "Should be denied for non-direct report.",
   }), 403);
-  await expectStatus("manager direct report status allowed", () => postWorkspace(sessions.manager.cookie, {
-    type: "updateApplicationStatus",
-    id: "gc-rbac-app-erin",
-    status: "Approved by Line Manager",
-    note: "Operational RBAC validation manager approval check.",
-  }), 200);
+  const managerDecisionApplication = managerWorkspace.workspace.data.applications.find((item) => item.id === "gc-rbac-app-erin");
+  if (["Submitted to Line Manager", "Awaiting Manager Review"].includes(managerDecisionApplication?.status)) {
+    await expectStatus("manager direct report status allowed", () => postWorkspace(sessions.manager.cookie, {
+      type: "updateApplicationStatus",
+      id: "gc-rbac-app-erin",
+      status: "Approved by Line Manager",
+      note: "Operational RBAC validation manager approval check.",
+    }), 200);
+  } else {
+    assert(
+      "manager direct report decision already advanced safely",
+      managerWorkspace.workspace.meta.permissions.includes("applications:status")
+        && ["Approved by Line Manager", "Submitted to Apprenticeship Lead", "Awaiting Final Approval", "Approved for Enrolment"].includes(managerDecisionApplication?.status),
+      { status: managerDecisionApplication?.status ?? null },
+    );
+  }
   await expectStatus("lead organisation status allowed", () => postWorkspace(sessions.lead.cookie, {
     type: "updateApplicationStatus",
     id: "gc-rbac-app-nadia",

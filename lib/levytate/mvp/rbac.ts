@@ -118,6 +118,7 @@ export const mvpRolePermissions = {
   "Employer Admin": allPermissions.filter((permission) => permission !== "earlyAccess:manage"),
   "Apprenticeship Lead": [
     "workspace:read",
+    "settings:read",
     "employees:read",
     "employees:write",
     "employeeDevelopment:write",

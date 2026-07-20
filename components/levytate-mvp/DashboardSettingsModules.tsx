@@ -219,7 +219,7 @@ function ActionCard({ title, copy, cta, onClick }: { title: string; copy: string
   );
 }
 
-function EmployerPrioritiesSetup({ compact = false }: { compact?: boolean }) {
+function EmployerPrioritiesSetup({ compact = false, readOnly = false }: { compact?: boolean; readOnly?: boolean }) {
   const { data, saveProfile } = useMvpWorkspace();
   const [step, setStep] = useState<"priorities" | "importance" | "complete">(data.profile.priorities.length ? "complete" : "priorities");
   const [selected, setSelected] = useState<MvpEmployerPriorityName[]>(data.profile.priorities.map((item) => item.name));
@@ -263,10 +263,20 @@ function EmployerPrioritiesSetup({ compact = false }: { compact?: boolean }) {
               </span>
             ))}
           </div>
-          <button type="button" onClick={() => setStep("priorities")} className="shrink-0 rounded-full bg-[#f5f8f6] px-4 py-2 text-xs font-semibold text-[#102c3d]/64 ring-1 ring-[#102c3d]/[0.07]">
-            Refine priorities
-          </button>
+          {readOnly ? <p className="text-xs font-semibold text-[#102c3d]/42">Read-only</p> : (
+            <button type="button" onClick={() => setStep("priorities")} className="shrink-0 rounded-full bg-[#f5f8f6] px-4 py-2 text-xs font-semibold text-[#102c3d]/64 ring-1 ring-[#102c3d]/[0.07]">
+              Refine priorities
+            </button>
+          )}
         </div>
+      </MvpPanel>
+    );
+  }
+
+  if (readOnly) {
+    return (
+      <MvpPanel title="Business priorities" eyebrow="Recommendation context">
+        <p className="text-sm leading-6 text-[#102c3d]/58">No business priorities have been configured. A workspace administrator can add them.</p>
       </MvpPanel>
     );
   }
@@ -324,14 +334,16 @@ function EmployerPrioritiesSetup({ compact = false }: { compact?: boolean }) {
 }
 
 export function SettingsModule() {
-  const { data, saveProfile } = useMvpWorkspace();
+  const { data, saveProfile, can } = useMvpWorkspace();
   const [draft, setDraft] = useState<MvpWorkspaceProfile>(data.profile);
   const [saved, setSaved] = useState(false);
+  const canEdit = can("settings:write");
 
   useEffect(() => { setDraft(data.profile); }, [data.profile]);
 
   function submit(event: FormEvent) {
     event.preventDefault();
+    if (!canEdit) return;
     saveProfile({
       ...draft,
       priorities: data.profile.priorities,
@@ -343,7 +355,7 @@ export function SettingsModule() {
 
   return (
     <div className="grid gap-5">
-      <EmployerPrioritiesSetup compact />
+      <EmployerPrioritiesSetup compact readOnly={!canEdit} />
       <details className="group rounded-[1.25rem] border border-[#102c3d]/[0.07] bg-white shadow-[0_16px_44px_rgba(16,44,61,0.045)]">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4">
           <div>
@@ -352,22 +364,46 @@ export function SettingsModule() {
           </div>
           <ChevronDown size={18} className="text-[#102c3d]/42 transition group-open:rotate-180" aria-hidden="true" />
         </summary>
-        <form onSubmit={submit} className="border-t border-[#102c3d]/[0.07] p-5">
-          <FormGrid>
-            <FormField label="Employer name" value={draft.employerName} onChange={(value) => setDraft({ ...draft, employerName: value })} />
-            <FormField label="Workspace name" value={draft.workspaceName} onChange={(value) => setDraft({ ...draft, workspaceName: value })} required />
-            <FormField label="Primary contact" value={draft.primaryContact} onChange={(value) => setDraft({ ...draft, primaryContact: value })} />
-            <FormField label="Contact email" type="email" value={draft.contactEmail} onChange={(value) => setDraft({ ...draft, contactEmail: value })} />
-            <FormField label="Default site" value={draft.defaultSite} onChange={(value) => setDraft({ ...draft, defaultSite: value })} />
-            <FormField label="Sites" value={draft.sites.join(", ")} onChange={(value) => setDraft({ ...draft, sites: splitMvpList(value) })} />
-            <FormField label="Departments" value={draft.departments.join(", ")} onChange={(value) => setDraft({ ...draft, departments: splitMvpList(value) })} wide />
-          </FormGrid>
-          <div className="mt-5 flex items-center justify-between border-t border-[#102c3d]/[0.07] pt-4">
-            {saved ? <p className="text-xs font-semibold text-[#0b6f63]">Workspace saved.</p> : <span />}
-            <button className="h-10 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white">Save details</button>
+        {canEdit ? (
+          <form onSubmit={submit} className="border-t border-[#102c3d]/[0.07] p-5">
+            <FormGrid>
+              <FormField label="Employer name" value={draft.employerName} onChange={(value) => setDraft({ ...draft, employerName: value })} />
+              <FormField label="Workspace name" value={draft.workspaceName} onChange={(value) => setDraft({ ...draft, workspaceName: value })} required />
+              <FormField label="Primary contact" value={draft.primaryContact} onChange={(value) => setDraft({ ...draft, primaryContact: value })} />
+              <FormField label="Contact email" type="email" value={draft.contactEmail} onChange={(value) => setDraft({ ...draft, contactEmail: value })} />
+              <FormField label="Default site" value={draft.defaultSite} onChange={(value) => setDraft({ ...draft, defaultSite: value })} />
+              <FormField label="Sites" value={draft.sites.join(", ")} onChange={(value) => setDraft({ ...draft, sites: splitMvpList(value) })} />
+              <FormField label="Departments" value={draft.departments.join(", ")} onChange={(value) => setDraft({ ...draft, departments: splitMvpList(value) })} wide />
+            </FormGrid>
+            <div className="mt-5 flex items-center justify-between border-t border-[#102c3d]/[0.07] pt-4">
+              {saved ? <p className="text-xs font-semibold text-[#0b6f63]">Workspace saved.</p> : <span />}
+              <button className="h-10 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white">Save details</button>
+            </div>
+          </form>
+        ) : (
+          <div className="border-t border-[#102c3d]/[0.07] p-5">
+            <div className="grid gap-4 md:grid-cols-2">
+              <ReadOnlySetting label="Employer name" value={data.profile.employerName} />
+              <ReadOnlySetting label="Workspace name" value={data.profile.workspaceName} />
+              <ReadOnlySetting label="Primary contact" value={data.profile.primaryContact} />
+              <ReadOnlySetting label="Contact email" value={data.profile.contactEmail} />
+              <ReadOnlySetting label="Default site" value={data.profile.defaultSite} />
+              <ReadOnlySetting label="Sites" value={data.profile.sites.join(", ")} />
+              <ReadOnlySetting label="Departments" value={data.profile.departments.join(", ")} wide />
+            </div>
+            <p className="mt-5 border-t border-[#102c3d]/[0.07] pt-4 text-xs font-semibold text-[#102c3d]/42">Workspace settings are read-only for this role.</p>
           </div>
-        </form>
+        )}
       </details>
+    </div>
+  );
+}
+
+function ReadOnlySetting({ label, value, wide = false }: { label: string; value: string; wide?: boolean }) {
+  return (
+    <div className={wide ? "md:col-span-2" : ""}>
+      <p className="text-xs font-semibold text-[#102c3d]/48">{label}</p>
+      <p className="mt-1 text-sm font-medium text-[#102c3d]">{value || "Not configured"}</p>
     </div>
   );
 }
