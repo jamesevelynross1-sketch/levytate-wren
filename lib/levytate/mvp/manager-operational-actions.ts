@@ -7,12 +7,14 @@ import type {
 import type { OperationalItem } from "@/lib/levytate/mvp/operations-centre";
 
 export const managerOwnedOperationalActionTypes = [
+  "review_application",
   "confirm_probation",
   "record_manager_check_in",
   "obtain_manager_readiness_confirmation",
 ] as const satisfies readonly PersistentOperationalActionType[];
 
 export type ManagerOperationalActionFilter = "all" | "open" | "acknowledged" | "in_progress" | "overdue";
+export type ManagerOperationalActionKindFilter = "all" | "application_review" | "manager_support";
 
 export type ManagerOperationalActionListItem = {
   actionId: string;
@@ -26,6 +28,9 @@ export type ManagerOperationalActionListItem = {
   timingLabel: string;
   overdue: boolean;
   reason: string;
+  kind: "application_review" | "manager_support";
+  submittedDate: string;
+  submittedVersion: number | null;
   primaryAction: "Acknowledge" | "Start work" | "Open source workflow" | "View history";
   sourceUrl: string;
   version: number;
@@ -60,6 +65,7 @@ export function isManagerRelevantOperationalItem(item: OperationalItem) {
 
 export function isManagerRelevantPersistentAction(action: PersistentOperationalAction, managerUserId: string) {
   if (action.ownerType === "Line Manager") {
+    if (action.actionType === "review_application") return action.ownerUserId === managerUserId;
     return managerOwnedOperationalActionTypes.includes(action.actionType as typeof managerOwnedOperationalActionTypes[number])
       && (!action.ownerUserId || action.ownerUserId === managerUserId);
   }

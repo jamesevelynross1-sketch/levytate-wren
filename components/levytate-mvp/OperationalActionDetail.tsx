@@ -65,12 +65,15 @@ export function OperationalActionDetail({ actionId, onBack, onOpenAction, onOpen
 
   const { action, context } = detail;
   const terminal = ["completed", "dismissed", "cancelled"].includes(action.status);
-  const primary = action.status === "open"
+  const applicationReview = action.actionType === "review_application";
+  const primary = applicationReview
+    ? { label: context.workflowLabel, run: () => window.location.assign(action.sourceUrl) }
+    : action.status === "open"
     ? { label: "Acknowledge", run: () => mutate("acknowledge", {}, "Action acknowledged.") }
     : action.status === "acknowledged"
       ? { label: "Start work", run: () => mutate("start", {}, "Action marked as in progress.") }
       : action.status === "in_progress"
-        ? { label: context.workflowLabel, run: () => onOpenLearner({ learnerRecordId: action.learnerRecordId, actionType: context.workflowActionType }) }
+        ? { label: context.workflowLabel, run: () => applicationReview ? window.location.assign(action.sourceUrl) : onOpenLearner({ learnerRecordId: action.learnerRecordId, actionType: context.workflowActionType }) }
         : { label: "View history", run: () => document.getElementById("operational-action-history")?.scrollIntoView({ behavior: "smooth" }) };
 
   return (
@@ -108,7 +111,7 @@ export function OperationalActionDetail({ actionId, onBack, onOpenAction, onOpen
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 {context.sourceFacts.map((fact) => <div key={`${fact.label}-${fact.value}`} className="rounded-xl border border-[#102c3d]/[0.065] bg-[#f8fbfa] p-3.5"><p className="text-[10px] font-semibold uppercase tracking-[0.11em] text-[#102c3d]/38">{fact.label}</p><p className="mt-1.5 text-sm font-semibold leading-5 text-[#102c3d]">{fact.value}</p></div>)}
               </div>
-              <button type="button" onClick={() => onOpenLearner({ learnerRecordId: action.learnerRecordId, actionType: "open_learner" })} className="mt-3 inline-flex items-center gap-2 text-xs font-semibold text-[#0b6f63] hover:text-[#102c3d]">Open learner record<ArrowRight size={14} /></button>
+              <button type="button" onClick={() => applicationReview ? window.location.assign(action.sourceUrl) : onOpenLearner({ learnerRecordId: action.learnerRecordId, actionType: "open_learner" })} className="mt-3 inline-flex items-center gap-2 text-xs font-semibold text-[#0b6f63] hover:text-[#102c3d]">{applicationReview ? "Open application review" : "Open learner record"}<ArrowRight size={14} /></button>
             </section>
 
             <section id="operational-action-history" className="border-t border-[#102c3d]/[0.07] pt-5">
@@ -125,13 +128,15 @@ export function OperationalActionDetail({ actionId, onBack, onOpenAction, onOpen
             {error ? <div className="rounded-xl border border-[#b13b51]/12 bg-[#fff0f2] px-4 py-3 text-sm font-semibold leading-5 text-[#b13b51]">{error}</div> : null}
 
             {!terminal ? <>
-              <ActionStateControls action={action} saving={saving} mutate={mutate} />
-              <AssignmentForm action={action} options={detail.ownerOptions} saving={saving} onSave={(option) => mutate("assign", { ownerType: option.ownerType, ownerUserId: option.ownerUserId }, "Action owner updated.")} />
-              <DueDateForm action={action} origin={context.dueDateOrigin} saving={saving} onSave={(date, reason) => mutate("due_date", { dueDate: date, dueDateReason: reason }, "Due date updated.")} />
-              <SourceWorkflowCard label={context.workflowLabel} onOpen={() => onOpenLearner({ learnerRecordId: action.learnerRecordId, actionType: context.workflowActionType })} />
-              <CompletionForm saving={saving} onSubmit={(note) => mutate("complete", { completionNote: note, resolvedOutsideLevyTate: true }, "Action completed.")} />
-              <DismissalForm protectedAction={context.terminalProtection} saving={saving} onSubmit={(kind, reason) => mutate("dismiss", { dismissalKind: kind, dismissalReason: reason }, "Action dismissed.")} />
-              <CancellationForm protectedAction={context.terminalProtection} saving={saving} onSubmit={(kind, reason) => mutate("cancel", { cancellationKind: kind, cancellationReason: reason }, "Action cancelled.")} />
+              {applicationReview ? <SourceWorkflowCard label={context.workflowLabel} onOpen={() => window.location.assign(action.sourceUrl)} applicationReview /> : <>
+                <ActionStateControls action={action} saving={saving} mutate={mutate} />
+                <AssignmentForm action={action} options={detail.ownerOptions} saving={saving} onSave={(option) => mutate("assign", { ownerType: option.ownerType, ownerUserId: option.ownerUserId }, "Action owner updated.")} />
+                <DueDateForm action={action} origin={context.dueDateOrigin} saving={saving} onSave={(date, reason) => mutate("due_date", { dueDate: date, dueDateReason: reason }, "Due date updated.")} />
+                <SourceWorkflowCard label={context.workflowLabel} onOpen={() => onOpenLearner({ learnerRecordId: action.learnerRecordId, actionType: context.workflowActionType })} />
+                <CompletionForm saving={saving} onSubmit={(note) => mutate("complete", { completionNote: note, resolvedOutsideLevyTate: true }, "Action completed.")} />
+                <DismissalForm protectedAction={context.terminalProtection} saving={saving} onSubmit={(kind, reason) => mutate("dismiss", { dismissalKind: kind, dismissalReason: reason }, "Action dismissed.")} />
+                <CancellationForm protectedAction={context.terminalProtection} saving={saving} onSubmit={(kind, reason) => mutate("cancel", { cancellationKind: kind, cancellationReason: reason }, "Action cancelled.")} />
+              </>}
             </> : <TerminalSummary action={action} />}
           </aside>
         </div>
@@ -160,8 +165,8 @@ function DueDateForm({ action, origin, saving, onSave }: { action: PersistentOpe
   return <details className="action-management-panel"><summary>Due date</summary><div className="mt-3 grid gap-3"><label className="text-[10px] font-semibold uppercase tracking-[0.11em] text-[#102c3d]/42">Due date<input type="date" value={date} onChange={(event) => setDate(event.target.value)} className="action-input mt-1.5" /></label><label className="text-[10px] font-semibold uppercase tracking-[0.11em] text-[#102c3d]/42">Override reason<textarea value={reason} onChange={(event) => setReason(event.target.value)} rows={2} className="action-input mt-1.5 resize-none" placeholder="Required when changing a source-derived date" /></label><p className="text-xs text-[#102c3d]/48">Current origin: {origin}</p><button type="button" disabled={saving || date === action.dueDate} onClick={() => onSave(date, reason)} className="action-button-secondary">Save due date</button></div></details>;
 }
 
-function SourceWorkflowCard({ label, onOpen }: { label: string; onOpen: () => void }) {
-  return <section className="rounded-2xl border border-[#159b8f]/15 bg-[#edf7f3] p-4"><p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#0b6f63]">Preferred completion route</p><h3 className="mt-1 text-base font-semibold text-[#102c3d]">Resolve the learner condition</h3><p className="mt-1 text-xs leading-5 text-[#102c3d]/54">Complete the source workflow. LevyTate will then close this action automatically and retain its history.</p><button type="button" onClick={onOpen} className="action-button-primary mt-3">{label}<ArrowRight size={14} /></button></section>;
+function SourceWorkflowCard({ label, onOpen, applicationReview = false }: { label: string; onOpen: () => void; applicationReview?: boolean }) {
+  return <section className="rounded-2xl border border-[#159b8f]/15 bg-[#edf7f3] p-4"><p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#0b6f63]">Authoritative source</p><h3 className="mt-1 text-base font-semibold text-[#102c3d]">{applicationReview ? "Open the application record" : "Resolve the learner condition"}</h3><p className="mt-1 text-xs leading-5 text-[#102c3d]/54">{applicationReview ? "Review the application context in the existing Approvals workflow. Only the authorised current Line Manager can record its decision." : "Complete the source workflow. LevyTate will then close this action automatically and retain its history."}</p><button type="button" onClick={onOpen} className="action-button-primary mt-3">{label}<ArrowRight size={14} /></button></section>;
 }
 
 function CompletionForm({ saving, onSubmit }: { saving: boolean; onSubmit: (note: string) => void }) {

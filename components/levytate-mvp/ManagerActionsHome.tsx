@@ -6,6 +6,7 @@ import { FormTextArea, MvpModal, MvpPanel, StatusBadge } from "@/components/levy
 import type {
   ManagerOperationalActionDetail,
   ManagerOperationalActionFilter,
+  ManagerOperationalActionKindFilter,
   ManagerOperationalActionListItem,
   ManagerOperationalActionsResponse,
 } from "@/lib/levytate/mvp/manager-operational-actions";
@@ -18,7 +19,7 @@ const filters: Array<{ value: ManagerOperationalActionFilter; label: string; sum
   { value: "overdue", label: "Overdue", summaryKey: "overdue" },
 ];
 
-export function ManagerActionsHome() {
+export function ManagerActionsHome({ kind = "manager_support" }: { kind?: ManagerOperationalActionKindFilter }) {
   const [filter, setFilter] = useState<ManagerOperationalActionFilter>("all");
   const [response, setResponse] = useState<ManagerOperationalActionsResponse | null>(null);
   const [selected, setSelected] = useState<ManagerOperationalActionDetail | null>(null);
@@ -32,7 +33,7 @@ export function ManagerActionsHome() {
     setLoading(true);
     setError("");
     try {
-      const request = await fetch(`/api/levytate-manager/actions?status=${encodeURIComponent(nextFilter)}`, { cache: "no-store" });
+      const request = await fetch(`/api/levytate-manager/actions?status=${encodeURIComponent(nextFilter)}&kind=${encodeURIComponent(kind)}`, { cache: "no-store" });
       const body = await request.json() as ManagerOperationalActionsResponse & { message?: string };
       if (!request.ok) throw new Error(body.message || "Your actions could not be loaded.");
       setResponse(body);
@@ -41,7 +42,7 @@ export function ManagerActionsHome() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [kind]);
 
   const openAction = useCallback(async (actionId: string, updateUrl = true) => {
     setError("");
@@ -103,8 +104,13 @@ export function ManagerActionsHome() {
   }
 
   return (
-    <MvpPanel title="My actions" eyebrow="Direct-report work" actions={loading ? <LoaderCircle size={18} className="animate-spin text-[#0b6f63]" aria-label="Loading actions" /> : null}>
+    <MvpPanel title={kind === "all" ? "My actions" : "Other manager actions"} eyebrow="Direct-report work" actions={loading ? <LoaderCircle size={18} className="animate-spin text-[#0b6f63]" aria-label="Loading actions" /> : null}>
       <div className="grid gap-4">
+        <div className="flex justify-end">
+          <button type="button" onClick={() => window.location.assign(kind === "all" ? "/levytate/app?module=Home" : "/levytate/app?module=Home&actions=all")} className="text-xs font-semibold text-[#0b6f63] hover:text-[#102c3d]">
+            {kind === "all" ? "Back to Home" : "View all actions"}
+          </button>
+        </div>
         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
           {filters.filter((item) => item.summaryKey).map((item) => {
             const active = filter === item.value;
@@ -155,11 +161,14 @@ export function ManagerActionsHome() {
             <div className="flex flex-wrap gap-2"><StatusBadge tone={statusTone(selected)}>{selected.statusLabel}</StatusBadge><StatusBadge tone={priorityTone(selected.priority)}>{selected.priority}</StatusBadge>{selected.overdue ? <StatusBadge tone="red">{selected.timingLabel}</StatusBadge> : null}</div>
             <div className="grid gap-3 sm:grid-cols-2">
               <Fact label="Employee" value={selected.employee.name} />
+              <Fact label="Current role" value={selected.employee.jobTitle || "Not recorded"} />
               <Fact label="Programme" value={selected.programme.name} />
               <Fact label="Department" value={selected.employee.department || "Not recorded"} />
               <Fact label="Due" value={selected.dueDate || "No due date"} />
               <Fact label="Owner" value={selected.ownerLabel} />
               <Fact label="Detected" value={formatDateTime(selected.detectedAt)} />
+              {selected.kind === "application_review" ? <Fact label="Submitted" value={formatDateTime(selected.submittedDate)} /> : null}
+              {selected.kind === "application_review" ? <Fact label="Submitted version" value={`Version ${selected.submittedVersion ?? 1}`} /> : null}
             </div>
             <section className="rounded-xl bg-[#f8fbfa] p-4"><h3 className="text-sm font-semibold text-[#102c3d]">Why this needs attention</h3><p className="mt-2 text-sm leading-6 text-[#102c3d]/60">{selected.reason}</p></section>
             <section className="rounded-xl bg-[#edf7f3] p-4"><h3 className="text-sm font-semibold text-[#0b6f63]">Next manager step</h3><p className="mt-2 text-sm leading-6 text-[#102c3d]/64">{selected.nextStep}</p></section>

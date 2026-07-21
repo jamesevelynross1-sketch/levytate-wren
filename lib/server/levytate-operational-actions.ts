@@ -1,4 +1,9 @@
 import type { LevyTateBetaSession } from "@/lib/levytate/config/beta-access";
+import { getApprenticeshipStandard, type RequestStatus } from "@/lib/levytate/domain";
+import {
+  getApplicationReviewOccurrence,
+  isManagerReviewableApplication,
+} from "@/lib/levytate/mvp/application-review-actions";
 import {
   canTransitionOperationalAction,
   isCriticalOperationalBlocker,
@@ -19,6 +24,7 @@ import {
 } from "@/lib/levytate/mvp/operations-centre";
 import { hasMvpPermission, normaliseMvpUserRole } from "@/lib/levytate/mvp/rbac";
 import type { LearnerRecordDetail } from "@/lib/levytate/mvp/learner-record-view";
+import type { MvpApplicationHistoryEntry, MvpApplicationOwner } from "@/lib/levytate/mvp/workspace";
 import {
   isManagerRelevantOperationalItem,
   isManagerRelevantPersistentAction,
@@ -30,7 +36,12 @@ import {
   listOrganisationLearnerLifecycleDetails,
   LevyTateLearnerLifecyclePermissionError,
 } from "@/lib/server/levytate-learner-lifecycle";
-import { getManagerDirectReportContext, type ManagerDirectReportContext } from "@/lib/server/levytate-manager-scope";
+import {
+  getManagerDirectReportContext,
+  listManagerDirectReportApplications,
+  type ManagerDirectReportApplication,
+  type ManagerDirectReportContext,
+} from "@/lib/server/levytate-manager-scope";
 import {
   getLevyTateSupabaseConfig,
   LevyTateSupabaseError,
@@ -45,7 +56,7 @@ const eventsTable = "levytate_operational_action_events";
 type OperationalActionRow = {
   organisation_id: string;
   id: string;
-  learner_record_id: string;
+  learner_record_id: string | null;
   application_id: string;
   employee_id: string;
   source_type: PersistentOperationalAction["sourceType"];
@@ -77,6 +88,53 @@ type OperationalActionRow = {
   version: number;
   created_at: string;
   updated_at: string;
+};
+
+type ApplicationReviewRow = {
+  id: string;
+  employee_id: string;
+  apprenticeship_standard_id: string;
+  status: RequestStatus;
+  current_owner: MvpApplicationOwner;
+  reason: string;
+  submitted_at: string;
+  updated_at: string;
+};
+
+type ApplicationReviewHistoryRow = {
+  id: string;
+  application_id: string;
+  status: RequestStatus;
+  owner: MvpApplicationOwner;
+  note: string;
+  created_at: string;
+};
+
+type ApplicationReviewEmployeeRow = {
+  id: string;
+  name: string;
+  email: string;
+  job_title: string;
+  role_id: string;
+  manager_id: string;
+  department: string;
+  site: string;
+  status: string;
+};
+
+type ApplicationReviewUserRow = {
+  id: string;
+  email: string;
+};
+
+export type ApplicationReviewActionSource = {
+  application: ManagerDirectReportApplication;
+  sourceKey: string;
+  sourceCondition: string;
+  submittedVersion: number;
+  submittedAt: string;
+  occurrenceId: string;
+  manager: { employeeId: string; userId: string; name: string };
 };
 
 type OperationalActionEventRow = {
@@ -176,8 +234,9 @@ export async function synchroniseOrganisationOperationalActions(
   const derived = buildOrganisationOperationalItems(details, new Date(now));
   const currentItems = uniqueSourceItems(derived.items);
   const existing = await selectActions(organisationId, { includeTerminal: true });
-  const activeBySource = new Map(existing.filter((action) => !isOperationalActionTerminal(action.status)).map((action) => [action.sourceKey, action]));
-  const latestBySource = latestActionsBySource(existing);
+  const lifecycleExisting = existing.filter((action) => action.actionType !== "review_application");
+  const activeBySource = new Map(lifecycleExisting.filter((action) => !isOperationalActionTerminal(action.status)).map((action) => [action.sourceKey, action]));
+  const latestBySource = latestActionsBySource(lifecycleExisting);
   const detailByLearner = new Map(details.map((detail) => [detail.learnerRecordId, detail]));
   const currentSourceKeys = new Set(currentItems.map((item) => item.sourceKey));
   const result: OperationalActionSynchronisationResult = {
@@ -225,10 +284,18 @@ export async function synchroniseOrganisationOperationalActions(
     result.completed += 1;
   }
 
-  for (const action of existing) {
+  for (const action of lifecycleExisting) {
     if (action.status !== "dismissed" || currentSourceKeys.has(action.sourceKey) || action.metadata.conditionClearedAt) continue;
     await markDismissedConditionCleared(context, action, now);
   }
+
+  const applicationReviews = await synchroniseApplicationReviewActionsForContext(context);
+  result.detectedConditions += applicationReviews.detectedConditions;
+  result.created += applicationReviews.created;
+  result.updated += applicationReviews.updated;
+  result.completed += applicationReviews.completed;
+  result.unchanged += applicationReviews.unchanged;
+  result.actions.push(...applicationReviews.actions);
 
   return result;
 }
@@ -236,6 +303,7 @@ export async function synchroniseOrganisationOperationalActions(
 export type ManagerOperationalActionScopeResult = {
   scope: ManagerDirectReportContext;
   details: LearnerRecordDetail[];
+  applicationSources: ApplicationReviewActionSource[];
   actions: PersistentOperationalAction[];
 };
 
@@ -243,14 +311,16 @@ export async function synchroniseManagerDirectReportOperationalActions(
   session: LevyTateBetaSession,
 ): Promise<ManagerOperationalActionScopeResult> {
   const context = await managerOperationalActionContext(session);
-  const { scope, details } = context;
+  const { scope, details, applications } = context;
   const now = new Date().toISOString();
+  const applicationReviews = await synchroniseApplicationReviewActionsForContext(context, applications);
   const currentItems = uniqueSourceItems(buildOrganisationOperationalItems(details, new Date(now)).items.filter(isManagerRelevantOperationalItem));
   const allExisting = await selectActions(scope.organisation.id, { includeTerminal: true });
   const directReportIds = new Set(scope.directReports.map((employee) => employee.id));
   const scopedExisting = allExisting.filter((action) => directReportIds.has(action.employeeId));
-  const activeBySource = new Map(scopedExisting.filter((action) => !isOperationalActionTerminal(action.status)).map((action) => [action.sourceKey, action]));
-  const latestBySource = latestActionsBySource(scopedExisting);
+  const scopedLifecycleExisting = scopedExisting.filter((action) => action.actionType !== "review_application");
+  const activeBySource = new Map(scopedLifecycleExisting.filter((action) => !isOperationalActionTerminal(action.status)).map((action) => [action.sourceKey, action]));
+  const latestBySource = latestActionsBySource(scopedLifecycleExisting);
   const detailByLearner = new Map(details.map((detail) => [detail.learnerRecordId, detail]));
   const currentSourceKeys = new Set(currentItems.map((item) => item.sourceKey));
 
@@ -274,7 +344,7 @@ export async function synchroniseManagerDirectReportOperationalActions(
     });
   }
 
-  for (const action of scopedExisting) {
+  for (const action of scopedLifecycleExisting) {
     if (isOperationalActionTerminal(action.status)) continue;
     if (!isManagerRelevantPersistentAction(action, scope.user.id)) continue;
     if (currentSourceKeys.has(action.sourceKey)) continue;
@@ -283,7 +353,7 @@ export async function synchroniseManagerDirectReportOperationalActions(
 
   const actions = (await selectActions(scope.organisation.id, { includeTerminal: true }))
     .filter((action) => directReportIds.has(action.employeeId) && isManagerRelevantPersistentAction(action, scope.user.id));
-  return { scope, details, actions };
+  return { scope, details, applicationSources: applicationReviews.sources, actions };
 }
 
 export async function listManagerDirectReportOperationalActions(session: LevyTateBetaSession) {
@@ -297,9 +367,9 @@ export async function listManagerDirectReportOperationalActions(session: LevyTat
 export async function getManagerDirectReportOperationalAction(session: LevyTateBetaSession, actionId: string) {
   const context = await managerOperationalActionContext(session);
   const action = await requireManagerScopedAction(context, actionId);
-  const detail = requireManagerActionAccess(context, action);
+  const source = requireManagerActionAccess(context, action);
   const history = await selectActionHistory(context.scope.organisation.id, action.id);
-  return { scope: context.scope, action, detail, history };
+  return { scope: context.scope, action, source, history };
 }
 
 export async function acknowledgeManagerDirectReportOperationalAction(
@@ -341,6 +411,275 @@ export async function startManagerDirectReportOperationalAction(
   return transitionScopedAction(context, action, "in_progress", { metadata }, summary);
 }
 
+export async function synchroniseApplicationReviewOperationalActions(
+  session: LevyTateBetaSession,
+  applicationIds?: string[],
+) {
+  const context = await applicationReviewActionContext(session);
+  return synchroniseApplicationReviewActionsForContext(context, undefined, applicationIds);
+}
+
+type ApplicationReviewSynchronisationResult = {
+  detectedConditions: number;
+  created: number;
+  updated: number;
+  completed: number;
+  unchanged: number;
+  sources: ApplicationReviewActionSource[];
+  actions: PersistentOperationalAction[];
+};
+
+async function synchroniseApplicationReviewActionsForContext(
+  context: ActionContext,
+  providedApplications?: ManagerDirectReportApplication[],
+  applicationIds?: string[],
+): Promise<ApplicationReviewSynchronisationResult> {
+  const applications = providedApplications ?? await loadOrganisationApplicationReviewApplications(context.organisation.id, applicationIds);
+  const scopedIds = new Set(applications.map((application) => application.id));
+  const sources = applicationReviewSources(applications, context);
+  const existing = (await selectActions(context.organisation.id, { includeTerminal: true }))
+    .filter((action) => action.actionType === "review_application" && scopedIds.has(action.applicationId));
+  const active = existing.filter((action) => !isOperationalActionTerminal(action.status));
+  const currentByApplication = new Map(sources.map((source) => [source.application.id, source]));
+  const result: ApplicationReviewSynchronisationResult = {
+    detectedConditions: sources.length,
+    created: 0,
+    updated: 0,
+    completed: 0,
+    unchanged: 0,
+    sources,
+    actions: [],
+  };
+
+  for (const action of active) {
+    const source = currentByApplication.get(action.applicationId);
+    if (source?.sourceKey === action.sourceKey) continue;
+    const application = applications.find((item) => item.id === action.applicationId);
+    const closed = await closeApplicationReviewAction(context, action, application?.status);
+    result.actions.push(closed);
+    result.completed += 1;
+  }
+
+  const refreshed = (await selectActions(context.organisation.id, { includeTerminal: true }))
+    .filter((action) => action.actionType === "review_application" && scopedIds.has(action.applicationId));
+  const activeBySource = new Map(refreshed.filter((action) => !isOperationalActionTerminal(action.status)).map((action) => [action.sourceKey, action]));
+  const latestByApplication = new Map<string, PersistentOperationalAction>();
+  for (const action of [...refreshed].sort((left, right) => right.createdAt.localeCompare(left.createdAt))) {
+    if (!latestByApplication.has(action.applicationId)) latestByApplication.set(action.applicationId, action);
+  }
+
+  for (const source of sources) {
+    const current = activeBySource.get(source.sourceKey);
+    if (current) {
+      const update = await updateApplicationReviewAction(context, current, source);
+      result.actions.push(update.action);
+      if (update.changed) result.updated += 1;
+      else result.unchanged += 1;
+      continue;
+    }
+    const created = await createApplicationReviewAction(context, source, latestByApplication.get(source.application.id)?.id);
+    result.actions.push(created);
+    result.created += 1;
+  }
+
+  return result;
+}
+
+async function applicationReviewActionContext(session: LevyTateBetaSession): Promise<ActionContext> {
+  const context = await getLearnerLifecycleServerContext(session);
+  const config = requireConfig();
+  const actors = await supabaseSelect<{ name: string }>(config, "levytate_employees", new URLSearchParams({
+    select: "name",
+    organisation_id: `eq.${context.organisation.id}`,
+    email: `eq.${context.user.email}`,
+    limit: "1",
+  }));
+  return { ...context, actorDisplayName: actors[0]?.name || context.user.email };
+}
+
+async function loadOrganisationApplicationReviewApplications(organisationId: string, applicationIds?: string[]) {
+  const config = requireConfig();
+  const applicationQuery = new URLSearchParams({
+    select: "id,employee_id,apprenticeship_standard_id,status,current_owner,reason,submitted_at,updated_at",
+    organisation_id: `eq.${organisationId}`,
+    order: "submitted_at.desc",
+    limit: "5000",
+  });
+  if (applicationIds?.length) applicationQuery.set("id", `in.(${applicationIds.join(",")})`);
+  const applications = await supabaseSelect<ApplicationReviewRow>(config, "levytate_applications", applicationQuery);
+  if (!applications.length) return [];
+  const employeeIds = [...new Set(applications.map((application) => application.employee_id))];
+  const employees = await supabaseSelect<ApplicationReviewEmployeeRow>(config, "levytate_employees", new URLSearchParams({
+    select: "id,name,email,job_title,role_id,manager_id,department,site,status",
+    organisation_id: `eq.${organisationId}`,
+    id: `in.(${employeeIds.join(",")})`,
+    limit: "5000",
+  }));
+  const managerIds = [...new Set(employees.map((employee) => employee.manager_id).filter(Boolean))];
+  const managers = managerIds.length ? await supabaseSelect<ApplicationReviewEmployeeRow>(config, "levytate_employees", new URLSearchParams({
+    select: "id,name,email,job_title,role_id,manager_id,department,site,status",
+    organisation_id: `eq.${organisationId}`,
+    id: `in.(${managerIds.join(",")})`,
+    status: "eq.Active",
+    limit: "5000",
+  })) : [];
+  const users = managers.length ? await supabaseSelect<ApplicationReviewUserRow>(config, "levytate_users", new URLSearchParams({
+    select: "id,email",
+    organisation_id: `eq.${organisationId}`,
+    email: `in.(${managers.map((manager) => manager.email).join(",")})`,
+    limit: "5000",
+  })) : [];
+  const history = await supabaseSelect<ApplicationReviewHistoryRow>(config, "levytate_application_history", new URLSearchParams({
+    select: "id,application_id,status,owner,note,created_at",
+    organisation_id: `eq.${organisationId}`,
+    application_id: `in.(${applications.map((application) => application.id).join(",")})`,
+    order: "created_at.asc",
+    limit: "10000",
+  }));
+  const employeeById = new Map(employees.map((employee) => [employee.id, employee]));
+  const managerById = new Map(managers.map((manager) => [manager.id, manager]));
+  const userByEmail = new Map(users.map((user) => [user.email.trim().toLowerCase(), user]));
+
+  return applications.flatMap((application): ManagerDirectReportApplication[] => {
+    const employee = employeeById.get(application.employee_id);
+    const manager = employee ? managerById.get(employee.manager_id) : undefined;
+    if (!employee || employee.status !== "Active" || !manager) return [];
+    return [{
+      id: application.id,
+      employee: {
+        id: employee.id,
+        name: employee.name,
+        email: employee.email,
+        jobTitle: employee.job_title,
+        roleId: employee.role_id,
+        managerId: employee.manager_id,
+        department: employee.department,
+        site: employee.site,
+      },
+      apprenticeshipStandardId: application.apprenticeship_standard_id,
+      status: application.status,
+      currentOwner: application.current_owner,
+      reason: application.reason,
+      careerGoal: "",
+      supportRequired: "",
+      managerNote: "",
+      submittedAt: application.submitted_at,
+      updatedAt: application.updated_at,
+      history: history.filter((entry) => entry.application_id === application.id).map(applicationHistoryFromRow),
+    }];
+  }).map((application) => {
+    const manager = managerById.get(application.employee.managerId)!;
+    const user = userByEmail.get(manager.email.trim().toLowerCase());
+    return Object.assign(application, { managerOwner: { employeeId: manager.id, userId: user?.id ?? "", name: manager.name } });
+  });
+}
+
+function applicationReviewSources(applications: ManagerDirectReportApplication[], context: ActionContext): ApplicationReviewActionSource[] {
+  return applications.flatMap((application) => {
+    const occurrence = getApplicationReviewOccurrence(application);
+    if (!occurrence || !isManagerReviewableApplication(application)) return [];
+    const storedOwner = (application as ManagerDirectReportApplication & { managerOwner?: ApplicationReviewActionSource["manager"] }).managerOwner;
+    const manager = storedOwner ?? {
+      employeeId: application.employee.managerId,
+      userId: context.user.id,
+      name: context.actorDisplayName,
+    };
+    return [{ application, ...occurrence, manager }];
+  });
+}
+
+function applicationHistoryFromRow(row: ApplicationReviewHistoryRow): MvpApplicationHistoryEntry {
+  return { id: row.id, status: row.status, owner: row.owner, note: row.note, createdAt: row.created_at };
+}
+
+async function createApplicationReviewAction(context: ActionContext, source: ApplicationReviewActionSource, priorActionId?: string) {
+  const config = requireConfig();
+  const now = new Date().toISOString();
+  const id = createMvpId("operational-action");
+  const row = {
+    organisation_id: context.organisation.id,
+    id,
+    learner_record_id: null,
+    application_id: source.application.id,
+    employee_id: source.application.employee.id,
+    source_type: "application_workflow",
+    source_key: source.sourceKey,
+    action_type: "review_application",
+    title: "Review application",
+    description: source.application.reason.trim() || "A direct-report application requires a Line Manager decision.",
+    priority: "High",
+    priority_rank: operationalPriorityRanks.High,
+    status: "open",
+    owner_type: "Line Manager",
+    owner_user_id: source.manager.userId,
+    owner_display_name: source.manager.name,
+    due_date: null,
+    detected_at: now,
+    source_url: `/levytate/app?module=Approvals&application=${encodeURIComponent(source.application.id)}`,
+    metadata: {
+      sourceCondition: source.sourceCondition,
+      submittedVersion: source.submittedVersion,
+      submittedAt: source.submittedAt,
+      occurrenceId: source.occurrenceId,
+      apprenticeshipStandardId: source.application.apprenticeshipStandardId,
+      ...(priorActionId ? { priorActionId } : {}),
+    },
+    version: 1,
+  };
+  let inserted: OperationalActionRow[];
+  try {
+    inserted = await supabaseInsert<OperationalActionRow>(config, actionsTable, row);
+  } catch (error) {
+    if (!(error instanceof LevyTateSupabaseError) || !/duplicate|23505/i.test(error.message)) throw error;
+    const concurrent = await selectActions(context.organisation.id, { sourceKey: source.sourceKey });
+    const active = concurrent.find((action) => !isOperationalActionTerminal(action.status));
+    if (!active) throw error;
+    return active;
+  }
+  const created = actionFromRow(inserted[0]);
+  await recordEvent(context, created, "detected", "", "open", "Application submitted for Line Manager review.");
+  if (priorActionId) {
+    await recordEvent(context, created, "regenerated", "", "open", "A new application review occurrence was created after employee resubmission.", { priorActionId });
+  }
+  return created;
+}
+
+async function updateApplicationReviewAction(context: ActionContext, action: PersistentOperationalAction, source: ApplicationReviewActionSource) {
+  const changes: Record<string, unknown> = {};
+  const nextUrl = `/levytate/app?module=Approvals&application=${encodeURIComponent(source.application.id)}`;
+  if (action.ownerType !== "Line Manager" || action.ownerUserId !== source.manager.userId || action.ownerDisplayName !== source.manager.name) {
+    changes.owner_type = "Line Manager";
+    changes.owner_user_id = source.manager.userId;
+    changes.owner_display_name = source.manager.name;
+  }
+  if (action.employeeId !== source.application.employee.id) changes.employee_id = source.application.employee.id;
+  if (action.sourceUrl !== nextUrl) changes.source_url = nextUrl;
+  if (action.description !== source.application.reason) changes.description = source.application.reason;
+  if (!Object.keys(changes).length) return { action, changed: false };
+  const updated = await versionedUpdate(context, action, changes);
+  if ("owner_user_id" in changes) {
+    await recordEvent(context, updated, "owner_changed", action.status, updated.status, `Owner updated to ${source.manager.name}, the employee's current Line Manager.`);
+  }
+  return { action: updated, changed: true };
+}
+
+async function closeApplicationReviewAction(context: ActionContext, action: PersistentOperationalAction, status?: RequestStatus) {
+  if (isOperationalActionTerminal(action.status)) return action;
+  const now = new Date().toISOString();
+  if (status === "Withdrawn" || status === "Cancelled") {
+    return transitionScopedAction(context, action, "cancelled", {
+      completed_at: now,
+      completed_by: context.user.id,
+      completion_method: "system_cancelled",
+      completion_note: `Application review cancelled because the application is ${status.toLowerCase()}.`,
+    }, `Application review cancelled because the application is ${status.toLowerCase()}.`);
+  }
+  return transitionScopedAction(context, action, "completed", {
+    completion_method: "source_condition_resolved",
+    completion_note: status ? `Application moved to ${status}.` : "The application no longer requires this manager review occurrence.",
+  }, status ? `Application review completed through the source workflow: ${status}.` : "Application review completed through the source workflow.");
+}
+
 export async function listOperationalActions(session: LevyTateBetaSession, query: OperationalActionListQuery = {}) {
   const context = await requireOperationalActionContext(session, "read");
   return selectActions(context.organisation.id, query);
@@ -357,6 +696,42 @@ export async function getOperationalActionManagementDetail(
 ): Promise<OperationalActionManagementDetail> {
   const context = await requireOperationalActionContext(session, "read");
   const action = await requireScopedAction(context, actionId);
+  if (action.actionType === "review_application") {
+    const [applications, history, allOccurrences, ownerOptions] = await Promise.all([
+      loadOrganisationApplicationReviewApplications(context.organisation.id, [action.applicationId]),
+      selectActionHistory(context.organisation.id, actionId),
+      selectActions(context.organisation.id, { includeTerminal: true }),
+      buildOwnerOptions(context, action),
+    ]);
+    const application = applications.find((item) => item.id === action.applicationId);
+    if (!application) throw new LevyTateOperationalActionError("The application context for this action was not found.");
+    const standard = getApprenticeshipStandard(application.apprenticeshipStandardId);
+    return {
+      action,
+      history,
+      previousOccurrences: allOccurrences.filter((item) => item.actionType === "review_application" && item.applicationId === action.applicationId && item.id !== action.id && isOperationalActionTerminal(item.status)),
+      context: {
+        learnerName: application.employee.name,
+        jobTitle: application.employee.jobTitle,
+        department: application.employee.department,
+        site: application.employee.site,
+        managerName: action.ownerDisplayName,
+        programmeName: standard?.title ?? application.apprenticeshipStandardId,
+        providerName: "Confirmed after approval",
+        sourceReason: action.description,
+        sourceFacts: [
+          { label: "Current role", value: application.employee.jobTitle || "Not recorded" },
+          { label: "Submitted", value: String(action.metadata.submittedAt || application.submittedAt) },
+          { label: "Submitted version", value: `Version ${Number(action.metadata.submittedVersion || 1)}` },
+        ],
+        workflowLabel: "Review application",
+        workflowActionType: "open_learner",
+        dueDateOrigin: "No source date",
+        terminalProtection: true,
+      },
+      ownerOptions,
+    };
+  }
   const [details, history, occurrences, ownerOptions] = await Promise.all([
     listOrganisationLearnerLifecycleDetails(session),
     selectActionHistory(context.organisation.id, actionId),
@@ -409,6 +784,7 @@ export async function completeOperationalAction(
   const context = await requireOperationalActionContext(session, "write");
   const action = await requireScopedAction(context, actionId);
   if (action.status === "completed") return action;
+  assertNotApplicationSourceManaged(action);
   assertVersion(action, expectedVersion);
   const details = await listOrganisationLearnerLifecycleDetails(session);
   const currentKeys = new Set(uniqueSourceItems(buildOrganisationOperationalItems(details).items).map((item) => item.sourceKey));
@@ -437,6 +813,7 @@ export async function assignOperationalActionOwner(
 ) {
   const context = await requireOperationalActionContext(session, "write");
   const action = await requireScopedAction(context, actionId);
+  assertNotApplicationSourceManaged(action);
   assertVersion(action, expectedVersion);
   if (isOperationalActionTerminal(action.status)) throw new LevyTateOperationalActionError("Terminal actions cannot be reassigned.");
   const validOwnerTypes: OperationalOwnerType[] = ["Employee", "Line Manager", "Apprenticeship Lead", "HR", "Provider", "Shared"];
@@ -476,6 +853,7 @@ export async function updateOperationalActionDueDate(
 ) {
   const context = await requireOperationalActionContext(session, "write");
   const action = await requireScopedAction(context, actionId);
+  assertNotApplicationSourceManaged(action);
   assertVersion(action, expectedVersion);
   if (isOperationalActionTerminal(action.status)) throw new LevyTateOperationalActionError("Terminal actions cannot have their due date changed.");
   const cleanDate = dueDate.trim();
@@ -519,6 +897,7 @@ export async function cancelOperationalAction(
 ) {
   const context = await requireOperationalActionContext(session, "write");
   const action = await requireScopedAction(context, actionId);
+  assertNotApplicationSourceManaged(action);
   if (action.status === "cancelled") return action;
   assertVersion(action, expectedVersion);
   if (!operationalActionCancellationKinds.includes(category)) throw new LevyTateOperationalActionError("A supported cancellation category is required.");
@@ -549,6 +928,7 @@ export async function dismissOperationalAction(
 ) {
   const context = await requireOperationalActionContext(session, "write");
   const action = await requireScopedAction(context, actionId);
+  assertNotApplicationSourceManaged(action);
   if (action.status === "dismissed") return action;
   assertVersion(action, expectedVersion);
   if (!operationalActionDismissalKinds.includes(dismissalKind)) throw new LevyTateOperationalActionError("A supported dismissal category is required.");
@@ -631,6 +1011,7 @@ async function transitionAction(
 ) {
   const context = await requireOperationalActionContext(session, "write");
   const action = await requireScopedAction(context, actionId);
+  assertNotApplicationSourceManaged(action);
   if (action.status === target) return action;
   assertVersion(action, expectedVersion);
   return transitionScopedAction(context, action, target, extra);
@@ -877,29 +1258,38 @@ async function requireOperationalActionContext(session: LevyTateBetaSession, acc
 type ManagerActionContext = ActionContext & {
   scope: ManagerDirectReportContext;
   details: LearnerRecordDetail[];
+  applications: ManagerDirectReportApplication[];
 };
 
 async function managerOperationalActionContext(session: LevyTateBetaSession): Promise<ManagerActionContext> {
   const scope = await getManagerDirectReportContext(session);
-  const [lifecycleContext, details] = await Promise.all([
+  const [lifecycleContext, details, applications] = await Promise.all([
     getLearnerLifecycleServerContext(session),
     listManagerDirectReportLearnerLifecycleDetails(session, scope),
+    listManagerDirectReportApplications(session, scope),
   ]);
   if (lifecycleContext.organisation.id !== scope.organisation.id || lifecycleContext.user.id !== scope.user.id) {
     throw new LevyTateManagerOperationalActionAccessError();
   }
-  return { ...lifecycleContext, actorDisplayName: scope.manager.name, scope, details };
+  return { ...lifecycleContext, actorDisplayName: scope.manager.name, scope, details, applications };
 }
 
 function requireManagerActionAccess(context: ManagerActionContext, action: PersistentOperationalAction) {
   if (!isManagerRelevantPersistentAction(action, context.scope.user.id)) {
     throw new LevyTateManagerOperationalActionAccessError();
   }
-  const detail = context.details.find((item) => item.learnerRecordId === action.learnerRecordId && item.learner.id === action.employeeId);
-  if (!detail || !context.scope.directReports.some((employee) => employee.id === action.employeeId)) {
+  const directReport = context.scope.directReports.find((employee) => employee.id === action.employeeId);
+  if (!directReport) {
     throw new LevyTateManagerOperationalActionAccessError();
   }
-  return detail;
+  if (action.actionType === "review_application") {
+    const application = context.applications.find((item) => item.id === action.applicationId && item.employee.id === action.employeeId);
+    if (!application) throw new LevyTateManagerOperationalActionAccessError();
+    return { kind: "application_review" as const, application };
+  }
+  const detail = context.details.find((item) => item.learnerRecordId === action.learnerRecordId && item.learner.id === action.employeeId);
+  if (!detail) throw new LevyTateManagerOperationalActionAccessError();
+  return { kind: "learner" as const, detail };
 }
 
 async function requireManagerScopedAction(context: ManagerActionContext, actionId: string) {
@@ -1082,6 +1472,7 @@ function actionTitle(item: OperationalItem) {
     obtain_learner_readiness_confirmation: "Obtain learner readiness confirmation",
     record_gateway: "Record gateway",
     move_learner_to_assessment: "Move learner to assessment",
+    review_application: "Review application",
   };
   return `${labels[item.persistentActionType]} for ${item.learnerName}`;
 }
@@ -1105,6 +1496,12 @@ function assertVersion(action: PersistentOperationalAction, expectedVersion: num
   }
 }
 
+function assertNotApplicationSourceManaged(action: PersistentOperationalAction) {
+  if (action.actionType === "review_application") {
+    throw new LevyTateOperationalActionError("Application review actions are resolved only through the authoritative Approvals workflow.");
+  }
+}
+
 function requireConfig() {
   const config = getLevyTateSupabaseConfig();
   if (!config) throw new LevyTateOperationalActionError("Operational actions require the configured Supabase service connection.");
@@ -1119,7 +1516,7 @@ function actionFromRow(row: OperationalActionRow): PersistentOperationalAction {
   return {
     organisationId: row.organisation_id,
     id: row.id,
-    learnerRecordId: row.learner_record_id,
+    learnerRecordId: row.learner_record_id ?? "",
     applicationId: row.application_id,
     employeeId: row.employee_id,
     sourceType: row.source_type,

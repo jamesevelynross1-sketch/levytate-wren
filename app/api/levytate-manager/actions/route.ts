@@ -1,12 +1,13 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie, readLevyTateBetaSession } from "@/lib/levytate/config/beta-access";
-import type { ManagerOperationalActionFilter } from "@/lib/levytate/mvp/manager-operational-actions";
+import type { ManagerOperationalActionFilter, ManagerOperationalActionKindFilter } from "@/lib/levytate/mvp/manager-operational-actions";
 import { listManagerActions } from "@/lib/server/levytate-manager-actions";
 import { LevyTateManagerScopeError } from "@/lib/server/levytate-manager-scope";
 import { logLevyTateServerError } from "@/lib/server/levytate-safe-api-error";
 
 const filters: ManagerOperationalActionFilter[] = ["all", "open", "acknowledged", "in_progress", "overdue"];
+const kinds: ManagerOperationalActionKindFilter[] = ["all", "application_review", "manager_support"];
 
 export async function GET(request: Request) {
   const cookieStore = await cookies();
@@ -14,8 +15,10 @@ export async function GET(request: Request) {
   if (!session) return NextResponse.json({ message: "Unauthorised." }, { status: 401 });
   const requested = new URL(request.url).searchParams.get("status") ?? "all";
   const filter = filters.includes(requested as ManagerOperationalActionFilter) ? requested as ManagerOperationalActionFilter : "all";
+  const requestedKind = new URL(request.url).searchParams.get("kind") ?? "all";
+  const kind = kinds.includes(requestedKind as ManagerOperationalActionKindFilter) ? requestedKind as ManagerOperationalActionKindFilter : "all";
   try {
-    return NextResponse.json(await listManagerActions(session, filter), { headers: { "Cache-Control": "private, no-store" } });
+    return NextResponse.json(await listManagerActions(session, filter, kind), { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     if (error instanceof LevyTateManagerScopeError) {
       return NextResponse.json({ message: "Line Manager access is required." }, { status: 403 });

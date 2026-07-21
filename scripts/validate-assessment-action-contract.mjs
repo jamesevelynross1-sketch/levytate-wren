@@ -2,15 +2,16 @@ import { readFileSync } from "node:fs";
 
 const domain = readFileSync("lib/levytate/mvp/operational-actions.ts", "utf8");
 const operations = readFileSync("lib/levytate/mvp/operations-centre.ts", "utf8");
-const migration = readFileSync("supabase/migrations/014_extend_operational_action_types_for_assessment.sql", "utf8");
+const assessmentMigration = readFileSync("supabase/migrations/014_extend_operational_action_types_for_assessment.sql", "utf8");
+const actionMigration = readFileSync("supabase/migrations/016_add_application_review_operational_action.sql", "utf8");
 const operationsApi = readFileSync("app/api/levytate-operations/route.ts", "utf8");
 const actionsApi = readFileSync("app/api/levytate-operational-actions/route.ts", "utf8");
 const operationsUi = readFileSync("components/levytate-mvp/OperationsCentreModule.tsx", "utf8");
 
 const domainActionTypes = extractTsArray(domain, "persistentOperationalActionTypes");
 const domainSourceTypes = extractTsArray(domain, "operationalActionSourceTypes");
-const migrationActionTypes = extractSqlCheckValues(migration, "levytate_operational_actions_action_type_check", "action_type");
-const migrationSourceTypes = extractSqlCheckValues(migration, "levytate_operational_actions_source_type_check", "source_type");
+const migrationActionTypes = extractSqlCheckValues(actionMigration, "levytate_operational_actions_action_type_check", "action_type");
+const migrationSourceTypes = extractSqlCheckValues(assessmentMigration, "levytate_operational_actions_source_type_check", "source_type");
 
 assertEqualSets("Operational action types", domainActionTypes, migrationActionTypes);
 assertEqualSets("Operational source types", domainSourceTypes, migrationSourceTypes);

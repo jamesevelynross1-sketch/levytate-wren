@@ -27,7 +27,7 @@ assert("only non-terminal manager actions are listed", initial.body.actions?.eve
 assert("summary counts are derived from the authorised list", initial.body.summary.open === initial.body.actions.filter((action) => action.status === "open").length && initial.body.summary.acknowledged === initial.body.actions.filter((action) => action.status === "acknowledged").length && initial.body.summary.inProgress === initial.body.actions.filter((action) => action.status === "in_progress").length, initial.body.summary);
 assert("manager response excludes organisation and learner-record IDs", !JSON.stringify(initial.body).match(/organisationId|organisation_id|learnerRecordId|learner_record_id|applicationId|application_id|ownerUserId|owner_user_id/), initial.body);
 assert("provider, HR and Apprenticeship Lead actions are excluded", initial.body.actions.every((action) => !/provider review|l&d check-in|hr approval|complete enrolment|add progress update/i.test(action.title)), initial.body.actions);
-assert("all listed source links remain in My Team", initial.body.actions.every((action) => action.sourceUrl.startsWith("/levytate/app/my-team/")), initial.body.actions);
+assert("all listed source links remain in authorised manager workflows", initial.body.actions.every((action) => action.kind === "application_review" ? /^\/levytate\/app\?module=Approvals&application=/.test(action.sourceUrl) : action.sourceUrl.startsWith("/levytate/app/my-team/")), initial.body.actions);
 
 for (const filter of ["open", "acknowledged", "in_progress", "overdue"]) {
   const filtered = await request(`/api/levytate-manager/actions?status=${filter}`, manager.cookie);

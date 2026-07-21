@@ -5,6 +5,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { FormField, FormGrid, MvpPanel, StatusBadge } from "@/components/levytate-mvp/MvpUi";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { ManagerActionsHome } from "@/components/levytate-mvp/ManagerActionsHome";
+import type { ManagerOperationalActionListItem } from "@/lib/levytate/mvp/manager-operational-actions";
 import {
   buildNotifications,
   employeeCurrentApplication,
@@ -124,6 +125,16 @@ export function LineManagerHomeModule({ onNavigate, onOpenApplicationReview }: {
   onOpenApplicationReview: (applicationId: string) => void;
 }) {
   const { data, meta } = useMvpWorkspace();
+  const [allActionsMode, setAllActionsMode] = useState(false);
+  const [reviewActions, setReviewActions] = useState<ManagerOperationalActionListItem[]>([]);
+
+  useEffect(() => {
+    setAllActionsMode(new URLSearchParams(window.location.search).get("actions") === "all");
+    void fetch("/api/levytate-manager/actions?kind=application_review", { cache: "no-store" })
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error("Review actions unavailable")))
+      .then((body: { actions?: ManagerOperationalActionListItem[] }) => setReviewActions(body.actions ?? []))
+      .catch(() => setReviewActions([]));
+  }, []);
   const manager = data.employees.find((employee) =>
     employee.status === "Active" && employee.email.trim().toLowerCase() === (meta?.userEmail ?? "").trim().toLowerCase()
   );
@@ -142,6 +153,11 @@ export function LineManagerHomeModule({ onNavigate, onOpenApplicationReview }: {
   const nextApplication = awaitingReview[0] ?? null;
   const nextEmployee = nextApplication ? data.employees.find((employee) => employee.id === nextApplication.employeeId) : null;
   const nextStandard = nextApplication ? getApprenticeshipStandard(nextApplication.apprenticeshipStandardId) : null;
+  const nextReviewAction = nextApplication
+    ? reviewActions.find((action) => action.sourceUrl.includes(`application=${encodeURIComponent(nextApplication.id)}`)) ?? null
+    : null;
+
+  if (allActionsMode) return <ManagerActionsHome kind="all" />;
 
   return (
     <div className="grid gap-5">
@@ -171,7 +187,10 @@ export function LineManagerHomeModule({ onNavigate, onOpenApplicationReview }: {
                   <p className="text-base font-semibold text-[#102c3d]">{nextEmployee.name}</p>
                   <p className="mt-1 text-sm leading-6 text-[#102c3d]/58">{nextEmployee.jobTitle || "Role to confirm"} - {nextEmployee.department || "Department to confirm"}</p>
                 </div>
-                <StatusBadge tone="yellow">{nextApplication.status}</StatusBadge>
+                <div className="flex flex-wrap justify-end gap-2">
+                  <StatusBadge tone="yellow">{nextApplication.status}</StatusBadge>
+                  {nextReviewAction ? <StatusBadge tone={nextReviewAction.status === "in_progress" ? "green" : nextReviewAction.status === "acknowledged" ? "blue" : "yellow"}>Action: {nextReviewAction.statusLabel}</StatusBadge> : null}
+                </div>
               </div>
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <DashboardFact label="Programme" value={nextStandard?.title ?? nextApplication.apprenticeshipStandardId} />
@@ -197,7 +216,7 @@ export function LineManagerHomeModule({ onNavigate, onOpenApplicationReview }: {
           </div>
         </MvpPanel>
       </div>
-      <ManagerActionsHome />
+      <ManagerActionsHome kind="manager_support" />
     </div>
   );
 }

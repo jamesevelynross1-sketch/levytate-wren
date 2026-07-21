@@ -42,6 +42,7 @@ export const persistentOperationalActionTypes = [
   "obtain_learner_readiness_confirmation",
   "record_gateway",
   "move_learner_to_assessment",
+  "review_application",
 ] as const;
 
 export type PersistentOperationalActionType = typeof persistentOperationalActionTypes[number];

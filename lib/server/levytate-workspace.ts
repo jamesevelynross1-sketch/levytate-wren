@@ -49,6 +49,7 @@ import {
 } from "@/lib/server/levytate-supabase";
 import { getEarlyAccessRequestByEmail } from "@/lib/server/levytate-early-access";
 import { getPersistentEarlyAccessState } from "@/lib/server/levytate-beta-access-grants";
+import { synchroniseApplicationReviewOperationalActions } from "@/lib/server/levytate-operational-actions";
 import { isBetaApprovedEarlyAccessStatus } from "@/lib/levytate/early-access/domain";
 
 type OrganisationRow = {
@@ -426,10 +427,12 @@ export async function applyWorkspaceMutationForSession(
       break;
     case "saveApplication":
       await saveApplication(organisationId, mutation.application);
+      await synchroniseApplicationReviewOperationalActions(session, [mutation.application.id]);
       await recordAuditEvent(context, "application", mutation.application.id, "application.saved", "Application record saved.");
       break;
     case "updateApplicationStatus":
       await updateApplicationStatus(organisationId, mutation.id, mutation.status, mutation.note);
+      await synchroniseApplicationReviewOperationalActions(session, [mutation.id]);
       await recordAuditEvent(context, "application", mutation.id, "application.status_updated", `Application moved to ${mutation.status}.`, { note: mutation.note ?? "" });
       break;
     case "saveProvider":
@@ -1279,6 +1282,23 @@ async function saveRole(organisationId: string, role: MvpRole) {
 }
 
 async function saveApplication(organisationId: string, application: MvpApplication) {
+  const existing = await selectOne<ApplicationRow>(
+    applicationsTable,
+    new URLSearchParams({
+      select: "id,status,current_owner",
+      organisation_id: `eq.${organisationId}`,
+      id: `eq.${application.id}`,
+      limit: "1",
+    }),
+  );
+  const history = [...application.history];
+  const latestHistory = history.at(-1);
+  const resubmittedForManagerReview = existing?.status === "More information requested"
+    && lineManagerReviewStatuses.includes(application.status)
+    && (!latestHistory || !lineManagerReviewStatuses.includes(latestHistory.status));
+  if (resubmittedForManagerReview) {
+    history.push(buildApplicationHistoryEntry(application.status, "Application resubmitted to Line Manager."));
+  }
   const row: ApplicationRow = {
     organisation_id: organisationId,
     id: application.id,
@@ -1300,8 +1320,8 @@ async function saveApplication(organisationId: string, application: MvpApplicati
   });
 
   await supabaseDelete(assertSupabase(), applicationHistoryTable, buildOrganisationQuery(organisationId, { application_id: application.id }));
-  if (application.history.length) {
-    const historyRows: ApplicationHistoryRow[] = application.history.map((entry) => ({
+  if (history.length) {
+    const historyRows: ApplicationHistoryRow[] = history.map((entry) => ({
       organisation_id: organisationId,
       id: entry.id,
       application_id: application.id,
@@ -1925,8 +1945,6 @@ function assertSupabase() {
   }
   return config;
 }
-
-
 
 
 
