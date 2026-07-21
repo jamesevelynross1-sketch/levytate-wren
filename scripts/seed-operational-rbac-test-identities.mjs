@@ -669,6 +669,8 @@ function userRow(user, organisationId) {
     email: user.email,
     role: user.role,
     access_level: "beta_user",
+    display_name: user.displayName,
+    active: user.active,
     auth_subject: null,
     last_login_at: null,
     created_at: now,

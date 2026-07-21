@@ -63,6 +63,8 @@ type OrganisationRow = {
   sites?: unknown;
   departments?: unknown;
   priorities?: unknown;
+  logo_reference?: string | null;
+  workspace_template?: string | null;
   status?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -74,6 +76,8 @@ type UserRow = {
   email: string;
   role: LevyTateWorkspaceMeta["userRole"];
   access_level: string;
+  display_name?: string | null;
+  active?: boolean | null;
   auth_subject?: string | null;
   last_login_at?: string | null;
   created_at?: string | null;
@@ -805,13 +809,37 @@ function employeeRecordToRow(employee: MvpEmployee): EmployeeRow {
 async function ensureWorkspaceContext(session: LevyTateBetaSession): Promise<WorkspaceContext> {
   const config = assertSupabase();
   await assertSessionStillAllowed(session);
-  const seed = await deriveOrganisationSeed(session);
   const now = nowIso();
 
-  const existingOrganisation = await selectOne<OrganisationRow>(
+  const existingUser = await selectOne<UserRow>(
+    usersTable,
+    new URLSearchParams({
+      select: "id,organisation_id,email,role,access_level,display_name,active,auth_subject,last_login_at,created_at,updated_at",
+      email: `eq.${session.email}`,
+      limit: "1",
+    }),
+  );
+
+  if (existingUser?.active === false) {
+    throw new LevyTateWorkspacePermissionError("Your LevyTate access is not active. Please contact your Apprenticeship Lead.");
+  }
+
+  const provisionedOrganisation = existingUser
+    ? await selectOne<OrganisationRow>(
+      organisationsTable,
+      new URLSearchParams({
+        select: "id,name,slug,workspace_name,primary_contact,contact_email,default_site,sites,departments,priorities,logo_reference,workspace_template,status,created_at,updated_at",
+        id: `eq.${existingUser.organisation_id}`,
+        limit: "1",
+      }),
+    )
+    : null;
+  const seed = await deriveOrganisationSeed(session);
+
+  const existingOrganisation = provisionedOrganisation ?? await selectOne<OrganisationRow>(
     organisationsTable,
     new URLSearchParams({
-      select: "id,name,slug,workspace_name,primary_contact,contact_email,default_site,sites,departments,priorities,status,created_at,updated_at",
+      select: "id,name,slug,workspace_name,primary_contact,contact_email,default_site,sites,departments,priorities,logo_reference,workspace_template,status,created_at,updated_at",
       slug: `eq.${seed.slug}`,
       limit: "1",
     }),
@@ -821,16 +849,9 @@ async function ensureWorkspaceContext(session: LevyTateBetaSession): Promise<Wor
   if (existingOrganisation) {
     await updateOrganisationDefaults(organisation.id, seed);
   }
-  await syncSeedProviderCatalogue(organisation.id);
-
-  const existingUser = await selectOne<UserRow>(
-    usersTable,
-    new URLSearchParams({
-      select: "id,organisation_id,email,role,access_level,auth_subject,last_login_at,created_at,updated_at",
-      email: `eq.${session.email}`,
-      limit: "1",
-    }),
-  );
+  if (organisation.workspace_template !== "levytate-prospect-sandbox") {
+    await syncSeedProviderCatalogue(organisation.id);
+  }
 
   const userRole = resolveSessionWorkspaceRole(session, seed.userRole, existingUser?.role);
   const nextUser: UserRow = existingUser
@@ -839,6 +860,7 @@ async function ensureWorkspaceContext(session: LevyTateBetaSession): Promise<Wor
         organisation_id: organisation.id,
         role: userRole,
         access_level: session.accessLevel,
+        active: true,
         last_login_at: now,
         updated_at: now,
       }
@@ -848,6 +870,8 @@ async function ensureWorkspaceContext(session: LevyTateBetaSession): Promise<Wor
         email: session.email,
         role: userRole,
         access_level: session.accessLevel,
+        display_name: "",
+        active: true,
         auth_subject: null,
         last_login_at: now,
         created_at: now,
@@ -862,7 +886,7 @@ async function ensureWorkspaceContext(session: LevyTateBetaSession): Promise<Wor
   const savedUser = await selectOne<UserRow>(
     usersTable,
     new URLSearchParams({
-      select: "id,organisation_id,email,role,access_level,auth_subject,last_login_at,created_at,updated_at",
+      select: "id,organisation_id,email,role,access_level,display_name,active,auth_subject,last_login_at,created_at,updated_at",
       email: `eq.${session.email}`,
       limit: "1",
     }),
@@ -1945,9 +1969,6 @@ function assertSupabase() {
   }
   return config;
 }
-
-
-
 
 
 

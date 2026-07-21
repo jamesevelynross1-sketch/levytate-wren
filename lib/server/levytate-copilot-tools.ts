@@ -329,6 +329,12 @@ export function classifyOperationalCopilotQuery(
   if (/\b(readiness checks?).{0,25}(involve me|need me|line manager)\b/.test(text)) {
     return { intent: "assessment_readiness", filters: { assessmentState: "all", actionType: "line_manager_readiness" }, direct: true };
   }
+  if (/\b(summarise|summarize|show).{0,20}(recent )?(operational )?activity\b/.test(text)) {
+    return { intent: "operational_actions", filters: { dueState: "recent_activity" }, direct: true };
+  }
+  if (/\b(show|list)?\s*(all )?(open|outstanding)\s+(operational )?(actions?|tasks?)\b/.test(text)) {
+    return { intent: "operational_actions", filters: { status: "open" }, direct: true };
+  }
   if (/\b(ending|end|finish|finishing|complete|completion)\b.*\b(before|by|next|soon|within)\b/.test(text)) {
     return { intent: "learners_ending_before", filters: { dateBefore: extractDateBefore(text) }, direct: true };
   }
@@ -626,6 +632,22 @@ export async function getOperationalActions(session: LevyTateBetaSession, filter
     priority: filters.priority,
     actionType: filters.actionType,
   });
+  if (filters.dueState === "recent_activity") {
+    return payloadFromRows({
+      type: "operational_action_results",
+      title: "Recent apprenticeship activity",
+      rows: operations.recentActivity.map((item) => ({
+        key: item.id,
+        cells: { activity: item.action, learner: item.learnerName, actor: item.actorName, date: displayDate(item.eventDate) },
+        actions: [{ label: "Open learner", url: item.actionUrl }],
+      })),
+      columns: [col("activity", "Activity"), col("learner", "Learner"), col("actor", "Recorded by"), col("date", "Date")],
+      interpretation: "This activity is drawn from the current organisation's learner lifecycle timeline.",
+      emptyMessage: "No recent apprenticeship activity is currently recorded.",
+      viewAllUrl: "/levytate/app?module=Home",
+      toolName: "getOrganisationRecentActivity",
+    });
+  }
   let items = Object.values(operations.queues).flat();
   if (filters.dueState === "attention_today") items = items.filter((item) => item.queueType === "urgent" || item.dueStatus === "Overdue" || item.dueStatus === "Due today");
   const rows = items.map((item) => ({
@@ -635,7 +657,7 @@ export async function getOperationalActions(session: LevyTateBetaSession, filter
   }));
   return payloadFromRows({
     type: "operational_action_results",
-    title: filters.owner === "mine" ? "Actions assigned to you" : filters.priority === "Critical" ? "Open critical actions" : "Actions requiring attention today",
+    title: filters.owner === "mine" ? "Actions assigned to you" : filters.priority === "Critical" ? "Open critical actions" : filters.dueState === "attention_today" ? "Actions requiring attention today" : "Open operational actions",
     rows,
     columns: [col("action", "Action"), col("learner", "Learner"), col("owner", "Owner"), col("status", "Status"), col("priority", "Priority"), col("dueDate", "Due"), col("reason", "Reason")],
     interpretation: "The list is ordered from the current organisation-scoped Operations Centre data.",

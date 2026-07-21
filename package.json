@@ -9,6 +9,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "prospect:sandbox": "node scripts/prospect-sandbox.mjs",
+    "validate:prospect-sandbox": "node scripts/validate-prospect-sandbox.mjs",
     "lint": "node --max-old-space-size=4096 node_modules/eslint/bin/eslint.js app/layout.tsx app/page.tsx app/stocks app/api/stocks components/stocks components/layout/SiteChrome.tsx components/ui/SectionEyebrow.tsx components/brand/Logo.tsx components/sections/TrustBandLocal.tsx lib/stocks next.config.ts tailwind.config.ts"
   },
   "dependencies": {
@@ -32,4 +34,3 @@
     "postcss": "^8.5.10"
   }
 }
-
