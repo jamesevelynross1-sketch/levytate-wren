@@ -30,6 +30,8 @@ import { OperationsCentreModule } from "@/components/levytate-mvp/OperationsCent
 import { LevyTateStandardsProvider } from "@/components/levytate-mvp/LevyTateStandardsProvider";
 import { MvpWorkspaceProvider, useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { ProviderMatchingModule } from "@/components/levytate-mvp/ProviderMatchingModule";
+import { ProspectGettingStarted } from "@/components/levytate-mvp/ProspectGettingStarted";
+import { ProspectAccessAdminModule } from "@/components/levytate-mvp/ProspectAccessAdminModule";
 import { ProvidersModule } from "@/components/levytate-mvp/ProvidersModule";
 import { ReportsModule } from "@/components/levytate-mvp/ReportsModule";
 import { RolesModule } from "@/components/levytate-mvp/RolesModule";
@@ -322,6 +324,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
             <span className="hidden rounded-full border border-[#159b8f]/10 bg-[#edf7f3] px-3.5 py-2 text-xs font-semibold text-[#0b6f63] sm:inline-flex">
               {hydrated ? `${notifications.length} alerts` : "Loading"}
             </span>
+            {meta?.prospectAccess?.status === "active" && meta.userRole === "Apprenticeship Lead" ? <ProspectGettingStarted access={meta.prospectAccess} onNavigate={navigateTo} /> : null}
             <button onClick={logout} title="Logout" className="inline-flex h-11 shrink-0 items-center gap-2 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white shadow-[0_10px_22px_rgba(16,44,61,0.12)] transition hover:bg-[#17394d]">
               <LogOut size={15} aria-hidden="true" />
               <span className="hidden sm:inline">Logout</span>
@@ -433,7 +436,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
             {activeModule === "Settings" ? (
               <ModuleStackNav items={settingsItems} active={settingsView} onSelect={(item) => setSettingsView(item as SettingsView)}>
                 {settingsView === "Workspace" ? <SettingsModule /> : null}
-                {settingsView === "Early Access" ? <EarlyAccessModule /> : null}
+                {settingsView === "Early Access" ? <div className="grid gap-5"><ProspectAccessAdminModule /><EarlyAccessModule /></div> : null}
               </ModuleStackNav>
             ) : null}
           </div>

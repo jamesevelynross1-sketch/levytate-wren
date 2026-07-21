@@ -25,7 +25,8 @@ import {
   type LevyTateWorkspaceEmployeeContext,
 } from "@/lib/levytate/ai/types";
 import { applyLevyTateAiSafety } from "@/lib/levytate-ai/safety";
-import { levytateBetaSessionCookie, readLevyTateBetaSession } from "@/lib/levytate/config/beta-access";
+import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
+import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
 import { getApprenticeshipStandard } from "@/lib/levytate/domain";
 import type { LevyTateWorkspaceBootstrap } from "@/lib/levytate/mvp/api";
 import type { MvpApplication, MvpEmployee, MvpEmployeeDevelopmentProfile, MvpRole } from "@/lib/levytate/mvp/workspace";
@@ -215,7 +216,7 @@ function isDeterministicEmployeeStateResponse(request: LevyTateAiRequest, respon
 
 async function getSession() {
   const cookieStore = await cookies();
-  return readLevyTateBetaSession(cookieStore.get(levytateBetaSessionCookie)?.value);
+  return readAuthorisedLevyTateBetaSession(cookieStore.get(levytateBetaSessionCookie)?.value);
 }
 
 function allowedCopilotRole(requestedRole: LevyTateRole, workspace: LevyTateWorkspaceBootstrap): LevyTateRole {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { levytateBetaSessionCookie, readLevyTateBetaSession } from "@/lib/levytate/config/beta-access";
+import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
+import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
 import { syncPersistentEarlyAccessState } from "@/lib/server/levytate-beta-access-grants";
 import {
   createEarlyAccessRequest,
@@ -12,7 +13,7 @@ import {
 
 export async function GET() {
   const cookieStore = await cookies();
-  const session = await readLevyTateBetaSession(cookieStore.get(levytateBetaSessionCookie)?.value);
+  const session = await readAuthorisedLevyTateBetaSession(cookieStore.get(levytateBetaSessionCookie)?.value);
 
   if (!session) {
     return NextResponse.json({ message: "Unauthorised." }, { status: 401 });

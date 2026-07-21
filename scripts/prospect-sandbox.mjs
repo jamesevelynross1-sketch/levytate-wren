@@ -27,6 +27,7 @@ export async function createProspectSandbox(input) {
     select: "id,name,slug,workspace_name,primary_contact,contact_email,logo_reference,workspace_template,status",
     slug: `eq.${request.workspaceSlug}`,
   });
+  if (!existing) await removeOrphanedSandboxRows(config, request.workspaceSlug);
 
   if (existing && existing.workspace_template !== templateKey) {
     throw new Error("The requested workspace slug is already owned by a non-prospect workspace.");
@@ -46,6 +47,7 @@ export async function createProspectSandbox(input) {
   }
 
   if (existing && membership && await isCanonical(config, existing, membership, request)) {
+    await prepareAccess(config, existing.id, membership, request);
     return safeReport("create", existing, membership, await counts(config, existing.id), 0);
   }
 
@@ -79,14 +81,15 @@ export async function createProspectSandbox(input) {
     role: "Apprenticeship Lead",
     access_level: "beta_user",
     display_name: request.prospectDisplayName,
-    active: true,
+    active: false,
     auth_subject: null,
     last_login_at: membership?.last_login_at ?? null,
     created_at: fixedTime,
     updated_at: fixedTime,
   };
   await upsert(config, "levytate_users", [user], "email");
-  await grantAccess(config, request, true);
+  await prepareAccess(config, organisationId, user, request);
+  await grantAccess(config, request, "prepared");
   await replaceSandboxData(config, organisationId, request);
   await audit(config, organisationId, request.prospectEmail, "prospect_sandbox_created", "Prospect workspace provisioned from the controlled sandbox template.");
   return safeReport("create", organisation, user, await counts(config, organisationId), 1);
@@ -104,9 +107,25 @@ export async function inspectProspectSandbox(input) {
     organisation_id: `eq.${organisation.id}`,
   });
   const membership = users.find((item) => item.email === request.prospectEmail) ?? users[0];
+  const access = membership ? await one(config, "levytate_prospect_access", {
+    select: "id,access_status,access_start_at,access_expires_at,first_login_at,guidance_completed_at,internal_owner_name,last_status_changed_at,version",
+    organisation_id: `eq.${organisation.id}`,
+    user_id: `eq.${membership.id}`,
+  }) : null;
   return {
     ...safeReport("inspect", organisation, membership, await counts(config, organisation.id), 0),
     activeMemberships: users.filter((item) => item.active).length,
+    prospectAccess: access ? {
+      id: access.id,
+      status: access.access_status,
+      accessStartAt: access.access_start_at,
+      accessExpiresAt: access.access_expires_at,
+      firstLoginAt: access.first_login_at,
+      guidanceCompletedAt: access.guidance_completed_at,
+      internalOwnerName: access.internal_owner_name,
+      lastStatusChangedAt: access.last_status_changed_at,
+      version: access.version,
+    } : null,
     canonical: Boolean(membership && await isCanonical(config, organisation, membership, {
       organisationName: organisation.name,
       workspaceSlug: organisation.slug,
@@ -162,17 +181,31 @@ async function setProspectAccess(input, active) {
   assertSandbox(organisation);
   const membership = await prospectMembership(config, organisation.id, request.prospectEmail);
   if (!membership) throw new Error("Prospect membership was not found.");
+  const access = await one(config, "levytate_prospect_access", { select: "*", organisation_id: `eq.${organisation.id}`, user_id: `eq.${membership.id}` });
+  if (!access) throw new Error("Prospect access record was not found.");
+  const now = new Date().toISOString();
+  const expiry = active ? new Date(input.accessExpiresAt ?? Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() : access.access_expires_at;
+  if (active && Date.parse(expiry) <= Date.now()) throw new Error("A future expiry date is required to reactivate access.");
+  await patch(config, "levytate_prospect_access", { id: `eq.${access.id}`, version: `eq.${access.version}` }, active ? {
+    access_status: "active", access_start_at: access.access_start_at ?? now, access_expires_at: expiry,
+    reactivated_at: now, reactivated_by: "Prospect sandbox command", revoked_at: null, revoked_by: "", revocation_reason: "",
+    last_status_changed_at: now, updated_at: now, version: access.version + 1,
+  } : {
+    access_status: "revoked", revoked_at: now, revoked_by: "Prospect sandbox command",
+    revocation_reason: String(input.reason ?? "Controlled validation deactivation"), last_status_changed_at: now,
+    updated_at: now, version: access.version + 1,
+  });
   await patch(config, "levytate_users", { id: `eq.${membership.id}` }, {
     active,
     role: "Apprenticeship Lead",
     organisation_id: organisation.id,
-    updated_at: new Date().toISOString(),
+    updated_at: now,
   });
   await grantAccess(config, {
     organisationName: organisation.name,
     prospectEmail: membership.email,
     prospectDisplayName: membership.display_name || organisation.primary_contact,
-  }, active);
+  }, active ? "active" : "inactive");
   await audit(config, organisation.id, membership.email, active ? "prospect_access_reactivated" : "prospect_access_deactivated", active ? "Prospect access reactivated." : "Prospect access deactivated; workspace records retained.");
   return { operation: active ? "reactivate" : "deactivate", organisationId: organisation.id, membershipId: membership.id, role: "Apprenticeship Lead", active };
 }
@@ -181,6 +214,15 @@ async function replaceSandboxData(config, organisationId, request) {
   for (const table of managedTables) await remove(config, table, { organisation_id: `eq.${organisationId}` });
   const data = buildProspectSandboxTemplate(organisationId, request);
   for (const [table, rows, conflict] of data) await upsert(config, table, rows, conflict);
+}
+
+async function removeOrphanedSandboxRows(config, workspaceSlug) {
+  const prefix = `prospect-${shortHash(workspaceSlug)}`;
+  const orphan = await one(config, "levytate_roles", { select: "organisation_id", id: `eq.${prefix}-role-lead` });
+  if (!orphan?.organisation_id) return;
+  const owner = await one(config, "levytate_organisations", { select: "id,workspace_template", id: `eq.${orphan.organisation_id}` });
+  if (owner) throw new Error("The prospect fixture identifier is already owned by an existing workspace.");
+  for (const table of managedTables) await remove(config, table, { organisation_id: `eq.${orphan.organisation_id}` });
 }
 
 export function buildProspectSandboxTemplate(organisationId, request) {
@@ -352,16 +394,26 @@ function shortHash(value) { return createHash("sha256").update(value).digest("he
 
 async function findOrganisation(config, request) { return one(config, "levytate_organisations", { select: "id,name,slug,workspace_name,primary_contact,contact_email,logo_reference,workspace_template,status", slug: `eq.${request.workspaceSlug}` }); }
 async function prospectMembership(config, org, email) { return one(config, "levytate_users", { select: "id,organisation_id,email,role,display_name,active", organisation_id: `eq.${org}`, ...(email ? { email: `eq.${email}` } : {}), limit: "1" }); }
-async function isCanonical(config, org, membership, request) { const c = await counts(config, org.id); return org.name === request.organisationName && org.workspace_name === request.organisationName && org.primary_contact === request.prospectDisplayName && org.contact_email === request.primaryContactEmail && (org.logo_reference || "") === (request.logoReference || "") && org.workspace_template === templateKey && membership.role === "Apprenticeship Lead" && membership.active === true && membership.email === request.prospectEmail && membership.display_name === request.prospectDisplayName && c.users === 1 && c.employees === 15 && c.applications === 10 && c.learners === 8 && c.providers === 3 && c.programmes === 5; }
+async function isCanonical(config, org, membership, request) { const c = await counts(config, org.id); return org.name === request.organisationName && org.workspace_name === request.organisationName && org.primary_contact === request.prospectDisplayName && org.contact_email === request.primaryContactEmail && (org.logo_reference || "") === (request.logoReference || "") && org.workspace_template === templateKey && membership.role === "Apprenticeship Lead" && membership.email === request.prospectEmail && membership.display_name === request.prospectDisplayName && c.users === 1 && c.employees === 15 && c.applications === 10 && c.learners === 8 && c.providers === 3 && c.programmes === 5; }
 async function counts(config, org) { const map = { users: "levytate_users", employees: "levytate_employees", applications: "levytate_applications", learners: "levytate_learner_records", providers: "levytate_providers", programmes: "levytate_provider_programmes", actions: "levytate_operational_actions" }; return Object.fromEntries(await Promise.all(Object.entries(map).map(async ([key, table]) => [key, (await many(config, table, { select: "*", organisation_id: `eq.${org}` })).length]))); }
 function safeReport(operation, org, user, itemCounts, changes) { return { operation, template: PROSPECT_SANDBOX_TEMPLATE, organisationId: org.id, membershipId: user?.id ?? null, workspaceSlug: org.slug, organisationName: org.name, role: user?.role ?? null, active: user?.active ?? null, counts: itemCounts, changes }; }
 
-async function grantAccess(config, request, active) {
-  const segments = [active ? "levytate_beta_access" : "levytate_early_access_declined"];
-  await upsert(config, "subscribers", [{ email: request.prospectEmail, status: "active", source_page: "/levytate/early-access", unsubscribe_token: stableUuid(`${request.prospectEmail}:unsubscribe`), segments, updated_at: new Date().toISOString() }], "email");
-  await upsert(config, "levytate_early_access_requests", [{ id: stableUuid(`${request.prospectEmail}:access`), organisation: request.organisationName, contact_name: request.prospectDisplayName, email: request.prospectEmail, employee_count: "Controlled prospect workspace", biggest_challenge: "Evaluate apprenticeship operations in a prepared workspace", consent: true, submitted_at: fixedTime, updated_at: new Date().toISOString(), status: active ? "Approved" : "Declined", source: "prospect-readiness", admin_owner_email: null, approved_at: active ? new Date().toISOString() : null, notes: [{ type: "prospect_workspace", template: templateKey }], history: [{ at: new Date().toISOString(), status: active ? "Approved" : "Declined", note: active ? "Prospect access active." : "Prospect access deactivated." }] }], "email");
+async function prepareAccess(config, organisationId, user, request) {
+  const existing = await one(config, "levytate_prospect_access", { select: "id", organisation_id: `eq.${organisationId}`, user_id: `eq.${user.id}` });
+  if (existing) return existing;
+  const now = new Date().toISOString();
+  const created = (await upsert(config, "levytate_prospect_access", [{ organisation_id: organisationId, user_id: user.id, access_status: "prepared", internal_owner_name: request.internalOwnerName ?? "", internal_notes: request.internalNotes ?? "", last_status_changed_at: now, created_at: now, updated_at: now, version: 1 }], "organisation_id,user_id"))[0];
+  await audit(config, organisationId, request.prospectEmail, "prospect_access.prepared", "Access prepared.");
+  return created;
 }
-async function audit(config, org, email, action, summary) { await upsert(config, "levytate_audit_events", [{ id: randomUUID(), organisation_id: org, actor_email: email, actor_role: "Apprenticeship Lead", entity_type: "prospect_workspace", entity_id: org, action, summary, metadata: { template: templateKey }, created_at: new Date().toISOString() }], "id"); }
+
+async function grantAccess(config, request, state) {
+  const segments = [state === "active" ? "levytate_beta_access" : state === "prepared" ? "levytate_early_access_pending" : "levytate_early_access_declined"];
+  const status = state === "active" ? "Approved" : state === "prepared" ? "New" : "Declined";
+  await upsert(config, "subscribers", [{ email: request.prospectEmail, status: "active", source_page: "/levytate/early-access", unsubscribe_token: stableUuid(`${request.prospectEmail}:unsubscribe`), segments, updated_at: new Date().toISOString() }], "email");
+  await upsert(config, "levytate_early_access_requests", [{ id: stableUuid(`${request.prospectEmail}:access`), organisation: request.organisationName, contact_name: request.prospectDisplayName, email: request.prospectEmail, employee_count: "Controlled prospect workspace", biggest_challenge: "Evaluate apprenticeship operations in a prepared workspace", consent: true, submitted_at: fixedTime, updated_at: new Date().toISOString(), status, source: "prospect-readiness", admin_owner_email: null, approved_at: state === "active" ? new Date().toISOString() : null, notes: [{ type: "prospect_workspace", template: templateKey }], history: [{ at: new Date().toISOString(), status, note: state === "active" ? "Prospect access active." : state === "prepared" ? "Prospect access prepared." : "Prospect access inactive." }] }], "email");
+}
+async function audit(config, org, email, action, summary) { await upsert(config, "levytate_audit_events", [{ id: randomUUID(), organisation_id: org, actor_email: email, actor_role: "Apprenticeship Lead", entity_type: action.startsWith("prospect_access.") ? "prospect_access" : "prospect_workspace", entity_id: org, action, summary, metadata: { template: templateKey }, created_at: new Date().toISOString() }], "id"); }
 
 async function runtimeConfig() { await loadEnv(); const url = String(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim().replace(/\/rest\/v1\/?$/i, "").replace(/\/$/, ""); const key = String(process.env.SUPABASE_SERVICE_ROLE_KEY ?? "").trim(); if (!url || !key) throw new Error("Supabase service configuration is required."); return { url, key }; }
 async function loadEnv() { for (const name of [".env.local", ".env"]) { try { const raw = await fs.readFile(path.join(cwd, name), "utf8"); for (const line of raw.split(/\r?\n/)) { if (!line || line.trimStart().startsWith("#")) continue; const at = line.indexOf("="); if (at < 1) continue; const key = line.slice(0, at).trim(), value = line.slice(at + 1).trim().replace(/^["']|["']$/g, ""); if (!process.env[key] && value) process.env[key] = value; } } catch {} } }

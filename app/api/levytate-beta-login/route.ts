@@ -12,6 +12,7 @@ import {
 import { isBetaApprovedEarlyAccessStatus } from "@/lib/levytate/early-access/domain";
 import { getPersistentEarlyAccessState } from "@/lib/server/levytate-beta-access-grants";
 import { getEarlyAccessRequestByEmail } from "@/lib/server/levytate-early-access";
+import { ProspectAccessError, assertProspectLoginAccess, recordProspectFirstLogin } from "@/lib/server/levytate-prospect-access";
 
 type LoginRequestBody = {
   email?: unknown;
@@ -38,9 +39,11 @@ export async function POST(request: Request) {
       throw new BetaLoginError("Invalid beta access code.", 401);
     }
 
+    await assertProspectLoginAccess(email);
     const accessLevel = await resolveAccessLevel(email, approvalToken);
+    const prospectAccess = await recordProspectFirstLogin(email);
     const sessionToken = await createLevyTateBetaSession(email, accessLevel);
-    const response = NextResponse.json({ ok: true, user: { email, accessLevel } });
+    const response = NextResponse.json({ ok: true, user: { email, accessLevel }, prospectAccess });
 
     response.cookies.set(levytateBetaSessionCookie, sessionToken, {
       httpOnly: true,
@@ -52,7 +55,7 @@ export async function POST(request: Request) {
 
     return response;
   } catch (error) {
-    if (!(error instanceof BetaLoginError)) {
+    if (!(error instanceof BetaLoginError) && !(error instanceof ProspectAccessError)) {
       console.error("LevyTate beta login failed", error);
     }
 
@@ -106,6 +109,9 @@ class BetaLoginError extends Error {
 }
 
 function getLoginErrorMessage(error: unknown) {
+  if (error instanceof ProspectAccessError) {
+    return error.message;
+  }
   if (error instanceof BetaLoginError) {
     return error.message;
   }
@@ -114,6 +120,9 @@ function getLoginErrorMessage(error: unknown) {
 }
 
 function getLoginErrorStatus(error: unknown) {
+  if (error instanceof ProspectAccessError) {
+    return error.status;
+  }
   if (error instanceof BetaLoginError) {
     return error.status;
   }

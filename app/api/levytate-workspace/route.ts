@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { levytateBetaSessionCookie, readLevyTateBetaSession } from "@/lib/levytate/config/beta-access";
+import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
+import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
 import type { LevyTateWorkspaceMutation } from "@/lib/levytate/mvp/api";
 import {
   LevyTateWorkspacePermissionError,
@@ -11,7 +12,7 @@ import {
 
 async function getSession() {
   const cookieStore = await cookies();
-  return readLevyTateBetaSession(cookieStore.get(levytateBetaSessionCookie)?.value);
+  return readAuthorisedLevyTateBetaSession(cookieStore.get(levytateBetaSessionCookie)?.value);
 }
 
 export async function GET() {

@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { levytateBetaSessionCookie, readLevyTateBetaSession } from "@/lib/levytate/config/beta-access";
+import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
+import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
 import type { GuidanceItem, GuidanceItemReviewStatus } from "@/lib/levytate/guidance/source-registry";
 import {
   GuidanceSourcePermissionError,
@@ -12,7 +13,7 @@ import { LevyTateSupabaseError } from "@/lib/server/levytate-supabase";
 
 async function getSession() {
   const cookieStore = await cookies();
-  return readLevyTateBetaSession(cookieStore.get(levytateBetaSessionCookie)?.value);
+  return readAuthorisedLevyTateBetaSession(cookieStore.get(levytateBetaSessionCookie)?.value);
 }
 
 export async function GET() {

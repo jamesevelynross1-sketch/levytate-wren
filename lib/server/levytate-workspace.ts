@@ -49,6 +49,7 @@ import {
 } from "@/lib/server/levytate-supabase";
 import { getEarlyAccessRequestByEmail } from "@/lib/server/levytate-early-access";
 import { getPersistentEarlyAccessState } from "@/lib/server/levytate-beta-access-grants";
+import { getProspectAccessForSession } from "@/lib/server/levytate-prospect-access";
 import { synchroniseApplicationReviewOperationalActions } from "@/lib/server/levytate-operational-actions";
 import { isBetaApprovedEarlyAccessStatus } from "@/lib/levytate/early-access/domain";
 
@@ -352,6 +353,7 @@ export async function getWorkspaceBootstrapForSession(session: LevyTateBetaSessi
     await assertWorkspaceReadAllowed(context);
     const data = await loadWorkspaceData(context);
     const userRole = normaliseMvpUserRole(context.user.role);
+    const prospectAccess = await getProspectAccessForSession(session);
     const warnings = [...context.warnings];
     let directReportOperationalSummaries;
     if (userRole === "Line Manager") {
@@ -372,6 +374,16 @@ export async function getWorkspaceBootstrapForSession(session: LevyTateBetaSessi
         userRole,
         permissions: permissionsForMvpRole(context.user.role),
         directReportOperationalSummaries,
+        prospectAccess: prospectAccess ? {
+          id: prospectAccess.id,
+          status: prospectAccess.status,
+          statusLabel: prospectAccess.statusLabel,
+          accessStartAt: prospectAccess.accessStartAt,
+          accessExpiresAt: prospectAccess.accessExpiresAt,
+          firstLoginAt: prospectAccess.firstLoginAt,
+          guidanceCompletedAt: prospectAccess.guidanceCompletedAt,
+          version: prospectAccess.version,
+        } : null,
         storageMode: "supabase",
         warnings,
       },
@@ -1969,6 +1981,5 @@ function assertSupabase() {
   }
   return config;
 }
-
 
 

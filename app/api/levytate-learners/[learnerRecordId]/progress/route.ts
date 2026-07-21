@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { levytateBetaSessionCookie, readLevyTateBetaSession } from "@/lib/levytate/config/beta-access";
+import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
+import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
 import { lifecycleErrorResponse } from "@/lib/server/levytate-learner-api";
 import {
   addProgressUpdate,
@@ -10,7 +11,7 @@ import {
 
 async function getSession() {
   const cookieStore = await cookies();
-  return readLevyTateBetaSession(cookieStore.get(levytateBetaSessionCookie)?.value);
+  return readAuthorisedLevyTateBetaSession(cookieStore.get(levytateBetaSessionCookie)?.value);
 }
 
 export async function GET(

@@ -25,7 +25,7 @@ const checks = [];
 try {
   await cleanup();
   const created = await createProspectSandbox(input);
-  check("sandbox creates one organisation membership", created.changes === 1 && created.role === "Apprenticeship Lead" && created.active === true, created);
+  check("sandbox creates one prepared organisation membership", created.changes === 1 && created.role === "Apprenticeship Lead" && created.active === false, created);
   check("template has recommended people and journey volume", created.counts.users === 1 && created.counts.employees === 15 && created.counts.applications === 10 && created.counts.learners === 8, created.counts);
   check("template has provider and programme breadth", created.counts.providers === 3 && created.counts.programmes === 5, created.counts);
   check("template starts with operational actions", created.counts.actions >= 6, created.counts);
@@ -33,7 +33,11 @@ try {
   const repeated = await createProspectSandbox(input);
   check("identical provisioning is idempotent", repeated.changes === 0 && repeated.counts.employees === 15 && repeated.counts.learners === 8, repeated);
   const inspected = await inspectProspectSandbox(input);
-  check("inspection reports one active membership", inspected.activeMemberships === 1 && inspected.canonical, inspected);
+  check("inspection reports prepared governed access", inspected.activeMemberships === 0 && inspected.canonical && inspected.prospectAccess?.status === "prepared", inspected);
+
+  const preparedLogin = await login();
+  check("prepared access denies login with a safe message", preparedLogin.status === 403 && !preparedLogin.cookie && preparedLogin.message === "Your LevyTate access has not yet been activated.", { status: preparedLogin.status, message: preparedLogin.message });
+  await reactivateProspectAccess({ ...input, confirmation: "REACTIVATE", accessExpiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() });
 
   const session = await login();
   check("prospect signed login succeeds", session.status === 200 && Boolean(session.cookie), { status: session.status });
@@ -71,15 +75,15 @@ try {
   await mutateOneEmployee();
   await resetProspectSandbox({ ...input, confirmation: "RESET" });
   const afterReset = await inspectProspectSandbox(input);
-  check("reset restores canonical counts and branding", afterReset.canonical && afterReset.organisationName === input.organisationName && afterReset.activeMemberships === 1, afterReset);
+  check("reset restores canonical data while preserving active governance", afterReset.canonical && afterReset.organisationName === input.organisationName && afterReset.activeMemberships === 1 && afterReset.prospectAccess?.status === "active", afterReset);
 
   await deactivateProspectAccess({ ...input, confirmation: "DEACTIVATE" });
   const denied = await login();
-  check("deactivation denies login", denied.status === 403 && !denied.cookie, { status: denied.status });
+  check("deactivation denies login", denied.status === 403 && !denied.cookie && denied.message.includes("no longer active"), { status: denied.status, message: denied.message });
   const retained = await inspectProspectSandbox(input);
   check("deactivation retains organisation data and audit-safe membership", retained.counts.learners === 8 && retained.active === false, retained);
 
-  await reactivateProspectAccess({ ...input, confirmation: "REACTIVATE" });
+  await reactivateProspectAccess({ ...input, confirmation: "REACTIVATE", accessExpiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() });
   const restored = await login();
   check("reactivation restores the same scoped role", restored.status === 200 && Boolean(restored.cookie), { status: restored.status });
   const finalInspection = await inspectProspectSandbox(input);
@@ -101,7 +105,8 @@ function hasRawError(value) {
 
 async function login() {
   const response = await fetch(`${baseUrl}/api/levytate-beta-login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: input.prospectEmail, code: betaCode }) });
-  return { status: response.status, cookie: response.headers.get("set-cookie")?.split(";")[0] ?? "" };
+  const body = await response.json().catch(() => ({}));
+  return { status: response.status, cookie: response.headers.get("set-cookie")?.split(";")[0] ?? "", message: body.message ?? "" };
 }
 
 async function api(pathname, { method = "GET", cookie = "", body } = {}) {

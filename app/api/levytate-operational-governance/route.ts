@@ -1,12 +1,13 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { levytateBetaSessionCookie, readLevyTateBetaSession } from "@/lib/levytate/config/beta-access";
+import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
+import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
 import { LevyTateLearnerLifecyclePermissionError } from "@/lib/server/levytate-learner-lifecycle";
 import { getOperationalGovernanceSummary, type OperationalGovernanceQuery } from "@/lib/server/levytate-operational-governance";
 
 export async function GET(request: Request) {
   const cookieStore = await cookies();
-  const session = await readLevyTateBetaSession(cookieStore.get(levytateBetaSessionCookie)?.value);
+  const session = await readAuthorisedLevyTateBetaSession(cookieStore.get(levytateBetaSessionCookie)?.value);
   if (!session) return NextResponse.json({ message: "Unauthorised." }, { status: 401 });
   const url = new URL(request.url);
   const query: OperationalGovernanceQuery = {

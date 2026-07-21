@@ -234,7 +234,7 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
   }
 
   return (
-    <div className="grid min-w-0 gap-5">
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5">
       <section className="grid gap-3 md:grid-cols-3 xl:grid-cols-7">
         <SummaryTile label="Total records" value={summary?.total ?? 0} />
         <SummaryTile label="Pre-enrolment" value={summary?.preEnrolment ?? 0} />
@@ -370,7 +370,7 @@ function LearnerRecordView({ detail, loading, error, onBack, mayMutatePreEnrolme
   const breakStartAllowed = mayMutatePreEnrolment && learnerBreakPolicy.eligibleStartStatuses.includes(detail.lifecycleStatus);
 
   return (
-    <div className="grid min-w-0 gap-5">
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5">
       <button type="button" onClick={onBack} className="inline-flex w-fit items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-semibold text-[#102c3d]/68 ring-1 ring-[#102c3d]/[0.08] transition hover:bg-[#f8fbfa] hover:text-[#102c3d]">
         <ArrowLeft size={15} /> Back to learners
       </button>

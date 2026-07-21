@@ -17,6 +17,17 @@ import type { MvpPermission, MvpUserRole } from "@/lib/levytate/mvp/rbac";
 
 export type MvpWorkspaceStorageMode = "supabase" | "local_fallback";
 
+export type ProspectAccessMeta = {
+  id: string;
+  status: "prepared" | "active" | "expired" | "revoked";
+  statusLabel: string;
+  accessStartAt: string | null;
+  accessExpiresAt: string | null;
+  firstLoginAt: string | null;
+  guidanceCompletedAt: string | null;
+  version: number;
+};
+
 export type LevyTateWorkspaceMeta = {
   organisationId: string;
   organisationName: string;
@@ -24,6 +35,7 @@ export type LevyTateWorkspaceMeta = {
   userRole: MvpUserRole;
   permissions?: MvpPermission[];
   directReportOperationalSummaries?: EmployeeOperationalSummary[];
+  prospectAccess?: ProspectAccessMeta | null;
   storageMode: MvpWorkspaceStorageMode;
   warnings: string[];
 };

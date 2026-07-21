@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { levytateBetaSessionCookie, readLevyTateBetaSession } from "@/lib/levytate/config/beta-access";
+import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
+import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
 import { getManagerDirectReportLearnerDetail } from "@/lib/server/levytate-manager-learner-detail";
 
 export async function GET(_request: Request, context: { params: Promise<{ employeeId: string }> }) {
   const cookieStore = await cookies();
-  const session = await readLevyTateBetaSession(cookieStore.get(levytateBetaSessionCookie)?.value);
+  const session = await readAuthorisedLevyTateBetaSession(cookieStore.get(levytateBetaSessionCookie)?.value);
   if (!session) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
 
   try {

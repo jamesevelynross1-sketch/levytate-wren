@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { LevyTateMvpApp } from "@/components/levytate-mvp/LevyTateMvpApp";
-import { levytateBetaSessionCookie, readLevyTateBetaSession } from "@/lib/levytate/config/beta-access";
+import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
+import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
 import { LevyTateWorkspacePermissionError, getWorkspaceBootstrapForSession } from "@/lib/server/levytate-workspace";
 
 export const metadata: Metadata = {
@@ -12,7 +13,7 @@ export const metadata: Metadata = {
 
 export default async function LevyTateAppPage() {
   const cookieStore = await cookies();
-  const session = await readLevyTateBetaSession(cookieStore.get(levytateBetaSessionCookie)?.value);
+  const session = await readAuthorisedLevyTateBetaSession(cookieStore.get(levytateBetaSessionCookie)?.value);
 
   if (!session) redirect("/levytate/login");
 

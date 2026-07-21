@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { createLevyTateApprovalToken, isLevyTateApprovalStatus, levytateBetaSessionCookie, readLevyTateBetaSession } from "@/lib/levytate/config/beta-access";
+import { createLevyTateApprovalToken, isLevyTateApprovalStatus, levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
+import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
 import { isEarlyAccessStatus, type EarlyAccessRequest, type EarlyAccessStatus } from "@/lib/levytate/early-access/domain";
 import { syncPersistentEarlyAccessState } from "@/lib/server/levytate-beta-access-grants";
 import { EarlyAccessStoreError, updateEarlyAccessStatus } from "@/lib/server/levytate-early-access";
@@ -15,7 +16,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const cookieStore = await cookies();
-  const session = await readLevyTateBetaSession(cookieStore.get(levytateBetaSessionCookie)?.value);
+  const session = await readAuthorisedLevyTateBetaSession(cookieStore.get(levytateBetaSessionCookie)?.value);
 
   if (!session) {
     return NextResponse.json({ message: "Unauthorised." }, { status: 401 });

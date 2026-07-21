@@ -650,11 +650,14 @@ export async function getOperationalActions(session: LevyTateBetaSession, filter
   }
   let items = Object.values(operations.queues).flat();
   if (filters.dueState === "attention_today") items = items.filter((item) => item.queueType === "urgent" || item.dueStatus === "Overdue" || item.dueStatus === "Due today");
-  const rows = items.map((item) => ({
-    key: item.persistentActionId || item.sourceKey,
-    cells: { action: item.actionLabel, learner: item.learnerName, owner: item.persistentOwnerDisplayName || item.ownerType, status: item.persistentActionStatus || "open", priority: item.priorityLevel, dueDate: displayDate(item.persistentDueDate || item.dueDate), reason: item.reason },
-    actions: [{ label: "Open action", url: item.actionUrl }],
-  }));
+  const rows = [...new Map(items.map((item) => {
+    const key = item.persistentActionId || item.sourceKey;
+    return [key, {
+      key,
+      cells: { action: item.actionLabel, learner: item.learnerName, owner: item.persistentOwnerDisplayName || item.ownerType, status: item.persistentActionStatus || "open", priority: item.priorityLevel, dueDate: displayDate(item.persistentDueDate || item.dueDate), reason: item.reason },
+      actions: [{ label: "Open action", url: item.actionUrl }],
+    }];
+  })).values()];
   return payloadFromRows({
     type: "operational_action_results",
     title: filters.owner === "mine" ? "Actions assigned to you" : filters.priority === "Critical" ? "Open critical actions" : filters.dueState === "attention_today" ? "Actions requiring attention today" : "Open operational actions",
