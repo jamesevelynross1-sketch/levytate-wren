@@ -152,6 +152,14 @@ function responseActions(response: LevyTateAiResponse) {
 }
 
 function targetForCopilotAction(action: LevyTateAiAction) {
+  const guidanceText = `${action.label} ${action.target ?? ""}`.toLowerCase();
+  if (/guidance|funding|off-the-job|break in learning|gateway|assessment readiness/.test(guidanceText)) {
+    const topic = /off-the-job/.test(guidanceText) ? "off-the-job"
+      : /break in learning/.test(guidanceText) ? "breaks"
+        : /gateway|assessment readiness/.test(guidanceText) ? "assessment"
+          : /funding/.test(guidanceText) ? "funding" : "employer-responsibilities";
+    return `Guidance Centre:${topic}`;
+  }
   if (action.type === "open_my_applications") return action.target === "My Application" ? "My Application" : "Applications";
   if (action.type === "start_application" || action.type === "draft_application_reason") return "My Application";
   if (action.type === "open_pathway") return action.target === "My Programme" || /programme|pathway/i.test(action.label) ? "My Programme" : null;
@@ -1347,4 +1355,3 @@ function WorkflowDraft({ response, action, status }: { response: LevyTateAiRespo
     </div>
   );
 }
-

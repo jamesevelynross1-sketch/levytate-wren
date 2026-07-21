@@ -104,7 +104,7 @@ const moduleCopy: Record<ModuleName, string> = {
   Learners: "Read-only lifecycle records covering eligibility, enrolment, progress, reviews and completion.",
   Providers: "Programme-first matching, provider evidence and relationship coverage.",
   Copilot: "Use LevyTate Copilot to explain, find, guide and create work inside the platform.",
-  Knowledge: "Trusted guidance for funding, readiness, provider selection and future skills.",
+  Knowledge: "Clear, practical guidance to help you manage apprenticeships confidently.",
   Reports: "Board-ready workforce readiness, provider and participation insight.",
   Settings: "Workspace setup, business priorities and beta access controls.",
 };
@@ -198,6 +198,11 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
     setActiveModule(module);
   }
 
+  function moduleLabel(module: ModuleName) {
+    if (module !== "Knowledge") return module;
+    return meta?.userRole === "Platform Admin" ? "Guidance administration" : "Guidance Centre";
+  }
+
   function openApplicationReview(applicationId: string) {
     if (meta?.userRole !== "Line Manager" || !availableModules.some((item) => item.name === "Approvals")) return;
     setManagerDirectReportDetail(null);
@@ -227,6 +232,13 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
   }
 
   function navigateTo(target: string) {
+    if (target.startsWith("Guidance Centre:")) {
+      const topic = target.slice("Guidance Centre:".length);
+      openModule("Knowledge");
+      window.history.replaceState(null, "", `/levytate/app?module=Knowledge&topic=${encodeURIComponent(topic)}`);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+      return;
+    }
     const exactModule = availableModules.find((module) => module.name === target);
     if (exactModule) {
       openModule(exactModule.name);
@@ -318,7 +330,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
           <div className="flex w-full min-w-0 items-center gap-2 sm:gap-3 lg:w-auto">
             <div className="min-w-0 flex-1 lg:hidden">
               <select value={activeModule} onChange={(event) => openModule(event.target.value as ModuleName)} className="h-11 w-full rounded-xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 text-sm font-semibold text-[#102c3d] shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
-                {availableModules.map((module) => <option key={module.name}>{module.name}</option>)}
+                {availableModules.map((module) => <option key={module.name} value={module.name}>{moduleLabel(module.name)}</option>)}
               </select>
             </div>
             <span className="hidden rounded-full border border-[#159b8f]/10 bg-[#edf7f3] px-3.5 py-2 text-xs font-semibold text-[#0b6f63] sm:inline-flex">
@@ -352,7 +364,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
                         <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg transition ${active ? "bg-white text-[#0b8e82] ring-1 ring-[#159b8f]/12" : "bg-[#f7faf8] text-[#102c3d]/42 group-hover:bg-white group-hover:text-[#0b8e82] group-hover:ring-1 group-hover:ring-[#102c3d]/[0.06]"}`}>
                           <Icon size={16} strokeWidth={active ? 2 : 1.8} aria-hidden="true" />
                         </span>
-                        <span className="truncate">{name}</span>
+                        <span className="truncate">{moduleLabel(name)}</span>
                       </span>
                       {badge ? <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-[#0b6f63] ring-1 ring-[#159b8f]/12">{badge}</span> : null}
                     </button>
@@ -395,7 +407,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
           <div className="mx-auto max-w-[1540px] px-4 py-5 sm:px-6 lg:px-8">
             <section className="mb-5 border-b border-[#102c3d]/[0.07] pb-4">
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">Protected workspace</p>
-              <h1 className="mt-1 text-2xl font-semibold tracking-[-0.025em]">{activeModule === "Home" && isOperationsRole ? "Operations Centre" : activeModule}</h1>
+              <h1 className="mt-1 text-2xl font-semibold tracking-[-0.025em]">{activeModule === "Home" && isOperationsRole ? "Operations Centre" : moduleLabel(activeModule)}</h1>
               <p className="mt-1.5 max-w-3xl text-sm leading-6 text-[#102c3d]/56">{activeModule === "Home" && isOperationsRole ? "Prioritised learner operations showing what needs attention, why it matters and where to act next." : moduleCopy[activeModule]}</p>
             </section>
 

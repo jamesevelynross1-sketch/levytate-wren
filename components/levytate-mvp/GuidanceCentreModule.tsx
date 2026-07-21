@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { BookOpen, BriefcaseBusiness, CircleHelp, ExternalLink, GraduationCap, Lightbulb, ShieldCheck } from "lucide-react";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
+import { EmployerGuidanceCentre } from "@/components/levytate-mvp/EmployerGuidanceCentre";
 import { MvpModal, MvpPanel, StatusBadge, TableAction, TableBody, TableHead, TableShell } from "@/components/levytate-mvp/MvpUi";
 import {
   guidanceAuthorityLevels,
@@ -69,6 +70,8 @@ const topics = [
 export function GuidanceCentreModule() {
   const { meta } = useMvpWorkspace();
   const isPlatformAdmin = meta?.userRole === "Platform Admin";
+
+  if (!isPlatformAdmin) return <EmployerGuidanceCentre />;
 
   return (
     <div className="grid gap-5">
