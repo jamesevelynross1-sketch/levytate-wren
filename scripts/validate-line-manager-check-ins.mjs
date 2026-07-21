@@ -27,6 +27,7 @@ const before = await detail(ids.routine, manager.cookie);
 assert("direct-report record exposes one manager check-in entry point", before.managerCheckIn.canRecord === true && before.managerCheckIn.destination.endsWith("?action=manager-check-in"));
 assert("form concurrency version is present without raw lifecycle IDs", Boolean(before.managerCheckIn.formVersion));
 const managerEventCountBefore = before.timeline.filter((event) => event.event === "Manager check-in recorded").length;
+const routineControlledBoundaryBefore = controlledBoundary(before);
 
 const checkInDate = today();
 const nextDate = addDays(checkInDate, 30);
@@ -58,10 +59,12 @@ const matchingReviews = after.reviews.history.filter((review) => review.managerC
 assert("one structured check-in exists after retry", matchingReviews.length === 1);
 assert("structured history contains workplace support and agreed action", matchingReviews[0].managerCheckIn.learningApplied.includes("weekly regional performance pack") && matchingReviews[0].managerCheckIn.agreedActions.length === 1);
 assert("manager-support summary refreshes", /Manager check-in completed on/i.test(after.managerSupport.title) && after.managerSupport.whyItMatters.includes("next agreed check-in"));
+assert("routine check-in does not mutate progress, lifecycle, provider, L&D or unrelated actions", controlledBoundary(after) === routineControlledBoundaryBefore);
 const managerEventCountAfter = after.timeline.filter((event) => event.event === "Manager check-in recorded").length;
 assert("retry does not duplicate the readable lifecycle event", managerEventCountAfter === managerEventCountBefore + (first.body.created ? 1 : 0));
 
 const behind = await detail(ids.behind, manager.cookie);
+const behindControlledBoundaryBefore = controlledBoundary(behind);
 const behindResult = await postCheckIn(ids.behind, manager.cookie, payload({
   idempotencyKey: "ops7c2-cara-behind-v1",
   expectedActivityVersion: behind.managerCheckIn.formVersion,
@@ -81,6 +84,7 @@ const behindResult = await postCheckIn(ids.behind, manager.cookie, payload({
 }));
 assert("behind-target check-in records action required", behindResult.status === 200 && behindResult.body.record.status === "action_required");
 assert("outstanding support remains explicit", /workplace support is still required/i.test(behindResult.body.detail.managerSupport.title));
+assert("action-required check-in only synchronises manager check-in conditions", controlledBoundary(behindResult.body.detail) === behindControlledBoundaryBefore);
 
 for (const [label, employeeId, purpose] of [
   ["Break in Learning", ids.break, "return_to_learning"],
@@ -122,6 +126,10 @@ for (const [label, employeeId, cookie] of [
 
 const managerGenericReview = await fetch(`${baseUrl}/api/levytate-learners/${ids.learnerRecord}/reviews`, { method: "POST", headers: { "content-type": "application/json", cookie: manager.cookie }, body: JSON.stringify({}) });
 assert("Line Manager did not gain generic review mutation", managerGenericReview.status === 403);
+const managerGenericProgress = await fetch(`${baseUrl}/api/levytate-learners/${ids.learnerRecord}/progress`, { method: "POST", headers: { "content-type": "application/json", cookie: manager.cookie }, body: JSON.stringify({}) });
+assert("Line Manager did not gain progress mutation", managerGenericProgress.status === 403);
+const managerLifecycleTransition = await fetch(`${baseUrl}/api/levytate-learners/${ids.learnerRecord}/assessment-preparation`, { method: "POST", headers: { "content-type": "application/json", cookie: manager.cookie }, body: JSON.stringify({ idempotencyKey: "ops7c2-denied-lifecycle" }) });
+assert("Line Manager did not gain lifecycle transition mutation", managerLifecycleTransition.status === 403);
 const leadRead = await fetch(`${baseUrl}/api/levytate-learners/${ids.learnerRecord}/reviews`, { headers: { cookie: lead.cookie } });
 assert("Apprenticeship Lead review visibility remains available", leadRead.status === 200);
 
@@ -137,8 +145,11 @@ assert("refresh-safe check-in deep link renders the authorised form contract", p
 
 const domainContract = await fs.readFile(path.join(process.cwd(), "lib/levytate/mvp/manager-check-in.ts"), "utf8");
 const serverContract = await fs.readFile(path.join(process.cwd(), "lib/server/levytate-manager-check-ins.ts"), "utf8");
+const copilotContract = await fs.readFile(path.join(process.cwd(), "lib/server/levytate-copilot-tools.ts"), "utf8");
 assert("terminal lifecycle states are excluded centrally", !/managerCheckInEligibleLifecycleStatuses[\s\S]*withdrawn[\s\S]*achieved/.test(domainContract));
 assert("direct-report scope is re-resolved before every write", serverContract.indexOf("authorisedScope(session, employeeId)") < serverContract.indexOf("supabaseInsert<ManagerReviewRow>"));
+assert("check-in persistence cannot complete general operational actions", !serverContract.includes("completeOperationalAction") && serverContract.includes("resolveManagerCheckInActionsForDirectReport"));
+assert("Copilot remains navigation-only for manager check-ins", !copilotContract.includes("recordManagerDirectReportCheckIn"));
 
 console.log(JSON.stringify({
   baseUrl,
@@ -219,6 +230,19 @@ function today() { return new Date().toISOString().slice(0, 10); }
 function addDays(value, days) { const date = new Date(`${value}T12:00:00Z`); date.setUTCDate(date.getUTCDate() + days); return date.toISOString().slice(0, 10); }
 async function safeJson(response) { return response.json().catch(() => ({})); }
 function assert(label, condition) { if (!condition) throw new Error(`FAILED: ${label}`); checks.push(label); }
+
+function controlledBoundary(detail) {
+  return JSON.stringify({
+    application: detail.application,
+    journey: detail.journey,
+    progress: detail.progress,
+    providerReviews: detail.reviews.history.filter((review) => review.type === "provider_review"),
+    lAndDReviews: detail.reviews.history.filter((review) => review.type === "l_and_d_check_in"),
+    breakInLearning: detail.breakInLearning,
+    assessment: detail.assessment,
+    unrelatedActions: detail.actions.filter((action) => !(action.owner === "Line Manager" && /manager check-in/i.test(`${action.title} ${action.reason}`))),
+  });
+}
 
 async function loadRuntimeEnv() {
   const cwd = process.cwd();

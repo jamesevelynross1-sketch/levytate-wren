@@ -18,7 +18,7 @@ assert("line manager remains direct-report scoped", workspace.meta?.userRole ===
 const employeeNames = new Map((workspace.data?.employees ?? []).map((employee) => [employee.id, employee.name]));
 const summaries = new Map((workspace.meta?.directReportOperationalSummaries ?? []).map((summary) => [employeeNames.get(summary.employeeId), summary]));
 const ben = requireSummary(summaries, "Ben Marshall");
-assert("Ben lifecycle outranks application", ben.primaryStatus === "In assessment" && ben.primaryStatusSource === "learner_lifecycle");
+assert("Ben lifecycle outranks application", ben.primaryStatus === "Enrolled" && ben.primaryStatusSource === "learner_lifecycle");
 assert("Ben progress is separate", ben.progressPosition === "Ahead of target");
 assert("Ben programme is current", /data analyst/i.test(ben.programme));
 assert("Ben stale discovery state is absent", !/discovery in progress|building/i.test(JSON.stringify(ben)));
@@ -46,12 +46,12 @@ assert("draft application outranks development", draft.primaryStatus === "Draft"
 const detailResponse = await fetch(`${baseUrl}/api/levytate-manager-direct-reports/gc-lifecycle-employee-ben`, { headers: { cookie: manager.cookie } });
 const detailBody = await safeJson(detailResponse);
 assert("Ben learner detail succeeds", detailResponse.status === 200);
-assert("profile header summary uses lifecycle", detailBody.detail?.operationalSummary?.primaryStatus === "In assessment");
+assert("profile header summary uses lifecycle", detailBody.detail?.operationalSummary?.primaryStatus === "Enrolled");
 assert("application is historical context", detailBody.detail?.operationalSummary?.applicationOutcome === "Approved for Enrolment");
 
 const copilot = await ask(manager.cookie, "What is Ben Marshall's current status?");
 const copilotCells = copilot.structuredResult?.rows?.[0]?.cells ?? {};
-assert("Copilot uses lifecycle stage", copilotCells.currentStage === "In assessment");
+assert("Copilot uses lifecycle stage", copilotCells.currentStage === "Enrolled");
 assert("Copilot uses same progress", copilotCells.progress === "Ahead of target");
 assert("Copilot keeps application outcome secondary", copilotCells.applicationOutcome === "Approved for Enrolment");
 
