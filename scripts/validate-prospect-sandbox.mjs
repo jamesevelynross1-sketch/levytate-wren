@@ -5,6 +5,10 @@ import {
   reactivateProspectAccess,
   resetProspectSandbox,
 } from "./prospect-sandbox.mjs";
+import fs from "node:fs/promises";
+import path from "node:path";
+
+await loadLocalEnvironment();
 
 const baseUrl = (process.argv[2] ?? process.env.LEVYTATE_VALIDATION_BASE_URL ?? "http://localhost:3000").replace(/\/$/, "");
 const betaCode = process.env.LEVYTATE_BETA_CODE?.trim() || "LEVYTATE-BETA";
@@ -136,4 +140,20 @@ async function cleanup() {
   if (org?.workspace_template === "levytate-prospect-sandbox") await rest("levytate_organisations", { method: "DELETE", query: { id: `eq.${org.id}` } });
   await rest("levytate_early_access_requests", { method: "DELETE", query: { email: `eq.${input.prospectEmail}` } });
   await rest("subscribers", { method: "DELETE", query: { email: `eq.${input.prospectEmail}` } });
+}
+
+async function loadLocalEnvironment() {
+  for (const name of [".env.local", ".env"]) {
+    try {
+      const raw = await fs.readFile(path.join(process.cwd(), name), "utf8");
+      for (const line of raw.split(/\r?\n/)) {
+        if (!line || line.trimStart().startsWith("#")) continue;
+        const at = line.indexOf("=");
+        if (at < 1) continue;
+        const key = line.slice(0, at).trim();
+        const value = line.slice(at + 1).trim().replace(/^["']|["']$/g, "");
+        if (!process.env[key] && value) process.env[key] = value;
+      }
+    } catch {}
+  }
 }
