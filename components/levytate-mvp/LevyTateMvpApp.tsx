@@ -102,7 +102,7 @@ const moduleCopy: Record<ModuleName, string> = {
   Applications: "Organisation application flow, final approval work and learner handoff readiness.",
   People: "Employee and role records that shape workforce development decisions.",
   Learners: "Read-only lifecycle records covering eligibility, enrolment, progress, reviews and completion.",
-  Providers: "Programme-first matching, provider evidence and relationship coverage.",
+  Providers: "Explore factual apprenticeship programme and provider information in one clear directory.",
   Copilot: "Use LevyTate Copilot to explain, find, guide and create work inside the platform.",
   Knowledge: "Clear, practical guidance to help you manage apprenticeships confidently.",
   Reports: "Board-ready workforce readiness, provider and participation insight.",
@@ -133,8 +133,8 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
   const permissions = meta?.permissions ?? permissionsForMvpRole(meta?.userRole);
   const can = (permission: MvpPermission) => hasMvpPermission(permissions, permission);
   const isOperationsRole = meta?.userRole === "Apprenticeship Lead" || meta?.userRole === "Employer Admin" || meta?.userRole === "Platform Admin";
-  const employeeModules: readonly ModuleName[] = ["Home", "My Programme", "My Application", "Copilot", "Knowledge"];
-  const lineManagerModules: readonly ModuleName[] = ["Home", "My Team", "Approvals", "Copilot", "Knowledge"];
+  const employeeModules: readonly ModuleName[] = ["Home", "My Programme", "My Application", "Providers", "Copilot", "Knowledge"];
+  const lineManagerModules: readonly ModuleName[] = ["Home", "My Team", "Approvals", "Providers", "Copilot", "Knowledge"];
   const apprenticeshipLeadModules: readonly ModuleName[] = ["Home", "People", "Applications", "Learners", "Providers", "Reports", "Copilot", "Knowledge", "Settings"];
   const availableModules = modules.filter((module) => {
     if (meta?.userRole === "Employee" && !employeeModules.includes(module.name)) return false;
@@ -199,8 +199,9 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
   }
 
   function moduleLabel(module: ModuleName) {
-    if (module !== "Knowledge") return module;
-    return meta?.userRole === "Platform Admin" ? "Guidance administration" : "Guidance Centre";
+    if (module === "Knowledge") return meta?.userRole === "Platform Admin" ? "Guidance administration" : "Guidance Centre";
+    if (module === "Providers") return meta?.userRole === "Platform Admin" ? "Provider administration" : "Programmes & Providers";
+    return module;
   }
 
   function openApplicationReview(applicationId: string) {
@@ -232,6 +233,15 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
   }
 
   function navigateTo(target: string) {
+    if (target === "Programmes & Providers" || target.startsWith("Programmes & Providers:")) {
+      openModule("Providers");
+      const [, kind, id] = target.split(":");
+      if (kind && id) {
+        window.history.replaceState(null, "", `/levytate/app?module=Providers&${encodeURIComponent(kind)}=${encodeURIComponent(id)}`);
+        window.dispatchEvent(new PopStateEvent("popstate"));
+      }
+      return;
+    }
     if (target.startsWith("Guidance Centre:")) {
       const topic = target.slice("Guidance Centre:".length);
       openModule("Knowledge");
@@ -439,10 +449,12 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
               </ModuleStackNav>
             ) : null}
             {activeModule === "Providers" ? (
-              <ModuleStackNav items={providerItems} active={providerView} onSelect={(item) => setProviderView(item as ProviderView)}>
-                {providerView === "Programmes" ? <ProvidersModule /> : null}
-                {providerView === "Relationships" ? <ProviderMatchingModule /> : null}
-              </ModuleStackNav>
+              meta?.userRole === "Platform Admin"
+                ? <ModuleStackNav items={providerItems} active={providerView} onSelect={(item) => setProviderView(item as ProviderView)}>
+                    {providerView === "Programmes" ? <ProvidersModule /> : null}
+                    {providerView === "Relationships" ? <ProviderMatchingModule /> : null}
+                  </ModuleStackNav>
+                : <ProvidersModule />
             ) : null}
             {activeModule === "Reports" ? <ReportsModule /> : null}
             {activeModule === "Settings" ? (

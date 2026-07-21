@@ -254,6 +254,7 @@ export type LevyTateOperationalCopilotIntent =
   | "operational_actions"
   | "provider_operational_summary"
   | "programme_operational_summary"
+  | "programme_directory"
   | "team_summary"
   | "access_boundary";
 
@@ -273,6 +274,10 @@ export type LevyTateOperationalCopilotFilters = {
   employeeName?: string;
   applicationState?: "awaiting_review" | "returned" | "approved" | "active";
   reviewDueState?: "overdue" | "due_soon" | "latest";
+  query?: string;
+  level?: string;
+  deliveryModel?: string;
+  region?: string;
 };
 
 export type LevyTateOperationalCopilotContext = {
@@ -1416,4 +1421,3 @@ export function parseLevyTateAiRequest(payload: unknown): LevyTateAiRequest | nu
     contextData,
   };
 }
-

@@ -59,6 +59,7 @@ import {
 } from "@/components/levytate-mvp/MvpUi";
 import { useLevyTateStandards } from "@/components/levytate-mvp/LevyTateStandardsProvider";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
+import { EmployerProgrammeDirectory } from "@/components/levytate-mvp/EmployerProgrammeDirectory";
 import {
   createMvpId,
   normaliseProviderProgramme,
@@ -602,6 +603,12 @@ function MiniEvidenceBlock({ title, items }: { title: string; items: string[] })
   );
 }
 export function ProvidersModule() {
+  const { meta } = useMvpWorkspace();
+  if (meta?.userRole !== "Platform Admin") return <EmployerProgrammeDirectory />;
+  return <ProviderAdministration />;
+}
+
+function ProviderAdministration() {
   const { data, saveProvider, saveProviderProgramme, archiveProviderProgramme, removeProviderProgramme } = useMvpWorkspace();
   const { selectableStandards } = useLevyTateStandards();
   const [filters, setFilters] = useState<ProviderCatalogueFilters>(defaultProviderCatalogueFilters);

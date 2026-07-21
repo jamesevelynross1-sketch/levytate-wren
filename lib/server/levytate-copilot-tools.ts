@@ -36,6 +36,7 @@ import {
 import { deriveManagerOperationalContext } from "@/lib/server/levytate-manager-learner-detail";
 import { listManagerActions } from "@/lib/server/levytate-manager-actions";
 import { getOrganisationOperationsSummary } from "@/lib/server/levytate-operations";
+import { getWorkspaceBootstrapForSession } from "@/lib/server/levytate-workspace";
 
 const resultLimit = 25;
 const operationalRoles = new Set(["Line Manager", "Apprenticeship Lead", "Employer Admin", "Platform Admin"]);
@@ -101,7 +102,7 @@ export async function routeOperationalCopilotQuery(
     );
   }
   if (managerOnlyIntents.has(classification.intent) && role !== "Line Manager") return null;
-  if (!operationalRoles.has(role)) {
+  if (!operationalRoles.has(role) && classification.intent !== "programme_directory") {
     return responseForPayload(
       request,
       classification,
@@ -278,6 +279,14 @@ export function classifyOperationalCopilotQuery(
   if (/\b(which providers?|providers?)\b/.test(text) && /\b(they|them|those|these learners?)\b/.test(text) && prior) {
     return { intent: "provider_operational_summary", filters: { ...priorFilters, actionType: `context:${prior}` }, direct: true, contextResultKeys: previous?.resultKeys };
   }
+  if (/\b(programmes?|providers?)\b/.test(text)
+    && /\b(show|which|find|browse|available|offer|offers|level|nationally|national|remote|online|blended|classroom|workplace)\b/.test(text)
+    && !/\b(team|direct reports?|represented|activity|active learners?|performance|reviews?|issues?)\b/.test(text)) {
+    const level = text.match(/\blevel\s*(\d+)\b/)?.[1];
+    const deliveryModel = text.match(/\b(remote|online|blended|classroom|workplace(?: learning)?)\b/)?.[1];
+    const query = /\bdata analyst\b/.test(text) ? "data analyst" : /\bai\b|artificial intelligence/.test(text) ? "ai" : undefined;
+    return { intent: "programme_directory", filters: { query, level, deliveryModel, region: /\bnational|nationally\b/.test(text) ? "national" : undefined }, direct: true };
+  }
   if (/\b(only|just)\b.*\bsignificantly behind\b|\bsignificantly behind\b/.test(text) && prior === "learners_behind_target") {
     return { intent: "learners_behind_target", filters: { ...priorFilters, progressPosition: "Significantly behind" }, direct: true };
   }
@@ -389,6 +398,7 @@ async function executeTool(
     case "operational_actions": return getOperationalActions(session, query.filters);
     case "provider_operational_summary": return getProviderOperationalSummary(session, query.filters, query.contextResultKeys);
     case "programme_operational_summary": return getProgrammeOperationalSummary(session);
+    case "programme_directory": return getProgrammeDirectory(session, query.filters);
     case "access_boundary": throw new Error("Access boundary is handled before tool execution.");
   }
 }
@@ -417,6 +427,7 @@ async function executeManagerTool(
     case "operational_actions": return getManagerOperationalActions(session, query.filters, scope);
     case "provider_operational_summary": return getProviderOperationalSummary(session, query.filters, query.contextResultKeys, scope);
     case "programme_operational_summary": return getProgrammeOperationalSummary(session, scope);
+    case "programme_directory": return getProgrammeDirectory(session, query.filters);
     case "team_summary": return getManagerTeamSummary(session, scope);
     case "ready_to_enrol":
     case "pre_enrolment_blockers":
@@ -723,6 +734,58 @@ export async function getProgrammeOperationalSummary(session: LevyTateBetaSessio
     emptyMessage: managerScope ? "No direct reports currently have learner programme activity." : "No programme activity is currently recorded.",
     viewAllUrl: managerScope ? "/levytate/app?module=My%20Team" : "/levytate/app?module=Learners",
     toolName: managerScope ? "getManagerTeamProgrammeSummary" : "getProgrammeOperationalSummary",
+  });
+}
+
+export async function getProgrammeDirectory(
+  session: LevyTateBetaSession,
+  filters: LevyTateOperationalCopilotFilters = {},
+): Promise<ToolPayload> {
+  const { data } = await getWorkspaceBootstrapForSession(session);
+  const query = filters.query?.toLowerCase();
+  const programmes = data.providerProgrammes
+    .filter((programme) => programme.recordStatus === "Active" && programme.status === "Active")
+    .map((programme) => {
+      const provider = data.providers.find((candidate) => candidate.providerId === programme.providerId && candidate.status === "Active");
+      if (!provider) return null;
+      const standard = getApprenticeshipStandard(programme.linkedStandardId || programme.linkedStandardIds[0]);
+      const level = programme.level ?? standard?.level ?? null;
+      const delivery = [...new Set([...programme.deliveryModels, ...provider.deliveryModels])];
+      const locations = [...new Set([...programme.commercialProfile.locations, ...programme.regions, ...provider.regions])];
+      const national = provider.providerType === "National provider" || locations.includes("England");
+      const index = [programme.programmeName, provider.providerName, standard?.title, standard?.referenceCode, programme.shortDescription, programme.fullDescription, programme.targetJobRoles, programme.targetIndustries, programme.skillsDeveloped, programme.technologiesCovered, delivery, locations].flat().join(" ").toLowerCase();
+      return { programme, provider, standard, level, delivery, locations, national, index };
+    })
+    .filter((item): item is NonNullable<typeof item> => Boolean(item))
+    .filter((item) => !query || (query === "ai" ? /\b(ai|artificial intelligence)\b/.test(item.index) : item.index.includes(query)))
+    .filter((item) => !filters.level || String(item.level) === filters.level)
+    .filter((item) => !filters.deliveryModel || item.delivery.some((value) => value.toLowerCase().includes(filters.deliveryModel!.toLowerCase())))
+    .filter((item) => filters.region !== "national" || item.national)
+    .sort((left, right) => left.programme.programmeName.localeCompare(right.programme.programmeName) || left.provider.providerName.localeCompare(right.provider.providerName));
+
+  return payloadFromRows({
+    type: "programme_results",
+    title: "Programmes matching your selected filters",
+    rows: programmes.map((item) => ({
+      key: item.programme.id,
+      cells: {
+        programme: item.programme.programmeName,
+        provider: item.provider.providerName,
+        level: item.level ? `Level ${item.level}` : "Being reviewed",
+        delivery: item.delivery.join(", ") || "Being reviewed",
+        location: item.national ? "National delivery" : item.locations.join(", ") || "Being reviewed",
+        standard: item.standard?.title || item.programme.linkedStandardName || "Being reviewed",
+      },
+      actions: [
+        { label: "View programme", url: `/levytate/app?module=Providers&programme=${encodeURIComponent(item.programme.id)}` },
+        { label: "View provider", url: `/levytate/app?module=Providers&provider=${encodeURIComponent(item.provider.providerId)}` },
+      ],
+    })),
+    columns: [col("programme", "Programme"), col("provider", "Provider"), col("level", "Level"), col("delivery", "Delivery"), col("location", "Location"), col("standard", "Standard")],
+    interpretation: "Results use factual active programme and provider catalogue fields in alphabetical order.",
+    emptyMessage: "No programmes match the selected filters.",
+    viewAllUrl: "/levytate/app?module=Providers",
+    toolName: "getProgrammeDirectory",
   });
 }
 
@@ -1103,7 +1166,9 @@ function responseForPayload(
     providerMatchDraft: null,
     nextStep: payload.viewAllUrl ? "Open the relevant LevyTate workspace for the underlying record." : null,
     safetyNotes: [
-      role === "Line Manager"
+      query.intent === "programme_directory"
+        ? "Programme results use active factual provider catalogue fields and alphabetical ordering."
+        : role === "Line Manager"
         ? "Operational data was retrieved through manager-scoped direct-report server contracts."
         : "Operational data was retrieved through organisation-scoped LevyTate server contracts.",
       "Deterministic operational routing was used; no model generated or reordered the records.",
@@ -1232,6 +1297,7 @@ function directAnswer(intent: LevyTateOperationalCopilotIntent, count: number, f
   if (intent === "operational_actions") return `${count} operational action${singular ? " requires" : "s require"} attention.`;
   if (intent === "provider_operational_summary") return `${count} provider${singular ? " is" : "s are"} represented in the current result.`;
   if (intent === "programme_operational_summary") return `${count} programme${singular ? " has" : "s have"} current learner activity.`;
+  if (intent === "programme_directory") return `${count} active programme${singular ? " matches" : "s match"} your selected filters.`;
   return "This request is outside your authorised workspace boundary.";
 }
 

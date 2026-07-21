@@ -169,8 +169,8 @@ function targetForCopilotAction(action: LevyTateAiAction) {
   if (action.type === "open_department_analytics") return "Reports";
   if (action.type === "open_site_breakdown") return "Reports";
   if (action.type === "open_reporting") return "Reports";
-  if (action.type === "open_provider_relationships") return "Provider Relationships";
-  if (action.type === "request_provider_matching") return "Provider Relationships";
+  if (action.type === "open_provider_relationships") return "Programmes & Providers";
+  if (action.type === "request_provider_matching") return "Programmes & Providers";
   return null;
 }
 

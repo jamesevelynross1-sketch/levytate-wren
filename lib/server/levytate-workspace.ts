@@ -715,11 +715,61 @@ function scopedProfile(profile: MvpWorkspaceProfile, employees: MvpEmployee[], i
   };
 }
 
+function employerSafeProvider(provider: ProviderCatalogueRecord): ProviderCatalogueRecord {
+  return {
+    ...provider,
+    contactName: "",
+    contactEmail: "",
+    ofstedRating: "",
+    sourceUrls: [],
+    notes: "",
+    commercialProfile: {
+      ...provider.commercialProfile,
+      primaryContactTitle: "",
+      commercialContactName: "",
+      commercialContactEmail: "",
+      commercialContactTitle: "",
+      commercialContactPhone: "",
+      learnerNumbers: "",
+      employerPartners: "",
+      achievementRate: "",
+      learnerSatisfaction: "",
+      employerSatisfaction: "",
+      googleReviewSignal: "",
+      awards: [],
+      caseStudies: [],
+      successStories: [],
+      testimonials: [],
+      downloads: [],
+      pricingNotes: "",
+      commercialNotes: "",
+    },
+  };
+}
+
+function employerSafeProgramme(programme: ProviderProgramme): ProviderProgramme {
+  return {
+    ...programme,
+    commercialNotes: "",
+    sourceUrl: "",
+    notes: "",
+    commercialProfile: {
+      ...programme.commercialProfile,
+      confidenceLabel: "",
+      caseStudies: [],
+      downloads: [],
+    },
+  };
+}
+
 function scopeWorkspaceDataForContext(workspace: MvpWorkspaceData, context: WorkspaceContext) {
   const role = normaliseMvpUserRole(context.user.role);
-  if (role === "Platform Admin" || role === "Employer Admin" || role === "Apprenticeship Lead") {
+  if (role === "Platform Admin") {
     return workspace;
   }
+  const safeProviders = workspace.providers.map(employerSafeProvider);
+  const safeProgrammes = workspace.providerProgrammes.map(employerSafeProgramme);
+  if (role === "Employer Admin" || role === "Apprenticeship Lead") return { ...workspace, providers: safeProviders, providerProgrammes: safeProgrammes };
 
   const visibleEmployeeIds = readableEmployeeIdsForUser(context.user.email, role, workspace.employees.map(employeeRecordToRow));
   const visibleEmployees = workspace.employees
@@ -768,9 +818,9 @@ function scopeWorkspaceDataForContext(workspace: MvpWorkspaceData, context: Work
     employeeDevelopmentProfiles: workspace.employeeDevelopmentProfiles.filter((profile) => visibleEmployeeIds.has(profile.employeeId)),
     roles: visibleRoles,
     applications: visibleApplications,
-    providers: readProviders ? workspace.providers : [],
+    providers: readProviders ? safeProviders : [],
     providerProgrammes: readProviders
-      ? workspace.providerProgrammes
+      ? safeProgrammes
       : workspace.providerProgrammes.filter((programme) =>
           visibleStandardIds.has(programme.linkedStandardId) || programme.linkedStandardIds.some((id) => visibleStandardIds.has(id))
         ).map((programme) => ({
@@ -1981,5 +2031,4 @@ function assertSupabase() {
   }
   return config;
 }
-
 

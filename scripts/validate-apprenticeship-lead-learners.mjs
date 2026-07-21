@@ -25,12 +25,15 @@ async function main() {
   const learners = Array.isArray(listPayload.learners) ? listPayload.learners : [];
   const assessmentStageStatuses = new Set(["assessment_preparation", "in_assessment"]);
   const expectedAssessmentStage = learners.filter((learner) => assessmentStageStatuses.has(learner.lifecycleStatus)).length;
+  const expectedPreEnrolment = learners.filter((learner) => learner.lifecycleStatus === "pre_enrolment").length;
+  const activeStatuses = new Set(["enrolled", "break_in_learning", "assessment_preparation", "in_assessment"]);
+  const expectedActiveLearners = learners.filter((learner) => activeStatuses.has(learner.lifecycleStatus)).length;
 
   assert("Apprenticeship Lead learner list is accessible", listResponse.status === 200, listPayload);
   assert("Learner list reads from Supabase", listPayload.source === "supabase", listPayload);
   assert("Learner list contains ten seeded lifecycle records", listPayload.summary?.total === 10, listPayload.summary);
-  assert("Learner summary includes two pre-enrolment records", listPayload.summary?.preEnrolment === 2, listPayload.summary);
-  assert("Learner summary includes active learners", listPayload.summary?.activeLearners === 5, listPayload.summary);
+  assert("Learner summary pre-enrolment count matches live records", listPayload.summary?.preEnrolment === expectedPreEnrolment, listPayload.summary);
+  assert("Learner summary active count matches live records", listPayload.summary?.activeLearners === expectedActiveLearners, listPayload.summary);
   assert("Learner summary includes one break in learning", listPayload.summary?.breakInLearning === 1, listPayload.summary);
   assert("Learner summary includes only assessment-preparation and in-assessment records", listPayload.summary?.assessmentStage === expectedAssessmentStage, listPayload.summary);
   assert("Learner summary includes achieved record", listPayload.summary?.achieved === 1, listPayload.summary);

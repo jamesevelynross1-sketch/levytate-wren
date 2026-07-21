@@ -39,7 +39,8 @@ async function main() {
   assert("employee role scoped", employeeWorkspace.workspace.meta.userRole === "Employee");
   assert("employee sees only own employee record", employeeWorkspace.workspace.data.employees.length === 1 && employeeWorkspace.workspace.data.employees[0].email === identities.employee);
   assert("employee sees only own applications", employeeWorkspace.workspace.data.applications.every((item) => item.employeeId === "gc-rbac-employee-erin"));
-  assert("employee cannot see provider management", employeeWorkspace.workspace.data.providers.length === 0);
+  assert("employee receives employer-safe provider directory", employeeWorkspace.workspace.data.providers.length > 0 && employeeWorkspace.workspace.data.providers.every((provider) => !provider.notes && !provider.contactEmail && !provider.sourceUrls?.length));
+  assert("employee has provider read without provider write", employeeWorkspace.workspace.meta.permissions.includes("providers:read") && !employeeWorkspace.workspace.meta.permissions.includes("providers:write"));
   assert("employee has no employees:read permission", !employeeWorkspace.workspace.meta.permissions.includes("employees:read"));
 
   const employeeNewWorkspace = await getWorkspaceJson(sessions.employeeNew.cookie);
