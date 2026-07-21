@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 
 loadEnv(".env.vercel.local");
+loadEnv(".env.local", false);
 loadEnv(".env.production.vercel.local", false);
 
 const baseUrl = (process.argv[2] ?? "http://localhost:3000").replace(/\/$/, "");

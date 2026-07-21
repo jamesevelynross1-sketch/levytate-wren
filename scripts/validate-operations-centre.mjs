@@ -21,7 +21,11 @@ async function main() {
   check("Provider review overdue is visible", body.queues?.reviews?.some((item) => item.learnerName === "Cara Hughes" && item.reviewType === "Provider review" && item.dueStatus === "Overdue"), body.queues?.reviews);
   check("L&D check-in overdue is visible", body.queues?.reviews?.some((item) => item.learnerName === "Cara Hughes" && item.reviewType === "L&D check-in" && item.dueStatus === "Overdue"), body.queues?.reviews);
   check("Active break and overdue return are visible", body.queues?.breaks?.some((item) => item.learnerName === "Daniel Frost" && item.actionType === "return_learner") && body.queues?.urgent?.some((item) => item.learnerName === "Daniel Frost" && item.priorityLevel === "Critical"), body.queues?.breaks);
-  check("Post-return review is visible", body.queues?.breaks?.some((item) => item.learnerName === "Ben Marshall" && /Post-return review/i.test(item.reason)), body.queues?.breaks);
+  const benResponse = await getJson("/api/levytate-learners/gc-lifecycle-record-on-track", leadCookie);
+  const ben = benResponse.body.learner;
+  const reviewAfterReturn = ben?.reviewHistory?.some((review) => review.reviewType !== "provider_review" && review.reviewDate >= ben.latestBreak?.actualReturnDate);
+  const postReturnActionVisible = body.queues?.breaks?.some((item) => item.learnerName === "Ben Marshall" && /Post-return review/i.test(item.reason));
+  check("Post-return review reflects current review history", reviewAfterReturn ? !postReturnActionVisible : postReturnActionVisible, { reviewAfterReturn, queues: body.queues?.breaks });
   check("Recent activity is bounded and meaningful", Array.isArray(body.recentActivity) && body.recentActivity.length <= 12 && body.recentActivity.every((item) => item.learnerName && item.action && item.eventDate), body.recentActivity);
   check("Urgent queue is priority ordered", isPriorityOrdered(body.queues?.urgent ?? []), body.queues?.urgent);
   check("Operational items contain the server contract", Object.values(body.queues ?? {}).flat().every((item) => ["priorityLevel", "priorityRank", "reason", "dueDate", "daysOverdue", "ownerType", "actionType", "actionUrl", "sourceKey", "sourceCondition", "persistentActionId", "persistentActionStatus"].every((key) => key in item)), body.queues);

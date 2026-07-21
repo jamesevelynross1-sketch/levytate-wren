@@ -12,6 +12,7 @@ import type {
 } from "@/lib/levytate/mvp/learner-lifecycle";
 import type { LearnerProgressPosition } from "@/lib/levytate/mvp/learner-record-view";
 import type { OperationalItem } from "@/lib/levytate/mvp/operations-centre";
+import { isManagerRelevantOperationalItem } from "@/lib/levytate/mvp/manager-operational-actions";
 import type { EmployeeOperationalDisplaySummary } from "@/lib/levytate/mvp/employee-operational-summary";
 
 export type ManagerSupportState =
@@ -313,10 +314,7 @@ export function deriveManagerSupportSummary(input: ManagerSupportInput): Manager
 }
 
 export function isManagerRelevantOperationalAction(item: OperationalItem) {
-  return item.ownerType === "Line Manager"
-    || item.sourceCondition.includes("manager_check_in")
-    || item.sourceCondition.includes("line_manager")
-    || item.sourceCondition === "support_intervention";
+  return isManagerRelevantOperationalItem(item);
 }
 
 function formatManagerDate(value: string) {

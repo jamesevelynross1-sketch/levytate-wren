@@ -4,6 +4,7 @@ import { Check, ChevronDown, Target } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { FormField, FormGrid, MvpPanel, StatusBadge } from "@/components/levytate-mvp/MvpUi";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
+import { ManagerActionsHome } from "@/components/levytate-mvp/ManagerActionsHome";
 import {
   buildNotifications,
   employeeCurrentApplication,
@@ -196,6 +197,7 @@ export function LineManagerHomeModule({ onNavigate, onOpenApplicationReview }: {
           </div>
         </MvpPanel>
       </div>
+      <ManagerActionsHome />
     </div>
   );
 }

@@ -415,7 +415,9 @@ function buildAssessmentOperationalItems(detail: LearnerRecordDetail, now: Date)
     const confirmation = readiness?.confirmations[type];
     if (confirmation?.status === "confirmed") return;
     const label = type === "line_manager" ? "Line Manager" : type[0].toUpperCase() + type.slice(1);
-    items.push(assessmentItem(detail, "assessment_confirmation_outstanding", `${label} readiness confirmation is outstanding.`, confirmationActions[type], `${type}-readiness-confirmation`, readiness?.expectedAssessmentReadinessDate ?? "", now));
+    const item = assessmentItem(detail, "assessment_confirmation_outstanding", `${label} readiness confirmation is outstanding.`, confirmationActions[type], `${type}-readiness-confirmation`, readiness?.expectedAssessmentReadinessDate ?? "", now);
+    if (type === "line_manager") item.ownerType = "Line Manager";
+    items.push(item);
   });
 
   const readinessDate = readiness?.expectedAssessmentReadinessDate ?? "";

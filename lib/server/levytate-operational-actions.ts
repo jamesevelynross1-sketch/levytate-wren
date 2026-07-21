@@ -19,6 +19,10 @@ import {
 } from "@/lib/levytate/mvp/operations-centre";
 import { hasMvpPermission, normaliseMvpUserRole } from "@/lib/levytate/mvp/rbac";
 import type { LearnerRecordDetail } from "@/lib/levytate/mvp/learner-record-view";
+import {
+  isManagerRelevantOperationalItem,
+  isManagerRelevantPersistentAction,
+} from "@/lib/levytate/mvp/manager-operational-actions";
 import { createMvpId } from "@/lib/levytate/mvp/workspace";
 import {
   getLearnerLifecycleServerContext,
@@ -26,7 +30,7 @@ import {
   listOrganisationLearnerLifecycleDetails,
   LevyTateLearnerLifecyclePermissionError,
 } from "@/lib/server/levytate-learner-lifecycle";
-import { getManagerDirectReportContext } from "@/lib/server/levytate-manager-scope";
+import { getManagerDirectReportContext, type ManagerDirectReportContext } from "@/lib/server/levytate-manager-scope";
 import {
   getLevyTateSupabaseConfig,
   LevyTateSupabaseError,
@@ -103,6 +107,13 @@ export class LevyTateOperationalActionConflictError extends LevyTateOperationalA
   constructor(message: string) {
     super(message);
     this.name = "LevyTateOperationalActionConflictError";
+  }
+}
+
+export class LevyTateManagerOperationalActionAccessError extends LevyTateOperationalActionError {
+  constructor() {
+    super("This action is not available in your current direct-report scope.");
+    this.name = "LevyTateManagerOperationalActionAccessError";
   }
 }
 
@@ -220,6 +231,114 @@ export async function synchroniseOrganisationOperationalActions(
   }
 
   return result;
+}
+
+export type ManagerOperationalActionScopeResult = {
+  scope: ManagerDirectReportContext;
+  details: LearnerRecordDetail[];
+  actions: PersistentOperationalAction[];
+};
+
+export async function synchroniseManagerDirectReportOperationalActions(
+  session: LevyTateBetaSession,
+): Promise<ManagerOperationalActionScopeResult> {
+  const context = await managerOperationalActionContext(session);
+  const { scope, details } = context;
+  const now = new Date().toISOString();
+  const currentItems = uniqueSourceItems(buildOrganisationOperationalItems(details, new Date(now)).items.filter(isManagerRelevantOperationalItem));
+  const allExisting = await selectActions(scope.organisation.id, { includeTerminal: true });
+  const directReportIds = new Set(scope.directReports.map((employee) => employee.id));
+  const scopedExisting = allExisting.filter((action) => directReportIds.has(action.employeeId));
+  const activeBySource = new Map(scopedExisting.filter((action) => !isOperationalActionTerminal(action.status)).map((action) => [action.sourceKey, action]));
+  const latestBySource = latestActionsBySource(scopedExisting);
+  const detailByLearner = new Map(details.map((detail) => [detail.learnerRecordId, detail]));
+  const currentSourceKeys = new Set(currentItems.map((item) => item.sourceKey));
+
+  for (const item of currentItems) {
+    const active = activeBySource.get(item.sourceKey);
+    if (active) {
+      if (isManagerRelevantPersistentAction(active, scope.user.id) || !active.metadata.ownershipOverride) {
+        await updateActionFromDerivedCondition(context, active, item);
+      }
+      continue;
+    }
+
+    const latest = latestBySource.get(item.sourceKey);
+    if (latest?.status === "dismissed" && !latest.metadata.conditionClearedAt) continue;
+    const detail = detailByLearner.get(item.learnerRecordId);
+    if (!detail) continue;
+    await createActionForCondition(context, item, {
+      applicationId: detail.programme.applicationReference,
+      employeeId: detail.learner.id,
+      priorActionId: latest?.id,
+    });
+  }
+
+  for (const action of scopedExisting) {
+    if (isOperationalActionTerminal(action.status)) continue;
+    if (!isManagerRelevantPersistentAction(action, scope.user.id)) continue;
+    if (currentSourceKeys.has(action.sourceKey)) continue;
+    await transitionSystemResolvedAction(context, action, now);
+  }
+
+  const actions = (await selectActions(scope.organisation.id, { includeTerminal: true }))
+    .filter((action) => directReportIds.has(action.employeeId) && isManagerRelevantPersistentAction(action, scope.user.id));
+  return { scope, details, actions };
+}
+
+export async function listManagerDirectReportOperationalActions(session: LevyTateBetaSession) {
+  const result = await synchroniseManagerDirectReportOperationalActions(session);
+  return {
+    ...result,
+    actions: result.actions.filter((action) => !isOperationalActionTerminal(action.status)),
+  };
+}
+
+export async function getManagerDirectReportOperationalAction(session: LevyTateBetaSession, actionId: string) {
+  const context = await managerOperationalActionContext(session);
+  const action = await requireManagerScopedAction(context, actionId);
+  const detail = requireManagerActionAccess(context, action);
+  const history = await selectActionHistory(context.scope.organisation.id, action.id);
+  return { scope: context.scope, action, detail, history };
+}
+
+export async function acknowledgeManagerDirectReportOperationalAction(
+  session: LevyTateBetaSession,
+  actionId: string,
+  expectedVersion: number,
+) {
+  const context = await managerOperationalActionContext(session);
+  const action = await requireManagerScopedAction(context, actionId);
+  requireManagerActionAccess(context, action);
+  if (action.status === "acknowledged") return action;
+  if (isOperationalActionTerminal(action.status)) throw new LevyTateOperationalActionConflictError("This action is already closed.");
+  if (action.status !== "open") throw new LevyTateOperationalActionError("Only open actions can be acknowledged.");
+  assertVersion(action, expectedVersion);
+  return transitionScopedAction(context, action, "acknowledged", {}, `${context.actorDisplayName} acknowledged the action.`);
+}
+
+export async function startManagerDirectReportOperationalAction(
+  session: LevyTateBetaSession,
+  actionId: string,
+  expectedVersion: number,
+  note = "",
+) {
+  const context = await managerOperationalActionContext(session);
+  const action = await requireManagerScopedAction(context, actionId);
+  requireManagerActionAccess(context, action);
+  if (action.status === "in_progress") return action;
+  if (isOperationalActionTerminal(action.status)) throw new LevyTateOperationalActionConflictError("This action is already closed.");
+  if (action.status !== "open" && action.status !== "acknowledged") {
+    throw new LevyTateOperationalActionError("Only open or acknowledged actions can be started.");
+  }
+  assertVersion(action, expectedVersion);
+  const cleanNote = note.trim();
+  if (cleanNote.length > 240) throw new LevyTateOperationalActionError("Keep the start-work note to 240 characters or fewer.");
+  const metadata = cleanNote ? { ...action.metadata, managerStartNote: cleanNote } : action.metadata;
+  const summary = cleanNote
+    ? `${context.actorDisplayName} started work: ${cleanNote}`
+    : `${context.actorDisplayName} started work on the action.`;
+  return transitionScopedAction(context, action, "in_progress", { metadata }, summary);
 }
 
 export async function listOperationalActions(session: LevyTateBetaSession, query: OperationalActionListQuery = {}) {
@@ -522,6 +641,7 @@ async function transitionScopedAction(
   action: PersistentOperationalAction,
   target: OperationalActionStatus,
   extra: Record<string, unknown>,
+  eventSummary?: string,
 ) {
   if (!canTransitionOperationalAction(action.status, target)) {
     throw new LevyTateOperationalActionError(`${action.status} actions cannot transition to ${target}.`);
@@ -538,7 +658,7 @@ async function transitionScopedAction(
           ? { dismissed_at: now, dismissed_by: context.user.id }
           : {};
   const updated = await versionedUpdate(context, action, { status: target, ...timestamps, ...extra });
-  await recordEvent(context, updated, eventTypeForStatus(target), action.status, target, `${actor} marked the action ${target.replace("_", " ")}.`);
+  await recordEvent(context, updated, eventTypeForStatus(target), action.status, target, eventSummary ?? `${actor} marked the action ${target.replace("_", " ")}.`);
   return updated;
 }
 
@@ -752,6 +872,43 @@ async function requireOperationalActionContext(session: LevyTateBetaSession, acc
     limit: "1",
   }));
   return { ...context, actorDisplayName: actors[0]?.name || context.user.email };
+}
+
+type ManagerActionContext = ActionContext & {
+  scope: ManagerDirectReportContext;
+  details: LearnerRecordDetail[];
+};
+
+async function managerOperationalActionContext(session: LevyTateBetaSession): Promise<ManagerActionContext> {
+  const scope = await getManagerDirectReportContext(session);
+  const [lifecycleContext, details] = await Promise.all([
+    getLearnerLifecycleServerContext(session),
+    listManagerDirectReportLearnerLifecycleDetails(session, scope),
+  ]);
+  if (lifecycleContext.organisation.id !== scope.organisation.id || lifecycleContext.user.id !== scope.user.id) {
+    throw new LevyTateManagerOperationalActionAccessError();
+  }
+  return { ...lifecycleContext, actorDisplayName: scope.manager.name, scope, details };
+}
+
+function requireManagerActionAccess(context: ManagerActionContext, action: PersistentOperationalAction) {
+  if (!isManagerRelevantPersistentAction(action, context.scope.user.id)) {
+    throw new LevyTateManagerOperationalActionAccessError();
+  }
+  const detail = context.details.find((item) => item.learnerRecordId === action.learnerRecordId && item.learner.id === action.employeeId);
+  if (!detail || !context.scope.directReports.some((employee) => employee.id === action.employeeId)) {
+    throw new LevyTateManagerOperationalActionAccessError();
+  }
+  return detail;
+}
+
+async function requireManagerScopedAction(context: ManagerActionContext, actionId: string) {
+  try {
+    return await requireScopedAction(context, actionId);
+  } catch (error) {
+    if (error instanceof LevyTateOperationalActionConflictError) throw error;
+    throw new LevyTateManagerOperationalActionAccessError();
+  }
 }
 
 type ActionEmployeeRow = {

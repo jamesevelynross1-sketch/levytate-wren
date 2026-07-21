@@ -16,7 +16,7 @@ import type {
 } from "@/lib/levytate/ai/types";
 import type { LearnerRecordDetail } from "@/lib/levytate/mvp/learner-record-view";
 import type { LearnerReviewType } from "@/lib/levytate/mvp/learner-lifecycle";
-import { buildOrganisationOperationalItems, type OperationalItem } from "@/lib/levytate/mvp/operations-centre";
+import { buildOrganisationOperationalItems } from "@/lib/levytate/mvp/operations-centre";
 import { normaliseMvpUserRole } from "@/lib/levytate/mvp/rbac";
 import { activeApplicationStatuses } from "@/lib/levytate/mvp/workspace";
 import {
@@ -34,6 +34,7 @@ import {
   type ManagerDirectReportContext,
 } from "@/lib/server/levytate-manager-scope";
 import { deriveManagerOperationalContext } from "@/lib/server/levytate-manager-learner-detail";
+import { listManagerActions } from "@/lib/server/levytate-manager-actions";
 import { getOrganisationOperationsSummary } from "@/lib/server/levytate-operations";
 
 const resultLimit = 25;
@@ -906,19 +907,15 @@ async function getManagerEmployeeSupport(session: LevyTateBetaSession, filters: 
 }
 
 async function getManagerOperationalActions(session: LevyTateBetaSession, filters: LevyTateOperationalCopilotFilters, scope: ManagerDirectReportContext): Promise<ToolPayload> {
-  const details = await listManagerDirectReportLearnerLifecycleDetails(session, scope);
-  let items = buildOrganisationOperationalItems(details).items.filter((item) => managerRelevantAction(item, filters));
-  if (filters.dueState === "attention_today") items = items.filter((item) => item.queueType === "urgent" || item.dueStatus === "Overdue" || item.dueStatus === "Due today");
-  if (filters.dueState === "overdue") items = items.filter((item) => item.dueStatus === "Overdue");
-  items = items.filter((item, index, all) => all.findIndex((candidate) => candidate.sourceKey === item.sourceKey) === index);
-  const rows = items.map((item) => {
-    const detail = details.find((candidate) => candidate.learnerRecordId === item.learnerRecordId);
-    return {
-      key: authorisedManagerResultKey(scope, "action", item.sourceKey),
-      cells: { action: item.actionLabel, learner: item.learnerName, priority: item.priorityLevel, status: "Open", owner: item.ownerType, dueDate: displayDate(item.dueDate), managerAction: managerActionForOperationalItem(item) },
-      actions: detail ? managerLearnerActions(detail, item.persistentActionType === "record_manager_check_in" ? "Record manager check-in" : undefined) : [],
-    };
-  });
+  const response = await listManagerActions(session, filters.dueState === "overdue" ? "overdue" : "all");
+  let items = response.actions;
+  if (filters.actionType === "team_support") items = items.filter((item) => /check-in|support|progress/i.test(`${item.title} ${item.reason}`));
+  if (filters.dueState === "attention_today") items = items.filter((item) => item.overdue || item.timingLabel === "Due today");
+  const rows = items.map((item) => ({
+    key: authorisedManagerResultKey(scope, "action", item.actionId),
+    cells: { action: item.title, learner: item.employeeName, priority: item.priority, status: item.statusLabel, owner: "Line Manager", dueDate: displayDate(item.dueDate), managerAction: item.status === "in_progress" ? "Continue in the source workflow." : item.primaryAction },
+    actions: [{ label: "Open manager action", url: `/levytate/app?module=Home&managerAction=${encodeURIComponent(item.actionId)}` }],
+  }));
   return payloadFromRows({
     type: "operational_action_results",
     title: filters.dueState === "overdue" ? "Overdue actions for your direct reports" : filters.actionType === "team_support" ? "Support actions for your team" : "Actions requiring your attention",
@@ -1027,19 +1024,6 @@ function applicationInterpretation(application?: ManagerDirectReportApplication)
 function applicationDirectAnswer(application: ManagerDirectReportApplication) {
   const next = managerApplicationAction(application);
   return `${application.employee.name}'s ${standardTitle(application.apprenticeshipStandardId)} application is ${application.status}. ${next}`;
-}
-
-function managerRelevantAction(item: OperationalItem, filters: LevyTateOperationalCopilotFilters) {
-  if (filters.actionType === "team_support") return item.sourceType === "progress_exception" || item.sourceType === "review_due" || item.sourceCondition === "support_intervention";
-  return item.ownerType === "Line Manager" || item.sourceCondition.includes("manager_check_in") || item.sourceCondition.includes("line_manager") || item.sourceCondition === "support_intervention";
-}
-
-function managerActionForOperationalItem(item: OperationalItem) {
-  if (item.reviewType === "Manager check-in" || item.sourceCondition.includes("manager_check_in")) return "Discuss workplace support and record a manager check-in where appropriate.";
-  if (item.sourceType === "progress_exception") return "Discuss progress and agree practical workplace support.";
-  if (item.sourceType === "break_in_learning") return "Confirm the expected return plan with the Apprenticeship Lead.";
-  if (item.sourceType === "assessment_readiness") return "Review whether the learner has suitable workplace support and evidence.";
-  return item.ownerType === "Line Manager" ? item.actionLabel : "Support the learner and coordinate with the Apprenticeship Lead.";
 }
 
 function standardTitle(standardId: string) {
