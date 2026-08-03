@@ -56,11 +56,13 @@ try {
   const foreignApplication = await api("/api/levytate-workspace", { method: "POST", cookie: session.cookie, body: { type: "updateApplicationStatus", id: "gc-rbac-app-erin", status: "Approved for Enrolment", note: "Cross-organisation boundary check." } });
   check("copied cross-organisation application id fails safely", [403, 404, 503].includes(foreignApplication.status) && !hasRawError(foreignApplication.body), { status: foreignApplication.status });
 
-  const pages = ["/levytate/app", "/levytate/app?module=Applications", "/levytate/app?module=Learners", "/levytate/app?module=Providers", "/levytate/app?module=Reports", "/levytate/app?module=Copilot", "/levytate/app?module=Knowledge", "/levytate/app?module=Settings"];
+  const pages = ["/levytate/app", "/levytate/app?module=Applications", "/levytate/app?module=Learners", "/levytate/app?module=Providers", "/levytate/app?module=Programmes", "/levytate/app?module=Copilot", "/levytate/app?module=Knowledge", "/levytate/app?module=Settings"];
   for (const page of pages) {
     const response = await fetch(`${baseUrl}${page}`, { headers: { Cookie: session.cookie }, redirect: "manual" });
     check(`lead surface loads ${page}`, response.status === 200, { status: response.status });
   }
+  const hiddenReport = await fetch(`${baseUrl}/levytate/app?module=Reports`, { headers: { Cookie: session.cookie }, redirect: "manual" });
+  check("matching-oriented Reports is hidden in Core Early Access", [307, 308].includes(hiddenReport.status) && hiddenReport.headers.get("location") === "/levytate/app", { status: hiddenReport.status, location: hiddenReport.headers.get("location") });
 
   const prompts = [
     "What requires attention today?", "Show learners behind target.", "Which provider reviews are overdue?",

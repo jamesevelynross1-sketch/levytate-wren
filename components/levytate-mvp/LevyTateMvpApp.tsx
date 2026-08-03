@@ -27,6 +27,7 @@ import { GuidanceCentreModule } from "@/components/levytate-mvp/GuidanceCentreMo
 import { LearnersModule } from "@/components/levytate-mvp/LearnersModule";
 import { ManagerDirectReportDetail } from "@/components/levytate-mvp/ManagerDirectReportDetail";
 import { OperationsCentreModule } from "@/components/levytate-mvp/OperationsCentreModule";
+import { PlatformAdminSupportContextModule, PlatformAdminWorkspacesModule } from "@/components/levytate-mvp/PlatformAdminModules";
 import { LevyTateStandardsProvider } from "@/components/levytate-mvp/LevyTateStandardsProvider";
 import { MvpWorkspaceProvider, useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { ProviderMatchingModule } from "@/components/levytate-mvp/ProviderMatchingModule";
@@ -36,6 +37,7 @@ import { ProvidersModule } from "@/components/levytate-mvp/ProvidersModule";
 import { ReportsModule } from "@/components/levytate-mvp/ReportsModule";
 import { RolesModule } from "@/components/levytate-mvp/RolesModule";
 import type { LevyTateWorkspaceBootstrap } from "@/lib/levytate/mvp/api";
+import { getCoreEarlyAccessPolicy, resolveCoreEarlyAccessRouteAccess, type CoreEarlyAccessNavigationGroup } from "@/lib/levytate/core-early-access-policy";
 import type { ManagerDirectReportLearnerDetail } from "@/lib/levytate/mvp/manager-learner-detail";
 import type { OperationalActionType } from "@/lib/levytate/mvp/operations-centre";
 import { hasMvpPermission, permissionsForMvpRole, type MvpPermission } from "@/lib/levytate/mvp/rbac";
@@ -51,10 +53,12 @@ const modules = [
   { name: "People", icon: Users },
   { name: "Learners", icon: GraduationCap },
   { name: "Providers", icon: Building2 },
+  { name: "Programmes", icon: BookOpenCheck },
   { name: "Copilot", icon: Sparkles },
   { name: "Knowledge", icon: BellRing },
   { name: "Reports", icon: ChartNoAxesCombined },
   { name: "Settings", icon: Settings },
+  { name: "Support", icon: BellRing },
 ] as const satisfies ReadonlyArray<{ name: string; icon: LucideIcon }>;
 
 type ModuleName = (typeof modules)[number]["name"];
@@ -72,10 +76,12 @@ const modulePermissions = {
   People: "employees:read",
   Learners: "learnerLifecycle:read",
   Providers: "providers:read",
+  Programmes: "providers:read",
   Copilot: "copilot:use",
   Knowledge: "knowledge:read",
   Reports: "reports:read",
   Settings: "settings:read",
+  Support: "workspace:read",
 } as const satisfies Record<ModuleName, MvpPermission>;
 
 const peopleViewPermissions = {
@@ -103,10 +109,12 @@ const moduleCopy: Record<ModuleName, string> = {
   People: "Employee and role records that shape workforce development decisions.",
   Learners: "Read-only lifecycle records covering eligibility, enrolment, progress, reviews and completion.",
   Providers: "Explore factual apprenticeship programme and provider information in one clear directory.",
+  Programmes: "Review the factual programme catalogue available to your organisation.",
   Copilot: "Use LevyTate Copilot to explain, find, guide and create work inside the platform.",
   Knowledge: "Clear, practical guidance to help you manage apprenticeships confidently.",
   Reports: "Board-ready workforce readiness, provider and participation insight.",
   Settings: "Workspace setup, business priorities and beta access controls.",
+  Support: "Safe platform support and audit context without employer operational data.",
 };
 
 export function LevyTateMvpApp({ initialWorkspace, persistLocal = true, initialManagerDirectReportDetail = null }: {
@@ -132,19 +140,19 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
   const notifications = useMemo(() => buildNotifications(data), [data]);
   const permissions = meta?.permissions ?? permissionsForMvpRole(meta?.userRole);
   const can = (permission: MvpPermission) => hasMvpPermission(permissions, permission);
-  const isOperationsRole = meta?.userRole === "Apprenticeship Lead" || meta?.userRole === "Employer Admin" || meta?.userRole === "Platform Admin";
-  const employeeModules: readonly ModuleName[] = ["Home", "My Programme", "My Application", "Providers", "Copilot", "Knowledge"];
-  const lineManagerModules: readonly ModuleName[] = ["Home", "My Team", "Approvals", "Providers", "Copilot", "Knowledge"];
-  const apprenticeshipLeadModules: readonly ModuleName[] = ["Home", "People", "Applications", "Learners", "Providers", "Reports", "Copilot", "Knowledge", "Settings"];
-  const availableModules = modules.filter((module) => {
-    if (meta?.userRole === "Employee" && !employeeModules.includes(module.name)) return false;
-    if (meta?.userRole === "Line Manager" && !lineManagerModules.includes(module.name)) return false;
-    if (meta?.userRole === "Apprenticeship Lead" && !apprenticeshipLeadModules.includes(module.name)) return false;
-    if (meta?.userRole !== "Employee" && (module.name === "My Programme" || module.name === "My Application")) return false;
-    if (meta?.userRole !== "Line Manager" && (module.name === "My Team" || module.name === "Approvals")) return false;
-    if ((meta?.userRole === "Employee" || meta?.userRole === "Line Manager") && (module.name === "Applications" || module.name === "Learners")) return false;
-    return can(modulePermissions[module.name]);
-  });
+  const isOperationsRole = meta?.userRole === "Apprenticeship Lead" || meta?.userRole === "Employer Admin";
+  const earlyAccessPolicy = meta?.coreEarlyAccess ?? getCoreEarlyAccessPolicy(meta?.userRole ?? "Employee");
+  const availableModules = earlyAccessPolicy.modules
+    .filter((status) => status.availability === "enabled" || status.availability === "secondary")
+    .map((status) => modules.find((module) => module.name === status.moduleKey))
+    .filter((module): module is (typeof modules)[number] => Boolean(module))
+    .filter((module) => can(modulePermissions[module.name]));
+  const navigationGroups = (["primary", "administration", "help", "secondary"] as const)
+    .map((group) => ({
+      group,
+      modules: availableModules.filter((module) => earlyAccessPolicy.modules.find((entry) => entry.moduleKey === module.name)?.group === group),
+    }))
+    .filter((entry) => entry.modules.length);
   const peopleItems = (["Employees", "Roles"] as PeopleView[]).filter((item) => can(peopleViewPermissions[item]));
   const providerItems = (["Programmes", "Relationships"] as ProviderView[]).filter((item) => can(providerViewPermissions[item]));
   const settingsItems = (["Workspace", "Early Access"] as SettingsView[]).filter((item) => can(settingsViewPermissions[item]));
@@ -163,12 +171,15 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
     if (!hydrated || deepLinkHandled.current) return;
     const searchParams = new URLSearchParams(window.location.search);
     const requested = searchParams.get("module") as ModuleName | null;
-    if (requested && availableModules.some((module) => module.name === requested)) {
-      setActiveModule(requested);
-      setManagerReviewApplicationId(requested === "Approvals" ? searchParams.get("application") : null);
+    if (requested) {
+      const access = resolveCoreEarlyAccessRouteAccess(meta?.userRole ?? "Employee", requested);
+      const resolved = access.module as ModuleName;
+      setActiveModule(resolved);
+      setManagerReviewApplicationId(access.permitted && resolved === "Approvals" ? searchParams.get("application") : null);
+      if (!access.permitted) window.history.replaceState(null, "", access.safeRedirect);
     }
     deepLinkHandled.current = true;
-  }, [availableModules, hydrated]);
+  }, [availableModules, hydrated, meta?.userRole]);
 
   useEffect(() => {
     if (peopleItems.includes(peopleView)) return;
@@ -199,9 +210,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
   }
 
   function moduleLabel(module: ModuleName) {
-    if (module === "Knowledge") return meta?.userRole === "Platform Admin" ? "Guidance administration" : "Guidance Centre";
-    if (module === "Providers") return meta?.userRole === "Platform Admin" ? "Provider administration" : "Programmes & Providers";
-    return module;
+    return earlyAccessPolicy.modules.find((entry) => entry.moduleKey === module)?.label ?? module;
   }
 
   function openApplicationReview(applicationId: string) {
@@ -364,22 +373,20 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-              <nav className="grid gap-1" aria-label="MVP navigation">
-                {availableModules.map(({ name, icon: Icon }) => {
-                  const active = activeModule === name;
-                  const badge = moduleBadges[name as keyof typeof moduleBadges];
-                  return (
-                    <button key={name} onClick={() => openModule(name)} className={`group flex min-h-[44px] items-center justify-between gap-3 rounded-xl px-3 text-left text-sm font-semibold transition ${active ? "bg-[#eaf5f1] text-[#102c3d] shadow-[inset_3px_0_0_#159b8f,0_10px_18px_rgba(21,155,143,0.06)]" : "text-[#102c3d]/58 hover:bg-[#f6f9f7] hover:text-[#102c3d]"}`}>
-                      <span className="flex min-w-0 items-center gap-3">
-                        <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg transition ${active ? "bg-white text-[#0b8e82] ring-1 ring-[#159b8f]/12" : "bg-[#f7faf8] text-[#102c3d]/42 group-hover:bg-white group-hover:text-[#0b8e82] group-hover:ring-1 group-hover:ring-[#102c3d]/[0.06]"}`}>
-                          <Icon size={16} strokeWidth={active ? 2 : 1.8} aria-hidden="true" />
-                        </span>
-                        <span className="truncate">{moduleLabel(name)}</span>
-                      </span>
-                      {badge ? <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-[#0b6f63] ring-1 ring-[#159b8f]/12">{badge}</span> : null}
-                    </button>
-                  );
-                })}
+              <nav className="grid gap-4" aria-label="Core Early Access navigation">
+                {navigationGroups.map(({ group, modules: groupModules }) => <div key={group} className="grid gap-1">
+                  {group !== "primary" ? <p className="px-3 pb-1 pt-2 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/34">{navigationGroupLabel(group)}</p> : null}
+                  {groupModules.map(({ name, icon: Icon }) => {
+                    const active = activeModule === name;
+                    const badge = moduleBadges[name as keyof typeof moduleBadges];
+                    return (
+                      <button key={name} onClick={() => openModule(name)} className={`group flex min-h-[44px] items-center justify-between gap-3 rounded-xl px-3 text-left text-sm font-semibold transition ${active ? "bg-[#eaf5f1] text-[#102c3d] shadow-[inset_3px_0_0_#159b8f,0_10px_18px_rgba(21,155,143,0.06)]" : "text-[#102c3d]/58 hover:bg-[#f6f9f7] hover:text-[#102c3d]"}`}>
+                        <span className="flex min-w-0 items-center gap-3"><span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg transition ${active ? "bg-white text-[#0b8e82] ring-1 ring-[#159b8f]/12" : "bg-[#f7faf8] text-[#102c3d]/42 group-hover:bg-white group-hover:text-[#0b8e82] group-hover:ring-1 group-hover:ring-[#102c3d]/[0.06]"}`}><Icon size={16} strokeWidth={active ? 2 : 1.8} aria-hidden="true" /></span><span className="truncate">{moduleLabel(name)}</span></span>
+                        {badge ? <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-[#0b6f63] ring-1 ring-[#159b8f]/12">{badge}</span> : null}
+                      </button>
+                    );
+                  })}
+                </div>)}
               </nav>
             </div>
 
@@ -426,7 +433,9 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
                 ? <EmployeeHomeModule onNavigate={(target) => navigateTo(target)} />
                 : meta?.userRole === "Line Manager"
                   ? <LineManagerHomeModule onNavigate={(target) => navigateTo(target)} onOpenApplicationReview={openApplicationReview} />
-                : isOperationsRole
+                : meta?.userRole === "Platform Admin"
+                  ? <PlatformAdminWorkspacesModule onNavigate={navigateTo} />
+                  : isOperationsRole
                   ? <OperationsCentreModule onOpenLearner={(target) => { setLearnerTarget(target); openModule("Learners"); }} />
                   : <DashboardModule onNavigate={navigateTo} />
             ) : null}
@@ -456,7 +465,9 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
                   </ModuleStackNav>
                 : <ProvidersModule />
             ) : null}
+            {activeModule === "Programmes" ? <ProvidersModule /> : null}
             {activeModule === "Reports" ? <ReportsModule /> : null}
+            {activeModule === "Support" ? <PlatformAdminSupportContextModule /> : null}
             {activeModule === "Settings" ? (
               <ModuleStackNav items={settingsItems} active={settingsView} onSelect={(item) => setSettingsView(item as SettingsView)}>
                 {settingsView === "Workspace" ? <SettingsModule /> : null}
@@ -498,4 +509,11 @@ function ModuleStackNav({
       {children}
     </div>
   );
+}
+
+function navigationGroupLabel(group: CoreEarlyAccessNavigationGroup) {
+  if (group === "administration") return "Administration";
+  if (group === "help") return "Help";
+  if (group === "secondary") return "Secondary";
+  return "Primary";
 }

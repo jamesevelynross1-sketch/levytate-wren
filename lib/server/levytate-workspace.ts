@@ -40,6 +40,7 @@ import {
   normaliseMvpUserRole,
   permissionsForMvpRole,
 } from "@/lib/levytate/mvp/rbac";
+import { getCoreEarlyAccessPolicy, hasCoreEarlyAccessCapability } from "@/lib/levytate/core-early-access-policy";
 import {
   getLevyTateSupabaseConfig,
   supabaseDelete,
@@ -373,6 +374,7 @@ export async function getWorkspaceBootstrapForSession(session: LevyTateBetaSessi
         userEmail: session.email,
         userRole,
         permissions: permissionsForMvpRole(context.user.role),
+        coreEarlyAccess: getCoreEarlyAccessPolicy(userRole),
         directReportOperationalSummaries,
         prospectAccess: prospectAccess ? {
           id: prospectAccess.id,
@@ -516,24 +518,35 @@ function buildFallbackMeta(session: LevyTateBetaSession, warnings: string[]): Le
     userEmail: session.email,
     userRole,
     permissions: permissionsForMvpRole(userRole),
+    coreEarlyAccess: getCoreEarlyAccessPolicy(userRole),
     storageMode: "local_fallback",
     warnings,
   };
 }
 
 async function assertMutationAllowed(context: WorkspaceContext, mutation: LevyTateWorkspaceMutation) {
+  const role = normaliseMvpUserRole(context.user.role);
+  if (role === "Platform Admin") {
+    const workspaceAdministration = ["saveProfile", "migrateWorkspaceSnapshot"].includes(mutation.type);
+    const providerCatalogueAdministration = ["saveProvider", "archiveProvider", "saveProviderProgramme", "archiveProviderProgramme", "removeProviderProgramme"].includes(mutation.type);
+    if (
+      (!workspaceAdministration || !hasCoreEarlyAccessCapability(role, "platform-workspace-administration")) &&
+      (!providerCatalogueAdministration || !hasCoreEarlyAccessCapability(role, "platform-provider-catalogue"))
+    ) {
+      throw new LevyTateWorkspacePermissionError("Platform Admin cannot perform employer operational mutations.");
+    }
+  }
   if (!canRunMvpMutation(context.user.role, mutation.type)) {
     throw new LevyTateWorkspacePermissionError(
       `${normaliseMvpUserRole(context.user.role)} cannot perform ${mutation.type}.`,
     );
   }
 
-  const role = normaliseMvpUserRole(context.user.role);
   if (mutation.type === "saveApplication") {
     await assertOneActiveApplication(context.organisation.id, mutation.application);
   }
 
-  if (role === "Platform Admin" || role === "Employer Admin" || role === "Apprenticeship Lead") return;
+  if (role === "Employer Admin" || role === "Apprenticeship Lead") return;
 
   const employees = await selectMany<EmployeeRow>(
     employeesTable,
@@ -765,7 +778,27 @@ function employerSafeProgramme(programme: ProviderProgramme): ProviderProgramme 
 function scopeWorkspaceDataForContext(workspace: MvpWorkspaceData, context: WorkspaceContext) {
   const role = normaliseMvpUserRole(context.user.role);
   if (role === "Platform Admin") {
-    return workspace;
+    return {
+      ...workspace,
+      employees: [],
+      employeeDevelopmentProfiles: [],
+      roles: [],
+      applications: [],
+      providerRelationships: [],
+      matchingRequests: [],
+      enrolments: [],
+      learnerRecords: [],
+      eligibilityDeclarations: [],
+      preEnrolmentChecks: [],
+      breaksInLearning: [],
+      withdrawals: [],
+      learnerReviews: [],
+      progressUpdates: [],
+      assessmentReadiness: [],
+      achievements: [],
+      operationalActions: [],
+      lifecycleEvents: [],
+    } satisfies MvpWorkspaceData;
   }
   const safeProviders = workspace.providers.map(employerSafeProvider);
   const safeProgrammes = workspace.providerProgrammes.map(employerSafeProgramme);
@@ -2031,4 +2064,3 @@ function assertSupabase() {
   }
   return config;
 }
-

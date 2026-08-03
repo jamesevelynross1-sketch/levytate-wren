@@ -255,7 +255,7 @@ async function main() {
       check(`${label} cannot synchronise organisation actions`, deniedSync.status === 403, deniedSync.body);
     }
     const adminRead = await requestJson("/api/levytate-operational-actions", adminCookie);
-    check("Platform Admin retains authorised organisation-scoped access", adminRead.status === 200, adminRead.body);
+    check("Platform Admin is denied employer operational-action access", adminRead.status === 403, adminRead.body);
 
     const activeRows = await selectMany("levytate_operational_actions", {
       organisation_id: `eq.${leadUser.organisation_id}`,

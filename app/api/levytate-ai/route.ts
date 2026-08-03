@@ -161,6 +161,9 @@ export async function POST(request: Request) {
     if (!session) {
       return NextResponse.json({ message: "Unauthorised." }, { status: 401 });
     }
+    if (session.accessLevel === "beta_admin") {
+      return NextResponse.json({ message: "Employer operational Copilot is not available to Platform Admin." }, { status: 403 });
+    }
 
     parsedRequest = parseLevyTateAiRequest(await request.json());
     if (!parsedRequest) {

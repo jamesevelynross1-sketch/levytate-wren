@@ -114,7 +114,18 @@ const allPermissions = [
 ] as const satisfies readonly MvpPermission[];
 
 export const mvpRolePermissions = {
-  "Platform Admin": allPermissions,
+  "Platform Admin": [
+    "workspace:read",
+    "workspace:migrate",
+    "settings:read",
+    "settings:write",
+    "providers:read",
+    "providers:write",
+    "providers:archive",
+    "knowledge:read",
+    "knowledge:manage",
+    "earlyAccess:manage",
+  ],
   "Employer Admin": allPermissions.filter((permission) => permission !== "earlyAccess:manage"),
   "Apprenticeship Lead": [
     "workspace:read",

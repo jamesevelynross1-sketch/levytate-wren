@@ -88,7 +88,7 @@ assert("manager detail contract is read-only", mutationResponse.status === 405);
 const leadLearners = await fetch(`${baseUrl}/api/levytate-learners`, { headers: { cookie: lead.cookie } });
 assert("Apprenticeship Lead organisation learner access remains available", leadLearners.status === 200);
 const adminLearners = await fetch(`${baseUrl}/api/levytate-learners`, { headers: { cookie: admin.cookie } });
-assert("Platform Admin authorised learner access remains available", adminLearners.status === 200);
+assert("Platform Admin is denied employer learner access", adminLearners.status === 403);
 
 const copilotBehind = await ask(manager.cookie, "Show me learners behind target.");
 const learnerActions = (copilotBehind.structuredResult?.rows || []).flatMap((row) => row.actions || []);

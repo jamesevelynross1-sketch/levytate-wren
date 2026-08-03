@@ -66,7 +66,7 @@ async function main() {
       check(`${label} is denied organisation-wide governance`, denied.status === 403, denied.body);
     }
     const admin = await getJson("/api/levytate-operational-governance?datePeriod=30", adminCookie);
-    check("Platform Admin retains authorised governance access", admin.status === 200, admin.body);
+    check("Platform Admin is denied employer governance access", admin.status === 403, admin.body);
     const crossOrganisationAttempt = await getJson(`/api/levytate-operational-governance?organisationId=00000000-0000-4000-8000-000000000000&search=${encodeURIComponent("governance validation")}`, leadCookie);
     check("Client organisation input cannot escape the signed organisation scope", crossOrganisationAttempt.status === 200 && crossOrganisationAttempt.body.overdue?.some((item) => item.id === `${prefix}:overdue-open`), crossOrganisationAttempt.body);
     const mutation = await request("/api/levytate-operational-governance", leadCookie, { method: "POST" });

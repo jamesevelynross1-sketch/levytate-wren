@@ -5,13 +5,14 @@ import { LevyTateMvpApp } from "@/components/levytate-mvp/LevyTateMvpApp";
 import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
 import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
 import { LevyTateWorkspacePermissionError, getWorkspaceBootstrapForSession } from "@/lib/server/levytate-workspace";
+import { resolveCoreEarlyAccessRouteAccess } from "@/lib/levytate/core-early-access-policy";
 
 export const metadata: Metadata = {
   title: "MVP App | LevyTate",
   description: "Protected LevyTate beta MVP workspace.",
 };
 
-export default async function LevyTateAppPage() {
+export default async function LevyTateAppPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const cookieStore = await cookies();
   const session = await readAuthorisedLevyTateBetaSession(cookieStore.get(levytateBetaSessionCookie)?.value);
 
@@ -19,6 +20,12 @@ export default async function LevyTateAppPage() {
 
   try {
     const initialWorkspace = await getWorkspaceBootstrapForSession(session);
+    const query = await searchParams;
+    const requestedModule = typeof query.module === "string" ? query.module : null;
+    if (requestedModule) {
+      const access = resolveCoreEarlyAccessRouteAccess(initialWorkspace.meta.userRole, requestedModule);
+      if (!access.permitted) redirect(access.safeRedirect);
+    }
     return <LevyTateMvpApp initialWorkspace={initialWorkspace} />;
   } catch (error) {
     if (error instanceof LevyTateWorkspacePermissionError) {

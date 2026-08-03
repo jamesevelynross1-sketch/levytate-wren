@@ -25,7 +25,7 @@ const dueStatuses: Array<OperationalDueStatus | "All"> = ["All", "Overdue", "Due
 
 export function OperationsCentreModule({ onOpenLearner }: { onOpenLearner: (target: LearnerAction) => void }) {
   const { can, meta } = useMvpWorkspace();
-  const authorised = can("learnerLifecycle:read") && ["Apprenticeship Lead", "Employer Admin", "Platform Admin"].includes(meta?.userRole ?? "");
+  const authorised = can("learnerLifecycle:read") && ["Apprenticeship Lead", "Employer Admin"].includes(meta?.userRole ?? "");
   const [data, setData] = useState<OperationsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -100,7 +100,7 @@ export function OperationsCentreModule({ onOpenLearner }: { onOpenLearner: (targ
   }
 
   if (!authorised) {
-    return <EmptyState title="Operations Centre is not available for this role" copy="Organisation-wide learner operations are restricted to Apprenticeship Leads and authorised platform administrators." actionLabel="Return home" onAction={() => window.scrollTo({ top: 0, behavior: "smooth" })} />;
+    return <EmptyState title="Operations Centre is not available for this role" copy="Organisation-wide learner operations are restricted to authorised employer roles." actionLabel="Return home" onAction={() => window.scrollTo({ top: 0, behavior: "smooth" })} />;
   }
 
   if (selectedActionId) {

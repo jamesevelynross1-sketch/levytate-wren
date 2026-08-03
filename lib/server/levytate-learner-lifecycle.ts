@@ -2182,7 +2182,7 @@ function buildLearnerOperationalSummary(
 function assertOrganisationLearnerReadPermission(context: LifecycleContext) {
   assertPermission(context, "learnerLifecycle:read");
   const role = normaliseMvpUserRole(context.user.role);
-  if (role === "Platform Admin" || role === "Employer Admin" || role === "Apprenticeship Lead") return;
+  if (role === "Employer Admin" || role === "Apprenticeship Lead") return;
   throw new LevyTateLearnerLifecyclePermissionError(`${role} cannot access organisation-wide learner records.`);
 }
 
@@ -2278,7 +2278,7 @@ async function getScopedLearnerRecord(context: LifecycleContext, learnerRecordId
 
 async function assertCanAccessEmployee(context: LifecycleContext, employeeId: string, access: "read" | "write") {
   const role = normaliseMvpUserRole(context.user.role);
-  if (role === "Platform Admin" || role === "Employer Admin" || role === "Apprenticeship Lead") return;
+  if (role === "Employer Admin" || role === "Apprenticeship Lead") return;
   if (access === "write") {
     throw new LevyTateLearnerLifecyclePermissionError(`${role} cannot edit employer-controlled learner lifecycle records.`);
   }

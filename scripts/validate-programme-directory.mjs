@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 const directory = await fs.readFile(new URL("../components/levytate-mvp/EmployerProgrammeDirectory.tsx", import.meta.url), "utf8");
 const providers = await fs.readFile(new URL("../components/levytate-mvp/ProvidersModule.tsx", import.meta.url), "utf8");
 const shell = await fs.readFile(new URL("../components/levytate-mvp/LevyTateMvpApp.tsx", import.meta.url), "utf8");
+const policy = await fs.readFile(new URL("../lib/levytate/core-early-access-policy.ts", import.meta.url), "utf8");
 const rbac = await fs.readFile(new URL("../lib/levytate/mvp/rbac.ts", import.meta.url), "utf8");
 const workspace = await fs.readFile(new URL("../lib/server/levytate-workspace.ts", import.meta.url), "utf8");
 const copilot = await fs.readFile(new URL("../lib/server/levytate-copilot-tools.ts", import.meta.url), "utf8");
@@ -15,8 +16,9 @@ function check(label, condition) {
   checks.push(label);
 }
 
-check("canonical employer label", shell.includes('"Programmes & Providers"'));
-check("Platform Admin label remains distinct", shell.includes('"Provider administration"'));
+check("canonical employer label", policy.includes('item("Providers", "Providers", "enabled", "primary", "core")'));
+check("Platform Admin label remains distinct", policy.includes('item("Providers", "Provider Catalogue", "enabled", "primary", "core")'));
+check("employee and manager directory is hidden in Core Early Access", (policy.match(/item\("Providers", "Programmes & Providers", "hidden"/g) ?? []).length === 2);
 check("programme-first landing copy", directory.includes("Explore apprenticeship programmes available through LevyTate&apos;s provider directory."));
 for (const filter of ["Level", "Provider", "Delivery", "Location", "Category"]) check(`factual filter: ${filter}`, directory.includes(`label="${filter}"`));
 for (const field of ["Standard", "Duration", "Delivery", "Locations", "Typical learner activities", "Suitable roles or teams", "Employer considerations", "Learner support", "Assessment model"]) check(`programme detail: ${field}`, directory.includes(field));

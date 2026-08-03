@@ -1353,7 +1353,7 @@ async function buildOwnerOptions(context: ActionContext, action: PersistentOpera
     const user = userByEmail.get(manager.email.toLowerCase());
     options.push({ ownerType: "Line Manager", ownerUserId: user?.id ?? "", label: manager.name, accessNote: user ? "Platform user" : "Accountability only, no platform account" });
   }
-  for (const user of users.filter((item) => ["Apprenticeship Lead", "Employer Admin", "Platform Admin"].includes(normaliseMvpUserRole(item.role)))) {
+  for (const user of users.filter((item) => ["Apprenticeship Lead", "Employer Admin"].includes(normaliseMvpUserRole(item.role)))) {
     const person = employees.find((item) => item.email.toLowerCase() === user.email.toLowerCase());
     options.push({ ownerType: "Apprenticeship Lead", ownerUserId: user.id, label: person?.name || user.email, accessNote: "Authorised organisation user" });
   }

@@ -14,6 +14,7 @@ import type {
   MvpWorkspaceProfile,
 } from "@/lib/levytate/mvp/workspace";
 import type { MvpPermission, MvpUserRole } from "@/lib/levytate/mvp/rbac";
+import type { CoreEarlyAccessRolePolicy } from "@/lib/levytate/core-early-access-policy";
 
 export type MvpWorkspaceStorageMode = "supabase" | "local_fallback";
 
@@ -34,6 +35,7 @@ export type LevyTateWorkspaceMeta = {
   userEmail: string;
   userRole: MvpUserRole;
   permissions?: MvpPermission[];
+  coreEarlyAccess?: CoreEarlyAccessRolePolicy;
   directReportOperationalSummaries?: EmployeeOperationalSummary[];
   prospectAccess?: ProspectAccessMeta | null;
   storageMode: MvpWorkspaceStorageMode;

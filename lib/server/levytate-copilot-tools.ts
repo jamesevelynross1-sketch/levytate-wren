@@ -39,7 +39,7 @@ import { getOrganisationOperationsSummary } from "@/lib/server/levytate-operatio
 import { getWorkspaceBootstrapForSession } from "@/lib/server/levytate-workspace";
 
 const resultLimit = 25;
-const operationalRoles = new Set(["Line Manager", "Apprenticeship Lead", "Employer Admin", "Platform Admin"]);
+const operationalRoles = new Set(["Line Manager", "Apprenticeship Lead", "Employer Admin"]);
 const managerOnlyIntents = new Set<LevyTateOperationalCopilotIntent>([
   "applications_awaiting_review", "applications_returned", "applications_approved", "application_status",
   "manager_check_ins", "employee_review_status", "employee_support", "team_summary",

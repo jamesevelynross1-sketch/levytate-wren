@@ -201,15 +201,18 @@ async function main() {
   });
   assert("lead Copilot receives organisation-wide role", leadCopilot && typeof leadCopilot.assistantMessage === "string");
 
-  const adminCopilot = await postAi(sessions.admin.cookie, {
+  const adminCopilot = await request("/api/levytate-ai", sessions.admin.cookie, {
+    method: "POST",
+    body: JSON.stringify({
     role: "LevyTate Admin",
     selectedSite: "All sites",
     currentSection: "Copilot",
     employerContext: "LevyTate Internal",
     userMessage: "What internal support checks should I run?",
     conversationHistory: [],
+    }),
   });
-  assert("admin Copilot authorised", adminCopilot && typeof adminCopilot.assistantMessage === "string");
+  assert("admin employer-operational Copilot denied", adminCopilot.status === 403);
 
   const employeeRelogin = await loginOk("employee relogin", identities.employee);
   const employeeReload = await getWorkspaceJson(employeeRelogin.cookie);
