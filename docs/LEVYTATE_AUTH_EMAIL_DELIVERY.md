@@ -45,11 +45,11 @@ Supabase verifies the token before LevyTate binds or accepts an identity. LevyTa
 
 - Supabase project email limit: 10 emails per hour for Early Access validation
 - Supabase minimum interval: 60 seconds per user
-- Application request limit: 5 requests per 15 minutes per process/IP key
-- Application callback limit: 10 attempts per 15 minutes per process/IP key
+- Application request limits: 3 per email/10 minutes, 5 per email/hour, 20 per network source/hour and 200 globally/hour
+- Application callback limit: 10 attempts per network source/15 minutes
 - Supabase verification limit: 30 attempts per 5 minutes per IP
 
-The application-level limiter is process-local and is not the final production control. Sprint 2B.3 must provide a shared limiter across application instances.
+Application limits use the shared Supabase-backed security store described in `LEVYTATE_DISTRIBUTED_AUTH_RATE_LIMITING.md`. They are evaluated before Supabase and Resend, use HMAC-derived actor keys and isolate local, Preview and Production counters.
 
 Safe application audit events cover request receipt, provider acceptance, provider failure, verified email identity, first binding and successful sign-in. Resend exposes accepted, delivered, delayed, bounced, complained and failed delivery events in its dashboard/logs. Supabase Auth logs expose request and verification failures. Public login responses must remain generic; raw SMTP or provider errors must never be returned to a user.
 

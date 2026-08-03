@@ -2,9 +2,17 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie, levytateBetaSessionMaxAge } from "@/lib/levytate/config/beta-access";
 import { levytateAuthCookieMaxAge, levytateSupabaseAccessCookie, levytateSupabaseRefreshCookie, refreshEmployerAuth } from "@/lib/server/levytate-auth";
+import { checkSessionRefreshLimit, LevyTateRateLimitStoreError } from "@/lib/server/levytate-auth-rate-limit";
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
+    try {
+      const rateLimit = await checkSessionRefreshLimit(request);
+      if (!rateLimit.allowed) return NextResponse.json({ ok: false, message: "Please wait before refreshing your session again." }, { status: 429 });
+    } catch (error) {
+      if (!(error instanceof LevyTateRateLimitStoreError)) throw error;
+      // A valid refresh token is still verified by Supabase during a limiter outage.
+    }
     const store = await cookies();
     const refresh = store.get(levytateSupabaseRefreshCookie)?.value;
     if (!refresh) throw new Error("missing");

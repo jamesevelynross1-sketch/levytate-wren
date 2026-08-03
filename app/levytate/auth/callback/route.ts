@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie, levytateBetaSessionMaxAge } from "@/lib/levytate/config/beta-access";
 import { levytateAuthCookieMaxAge, levytateSupabaseAccessCookie, levytateSupabaseRefreshCookie, verifyEmployerMagicLink } from "@/lib/server/levytate-auth";
-import { authRateLimitKey, isLevyTateAuthRateLimited } from "@/lib/server/levytate-auth-rate-limit";
+import { checkCallbackAttemptLimit } from "@/lib/server/levytate-auth-rate-limit";
 import { getCoreEarlyAccessPolicy } from "@/lib/levytate/core-early-access-policy";
 import { normaliseMvpUserRole } from "@/lib/levytate/mvp/rbac";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  if (isLevyTateAuthRateLimited(authRateLimitKey(request, "verify"), 10, 15 * 60_000)) return failed(url, "invalid-link");
   try {
+    const rateLimit = await checkCallbackAttemptLimit(request);
+    if (!rateLimit.allowed) return failed(url, "invalid-link");
     const result = await verifyEmployerMagicLink(url.searchParams.get("token_hash") ?? "", url.searchParams.get("type") ?? "email");
     const role = normaliseMvpUserRole(result.membership.role);
     const first = getCoreEarlyAccessPolicy(role).modules.find((module) => module.availability === "enabled")?.moduleKey;

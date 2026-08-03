@@ -32,7 +32,7 @@ check("invalid-link state is server-derived without hydration drift", loginPage.
 check("runbook names the exact Supabase project", runbook.includes("lzwcahdgchrkeulmlfqv"));
 check("runbook preserves Microsoft 365 mail routing", runbook.includes("Do not remove or replace the root Microsoft 365 MX or SPF records"));
 check("runbook prohibits wildcard Preview redirects", runbook.includes("Do not add wildcard Vercel redirects"));
-check("runbook records the shared-limiter limitation", runbook.includes("process-local") && runbook.includes("Sprint 2B.3"));
+check("runbook records the shared distributed limiter", runbook.includes("shared Supabase-backed security store") && runbook.includes("HMAC-derived actor keys"));
 check("runbook contains no credential values", !/re_[A-Za-z0-9_-]{12,}|service_role|smtp_password/i.test(runbook));
 
 console.log(`\nAuthentication email delivery: ${passed} passed, ${failed} failed.`);

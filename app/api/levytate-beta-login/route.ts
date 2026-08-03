@@ -15,6 +15,7 @@ import { isBetaApprovedEarlyAccessStatus } from "@/lib/levytate/early-access/dom
 import { getPersistentEarlyAccessState } from "@/lib/server/levytate-beta-access-grants";
 import { getEarlyAccessRequestByEmail } from "@/lib/server/levytate-early-access";
 import { ProspectAccessError, assertProspectLoginAccess, recordProspectFirstLogin } from "@/lib/server/levytate-prospect-access";
+import { checkBetaLoginLimits, LevyTateRateLimitStoreError } from "@/lib/server/levytate-auth-rate-limit";
 
 type LoginRequestBody = {
   email?: unknown;
@@ -31,6 +32,11 @@ export async function POST(request: Request) {
     const email = typeof body.email === "string" ? normaliseBetaEmail(body.email) : "";
     const code = typeof body.code === "string" ? body.code.trim() : "";
     const approvalToken = typeof body.approvalToken === "string" ? body.approvalToken : "";
+
+    const rateLimit = await checkBetaLoginLimits(request, email);
+    if (!rateLimit.allowed) {
+      return NextResponse.json({ ok: false, message: "Please wait before trying to sign in again." }, { status: 429 });
+    }
 
     if (!email) {
       throw new BetaLoginError("Please enter your email address.", 400);
@@ -64,6 +70,9 @@ export async function POST(request: Request) {
 
     return response;
   } catch (error) {
+    if (error instanceof LevyTateRateLimitStoreError) {
+      return NextResponse.json({ ok: false, message: "Internal sign-in is temporarily unavailable." }, { status: 503 });
+    }
     if (!(error instanceof BetaLoginError) && !(error instanceof ProspectAccessError)) {
       console.error("LevyTate beta login failed", error);
     }

@@ -15,8 +15,9 @@ export function LevyTateLoginClient({ internalLoginEnabled, invalidLink = false 
   async function requestLink(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setLoading(true); setError("");
     const response = await fetch("/api/levytate-auth/request", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
+    const body = await response.json().catch(() => null);
     setLoading(false);
-    if (!response.ok) { setError("We couldn’t complete sign-in just now. Please try again."); return; }
+    if (!response.ok) { setError(body?.message ?? "We couldn’t complete sign-in just now. Please try again."); return; }
     setSent(true);
   }
 
