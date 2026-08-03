@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { LevyTateLoginClient } from "@/components/levytate-mvp/LevyTateLoginClient";
+import { isInternalBetaLoginEnabled } from "@/lib/levytate/config/beta-access";
 
 export const metadata: Metadata = {
   title: "Beta Login | LevyTate",
@@ -7,5 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function LevyTateLoginPage() {
-  return <LevyTateLoginClient />;
+  return <LevyTateLoginClient internalLoginEnabled={isInternalBetaLoginEnabled()} />;
 }

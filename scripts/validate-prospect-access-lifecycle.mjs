@@ -13,9 +13,9 @@ const betaCode = process.env.LEVYTATE_BETA_CODE?.trim() || "LEVYTATE-BETA";
 const input = {
   organisationName: "Northbridge Validation Works",
   workspaceSlug: "northbridge-p2a-validation",
-  prospectEmail: "prospect.lead@northbridge-validation.example",
+  prospectEmail: "prospect.lead@northbridge-validation.test",
   prospectDisplayName: "Morgan Hale",
-  primaryContactEmail: "prospect.lead@northbridge-validation.example",
+  primaryContactEmail: "prospect.lead@northbridge-validation.test",
   logoReference: "",
   internalOwnerName: "LevyTate validation owner",
 };

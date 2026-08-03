@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import {
   createLevyTateBetaSession,
   getLevyTateBetaAccessCode,
+  isInternalBetaLoginEnabled,
+  isInternalValidationEmail,
   isAdminBetaEmail,
   normaliseBetaEmail,
   readLevyTateApprovalToken,
@@ -22,6 +24,9 @@ type LoginRequestBody = {
 
 export async function POST(request: Request) {
   try {
+    if (!isInternalBetaLoginEnabled()) {
+      return NextResponse.json({ ok: false, message: "Internal demonstration sign-in is not available." }, { status: 404 });
+    }
     const body = await parseLoginRequestBody(request);
     const email = typeof body.email === "string" ? normaliseBetaEmail(body.email) : "";
     const code = typeof body.code === "string" ? body.code.trim() : "";
@@ -29,6 +34,10 @@ export async function POST(request: Request) {
 
     if (!email) {
       throw new BetaLoginError("Please enter your email address.", 400);
+    }
+
+    if (!isInternalValidationEmail(email)) {
+      throw new BetaLoginError("Internal demonstration sign-in is available only for fictional validation identities.", 403);
     }
 
     if (!code) {
@@ -42,7 +51,7 @@ export async function POST(request: Request) {
     await assertProspectLoginAccess(email);
     const accessLevel = await resolveAccessLevel(email, approvalToken);
     const prospectAccess = await recordProspectFirstLogin(email);
-    const sessionToken = await createLevyTateBetaSession(email, accessLevel);
+    const sessionToken = await createLevyTateBetaSession(email, accessLevel, { authMode: "internal_beta" });
     const response = NextResponse.json({ ok: true, user: { email, accessLevel }, prospectAccess });
 
     response.cookies.set(levytateBetaSessionCookie, sessionToken, {

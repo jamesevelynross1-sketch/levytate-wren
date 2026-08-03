@@ -10,6 +10,8 @@ export type LevyTateApprovalStatus = "Approved" | "Onboarded";
 export type LevyTateBetaSession = {
   email: string;
   accessLevel: LevyTateBetaAccessLevel;
+  authMode?: "internal_beta" | "supabase_email";
+  authSubject?: string;
   issuedAt: number;
   expiresAt: number;
 };
@@ -26,6 +28,18 @@ const decoder = new TextDecoder();
 
 export function getLevyTateBetaAccessCode() {
   return process.env.LEVYTATE_BETA_CODE ?? "LEVYTATE-BETA";
+}
+
+export function isInternalBetaLoginEnabled() {
+  const configured = process.env.LEVYTATE_BETA_LOGIN_ENABLED?.trim().toLowerCase();
+  if (configured === "true") return true;
+  if (configured === "false") return false;
+  return process.env.NODE_ENV !== "production";
+}
+
+export function isInternalValidationEmail(email: string) {
+  const normalised = normaliseBetaEmail(email);
+  return normalised.endsWith(".test") || isAdminBetaEmail(normalised);
 }
 
 export function normaliseBetaEmail(email: string) {
@@ -105,7 +119,7 @@ async function readSignedPayload(token: string | undefined | null) {
   return JSON.parse(decoder.decode(base64UrlToBytes(payload))) as Record<string, unknown>;
 }
 
-export async function createLevyTateBetaSession(email: string, accessLevel: LevyTateBetaAccessLevel) {
+export async function createLevyTateBetaSession(email: string, accessLevel: LevyTateBetaAccessLevel, identity?: { authMode: "internal_beta" | "supabase_email"; authSubject?: string }) {
   const normalisedEmail = normaliseBetaEmail(email);
 
   if (accessLevel === "beta_admin" && !isAdminBetaEmail(normalisedEmail)) {
@@ -116,6 +130,8 @@ export async function createLevyTateBetaSession(email: string, accessLevel: Levy
   const session: LevyTateBetaSession = {
     email: normalisedEmail,
     accessLevel,
+    authMode: identity?.authMode ?? "internal_beta",
+    authSubject: identity?.authSubject,
     issuedAt,
     expiresAt: issuedAt + levytateBetaSessionMaxAge * 1000,
   };
@@ -149,6 +165,8 @@ export async function readLevyTateBetaSession(token: string | undefined | null) 
     ) {
       return null;
     }
+
+    if (session.authMode === "supabase_email" && typeof session.authSubject !== "string") return null;
 
     if (session.accessLevel === "beta_admin" && !isAdminBetaEmail(session.email)) {
       return null;

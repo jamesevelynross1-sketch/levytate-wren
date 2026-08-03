@@ -15,10 +15,10 @@ const betaCode = process.env.LEVYTATE_BETA_CODE?.trim() || "LEVYTATE-BETA";
 const input = {
   organisationName: "Rivermark Engineering",
   workspaceSlug: "rivermark-prospect-validation",
-  prospectEmail: "prospect.lead@rivermark.example",
+  prospectEmail: "prospect.lead@rivermark-validation.test",
   prospectDisplayName: "Alex Rowan",
   logoReference: "",
-  primaryContactEmail: "prospect.lead@rivermark.example",
+  primaryContactEmail: "prospect.lead@rivermark-validation.test",
 };
 const checks = [];
 
