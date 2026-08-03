@@ -3,6 +3,7 @@ import { createLevyTateBetaSession, normaliseBetaEmail, type LevyTateBetaAccessL
 import { normaliseMvpUserRole } from "@/lib/levytate/mvp/rbac";
 import { getLevyTateSupabaseConfig, supabaseInsert, supabaseSelect, supabaseUpdate } from "@/lib/server/levytate-supabase";
 import { checkProspectSessionAccess } from "@/lib/server/levytate-prospect-access";
+import { recordAuthenticationEmailAccepted, recordAuthenticationEmailRequest, shouldSuppressAuthenticationEmail } from "@/lib/server/levytate-auth-email-delivery";
 
 export const levytateSupabaseAccessCookie = "levytate_auth_access";
 export const levytateSupabaseRefreshCookie = "levytate_auth_refresh";
@@ -33,10 +34,28 @@ export async function requestEmployerSignIn(emailInput: string, redirectTo: stri
   const membership = await findMembershipByEmail(email);
   await audit(membership, email, "auth.sign_in_requested", "requested");
   if (!membership?.active || !(await checkProspectSessionAccess(email))) return;
+  if (await shouldSuppressAuthenticationEmail(email)) {
+    await audit(membership, email, "auth.email_delivery_suppressed", "safe_suppression_active");
+    return;
+  }
+  let requestReference: string | null = null;
+  try {
+    requestReference = await recordAuthenticationEmailRequest(email);
+  } catch {
+    console.error("LevyTate authentication delivery evidence unavailable", { outcome: "request_not_recorded" });
+  }
   try {
     const response = await authFetch(`otp?redirect_to=${encodeURIComponent(redirectTo)}`, { method: "POST", body: JSON.stringify({ email, create_user: false, gotrue_meta_security: { captcha_token: undefined } }) });
+    if (requestReference) {
+      try { await recordAuthenticationEmailAccepted(email, requestReference, response.ok); }
+      catch { console.error("LevyTate authentication delivery evidence unavailable", { outcome: "acceptance_not_recorded" }); }
+    }
     await audit(membership, email, response.ok ? "auth.email_delivery_accepted" : "auth.email_delivery_failed", response.ok ? "accepted_by_provider" : "delivery_not_started");
   } catch (error) {
+    if (requestReference) {
+      try { await recordAuthenticationEmailAccepted(email, requestReference, false); }
+      catch { console.error("LevyTate authentication delivery evidence unavailable", { outcome: "failure_not_recorded" }); }
+    }
     await audit(membership, email, "auth.email_delivery_failed", "provider_unavailable");
     throw error;
   }
