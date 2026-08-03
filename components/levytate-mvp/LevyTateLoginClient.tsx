@@ -4,7 +4,7 @@ import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { LevyTateLogo } from "@/components/levytate-demo/PlatformShell";
 
-export function LevyTateLoginClient({ internalLoginEnabled }: { internalLoginEnabled: boolean }) {
+export function LevyTateLoginClient({ internalLoginEnabled, invalidLink = false }: { internalLoginEnabled: boolean; invalidLink?: boolean }) {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -12,8 +12,6 @@ export function LevyTateLoginClient({ internalLoginEnabled }: { internalLoginEna
   const [demoEmail, setDemoEmail] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
-  const invalidLink = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("auth") === "invalid-link";
-
   async function requestLink(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setLoading(true); setError("");
     const response = await fetch("/api/levytate-auth/request", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });

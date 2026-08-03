@@ -33,8 +33,13 @@ export async function requestEmployerSignIn(emailInput: string, redirectTo: stri
   const membership = await findMembershipByEmail(email);
   await audit(membership, email, "auth.sign_in_requested", "requested");
   if (!membership?.active || !(await checkProspectSessionAccess(email))) return;
-  const response = await authFetch("otp", { method: "POST", body: JSON.stringify({ email, create_user: false, gotrue_meta_security: { captcha_token: undefined }, options: { email_redirect_to: redirectTo, should_create_user: false } }) });
-  if (!response.ok) await audit(membership, email, "auth.sign_in_denied", "delivery_not_started");
+  try {
+    const response = await authFetch(`otp?redirect_to=${encodeURIComponent(redirectTo)}`, { method: "POST", body: JSON.stringify({ email, create_user: false, gotrue_meta_security: { captcha_token: undefined } }) });
+    await audit(membership, email, response.ok ? "auth.email_delivery_accepted" : "auth.email_delivery_failed", response.ok ? "accepted_by_provider" : "delivery_not_started");
+  } catch (error) {
+    await audit(membership, email, "auth.email_delivery_failed", "provider_unavailable");
+    throw error;
+  }
 }
 
 export async function verifyEmployerMagicLink(tokenHash: string, type: string) {
@@ -64,7 +69,9 @@ async function bindVerifiedIdentity(auth: AuthSessionResponse) {
   await supabaseUpdate(config(), "levytate_users", `id=eq.${encodeURIComponent(membership.id)}`, { auth_subject: auth.user.id, auth_binding_status: "bound", auth_bound_at: membership.auth_subject ? undefined : now, last_authentication_at: now, last_login_at: now, updated_at: now });
   const accessLevel: LevyTateBetaAccessLevel = normaliseMvpUserRole(membership.role) === "Platform Admin" ? "beta_admin" : "beta_user";
   const sessionToken = await createLevyTateBetaSession(email, accessLevel, { authMode: "supabase_email", authSubject: auth.user.id });
-  await audit(membership, email, membership.auth_subject ? "auth.sign_in_successful" : "auth.identity_bound", "successful");
+  await audit(membership, email, "auth.email_identity_verified", "verified");
+  if (!membership.auth_subject) await audit(membership, email, "auth.identity_bound", "successful");
+  await audit(membership, email, "auth.sign_in_successful", "successful");
   return { ...auth, sessionToken, membership };
 }
 
