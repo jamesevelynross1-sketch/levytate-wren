@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { levytateBetaSessionCookie, readLevyTateBetaSession } from "@/lib/levytate/config/beta-access";
 
 const levytateHosts = new Set(["levytate.co.uk", "www.levytate.co.uk"]);
+const publicTrustPaths = new Set(["/privacy", "/early-access-terms", "/data-processing", "/support", "/account-help", "/data-rights"]);
 
 function isLevyTateHost(request: NextRequest) {
   const host = request.headers.get("host")?.split(":")[0]?.toLowerCase() ?? "";
@@ -15,6 +16,11 @@ function clearInvalidBetaSession(response: NextResponse) {
 
 export async function middleware(request: NextRequest) {
   if (!isLevyTateHost(request)) {
+    if (request.nextUrl.pathname === "/levytate" || request.nextUrl.pathname.startsWith("/levytate/")) {
+      const requestHeaders = new Headers(request.headers);
+      requestHeaders.set("x-levytate-route", "1");
+      return NextResponse.next({ request: { headers: requestHeaders } });
+    }
     return NextResponse.next();
   }
 
@@ -26,6 +32,10 @@ export async function middleware(request: NextRequest) {
 
   if (pathname === "/early-access") {
     return NextResponse.rewrite(new URL("/levytate/early-access", request.url));
+  }
+
+  if (publicTrustPaths.has(pathname)) {
+    return NextResponse.rewrite(new URL(`/levytate${pathname}`, request.url));
   }
 
   if (pathname === "/login") {

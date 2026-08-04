@@ -472,6 +472,12 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
               </ModuleStackNav>
             ) : null}
           </div>
+          <nav aria-label="Trust and support" className="mx-auto flex max-w-[1540px] flex-wrap gap-x-5 gap-y-2 px-4 pb-7 text-xs font-semibold text-[#102c3d]/48 sm:px-6 lg:px-8">
+            <a href="/levytate/privacy" className="min-h-11 content-center hover:text-[#087c73]">Privacy</a>
+            <a href="/levytate/early-access-terms" className="min-h-11 content-center hover:text-[#087c73]">Terms</a>
+            <a href="/levytate/support" className="min-h-11 content-center hover:text-[#087c73]">Support</a>
+            <a href="/levytate/data-rights" className="min-h-11 content-center hover:text-[#087c73]">Data rights</a>
+          </nav>
         </section>
       </div>
     </main>

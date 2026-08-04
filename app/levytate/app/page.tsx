@@ -10,6 +10,7 @@ import { resolveCoreEarlyAccessRouteAccess } from "@/lib/levytate/core-early-acc
 export const metadata: Metadata = {
   title: "MVP App | LevyTate",
   description: "Protected LevyTate beta MVP workspace.",
+  robots: { index: false, follow: false },
 };
 export const dynamic = "force-dynamic";
 export const revalidate = 0;

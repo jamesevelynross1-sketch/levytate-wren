@@ -1,7 +1,10 @@
 "use client";
 
 import { BookOpenCheck, Building2, KeyRound, ShieldCheck } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
+
+type PublicationMetadata = { slug: string; title: string; version: string; effectiveDate: string; lastReviewedDate: string; reviewStatus: string; internalOwner: string; active: boolean };
 
 export function PlatformAdminWorkspacesModule({ onNavigate }: { onNavigate: (module: string) => void }) {
   const { data, meta } = useMvpWorkspace();
@@ -28,14 +31,34 @@ export function PlatformAdminWorkspacesModule({ onNavigate }: { onNavigate: (mod
 
 export function PlatformAdminSupportContextModule() {
   const { meta } = useMvpWorkspace();
+  const [publications, setPublications] = useState<PublicationMetadata[]>([]);
+  const [metadataError, setMetadataError] = useState(false);
+  useEffect(() => {
+    let active = true;
+    fetch("/api/levytate-publication-metadata", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Publication metadata unavailable");
+        const body = await response.json() as { publications?: PublicationMetadata[] };
+        if (active) setPublications(body.publications ?? []);
+      })
+      .catch(() => { if (active) setMetadataError(true); });
+    return () => { active = false; };
+  }, []);
   return (
-    <section className="rounded-[1.5rem] border border-[#102c3d]/[0.08] bg-white p-6 shadow-[0_14px_34px_rgba(16,44,61,0.045)] sm:p-8">
+    <div className="grid gap-5"><section className="rounded-[1.5rem] border border-[#102c3d]/[0.08] bg-white p-6 shadow-[0_14px_34px_rgba(16,44,61,0.045)] sm:p-8">
       <div className="grid h-11 w-11 place-items-center rounded-xl bg-[#edf7f3] text-[#0b8e82]"><ShieldCheck size={21} /></div>
       <p className="mt-5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">Safe support context</p>
       <h2 className="mt-2 text-2xl font-semibold">Platform boundary active</h2>
       <p className="mt-3 max-w-3xl text-sm leading-7 text-[#102c3d]/60">This view confirms platform-support access without exposing employer applications, learner records, operational actions or employer governance. Support impersonation and audit exports are not available in Core Early Access.</p>
       <dl className="mt-6 grid gap-3 sm:grid-cols-2"><SafeFact label="Role" value={meta?.userRole ?? "Platform Admin"} /><SafeFact label="Workspace storage" value={meta?.storageMode === "supabase" ? "Persistent" : "Fallback"} /></dl>
     </section>
+    <section className="rounded-[1.5rem] border border-[#102c3d]/[0.08] bg-white p-6 shadow-[0_14px_34px_rgba(16,44,61,0.045)] sm:p-8">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">Publication control</p>
+      <h2 className="mt-2 text-xl font-semibold">Public trust-page status</h2>
+      <p className="mt-2 text-sm leading-6 text-[#102c3d]/60">Internal review metadata is available only to Platform Admin. Content updates remain code-reviewed during Early Access.</p>
+      {metadataError ? <p className="mt-4 rounded-xl bg-[#fff4f5] p-3 text-sm text-[#ad344e]">Publication metadata could not be loaded.</p> : null}
+      <div className="mt-5 grid gap-3">{publications.map((publication) => <article key={publication.slug} className="rounded-xl bg-[#f6f9f7] p-4"><div className="flex flex-wrap items-start justify-between gap-2"><h3 className="text-sm font-semibold">{publication.title}</h3><span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${publication.reviewStatus === "approved_for_early_access" ? "bg-[#e4f5ee] text-[#0b6f63]" : "bg-[#fff3dc] text-[#7a5818]"}`}>{publication.reviewStatus.replaceAll("_", " ")}</span></div><dl className="mt-3 grid gap-2 text-xs text-[#102c3d]/60 sm:grid-cols-3"><SafeFact label="Version" value={publication.version} /><SafeFact label="Reviewed" value={publication.lastReviewedDate} /><SafeFact label="Internal owner" value={publication.internalOwner} /></dl></article>)}</div>
+    </section></div>
   );
 }
 

@@ -285,6 +285,9 @@ export function PublicFooter() {
           <Link href="/solutions/training-providers">Training providers</Link>
           <Link href="/solutions/employees">Employees</Link>
           <Link href="/company/contact">Contact</Link>
+          <Link href="/levytate/privacy">Privacy</Link>
+          <Link href="/levytate/early-access-terms">Terms</Link>
+          <Link href="/levytate/support">Support</Link>
         </div>
       </div>
     </footer>

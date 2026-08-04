@@ -10,10 +10,14 @@ async function getRequestHost() {
   return requestHeaders.get("host")?.split(":")[0]?.toLowerCase() ?? "";
 }
 
-export async function generateMetadata(): Promise<Metadata> {
-  const host = await getRequestHost();
+async function isLevyTateRequest() {
+  const requestHeaders = await headers();
+  const host = requestHeaders.get("host")?.split(":")[0]?.toLowerCase() ?? "";
+  return levytateHosts.has(host) || requestHeaders.get("x-levytate-route") === "1";
+}
 
-  if (levytateHosts.has(host)) {
+export async function generateMetadata(): Promise<Metadata> {
+  if (await isLevyTateRequest()) {
     return {
       metadataBase: new URL("https://www.levytate.co.uk"),
       title: {
@@ -41,7 +45,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const host = await getRequestHost();
-  const isLevyTateHost = levytateHosts.has(host);
+  const isLevyTateHost = levytateHosts.has(host) || (await headers()).get("x-levytate-route") === "1";
 
   return (
     <html lang="en-GB">
