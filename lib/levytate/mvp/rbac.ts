@@ -40,7 +40,8 @@ export type MvpPermission =
   | "knowledge:read"
   | "knowledge:manage"
   | "reports:read"
-  | "earlyAccess:manage";
+  | "earlyAccess:manage"
+  | "diagnostics:read";
 
 export type MvpWorkspaceMutationType =
   | "saveProfile"
@@ -111,6 +112,7 @@ const allPermissions = [
   "knowledge:manage",
   "reports:read",
   "earlyAccess:manage",
+  "diagnostics:read",
 ] as const satisfies readonly MvpPermission[];
 
 export const mvpRolePermissions = {
@@ -125,8 +127,9 @@ export const mvpRolePermissions = {
     "knowledge:read",
     "knowledge:manage",
     "earlyAccess:manage",
+    "diagnostics:read",
   ],
-  "Employer Admin": allPermissions.filter((permission) => permission !== "earlyAccess:manage"),
+  "Employer Admin": allPermissions.filter((permission) => !["earlyAccess:manage", "diagnostics:read"].includes(permission)),
   "Apprenticeship Lead": [
     "workspace:read",
     "settings:read",
