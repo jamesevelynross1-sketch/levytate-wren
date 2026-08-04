@@ -13,6 +13,8 @@ const callback = read("app/levytate/auth/callback/route.ts");
 const login = read("components/levytate-mvp/LevyTateLoginClient.tsx");
 const beta = read("app/api/levytate-beta-login/route.ts");
 const logout = read("app/api/levytate-beta-logout/route.ts");
+const app = read("components/levytate-mvp/LevyTateMvpApp.tsx");
+const workspace = read("app/api/levytate-workspace/route.ts");
 
 check("migration preserves existing users", /alter table if exists public\.levytate_users/.test(migration) && !/drop table|truncate/i.test(migration));
 check("auth subject is unique when bound", /unique index if not exists levytate_users_auth_subject_unique_idx/.test(migration));
@@ -33,6 +35,11 @@ check("internal login is visibly separated", login.includes("Internal demonstrat
 check("beta login is environment gated", beta.includes("isInternalBetaLoginEnabled"));
 check("beta login accepts only fictional .test/internal identities", beta.includes("isInternalValidationEmail"));
 check("logout clears LevyTate and Supabase cookies", logout.includes("levytateSupabaseAccessCookie") && logout.includes("levytateSupabaseRefreshCookie"));
+check("logout is a server-owned full-document form submission", app.includes('action="/api/levytate-beta-logout"') && app.includes('method="post"') && !app.includes('fetch("/api/levytate-beta-logout"'));
+check("logout redirects only after server cookie expiry", logout.includes("NextResponse.redirect") && logout.includes("expires: new Date(0)") && logout.includes("maxAge: 0"));
+check("logout revokes only the current Supabase session", auth.includes('logout?scope=local') && !auth.includes('logout?scope=global'));
+check("provider failure still enforces local logout", logout.includes("local_logout_enforced") && logout.includes('logout", "local-only"'));
+check("protected workspace responses are private no-store", workspace.includes('Cache-Control') && workspace.includes('private, no-store'));
 check("no password authentication introduced", !/password/i.test(auth + login));
 
 console.log(`\nSecure employer auth foundation: ${passed} passed, ${failed} failed.`);

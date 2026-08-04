@@ -196,11 +196,6 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
     setSettingsView(settingsItems[0] ?? "Workspace");
   }, [settingsItems, settingsView]);
 
-  async function logout() {
-    await fetch("/api/levytate-beta-logout", { method: "POST" });
-    window.location.href = "/levytate/login";
-  }
-
   function openModule(module: ModuleName) {
     if (!availableModules.some((item) => item.name === module)) return;
     setManagerDirectReportDetail(null);
@@ -356,10 +351,12 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
               {hydrated ? `${notifications.length} alerts` : "Loading"}
             </span>
             {meta?.prospectAccess?.status === "active" && meta.userRole === "Apprenticeship Lead" ? <ProspectGettingStarted access={meta.prospectAccess} onNavigate={navigateTo} /> : null}
-            <button onClick={logout} title="Logout" className="inline-flex h-11 shrink-0 items-center gap-2 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white shadow-[0_10px_22px_rgba(16,44,61,0.12)] transition hover:bg-[#17394d]">
-              <LogOut size={15} aria-hidden="true" />
-              <span className="hidden sm:inline">Logout</span>
-            </button>
+            <form action="/api/levytate-beta-logout" method="post">
+              <button type="submit" title="Logout" className="inline-flex h-11 shrink-0 items-center gap-2 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white shadow-[0_10px_22px_rgba(16,44,61,0.12)] transition hover:bg-[#17394d]">
+                <LogOut size={15} aria-hidden="true" />
+                <span className="hidden sm:inline">Logout</span>
+              </button>
+            </form>
           </div>
         </div>
       </header>

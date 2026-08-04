@@ -13,6 +13,7 @@ export const genericSignInRequestMessage = "If this email is authorised for Levy
 type MembershipRow = { id: string; organisation_id: string; email: string; role: string; access_level: string; active: boolean; auth_subject: string | null; auth_binding_status?: string; };
 type AuthUser = { id: string; email?: string };
 type AuthSessionResponse = { access_token: string; refresh_token: string; expires_in?: number; user: AuthUser };
+export type EmployerLogoutResult = { attempted: boolean; invalidated: boolean };
 
 export class LevyTateAuthError extends Error {
   constructor(public code: "invalid_link" | "unauthorised" | "inactive" | "conflict" | "configuration", message: string, public status = 403) { super(message); this.name = "LevyTateAuthError"; }
@@ -73,6 +74,44 @@ export async function refreshEmployerAuth(refreshToken: string) {
   const response = await authFetch("token?grant_type=refresh_token", { method: "POST", body: JSON.stringify({ refresh_token: refreshToken }) });
   if (!response.ok) throw new LevyTateAuthError("invalid_link", "Your session has ended. Sign in again to continue.", 401);
   return bindVerifiedIdentity(await response.json() as AuthSessionResponse);
+}
+
+export async function invalidateEmployerAuthSession(accessToken?: string, refreshToken?: string): Promise<EmployerLogoutResult> {
+  if (!accessToken && !refreshToken) return { attempted: false, invalidated: true };
+  let currentAccessToken = accessToken;
+  if (!currentAccessToken && refreshToken) currentAccessToken = (await exchangeRefreshToken(refreshToken)) ?? undefined;
+
+  if (currentAccessToken && await revokeCurrentSession(currentAccessToken)) {
+    return { attempted: true, invalidated: true };
+  }
+
+  if (refreshToken) {
+    currentAccessToken = (await exchangeRefreshToken(refreshToken)) ?? undefined;
+    if (currentAccessToken && await revokeCurrentSession(currentAccessToken)) {
+      return { attempted: true, invalidated: true };
+    }
+  }
+
+  return { attempted: true, invalidated: false };
+}
+
+export async function recordEmployerLogoutEvent(session: LevyTateBetaSession, action: string, outcome: string) {
+  const membership = session.authSubject
+    ? await findMembershipBySubject(session.authSubject)
+    : await findMembershipByEmail(session.email);
+  await audit(membership, session.email, action, outcome);
+}
+
+async function exchangeRefreshToken(refreshToken: string) {
+  const response = await authFetch("token?grant_type=refresh_token", { method: "POST", body: JSON.stringify({ refresh_token: refreshToken }) });
+  if (!response.ok) return null;
+  const body = await response.json() as Partial<AuthSessionResponse>;
+  return typeof body.access_token === "string" ? body.access_token : null;
+}
+
+async function revokeCurrentSession(accessToken: string) {
+  const response = await authFetch("logout?scope=local", { method: "POST", headers: { Authorization: `Bearer ${accessToken}` } });
+  return response.ok;
 }
 
 async function bindVerifiedIdentity(auth: AuthSessionResponse) {

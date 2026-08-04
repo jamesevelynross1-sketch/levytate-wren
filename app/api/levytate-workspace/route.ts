@@ -18,17 +18,17 @@ async function getSession() {
 export async function GET() {
   const session = await getSession();
   if (!session) {
-    return NextResponse.json({ message: "Unauthorised." }, { status: 401 });
+    return noStore({ message: "Unauthorised." }, 401);
   }
 
   try {
     const workspace = await getWorkspaceBootstrapForSession(session);
-    return NextResponse.json({ ok: true, workspace });
+    return noStore({ ok: true, workspace });
   } catch (error) {
     const status = error instanceof LevyTateWorkspacePermissionError ? 403 : 500;
-    return NextResponse.json(
+    return noStore(
       { message: getMessage(error) },
-      { status },
+      status,
     );
   }
 }
@@ -36,24 +36,28 @@ export async function GET() {
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session) {
-    return NextResponse.json({ message: "Unauthorised." }, { status: 401 });
+    return noStore({ message: "Unauthorised." }, 401);
   }
 
   try {
     const mutation = (await request.json()) as LevyTateWorkspaceMutation;
     const workspace = await applyWorkspaceMutationForSession(session, mutation);
-    return NextResponse.json({ ok: true, workspace });
+    return noStore({ ok: true, workspace });
   } catch (error) {
     const status = error instanceof LevyTateWorkspacePermissionError
       ? 403
       : error instanceof LevyTateWorkspacePersistenceError
         ? 503
         : 500;
-    return NextResponse.json(
+    return noStore(
       { message: getMessage(error) },
-      { status },
+      status,
     );
   }
+}
+
+function noStore(body: unknown, status = 200) {
+  return NextResponse.json(body, { status, headers: { "Cache-Control": "private, no-store, max-age=0" } });
 }
 
 function getMessage(error: unknown) {

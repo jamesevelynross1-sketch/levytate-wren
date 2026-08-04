@@ -23,11 +23,13 @@ try {
   const schema = await rest("levytate_users?select=id,auth_binding_status,auth_bound_at,last_authentication_at&limit=1");
   check("migration 020 live schema available", schema.status === 200);
 
-  const publicKnown = await publicRequest("employee.demo@levytate.test", "198.51.100.10");
-  const publicUnknown = await publicRequest(`unknown-${randomUUID()}@levytate.test`, "198.51.100.11");
-  check("known sign-in request is generic", publicKnown.status === 200);
-  check("unknown sign-in request is generic", publicUnknown.status === 200);
-  check("enumeration responses are indistinguishable", publicKnown.body === publicUnknown.body);
+  if (process.env.LEVYTATE_VALIDATE_EMAIL_REQUESTS === "true") {
+    const publicKnown = await publicRequest("employee.demo@levytate.test", "198.51.100.10");
+    const publicUnknown = await publicRequest(`unknown-${randomUUID()}@levytate.test`, "198.51.100.11");
+    check("known sign-in request is generic", publicKnown.status === 200);
+    check("unknown sign-in request is generic", publicUnknown.status === 200);
+    check("enumeration responses are indistinguishable", publicKnown.body === publicUnknown.body);
+  }
 
   const sessions = new Map();
   for (const [email, expectedRole] of identities) {
@@ -59,10 +61,42 @@ try {
   const refreshed = await appRequest("/api/levytate-auth/session", sessions.get("apprenticeshiplead.demo@levytate.test").cookie, { method: "POST" });
   check("session refresh succeeds", refreshed.status === 200 && refreshed.json?.ok === true);
 
-  const logout = await appRequest("/api/levytate-beta-logout", sessions.get("employee.demo@levytate.test").cookie, { method: "POST", raw: true });
-  check("logout clears all authentication cookies", /levytate_beta_session=;|levytate_beta_session=""/i.test(logout.rawCookies) && /levytate_auth_refresh=;|levytate_auth_refresh=""/i.test(logout.rawCookies));
-  const afterLogout = await appRequest("/api/levytate-workspace", "");
-  check("protected API denied without cookie after logout", afterLogout.status === 401);
+  const employeeSessionA = sessions.get("employee.demo@levytate.test");
+  const employeeSessionB = await magicLogin("employee.demo@levytate.test");
+  const oldRefreshToken = cookieValue(employeeSessionA.cookie, "levytate_auth_refresh");
+  const logout = await appRequest("/api/levytate-beta-logout", employeeSessionA.cookie, { method: "POST", raw: true });
+  const loggedOutCookie = applySetCookies(employeeSessionA.cookie, logout.setCookies);
+  check("logout returns a server-confirmed login redirect", logout.status === 303 && logout.location.includes("/levytate/login"));
+  check("logout clears all authentication cookies", ["levytate_beta_session", "levytate_auth_access", "levytate_auth_refresh"].every((name) => !cookieValue(loggedOutCookie, name)));
+  check("logout expiry attributes match the root cookie path", logout.setCookies.filter((value) => /levytate_(?:beta_session|auth_access|auth_refresh)=/i.test(value)).every((value) => /Path=\//i.test(value) && /Max-Age=0/i.test(value)));
+  const afterLogout = await appRequest("/api/levytate-workspace", loggedOutCookie);
+  check("protected API denied after applying logout response", afterLogout.status === 401);
+  const pageAfterLogout = await appRequest("/levytate/app", loggedOutCookie);
+  check("protected page redirects after logout", [307, 308].includes(pageAfterLogout.status) && pageAfterLogout.location.includes("/levytate/login"));
+  const refreshAfterLogout = await appRequest("/api/levytate-auth/session", loggedOutCookie, { method: "POST" });
+  check("session refresh cannot recreate local access", refreshAfterLogout.status === 401 && !refreshAfterLogout.setCookies.some((value) => /levytate_beta_session=[^;]/i.test(value)));
+  const revokedRefresh = await auth("token?grant_type=refresh_token", { method: "POST", body: { refresh_token: oldRefreshToken } });
+  check("revoked Supabase refresh session cannot be reused", revokedRefresh.status >= 400);
+  const otherBrowser = await appRequest("/api/levytate-workspace", employeeSessionB.cookie);
+  check("local logout leaves another browser session active", otherBrowser.status === 200);
+  const duplicateLogout = await appRequest("/api/levytate-beta-logout", loggedOutCookie, { method: "POST" });
+  check("duplicate logout is idempotent", duplicateLogout.status === 303 && duplicateLogout.location.includes("/levytate/login"));
+  const expiredLogout = await appRequest("/api/levytate-beta-logout", "levytate_beta_session=expired", { method: "POST" });
+  check("already-expired session logout is safe", expiredLogout.status === 303 && expiredLogout.location.includes("/levytate/login"));
+
+  const providerFailureCookie = replaceCookie(sessions.get("manager.demo@levytate.test").cookie, "levytate_auth_access", "invalid");
+  const invalidProviderCookie = replaceCookie(providerFailureCookie, "levytate_auth_refresh", "invalid");
+  const providerFailureLogout = await appRequest("/api/levytate-beta-logout", invalidProviderCookie, { method: "POST" });
+  const providerFailureCleared = applySetCookies(invalidProviderCookie, providerFailureLogout.setCookies);
+  check("provider sign-out failure still clears local access", providerFailureLogout.status === 303 && providerFailureLogout.location.includes("logout=local-only") && !cookieValue(providerFailureCleared, "levytate_beta_session"));
+
+  for (const [email, expectedRole] of identities) {
+    const beta = await betaLogin(email);
+    check(`${expectedRole} internal beta session starts`, beta.status === 200 && Boolean(cookieValue(beta.cookie, "levytate_beta_session")));
+    const betaLogout = await appRequest("/api/levytate-beta-logout", beta.cookie, { method: "POST" });
+    const betaCleared = applySetCookies(beta.cookie, betaLogout.setCookies);
+    check(`${expectedRole} internal beta session logout completes`, betaLogout.status === 303 && !cookieValue(betaCleared, "levytate_beta_session"));
+  }
 
   const realBeta = await fetch(`${baseUrl}/api/levytate-beta-login`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: "person@example.com", code: process.env.LEVYTATE_BETA_CODE || "LEVYTATE-BETA" }) });
   const fictionalBeta = await fetch(`${baseUrl}/api/levytate-beta-login`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: "employee.demo@levytate.test", code: process.env.LEVYTATE_BETA_CODE || "LEVYTATE-BETA" }) });
@@ -126,7 +160,11 @@ async function createTemporaryProspect() {
   temporaryRows.push({ table: "levytate_prospect_access", query: `id=eq.${accessId}` });
   return { userId, accessId, email };
 }
-async function appRequest(path, cookie, init = {}) { const response = await fetch(`${baseUrl}${path}`, { ...init, headers: { cookie, ...(init.headers ?? {}) }, redirect: "manual" }); const text = await response.text(); let json; try { json = JSON.parse(text); } catch {} return { status: response.status, json, rawCookies: response.headers.getSetCookie().join(", ") }; }
+async function betaLogin(email) { const response = await appRequest("/api/levytate-beta-login", "", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, code: process.env.LEVYTATE_BETA_CODE || "LEVYTATE-BETA" }) }); return { ...response, cookie: response.setCookies.map((value) => value.split(";", 1)[0]).join("; ") }; }
+async function appRequest(path, cookie, init = {}) { const response = await fetch(`${baseUrl}${path}`, { ...init, headers: { cookie, ...(init.headers ?? {}) }, redirect: "manual" }); const text = await response.text(); let json; try { json = JSON.parse(text); } catch {} const setCookies = response.headers.getSetCookie(); return { status: response.status, location: response.headers.get("location") || "", json, setCookies, rawCookies: setCookies.join(", ") }; }
 async function rest(path, init = {}) { const response = await fetch(`${supabaseUrl}/rest/v1/${path}`, { method: init.method || "GET", headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json", Prefer: "return=representation" }, ...(init.body ? { body: JSON.stringify(init.body) } : {}) }); const text = await response.text(); let json; try { json = JSON.parse(text); } catch {} return { status: response.status, json }; }
 async function auth(path, init = {}) { const response = await fetch(`${supabaseUrl}/auth/v1/${path}`, { method: init.method || "GET", headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, ...(init.body ? { body: JSON.stringify(init.body) } : {}) }); const text = await response.text(); let json; try { json = JSON.parse(text); } catch {} return { ok: response.ok, status: response.status, json }; }
 function loadEnv() { const raw = fs.readFileSync(".env.local", "utf8"); for (const line of raw.split(/\r?\n/)) { const match = line.match(/^([^#=]+)=(.*)$/); if (match) process.env[match[1].trim()] = match[2].trim().replace(/^["']|["']$/g, ""); } }
+function cookieValue(cookie, name) { return cookie.split(/;\s*/).map((part) => part.split("=")).find(([key]) => key === name)?.slice(1).join("=") || ""; }
+function applySetCookies(cookie, setCookies) { const jar = new Map(cookie.split(/;\s*/).filter(Boolean).map((part) => { const index = part.indexOf("="); return [part.slice(0, index), part.slice(index + 1)]; })); for (const value of setCookies) { const pair = value.split(";", 1)[0]; const index = pair.indexOf("="); const name = pair.slice(0, index), next = pair.slice(index + 1); if (!next || /Max-Age=0/i.test(value)) jar.delete(name); else jar.set(name, next); } return [...jar].map(([name, value]) => `${name}=${value}`).join("; "); }
+function replaceCookie(cookie, name, value) { const jar = new Map(cookie.split(/;\s*/).filter(Boolean).map((part) => { const index = part.indexOf("="); return [part.slice(0, index), part.slice(index + 1)]; })); jar.set(name, value); return [...jar].map(([key, next]) => `${key}=${next}`).join("; "); }

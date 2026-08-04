@@ -11,6 +11,8 @@ export const metadata: Metadata = {
   title: "MVP App | LevyTate",
   description: "Protected LevyTate beta MVP workspace.",
 };
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function LevyTateAppPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const cookieStore = await cookies();
