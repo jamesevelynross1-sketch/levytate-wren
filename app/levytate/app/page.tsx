@@ -6,6 +6,7 @@ import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
 import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
 import { LevyTateWorkspacePermissionError, getWorkspaceBootstrapForSession } from "@/lib/server/levytate-workspace";
 import { resolveCoreEarlyAccessRouteAccess } from "@/lib/levytate/core-early-access-policy";
+import { getTermsGateState } from "@/lib/server/levytate-early-access-terms";
 
 export const metadata: Metadata = {
   title: "MVP App | LevyTate",
@@ -17,11 +18,16 @@ export const revalidate = 0;
 
 export default async function LevyTateAppPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const cookieStore = await cookies();
-  const session = await readAuthorisedLevyTateBetaSession(cookieStore.get(levytateBetaSessionCookie)?.value);
+  const session = await readAuthorisedLevyTateBetaSession(cookieStore.get(levytateBetaSessionCookie)?.value, { allowTermsPending: true });
 
   if (!session) redirect("/levytate/login");
 
   try {
+    const termsGate = await getTermsGateState(session);
+    if (!termsGate.bypass && !termsGate.accepted) {
+      if (termsGate.authorisedAcceptor) redirect("/levytate/accept-terms");
+      return <AwaitingOrganisationAcceptance />;
+    }
     const initialWorkspace = await getWorkspaceBootstrapForSession(session);
     const query = await searchParams;
     const requestedModule = typeof query.module === "string" ? query.module : null;
@@ -37,6 +43,10 @@ export default async function LevyTateAppPage({ searchParams }: { searchParams: 
 
     throw error;
   }
+}
+
+function AwaitingOrganisationAcceptance() {
+  return <main className="grid min-h-screen place-items-center bg-[#f6fbf8] px-5 py-10 text-[#102c3d]"><section className="w-full max-w-lg rounded-[1.5rem] border border-[#102c3d]/[0.08] bg-white p-7 shadow-[0_30px_90px_rgba(16,44,61,0.1)]"><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">Organisation access</p><h1 className="mt-3 text-3xl font-semibold tracking-[-0.035em]">Acceptance pending</h1><p className="mt-4 text-sm leading-7 text-[#102c3d]/64">Your organisation’s operational workspace is waiting for acceptance of the current Early Access Terms by an authorised representative.</p><div className="mt-6 flex flex-wrap gap-4 text-sm font-semibold text-[#087c73]"><a href="/levytate/support">Support</a><a href="/levytate/account-help">Account help</a></div></section></main>;
 }
 
 function AccountSetupRequired({ message }: { message: string }) {

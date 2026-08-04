@@ -1,0 +1,44 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+
+const read = (file) => fs.readFileSync(file, "utf8");
+const migration = read("supabase/migrations/023_create_early_access_terms_acceptances.sql");
+const model = read("lib/server/levytate-early-access-terms.ts");
+const endpoint = read("app/api/levytate-terms-acceptance/route.ts");
+const page = read("app/levytate/accept-terms/page.tsx");
+const form = read("components/levytate-mvp/EarlyAccessTermsAcceptanceForm.tsx");
+const app = read("app/levytate/app/page.tsx");
+const callback = read("app/levytate/auth/callback/route.ts");
+const metadata = read("app/api/levytate-publication-metadata/route.ts");
+const authorisedSession = read("lib/server/levytate-authorised-session.ts");
+const checks = [];
+const check = (label, condition) => { assert.ok(condition, label); checks.push(label); };
+
+check("migration is additive and isolated", /create table if not exists public\.levytate_early_access_terms_acceptances/.test(migration) && !/drop table|truncate public\./i.test(migration));
+check("required evidence fields exist", ["organisation_id", "accepted_by_user_id", "document_type", "document_version", "document_content_hash", "accepted_at", "acceptance_method", "role_at_acceptance", "created_at"].every((field) => migration.includes(field)));
+check("content hash is constrained SHA-256", /\^\[a-f0-9\]\{64\}\$/.test(migration));
+check("acceptance evidence is duplicate-safe", /unique \(organisation_id, accepted_by_user_id, document_type, document_version, document_content_hash\)/.test(migration));
+check("acceptance table forces RLS", /enable row level security[\s\S]*force row level security/.test(migration));
+check("browser roles receive no access", /revoke all[\s\S]*from anon, authenticated/.test(migration));
+check("service role cannot update or delete", /revoke update, delete, truncate/.test(migration) && /grant select, insert/.test(migration));
+check("published representation includes material content and version", /version: page\.version[\s\S]*effectiveDate[\s\S]*title[\s\S]*summary[\s\S]*sections/.test(model));
+check("server calculates SHA-256", /createHash\("sha256"\).*update\(representation/.test(model));
+check("only canonical Apprenticeship Lead accepts", /role !== "Apprenticeship Lead"/.test(model));
+check("active authenticated membership is server-resolved", /authMode !== "supabase_email"/.test(model) && /auth_subject: `eq\.\$\{session\.authSubject/.test(model) && /membership\.active/.test(model));
+check("active prospect access is revalidated", /assertProspectLoginAccess\(membership\.email\)/.test(model));
+check("browser authority fields are unused", !/body\.get\("organisation|body\.get\("user|body\.get\("role|body\.get\("version|body\.get\("hash/.test(endpoint));
+check("POST requires explicit acknowledgement", /body\.get\("acknowledged"\) !== "yes"/.test(endpoint));
+check("GET cannot accept terms", !/export async function GET/.test(endpoint));
+check("checkbox starts unselected", /useState\(false\)/.test(form) && !/defaultChecked|checked=\{true\}/.test(form));
+check("button has explicit acceptance language", /Accept Early Access Terms/.test(form) && /disabled=\{!acknowledged\}/.test(form));
+check("acceptance route shows current terms and help", /document\.page\.sections/.test(page) && /Support/.test(page) && /Privacy/.test(page) && /Data processing/.test(page));
+check("organisation workspace is gated", /getTermsGateState/.test(app) && /AwaitingOrganisationAcceptance/.test(app));
+check("operational APIs are centrally gated", /getTermsGateState\(current\)/.test(authorisedSession) && /terms\.bypass \|\| terms\.accepted/.test(authorisedSession) && /allowTermsPending/.test(authorisedSession));
+check("callback applies current acceptance destination", /getTermsGateState/.test(callback) && /accept-terms/.test(callback));
+check("historic acceptance does not satisfy changed version or hash", /document_version: `eq\.\$\{version\}`/.test(model) && /document_content_hash: `eq\.\$\{hash\}`/.test(model));
+check("internal beta bypass creates no record", /session\.authMode !== "supabase_email"\) return \{ bypass: true/.test(model) && /Internal demonstration sessions do not create legal acceptance records/.test(model));
+check("Platform Admin can inspect but endpoint has no write", /listTermsAcceptanceStatusForAdmin/.test(metadata) && !/export async function POST|export async function PATCH|export async function DELETE/.test(metadata));
+check("safe audit events are present", ["terms.acceptance_required", "terms.acceptance_viewed", "terms.accepted", "terms.duplicate_acceptance_request", "terms.acceptance_denied", "terms.reacceptance_required"].every((event) => model.includes(event)));
+check("no prohibited evidence is stored", !/ip_address|magic_link_token|access_token|user_agent|email_contents|password/i.test(migration));
+
+console.log(JSON.stringify({ ok: true, checksPassed: checks.length }, null, 2));

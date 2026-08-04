@@ -9,11 +9,14 @@
 - [ ] Approve retention and deletion periods listed below.
 - [ ] Confirm international-transfer locations and safeguards for enabled providers.
 - [ ] Approve Early Access liability, suspension, termination and governing-law terms.
-- [ ] Implement and approve versioned terms/privacy acceptance before issuing the first real employer account.
+- [x] Implement the technical versioned Early Access Terms acceptance mechanism.
+- [ ] Obtain professional approval of the published legal content before issuing the first real employer account. Privacy remains informational and is not clickwrap.
 - [ ] Upgrade the production Supabase project to Pro and confirm daily backups before loading real employer or employee data. Keep PITR disabled and spend cap enabled unless separately approved.
 - [ ] Confirm production support ownership, escalation contacts and incident communications.
 
 Nothing unchecked may be represented publicly as approved or certified.
+
+Real employer invitations remain prohibited while any legal-content approval above is outstanding, even though the technical acceptance mechanism is complete.
 
 ## Internal service-provider inventory
 

@@ -4,6 +4,7 @@ import { publicTrustPages } from "@/lib/levytate/public-trust-content";
 import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
 import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
 import { getPublicTrustGovernance } from "@/lib/server/levytate-public-trust-governance";
+import { listTermsAcceptanceStatusForAdmin } from "@/lib/server/levytate-early-access-terms";
 
 export async function GET() {
   const cookieStore = await cookies();
@@ -12,5 +13,5 @@ export async function GET() {
   if (session.accessLevel !== "beta_admin") return NextResponse.json({ message: "Forbidden." }, { status: 403 });
   const governance = getPublicTrustGovernance();
   const publications = Object.values(publicTrustPages).map((page) => ({ slug: page.slug, title: page.title, version: page.version, effectiveDate: page.effectiveDate, lastReviewedDate: page.lastReviewedDate, ...governance[page.slug] }));
-  return NextResponse.json({ ok: true, publications });
+  return NextResponse.json({ ok: true, publications, termsAcceptance: await listTermsAcceptanceStatusForAdmin() });
 }

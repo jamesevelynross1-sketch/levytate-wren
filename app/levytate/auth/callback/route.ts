@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { levytateBetaSessionCookie, levytateBetaSessionMaxAge } from "@/lib/levytate/config/beta-access";
+import { levytateBetaSessionCookie, levytateBetaSessionMaxAge, readLevyTateBetaSession } from "@/lib/levytate/config/beta-access";
 import { levytateAuthCookieMaxAge, levytateSupabaseAccessCookie, levytateSupabaseRefreshCookie, verifyEmployerMagicLink } from "@/lib/server/levytate-auth";
 import { checkCallbackAttemptLimit } from "@/lib/server/levytate-auth-rate-limit";
 import { getCoreEarlyAccessPolicy } from "@/lib/levytate/core-early-access-policy";
 import { normaliseMvpUserRole } from "@/lib/levytate/mvp/rbac";
+import { getTermsGateState } from "@/lib/server/levytate-early-access-terms";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -15,6 +16,10 @@ export async function GET(request: Request) {
     const first = getCoreEarlyAccessPolicy(role).modules.find((module) => module.availability === "enabled")?.moduleKey;
     const destination = new URL("/levytate/app", url.origin);
     if (first) destination.searchParams.set("module", first);
+    const session = await readLevyTateBetaSession(result.sessionToken);
+    if (!session) return failed(url, "invalid-link");
+    const termsGate = await getTermsGateState(session);
+    if (!termsGate.bypass && !termsGate.accepted) destination.pathname = termsGate.authorisedAcceptor ? "/levytate/accept-terms" : "/levytate/app";
     const response = NextResponse.redirect(destination);
     setCookie(response, levytateBetaSessionCookie, result.sessionToken, levytateBetaSessionMaxAge);
     setCookie(response, levytateSupabaseAccessCookie, result.access_token, Math.min(result.expires_in ?? 3600, levytateAuthCookieMaxAge));
