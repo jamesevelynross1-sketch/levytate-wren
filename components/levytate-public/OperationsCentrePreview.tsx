@@ -1,3 +1,5 @@
+import { LevyTateLogo } from "@/components/levytate-demo/PlatformShell";
+
 const summaryItems = [
   { label: "Needs attention", value: "4", context: "2 due today", tone: "bg-[#d65b70]" },
   { label: "Ready to enrol", value: "2", context: "Details complete", tone: "bg-[#159b8f]" },
@@ -39,11 +41,11 @@ export function OperationsCentrePreview({ detailed = false }: { detailed?: boole
   return (
     <div className="min-w-0 overflow-hidden rounded-[22px] bg-[#0a2333] text-white shadow-[0_32px_90px_rgba(9,31,45,0.24)] ring-1 ring-white/10">
       <div className="flex min-h-[62px] items-center justify-between gap-5 border-b border-white/[0.08] px-5 sm:px-6">
-        <div className="flex min-w-0 items-center gap-5">
-          <p className="shrink-0 text-[15px] font-semibold tracking-[-0.03em]">
-            <span className="text-white">Levy</span><span className="text-[#ff8090]">Tate</span>
-          </p>
-          <span className="hidden h-5 w-px bg-white/10 sm:block" aria-hidden="true" />
+        <div className="flex min-w-0 items-center gap-4 sm:gap-5">
+          <div className="flex shrink-0 items-center py-3" aria-hidden="true">
+            <LevyTateLogo className="[--levytate-logo-size:1.55rem] sm:[--levytate-logo-size:1.65rem]" />
+          </div>
+          <span className="h-6 w-px shrink-0 bg-white/10" aria-hidden="true" />
           <div className="min-w-0">
             <p className="truncate text-[13px] font-semibold text-white/92">Operations Centre</p>
             <p className="mt-0.5 text-[11px] text-white/42">Example employer workspace</p>
