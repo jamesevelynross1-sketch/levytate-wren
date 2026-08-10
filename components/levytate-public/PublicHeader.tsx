@@ -99,9 +99,9 @@ export function PublicHeader() {
   }, []);
 
   return (
-    <header ref={headerRef} className="sticky top-0 z-50 border-b border-[#102c3d]/[0.07] bg-[#f6fbf8]/95 backdrop-blur-xl">
+    <header ref={headerRef} className="sticky top-0 z-50 border-b border-[#102c3d]/[0.07] bg-[#f6fbf8]/[0.95] backdrop-blur-xl">
       <div className="relative mx-auto flex h-[78px] max-w-[90rem] items-center gap-5 px-6 sm:px-8 lg:px-10 xl:px-12">
-        <Link href="/" aria-label="LevyTate home" className="inline-flex min-h-11 shrink-0 items-center focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20" onClick={closeMenus}>
+        <Link href="/" aria-label="LevyTate home" className="inline-flex min-h-11 shrink-0 items-center focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/[0.20]" onClick={closeMenus}>
           <LevyTateLogo className="[--levytate-logo-size:2rem] sm:[--levytate-logo-size:2.25rem]" />
         </Link>
 
@@ -126,21 +126,21 @@ export function PublicHeader() {
             onNavigate={closeMenus}
             footer={(
               <div className="border-t border-[#102c3d]/[0.07] px-5 py-4">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/40">Built for employer apprenticeship operations</p>
-                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs font-medium text-[#102c3d]/58">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/[0.66]">Built for employer apprenticeship operations</p>
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs font-medium text-[#102c3d]/[0.66]">
                   {builtFor.map((role) => <span key={role}>{role}</span>)}
                 </div>
               </div>
             )}
           />
-          <Link href="/levytate/support" onClick={closeMenus} className="inline-flex min-h-11 items-center px-3.5 text-[13px] font-medium text-[#102c3d]/62 transition-colors hover:text-[#102c3d] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20">Support</Link>
+          <Link href="/levytate/support" onClick={closeMenus} className="inline-flex min-h-11 items-center px-3.5 text-[13px] font-medium text-[#102c3d]/[0.66] transition-colors hover:text-[#102c3d] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/[0.20]">Support</Link>
         </nav>
 
         <div className="ml-auto hidden items-center gap-2 sm:flex lg:ml-4">
-          <Link href="/login" onClick={closeMenus} className="inline-flex h-11 items-center whitespace-nowrap rounded-xl bg-white px-4 text-[13px] font-semibold text-[#102c3d] ring-1 ring-[#102c3d]/[0.1] transition-colors hover:bg-[#f1f6f3] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20">
+          <Link href="/login" onClick={closeMenus} className="inline-flex h-11 items-center whitespace-nowrap rounded-xl bg-white px-4 text-[13px] font-semibold text-[#102c3d] ring-1 ring-[#102c3d]/[0.1] transition-colors hover:bg-[#f1f6f3] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/[0.20]">
             Login
           </Link>
-          <Link href="/early-access" onClick={closeMenus} className="inline-flex h-11 items-center whitespace-nowrap rounded-xl bg-[#102c3d] px-5 text-[13px] font-semibold text-white transition-colors hover:bg-[#183b50] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/25">
+          <Link href="/early-access" onClick={closeMenus} className="inline-flex h-11 items-center whitespace-nowrap rounded-xl bg-[#102c3d] px-5 text-[13px] font-semibold text-white transition-colors hover:bg-[#183b50] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/[0.25]">
             Request Early Access
           </Link>
         </div>
@@ -188,7 +188,7 @@ function NavDropdown({
         aria-expanded={active}
         aria-controls={panelId}
         onClick={() => onToggle(dropdown)}
-        className={`flex min-h-11 items-center gap-2 px-3.5 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 ${active ? "text-[#102c3d]" : "text-[#102c3d]/62 hover:text-[#102c3d]"}`}
+        className={`flex min-h-11 items-center gap-2 px-3.5 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/[0.20] ${active ? "text-[#102c3d]" : "text-[#102c3d]/[0.66] hover:text-[#102c3d]"}`}
       >
         {label}
         <span aria-hidden="true" className={`h-1.5 w-1.5 rotate-45 border-b border-r border-current transition ${active ? "rotate-[225deg]" : ""}`} />
@@ -199,9 +199,9 @@ function NavDropdown({
           <div className="overflow-hidden rounded-2xl border border-[#102c3d]/[0.08] bg-white shadow-[0_24px_70px_rgba(16,44,61,0.14)]">
             <div className={columns ? "grid grid-cols-2 gap-1 p-3" : "grid grid-cols-2 gap-1 p-3"}>
               {items.map((item) => (
-                <Link key={item.title} href={item.href} onClick={onNavigate} className={`group/item min-h-[88px] rounded-xl px-4 py-3 transition-colors hover:bg-[#eef8f4] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/15 ${item.secondary ? "col-span-2 border-t border-[#102c3d]/[0.06] bg-[#fbfcfb]" : ""}`}>
+                <Link key={item.title} href={item.href} onClick={onNavigate} className={`group/item min-h-[88px] rounded-xl px-4 py-3 transition-colors hover:bg-[#eef8f4] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/[0.15] ${item.secondary ? "col-span-2 border-t border-[#102c3d]/[0.06] bg-[#fbfcfb]" : ""}`}>
                   <span className="block text-sm font-semibold text-[#102c3d] transition group-hover/item:text-[#0b6f63]">{item.title}</span>
-                  {item.description ? <span className="mt-1.5 block text-xs leading-5 text-[#102c3d]/56">{item.description}</span> : null}
+                  {item.description ? <span className="mt-1.5 block text-xs leading-5 text-[#102c3d]/[0.66]">{item.description}</span> : null}
                 </Link>
               ))}
             </div>
@@ -227,7 +227,7 @@ function MobileNavigation({ open, onToggle, onNavigate }: { open: boolean; onTog
         aria-expanded={open}
         aria-controls="public-mobile-navigation"
         onClick={onToggle}
-        className="grid h-11 w-11 place-items-center rounded-xl bg-white ring-1 ring-[#102c3d]/[0.1] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20"
+        className="grid h-11 w-11 place-items-center rounded-xl bg-white ring-1 ring-[#102c3d]/[0.1] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/[0.20]"
       >
         <span className="grid gap-1.5">
           <span className={`block h-px w-5 bg-[#102c3d] transition ${open ? "translate-y-[7px] rotate-45" : ""}`} />
@@ -244,14 +244,14 @@ function MobileNavigation({ open, onToggle, onNavigate }: { open: boolean; onTog
                 <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">{groupLabel}</p>
                 <div className="mt-2 grid">
                   {items.map((item) => (
-                    <Link key={item.title} href={item.href} onClick={onNavigate} className={`flex min-h-11 items-center rounded-xl px-2 py-2.5 text-sm font-semibold text-[#102c3d]/72 transition hover:bg-[#eef8f4] hover:text-[#102c3d] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/15 ${item.secondary ? "mt-1 border-t border-[#102c3d]/[0.06]" : ""}`}>
+                    <Link key={item.title} href={item.href} onClick={onNavigate} className={`flex min-h-11 items-center rounded-xl px-2 py-2.5 text-sm font-semibold text-[#102c3d]/[0.72] transition hover:bg-[#eef8f4] hover:text-[#102c3d] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/[0.15] ${item.secondary ? "mt-1 border-t border-[#102c3d]/[0.06]" : ""}`}>
                       {item.title}
                     </Link>
                   ))}
                 </div>
               </div>
             ))}
-            <Link href="/levytate/support" onClick={onNavigate} className="flex min-h-11 items-center rounded-xl px-2 text-sm font-semibold text-[#102c3d]/72">Support</Link>
+            <Link href="/levytate/support" onClick={onNavigate} className="flex min-h-11 items-center rounded-xl px-2 text-sm font-semibold text-[#102c3d]/[0.72]">Support</Link>
           </div>
           <div className="mt-5 grid grid-cols-2 gap-2 border-t border-[#102c3d]/[0.07] pt-4 sm:hidden">
             <Link href="/login" onClick={onNavigate} className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-xl bg-[#f6fbf8] px-2 text-[12px] font-semibold text-[#102c3d]">Login</Link>
@@ -270,9 +270,9 @@ export function PublicFooter() {
         <div className="grid gap-8 md:grid-cols-[1fr_auto] md:items-end">
           <div>
             <LevyTateLogo className="[--levytate-logo-size:2.2rem]" />
-            <p className="mt-4 max-w-lg text-sm leading-6 text-[#102c3d]/58">The operating system for employer apprenticeship programmes. Applications, learners, providers and operational work in one secure workspace.</p>
+            <p className="mt-4 max-w-lg text-sm leading-6 text-[#102c3d]/[0.68]">The operating system for employer apprenticeship programmes. Applications, learners, providers and operational work in one secure workspace.</p>
           </div>
-          <div className="flex flex-wrap gap-x-6 gap-y-3 text-sm font-semibold text-[#102c3d]/62 md:max-w-xl md:justify-end">
+          <div className="flex flex-wrap gap-x-6 gap-y-3 text-sm font-semibold text-[#102c3d]/[0.66] md:max-w-xl md:justify-end">
             <Link href="/solutions/employers" className="inline-flex min-h-11 items-center">Employers</Link>
             <Link href="/solutions/employees" className="inline-flex min-h-11 items-center">Employees</Link>
             <Link href="/solutions/training-providers" className="inline-flex min-h-11 items-center">Training providers</Link>
@@ -280,7 +280,7 @@ export function PublicFooter() {
             <Link href="/login" className="inline-flex min-h-11 items-center">Login</Link>
           </div>
         </div>
-        <div className="mt-8 flex flex-col gap-4 border-t border-[#102c3d]/[0.07] pt-6 text-xs text-[#102c3d]/48 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-8 flex flex-col gap-4 border-t border-[#102c3d]/[0.07] pt-6 text-xs text-[#102c3d]/[0.66] sm:flex-row sm:items-center sm:justify-between">
           <p>© {new Date().getFullYear()} LevyTate. Employer apprenticeship operations, connected.</p>
           <div className="flex flex-wrap gap-x-5 gap-y-2 font-semibold">
             <Link href="/levytate/privacy" className="inline-flex min-h-11 items-center">Privacy</Link>

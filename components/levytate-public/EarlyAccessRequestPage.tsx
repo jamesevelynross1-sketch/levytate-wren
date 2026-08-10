@@ -107,23 +107,23 @@ export function EarlyAccessRequestPage() {
               <h1 className="mt-6 text-[2.6rem] font-semibold leading-[1.04] tracking-[-0.03em] sm:text-5xl lg:text-[3.75rem]">
                 Request Early Access
               </h1>
-              <p className="mt-5 text-lg leading-8 text-[#102c3d]/66">
+              <p className="mt-5 text-lg leading-8 text-[#102c3d]/[0.72]">
                 Join a small group of employers helping shape the future of apprenticeship management.
               </p>
-              <p className="mt-4 max-w-xl text-base leading-7 text-[#102c3d]/58">
+              <p className="mt-4 max-w-xl text-base leading-7 text-[#102c3d]/[0.68]">
                 Access during the limited beta programme is offered to employers who want to improve visibility, reduce administration and build a clearer route from employee demand to approved delivery.
               </p>
 
               <div className="mt-8 grid gap-4">
                 {valuePoints.map(({ icon: Icon, title, copy }) => (
-                  <article key={title} className="rounded-[1.4rem] border border-[#102c3d]/[0.07] bg-white/88 p-5 shadow-[0_20px_55px_rgba(16,44,61,0.06)] backdrop-blur-xl">
+                  <article key={title} className="rounded-[1.4rem] border border-[#102c3d]/[0.07] bg-white/[0.88] p-5 shadow-[0_20px_55px_rgba(16,44,61,0.06)] backdrop-blur-xl">
                     <div className="flex items-start gap-4">
                       <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#eef8f4] text-[#0b8e82] ring-1 ring-[#159b8f]/[0.12]">
                         <Icon size={18} />
                       </div>
                       <div>
                         <h2 className="text-base font-semibold">{title}</h2>
-                        <p className="mt-2 text-sm leading-6 text-[#102c3d]/60">{copy}</p>
+                        <p className="mt-2 text-sm leading-6 text-[#102c3d]/[0.68]">{copy}</p>
                       </div>
                     </div>
                   </article>
@@ -131,7 +131,7 @@ export function EarlyAccessRequestPage() {
               </div>
             </div>
 
-            <div className="min-w-0 rounded-[2rem] border border-[#102c3d]/[0.08] bg-white/92 p-4 shadow-[0_34px_100px_rgba(16,44,61,0.13)] backdrop-blur-xl sm:p-5">
+            <div className="min-w-0 rounded-[2rem] border border-[#102c3d]/[0.08] bg-white/[0.92] p-4 shadow-[0_34px_100px_rgba(16,44,61,0.13)] backdrop-blur-xl sm:p-5">
               <div className="rounded-[1.6rem] border border-[#102c3d]/[0.06] bg-[#fbfcfc] p-5 sm:p-6">
                 {submittedLead ? (
                   <SuccessState organisation={submittedLead.organisation} />
@@ -140,7 +140,7 @@ export function EarlyAccessRequestPage() {
                     <div className="max-w-xl">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">Limited beta intake</p>
                       <h2 className="mt-2 text-3xl font-semibold tracking-[-0.025em]">Tell us about your organisation.</h2>
-                      <p className="mt-3 text-sm leading-7 text-[#102c3d]/60">
+                      <p className="mt-3 text-sm leading-7 text-[#102c3d]/[0.68]">
                         Keep it light. We only need enough context to assess fit for the early programme.
                       </p>
                     </div>
@@ -152,7 +152,7 @@ export function EarlyAccessRequestPage() {
                             required
                             value={form.organisation}
                             onChange={(event) => setForm((current) => ({ ...current, organisation: event.target.value }))}
-                            className="h-12 rounded-2xl border border-[#102c3d]/[0.08] bg-white px-4 text-sm font-medium text-[#102c3d] outline-none transition focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10"
+                            className="h-12 rounded-2xl border border-[#102c3d]/[0.08] bg-white px-4 text-sm font-medium text-[#102c3d] outline-none transition focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/[0.10]"
                             placeholder="Your organisation"
                           />
                         </Field>
@@ -161,7 +161,7 @@ export function EarlyAccessRequestPage() {
                             required
                             value={form.contactName}
                             onChange={(event) => setForm((current) => ({ ...current, contactName: event.target.value }))}
-                            className="h-12 rounded-2xl border border-[#102c3d]/[0.08] bg-white px-4 text-sm font-medium text-[#102c3d] outline-none transition focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10"
+                            className="h-12 rounded-2xl border border-[#102c3d]/[0.08] bg-white px-4 text-sm font-medium text-[#102c3d] outline-none transition focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/[0.10]"
                             placeholder="Your name"
                           />
                         </Field>
@@ -174,7 +174,7 @@ export function EarlyAccessRequestPage() {
                             type="email"
                             value={form.email}
                             onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
-                            className="h-12 rounded-2xl border border-[#102c3d]/[0.08] bg-white px-4 text-sm font-medium text-[#102c3d] outline-none transition focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10"
+                            className="h-12 rounded-2xl border border-[#102c3d]/[0.08] bg-white px-4 text-sm font-medium text-[#102c3d] outline-none transition focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/[0.10]"
                             placeholder="your.name@company.co.uk"
                           />
                         </Field>
@@ -183,7 +183,7 @@ export function EarlyAccessRequestPage() {
                             required
                             value={form.employeeCount}
                             onChange={(event) => setForm((current) => ({ ...current, employeeCount: event.target.value }))}
-                            className="h-12 rounded-2xl border border-[#102c3d]/[0.08] bg-white px-4 text-sm font-medium text-[#102c3d] outline-none transition focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10"
+                            className="h-12 rounded-2xl border border-[#102c3d]/[0.08] bg-white px-4 text-sm font-medium text-[#102c3d] outline-none transition focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/[0.10]"
                           >
                             <option value="">Select band</option>
                             {earlyAccessEmployeeBands.map((band) => (
@@ -197,7 +197,7 @@ export function EarlyAccessRequestPage() {
                         <input
                           value={form.biggestChallenge}
                           onChange={(event) => setForm((current) => ({ ...current, biggestChallenge: event.target.value }))}
-                          className="h-12 rounded-2xl border border-[#102c3d]/[0.08] bg-white px-4 text-sm font-medium text-[#102c3d] outline-none transition focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10"
+                          className="h-12 rounded-2xl border border-[#102c3d]/[0.08] bg-white px-4 text-sm font-medium text-[#102c3d] outline-none transition focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/[0.10]"
                           placeholder="Optional"
                         />
                       </Field>
@@ -207,15 +207,15 @@ export function EarlyAccessRequestPage() {
                           type="checkbox"
                           checked={form.consent}
                           onChange={(event) => setForm((current) => ({ ...current, consent: event.target.checked }))}
-                          className="mt-1 h-4 w-4 rounded border-[#102c3d]/20 text-[#0b8e82] focus:ring-[#159b8f]/20"
+                          className="mt-1 h-4 w-4 rounded border-[#102c3d]/[0.20] text-[#0b8e82] focus:ring-[#159b8f]/[0.20]"
                         />
-                        <span className="text-sm leading-6 text-[#102c3d]/68">
+                        <span className="text-sm leading-6 text-[#102c3d]/[0.68]">
                           I would like to be considered for LevyTate Early Access.
                         </span>
                       </label>
 
                       {message ? (
-                        <p className="rounded-2xl border border-[#c95568]/20 bg-[#fff4f5] px-4 py-3 text-sm text-[#a93d52]">
+                        <p className="rounded-2xl border border-[#c95568]/[0.20] bg-[#fff4f5] px-4 py-3 text-sm text-[#a93d52]">
                           {message}
                         </p>
                       ) : null}
@@ -248,7 +248,7 @@ export function EarlyAccessRequestPage() {
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="grid gap-2">
-      <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/48">{label}</span>
+      <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/[0.66]">{label}</span>
       {children}
     </label>
   );
@@ -262,7 +262,7 @@ function SuccessState({ organisation }: { organisation: string }) {
       </div>
       <p className="mt-6 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">Request received</p>
       <h2 className="mt-2 text-3xl font-semibold tracking-[-0.025em]">Thank you.</h2>
-      <p className="mt-4 max-w-lg text-base leading-7 text-[#102c3d]/62">
+      <p className="mt-4 max-w-lg text-base leading-7 text-[#102c3d]/[0.70]">
         Your Early Access request for {organisation} has been received. We are inviting a small number of employers into the LevyTate beta to help shape the platform. We will review your request and be in touch shortly.
       </p>
       <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
@@ -289,5 +289,4 @@ function persistSubmittedLead(lead: EarlyAccessRequest) {
     window.localStorage.setItem(earlyAccessStorageKey, JSON.stringify([lead]));
   }
 }
-
 

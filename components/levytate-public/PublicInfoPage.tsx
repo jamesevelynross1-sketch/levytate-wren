@@ -26,7 +26,7 @@ export function PublicInfoPage({
           <div className="mx-auto max-w-5xl px-5 py-16 sm:px-8 lg:py-20">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">{eyebrow}</p>
             <h1 className="mt-4 max-w-4xl text-4xl font-semibold leading-tight sm:text-5xl lg:text-6xl">{title}</h1>
-            <p className="mt-6 max-w-3xl text-lg leading-8 text-[#102c3d]/64">{description}</p>
+            <p className="mt-6 max-w-3xl text-lg leading-8 text-[#102c3d]/[0.72]">{description}</p>
           </div>
         </section>
 
@@ -36,14 +36,14 @@ export function PublicInfoPage({
               <article key={item.title} className="rounded-[1.5rem] border border-[#102c3d]/[0.07] bg-white p-6 shadow-[0_18px_50px_rgba(16,44,61,0.055)]">
                 <span className="text-xs font-semibold text-[#0b6f63]">0{index + 1}</span>
                 <h2 className="mt-4 text-xl font-semibold">{item.title}</h2>
-                <p className="mt-3 text-sm leading-7 text-[#102c3d]/60">{item.copy}</p>
+                <p className="mt-3 text-sm leading-7 text-[#102c3d]/[0.68]">{item.copy}</p>
               </article>
             ))}
           </div>
           <div className="mt-10 rounded-[1.7rem] bg-[#102c3d] p-7 text-white sm:flex sm:items-center sm:justify-between sm:gap-8">
             <div>
               <p className="text-sm font-semibold">LevyTate Early Access</p>
-              <p className="mt-2 max-w-xl text-sm leading-6 text-white/66">Speak with the LevyTate team about early access, employer requirements or provider partnership opportunities.</p>
+              <p className="mt-2 max-w-xl text-sm leading-6 text-white/[0.74]">Speak with the LevyTate team about early access, employer requirements or provider partnership opportunities.</p>
             </div>
             {isMailLink ? (
               <a href={ctaHref} className="mt-5 inline-flex min-h-11 shrink-0 items-center justify-center rounded-full bg-white px-5 text-sm font-semibold text-[#102c3d] sm:mt-0">{ctaLabel}</a>

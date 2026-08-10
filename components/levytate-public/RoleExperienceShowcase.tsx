@@ -42,13 +42,13 @@ const roles = [
 
 export function RoleExperienceShowcase() {
   return (
-    <div className="overflow-hidden rounded-[20px] bg-[#0a2333] shadow-[0_24px_70px_rgba(9,31,45,0.16)] ring-1 ring-[#102c3d]/10">
+    <div className="overflow-hidden rounded-[20px] bg-[#0a2333] shadow-[0_24px_70px_rgba(9,31,45,0.16)] ring-1 ring-[#102c3d]/[0.10]">
       <div className="grid border-b border-white/[0.08] px-5 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-7">
         <div>
           <p className="text-[12px] font-semibold text-white">Role-based workspace</p>
-          <p className="mt-1 text-[11px] text-white/40">One programme, deliberately different views</p>
+          <p className="mt-1 text-[11px] text-white/[0.64]">One programme, deliberately different views</p>
         </div>
-        <p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.13em] text-[#c7f0e4]/62 sm:mt-0">Access follows responsibility</p>
+        <p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.13em] text-[#c7f0e4]/[0.70] sm:mt-0">Access follows responsibility</p>
       </div>
 
       <div className="divide-y divide-white/[0.08]">
@@ -58,17 +58,17 @@ export function RoleExperienceShowcase() {
               <span className={`absolute inset-y-0 left-0 w-0.5 ${role.accent}`} aria-hidden="true" />
               <div className="flex items-baseline justify-between gap-4">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#ff9eaa]">{role.role}</p>
-                <span className="text-[11px] font-medium text-white/24">{role.number}</span>
+                <span className="text-[11px] font-medium text-white/[0.28]" aria-hidden="true">{role.number}</span>
               </div>
               <h3 className="mt-3 max-w-md text-[24px] font-semibold leading-[1.16] tracking-[-0.025em] text-white sm:text-[28px]">{role.headline}</h3>
-              <p className="mt-3 max-w-lg text-[14px] leading-6 text-white/54">{role.copy}</p>
+              <p className="mt-3 max-w-lg text-[15px] leading-6 text-white/[0.72]">{role.copy}</p>
             </div>
 
             <div className="border-t border-white/[0.08] bg-[#f4f7f6] p-4 text-[#102c3d] sm:p-5 lg:border-l lg:border-t-0">
               <div className="overflow-hidden rounded-[14px] bg-white ring-1 ring-[#102c3d]/[0.07]">
                 <div className="flex gap-5 overflow-x-auto border-b border-[#102c3d]/[0.07] px-4 sm:px-5" aria-label={`${role.role} primary modules`}>
                   {role.modules.map((module, index) => (
-                    <span key={module} className={`relative shrink-0 py-3.5 text-[11px] font-semibold ${index === 0 ? "text-[#102c3d]" : "text-[#102c3d]/38"}`}>
+                    <span key={module} className={`relative shrink-0 py-3.5 text-[11px] font-semibold ${index === 0 ? "text-[#102c3d]" : "text-[#102c3d]/[0.66]"}`}>
                       {module}
                       {index === 0 ? <span className="absolute inset-x-0 bottom-0 h-0.5 bg-[#159b8f]" aria-hidden="true" /> : null}
                     </span>
@@ -76,9 +76,9 @@ export function RoleExperienceShowcase() {
                 </div>
                 <div className="grid gap-4 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-5">
                   <div className="min-w-0">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/38">{role.section}</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/[0.66]">{role.section}</p>
                     <p className="mt-2 text-[13px] font-semibold">{role.title}</p>
-                    <p className="mt-1 text-[11px] leading-5 text-[#102c3d]/48">{role.detail}</p>
+                    <p className="mt-1 text-[11px] leading-5 text-[#102c3d]/[0.66]">{role.detail}</p>
                   </div>
                   <span className={`w-fit rounded-md px-2.5 py-1.5 text-[10px] font-semibold ${role.statusStyle}`}>{role.status}</span>
                 </div>

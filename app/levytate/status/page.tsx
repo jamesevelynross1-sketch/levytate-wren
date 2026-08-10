@@ -23,20 +23,20 @@ export default async function Page() {
       <header className="rounded-[1.6rem] bg-[#102c3d] px-6 py-8 text-white sm:px-10 sm:py-11">
         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8fe0d2]">Service health</p>
         <h1 className="mt-3 text-3xl font-semibold tracking-[-0.035em] sm:text-5xl">LevyTate status</h1>
-        <p className="mt-4 max-w-2xl text-sm leading-7 text-white/72 sm:text-base">A current check of the essential services needed to access LevyTate.</p>
+        <p className="mt-4 max-w-2xl text-sm leading-7 text-white/[0.76] sm:text-base">A current check of the essential services needed to access LevyTate.</p>
       </header>
       <section aria-live="polite" aria-atomic="true" className="mt-6 rounded-[1.4rem] border border-[#102c3d]/[0.08] bg-white p-6 shadow-[0_12px_30px_rgba(16,44,61,0.035)] sm:p-8">
         <div className={`grid h-12 w-12 place-items-center rounded-full text-lg font-bold ${display.tone}`} aria-hidden="true">{display.symbol}</div>
-        <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/45">Current status</p>
+        <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/[0.66]">Current status</p>
         <h2 className="mt-2 text-2xl font-semibold">{display.title}</h2>
-        <p className="mt-3 text-sm leading-7 text-[#102c3d]/65">{display.copy}</p>
-        <p className="mt-5 text-xs font-medium text-[#102c3d]/48">Last checked: {readiness ? new Date(readiness.checkedAt).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "medium", timeZone: "Europe/London" }) : "Not available"}</p>
+        <p className="mt-3 text-sm leading-7 text-[#102c3d]/[0.70]">{display.copy}</p>
+        <p className="mt-5 text-xs font-medium text-[#102c3d]/[0.66]">Last checked: {readiness ? new Date(readiness.checkedAt).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "medium", timeZone: "Europe/London" }) : "Not available"}</p>
       </section>
       <nav aria-label="Status help" className="mt-6 grid gap-3 sm:grid-cols-2">
-        <Link href="/levytate/support" className="flex min-h-12 items-center justify-center rounded-full bg-[#102c3d] px-5 text-sm font-semibold text-white focus:outline-none focus:ring-4 focus:ring-[#159b8f]/25">Contact Support</Link>
-        <Link href="/levytate/account-help" className="flex min-h-12 items-center justify-center rounded-full bg-white px-5 text-sm font-semibold text-[#102c3d] ring-1 ring-[#102c3d]/10 focus:outline-none focus:ring-4 focus:ring-[#159b8f]/25">Account Help</Link>
+        <Link href="/levytate/support" className="flex min-h-12 items-center justify-center rounded-full bg-[#102c3d] px-5 text-sm font-semibold text-white focus:outline-none focus:ring-4 focus:ring-[#159b8f]/[0.25]">Contact Support</Link>
+        <Link href="/levytate/account-help" className="flex min-h-12 items-center justify-center rounded-full bg-white px-5 text-sm font-semibold text-[#102c3d] ring-1 ring-[#102c3d]/[0.10] focus:outline-none focus:ring-4 focus:ring-[#159b8f]/[0.25]">Account Help</Link>
       </nav>
-      <p className="mt-7 text-xs leading-6 text-[#102c3d]/48">This page reports current checks only. LevyTate does not currently publish historical uptime or a formal service-level commitment.</p>
+      <p className="mt-7 text-xs leading-6 text-[#102c3d]/[0.66]">This page reports current checks only. LevyTate does not currently publish historical uptime or a formal service-level commitment.</p>
     </main>
     <PublicFooter />
   </div>;
