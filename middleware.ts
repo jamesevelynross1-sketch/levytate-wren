@@ -3,6 +3,7 @@ import { levytateBetaSessionCookie, readLevyTateBetaSession } from "@/lib/levyta
 
 const levytateHosts = new Set(["levytate.co.uk", "www.levytate.co.uk"]);
 const publicTrustPaths = new Set(["/privacy", "/early-access-terms", "/data-processing", "/support", "/account-help", "/data-rights"]);
+const legacyDemoPathPrefixes = ["/portakabin-apprenticeship-hub", "/future-talent-portal", "/levytate-mvp", "/levytate/ground-control"];
 
 function isLevyTateHost(request: NextRequest) {
   const host = request.headers.get("host")?.split(":")[0]?.toLowerCase() ?? "";
@@ -25,6 +26,10 @@ export async function middleware(request: NextRequest) {
   }
 
   const { pathname } = request.nextUrl;
+
+  if (legacyDemoPathPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) {
+    return new NextResponse("Not Found", { status: 404 });
+  }
 
   if (pathname === "/") {
     return NextResponse.rewrite(new URL("/levytate", request.url));
