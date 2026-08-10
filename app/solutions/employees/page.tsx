@@ -2,63 +2,83 @@ import type { Metadata } from "next";
 import { SolutionPage } from "@/components/levytate-public/SolutionPage";
 
 export const metadata: Metadata = {
-  title: "For Employees",
-  description: "Explore how LevyTate helps employees understand approved apprenticeship pathways and manage one clear application.",
+  title: "Employee Apprenticeship Journey",
+  description: "LevyTate gives employees one clear place to apply, follow application status, understand next steps and track their apprenticeship journey.",
 };
 
 export default function EmployeesSolutionPage() {
   return (
     <SolutionPage
       eyebrow="LevyTate for employees"
-      title="Find a development route that makes sense for your role and goals."
-      description="LevyTate gives employees supportive, role-aware guidance so they can understand suitable pathways, prepare for a manager conversation and track one clear application."
+      title="A clear apprenticeship journey from application onwards."
+      description="Apply, see where your application sits and follow what happens after approval without chasing different teams for an update."
       primaryCta="Request Early Access"
       primaryHref="/early-access"
-      secondaryCta="Login to Beta"
+      secondaryCta="Login"
       secondaryHref="/login"
-      painsTitle="Employees should not need apprenticeship expertise to understand their options."
+      visualEyebrow="Employee experience"
+      visualTitle="My Application"
+      visualItems={[
+        { label: "Current status", value: "Awaiting manager review", detail: "The current owner is clear.", status: "In progress" },
+        { label: "Next step", value: "Manager decision", detail: "You will see when the status changes.", status: "Next" },
+        { label: "My Apprenticeship", value: "Journey in one place", detail: "Available once the apprenticeship begins.", status: "Connected" },
+        { label: "Guidance", value: "Help when you need it", detail: "Copilot and the Guidance Centre support the journey.", status: "Support" },
+      ]}
+      painsTitle="Employees should always understand where they are and what happens next."
       pains={[
-        "Long lists of standards are difficult to interpret",
-        "Programme names do not explain role relevance",
-        "Career goals are disconnected from available pathways",
-        "Application steps and ownership are unclear",
-        "Employees repeat the same information to different people",
-        "Progress is difficult to track after submission",
+        "Application steps are difficult to find",
+        "The current decision owner is unclear",
+        "Updates depend on chasing HR or L&D",
+        "Manager conversations begin without enough context",
+        "The journey disappears after approval",
+        "Apprenticeship information can be difficult to interpret",
       ]}
       sections={[
         {
-          label: "Ask LevyTate AI",
-          title: "Start with your role, interests and future goals",
-          copy: "Ask open questions and receive plain-English guidance grounded in pathways approved by your employer.",
-          points: ["Role-aware conversations", "Support for career uncertainty", "Clear suitability explanations", "Honest guidance when information is limited"],
+          id: "my-application",
+          label: "My Application",
+          title: "Complete one clear application",
+          copy: "Employees can prepare, save and submit their current apprenticeship application from one focused workspace.",
+          points: ["One active application", "Clear application questions", "Draft before submission", "Submit to the Line Manager"],
         },
         {
-          label: "Pathway discovery",
-          title: "Compare suitable routes without marketplace noise",
-          copy: "Explore approved pathways by role fit, learner benefit, business value, duration and commitment.",
-          points: ["Primary and alternative pathways", "Business and learner outcomes", "Time commitment explained", "Approved options only"],
+          id: "status",
+          label: "Status visibility",
+          title: "Know where the decision sits",
+          copy: "The application view shows the current status, the responsible reviewer and the next step in the approval journey.",
+          points: ["Current application status", "Current reviewer", "Decision progression", "Next action explained"],
         },
         {
-          label: "Application support",
-          title: "Prepare one clear expression of interest",
-          copy: "LevyTate helps structure the information a manager needs while enforcing one active application at a time.",
-          points: ["Reason for interest", "Career goal", "Current role and site", "Support requirements"],
+          id: "next-steps",
+          label: "Clear next steps",
+          title: "Move forward without chasing updates",
+          copy: "Employees can see when they need to provide information and when the application is waiting with someone else.",
+          points: ["Action required states", "Requested information", "Manager review stage", "Final approval stage"],
         },
         {
-          label: "Progress tracking",
-          title: "See exactly where your application sits",
-          copy: "Follow progress from submission to manager review, final approval and enrolment readiness.",
-          points: ["Current status", "Current reviewer", "Decision history", "Clear next step"],
+          id: "my-apprenticeship",
+          label: "My Apprenticeship",
+          title: "Follow the journey after approval",
+          copy: "Once learning begins, the employee experience continues with a clear view of the apprenticeship journey and current operational context.",
+          points: ["Programme context", "Lifecycle visibility", "Reviews and progress", "Completion journey"],
         },
         {
-          label: "Manager conversation",
-          title: "Make development conversations easier to start",
-          copy: "Use concise pathway rationale and manager-ready notes to discuss suitability, timing and business benefit.",
-          points: ["Plain-English pathway summary", "Business benefit prompts", "Support needs captured", "Manager message draft"],
+          id: "manager-conversation",
+          label: "Manager conversations",
+          title: "Start better development conversations",
+          copy: "Use the same application and apprenticeship context to make conversations about timing, support and next steps easier.",
+          points: ["Shared application context", "Support needs captured", "Clear business rationale", "Visible manager ownership"],
+        },
+        {
+          id: "guidance",
+          label: "Guidance and Copilot",
+          title: "Get support without losing the human journey",
+          copy: "Plain-English guidance helps employees understand apprenticeship information, prepare application content and navigate to the right task.",
+          points: ["Application preparation", "Next-step explanation", "Apprenticeship information", "Platform navigation"],
         },
       ]}
-      closingTitle="Development guidance should feel supportive, not confusing."
-      closingCopy="Join a limited employer beta to explore a clearer employee experience for apprenticeship discovery and applications."
+      closingTitle="Your apprenticeship journey should never feel hidden."
+      closingCopy="LevyTate gives employees a clear application, visible next steps and one place to follow the journey after approval."
     />
   );
 }

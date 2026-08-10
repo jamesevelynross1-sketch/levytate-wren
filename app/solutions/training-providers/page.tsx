@@ -2,57 +2,76 @@ import type { Metadata } from "next";
 import { SolutionPage } from "@/components/levytate-public/SolutionPage";
 
 export const metadata: Metadata = {
-  title: "For Training Providers",
-  description: "Explore LevyTate provider partnership packages and qualified employer matching opportunities.",
+  title: "Provider Relationships in LevyTate",
+  description: "See how LevyTate helps employers maintain clearer provider, programme and learner relationships inside their apprenticeship operations.",
 };
 
 export default function TrainingProvidersSolutionPage() {
   return (
     <SolutionPage
-      eyebrow="LevyTate for training providers"
-      title="Build trusted employer relationships through a curated provider network."
-      description="LevyTate is building a carefully selected provider network focused on qualified employer demand, delivery fit and long-term partnership rather than marketplace advertising."
-      primaryCta="Discuss Partner Packages"
-      primaryHref="mailto:hello@levytate.co.uk?subject=LevyTate provider partner packages"
+      eyebrow="Training providers in LevyTate"
+      title="Help employers maintain clearer, more connected provider relationships."
+      description="LevyTate is employer-led. Its developing provider ecosystem keeps delivery partners, programmes and learner relationships visible alongside apprenticeship operations."
+      primaryCta="Talk to LevyTate"
+      primaryHref="mailto:hello@levytate.co.uk?subject=LevyTate%20provider%20relationships"
       secondaryCta="View employer solution"
       secondaryHref="/solutions/employers"
-      painsTitle="Strong providers need qualified opportunities, not another advertising marketplace."
+      visualEyebrow="Employer provider view"
+      visualTitle="Provider relationships"
+      visualItems={[
+        { label: "Provider record", value: "Delivery partner", detail: "Clear organisation and delivery context.", status: "Visible" },
+        { label: "Programmes", value: "Associated provision", detail: "Programmes stay connected to the employer view.", status: "Linked" },
+        { label: "Learners", value: "Operational relationships", detail: "Provider context sits alongside learner operations.", status: "Connected" },
+        { label: "Workspace", value: "Employer controlled", detail: "The employer operating model remains central.", status: "Employer-led" },
+      ]}
+      painsTitle="Provider relationships work better when operational context stays connected."
       pains={[
-        "Employer requirements often arrive without enough detail",
-        "Programme fit is difficult to assess early",
-        "Introductions do not always reflect delivery capability",
-        "Geography and delivery model are considered too late",
-        "Provider expertise is reduced to a basic listing",
-        "Partnership value is difficult to demonstrate",
+        "Provider details sit in separate files",
+        "Programmes are disconnected from learner activity",
+        "Ownership is unclear across organisations",
+        "Operational context gets lost between conversations",
+        "Provider activity is difficult to view alongside the programme",
+        "Employers lack one consistent relationship record",
       ]}
       sections={[
         {
-          label: "Why partner",
-          title: "A partnership model built around employer outcomes",
-          copy: "LevyTate is developing a curated network where provider expertise is considered alongside real employer requirements.",
-          points: ["Qualified employer introductions", "Relevant sector positioning", "Strategic partnership packages", "Early access to platform capabilities"],
+          id: "employer-led",
+          label: "Employer-led model",
+          title: "Keep the employer programme at the centre",
+          copy: "LevyTate is built to help employers operate their apprenticeship programme. Provider information supports that operating view.",
+          points: ["Employer-controlled workspace", "Operational purpose first", "Clear role boundaries", "No paid recommendation influence"],
         },
         {
-          label: "Provider matching",
-          title: "Structured requests before an introduction is made",
-          copy: "Employer needs are captured consistently so potential partners can assess programme, learner, location and delivery fit.",
-          points: ["Role and workforce need", "Learner volumes and locations", "Delivery preference", "Funding position and urgency"],
+          id: "provider-visibility",
+          label: "Provider visibility",
+          title: "Maintain a clear delivery-partner view",
+          copy: "Provider records give employer apprenticeship teams consistent context about the organisations supporting delivery.",
+          points: ["Provider organisation context", "Delivery information", "Relationship visibility", "Controlled provider records"],
         },
         {
-          label: "Provider capability",
-          title: "Present the expertise that makes delivery credible",
-          copy: "Partner profiles are designed to represent specialist programme capability without implying paid influence over recommendations.",
-          points: ["Programme and occupational expertise", "Delivery models and regions", "Quality and verification status", "Employer and learner fit"],
+          id: "programmes",
+          label: "Associated programmes",
+          title: "Connect providers to the programmes they support",
+          copy: "Programme associations help employers understand how delivery partners fit into their current apprenticeship environment.",
+          points: ["Programme associations", "Delivery context", "Employer programme view", "Clear provider links"],
         },
         {
-          label: "Partner packages",
-          title: "Commercial partnerships with clear boundaries",
-          copy: "Provider participation can support visibility and collaboration, but recommendations remain independent and employer-led.",
-          points: ["No pay-to-rank recommendations", "Controlled provider shortlists", "Transparent matching rationale", "Long-term relationship management"],
+          id: "learner-relationships",
+          label: "Learner relationships",
+          title: "Keep provider context beside learner operations",
+          copy: "Provider relationships remain visible alongside the learner lifecycle so operational teams do not have to reconstruct the context elsewhere.",
+          points: ["Learner and provider connection", "Operational clarity", "Shared programme context", "Visible relationship ownership"],
+        },
+        {
+          id: "developing-ecosystem",
+          label: "Developing ecosystem",
+          title: "Build clearer ways to work together",
+          copy: "LevyTate is developing its provider-management capability with a focus on factual information, controlled relationships and employer needs.",
+          points: ["Factual provider information", "Transparent relationship context", "Employer-led development", "Clear commercial boundaries"],
         },
       ]}
-      closingTitle="Discuss where your delivery expertise could support employer demand."
-      closingCopy="Speak with LevyTate about partner packages, capability verification and the standards expected from the curated provider network."
+      closingTitle="Make provider relationships part of the operating model."
+      closingCopy="Talk to LevyTate about its developing provider ecosystem and how clearer provider information can support employer apprenticeship operations."
     />
   );
 }
