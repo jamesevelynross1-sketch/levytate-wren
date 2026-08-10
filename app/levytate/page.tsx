@@ -1,15 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import {
-  ArrowRight,
-  BookOpenCheck,
-  Building2,
-  ClipboardCheck,
-  GraduationCap,
-  ShieldCheck,
-  Sparkles,
-  UsersRound,
-} from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { ApprenticeshipLifecycle } from "@/components/levytate-public/ApprenticeshipLifecycle";
 import { OperationsCentrePreview } from "@/components/levytate-public/OperationsCentrePreview";
 import { PublicFooter, PublicHeader } from "@/components/levytate-public/PublicHeader";
@@ -21,55 +12,31 @@ export const metadata: Metadata = {
 };
 
 const operatingAreas = [
-  {
-    id: "applications-approvals",
-    label: "Applications",
-    title: "Keep every decision moving",
-    copy: "Connect employee submission, Line Manager review and Apprenticeship Lead approval in one visible workflow.",
-    detail: "Employee submission · Manager decision · Final approval",
-    icon: ClipboardCheck,
-  },
-  {
-    id: "learner-management",
-    label: "Learners",
-    title: "Run the operational learner journey",
-    copy: "Maintain lifecycle records, reviews, progress, breaks and completion activity once an apprenticeship begins.",
-    detail: "Enrolment · Progress · Reviews · Completion",
-    icon: GraduationCap,
-  },
-  {
-    id: "provider-management",
-    label: "Providers",
-    title: "Keep delivery partners connected",
-    copy: "See the providers and programmes supporting your learners without separating them from day-to-day operations.",
-    detail: "Relationships · Programmes · Learner associations",
-    icon: Building2,
-  },
-  {
-    id: "people-programmes",
-    label: "People",
-    title: "Connect roles, managers and activity",
-    copy: "Keep organisational context alongside applications and apprenticeship activity so ownership stays clear.",
-    detail: "People · Roles · Managers · Organisation",
-    icon: UsersRound,
-  },
-  {
-    id: "programmes",
-    label: "Programmes",
-    title: "Maintain the employer programme view",
-    copy: "Give apprenticeship teams a clear view of the programmes available inside their employer environment.",
-    detail: "Programme catalogue · Availability · Delivery context",
-    icon: BookOpenCheck,
-  },
+  { label: "Applications", title: "Keep every decision moving", copy: "Connect employee submission, Line Manager review and Apprenticeship Lead approval in one visible workflow.", detail: "Employee submission · Manager decision · Final approval" },
+  { label: "Learners", title: "Run the operational learner journey", copy: "Maintain lifecycle records, reviews, progress, breaks and completion activity once an apprenticeship begins.", detail: "Enrolment · Progress · Reviews · Completion" },
+  { label: "Providers", title: "Keep delivery partners connected", copy: "See the providers and programmes supporting learners without separating them from day-to-day operations.", detail: "Relationships · Programmes · Learner associations" },
+  { label: "People", title: "Connect roles, managers and activity", copy: "Keep organisational context alongside applications and apprenticeship activity so ownership stays clear.", detail: "People · Roles · Managers · Organisation" },
+  { label: "Programmes", title: "Maintain the employer programme view", copy: "Give apprenticeship teams a clear view of programmes available inside their employer environment.", detail: "Programme catalogue · Availability · Delivery context" },
 ] as const;
 
 const fragmentation = [
-  "Employee interest arrives in different places",
-  "Manager approval gets stuck in email",
-  "Learner information sits across spreadsheets and providers",
-  "Operational actions are easy to miss",
-  "Apprenticeship Leads lack one operating view",
+  ["01", "Employee interest arrives in different places"],
+  ["02", "Manager approval gets stuck in email"],
+  ["03", "Learner information sits across spreadsheets and providers"],
+  ["04", "Operational actions are easy to miss"],
+  ["05", "Apprenticeship Leads lack one operating view"],
 ] as const;
+
+const controls = [
+  ["01", "Secure sign-in", "Individual access with a clear identity boundary."],
+  ["02", "Role-based access", "Experiences and actions follow responsibility."],
+  ["03", "Organisation separation", "Employer workspaces remain distinct."],
+  ["04", "Controlled permissions", "Access can be governed, expired and revoked."],
+] as const;
+
+const frame = "mx-auto max-w-[90rem] px-6 sm:px-8 lg:px-10 xl:px-12";
+const eyebrow = "text-[11px] font-semibold uppercase tracking-[0.14em] text-[#a9475a]";
+const sectionHeading = "text-balance text-[clamp(2.5rem,4vw,3.55rem)] font-semibold leading-[1.04] tracking-[-0.04em]";
 
 export default function LevyTateLandingPage() {
   return (
@@ -94,30 +61,35 @@ export default function LevyTateLandingPage() {
 
 function HeroSection() {
   return (
-    <section className="relative overflow-hidden border-b border-[#102c3d]/[0.07]">
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_12%_14%,rgba(199,240,228,0.92),transparent_31rem),radial-gradient(circle_at_93%_2%,rgba(255,128,144,0.19),transparent_29rem),linear-gradient(180deg,#f8fcfa_0%,#eef7f3_100%)]" />
-      <div className="mx-auto grid max-w-[90rem] gap-10 px-5 py-12 sm:px-8 lg:py-16 xl:grid-cols-[0.82fr_1.18fr] xl:items-center xl:gap-14">
-        <div className="max-w-3xl">
-          <p className="inline-flex min-h-9 items-center rounded-full bg-white px-4 text-[11px] font-semibold uppercase tracking-[0.15em] text-[#0b6f63] ring-1 ring-[#159b8f]/15 shadow-[0_10px_30px_rgba(16,44,61,0.05)]">
-            Built for employer apprenticeship teams
-          </p>
-          <h1 className="mt-6 text-balance text-[2.75rem] font-semibold leading-[1.02] tracking-[-0.045em] sm:text-6xl lg:text-[4.35rem]">
-            The operating system for employer apprenticeship programmes.
+    <section className="relative overflow-hidden border-b border-[#102c3d]/[0.07] bg-[linear-gradient(180deg,#fbfdfc_0%,#f1f8f5_100%)]">
+      <div className="pointer-events-none absolute right-[-8rem] top-[-16rem] h-[34rem] w-[34rem] rounded-full bg-[#c7f0e4]/40 blur-3xl" aria-hidden="true" />
+      <div className={`${frame} relative grid gap-12 py-14 sm:py-16 lg:py-20 xl:grid-cols-[46fr_54fr] xl:items-center xl:gap-12`}>
+        <div className="max-w-[39rem]">
+          <div className="flex items-center gap-3">
+            <span className="h-px w-8 bg-[#c95568]" aria-hidden="true" />
+            <p className={eyebrow}>Built for employer apprenticeship teams</p>
+          </div>
+          <h1 className="mt-6 text-[clamp(3.15rem,4.2vw,3.75rem)] font-semibold leading-[0.99] tracking-[-0.055em] 2xl:text-[4rem]">
+            <span className="xl:block xl:whitespace-nowrap">The operating system</span>{" "}
+            <span className="xl:block xl:whitespace-nowrap">for employer</span>{" "}
+            <span className="xl:block xl:whitespace-nowrap">apprenticeship</span>{" "}
+            <span className="xl:block xl:whitespace-nowrap">programmes.</span>
           </h1>
-          <p className="mt-6 max-w-2xl text-lg leading-8 text-[#102c3d]/66">
+          <p className="mt-7 max-w-[37rem] text-[17px] leading-[1.65] text-[#102c3d]/64 sm:text-[18px]">
             Bring employee applications, manager approvals, learner management, providers and apprenticeship operations into one secure workspace.
           </p>
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-            <Link href="/early-access" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-[#102c3d] px-6 text-sm font-semibold text-white shadow-[0_18px_38px_rgba(16,44,61,0.18)] transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/25">
-              Request Early Access
-              <ArrowRight size={16} aria-hidden="true" />
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <Link href="/early-access" className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-[#102c3d] px-5 text-[13px] font-semibold text-white transition-colors hover:bg-[#183b50] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/25">
+              Request Early Access <ArrowRight size={15} aria-hidden="true" />
             </Link>
-            <a href="#product" className="inline-flex min-h-12 items-center justify-center rounded-full bg-white px-6 text-sm font-semibold text-[#102c3d] ring-1 ring-[#102c3d]/[0.1] transition hover:-translate-y-0.5 hover:ring-[#159b8f]/30 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20">
+            <a href="#product" className="inline-flex h-12 items-center justify-center rounded-xl bg-white px-5 text-[13px] font-semibold text-[#102c3d] ring-1 ring-[#102c3d]/[0.1] transition-colors hover:bg-[#f4f8f6] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20">
               See how LevyTate works
             </a>
           </div>
         </div>
-        <OperationsCentrePreview />
+        <div className="mx-auto w-full max-w-[780px] xl:mx-0 xl:justify-self-end">
+          <OperationsCentrePreview />
+        </div>
       </div>
     </section>
   );
@@ -125,28 +97,23 @@ function HeroSection() {
 
 function ProblemSection() {
   return (
-    <section id="product" className="scroll-mt-24 border-b border-[#102c3d]/[0.07] bg-white">
-      <div className="mx-auto grid max-w-7xl gap-10 px-5 py-16 sm:px-8 lg:grid-cols-[0.86fr_1.14fr] lg:items-center lg:py-20">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">One connected apprenticeship workspace</p>
-          <h2 className="mt-4 text-balance text-3xl font-semibold leading-tight tracking-[-0.035em] sm:text-5xl">
-            Running apprenticeships should not mean running spreadsheets, inboxes and disconnected provider conversations.
-          </h2>
-          <p className="mt-5 max-w-xl text-base leading-7 text-[#102c3d]/60">
-            LevyTate gives the people responsible for apprenticeship delivery one place to see the journey, the owner and the next action.
-          </p>
+    <section id="product" className="scroll-mt-24 bg-white">
+      <div className={`${frame} grid gap-14 py-24 lg:grid-cols-[.92fr_1.08fr] lg:items-start lg:py-28`}>
+        <div className="max-w-[42rem]">
+          <p className={eyebrow}>One connected apprenticeship workspace</p>
+          <h2 className={`mt-5 ${sectionHeading}`}>Running apprenticeships should not mean running spreadsheets, inboxes and disconnected provider conversations.</h2>
+          <p className="mt-6 max-w-[38rem] text-[17px] leading-7 text-[#102c3d]/60">LevyTate gives the people responsible for apprenticeship delivery one place to see the journey, the owner and the next action.</p>
         </div>
-        <div className="overflow-hidden rounded-[1.6rem] border border-[#102c3d]/[0.08] bg-[#f6f9f8] shadow-[0_22px_65px_rgba(16,44,61,0.07)]">
-          {fragmentation.map((item, index) => (
-            <div key={item} className="grid grid-cols-[2.6rem_minmax(0,1fr)_auto] items-center gap-3 border-b border-[#102c3d]/[0.06] px-4 py-4 last:border-b-0 sm:px-5">
-              <span className="grid h-8 w-8 place-items-center rounded-xl bg-white text-xs font-semibold text-[#c95568] ring-1 ring-[#102c3d]/[0.07]">0{index + 1}</span>
-              <p className="text-sm font-semibold leading-5 text-[#102c3d]/70">{item}</p>
-              <ArrowRight size={15} className="text-[#102c3d]/30" aria-hidden="true" />
+        <div className="border-y border-[#102c3d]/[0.1]">
+          {fragmentation.map(([number, item]) => (
+            <div key={item} className="grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-4 border-b border-[#102c3d]/[0.07] py-4 last:border-b-0 sm:py-5">
+              <span className="text-[11px] font-semibold text-[#c95568]">{number}</span>
+              <p className="text-[14px] font-medium leading-6 text-[#102c3d]/68 sm:text-[15px]">{item}</p>
             </div>
           ))}
-          <div className="bg-[#102c3d] px-5 py-5 text-white sm:flex sm:items-center sm:justify-between sm:gap-6">
-            <p className="text-lg font-semibold">Replace fragmentation with one operating view.</p>
-            <span className="mt-2 inline-flex rounded-full bg-[#c7f0e4] px-3 py-1.5 text-xs font-semibold text-[#102c3d] sm:mt-0">Clear ownership</span>
+          <div className="flex items-center gap-4 border-t border-[#102c3d]/[0.1] py-5">
+            <span className="h-2 w-2 bg-[#159b8f]" aria-hidden="true" />
+            <p className="text-[15px] font-semibold">Replace fragmentation with one operating view.</p>
           </div>
         </div>
       </div>
@@ -156,16 +123,16 @@ function ProblemSection() {
 
 function RoleSection() {
   return (
-    <section id="role-experiences" className="scroll-mt-24">
-      <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8 lg:py-20">
-        <div className="max-w-4xl">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">Role-based experiences</p>
-          <h2 className="mt-3 text-balance text-4xl font-semibold leading-tight tracking-[-0.035em] sm:text-5xl">One platform. Different experiences.</h2>
-          <p className="mt-5 max-w-3xl text-base leading-7 text-[#102c3d]/60">Each user sees the work, people and decisions relevant to their role. The programme stays connected without exposing everything to everyone.</p>
+    <section id="role-experiences" className="scroll-mt-24 border-y border-[#102c3d]/[0.07]">
+      <div className={`${frame} py-24 lg:py-28`}>
+        <div className="grid gap-6 lg:grid-cols-[.72fr_1.28fr] lg:items-end">
+          <div>
+            <p className={eyebrow}>Role-based experiences</p>
+            <h2 className={`mt-4 ${sectionHeading}`}>One platform. Different experiences.</h2>
+          </div>
+          <p className="max-w-[42rem] text-[17px] leading-7 text-[#102c3d]/60 lg:justify-self-end">Each user sees the work, people and decisions relevant to their role. The programme stays connected without exposing everything to everyone.</p>
         </div>
-        <div className="mt-10">
-          <RoleExperienceShowcase />
-        </div>
+        <div className="mt-12"><RoleExperienceShowcase /></div>
       </div>
     </section>
   );
@@ -174,13 +141,15 @@ function RoleSection() {
 function LifecycleSection() {
   return (
     <section id="lifecycle" className="scroll-mt-24 bg-[#102c3d] text-white">
-      <div className="mx-auto grid max-w-7xl gap-10 px-5 py-16 sm:px-8 lg:grid-cols-[0.62fr_1.38fr] lg:items-start lg:py-20">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#ffde59]">The connected apprenticeship lifecycle</p>
-          <h2 className="mt-4 text-balance text-3xl font-semibold leading-tight tracking-[-0.03em] sm:text-4xl">Keep information and ownership connected from interest to completion.</h2>
-          <p className="mt-5 text-base leading-7 text-white/62">LevyTate supports the operational handoffs between employees, managers, apprenticeship teams and providers. People remain in control at every stage.</p>
+      <div className={`${frame} py-24 lg:py-28`}>
+        <div className="grid gap-7 lg:grid-cols-[.76fr_1.24fr] lg:items-end">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#c7f0e4]/66">The connected apprenticeship lifecycle</p>
+            <h2 className="mt-4 text-balance text-[clamp(2.5rem,4vw,3.55rem)] font-semibold leading-[1.04] tracking-[-0.04em]">Keep information and ownership connected from interest to completion.</h2>
+          </div>
+          <p className="max-w-[42rem] text-[16px] leading-7 text-white/56 lg:justify-self-end">Operational handoffs remain visible between employees, managers, apprenticeship teams and providers. People stay in control at every stage.</p>
         </div>
-        <ApprenticeshipLifecycle />
+        <div className="mt-14 border-t border-white/10 pt-10"><ApprenticeshipLifecycle /></div>
       </div>
     </section>
   );
@@ -188,18 +157,16 @@ function LifecycleSection() {
 
 function OperationsSection() {
   return (
-    <section id="operations-centre" className="scroll-mt-24 border-b border-[#102c3d]/[0.07] bg-white">
-      <div className="mx-auto max-w-[90rem] px-5 py-16 sm:px-8 lg:py-20">
-        <div className="grid gap-8 lg:grid-cols-[0.7fr_1.3fr] lg:items-end">
+    <section id="operations-centre" className="scroll-mt-24 bg-white">
+      <div className={`${frame} py-24 lg:py-28`}>
+        <div className="grid gap-7 lg:grid-cols-[.82fr_1.18fr] lg:items-end">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">The Operations Centre</p>
-            <h2 className="mt-3 text-balance text-4xl font-semibold leading-tight tracking-[-0.035em] sm:text-5xl">See what needs attention before it becomes a problem.</h2>
+            <p className={eyebrow}>The Operations Centre</p>
+            <h2 className={`mt-4 ${sectionHeading}`}>See what needs attention before it becomes a problem.</h2>
           </div>
-          <p className="max-w-2xl text-base leading-7 text-[#102c3d]/60 lg:justify-self-end">The daily operating view brings applications, learner status, reviews, provider activity and upcoming operational events into one prioritised workspace.</p>
+          <p className="max-w-[40rem] text-[17px] leading-7 text-[#102c3d]/60 lg:justify-self-end">Applications, learner status, reviews, provider activity and upcoming operational events in one prioritised daily view.</p>
         </div>
-        <div className="mt-10">
-          <OperationsCentrePreview detailed />
-        </div>
+        <div className="mt-12"><OperationsCentrePreview detailed /></div>
       </div>
     </section>
   );
@@ -207,29 +174,27 @@ function OperationsSection() {
 
 function OperatingAreasSection() {
   return (
-    <section className="border-b border-[#102c3d]/[0.07]">
-      <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8 lg:py-20">
-        <div className="max-w-4xl">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">Core operating areas</p>
-          <h2 className="mt-3 text-balance text-4xl font-semibold leading-tight tracking-[-0.035em] sm:text-5xl">The programme, organised around the work.</h2>
+    <section className="border-y border-[#102c3d]/[0.07] bg-[#f0f7f4]">
+      <div className={`${frame} grid gap-14 py-24 lg:grid-cols-[.68fr_1.32fr] lg:py-28`}>
+        <div className="max-w-md lg:sticky lg:top-28 lg:self-start">
+          <p className={eyebrow}>Core operating areas</p>
+          <h2 className={`mt-4 ${sectionHeading}`}>The programme, organised around the work.</h2>
+          <p className="mt-6 text-[16px] leading-7 text-[#102c3d]/58">Five connected areas give apprenticeship teams a common operating model without flattening every task into the same view.</p>
         </div>
-        <div className="mt-10 divide-y divide-[#102c3d]/[0.08] border-y border-[#102c3d]/[0.08]">
-          {operatingAreas.map((area, index) => {
-            const Icon = area.icon;
-            return (
-              <article id={area.id} key={area.label} className="scroll-mt-28 grid gap-4 py-6 sm:grid-cols-[3rem_0.55fr_1fr] sm:items-start sm:gap-6 lg:py-8">
-                <span className="grid h-11 w-11 place-items-center rounded-xl bg-white text-[#0b6f63] shadow-[0_8px_25px_rgba(16,44,61,0.06)] ring-1 ring-[#102c3d]/[0.07]"><Icon size={20} aria-hidden="true" /></span>
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">0{index + 1} · {area.label}</p>
-                  <h3 className="mt-2 text-xl font-semibold tracking-[-0.02em] sm:text-2xl">{area.title}</h3>
-                </div>
-                <div>
-                  <p className="text-sm leading-6 text-[#102c3d]/62">{area.copy}</p>
-                  <p className="mt-3 text-xs font-semibold text-[#0b6f63]">{area.detail}</p>
-                </div>
-              </article>
-            );
-          })}
+        <div className="border-y border-[#102c3d]/[0.1] bg-white">
+          {operatingAreas.map((area, index) => (
+            <article id={index === 0 ? "applications-approvals" : index === 1 ? "learner-management" : index === 2 ? "provider-management" : index === 3 ? "people-programmes" : "programmes"} key={area.label} className="scroll-mt-28 grid gap-4 border-b border-[#102c3d]/[0.07] px-5 py-7 last:border-b-0 sm:grid-cols-[3rem_.8fr_1.2fr] sm:gap-6 sm:px-7">
+              <span className="text-[11px] font-semibold text-[#c95568]">0{index + 1}</span>
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#0b6f63]">{area.label}</p>
+                <h3 className="mt-2 text-[21px] font-semibold leading-tight tracking-[-0.025em]">{area.title}</h3>
+              </div>
+              <div>
+                <p className="text-[14px] leading-6 text-[#102c3d]/58">{area.copy}</p>
+                <p className="mt-3 text-[11px] font-semibold text-[#102c3d]/46">{area.detail}</p>
+              </div>
+            </article>
+          ))}
         </div>
       </div>
     </section>
@@ -237,31 +202,32 @@ function OperatingAreasSection() {
 }
 
 function CopilotSection() {
-  const prompts = ["What happens next?", "Help me prepare my application", "Open my current work"];
   return (
     <section id="copilot" className="scroll-mt-24 bg-white">
-      <div className="mx-auto grid max-w-7xl gap-10 px-5 py-16 sm:px-8 lg:grid-cols-[0.78fr_1.22fr] lg:items-center lg:py-20">
+      <div className={`${frame} grid gap-14 py-24 lg:grid-cols-[.72fr_1.28fr] lg:items-center lg:py-28`}>
         <div>
-          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#102c3d] text-[#ffde59]"><Sparkles size={20} aria-hidden="true" /></div>
-          <p className="mt-6 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">LevyTate Copilot</p>
-          <h2 className="mt-3 text-balance text-4xl font-semibold leading-tight tracking-[-0.035em] sm:text-5xl">An intelligent support layer across the apprenticeship experience.</h2>
-          <p className="mt-5 text-base leading-7 text-[#102c3d]/60">Copilot helps users understand next steps, interpret apprenticeship information, support applications and navigate LevyTate. It supports people without replacing their decisions.</p>
+          <p className={eyebrow}>LevyTate Copilot</p>
+          <h2 className={`mt-4 ${sectionHeading}`}>An intelligent support layer across the apprenticeship experience.</h2>
+          <p className="mt-6 max-w-[38rem] text-[17px] leading-7 text-[#102c3d]/60">Copilot explains next steps, supports applications and helps people continue the right LevyTate workflow. It supports decisions without replacing them.</p>
         </div>
-        <div className="rounded-[1.7rem] bg-[#102c3d] p-3 text-white shadow-[0_28px_80px_rgba(16,44,61,0.2)] sm:p-5">
-          <div className="rounded-[1.25rem] bg-white p-5 text-[#102c3d]">
-            <div className="flex items-center justify-between gap-3 border-b border-[#102c3d]/[0.06] pb-4">
-              <div>
-                <p className="text-sm font-semibold">LevyTate Copilot</p>
-                <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.13em] text-[#0b6f63]">Role-aware platform guidance</p>
+        <div className="overflow-hidden rounded-[20px] bg-[#0a2333] text-white shadow-[0_24px_70px_rgba(9,31,45,0.16)]">
+          <div className="flex items-center justify-between border-b border-white/[0.08] px-6 py-4">
+            <div><p className="text-[13px] font-semibold">Copilot</p><p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-white/36">Application context</p></div>
+            <span className="text-[10px] font-medium text-[#c7f0e4]/60">Grounded in your current work</span>
+          </div>
+          <div className="grid gap-0 bg-[#f4f7f6] text-[#102c3d] sm:grid-cols-[.78fr_1.22fr]">
+            <div className="border-b border-[#102c3d]/[0.07] p-5 sm:border-b-0 sm:border-r sm:p-6">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/38">Current step</p>
+              <p className="mt-3 text-[14px] font-semibold">Awaiting manager review</p>
+              <p className="mt-2 text-[12px] leading-5 text-[#102c3d]/48">Application submitted · Line Manager owns the next action</p>
+            </div>
+            <div className="bg-white p-5 sm:p-6">
+              <p className="text-[11px] font-semibold text-[#0b6f63]">What happens next?</p>
+              <p className="mt-3 text-[13px] leading-6 text-[#102c3d]/66">Your manager reviews the application first. If approved, it moves to the Apprenticeship Lead for a final decision before enrolment.</p>
+              <div className="mt-5 flex items-center justify-between border-t border-[#102c3d]/[0.07] pt-4">
+                <span className="text-[10px] text-[#102c3d]/38">Source · Current application workflow</span>
+                <span className="text-[11px] font-semibold text-[#0b6f63]">Open application</span>
               </div>
-              <Sparkles size={18} className="text-[#c95568]" aria-hidden="true" />
-            </div>
-            <div className="mt-4 rounded-xl bg-[#eef8f4] p-4">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#0b6f63]">Copilot</p>
-              <p className="mt-2 text-sm leading-6 text-[#102c3d]/68">I can explain your current step, help prepare a draft or take you to the right LevyTate workflow.</p>
-            </div>
-            <div className="mt-4 grid gap-2 sm:grid-cols-3">
-              {prompts.map((prompt) => <div key={prompt} className="flex min-h-12 items-center rounded-xl bg-[#f6f9f8] px-3 text-xs font-semibold text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.06]">{prompt}</div>)}
             </div>
           </div>
         </div>
@@ -271,28 +237,20 @@ function CopilotSection() {
 }
 
 function SecuritySection() {
-  const controls = [
-    "Individual secure sign-in",
-    "Role-based access",
-    "Organisation-level workspace separation",
-    "Controlled user permissions",
-    "Access expiry and revocation",
-    "Separate employee, manager and lead experiences",
-  ];
   return (
-    <section id="security" className="scroll-mt-24 border-y border-[#102c3d]/[0.07] bg-[#edf7f3]">
-      <div className="mx-auto grid max-w-7xl gap-10 px-5 py-16 sm:px-8 lg:grid-cols-[0.72fr_1.28fr] lg:items-center lg:py-20">
-        <div>
-          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-[#0b6f63] shadow-[0_10px_30px_rgba(16,44,61,0.06)]"><ShieldCheck size={23} aria-hidden="true" /></div>
-          <p className="mt-6 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">Control and security</p>
-          <h2 className="mt-3 text-balance text-4xl font-semibold leading-tight tracking-[-0.035em] sm:text-5xl">Everyone sees what they need. Nothing more.</h2>
-          <p className="mt-5 text-base leading-7 text-[#102c3d]/60">Secure employer workspaces keep operational context available to the right people while preserving clear role and organisation boundaries.</p>
+    <section id="security" className="scroll-mt-24 bg-[#0a2333] text-white">
+      <div className={`${frame} py-24 lg:py-28`}>
+        <div className="max-w-[48rem]">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#c7f0e4]/66">Control and security</p>
+          <h2 className="mt-4 text-balance text-[clamp(2.5rem,4vw,3.55rem)] font-semibold leading-[1.04] tracking-[-0.04em]">Everyone sees what they need. Nothing more.</h2>
+          <p className="mt-6 max-w-[40rem] text-[16px] leading-7 text-white/54">Secure employer workspaces preserve clear role and organisation boundaries while keeping operational context available to the right people.</p>
         </div>
-        <div className="grid gap-2 sm:grid-cols-2">
-          {controls.map((control, index) => (
-            <div key={control} className="flex min-h-[4.5rem] items-center gap-3 rounded-[1rem] bg-white px-4 py-3 ring-1 ring-[#102c3d]/[0.06]">
-              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-[#102c3d] text-[10px] font-semibold text-white">0{index + 1}</span>
-              <p className="text-sm font-semibold leading-5 text-[#102c3d]/70">{control}</p>
+        <div className="mt-12 grid border-y border-white/10 sm:grid-cols-2 lg:grid-cols-4">
+          {controls.map(([number, title, copy], index) => (
+            <div key={title} className={`px-0 py-6 sm:px-6 lg:py-8 ${index % 2 === 0 ? "sm:border-r" : ""} ${index < 2 ? "border-b lg:border-b-0" : ""} lg:border-r lg:last:border-r-0 border-white/10`}>
+              <p className="text-[10px] font-semibold text-[#ff9eaa]">{number}</p>
+              <h3 className="mt-5 text-[16px] font-semibold">{title}</h3>
+              <p className="mt-3 text-[12px] leading-5 text-white/42">{copy}</p>
             </div>
           ))}
         </div>
@@ -304,13 +262,13 @@ function SecuritySection() {
 function ProviderSection() {
   return (
     <section className="bg-white">
-      <div className="mx-auto grid max-w-7xl gap-8 px-5 py-14 sm:px-8 lg:grid-cols-[1fr_auto] lg:items-center lg:py-16">
-        <div className="max-w-4xl">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">Provider relationships</p>
-          <h2 className="mt-3 text-balance text-3xl font-semibold leading-tight tracking-[-0.03em] sm:text-4xl">Keep delivery partners connected to your apprenticeship operations.</h2>
-          <p className="mt-4 max-w-3xl text-base leading-7 text-[#102c3d]/60">Maintain provider visibility, associated programmes and learner relationships alongside the operational programme. LevyTate remains employer-led.</p>
+      <div className={`${frame} grid gap-8 py-20 lg:grid-cols-[1fr_auto] lg:items-center lg:py-24`}>
+        <div className="max-w-[56rem]">
+          <p className={eyebrow}>Provider relationships</p>
+          <h2 className="mt-4 text-balance text-[clamp(2rem,3vw,2.8rem)] font-semibold leading-[1.08] tracking-[-0.035em]">Keep delivery partners connected to your apprenticeship operations.</h2>
+          <p className="mt-5 max-w-[45rem] text-[16px] leading-7 text-[#102c3d]/58">Maintain provider, programme and learner relationships alongside the operational programme. LevyTate remains employer-led.</p>
         </div>
-        <Link href="/solutions/training-providers" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-[#eef8f4] px-6 text-sm font-semibold text-[#0b6f63] ring-1 ring-[#159b8f]/15 transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20">Provider context <ArrowRight size={15} aria-hidden="true" /></Link>
+        <Link href="/solutions/training-providers" className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-[#102c3d]/[0.1] px-5 text-[13px] font-semibold text-[#102c3d] transition-colors hover:bg-[#f0f7f4] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20">Provider context <ArrowRight size={15} aria-hidden="true" /></Link>
       </div>
     </section>
   );
@@ -318,16 +276,16 @@ function ProviderSection() {
 
 function FinalCta() {
   return (
-    <section className="px-5 pb-16 pt-4 sm:px-8 lg:pb-20">
-      <div className="mx-auto grid max-w-7xl gap-8 overflow-hidden rounded-[2rem] bg-[#102c3d] p-7 text-white shadow-[0_28px_80px_rgba(16,44,61,0.2)] sm:p-10 lg:grid-cols-[1fr_auto] lg:items-center">
+    <section className="px-6 pb-20 sm:px-8 lg:px-10 lg:pb-24 xl:px-12">
+      <div className="mx-auto grid max-w-[90rem] gap-8 overflow-hidden rounded-[20px] bg-[#102c3d] p-7 text-white sm:p-10 lg:grid-cols-[1fr_auto] lg:items-center lg:p-12">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#ffde59]">Core Early Access</p>
-          <h2 className="mt-3 text-balance text-4xl font-semibold leading-tight tracking-[-0.035em] sm:text-5xl">Run apprenticeships from one place.</h2>
-          <p className="mt-4 max-w-3xl text-base leading-7 text-white/65">LevyTate is opening Early Access to employers that want a clearer way to manage applications, learners, providers and apprenticeship operations.</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#c7f0e4]/66">Core Early Access</p>
+          <h2 className="mt-4 text-balance text-[clamp(2.5rem,4vw,3.55rem)] font-semibold leading-[1.04] tracking-[-0.04em]">Run apprenticeships from one place.</h2>
+          <p className="mt-5 max-w-[46rem] text-[16px] leading-7 text-white/56">LevyTate is opening Early Access to employers that want a clearer way to manage applications, learners, providers and apprenticeship operations.</p>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
-          <Link href="/early-access" className="inline-flex min-h-12 items-center justify-center rounded-full bg-white px-6 text-sm font-semibold text-[#102c3d] transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#c7f0e4]/35">Request Early Access</Link>
-          <a href="mailto:hello@levytate.co.uk?subject=Book%20a%20LevyTate%20demonstration" className="inline-flex min-h-12 items-center justify-center rounded-full bg-white/10 px-6 text-sm font-semibold text-white ring-1 ring-white/15 transition hover:-translate-y-0.5 hover:bg-white/15 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#c7f0e4]/30">Book a demonstration</a>
+          <Link href="/early-access" className="inline-flex h-12 items-center justify-center rounded-xl bg-white px-5 text-[13px] font-semibold text-[#102c3d] transition-colors hover:bg-[#eef8f4] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#c7f0e4]/35">Request Early Access</Link>
+          <a href="mailto:hello@levytate.co.uk?subject=Book%20a%20LevyTate%20demonstration" className="inline-flex h-12 items-center justify-center rounded-xl border border-white/15 px-5 text-[13px] font-semibold text-white transition-colors hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#c7f0e4]/30">Book a demonstration</a>
         </div>
       </div>
     </section>

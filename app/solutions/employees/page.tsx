@@ -9,6 +9,7 @@ export const metadata: Metadata = {
 export default function EmployeesSolutionPage() {
   return (
     <SolutionPage
+      variant="employee"
       eyebrow="LevyTate for employees"
       title="A clear apprenticeship journey from application onwards."
       description="Apply, see where your application sits and follow what happens after approval without chasing different teams for an update."

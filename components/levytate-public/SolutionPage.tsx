@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Check, CircleDot } from "lucide-react";
+import { ArrowRight, Check } from "lucide-react";
 import { PublicFooter, PublicHeader } from "@/components/levytate-public/PublicHeader";
 
 export type SolutionSection = {
@@ -18,6 +18,7 @@ export type SolutionVisualItem = {
 };
 
 export type SolutionPageProps = {
+  variant: "employer" | "employee" | "provider";
   eyebrow: string;
   title: string;
   description: string;
@@ -35,7 +36,10 @@ export type SolutionPageProps = {
   closingCopy: string;
 };
 
+const frame = "mx-auto max-w-[90rem] px-6 sm:px-8 lg:px-10 xl:px-12";
+
 export function SolutionPage({
+  variant,
   eyebrow,
   title,
   description,
@@ -56,32 +60,36 @@ export function SolutionPage({
     <div className="min-h-screen bg-[#f6fbf8] text-[#102c3d]">
       <PublicHeader />
       <main>
-        <section className="relative overflow-hidden border-b border-[#102c3d]/[0.07]">
-          <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_15%_12%,rgba(199,240,228,0.88),transparent_31rem),radial-gradient(circle_at_92%_2%,rgba(255,128,144,0.16),transparent_28rem),linear-gradient(180deg,#f8fcfa_0%,#eef7f3_100%)]" />
-          <div className="mx-auto grid max-w-[90rem] gap-10 px-5 py-12 sm:px-8 lg:py-16 xl:grid-cols-[0.82fr_1.18fr] xl:items-center xl:gap-14">
-            <div className="max-w-3xl">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">{eyebrow}</p>
-              <h1 className="mt-4 text-balance text-[2.65rem] font-semibold leading-[1.03] tracking-[-0.045em] sm:text-6xl lg:text-[4.2rem]">{title}</h1>
-              <p className="mt-6 max-w-2xl text-lg leading-8 text-[#102c3d]/65">{description}</p>
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+        <section className="relative overflow-hidden border-b border-[#102c3d]/[0.07] bg-[linear-gradient(180deg,#fbfdfc_0%,#f1f8f5_100%)]">
+          <div className={`${frame} grid gap-12 py-14 sm:py-16 lg:py-20 xl:grid-cols-[45fr_55fr] xl:items-center xl:gap-16`}>
+            <div className="max-w-[42rem]">
+              <div className="flex items-center gap-3">
+                <span className="h-px w-8 bg-[#c95568]" aria-hidden="true" />
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#a9475a]">{eyebrow}</p>
+              </div>
+              <h1 className="mt-6 text-balance text-[clamp(3rem,4.5vw,4.1rem)] font-semibold leading-[1] tracking-[-0.05em]">{title}</h1>
+              <p className="mt-7 max-w-[39rem] text-[17px] leading-[1.65] text-[#102c3d]/64 sm:text-[18px]">{description}</p>
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
                 <ActionLink href={primaryHref} primary>{primaryCta}<ArrowRight size={15} aria-hidden="true" /></ActionLink>
                 {secondaryCta && secondaryHref ? <ActionLink href={secondaryHref}>{secondaryCta}</ActionLink> : null}
               </div>
             </div>
-            <SolutionHeroVisual eyebrow={visualEyebrow} title={visualTitle} items={visualItems} />
+            <div className="mx-auto w-full max-w-[760px] xl:mx-0 xl:justify-self-end">
+              <SolutionHeroVisual variant={variant} eyebrow={visualEyebrow} title={visualTitle} items={visualItems} />
+            </div>
           </div>
         </section>
 
         <section className="bg-[#102c3d] text-white">
-          <div className="mx-auto grid max-w-7xl gap-10 px-5 py-14 sm:px-8 lg:grid-cols-[0.7fr_1.3fr] lg:items-start lg:py-16">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#ffde59]">The challenge</p>
-              <h2 className="mt-3 text-balance text-3xl font-semibold leading-tight tracking-[-0.03em] sm:text-4xl">{painsTitle}</h2>
+          <div className={`${frame} grid gap-12 py-20 lg:grid-cols-[.78fr_1.22fr] lg:py-24`}>
+            <div className="max-w-[34rem]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#c7f0e4]/64">The challenge</p>
+              <h2 className="mt-4 text-balance text-[clamp(2.35rem,3.5vw,3.2rem)] font-semibold leading-[1.06] tracking-[-0.038em]">{painsTitle}</h2>
             </div>
-            <ul className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
-              {pains.map((pain) => (
-                <li key={pain} className="flex min-h-[4.2rem] items-center gap-3 border-b border-white/10 py-3 text-sm font-semibold leading-5 text-white/70">
-                  <CircleDot size={15} className="shrink-0 text-[#ff8090]" aria-hidden="true" />
+            <ul className="grid border-y border-white/10 sm:grid-cols-2">
+              {pains.map((pain, index) => (
+                <li key={pain} className={`grid min-h-[76px] grid-cols-[2rem_minmax(0,1fr)] items-center gap-3 border-b border-white/10 py-4 text-[13px] font-medium leading-5 text-white/62 sm:px-5 ${index % 2 === 0 ? "sm:border-r" : ""} ${index >= pains.length - 2 ? "sm:border-b-0" : ""}`}>
+                  <span className="text-[10px] font-semibold text-[#ff9eaa]">0{index + 1}</span>
                   <span>{pain}</span>
                 </li>
               ))}
@@ -90,35 +98,36 @@ export function SolutionPage({
         </section>
 
         <section className="bg-white">
-          <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8 lg:py-20">
-            <div className="max-w-4xl">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">How LevyTate helps</p>
-              <h2 className="mt-3 text-balance text-4xl font-semibold leading-tight tracking-[-0.035em] sm:text-5xl">A focused experience built around the work people need to complete.</h2>
+          <div className={`${frame} py-24 lg:py-28`}>
+            <div className="grid gap-6 lg:grid-cols-[.72fr_1.28fr] lg:items-end">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#a9475a]">How LevyTate helps</p>
+                <h2 className="mt-4 text-balance text-[clamp(2.5rem,4vw,3.55rem)] font-semibold leading-[1.04] tracking-[-0.04em]">A focused experience built around the work people need to complete.</h2>
+              </div>
+              <p className="max-w-[40rem] text-[16px] leading-7 text-[#102c3d]/56 lg:justify-self-end">Every section keeps the current task, owner and next step clear—without forcing every role into the same interface.</p>
             </div>
 
-            <div className="mt-12 divide-y divide-[#102c3d]/[0.08] border-y border-[#102c3d]/[0.08]">
+            <div className="mt-14 border-y border-[#102c3d]/[0.1]">
               {sections.map((section, index) => (
-                <article id={section.id} key={section.title} className="scroll-mt-28 grid gap-7 py-8 lg:grid-cols-[0.72fr_1.28fr] lg:items-start lg:gap-12 lg:py-10">
+                <article id={section.id} key={section.title} className="scroll-mt-28 grid gap-7 border-b border-[#102c3d]/[0.07] py-9 last:border-b-0 lg:grid-cols-[3rem_.78fr_1.22fr] lg:gap-10 lg:py-11">
+                  <span className="text-[11px] font-semibold text-[#c95568]">{String(index + 1).padStart(2, "0")}</span>
                   <div>
-                    <div className="flex items-center justify-between gap-4">
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#0b6f63]">{section.label}</p>
-                      <span className="text-xs font-semibold text-[#102c3d]/28">{String(index + 1).padStart(2, "0")}</span>
-                    </div>
-                    <h3 className="mt-3 text-2xl font-semibold leading-tight tracking-[-0.025em] sm:text-3xl">{section.title}</h3>
-                    <p className="mt-4 text-sm leading-7 text-[#102c3d]/60">{section.copy}</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#0b6f63]">{section.label}</p>
+                    <h3 className="mt-3 text-[26px] font-semibold leading-[1.12] tracking-[-0.03em] sm:text-[30px]">{section.title}</h3>
+                    <p className="mt-4 max-w-[34rem] text-[14px] leading-7 text-[#102c3d]/58">{section.copy}</p>
                   </div>
-                  <FeaturePanel section={section} index={index} />
+                  <FeatureIndex points={section.points} featured={variant === "employer" && index === 0} />
                 </article>
               ))}
             </div>
           </div>
         </section>
 
-        <section className="border-t border-[#102c3d]/[0.07] bg-[#eef8f4] px-5 py-16 sm:px-8 lg:py-20">
-          <div className="mx-auto grid max-w-7xl gap-8 rounded-[2rem] bg-[#102c3d] p-7 text-white shadow-[0_28px_80px_rgba(16,44,61,0.18)] sm:p-10 lg:grid-cols-[1fr_auto] lg:items-center">
+        <section className="border-t border-[#102c3d]/[0.07] bg-[#eef7f3] px-6 py-20 sm:px-8 lg:px-10 lg:py-24 xl:px-12">
+          <div className="mx-auto grid max-w-[90rem] gap-8 rounded-[20px] bg-[#102c3d] p-7 text-white sm:p-10 lg:grid-cols-[1fr_auto] lg:items-center lg:p-12">
             <div>
-              <h2 className="text-balance text-3xl font-semibold leading-tight tracking-[-0.03em] sm:text-4xl">{closingTitle}</h2>
-              <p className="mt-4 max-w-2xl text-base leading-7 text-white/66">{closingCopy}</p>
+              <h2 className="max-w-[54rem] text-balance text-[clamp(2.35rem,3.6vw,3.35rem)] font-semibold leading-[1.05] tracking-[-0.04em]">{closingTitle}</h2>
+              <p className="mt-5 max-w-[44rem] text-[16px] leading-7 text-white/56">{closingCopy}</p>
             </div>
             <ActionLink href={primaryHref} light>{primaryCta}<ArrowRight size={15} aria-hidden="true" /></ActionLink>
           </div>
@@ -129,54 +138,78 @@ export function SolutionPage({
   );
 }
 
-function SolutionHeroVisual({ eyebrow, title, items }: { eyebrow: string; title: string; items: SolutionVisualItem[] }) {
+function SolutionHeroVisual({ variant, eyebrow, title, items }: { variant: SolutionPageProps["variant"]; eyebrow: string; title: string; items: SolutionVisualItem[] }) {
+  const accent = variant === "employee" ? "bg-[#d65b70]" : variant === "provider" ? "bg-[#567f9d]" : "bg-[#159b8f]";
   return (
-    <div className="min-w-0 overflow-hidden rounded-[1.7rem] bg-[#102c3d] p-3 text-white shadow-[0_32px_90px_rgba(16,44,61,0.22)] sm:p-4">
-      <div className="overflow-hidden rounded-[1.3rem] bg-[#f6f9f8] text-[#102c3d]">
-        <div className="flex items-center justify-between gap-4 border-b border-[#102c3d]/[0.07] bg-white px-4 py-4 sm:px-5">
+    <div className="overflow-hidden rounded-[22px] bg-[#0a2333] text-white shadow-[0_30px_85px_rgba(9,31,45,0.22)] ring-1 ring-white/10">
+      <div className="flex items-center justify-between gap-5 border-b border-white/[0.08] px-5 py-4 sm:px-6">
+        <div className="flex items-center gap-4">
+          <span className={`h-2 w-2 ${accent}`} aria-hidden="true" />
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">{eyebrow}</p>
-            <p className="mt-1.5 text-lg font-semibold tracking-[-0.02em]">{title}</p>
-          </div>
-          <span className="rounded-full bg-[#eaf7f2] px-3 py-1.5 text-[10px] font-semibold text-[#0b6f63]">Example view</span>
-        </div>
-        <div className="p-3 sm:p-4">
-          <div className="grid gap-2 sm:grid-cols-2">
-            {items.map((item, index) => (
-              <div key={item.label} className={`min-w-0 rounded-[1.05rem] p-4 ring-1 ${index === 0 ? "bg-[#102c3d] text-white ring-[#102c3d]" : "bg-white ring-[#102c3d]/[0.06]"}`}>
-                <div className="flex items-start justify-between gap-3">
-                  <p className={`text-[10px] font-semibold uppercase tracking-[0.13em] ${index === 0 ? "text-[#c7f0e4]/70" : "text-[#102c3d]/38"}`}>{item.label}</p>
-                  {item.status ? <span className={`shrink-0 rounded-full px-2 py-1 text-[9px] font-semibold ${index === 0 ? "bg-white/10 text-white/75" : "bg-[#eef8f4] text-[#0b6f63]"}`}>{item.status}</span> : null}
-                </div>
-                <p className="mt-4 truncate text-sm font-semibold">{item.value}</p>
-                <p className={`mt-1.5 text-xs leading-5 ${index === 0 ? "text-white/52" : "text-[#102c3d]/48"}`}>{item.detail}</p>
-              </div>
-            ))}
+            <p className="text-[13px] font-semibold">{title}</p>
+            <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-white/36">{eyebrow}</p>
           </div>
         </div>
+        <p className="text-[10px] text-white/36">Example workspace</p>
+      </div>
+      <div className={`bg-[#f4f7f6] p-4 text-[#102c3d] sm:p-5 ${variant === "employee" ? "sm:px-8 sm:py-7" : ""}`}>
+        {variant === "employee" ? <EmployeeVisual items={items} /> : variant === "provider" ? <ProviderVisual items={items} /> : <EmployerVisual items={items} />}
       </div>
     </div>
   );
 }
 
-function FeaturePanel({ section, index }: { section: SolutionSection; index: number }) {
-  const dark = index % 4 === 0;
+function EmployerVisual({ items }: { items: SolutionVisualItem[] }) {
   return (
-    <div className={`rounded-[1.3rem] p-4 sm:p-5 ${dark ? "bg-[#102c3d] text-white" : index % 2 === 0 ? "bg-[#eef8f4] text-[#102c3d]" : "bg-[#f6f9f8] text-[#102c3d] ring-1 ring-[#102c3d]/[0.06]"}`}>
-      <p className={`text-[10px] font-semibold uppercase tracking-[0.14em] ${dark ? "text-[#ffde59]" : "text-[#c95568]"}`}>In the workspace</p>
-      <ul className="mt-3 grid gap-2 sm:grid-cols-2">
-        {section.points.map((point) => (
-          <li key={point} className={`flex min-h-[3.5rem] items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-semibold leading-5 ${dark ? "bg-white/[0.07] text-white/72" : "bg-white text-[#102c3d]/66"}`}>
-            <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-lg ${dark ? "bg-[#c7f0e4] text-[#102c3d]" : "bg-[#102c3d] text-white"}`}><Check size={13} aria-hidden="true" /></span>
-            <span>{point}</span>
-          </li>
-        ))}
-      </ul>
+    <div className="overflow-hidden rounded-[14px] bg-white ring-1 ring-[#102c3d]/[0.07]">
+      <div className="border-b border-[#102c3d]/[0.07] px-5 py-4"><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/38">Programme overview</p><p className="mt-2 text-[17px] font-semibold tracking-[-0.02em]">Today&apos;s operating view</p></div>
+      {items.map((item) => (
+        <div key={item.label} className="grid gap-3 border-b border-[#102c3d]/[0.06] px-5 py-4 last:border-b-0 sm:grid-cols-[.55fr_1fr_auto] sm:items-center">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#102c3d]/38">{item.label}</p>
+          <div><p className="text-[12px] font-semibold">{item.value}</p><p className="mt-1 text-[10px] text-[#102c3d]/44">{item.detail}</p></div>
+          {item.status ? <span className="w-fit rounded-md bg-[#eaf7f2] px-2 py-1 text-[10px] font-semibold text-[#0b6f63]">{item.status}</span> : null}
+        </div>
+      ))}
     </div>
   );
 }
 
+function EmployeeVisual({ items }: { items: SolutionVisualItem[] }) {
+  return (
+    <div className="overflow-hidden rounded-[14px] bg-white ring-1 ring-[#102c3d]/[0.07]">
+      <div className="border-b border-[#102c3d]/[0.07] px-5 py-5"><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#a9475a]">{items[0]?.label}</p><div className="mt-3 flex items-center justify-between gap-4"><p className="text-[17px] font-semibold">{items[0]?.value}</p><span className="rounded-md bg-[#fff1f3] px-2 py-1 text-[10px] font-semibold text-[#a53b4f]">{items[0]?.status}</span></div><p className="mt-2 text-[11px] text-[#102c3d]/46">{items[0]?.detail}</p></div>
+      <div className="divide-y divide-[#102c3d]/[0.06] px-5">
+        {items.slice(1).map((item, index) => <div key={item.label} className="grid grid-cols-[24px_minmax(0,1fr)] gap-3 py-4"><span className="grid h-6 w-6 place-items-center rounded-full bg-[#eef7f3] text-[9px] font-semibold text-[#0b6f63]">0{index + 1}</span><div><p className="text-[11px] font-semibold">{item.value}</p><p className="mt-1 text-[10px] leading-4 text-[#102c3d]/44">{item.detail}</p></div></div>)}
+      </div>
+    </div>
+  );
+}
+
+function ProviderVisual({ items }: { items: SolutionVisualItem[] }) {
+  return (
+    <div className="grid overflow-hidden rounded-[14px] bg-white ring-1 ring-[#102c3d]/[0.07] sm:grid-cols-[.82fr_1.18fr]">
+      <div className="border-b border-[#102c3d]/[0.07] bg-[#102c3d] p-5 text-white sm:border-b-0 sm:border-r sm:border-white/10"><p className="text-[10px] uppercase tracking-[0.12em] text-[#c7f0e4]/60">{items[0]?.label}</p><p className="mt-4 text-[18px] font-semibold">{items[0]?.value}</p><p className="mt-2 text-[11px] leading-5 text-white/46">{items[0]?.detail}</p></div>
+      <div className="divide-y divide-[#102c3d]/[0.06] px-5">
+        {items.slice(1).map((item) => <div key={item.label} className="grid grid-cols-[.65fr_1fr] gap-3 py-4"><p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#102c3d]/36">{item.label}</p><div><p className="text-[11px] font-semibold">{item.value}</p><p className="mt-1 text-[10px] leading-4 text-[#102c3d]/44">{item.detail}</p></div></div>)}
+      </div>
+    </div>
+  );
+}
+
+function FeatureIndex({ points, featured }: { points: string[]; featured: boolean }) {
+  return (
+    <ul className={`grid overflow-hidden rounded-[14px] sm:grid-cols-2 ${featured ? "bg-[#102c3d] text-white" : "bg-[#f3f7f5] text-[#102c3d]"}`}>
+      {points.map((point, index) => (
+        <li key={point} className={`flex min-h-[70px] items-center gap-3 border-b p-4 text-[12px] font-medium leading-5 sm:px-5 ${featured ? "border-white/[0.08] text-white/66" : "border-[#102c3d]/[0.06] text-[#102c3d]/62"} ${index % 2 === 0 ? "sm:border-r" : ""} ${index >= points.length - 2 ? "sm:border-b-0" : ""}`}>
+          <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-md ${featured ? "bg-[#c7f0e4] text-[#102c3d]" : "bg-white text-[#0b6f63]"}`}><Check size={12} aria-hidden="true" /></span>
+          <span>{point}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function ActionLink({ href, children, primary = false, light = false }: { href: string; children: React.ReactNode; primary?: boolean; light?: boolean }) {
-  const classes = `inline-flex min-h-12 items-center justify-center gap-2 rounded-full px-6 text-sm font-semibold transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-4 ${light ? "bg-white text-[#102c3d] focus-visible:ring-[#c7f0e4]/35" : primary ? "bg-[#102c3d] text-white shadow-[0_16px_34px_rgba(16,44,61,0.16)] focus-visible:ring-[#159b8f]/25" : "bg-white text-[#102c3d] ring-1 ring-[#102c3d]/[0.1] focus-visible:ring-[#159b8f]/20"}`;
+  const classes = `inline-flex h-12 items-center justify-center gap-2 rounded-xl px-5 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-4 ${light ? "bg-white text-[#102c3d] hover:bg-[#eef8f4] focus-visible:ring-[#c7f0e4]/35" : primary ? "bg-[#102c3d] text-white hover:bg-[#183b50] focus-visible:ring-[#159b8f]/25" : "bg-white text-[#102c3d] ring-1 ring-[#102c3d]/[0.1] hover:bg-[#f4f8f6] focus-visible:ring-[#159b8f]/20"}`;
   return href.startsWith("/") ? <Link href={href} className={classes}>{children}</Link> : <a href={href} className={classes}>{children}</a>;
 }

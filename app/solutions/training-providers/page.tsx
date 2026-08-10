@@ -9,6 +9,7 @@ export const metadata: Metadata = {
 export default function TrainingProvidersSolutionPage() {
   return (
     <SolutionPage
+      variant="provider"
       eyebrow="Training providers in LevyTate"
       title="Help employers maintain clearer, more connected provider relationships."
       description="LevyTate is employer-led. Its developing provider ecosystem keeps delivery partners, programmes and learner relationships visible alongside apprenticeship operations."

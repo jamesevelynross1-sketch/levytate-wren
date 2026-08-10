@@ -1,8 +1,8 @@
 const summaryItems = [
-  { label: "Needs attention", value: "4", tone: "coral" },
-  { label: "Ready to enrol", value: "2", tone: "mint" },
-  { label: "Reviews due", value: "3", tone: "yellow" },
-  { label: "Active learners", value: "18", tone: "blue" },
+  { label: "Needs attention", value: "4", context: "2 due today", tone: "bg-[#d65b70]" },
+  { label: "Ready to enrol", value: "2", context: "Details complete", tone: "bg-[#159b8f]" },
+  { label: "Reviews due", value: "3", context: "Next 14 days", tone: "bg-[#c79b35]" },
+  { label: "Active learners", value: "18", context: "Across 7 programmes", tone: "bg-[#567f9d]" },
 ] as const;
 
 const actionRows = [
@@ -12,7 +12,7 @@ const actionRows = [
     action: "Manager review due",
     owner: "Line Manager",
     status: "Due today",
-    tone: "coral",
+    tone: "bg-[#fff1f3] text-[#a53b4f]",
   },
   {
     learner: "Maya Patel",
@@ -20,7 +20,7 @@ const actionRows = [
     action: "Enrolment details ready",
     owner: "Apprenticeship Lead",
     status: "Ready",
-    tone: "mint",
+    tone: "bg-[#eaf7f2] text-[#0b6f63]",
   },
   {
     learner: "Sam Carter",
@@ -28,102 +28,108 @@ const actionRows = [
     action: "Progress review approaching",
     owner: "Provider",
     status: "Due soon",
-    tone: "yellow",
+    tone: "bg-[#fbf4df] text-[#725d20]",
   },
 ] as const;
 
-const toneClasses = {
-  coral: "bg-[#fff0f2] text-[#b13b51] ring-[#e77487]/20",
-  mint: "bg-[#eaf7f2] text-[#0b6f63] ring-[#159b8f]/20",
-  yellow: "bg-[#fff8dc] text-[#755e00] ring-[#d6b83f]/25",
-  blue: "bg-[#edf4fb] text-[#285f86] ring-[#5a8faf]/20",
-} as const;
+const primaryNavigation = ["Operations Centre", "Applications", "Learners", "Providers"];
+const administrationNavigation = ["People", "Programmes", "Settings"];
 
 export function OperationsCentrePreview({ detailed = false }: { detailed?: boolean }) {
   return (
-    <div className="min-w-0 overflow-hidden rounded-[1.6rem] border border-white/10 bg-[#0c2637] text-white shadow-[0_34px_100px_rgba(5,24,35,0.28)]">
-      <div className="flex min-h-[3.7rem] items-center justify-between gap-4 border-b border-white/10 px-4 sm:px-5">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#ff8090] text-xs font-black text-[#102c3d]">LT</div>
+    <div className="min-w-0 overflow-hidden rounded-[22px] bg-[#0a2333] text-white shadow-[0_32px_90px_rgba(9,31,45,0.24)] ring-1 ring-white/10">
+      <div className="flex min-h-[62px] items-center justify-between gap-5 border-b border-white/[0.08] px-5 sm:px-6">
+        <div className="flex min-w-0 items-center gap-5">
+          <p className="shrink-0 text-[15px] font-semibold tracking-[-0.03em]">
+            <span className="text-white">Levy</span><span className="text-[#ff8090]">Tate</span>
+          </p>
+          <span className="hidden h-5 w-px bg-white/10 sm:block" aria-hidden="true" />
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold">Operations Centre</p>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#c7f0e4]/70">Illustrative workspace</p>
+            <p className="truncate text-[13px] font-semibold text-white/92">Operations Centre</p>
+            <p className="mt-0.5 text-[11px] text-white/42">Example employer workspace</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="hidden rounded-full bg-white/[0.07] px-3 py-1.5 text-[10px] font-semibold text-white/65 sm:inline">Apprenticeship Lead</span>
-          <span className="h-8 w-8 rounded-full bg-[#c7f0e4] ring-2 ring-white/10" aria-hidden="true" />
+        <div className="hidden items-center gap-3 sm:flex">
+          <span className="h-1.5 w-1.5 rounded-full bg-[#c7f0e4]" aria-hidden="true" />
+          <span className="text-[11px] font-medium text-white/58">Apprenticeship Lead</span>
         </div>
       </div>
 
-      <div className={detailed ? "grid min-w-0 lg:grid-cols-[12rem_minmax(0,1fr)]" : "min-w-0"}>
-        {detailed ? (
-          <aside className="hidden border-r border-white/10 bg-[#091f2e] p-4 lg:block" aria-label="Example platform navigation">
-            <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/35">Primary</p>
-            <div className="mt-3 grid gap-1 text-xs font-semibold">
-              {[
-                "Operations Centre",
-                "Applications",
-                "Learners",
-                "Providers",
-              ].map((item, index) => (
-                <div key={item} className={index === 0 ? "rounded-xl bg-white/10 px-3 py-2.5 text-white" : "rounded-xl px-3 py-2.5 text-white/52"}>{item}</div>
-              ))}
-            </div>
-            <p className="mt-6 px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/35">Administration</p>
-            <div className="mt-3 grid gap-1 text-xs font-semibold text-white/52">
-              {['People', 'Programmes', 'Settings'].map((item) => <div key={item} className="rounded-xl px-3 py-2.5">{item}</div>)}
-            </div>
-          </aside>
-        ) : null}
+      <div className={detailed ? "grid min-w-0 lg:grid-cols-[184px_minmax(0,1fr)]" : "min-w-0"}>
+        {detailed ? <ProductSidebar /> : null}
 
-        <div className="min-w-0 bg-[#f6f9f8] p-3 text-[#102c3d] sm:p-4">
-          <div className="flex flex-col gap-3 rounded-[1.1rem] bg-white p-4 ring-1 ring-[#102c3d]/[0.07] sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">Daily learner operations</p>
-              <h3 className="mt-1.5 text-lg font-semibold tracking-[-0.02em] sm:text-xl">What needs attention today</h3>
-            </div>
-            <span className="w-fit rounded-full bg-[#edf7f3] px-3 py-2 text-[10px] font-semibold text-[#0b6f63]">Example view</span>
+        <div className="min-w-0 bg-[#f4f7f6] text-[#102c3d]">
+          <div className="border-b border-[#102c3d]/[0.07] bg-white px-5 py-5 sm:px-6 sm:py-6">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#9f4253]">Daily learner operations</p>
+            <h3 className="mt-2 text-[20px] font-semibold leading-tight tracking-[-0.025em] sm:text-[23px]">What needs attention today</h3>
+            <p className="mt-2 max-w-xl text-[12px] leading-5 text-[#102c3d]/52 sm:text-[13px]">Priority work across applications, enrolment and active learner support.</p>
           </div>
 
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {summaryItems.map((item) => (
-              <div key={item.label} className="min-w-0 rounded-[1rem] bg-white p-3 ring-1 ring-[#102c3d]/[0.06]">
-                <div className="flex items-center justify-between gap-2">
-                  <span className={`h-2 w-2 shrink-0 rounded-full ring-4 ${toneClasses[item.tone]}`} />
-                  <span className="text-xl font-semibold tracking-[-0.03em]">{item.value}</span>
+          <div className="grid grid-cols-2 border-b border-[#102c3d]/[0.07] bg-white sm:grid-cols-4">
+            {summaryItems.map((item, index) => (
+              <div key={item.label} className={`min-w-0 px-4 py-4 sm:px-5 sm:py-5 ${index % 2 === 0 ? "border-r" : ""} border-[#102c3d]/[0.07] sm:border-r sm:last:border-r-0 ${index < 2 ? "border-b sm:border-b-0" : ""}`}>
+                <div className="flex items-center gap-2">
+                  <span className={`h-1.5 w-1.5 rounded-full ${item.tone}`} aria-hidden="true" />
+                  <p className="truncate text-[11px] font-medium text-[#102c3d]/50">{item.label}</p>
                 </div>
-                <p className="mt-3 text-[10px] font-semibold leading-4 text-[#102c3d]/55 sm:text-[11px]">{item.label}</p>
+                <p className="mt-2 text-[25px] font-semibold leading-none tracking-[-0.04em] sm:text-[28px]">{item.value}</p>
+                <p className="mt-2 truncate text-[10px] text-[#102c3d]/40 sm:text-[11px]">{item.context}</p>
               </div>
             ))}
           </div>
 
-          <div className="mt-3 overflow-hidden rounded-[1.1rem] bg-white ring-1 ring-[#102c3d]/[0.07]">
-            <div className="flex items-center justify-between gap-3 border-b border-[#102c3d]/[0.06] px-4 py-3">
-              <div>
-                <p className="text-xs font-semibold">Priority actions</p>
-                <p className="mt-0.5 text-[10px] text-[#102c3d]/45">Ownership stays connected to the source workflow</p>
-              </div>
-              <span className="rounded-lg bg-[#f3f7f5] px-2.5 py-1.5 text-[10px] font-semibold text-[#102c3d]/55">All actions</span>
-            </div>
-            <div>
-              {actionRows.slice(0, detailed ? 3 : 2).map((row) => (
-                <div key={row.learner} className="grid gap-3 border-b border-[#102c3d]/[0.055] px-4 py-3 last:border-b-0 sm:grid-cols-[minmax(0,1.2fr)_minmax(7rem,0.65fr)_auto] sm:items-center">
-                  <div className="min-w-0">
-                    <p className="truncate text-xs font-semibold">{row.learner}</p>
-                    <p className="mt-1 truncate text-[10px] text-[#102c3d]/48">{row.programme}</p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-semibold text-[#102c3d]/72">{row.action}</p>
-                    <p className="mt-1 text-[10px] text-[#102c3d]/42">Owner: {row.owner}</p>
-                  </div>
-                  <span className={`w-fit rounded-full px-2.5 py-1.5 text-[10px] font-semibold ring-1 ${toneClasses[row.tone]}`}>{row.status}</span>
+          <div className="p-4 sm:p-5">
+            <div className="overflow-hidden rounded-[14px] bg-white shadow-[0_1px_2px_rgba(16,44,61,0.03)] ring-1 ring-[#102c3d]/[0.07]">
+              <div className="flex items-end justify-between gap-5 border-b border-[#102c3d]/[0.07] px-4 py-4 sm:px-5">
+                <div>
+                  <p className="text-[13px] font-semibold">Priority actions</p>
+                  <p className="mt-1 text-[11px] text-[#102c3d]/44">Ordered by urgency and ownership</p>
                 </div>
-              ))}
+                <button type="button" className="text-[11px] font-semibold text-[#0b6f63]">View all</button>
+              </div>
+
+              <div className="hidden grid-cols-[1.05fr_1.15fr_1fr_.85fr_auto] gap-4 border-b border-[#102c3d]/[0.06] bg-[#fafcfb] px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#102c3d]/35 md:grid">
+                <span>Learner</span><span>Programme</span><span>Next action</span><span>Owner</span><span>Status</span>
+              </div>
+
+              <div>
+                {actionRows.slice(0, detailed ? 3 : 2).map((row) => (
+                  <div key={row.learner} className="grid gap-3 border-b border-[#102c3d]/[0.06] px-4 py-4 last:border-b-0 sm:px-5 md:grid-cols-[1.05fr_1.15fr_1fr_.85fr_auto] md:items-center md:gap-4">
+                    <div className="min-w-0">
+                      <p className="truncate text-[12px] font-semibold">{row.learner}</p>
+                      <p className="mt-1 text-[10px] text-[#102c3d]/40 md:hidden">{row.programme}</p>
+                    </div>
+                    <p className="hidden truncate text-[11px] text-[#102c3d]/54 md:block">{row.programme}</p>
+                    <p className="text-[11px] font-medium text-[#102c3d]/68">{row.action}</p>
+                    <p className="text-[10px] text-[#102c3d]/42 sm:text-[11px]">{row.owner}</p>
+                    <span className={`w-fit rounded-md px-2 py-1 text-[10px] font-semibold ${row.tone}`}>{row.status}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+function ProductSidebar() {
+  return (
+    <aside className="hidden border-r border-white/[0.08] bg-[#081e2c] px-3 py-5 lg:block" aria-label="Example platform navigation">
+      <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/28">Workspace</p>
+      <div className="mt-3">
+        {primaryNavigation.map((item, index) => (
+          <div key={item} className={`relative flex min-h-9 items-center px-3 text-[11px] font-medium ${index === 0 ? "bg-white/[0.07] text-white" : "text-white/46"}`}>
+            {index === 0 ? <span className="absolute inset-y-0 left-0 w-0.5 bg-[#c7f0e4]" aria-hidden="true" /> : null}
+            {item}
+          </div>
+        ))}
+      </div>
+      <p className="mt-7 px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/28">Administration</p>
+      <div className="mt-3">
+        {administrationNavigation.map((item) => <div key={item} className="flex min-h-9 items-center px-3 text-[11px] font-medium text-white/46">{item}</div>)}
+      </div>
+    </aside>
   );
 }

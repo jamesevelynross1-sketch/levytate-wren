@@ -100,9 +100,9 @@ export function PublicHeader() {
 
   return (
     <header ref={headerRef} className="sticky top-0 z-50 border-b border-[#102c3d]/[0.07] bg-[#f6fbf8]/95 backdrop-blur-xl">
-      <div className="relative mx-auto flex min-h-[72px] max-w-[90rem] items-center gap-4 px-5 sm:px-8">
+      <div className="relative mx-auto flex h-[78px] max-w-[90rem] items-center gap-5 px-6 sm:px-8 lg:px-10 xl:px-12">
         <Link href="/" aria-label="LevyTate home" className="inline-flex min-h-11 shrink-0 items-center focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20" onClick={closeMenus}>
-          <LevyTateLogo className="[--levytate-logo-size:2.15rem] sm:[--levytate-logo-size:2.55rem]" />
+          <LevyTateLogo className="[--levytate-logo-size:2rem] sm:[--levytate-logo-size:2.25rem]" />
         </Link>
 
         <nav aria-label="Primary navigation" className="ml-auto hidden items-center gap-1 lg:flex">
@@ -133,14 +133,14 @@ export function PublicHeader() {
               </div>
             )}
           />
-          <Link href="/levytate/support" onClick={closeMenus} className="inline-flex min-h-11 items-center rounded-full px-3.5 text-sm font-semibold text-[#102c3d]/68 transition hover:bg-white hover:text-[#102c3d] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20">Support</Link>
+          <Link href="/levytate/support" onClick={closeMenus} className="inline-flex min-h-11 items-center px-3.5 text-[13px] font-medium text-[#102c3d]/62 transition-colors hover:text-[#102c3d] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20">Support</Link>
         </nav>
 
         <div className="ml-auto hidden items-center gap-2 sm:flex lg:ml-4">
-          <Link href="/login" onClick={closeMenus} className="inline-flex min-h-11 items-center whitespace-nowrap rounded-full bg-white px-4 text-sm font-semibold text-[#102c3d] ring-1 ring-[#102c3d]/[0.1] transition hover:-translate-y-0.5 hover:ring-[#159b8f]/25 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20">
+          <Link href="/login" onClick={closeMenus} className="inline-flex h-11 items-center whitespace-nowrap rounded-xl bg-white px-4 text-[13px] font-semibold text-[#102c3d] ring-1 ring-[#102c3d]/[0.1] transition-colors hover:bg-[#f1f6f3] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20">
             Login
           </Link>
-          <Link href="/early-access" onClick={closeMenus} className="inline-flex min-h-11 items-center whitespace-nowrap rounded-full bg-[#102c3d] px-5 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(16,44,61,0.14)] transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/25">
+          <Link href="/early-access" onClick={closeMenus} className="inline-flex h-11 items-center whitespace-nowrap rounded-xl bg-[#102c3d] px-5 text-[13px] font-semibold text-white transition-colors hover:bg-[#183b50] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/25">
             Request Early Access
           </Link>
         </div>
@@ -188,7 +188,7 @@ function NavDropdown({
         aria-expanded={active}
         aria-controls={panelId}
         onClick={() => onToggle(dropdown)}
-        className={`flex min-h-11 items-center gap-2 rounded-full px-3.5 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 ${active ? "bg-white text-[#102c3d] shadow-[0_8px_24px_rgba(16,44,61,0.06)]" : "text-[#102c3d]/68 hover:bg-white hover:text-[#102c3d]"}`}
+        className={`flex min-h-11 items-center gap-2 px-3.5 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 ${active ? "text-[#102c3d]" : "text-[#102c3d]/62 hover:text-[#102c3d]"}`}
       >
         {label}
         <span aria-hidden="true" className={`h-1.5 w-1.5 rotate-45 border-b border-r border-current transition ${active ? "rotate-[225deg]" : ""}`} />
@@ -196,10 +196,10 @@ function NavDropdown({
 
       {active ? (
         <div id={panelId} className={`absolute left-1/2 top-full z-[60] -translate-x-1/2 pt-3 ${width}`}>
-          <div className="overflow-hidden rounded-[1.25rem] border border-[#102c3d]/[0.08] bg-white shadow-[0_28px_80px_rgba(16,44,61,0.15)]">
+          <div className="overflow-hidden rounded-2xl border border-[#102c3d]/[0.08] bg-white shadow-[0_24px_70px_rgba(16,44,61,0.14)]">
             <div className={columns ? "grid grid-cols-2 gap-1 p-3" : "grid grid-cols-2 gap-1 p-3"}>
               {items.map((item) => (
-                <Link key={item.title} href={item.href} onClick={onNavigate} className={`group/item min-h-[88px] rounded-xl px-4 py-3 transition hover:bg-[#eef8f4] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/15 ${item.secondary ? "col-span-2 border-t border-[#102c3d]/[0.06] bg-[#fbfcfb]" : ""}`}>
+                <Link key={item.title} href={item.href} onClick={onNavigate} className={`group/item min-h-[88px] rounded-xl px-4 py-3 transition-colors hover:bg-[#eef8f4] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/15 ${item.secondary ? "col-span-2 border-t border-[#102c3d]/[0.06] bg-[#fbfcfb]" : ""}`}>
                   <span className="block text-sm font-semibold text-[#102c3d] transition group-hover/item:text-[#0b6f63]">{item.title}</span>
                   {item.description ? <span className="mt-1.5 block text-xs leading-5 text-[#102c3d]/56">{item.description}</span> : null}
                 </Link>
@@ -227,7 +227,7 @@ function MobileNavigation({ open, onToggle, onNavigate }: { open: boolean; onTog
         aria-expanded={open}
         aria-controls="public-mobile-navigation"
         onClick={onToggle}
-        className="grid h-11 w-11 place-items-center rounded-full bg-white ring-1 ring-[#102c3d]/[0.1] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20"
+        className="grid h-11 w-11 place-items-center rounded-xl bg-white ring-1 ring-[#102c3d]/[0.1] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20"
       >
         <span className="grid gap-1.5">
           <span className={`block h-px w-5 bg-[#102c3d] transition ${open ? "translate-y-[7px] rotate-45" : ""}`} />
@@ -237,7 +237,7 @@ function MobileNavigation({ open, onToggle, onNavigate }: { open: boolean; onTog
       </button>
 
       {open ? (
-        <div id="public-mobile-navigation" className="absolute right-0 top-14 z-[60] max-h-[calc(100vh-6rem)] w-[min(23rem,calc(100vw-2.5rem))] overflow-y-auto rounded-[1.25rem] border border-[#102c3d]/[0.08] bg-white p-4 shadow-[0_28px_80px_rgba(16,44,61,0.16)]">
+        <div id="public-mobile-navigation" className="absolute right-0 top-14 z-[60] max-h-[calc(100vh-6rem)] w-[min(23rem,calc(100vw-2.5rem))] overflow-y-auto rounded-2xl border border-[#102c3d]/[0.08] bg-white p-4 shadow-[0_24px_70px_rgba(16,44,61,0.16)]">
           <div className="grid gap-5">
             {groups.map(([groupLabel, items]) => (
               <div key={groupLabel}>
@@ -254,8 +254,8 @@ function MobileNavigation({ open, onToggle, onNavigate }: { open: boolean; onTog
             <Link href="/levytate/support" onClick={onNavigate} className="flex min-h-11 items-center rounded-xl px-2 text-sm font-semibold text-[#102c3d]/72">Support</Link>
           </div>
           <div className="mt-5 grid grid-cols-2 gap-2 border-t border-[#102c3d]/[0.07] pt-4 sm:hidden">
-            <Link href="/login" onClick={onNavigate} className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#f6fbf8] px-3 text-sm font-semibold text-[#102c3d]">Login</Link>
-            <Link href="/early-access" onClick={onNavigate} className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#102c3d] px-3 text-center text-sm font-semibold text-white">Request Early Access</Link>
+            <Link href="/login" onClick={onNavigate} className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-xl bg-[#f6fbf8] px-2 text-[12px] font-semibold text-[#102c3d]">Login</Link>
+            <Link href="/early-access" onClick={onNavigate} className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-xl bg-[#102c3d] px-2 text-center text-[12px] font-semibold text-white">Request Early Access</Link>
           </div>
         </div>
       ) : null}
@@ -266,7 +266,7 @@ function MobileNavigation({ open, onToggle, onNavigate }: { open: boolean; onTog
 export function PublicFooter() {
   return (
     <footer className="border-t border-[#102c3d]/[0.07] bg-white">
-      <div className="mx-auto max-w-7xl px-5 py-10 sm:px-8">
+      <div className="mx-auto max-w-[90rem] px-6 py-12 sm:px-8 lg:px-10 xl:px-12">
         <div className="grid gap-8 md:grid-cols-[1fr_auto] md:items-end">
           <div>
             <LevyTateLogo className="[--levytate-logo-size:2.2rem]" />

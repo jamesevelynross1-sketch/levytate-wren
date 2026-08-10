@@ -1,79 +1,92 @@
 const roles = [
   {
+    number: "01",
     role: "Employee",
     headline: "A clear apprenticeship journey.",
-    copy: "Employees can apply, understand what happens next and follow their apprenticeship journey without chasing HR or L&D.",
+    copy: "Apply, understand what happens next and follow the apprenticeship journey without chasing HR or L&D.",
     modules: ["Home", "My Application", "My Apprenticeship"],
-    eyebrow: "My application",
+    section: "My application",
     title: "Application submitted",
     detail: "Your manager is reviewing your application.",
     status: "Awaiting manager review",
-    tone: "coral",
+    statusStyle: "bg-[#fff1f3] text-[#a53b4f]",
+    accent: "bg-[#d65b70]",
   },
   {
+    number: "02",
     role: "Line Manager",
     headline: "Make decisions and support your team.",
-    copy: "Managers see only the people and actions relevant to them, making approval and learner support easier to manage.",
+    copy: "See only the people and actions relevant to you, with the context needed for a clear decision.",
     modules: ["Home", "Approvals", "My Team"],
-    eyebrow: "Approvals",
+    section: "Approvals",
     title: "Application ready to review",
     detail: "Review the employee case and record your decision.",
     status: "Decision required",
-    tone: "yellow",
+    statusStyle: "bg-[#fbf4df] text-[#725d20]",
+    accent: "bg-[#c79b35]",
   },
   {
+    number: "03",
     role: "Apprenticeship Lead",
-    headline: "Run the programme from one Operations Centre.",
-    copy: "Give apprenticeship teams one place to manage applications, learners, providers and operational work across the organisation.",
+    headline: "Run the programme from one operating view.",
+    copy: "Manage applications, learners, providers and operational work across the employer workspace.",
     modules: ["Operations Centre", "Applications", "Learners", "Providers"],
-    eyebrow: "Learner operations",
-    title: "Review approaching",
+    section: "Learner operations",
+    title: "Progress review approaching",
     detail: "The owner and next action are visible in one place.",
     status: "Due soon",
-    tone: "mint",
+    statusStyle: "bg-[#eaf7f2] text-[#0b6f63]",
+    accent: "bg-[#159b8f]",
   },
 ] as const;
 
-const statusTone = {
-  coral: "bg-[#fff0f2] text-[#b13b51]",
-  yellow: "bg-[#fff8dc] text-[#755e00]",
-  mint: "bg-[#eaf7f2] text-[#0b6f63]",
-} as const;
-
 export function RoleExperienceShowcase() {
   return (
-    <div className="grid gap-5 lg:grid-cols-3">
-      {roles.map((role, index) => (
-        <article key={role.role} className="flex min-w-0 flex-col overflow-hidden rounded-[1.6rem] border border-[#102c3d]/[0.08] bg-white shadow-[0_18px_55px_rgba(16,44,61,0.06)]">
-          <div className="p-5 sm:p-6">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[#c95568]">{role.role}</p>
-              <span className="text-xs font-semibold text-[#102c3d]/30">0{index + 1}</span>
-            </div>
-            <h3 className="mt-4 text-2xl font-semibold leading-[1.15] tracking-[-0.025em]">{role.headline}</h3>
-            <p className="mt-3 text-sm leading-6 text-[#102c3d]/60">{role.copy}</p>
-          </div>
+    <div className="overflow-hidden rounded-[20px] bg-[#0a2333] shadow-[0_24px_70px_rgba(9,31,45,0.16)] ring-1 ring-[#102c3d]/10">
+      <div className="grid border-b border-white/[0.08] px-5 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-7">
+        <div>
+          <p className="text-[12px] font-semibold text-white">Role-based workspace</p>
+          <p className="mt-1 text-[11px] text-white/40">One programme, deliberately different views</p>
+        </div>
+        <p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.13em] text-[#c7f0e4]/62 sm:mt-0">Access follows responsibility</p>
+      </div>
 
-          <div className="mt-auto bg-[#102c3d] p-3 text-white sm:p-4">
-            <div className="flex gap-1.5 overflow-hidden pb-3" aria-label={`${role.role} primary modules`}>
-              {role.modules.map((module, moduleIndex) => (
-                <span key={module} className={moduleIndex === 0 ? "whitespace-nowrap rounded-lg bg-white/12 px-2.5 py-2 text-[10px] font-semibold text-white" : "whitespace-nowrap rounded-lg px-2.5 py-2 text-[10px] font-semibold text-white/45"}>{module}</span>
-              ))}
-            </div>
-            <div className="rounded-[1.05rem] bg-white p-4 text-[#102c3d]">
-              <div className="flex items-start justify-between gap-3">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#102c3d]/40">{role.eyebrow}</p>
-                <span className={`rounded-full px-2.5 py-1 text-[9px] font-semibold ${statusTone[role.tone]}`}>{role.status}</span>
+      <div className="divide-y divide-white/[0.08]">
+        {roles.map((role) => (
+          <article key={role.role} className="grid min-w-0 bg-[#0a2333] lg:grid-cols-[minmax(280px,.72fr)_minmax(0,1.28fr)]">
+            <div className="relative px-5 py-7 sm:px-7 lg:py-8">
+              <span className={`absolute inset-y-0 left-0 w-0.5 ${role.accent}`} aria-hidden="true" />
+              <div className="flex items-baseline justify-between gap-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#ff9eaa]">{role.role}</p>
+                <span className="text-[11px] font-medium text-white/24">{role.number}</span>
               </div>
-              <p className="mt-4 text-sm font-semibold">{role.title}</p>
-              <p className="mt-1.5 text-xs leading-5 text-[#102c3d]/52">{role.detail}</p>
-              <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-[#edf2f0]">
-                <div className="h-full w-[62%] rounded-full bg-[#159b8f]" />
+              <h3 className="mt-3 max-w-md text-[24px] font-semibold leading-[1.16] tracking-[-0.025em] text-white sm:text-[28px]">{role.headline}</h3>
+              <p className="mt-3 max-w-lg text-[14px] leading-6 text-white/54">{role.copy}</p>
+            </div>
+
+            <div className="border-t border-white/[0.08] bg-[#f4f7f6] p-4 text-[#102c3d] sm:p-5 lg:border-l lg:border-t-0">
+              <div className="overflow-hidden rounded-[14px] bg-white ring-1 ring-[#102c3d]/[0.07]">
+                <div className="flex gap-5 overflow-x-auto border-b border-[#102c3d]/[0.07] px-4 sm:px-5" aria-label={`${role.role} primary modules`}>
+                  {role.modules.map((module, index) => (
+                    <span key={module} className={`relative shrink-0 py-3.5 text-[11px] font-semibold ${index === 0 ? "text-[#102c3d]" : "text-[#102c3d]/38"}`}>
+                      {module}
+                      {index === 0 ? <span className="absolute inset-x-0 bottom-0 h-0.5 bg-[#159b8f]" aria-hidden="true" /> : null}
+                    </span>
+                  ))}
+                </div>
+                <div className="grid gap-4 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-5">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/38">{role.section}</p>
+                    <p className="mt-2 text-[13px] font-semibold">{role.title}</p>
+                    <p className="mt-1 text-[11px] leading-5 text-[#102c3d]/48">{role.detail}</p>
+                  </div>
+                  <span className={`w-fit rounded-md px-2.5 py-1.5 text-[10px] font-semibold ${role.statusStyle}`}>{role.status}</span>
+                </div>
               </div>
             </div>
-          </div>
-        </article>
-      ))}
+          </article>
+        ))}
+      </div>
     </div>
   );
 }

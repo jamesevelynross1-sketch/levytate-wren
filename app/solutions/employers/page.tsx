@@ -9,6 +9,7 @@ export const metadata: Metadata = {
 export default function EmployersSolutionPage() {
   return (
     <SolutionPage
+      variant="employer"
       eyebrow="LevyTate for employers"
       title="Run your apprenticeship programme from one operating system."
       description="Give Apprenticeship Leads, L&D and People teams one secure workspace for applications, learners, providers and the operational work that keeps a programme moving."
