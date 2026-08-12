@@ -39,7 +39,7 @@ check("Line Manager exact primary navigation", ordered(manager, ["Home", "Approv
 check("Team Reporting is deferred", manager.includes('item("Reports", "Team Reporting", "deferred"'));
 
 const lead = roleBlock("Apprenticeship Lead");
-check("Lead exact primary navigation", ordered(lead, ["Home", "Applications", "Learners", "Providers"]));
+check("Lead exact primary navigation", ordered(lead, ["Home", "Intelligence", "Applications", "Learners", "Providers"]));
 check("Lead administration navigation exists", ["People", "Programmes", "Settings"].every((key) => lead.includes(`item("${key}"`) && lead.includes('"administration"')));
 check("Lead reports are deferred", lead.includes('item("Reports", "Reports", "deferred"'));
 

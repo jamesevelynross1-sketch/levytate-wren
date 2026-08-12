@@ -6,6 +6,7 @@ export type CoreEarlyAccessModuleKey =
   | "My Application"
   | "My Team"
   | "Approvals"
+  | "Intelligence"
   | "Applications"
   | "People"
   | "Learners"
@@ -102,6 +103,7 @@ export const coreEarlyAccessPolicy: Readonly<Record<MvpUserRole, CoreEarlyAccess
     role: "Apprenticeship Lead",
     modules: [
       item("Home", "Operations Centre", "enabled", "primary", "core"),
+      item("Intelligence", "Intelligence", "enabled", "primary", "core"),
       item("Applications", "Applications", "enabled", "primary", "core"),
       item("Learners", "Learners", "enabled", "primary", "core"),
       item("Providers", "Providers", "enabled", "primary", "core"),
@@ -119,6 +121,7 @@ export const coreEarlyAccessPolicy: Readonly<Record<MvpUserRole, CoreEarlyAccess
     role: "Platform Admin",
     modules: [
       item("Home", "Employer Workspaces", "enabled", "primary", "core"),
+      item("Intelligence", "Intelligence", "hidden", undefined, "role-denied"),
       item("Providers", "Provider Catalogue", "enabled", "primary", "core"),
       item("Programmes", "Programmes", "hidden", undefined, "role-denied"),
       item("Settings", "Access & Tenant Support", "enabled", "primary", "core"),
@@ -136,6 +139,7 @@ export const coreEarlyAccessPolicy: Readonly<Record<MvpUserRole, CoreEarlyAccess
     role: "Employer Admin",
     modules: [
       item("Home", "Operations Centre", "enabled", "primary", "core"),
+      item("Intelligence", "Intelligence", "enabled", "primary", "core"),
       item("Applications", "Applications", "enabled", "primary", "core"),
       item("Learners", "Learners", "enabled", "primary", "core"),
       item("Providers", "Providers", "enabled", "primary", "core"),

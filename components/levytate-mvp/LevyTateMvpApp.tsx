@@ -10,6 +10,7 @@ import {
   GraduationCap,
   LayoutDashboard,
   LogOut,
+  Newspaper,
   Settings,
   Sparkles,
   UserRound,
@@ -33,6 +34,7 @@ import { MvpWorkspaceProvider, useMvpWorkspace } from "@/components/levytate-mvp
 import { ProviderMatchingModule } from "@/components/levytate-mvp/ProviderMatchingModule";
 import { ProspectGettingStarted } from "@/components/levytate-mvp/ProspectGettingStarted";
 import { ProspectAccessAdminModule } from "@/components/levytate-mvp/ProspectAccessAdminModule";
+import { ProviderIntelligenceModule } from "@/components/levytate-mvp/ProviderIntelligenceModule";
 import { ProvidersModule } from "@/components/levytate-mvp/ProvidersModule";
 import { ReportsModule } from "@/components/levytate-mvp/ReportsModule";
 import { RolesModule } from "@/components/levytate-mvp/RolesModule";
@@ -49,6 +51,7 @@ const modules = [
   { name: "My Application", icon: ClipboardCheck },
   { name: "My Team", icon: Users },
   { name: "Approvals", icon: ClipboardCheck },
+  { name: "Intelligence", icon: Newspaper },
   { name: "Applications", icon: ClipboardCheck },
   { name: "People", icon: Users },
   { name: "Learners", icon: GraduationCap },
@@ -72,6 +75,7 @@ const modulePermissions = {
   "My Application": "applications:read",
   "My Team": "employees:read",
   Approvals: "applications:read",
+  Intelligence: "providers:read",
   Applications: "applications:read",
   People: "employees:read",
   Learners: "learnerLifecycle:read",
@@ -105,6 +109,7 @@ const moduleCopy: Record<ModuleName, string> = {
   "My Application": "Start, save and track your current apprenticeship application.",
   "My Team": "Direct reports, development status and current application activity.",
   Approvals: "Review direct-report apprenticeship applications and record fair manager decisions.",
+  Intelligence: "A balanced editorial view of provider updates, programme changes and apprenticeship market themes.",
   Applications: "Organisation application flow, final approval work and learner handoff readiness.",
   People: "Employee and role records that shape workforce development decisions.",
   Learners: "Read-only lifecycle records covering eligibility, enrolment, progress, reviews and completion.",
@@ -446,6 +451,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
                 : <EmployeesModule onOpenDirectReport={openDirectReport} onStartDiscovery={(employeeId) => { setAiEmployeeId(employeeId); openModule("Copilot"); }} />
             ) : null}
             {activeModule === "Approvals" ? <ApplicationsModule onOpenDirectReport={openDirectReport} initialApplicationId={managerReviewApplicationId} onApplicationSelectionChange={updateApplicationReviewSelection} /> : null}
+            {activeModule === "Intelligence" ? <ProviderIntelligenceModule /> : null}
             {activeModule === "Applications" ? <ApplicationsModule /> : null}
             {activeModule === "Learners" ? <LearnersModule initialLearnerRecordId={learnerTarget?.learnerRecordId} initialAction={learnerTarget?.actionType} onDeepLinkConsumed={() => setLearnerTarget(null)} /> : null}
             {activeModule === "People" ? (
