@@ -4,6 +4,8 @@
 
 Provider Intelligence gives Apprenticeship Leads and Employer Admins a calm, editorial view of apprenticeship provider developments. It is a decision-support reading experience, not a provider marketplace, recommendation engine, provider scorecard or live-news product.
 
+For Apprenticeship Leads, it creates one place to scan relevant programme changes, employer guidance and market themes before moving into operational work. For providers, the future value is a clear editorial route to reach relevant employers without buying organic position or competing on popularity metrics.
+
 Sprint 1 uses a self-contained set of fictional provider and editorial fixtures. It does not read or write employer, learner, application, provider-relationship or operational-action data.
 
 ## Access boundary
@@ -34,6 +36,10 @@ Every update contains:
 
 The product surface renders the editorial display headline and summary. The raw title is retained only to demonstrate the future editorial transformation boundary. No OpenAI call is made in Sprint 1.
 
+In a future implementation, AI may summarise source material, improve display headlines and personalise topic selection to a user's stated interests. It must never rank providers by payment, posting volume, popularity, engagement, commercial relationship or an inferred quality score.
+
+> **AI personalises topics and summarises information. It does not determine which paying provider deserves greater organic visibility.**
+
 ## Fair distribution contract
 
 The main stream first filters for editorial eligibility and selected topic. It then groups updates by provider and takes one update per eligible provider in a deterministic rotation before giving any provider another turn.
@@ -48,10 +54,17 @@ This means:
 
 Following is an explicit personal view stored only in client state. Following a provider or topic can narrow that view but cannot alter the fair main stream.
 
+## Experience areas
+
+- Morning Brief: a concise editorial synthesis with a small provider-balanced set of highlights.
+- Provider Stream: structured editorial updates ordered by the fair-distribution contract.
+- Market Watch: illustrative counts that make the fixture's current themes scannable.
+- Following: a device-local view of explicitly followed providers and topics, with device-local saves.
+
 ## Demonstration boundary
 
 All eight providers, updates, counts and dates are fictional and illustrative. Provider marks are generated typographic initials rather than real provider logos. The experience must not be interpreted as provider quality judgement or a LevyTate recommendation.
 
 ## Deferred work
 
-Live provider publishing, provider portal access, subscriptions, billing, analytics, sponsored content, scraping, live news ingestion, persistent follows and saves, and AI editorial processing are outside Sprint 1.
+Live provider publishing, provider portal access, subscriptions, billing, analytics, sponsored content, scraping, live news ingestion, persistent follows and saves, and AI editorial processing are outside Sprint 1. A future Premium provider publishing flow must still pass editorial eligibility and the same fair rotation. Future engagement analytics must remain diagnostic rather than an organic ranking input. If sponsored content is ever introduced, it must be visibly separated from the organic stream and must not alter organic exposure.
