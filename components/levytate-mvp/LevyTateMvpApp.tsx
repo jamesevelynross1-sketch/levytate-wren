@@ -16,7 +16,7 @@ import {
   UserRound,
   Users,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { LevyTateLogo } from "@/components/levytate-demo/PlatformShell";
 import { ApplicationsModule } from "@/components/levytate-mvp/ApplicationsModule";
 import { AskLevyTateAiWorkspace } from "@/components/levytate-mvp/AskLevyTateAiWorkspace";
@@ -33,6 +33,7 @@ import { LevyTateStandardsProvider } from "@/components/levytate-mvp/LevyTateSta
 import { MvpWorkspaceProvider, useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { ProviderMatchingModule } from "@/components/levytate-mvp/ProviderMatchingModule";
 import { ProspectGettingStarted } from "@/components/levytate-mvp/ProspectGettingStarted";
+import { PersistentCopilot } from "@/components/levytate-mvp/PersistentCopilot";
 import { ProspectAccessAdminModule } from "@/components/levytate-mvp/ProspectAccessAdminModule";
 import { ProviderIntelligenceModule } from "@/components/levytate-mvp/ProviderIntelligenceModule";
 import { ProvidersModule } from "@/components/levytate-mvp/ProvidersModule";
@@ -44,6 +45,7 @@ import type { ManagerDirectReportLearnerDetail } from "@/lib/levytate/mvp/manage
 import type { OperationalActionType } from "@/lib/levytate/mvp/operations-centre";
 import { hasMvpPermission, permissionsForMvpRole, type MvpPermission } from "@/lib/levytate/mvp/rbac";
 import { buildNotifications } from "@/lib/levytate/mvp/workspace-insights";
+import type { LevyTateCopilotContext, LevyTateCopilotEntityType } from "@/lib/levytate/copilot-context";
 
 const modules = [
   { name: "Home", icon: LayoutDashboard },
@@ -140,6 +142,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
   const [learnerTarget, setLearnerTarget] = useState<{ learnerRecordId: string; actionType: OperationalActionType } | null>(null);
   const [managerDirectReportDetail, setManagerDirectReportDetail] = useState(initialManagerDirectReportDetail);
   const [managerReviewApplicationId, setManagerReviewApplicationId] = useState<string | null>(null);
+  const [copilotEntity, setCopilotEntity] = useState<{ type: LevyTateCopilotEntityType; id: string; label: string } | null>(null);
   const deepLinkHandled = useRef(false);
 
   const notifications = useMemo(() => buildNotifications(data), [data]);
@@ -205,6 +208,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
     if (!availableModules.some((item) => item.name === module)) return;
     setManagerDirectReportDetail(null);
     setManagerReviewApplicationId(null);
+    setCopilotEntity(null);
     window.history.replaceState(null, "", `/levytate/app?module=${encodeURIComponent(module)}`);
     setActiveModule(module);
   }
@@ -221,8 +225,11 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
     window.history.replaceState(null, "", `/levytate/app?module=Approvals&application=${encodeURIComponent(applicationId)}`);
   }
 
-  function updateApplicationReviewSelection(applicationId: string | null) {
+  const updateApplicationReviewSelection = useCallback((applicationId: string | null) => {
     setManagerReviewApplicationId(applicationId);
+    const application = applicationId ? data.applications.find((item) => item.id === applicationId) : null;
+    const employee = application ? data.employees.find((item) => item.id === application.employeeId) : null;
+    setCopilotEntity(applicationId ? { type: "application", id: applicationId, label: `Application: ${employee?.name ?? "Selected record"}` } : null);
     window.history.replaceState(
       null,
       "",
@@ -230,7 +237,11 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
         ? `/levytate/app?module=Approvals&application=${encodeURIComponent(applicationId)}`
         : "/levytate/app?module=Approvals",
     );
-  }
+  }, [data.applications, data.employees]);
+
+  const updateLearnerCopilotSelection = useCallback((id: string | null, name?: string) => {
+    setCopilotEntity(id ? { type: "learner", id, label: `Learner: ${name ?? "Selected record"}` } : null);
+  }, []);
 
   function openDirectReport(employeeId: string) {
     window.location.assign(`/levytate/app/my-team/${encodeURIComponent(employeeId)}`);
@@ -247,6 +258,13 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
       const [, kind, id] = target.split(":");
       if (kind && id) {
         window.history.replaceState(null, "", `/levytate/app?module=Providers&${encodeURIComponent(kind)}=${encodeURIComponent(id)}`);
+        if (kind.toLowerCase().includes("provider")) {
+          const provider = data.providers.find((item) => item.providerId === id);
+          setCopilotEntity({ type: "provider", id, label: `Provider: ${provider?.providerName ?? "Selected record"}` });
+        } else if (kind.toLowerCase().includes("programme")) {
+          const programme = data.providerProgrammes.find((item) => item.id === id);
+          setCopilotEntity({ type: "programme", id, label: `Programme: ${programme?.programmeName ?? "Selected record"}` });
+        }
         window.dispatchEvent(new PopStateEvent("popstate"));
       }
       return;
@@ -331,6 +349,16 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
   const workspaceName = data.profile.employerName || "LevyTate beta employer";
   const workspaceLabel = data.profile.workspaceName || "Standalone employer workspace";
   const storageStatus = meta?.storageMode === "supabase" ? "Supabase workspace" : "Local fallback";
+  const copilotContext = useMemo<LevyTateCopilotContext>(() => {
+    const operationalLabel = activeModule === "Home" && isOperationsRole ? "Operations Centre" : earlyAccessPolicy.modules.find((entry) => entry.moduleKey === activeModule)?.label ?? activeModule;
+    return {
+      module: activeModule,
+      route: activeModule === "Home" ? "/levytate/app" : `/levytate/app?module=${encodeURIComponent(activeModule)}`,
+      contextLabel: copilotEntity?.label ?? operationalLabel,
+      entityType: copilotEntity?.type,
+      entityId: copilotEntity?.id,
+    };
+  }, [activeModule, copilotEntity, earlyAccessPolicy.modules, isOperationsRole]);
 
   return (
     <main className="min-h-screen bg-[#f4f7f5] text-[#102c3d]">
@@ -452,8 +480,8 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
             ) : null}
             {activeModule === "Approvals" ? <ApplicationsModule onOpenDirectReport={openDirectReport} initialApplicationId={managerReviewApplicationId} onApplicationSelectionChange={updateApplicationReviewSelection} /> : null}
             {activeModule === "Intelligence" ? <ProviderIntelligenceModule /> : null}
-            {activeModule === "Applications" ? <ApplicationsModule /> : null}
-            {activeModule === "Learners" ? <LearnersModule initialLearnerRecordId={learnerTarget?.learnerRecordId} initialAction={learnerTarget?.actionType} onDeepLinkConsumed={() => setLearnerTarget(null)} /> : null}
+            {activeModule === "Applications" ? <ApplicationsModule onApplicationSelectionChange={updateApplicationReviewSelection} /> : null}
+            {activeModule === "Learners" ? <LearnersModule initialLearnerRecordId={learnerTarget?.learnerRecordId} initialAction={learnerTarget?.actionType} onDeepLinkConsumed={() => setLearnerTarget(null)} onLearnerSelectionChange={updateLearnerCopilotSelection} /> : null}
             {activeModule === "People" ? (
               <ModuleStackNav items={peopleItems} active={peopleView} onSelect={(item) => setPeopleView(item as PeopleView)}>
                 {peopleView === "Employees" ? <EmployeesModule onStartDiscovery={(employeeId) => { setAiEmployeeId(employeeId); openModule("Copilot"); }} /> : null}
@@ -486,6 +514,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
           </nav>
         </section>
       </div>
+      {can("copilot:use") && meta?.userRole !== "Platform Admin" ? <PersistentCopilot context={copilotContext} initialEmployeeId={aiEmployeeId} onNavigate={navigateTo} /> : null}
     </main>
   );
 }

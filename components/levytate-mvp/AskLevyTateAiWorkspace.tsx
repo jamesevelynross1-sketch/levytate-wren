@@ -15,6 +15,7 @@ import type {
 } from "@/lib/levytate/ai/types";
 import { updateEmployeeDiscovery } from "@/lib/levytate/mvp/progressive-profiling";
 import { activeApplicationStatuses, createEmployeeDevelopmentProfile, nowIso, type MvpEmployee, type MvpRole, type MvpWorkspaceData } from "@/lib/levytate/mvp/workspace";
+import { copilotPlaceholderFor, copilotSuggestionsFor, type LevyTateCopilotContext } from "@/lib/levytate/copilot-context";
 
 type AssistantRole = Exclude<LevyTateRole, "Department Head">;
 type ChatMessage = {
@@ -468,7 +469,7 @@ function buildWorkspaceEmployeeResolution(
   };
 }
 
-export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate }: { initialEmployeeId?: string | null; onNavigate?: (target: string) => void }) {
+export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, presentation = "standalone", context }: { initialEmployeeId?: string | null; onNavigate?: (target: string) => void; presentation?: "standalone" | "drawer"; context?: LevyTateCopilotContext }) {
   const { data, meta, saveEmployeeDevelopmentProfile } = useMvpWorkspace();
   const [role, setRole] = useState<AssistantRole>("Employee");
   const [conversations, setConversations] = useState<Record<AssistantRole, ChatMessage[]>>(initialConversations);
@@ -482,6 +483,8 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate }:
   const [revealedAction, setRevealedAction] = useState<LevyTateAiAction | null>(null);
   const [actionStatus, setActionStatus] = useState("");
   const loadedEmployeeRef = useRef("");
+  const previousContextRef = useRef("");
+  const [contextChanges, setContextChanges] = useState<string[]>([]);
   const availableAssistantRoles = useMemo(() => {
     if (meta?.userRole === "Platform Admin") return ["LevyTate Admin"] as AssistantRole[];
     if (meta?.userRole === "Employer Admin" || meta?.userRole === "Apprenticeship Lead") return ["Apprenticeship Lead"] as AssistantRole[];
@@ -546,7 +549,14 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate }:
     [selectedApplication],
   );
   const activePurpose = role === "Employee" ? employeeStageContent.purpose : roleContent[role].purpose;
-  const activePrompts = role === "Employee" ? employeeStageContent.prompts : roleContent[role].prompts;
+  const activePrompts = presentation === "drawer" && context ? copilotSuggestionsFor(context) : role === "Employee" ? employeeStageContent.prompts : roleContent[role].prompts;
+
+  useEffect(() => {
+    if (presentation !== "drawer" || !context) return;
+    const key = `${context.module}:${context.entityType ?? "page"}:${context.entityId ?? ""}`;
+    if (previousContextRef.current && previousContextRef.current !== key) setContextChanges((current) => [...current, `Context changed to ${context.contextLabel}`].slice(-4));
+    previousContextRef.current = key;
+  }, [context, presentation]);
 
   useEffect(() => {
     if (initialEmployeeId && initialEmployeeId !== selectedEmployeeId) {
@@ -702,7 +712,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate }:
       userRole: activeRole,
       selectedEmployee: contextEmployee?.name ?? (activeRole === "Employee" ? selectedEmployee?.name : undefined),
       selectedSite: contextEmployee?.site || (activeRole === "Employee" ? selectedEmployee?.site || data.profile.defaultSite || "All sites" : data.profile.defaultSite || "All sites"),
-      currentSection: "LevyTate Copilot",
+      currentSection: context?.contextLabel ?? "LevyTate Copilot",
       userMessage: trimmed,
       conversationHistory,
       conversationProfile: developmentProfile?.conversationProfile ?? (activeRole === "Employee" ? selectedDevelopmentProfile?.conversationProfile ?? undefined : profiles[activeRole] ?? undefined),
@@ -711,7 +721,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate }:
       currentWorkspace: {
         employerName: data.profile.employerName || "LevyTate beta workspace",
         selectedSite: contextEmployee?.site || (activeRole === "Employee" ? selectedEmployee?.site || data.profile.defaultSite || "All sites" : data.profile.defaultSite || "All sites"),
-        activeModule: "LevyTate Copilot",
+        activeModule: context?.module ?? "LevyTate Copilot",
       },
       currentApplication: contextEmployee
         ? buildCurrentApplicationSummary(
@@ -858,6 +868,31 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate }:
   const conversationStarted = messages.some((message) => message.role === "user");
   const conversationCtaLabel = conversationStarted ? "Continue conversation" : "Start conversation";
   const conversationDisabled = loading || (role === "Employee" && !selectedEmployee);
+
+  if (presentation === "drawer" && context) {
+    return <div className="flex h-full min-h-0 flex-col bg-white">
+      <div className="border-b border-[#102c3d]/[0.08] bg-[#f7faf8] px-5 py-4">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b776e]">Using context: This page</p>
+        <p className="mt-1 text-sm font-semibold text-[#102c3d]">Working with you on {context.contextLabel}</p>
+        <p className="mt-1 text-xs leading-5 text-[#102c3d]/48">Copilot uses the current LevyTate workspace and page context. It cannot see data outside this workspace.</p>
+      </div>
+      <div className="border-b border-[#102c3d]/[0.07] px-4 py-4">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#b94f64]">Suggested for this page</p>
+        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">{activePrompts.slice(0, 4).map((prompt) => <button key={prompt} type="button" onClick={() => void sendMessage(prompt)} disabled={conversationDisabled} className="min-h-11 border border-[#102c3d]/[0.08] bg-white px-3 py-2 text-left text-xs font-semibold leading-5 text-[#102c3d]/68 transition hover:border-[#0b776e]/30 hover:text-[#102c3d] disabled:opacity-45">{prompt}</button>)}</div>
+      </div>
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-[#f7faf8] px-4 py-4" aria-live="polite">
+        {contextChanges.map((change, index) => <div key={`${change}-${index}`} className="flex items-center gap-3 py-1"><span className="h-px flex-1 bg-[#102c3d]/10" /><span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#102c3d]/40">{change}</span><span className="h-px flex-1 bg-[#102c3d]/10" /></div>)}
+        {messages.map((message) => <article key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}><div className={`max-w-[92%] px-3.5 py-3 text-sm leading-6 ${message.role === "user" ? "bg-[#102c3d] text-white" : "border border-[#102c3d]/[0.07] bg-white text-[#102c3d]/70"}`}><p className="whitespace-pre-wrap">{message.content}</p>{message.response ? <InlineResponse response={message.response} onAction={chooseAction} onQuickReply={(reply) => void sendMessage(reply)} onSelectPathway={role === "Employee" ? selectRecommendedPathway : undefined} selectedPathwayTitle={selectedPreferredStandard?.title ?? null} loading={loading} /> : null}</div></article>)}
+        {loading ? <p className="text-sm font-medium text-[#0b776e]">Thinking through the next step…</p> : null}
+        {error ? <p className="border border-[#bf4159]/15 bg-[#fff4f5] px-3 py-2 text-sm text-[#ad344e]">{error}</p> : null}
+      </div>
+      <form onSubmit={submit} className="border-t border-[#102c3d]/[0.08] bg-white p-4">
+        <label htmlFor="levytate-contextual-copilot-message" className="sr-only">Message LevyTate Copilot</label>
+        <textarea id="levytate-contextual-copilot-message" value={input} onChange={(event) => setInput(event.target.value)} rows={2} placeholder={copilotPlaceholderFor(context)} className="min-h-[58px] w-full resize-none border border-[#102c3d]/[0.1] bg-[#f8fbfa] px-3.5 py-3 text-sm text-[#102c3d] outline-none focus:border-[#0b776e] focus:ring-2 focus:ring-[#0b776e]/10" />
+        <div className="mt-2 flex items-center justify-between gap-3"><button type="button" onClick={resetConversation} className="min-h-11 text-xs font-semibold text-[#102c3d]/48">New conversation</button><button disabled={conversationDisabled} className="min-h-11 bg-[#102c3d] px-5 text-sm font-semibold text-white disabled:opacity-45">Ask Copilot</button></div>
+      </form>
+    </div>;
+  }
 
   return (
     <div className="grid gap-5">

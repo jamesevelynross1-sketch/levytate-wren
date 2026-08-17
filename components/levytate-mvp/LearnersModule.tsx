@@ -78,7 +78,7 @@ const progressOptions: Array<LearnerProgressPosition | typeof allOption> = [
 
 type LearnerDeepLinkAction = "open_learner" | "complete_pre_enrolment" | "complete_enrolment" | "record_review" | "add_progress" | "manage_break" | "return_learner" | "manage_assessment";
 
-export function LearnersModule({ initialLearnerRecordId = "", initialAction = "open_learner", onDeepLinkConsumed }: { initialLearnerRecordId?: string; initialAction?: LearnerDeepLinkAction; onDeepLinkConsumed?: () => void }) {
+export function LearnersModule({ initialLearnerRecordId = "", initialAction = "open_learner", onDeepLinkConsumed, onLearnerSelectionChange }: { initialLearnerRecordId?: string; initialAction?: LearnerDeepLinkAction; onDeepLinkConsumed?: () => void; onLearnerSelectionChange?: (learnerRecordId: string | null, learnerName?: string) => void }) {
   const { can, meta } = useMvpWorkspace();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -105,6 +105,10 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
   useEffect(() => {
     if (initialLearnerRecordId) setSelectedId(initialLearnerRecordId);
   }, [initialLearnerRecordId]);
+
+  useEffect(() => {
+    onLearnerSelectionChange?.(selectedId || null, detail?.learner.name);
+  }, [detail?.learner.name, onLearnerSelectionChange, selectedId]);
 
   useEffect(() => {
     if (!mayReadOrganisationLearners) {

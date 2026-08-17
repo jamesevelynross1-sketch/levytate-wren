@@ -69,6 +69,10 @@ export function ApplicationsModule({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
+  useEffect(() => {
+    onApplicationSelectionChange?.(selectedId);
+  }, [onApplicationSelectionChange, selectedId]);
+
   const activeSet = useMemo(() => new Set(activeApplicationStatuses()), []);
 
   if (meta?.userRole === "Line Manager") {
