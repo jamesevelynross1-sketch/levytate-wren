@@ -1,11 +1,12 @@
 "use client";
 
-import { Bookmark, Check, ChevronRight, Eye, Sparkles, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Bookmark, Check, ChevronRight, Eye, ShieldCheck, X } from "lucide-react";
+import { useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { buildFairProviderFeed } from "@/lib/levytate/provider-intelligence/fair-distribution";
 import { morningBrief } from "@/lib/levytate/provider-intelligence/feed";
 import { intelligenceProviders, marketWatchItems, providerIntelligenceUpdates } from "@/lib/levytate/provider-intelligence/fixtures";
-import { intelligenceTopics, type IntelligenceTopic, type ProviderIntelligenceUpdate } from "@/lib/levytate/provider-intelligence/domain";
+import { assignFeedPresentation } from "@/lib/levytate/provider-intelligence/presentation";
+import { intelligenceTopics, type PresentedIntelligenceUpdate, type IntelligenceTopic, type ProviderIntelligenceUpdate } from "@/lib/levytate/provider-intelligence/domain";
 
 const providerById = new Map(intelligenceProviders.map((provider) => [provider.id, provider]));
 
@@ -17,136 +18,63 @@ export function ProviderIntelligenceModule() {
   const [followedTopics, setFollowedTopics] = useState<Set<string>>(new Set(["AI & Data", "Procurement"]));
   const [selected, setSelected] = useState<ProviderIntelligenceUpdate | null>(null);
   const fairFeed = useMemo(() => buildFairProviderFeed(providerIntelligenceUpdates, { topic }), [topic]);
-  const visibleFeed = view === "Following"
-    ? fairFeed.filter((item) => followedProviders.has(item.providerId) || item.topics.some((itemTopic) => followedTopics.has(itemTopic)))
-    : fairFeed;
+  const presentedFeed = useMemo(() => assignFeedPresentation(fairFeed), [fairFeed]);
+  const visibleFeed = view === "Following" ? presentedFeed.filter((item) => followedProviders.has(item.providerId) || item.topics.some((value) => followedTopics.has(value))) : presentedFeed;
+  const savedItems = providerIntelligenceUpdates.filter((item) => saved.has(item.id));
+  const toggleSet = (setter: Dispatch<SetStateAction<Set<string>>>, value: string) => setter((current) => { const next = new Set(current); if (next.has(value)) next.delete(value); else next.add(value); return next; });
 
-  const toggleSet = (setter: React.Dispatch<React.SetStateAction<Set<string>>>, value: string) => setter((current) => {
-    const next = new Set(current);
-    if (next.has(value)) next.delete(value); else next.add(value);
-    return next;
-  });
-
-  return (
-    <section className="overflow-hidden rounded-[28px] border border-[#102c3d]/[0.08] bg-[#f8faf8] shadow-[0_24px_60px_rgba(16,44,61,0.06)]">
-      <div className="border-b border-[#102c3d]/[0.08] bg-[#102c3d] px-5 py-7 text-white sm:px-8 sm:py-9">
-        <div className="flex flex-wrap items-end justify-between gap-5">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#73d4c7]">Market intelligence</p>
-            <h2 className="mt-2 text-3xl font-semibold tracking-[-0.035em] sm:text-4xl">Good morning</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-white/64">Your apprenticeship market, in one place. A calm editorial view of provider updates, programme changes and themes worth your attention.</p>
-          </div>
-          <div className="flex flex-wrap gap-2 text-[11px] font-semibold">
-            <span className="rounded-full border border-white/12 bg-white/[0.07] px-3 py-2">Updated this morning</span>
-            <span className="rounded-full border border-white/12 bg-white/[0.07] px-3 py-2">Illustrative intelligence feed</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid gap-6 p-4 sm:p-6 lg:grid-cols-[minmax(0,7fr)_minmax(17rem,3fr)] lg:p-8">
-        <div className="min-w-0">
-          <MorningBrief />
-          <div className="mt-5 lg:hidden"><MarketWatch /></div>
-
-          <div className="mt-6 flex flex-col gap-4 border-b border-[#102c3d]/[0.09] pb-5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="inline-flex rounded-xl border border-[#102c3d]/[0.08] bg-white p-1">
-                {(["Stream", "Following"] as const).map((item) => <button key={item} onClick={() => setView(item)} className={`min-h-11 rounded-lg px-4 text-sm font-semibold transition ${view === item ? "bg-[#102c3d] text-white" : "text-[#102c3d]/58 hover:bg-[#f2f7f4]"}`}>{item}</button>)}
-              </div>
-              <p className="text-xs font-semibold text-[#102c3d]/46">{visibleFeed.length} editorial updates</p>
-            </div>
-            <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1" aria-label="Intelligence topics">
-              {intelligenceTopics.map((item) => <button key={item} onClick={() => setTopic(item)} className={`min-h-11 shrink-0 rounded-full border px-4 text-xs font-semibold transition ${topic === item ? "border-[#159b8f] bg-[#e9f6f2] text-[#0b6f63]" : "border-[#102c3d]/[0.08] bg-white text-[#102c3d]/58 hover:border-[#159b8f]/35"}`}>{item}</button>)}
-            </div>
-          </div>
-
-          <div className="divide-y divide-[#102c3d]/[0.08]">
-            {visibleFeed.map((item) => {
-              const provider = providerById.get(item.providerId)!;
-              return <article key={item.id} className="py-6 first:pt-5">
-                <div className="flex gap-4">
-                  <ProviderMark providerId={item.providerId} />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                      <p className="text-sm font-semibold text-[#102c3d]">{provider.name}</p>
-                      <span className="text-xs text-[#102c3d]/40">{formatDate(item.publishedAt)}</span>
-                      <span className="rounded-full bg-[#eef5f2] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[#0b6f63]">{item.contentType}</span>
-                    </div>
-                    <h3 className="mt-3 text-xl font-semibold leading-tight tracking-[-0.025em] text-[#102c3d]">{item.displayHeadline}</h3>
-                    <p className="mt-2 text-sm leading-6 text-[#102c3d]/62">{item.displaySummary}</p>
-                    <div className="mt-3 flex flex-wrap gap-2">{item.topics.map((itemTopic) => <span key={itemTopic} className="text-[11px] font-semibold text-[#0b6f63]">#{itemTopic.replaceAll(" ", "")}</span>)}</div>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <button onClick={() => setSelected(item)} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#102c3d] px-4 text-xs font-semibold text-white hover:bg-[#17394d]">View update <ChevronRight size={14} /></button>
-                      <button onClick={() => toggleSet(setSaved, item.id)} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#102c3d]/[0.09] bg-white px-4 text-xs font-semibold text-[#102c3d]/68"><Bookmark size={14} fill={saved.has(item.id) ? "currentColor" : "none"} />{saved.has(item.id) ? "Saved" : "Save"}</button>
-                      <button onClick={() => toggleSet(setFollowedProviders, item.providerId)} className="min-h-11 rounded-xl px-3 text-xs font-semibold text-[#0b6f63]">{followedProviders.has(item.providerId) ? "Following provider" : "Follow provider"}</button>
-                    </div>
-                  </div>
-                </div>
-              </article>;
-            })}
-            {!visibleFeed.length ? <div className="py-12 text-center"><p className="font-semibold">Nothing in Following yet.</p><p className="mt-2 text-sm text-[#102c3d]/54">Follow a provider or topic to create your local reading list.</p></div> : null}
-          </div>
-          <div className="mt-2 lg:hidden"><FollowingPanel followedProviders={followedProviders} followedTopics={followedTopics} onProvider={(id) => toggleSet(setFollowedProviders, id)} onTopic={(value) => toggleSet(setFollowedTopics, value)} /></div>
-        </div>
-
-        <aside className="hidden space-y-5 lg:block">
-          <MarketWatch />
-          <FollowingPanel followedProviders={followedProviders} followedTopics={followedTopics} onProvider={(id) => toggleSet(setFollowedProviders, id)} onTopic={(value) => toggleSet(setFollowedTopics, value)} />
-          <div className="rounded-2xl border border-[#159b8f]/15 bg-[#eaf5f1] p-5">
-            <div className="flex items-center gap-2 text-[#0b6f63]"><Sparkles size={16} /><p className="text-xs font-bold uppercase tracking-[0.12em]">Fair by design</p></div>
-            <p className="mt-3 text-sm leading-6 text-[#102c3d]/62">The main stream rotates eligible providers after topic relevance. Posting volume, engagement and commercial ranking do not control exposure.</p>
-          </div>
-        </aside>
-      </div>
-
-      {selected ? <UpdateDetail item={selected} onClose={() => setSelected(null)} /> : null}
-    </section>
-  );
-}
-
-function MorningBrief() {
-  return <article className="relative overflow-hidden rounded-2xl border border-[#102c3d]/[0.08] bg-white p-5 shadow-[0_16px_36px_rgba(16,44,61,0.05)] sm:p-7">
-    <div className="absolute inset-y-0 left-0 w-1 bg-[#159b8f]" />
-    <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#c95568]">Morning brief</p><p className="text-xs font-medium text-[#102c3d]/40">Editorial synthesis · illustrative</p></div>
-    <h3 className="mt-4 max-w-3xl text-2xl font-semibold leading-tight tracking-[-0.03em] text-[#102c3d] sm:text-[1.75rem]">{morningBrief.headline}</h3>
-    <p className="mt-3 max-w-3xl text-sm leading-7 text-[#102c3d]/64">{morningBrief.summary}</p>
-    <div className="mt-5 grid gap-3 sm:grid-cols-3">{morningBrief.highlights.map((item) => <div key={item.id} className="border-l border-[#102c3d]/[0.1] pl-3"><p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#0b6f63]">{providerById.get(item.providerId)?.name}</p><p className="mt-1 text-xs font-semibold leading-5 text-[#102c3d]/74">{item.displayHeadline}</p></div>)}</div>
-  </article>;
-}
-
-function MarketWatch() {
-  return <section className="rounded-2xl border border-[#102c3d]/[0.08] bg-white p-5 shadow-[0_14px_30px_rgba(16,44,61,0.04)]">
-    <div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#c95568]">Market watch</p><h3 className="mt-1 text-lg font-semibold">This morning</h3></div><Eye size={18} className="text-[#0b6f63]" /></div>
-    <div className="mt-4 divide-y divide-[#102c3d]/[0.07]">{marketWatchItems.map((item) => <div key={item.label} className="flex min-h-11 items-center justify-between gap-3 py-2"><span className="text-sm text-[#102c3d]/62">{item.label}</span><span className="text-sm font-semibold text-[#102c3d]">{item.count}</span></div>)}</div>
-    <p className="mt-3 text-[11px] leading-5 text-[#102c3d]/40">Illustrative counts from the fictional editorial fixture.</p>
+  return <section className="min-w-0 bg-[#f6f7f4]">
+    <div className="mb-6 flex flex-wrap items-end justify-between gap-4 border-b border-[#102c3d]/[0.09] pb-5"><div><p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#b94f64]">The apprenticeship market, in one place</p><h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[#102c3d]">A sharper view of what is changing</h2></div><p className="max-w-md text-sm leading-6 text-[#102c3d]/55">Provider news and market developments, edited for a useful morning scan. Fictional content for demonstration.</p></div>
+    <div className="grid items-start gap-7 lg:grid-cols-[minmax(0,7fr)_minmax(16rem,3fr)] xl:gap-9">
+      <main className="min-w-0">
+        <MorningBrief onOpen={() => setSelected(morningBrief.highlights[0])} />
+        <section className="mt-9" aria-labelledby="latest-intelligence-heading">
+          <div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#0b776e]">Intelligence feed</p><h2 id="latest-intelligence-heading" className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-[#102c3d]">Latest from the apprenticeship market</h2><p className="mt-2 text-sm text-[#102c3d]/52">Provider updates, programme launches, events, insights and market changes.</p></div><div className="inline-flex border-b border-[#102c3d]/12" aria-label="Feed view">{(["Stream", "Following"] as const).map((item) => <button key={item} onClick={() => setView(item)} className={`min-h-11 border-b-2 px-4 text-sm font-semibold transition ${view === item ? "border-[#0b776e] text-[#102c3d]" : "border-transparent text-[#102c3d]/45 hover:text-[#102c3d]"}`}>{item}</button>)}</div></div>
+          <div className="mt-5 -mx-1 flex gap-1 overflow-x-auto border-y border-[#102c3d]/[0.08] px-1 py-2" aria-label="Intelligence topics">{intelligenceTopics.map((item) => <button key={item} onClick={() => setTopic(item)} className={`min-h-11 shrink-0 border-b-2 px-3 text-xs font-semibold transition ${topic === item ? "border-[#b94f64] text-[#102c3d]" : "border-transparent text-[#102c3d]/48 hover:text-[#0b776e]"}`}>{item}</button>)}</div>
+          <div className="mt-5 grid gap-5 md:grid-cols-2">{visibleFeed.map((item) => <IntelligenceFeedCard key={item.id} item={item} saved={saved.has(item.id)} following={followedProviders.has(item.providerId)} onOpen={() => setSelected(item)} onSave={() => toggleSet(setSaved, item.id)} onFollow={() => toggleSet(setFollowedProviders, item.providerId)} />)}{!visibleFeed.length ? <div className="col-span-full border border-[#102c3d]/[0.09] bg-white px-6 py-14 text-center"><p className="font-semibold">Nothing in Following yet.</p><p className="mt-2 text-sm text-[#102c3d]/54">Follow a provider or topic to shape this local reading view.</p></div> : null}</div>
+        </section>
+        <div className="mt-7 grid gap-5 lg:hidden"><MarketWatch /><FollowingPanel followedProviders={followedProviders} followedTopics={followedTopics} onProvider={(id) => toggleSet(setFollowedProviders, id)} onTopic={(value) => toggleSet(setFollowedTopics, value)} /><SavedPanel items={savedItems} onOpen={setSelected} /><FairVisibility /></div>
+      </main>
+      <aside className="hidden space-y-5 lg:sticky lg:top-24 lg:block"><MarketWatch /><FollowingPanel followedProviders={followedProviders} followedTopics={followedTopics} onProvider={(id) => toggleSet(setFollowedProviders, id)} onTopic={(value) => toggleSet(setFollowedTopics, value)} /><SavedPanel items={savedItems} onOpen={setSelected} /><FairVisibility /></aside>
+    </div>
+    {selected ? <UpdateDetail item={selected} onClose={() => setSelected(null)} /> : null}
   </section>;
 }
 
-function FollowingPanel({ followedProviders, followedTopics, onProvider, onTopic }: { followedProviders: Set<string>; followedTopics: Set<string>; onProvider: (id: string) => void; onTopic: (topic: string) => void }) {
-  return <section className="rounded-2xl border border-[#102c3d]/[0.08] bg-white p-5">
-    <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#0b6f63]">Following</p><h3 className="mt-1 text-lg font-semibold">Shape your reading list</h3>
-    <p className="mt-2 text-xs leading-5 text-[#102c3d]/48">Stored on this device only. Following never changes the fair main stream.</p>
-    <div className="mt-4 grid gap-2">{intelligenceProviders.slice(0, 4).map((provider) => <button key={provider.id} onClick={() => onProvider(provider.id)} className="flex min-h-11 items-center justify-between rounded-xl border border-[#102c3d]/[0.07] px-3 text-left text-xs font-semibold"><span className="flex items-center gap-2"><ProviderMark providerId={provider.id} compact />{provider.name}</span>{followedProviders.has(provider.id) ? <Check size={14} className="text-[#0b6f63]" /> : <span className="text-[#102c3d]/34">Follow</span>}</button>)}</div>
-    <div className="mt-4 flex flex-wrap gap-2">{intelligenceTopics.slice(1, 5).map((item) => <button key={item} onClick={() => onTopic(item)} className={`min-h-11 rounded-full border px-3 text-[11px] font-semibold ${followedTopics.has(item) ? "border-[#159b8f] bg-[#eaf5f1] text-[#0b6f63]" : "border-[#102c3d]/[0.08] text-[#102c3d]/54"}`}>{item}</button>)}</div>
-  </section>;
+function MorningBrief({ onOpen }: { onOpen: () => void }) { return <article className="grid overflow-hidden border border-[#102c3d]/[0.09] bg-white shadow-[0_16px_40px_rgba(16,44,61,0.06)] md:grid-cols-[1.08fr_.92fr]"><div className="flex flex-col justify-center p-6 sm:p-8 lg:p-9"><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#b94f64]">Your morning brief</p><h3 className="mt-3 text-3xl font-semibold leading-[1.08] tracking-[-0.045em] text-[#102c3d] lg:text-[2.35rem]">What changed in apprenticeships since yesterday</h3><p className="mt-4 max-w-xl text-sm leading-6 text-[#102c3d]/60">Practical AI adoption, operational leadership and stronger workplace evidence lead this morning’s provider developments.</p><dl className="mt-6 flex flex-wrap gap-x-7 gap-y-3 border-t border-[#102c3d]/[0.08] pt-5">{[["7", "developments"], ["3", "worth reviewing"], ["2", "programme launches"]].map(([value, label]) => <div key={label}><dt className="text-xl font-semibold text-[#102c3d]">{value}</dt><dd className="mt-0.5 text-[11px] font-medium text-[#102c3d]/45">{label}</dd></div>)}</dl><button onClick={onOpen} className="mt-6 inline-flex min-h-11 w-full items-center justify-center gap-2 bg-[#102c3d] px-5 text-sm font-semibold text-white transition hover:bg-[#17394d] sm:w-fit">Read morning brief <ChevronRight size={15} /></button></div><EditorialVisual image="morning-brief" imageAlt="Abstract editorial composition representing apprenticeship market developments" className="min-h-64 md:min-h-full" featured /></article>; }
+
+function IntelligenceFeedCard({ item, saved, following, onOpen, onSave, onFollow }: { item: PresentedIntelligenceUpdate; saved: boolean; following: boolean; onOpen: () => void; onSave: () => void; onFollow: () => void }) {
+  if (item.presentation === "compact") return <article className="group flex min-h-36 gap-4 border border-[#102c3d]/[0.09] bg-white p-4 transition hover:-translate-y-0.5 hover:border-[#0b776e]/30"><EditorialVisual image={item.image} imageAlt={item.imageAlt} className="aspect-square w-28 shrink-0 self-start" /><div className="min-w-0 flex-1"><ContentLabel item={item} /><h3 className="mt-2 text-base font-semibold leading-snug tracking-[-0.02em] text-[#102c3d]">{item.displayHeadline}</h3><ProviderIdentity providerId={item.providerId} date={item.publishedAt} compact /><button onClick={onOpen} className="mt-2 min-h-11 text-xs font-semibold text-[#0b776e]">Read update →</button></div></article>;
+  if (item.presentation === "split") return <article className="group grid overflow-hidden border border-[#102c3d]/[0.09] bg-white transition hover:-translate-y-0.5 hover:shadow-[0_14px_30px_rgba(16,44,61,0.06)] md:col-span-2 md:grid-cols-[.9fr_1.1fr]"><EditorialVisual image={item.image} imageAlt={item.imageAlt} className="aspect-[4/3] md:aspect-auto md:min-h-72" /><div className="flex flex-col p-5 sm:p-7"><ProviderIdentity providerId={item.providerId} date={item.publishedAt} /><ContentLabel item={item} /><h3 className="mt-3 text-2xl font-semibold leading-tight tracking-[-0.035em] text-[#102c3d]">{item.displayHeadline}</h3><p className="mt-3 text-sm leading-6 text-[#102c3d]/60">{item.displaySummary}</p><FeedActions saved={saved} following={following} onOpen={onOpen} onSave={onSave} onFollow={onFollow} /></div></article>;
+  const wide = item.presentation === "feature" || item.presentation === "case-study";
+  const ratio = item.presentation === "feature" ? "aspect-[16/8]" : item.presentation === "case-study" ? "aspect-[16/7]" : "aspect-video";
+  return <article className={`group overflow-hidden border border-[#102c3d]/[0.09] bg-white transition hover:-translate-y-0.5 hover:shadow-[0_14px_30px_rgba(16,44,61,0.06)] ${wide ? "md:col-span-2" : ""}`}><div className="relative"><EditorialVisual image={item.image} imageAlt={item.imageAlt} className={ratio} featured={wide} />{item.presentation === "event" ? <EventMarker date={item.publishedAt} /> : null}</div><div className={wide ? "p-6 sm:p-7" : "p-5"}><ProviderIdentity providerId={item.providerId} date={item.publishedAt} /><ContentLabel item={item} /><h3 className={`mt-3 font-semibold leading-tight tracking-[-0.035em] text-[#102c3d] ${wide ? "text-2xl sm:text-[1.75rem]" : "text-xl"}`}>{item.displayHeadline}</h3><p className="mt-3 text-sm leading-6 text-[#102c3d]/60">{item.displaySummary}</p><div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-[11px] font-semibold text-[#102c3d]/46">{item.topics.slice(0, 2).map((value) => <span key={value}>{value}</span>)}<span>{item.regions[0]}</span></div><FeedActions saved={saved} following={following} onOpen={onOpen} onSave={onSave} onFollow={onFollow} event={item.presentation === "event"} /></div></article>;
 }
 
-function ProviderMark({ providerId, compact = false }: { providerId: string; compact?: boolean }) {
-  const provider = providerById.get(providerId)!;
-  return <span style={{ backgroundColor: provider.accent }} className={`grid shrink-0 place-items-center rounded-xl font-bold text-white shadow-sm ${compact ? "h-7 w-7 text-[9px]" : "h-11 w-11 text-[11px]"}`} aria-hidden="true">{provider.shortName}</span>;
+function EditorialVisual({ image, imageAlt, className, featured = false }: { image: string; imageAlt: string; className: string; featured?: boolean }) {
+  const variants: Record<string, string> = {
+    "morning-brief": "bg-[#102c3d] before:absolute before:-right-[8%] before:top-[8%] before:h-[72%] before:w-[72%] before:rotate-12 before:border before:border-[#82d7c8]/45 after:absolute after:-bottom-[20%] after:-left-[8%] after:h-[70%] after:w-[70%] after:rounded-full after:bg-[#b94f64]/75",
+    "signal-grid": "bg-[#132f40] before:absolute before:inset-[14%] before:bg-[linear-gradient(90deg,transparent_48%,rgba(130,215,200,.35)_49%,rgba(130,215,200,.35)_51%,transparent_52%),linear-gradient(0deg,transparent_48%,rgba(130,215,200,.22)_49%,rgba(130,215,200,.22)_51%,transparent_52%)] before:bg-[length:42px_42px] after:absolute after:right-[12%] after:top-[16%] after:h-20 after:w-20 after:bg-[#b94f64]",
+    "leadership-steps": "bg-[#dcebe5] before:absolute before:bottom-0 before:left-[12%] before:h-[38%] before:w-[24%] before:bg-[#739d94] after:absolute after:bottom-0 after:left-[40%] after:h-[62%] after:w-[46%] after:bg-[#102c3d]",
+    "digital-modules": "bg-[#b8dcd4] before:absolute before:left-[12%] before:top-[18%] before:h-[28%] before:w-[44%] before:bg-white/75 after:absolute after:bottom-[16%] after:right-[12%] after:h-[35%] after:w-[48%] after:border-2 after:border-[#102c3d]/70",
+    "operational-flow": "bg-[#e7ded2] before:absolute before:left-[10%] before:top-1/2 before:h-1 before:w-[80%] before:bg-[#102c3d] after:absolute after:right-[15%] after:top-[27%] after:h-[46%] after:w-[28%] after:bg-[#b94f64]",
+    "commercial-lines": "bg-[#243f50] before:absolute before:inset-[16%] before:border-l before:border-t before:border-[#d5b990]/70 after:absolute after:bottom-[18%] after:right-[14%] after:h-[48%] after:w-[52%] after:border-b-4 after:border-r-4 after:border-[#82d7c8]",
+    "procurement-network": "bg-[#e8e2d8] before:absolute before:left-[18%] before:top-[22%] before:h-16 before:w-16 before:rounded-full before:bg-[#102c3d] after:absolute after:bottom-[18%] after:right-[16%] after:h-24 after:w-24 after:rounded-full after:border-[16px] after:border-[#b94f64]",
+    "people-circles": "bg-[#dbe9e4] before:absolute before:left-[15%] before:top-[18%] before:h-24 before:w-24 before:rounded-full before:bg-[#0b776e] after:absolute after:bottom-[12%] after:right-[14%] after:h-32 after:w-32 after:rounded-full after:bg-[#102c3d]",
+  };
+  return <div role="img" aria-label={imageAlt} data-image={image} className={`relative isolate overflow-hidden ${variants[image] ?? variants["signal-grid"]} ${className}`}><div className={`absolute inset-0 z-10 bg-[linear-gradient(125deg,transparent_45%,rgba(255,255,255,.18))] transition duration-300 group-hover:scale-[1.015] ${featured ? "opacity-100" : "opacity-70"}`} /><div className="absolute bottom-[12%] left-[10%] z-20 h-px w-[24%] bg-white/70" /></div>;
 }
 
-function UpdateDetail({ item, onClose }: { item: ProviderIntelligenceUpdate; onClose: () => void }) {
-  const provider = providerById.get(item.providerId)!;
-  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#071a26]/55 p-0 backdrop-blur-sm sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-label="Provider update">
-    <article className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-[28px] bg-white p-6 shadow-2xl sm:rounded-[28px] sm:p-8">
-      <div className="flex items-start justify-between gap-4"><div className="flex items-center gap-3"><ProviderMark providerId={item.providerId} /><div><p className="text-sm font-semibold">{provider.name}</p><p className="mt-1 text-xs text-[#102c3d]/44">{item.contentType} · {formatDate(item.publishedAt)}</p></div></div><button onClick={onClose} className="grid h-11 w-11 place-items-center rounded-full bg-[#f1f5f3]" aria-label="Close update"><X size={18} /></button></div>
-      <h3 className="mt-7 text-3xl font-semibold leading-tight tracking-[-0.035em]">{item.displayHeadline}</h3><p className="mt-4 text-base leading-7 text-[#102c3d]/64">{item.displaySummary}</p>
-      <div className="mt-6 grid gap-4 rounded-2xl bg-[#f4f7f5] p-5 sm:grid-cols-2"><Detail label="Programmes" value={item.programmes.join(", ")} /><Detail label="Coverage" value={item.regions.join(", ")} /><Detail label="Source" value={item.sourceType} /><Detail label="Editorial status" value="Published" /></div>
-      <p className="mt-5 text-xs leading-5 text-[#102c3d]/42">Fictional provider content for product demonstration. No quality rating, recommendation or provider ranking is implied.</p>
-    </article>
-  </div>;
-}
-
-function Detail({ label, value }: { label: string; value: string }) { return <div><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#0b6f63]">{label}</p><p className="mt-1 text-sm font-semibold text-[#102c3d]/72">{value}</p></div>; }
+function ProviderIdentity({ providerId, date, compact = false }: { providerId: string; date: string; compact?: boolean }) { const provider = providerById.get(providerId)!; return <div className={`flex items-center gap-2.5 ${compact ? "mt-3" : "mb-4"}`}><ProviderMark providerId={providerId} compact={compact} /><div className="min-w-0"><p className="truncate text-xs font-semibold text-[#102c3d]">{provider.name}</p><p className="mt-0.5 text-[10px] font-medium text-[#102c3d]/42">Premium Provider · {formatDate(date)}</p></div></div>; }
+function ContentLabel({ item }: { item: ProviderIntelligenceUpdate }) { return <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#b94f64]">{contentLabel(item)}</p>; }
+function contentLabel(item: ProviderIntelligenceUpdate) { if (item.contentType === "Programme update") return item.regions.includes("National") ? "Programme launch" : "Delivery update"; return item.contentType; }
+function FeedActions({ saved, following, onOpen, onSave, onFollow, event = false }: { saved: boolean; following: boolean; onOpen: () => void; onSave: () => void; onFollow: () => void; event?: boolean }) { return <div className="mt-5 flex flex-col gap-2 border-t border-[#102c3d]/[0.07] pt-4 sm:flex-row sm:items-center"><button onClick={onSave} aria-pressed={saved} className="inline-flex min-h-11 items-center justify-center gap-2 border border-[#102c3d]/[0.1] px-4 text-xs font-semibold text-[#102c3d]/68"><Bookmark size={14} fill={saved ? "currentColor" : "none"} />{saved ? "Saved" : "Save"}</button><button onClick={onFollow} aria-pressed={following} className="min-h-11 px-4 text-xs font-semibold text-[#0b776e]">{following ? "Following provider" : "Follow provider"}</button><button onClick={onOpen} className="inline-flex min-h-11 items-center justify-center gap-2 bg-[#102c3d] px-4 text-xs font-semibold text-white sm:ml-auto">{event ? "View event" : "View update"}<ChevronRight size={14} /></button></div>; }
+function EventMarker({ date }: { date: string }) { const parts = new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short" }).formatToParts(new Date(date)); return <div className="absolute left-4 top-4 z-20 bg-white px-3 py-2 text-center shadow-sm"><p className="text-xl font-bold leading-none text-[#102c3d]">{parts.find((part) => part.type === "day")?.value}</p><p className="mt-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#b94f64]">{parts.find((part) => part.type === "month")?.value}</p></div>; }
+function MarketWatch() { return <section className="border border-[#102c3d]/[0.09] bg-white p-5"><div className="flex items-center justify-between"><div><p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#b94f64]">Market watch</p><h3 className="mt-1 text-lg font-semibold">This morning</h3></div><Eye size={17} className="text-[#0b776e]" /></div><div className="mt-4 divide-y divide-[#102c3d]/[0.07]">{marketWatchItems.slice(0, 4).map((item) => <div key={item.label} className="flex items-center gap-4 py-3"><span className="w-8 text-xl font-semibold tabular-nums text-[#102c3d]">{String(item.count).padStart(2, "0")}</span><span className="text-sm text-[#102c3d]/58">{item.label}</span></div>)}</div></section>; }
+function FollowingPanel({ followedProviders, followedTopics, onProvider, onTopic }: { followedProviders: Set<string>; followedTopics: Set<string>; onProvider: (id: string) => void; onTopic: (topic: string) => void }) { return <section className="border border-[#102c3d]/[0.09] bg-white p-5"><p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#0b776e]">Following</p><div className="mt-4 grid gap-2">{intelligenceProviders.slice(0, 3).map((provider) => <button key={provider.id} onClick={() => onProvider(provider.id)} className="flex min-h-11 items-center justify-between text-left text-xs font-semibold"><span className="flex min-w-0 items-center gap-2"><ProviderMark providerId={provider.id} compact /><span className="truncate">{provider.name}</span></span>{followedProviders.has(provider.id) ? <Check size={14} className="text-[#0b776e]" /> : <span className="text-[#102c3d]/35">Follow</span>}</button>)}</div><div className="mt-3 flex flex-wrap gap-2">{intelligenceTopics.slice(1, 4).map((item) => <button key={item} onClick={() => onTopic(item)} className={`min-h-11 border-b px-1 text-[11px] font-semibold ${followedTopics.has(item) ? "border-[#0b776e] text-[#0b776e]" : "border-transparent text-[#102c3d]/48"}`}>{item}</button>)}</div><button className="mt-3 min-h-11 text-xs font-semibold text-[#0b776e]">Manage following →</button></section>; }
+function SavedPanel({ items, onOpen }: { items: readonly ProviderIntelligenceUpdate[]; onOpen: (item: ProviderIntelligenceUpdate) => void }) { return <section className="border border-[#102c3d]/[0.09] bg-white p-5"><p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#b94f64]">Saved</p><p className="mt-2 text-lg font-semibold">{items.length} saved {items.length === 1 ? "update" : "updates"}</p>{items.length ? <div className="mt-3 divide-y divide-[#102c3d]/[0.07]">{items.slice(0, 2).map((item) => <button key={item.id} onClick={() => onOpen(item)} className="block min-h-11 w-full py-3 text-left text-xs font-semibold leading-5 text-[#102c3d]/68">{item.displayHeadline}</button>)}</div> : <p className="mt-2 text-xs leading-5 text-[#102c3d]/45">Bookmark useful updates and they will appear here on this device.</p>}<button className="mt-2 min-h-11 text-xs font-semibold text-[#0b776e]">View saved →</button></section>; }
+function FairVisibility() { return <section className="border-l-2 border-[#0b776e] bg-[#eaf2ee] p-5"><div className="flex items-center gap-2 text-[#0b776e]"><ShieldCheck size={16} /><p className="text-[10px] font-bold uppercase tracking-[0.15em]">Fair visibility</p></div><p className="mt-3 text-xs leading-5 text-[#102c3d]/58">Provider order and visual prominence are deterministic and provider-neutral. Spend, popularity and engagement do not influence the organic feed.</p></section>; }
+function ProviderMark({ providerId, compact = false }: { providerId: string; compact?: boolean }) { const provider = providerById.get(providerId)!; return <span style={{ backgroundColor: provider.accent }} className={`grid shrink-0 place-items-center font-bold text-white ${compact ? "h-7 w-7 text-[9px]" : "h-9 w-9 text-[10px]"}`} aria-hidden="true">{provider.shortName}</span>; }
+function UpdateDetail({ item, onClose }: { item: ProviderIntelligenceUpdate; onClose: () => void }) { return <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#071a26]/55 p-0 backdrop-blur-sm sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-label="Provider update"><article className="max-h-[92vh] w-full max-w-2xl overflow-y-auto bg-white shadow-2xl"><EditorialVisual image={item.image} imageAlt={item.imageAlt} className="aspect-[16/7]" featured /><div className="p-6 sm:p-8"><div className="flex items-start justify-between gap-4"><ProviderIdentity providerId={item.providerId} date={item.publishedAt} /><button onClick={onClose} className="grid h-11 w-11 shrink-0 place-items-center bg-[#f1f5f3]" aria-label="Close update"><X size={18} /></button></div><ContentLabel item={item} /><h3 className="mt-3 text-3xl font-semibold leading-tight tracking-[-0.035em]">{item.displayHeadline}</h3><p className="mt-4 text-base leading-7 text-[#102c3d]/64">{item.displaySummary}</p><div className="mt-6 grid gap-4 bg-[#f4f7f5] p-5 sm:grid-cols-2"><Detail label="Programmes" value={item.programmes.join(", ")} /><Detail label="Coverage" value={item.regions.join(", ")} /><Detail label="Source" value={item.sourceType} /><Detail label="Status" value="Published" /></div><p className="mt-5 text-xs leading-5 text-[#102c3d]/42">Fictional provider content for product demonstration. No quality rating, recommendation or provider ranking is implied.</p></div></article></div>; }
+function Detail({ label, value }: { label: string; value: string }) { return <div><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#0b776e]">{label}</p><p className="mt-1 text-sm font-semibold text-[#102c3d]/72">{value}</p></div>; }
 function formatDate(value: string) { return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" }).format(new Date(value)); }

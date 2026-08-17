@@ -33,6 +33,11 @@ Every update contains:
 - `publishedAt`
 - `sourceType`
 - `editorialStatus`
+- `image`
+- `imageAlt`
+- optional `imageFocalPoint`
+- `imageType`
+- optional `presentationHint`
 
 The product surface renders the editorial display headline and summary. The raw title is retained only to demonstrate the future editorial transformation boundary. No OpenAI call is made in Sprint 1.
 
@@ -53,6 +58,12 @@ This means:
 - the same fixture and filter always produce the same order.
 
 Following is an explicit personal view stored only in client state. Following a provider or topic can narrow that view but cannot alter the fair main stream.
+
+## Visual presentation contract
+
+The feed uses a separate deterministic `assignFeedPresentation()` pass after fair provider ordering. Its controlled rhythm includes feature, standard, split, compact, event and case-study formats. Presentation assignment never changes provider order. A provider that has already received a prominent feature, split or case-study placement is downgraded to a standard or compact format while another eligible provider has not yet received comparable prominence.
+
+Tile size is not influenced by provider spend, popularity, engagement or publishing volume. The current imagery is lightweight, local CSS editorial artwork using the LevyTate navy, mint and coral palette. Every fixture carries descriptive image metadata; no remote photography, licensing dependency or image-generation service is used.
 
 ## Experience areas
 

@@ -2,7 +2,9 @@ export const intelligenceTopics = ["All", "AI & Data", "Leadership", "Digital", 
 
 export type IntelligenceTopic = (typeof intelligenceTopics)[number];
 export type IntelligenceFeedTopic = Exclude<IntelligenceTopic, "All">;
-export type IntelligenceContentType = "Insight" | "Programme update" | "Event" | "Employer guide";
+export type IntelligenceContentType = "Insight" | "Programme update" | "Event" | "Employer guide" | "Employer story" | "Market update" | "Policy" | "Performance update";
+export type IntelligenceImageType = "provider" | "programme" | "event" | "workplace" | "editorial" | "case-study";
+export type IntelligencePresentation = "feature" | "standard" | "split" | "compact" | "event" | "case-study";
 
 export type IntelligenceProvider = {
   id: string;
@@ -25,7 +27,14 @@ export type ProviderIntelligenceUpdate = {
   publishedAt: string;
   sourceType: "Provider editorial";
   editorialStatus: "published" | "draft";
+  image: string;
+  imageAlt: string;
+  imageFocalPoint?: string;
+  imageType: IntelligenceImageType;
+  presentationHint?: IntelligencePresentation;
 };
+
+export type PresentedIntelligenceUpdate = ProviderIntelligenceUpdate & { presentation: IntelligencePresentation };
 
 export type FairFeedOptions = {
   topic?: IntelligenceTopic;
