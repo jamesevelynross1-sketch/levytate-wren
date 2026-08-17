@@ -30,7 +30,7 @@ check("learner selections are emitted", learners.includes("onLearnerSelectionCha
 check("application selections are emitted", applications.includes("onApplicationSelectionChange?.(selectedId)") && shell.includes("updateApplicationReviewSelection"));
 check("context changes preserve mounted conversation", workspace.includes("contextChanges") && persistent.includes("translate-x-full") && !persistent.includes("open &&"));
 check("Escape and focus return are implemented", persistent.includes('event.key !== "Escape"') && persistent.includes("launcherRef.current?.focus()") && persistent.includes("closeRef.current?.focus()"));
-check("mobile drawer is full width and desktop is 420px", persistent.includes("w-full") && persistent.includes("420px"));
+check("mobile drawer is full width and desktop is 400px", persistent.includes("w-full") && persistent.includes("400px"));
 check("contextual input avoids generic ask-anything copy", workspace.includes("copilotPlaceholderFor(context)") && !persistent.includes("Ask me anything"));
 check("no new Copilot write permission is introduced", !persistent.includes(":write") && !workspace.includes("copilot:write"));
 

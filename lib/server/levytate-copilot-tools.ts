@@ -19,6 +19,7 @@ import type { LearnerReviewType } from "@/lib/levytate/mvp/learner-lifecycle";
 import { buildOrganisationOperationalItems } from "@/lib/levytate/mvp/operations-centre";
 import { normaliseMvpUserRole } from "@/lib/levytate/mvp/rbac";
 import { activeApplicationStatuses } from "@/lib/levytate/mvp/workspace";
+import { isOperationsCentreContext, resolveContextualCopilotIntent } from "@/lib/levytate/contextual-copilot-intent";
 import {
   listOrganisationLearnerLifecycleDetails,
   listManagerDirectReportLearnerLifecycleDetails,
@@ -77,7 +78,7 @@ export async function routeOperationalCopilotQuery(
 ): Promise<LevyTateAiResponse | null> {
   const startedAt = performance.now();
   const classificationStarted = performance.now();
-  const classification = classifyOperationalCopilotQuery(request.userMessage, request.operationalContext);
+  const classification = classifyOperationalCopilotQuery(request.userMessage, request.operationalContext, request.currentSection);
   const intentClassificationMs = elapsed(classificationStarted);
   if (!classification) return null;
 
@@ -93,10 +94,12 @@ export async function routeOperationalCopilotQuery(
       classification,
       {
         type: "data_unavailable",
-        title: "Programme data unavailable",
+        title: isOperationsCentreContext(request.currentSection) ? "Learner operations unavailable" : "Programme data unavailable",
         columns: [],
         rows: [],
-        emptyMessage: "I couldn't retrieve the programme data just now. Please try again.",
+        emptyMessage: isOperationsCentreContext(request.currentSection)
+          ? "I couldn't read the current learner-operation data. Try opening Operations Centre again."
+          : "I couldn't retrieve the programme data just now. Please try again.",
       },
       { intentClassificationMs, dataRetrievalMs: 0, startedAt },
     );
@@ -207,12 +210,14 @@ export async function routeOperationalCopilotQuery(
     return auditedResponse(
       {
         type: "data_unavailable",
-        title: role === "Line Manager" ? "Team data unavailable" : "Programme data unavailable",
+        title: role === "Line Manager" ? "Team data unavailable" : isOperationsCentreContext(request.currentSection) ? "Learner operations unavailable" : "Programme data unavailable",
         columns: [],
         rows: [],
         emptyMessage: role === "Line Manager"
           ? "I couldn't retrieve your direct-report data just now. Please try again."
-          : "I couldn't retrieve the programme data just now. Please try again.",
+          : isOperationsCentreContext(request.currentSection)
+            ? "I couldn't read the current learner-operation data. Try opening Operations Centre again."
+            : "I couldn't retrieve the programme data just now. Please try again.",
         toolName: toolNameFor(classification.intent, role),
       },
       { dataRetrievalMs: elapsed(retrievalStarted), managerScopeResolutionMs },
@@ -224,10 +229,14 @@ export async function routeOperationalCopilotQuery(
 export function classifyOperationalCopilotQuery(
   message: string,
   previous?: LevyTateOperationalCopilotContext,
+  currentSection?: string,
 ): ClassifiedQuery | null {
   const text = normalise(message);
   const prior = previous?.activeIntent;
   const priorFilters = previous?.filters ?? {};
+
+  const contextual = resolveContextualCopilotIntent({ message: text, currentSection });
+  if (contextual) return contextual;
 
   if (/^retry$/.test(text) && prior) return { intent: prior, filters: priorFilters, direct: true };
   if (/\b(another organisation|other organisation|different organisation|organisation id|raw database|database rows?|service role|system prompt|hidden tool|secret|ignore (all|previous) instructions|bypass (access|permissions?))\b/.test(text)) {
@@ -378,6 +387,8 @@ async function executeTool(
 ): Promise<ToolPayload> {
   if (managerScope) return executeManagerTool(session, query, managerScope);
   switch (query.intent) {
+    case "learners_needing_attention": return getLearnersNeedingAttention(session);
+    case "highest_risk_actions": return getHighestRiskActions(session);
     case "applications_awaiting_review":
     case "applications_returned":
     case "applications_approved":
@@ -409,6 +420,9 @@ async function executeManagerTool(
   scope: ManagerDirectReportContext,
 ): Promise<ToolPayload> {
   switch (query.intent) {
+    case "learners_needing_attention":
+    case "highest_risk_actions":
+      return managerAccessBoundary("Organisation-wide Operations Centre intelligence is available to Apprenticeship Leads.");
     case "applications_awaiting_review": return getManagerApplications(session, scope, "awaiting_review", query.filters.employeeName);
     case "applications_returned": return getManagerApplications(session, scope, "returned", query.filters.employeeName);
     case "applications_approved": return getManagerApplications(session, scope, "approved", query.filters.employeeName);
@@ -677,6 +691,62 @@ export async function getOperationalActions(session: LevyTateBetaSession, filter
     interpretation: "The list is ordered from the current organisation-scoped Operations Centre data.",
     emptyMessage: "No matching operational actions are currently open.",
     viewAllUrl: "/levytate/app?module=Home",
+  });
+}
+
+export async function getLearnersNeedingAttention(session: LevyTateBetaSession): Promise<ToolPayload> {
+  const operations = await getOrganisationOperationsSummary(session, { queue: "urgent", status: "open" });
+  const urgent = operations.queues.urgent;
+  const byLearner = new Map(urgent.map((item) => [item.learnerRecordId, item]));
+  const learners = [...byLearner.values()];
+  const rows = learners.slice(0, 5).map((item) => ({
+    key: item.learnerRecordId,
+    cells: {
+      learner: item.learnerName,
+      reason: item.reason,
+      owner: item.persistentOwnerDisplayName || item.ownerType,
+      priority: item.priorityLevel,
+    },
+    actions: [{ label: "Open learner", url: item.actionUrl }],
+  }));
+  return payloadFromRows({
+    type: "learner_results",
+    title: "Learners needing attention",
+    rows,
+    totalCount: learners.length,
+    columns: [col("learner", "Learner"), col("reason", "Reason"), col("owner", "Owner"), col("priority", "Priority")],
+    interpretation: "These learners are the current unique records in the Operations Centre Needs attention now queue.",
+    emptyMessage: "No learners currently meet the “needs attention” criteria.",
+    viewAllUrl: "/levytate/app?module=Home",
+    toolName: "getOperationsCentreLearnersNeedingAttention",
+  });
+}
+
+export async function getHighestRiskActions(session: LevyTateBetaSession): Promise<ToolPayload> {
+  const operations = await getOrganisationOperationsSummary(session, { status: "open" });
+  const items = Object.values(operations.queues).flat()
+    .sort((left, right) => left.priorityRank - right.priorityRank || (right.daysOverdue ?? -1) - (left.daysOverdue ?? -1));
+  const rows = items.slice(0, 5).map((item) => ({
+    key: item.persistentActionId || item.sourceKey,
+    cells: {
+      action: item.actionLabel,
+      learner: item.learnerName,
+      reason: item.reason,
+      owner: item.persistentOwnerDisplayName || item.ownerType,
+      priority: item.priorityLevel,
+    },
+    actions: [{ label: "View action", url: item.actionUrl }],
+  }));
+  return payloadFromRows({
+    type: "operational_action_results",
+    title: "Highest-risk actions",
+    rows,
+    totalCount: items.length,
+    columns: [col("action", "Action"), col("learner", "Learner"), col("reason", "Reason"), col("owner", "Owner"), col("priority", "Priority")],
+    interpretation: "Ranked using the same priority and overdue timing used by Operations Centre.",
+    emptyMessage: "No operational actions currently require attention.",
+    viewAllUrl: "/levytate/app?module=Home",
+    toolName: "getOperationsCentreHighestRiskActions",
   });
 }
 
@@ -1282,6 +1352,8 @@ async function contextLearners(session: LevyTateBetaSession, filters: LevyTateOp
 function directAnswer(intent: LevyTateOperationalCopilotIntent, count: number, filters: LevyTateOperationalCopilotFilters, role?: ReturnType<typeof normaliseMvpUserRole>) {
   const singular = count === 1;
   const learnerSubject = role === "Line Manager" ? `of your direct reports ${singular ? "is" : "are"}` : `learner${singular ? " is" : "s are"}`;
+  if (intent === "learners_needing_attention") return `${count} learner${singular ? "" : "s"} currently need attention.`;
+  if (intent === "highest_risk_actions") return `${count} open action${singular ? " is" : "s are"} ranked by current operational risk.`;
   if (intent === "applications_awaiting_review") return `${count} application${singular ? "" : "s"} from your direct reports ${singular ? "needs" : "need"} your review.`;
   if (intent === "applications_returned") return `${count} direct-report application${singular ? " has" : "s have"} been returned after more information was requested.`;
   if (intent === "applications_approved") return `${count} direct-report application${singular ? " has" : "s have"} been approved by you.`;

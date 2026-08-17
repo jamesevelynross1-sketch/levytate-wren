@@ -236,6 +236,8 @@ export type LevyTateCapabilityFit = {
 };
 
 export type LevyTateOperationalCopilotIntent =
+  | "learners_needing_attention"
+  | "highest_risk_actions"
   | "applications_awaiting_review"
   | "applications_returned"
   | "applications_approved"
@@ -741,6 +743,8 @@ function cleanStringArray(value: unknown, limit = 8) {
 }
 
 const operationalIntents: LevyTateOperationalCopilotIntent[] = [
+  "learners_needing_attention",
+  "highest_risk_actions",
   "applications_awaiting_review",
   "applications_returned",
   "applications_approved",

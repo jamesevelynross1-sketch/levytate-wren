@@ -871,25 +871,20 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
 
   if (presentation === "drawer" && context) {
     return <div className="flex h-full min-h-0 flex-col bg-white">
-      <div className="border-b border-[#102c3d]/[0.08] bg-[#f7faf8] px-5 py-4">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b776e]">Using context: This page</p>
-        <p className="mt-1 text-sm font-semibold text-[#102c3d]">Working with you on {context.contextLabel}</p>
-        <p className="mt-1 text-xs leading-5 text-[#102c3d]/48">Copilot uses the current LevyTate workspace and page context. It cannot see data outside this workspace.</p>
-      </div>
-      <div className="border-b border-[#102c3d]/[0.07] px-4 py-4">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#b94f64]">Suggested for this page</p>
-        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">{activePrompts.slice(0, 4).map((prompt) => <button key={prompt} type="button" onClick={() => void sendMessage(prompt)} disabled={conversationDisabled} className="min-h-11 border border-[#102c3d]/[0.08] bg-white px-3 py-2 text-left text-xs font-semibold leading-5 text-[#102c3d]/68 transition hover:border-[#0b776e]/30 hover:text-[#102c3d] disabled:opacity-45">{prompt}</button>)}</div>
-      </div>
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-[#f7faf8] px-4 py-4" aria-live="polite">
+      {!conversationStarted ? <div className="border-b border-[#102c3d]/[0.07] px-4 py-3">
+        <p className="text-xs font-semibold text-[#102c3d]/48">Suggested</p>
+        <div className="mt-2 flex flex-wrap gap-2">{activePrompts.slice(0, 3).map((prompt) => <button key={prompt} type="button" onClick={() => void sendMessage(prompt)} disabled={conversationDisabled} className="min-h-9 rounded-full border border-[#102c3d]/[0.08] bg-[#f8fbfa] px-3 py-1.5 text-left text-[13px] font-medium leading-5 text-[#102c3d]/68 transition hover:border-[#0b776e]/30 hover:bg-white hover:text-[#102c3d] disabled:opacity-45">{prompt}</button>)}</div>
+      </div> : null}
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-white px-4 py-4" aria-live="polite">
         {contextChanges.map((change, index) => <div key={`${change}-${index}`} className="flex items-center gap-3 py-1"><span className="h-px flex-1 bg-[#102c3d]/10" /><span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#102c3d]/40">{change}</span><span className="h-px flex-1 bg-[#102c3d]/10" /></div>)}
-        {messages.map((message) => <article key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}><div className={`max-w-[92%] px-3.5 py-3 text-sm leading-6 ${message.role === "user" ? "bg-[#102c3d] text-white" : "border border-[#102c3d]/[0.07] bg-white text-[#102c3d]/70"}`}><p className="whitespace-pre-wrap">{message.content}</p>{message.response ? <InlineResponse response={message.response} onAction={chooseAction} onQuickReply={(reply) => void sendMessage(reply)} onSelectPathway={role === "Employee" ? selectRecommendedPathway : undefined} selectedPathwayTitle={selectedPreferredStandard?.title ?? null} loading={loading} /> : null}</div></article>)}
-        {loading ? <p className="text-sm font-medium text-[#0b776e]">Thinking through the next step…</p> : null}
+        {messages.map((message) => <article key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}><div className={`max-w-[92%] text-[14px] leading-6 ${message.role === "user" ? "rounded-2xl rounded-br-md bg-[#102c3d] px-3.5 py-2.5 text-white" : "w-full text-[#102c3d]/72"}`}><p className="whitespace-pre-wrap">{message.content}</p>{message.response ? <InlineResponse response={message.response} onAction={chooseAction} onQuickReply={(reply) => void sendMessage(reply)} onSelectPathway={role === "Employee" ? selectRecommendedPathway : undefined} selectedPathwayTitle={selectedPreferredStandard?.title ?? null} loading={loading} /> : null}</div></article>)}
+        {loading ? <p className="text-sm font-medium text-[#0b776e]">Checking {context.module === "Home" ? "learner operations" : context.contextLabel.toLowerCase()}…</p> : null}
         {error ? <p className="border border-[#bf4159]/15 bg-[#fff4f5] px-3 py-2 text-sm text-[#ad344e]">{error}</p> : null}
       </div>
-      <form onSubmit={submit} className="border-t border-[#102c3d]/[0.08] bg-white p-4">
+      <form onSubmit={submit} className="border-t border-[#102c3d]/[0.08] bg-white p-3">
         <label htmlFor="levytate-contextual-copilot-message" className="sr-only">Message LevyTate Copilot</label>
-        <textarea id="levytate-contextual-copilot-message" value={input} onChange={(event) => setInput(event.target.value)} rows={2} placeholder={copilotPlaceholderFor(context)} className="min-h-[58px] w-full resize-none border border-[#102c3d]/[0.1] bg-[#f8fbfa] px-3.5 py-3 text-sm text-[#102c3d] outline-none focus:border-[#0b776e] focus:ring-2 focus:ring-[#0b776e]/10" />
-        <div className="mt-2 flex items-center justify-between gap-3"><button type="button" onClick={resetConversation} className="min-h-11 text-xs font-semibold text-[#102c3d]/48">New conversation</button><button disabled={conversationDisabled} className="min-h-11 bg-[#102c3d] px-5 text-sm font-semibold text-white disabled:opacity-45">Ask Copilot</button></div>
+        <div className="flex items-end gap-2 rounded-xl border border-[#102c3d]/[0.1] bg-[#f8fbfa] p-1.5 focus-within:border-[#0b776e] focus-within:ring-2 focus-within:ring-[#0b776e]/10"><textarea id="levytate-contextual-copilot-message" value={input} onChange={(event) => setInput(event.target.value)} rows={1} placeholder={copilotPlaceholderFor(context)} className="max-h-32 min-h-10 flex-1 resize-y bg-transparent px-2 py-2 text-sm leading-5 text-[#102c3d] outline-none" /><button disabled={conversationDisabled} aria-label="Ask Copilot" className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[#102c3d] text-lg font-semibold text-white disabled:opacity-45">↑</button></div>
+        {conversationStarted ? <button type="button" onClick={resetConversation} className="mt-1.5 text-xs font-semibold text-[#102c3d]/42">New conversation</button> : null}
       </form>
     </div>;
   }

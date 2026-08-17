@@ -11,7 +11,7 @@ export type LevyTateCopilotContext = {
 };
 
 const suggestions: Partial<Record<CoreEarlyAccessModuleKey, readonly string[]>> = {
-  Home: ["What should I prioritise first?", "Summarise today's highest-risk actions", "Show me the learners needing attention", "Help me draft a follow-up"],
+  Home: ["What should I prioritise first?", "Show me the learners needing attention", "Show overdue reviews"],
   Intelligence: ["Summarise today's provider updates", "What changed in AI & Data?", "Show me programme launches", "What should I read first?"],
   Applications: ["Summarise current application workload", "Which applications need attention?", "Explain the current approval status", "What needs to happen next?"],
   Approvals: ["Which applications need my review?", "Summarise the selected application", "What information is missing?", "Help me draft decision notes"],
