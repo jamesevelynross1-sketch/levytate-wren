@@ -16,6 +16,9 @@ import type {
 import { updateEmployeeDiscovery } from "@/lib/levytate/mvp/progressive-profiling";
 import { activeApplicationStatuses, createEmployeeDevelopmentProfile, nowIso, type MvpEmployee, type MvpRole, type MvpWorkspaceData } from "@/lib/levytate/mvp/workspace";
 import { copilotPlaceholderFor, copilotSuggestionsFor, type LevyTateCopilotContext } from "@/lib/levytate/copilot-context";
+import { answerLevyFinanceQuestion } from "@/lib/levytate/finance/copilot";
+import { createIllustrativeFinanceFixture } from "@/lib/levytate/finance/fixtures";
+import { readFinanceState } from "@/lib/levytate/finance/storage";
 
 type AssistantRole = Exclude<LevyTateRole, "Department Head">;
 type ChatMessage = {
@@ -662,6 +665,18 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
     const roleMessages = conversations[activeRole];
     const userMessage: ChatMessage = { id: messageId(), role: "user", content: trimmed };
     const nextMessages = [...roleMessages, userMessage];
+    if (context?.module === "Finance") {
+      const persistence = meta?.storageMode === "supabase" ? "session" : "local";
+      const financeState = readFinanceState(meta?.organisationId ?? "local-demo", persistence)
+        ?? (persistence === "local" ? createIllustrativeFinanceFixture() : null);
+      const answer = financeState
+        ? answerLevyFinanceQuestion(trimmed, financeState).message
+        : "There is no imported DAS transaction data to summarise yet. Upload a DAS CSV in Finance first.";
+      setConversations((current) => ({ ...current, [activeRole]: [...nextMessages, { id: messageId(), role: "assistant", content: answer }] }));
+      setInput("");
+      setError("");
+      return;
+    }
     const conversationHistory: LevyTateConversationMessage[] = roleMessages
       .filter((item) => !item.id.startsWith("welcome-"))
       .map(({ role: messageRole, content }) => ({ role: messageRole, content }));

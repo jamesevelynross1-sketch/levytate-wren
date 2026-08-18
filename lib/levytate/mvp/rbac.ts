@@ -40,6 +40,8 @@ export type MvpPermission =
   | "knowledge:read"
   | "knowledge:manage"
   | "reports:read"
+  | "finance:read"
+  | "finance:manage"
   | "earlyAccess:manage"
   | "diagnostics:read";
 
@@ -111,6 +113,8 @@ const allPermissions = [
   "knowledge:read",
   "knowledge:manage",
   "reports:read",
+  "finance:read",
+  "finance:manage",
   "earlyAccess:manage",
   "diagnostics:read",
 ] as const satisfies readonly MvpPermission[];
@@ -159,6 +163,8 @@ export const mvpRolePermissions = {
     "copilot:use",
     "knowledge:read",
     "reports:read",
+    "finance:read",
+    "finance:manage",
   ],
   "Line Manager": [
     "workspace:read",

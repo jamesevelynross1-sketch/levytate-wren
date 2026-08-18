@@ -9,6 +9,7 @@ import {
   ClipboardCheck,
   GraduationCap,
   LayoutDashboard,
+  Landmark,
   LogOut,
   Newspaper,
   Settings,
@@ -26,6 +27,7 @@ import { EmployeeApplicationModule, EmployeeHomeModule, EmployeeProgrammeModule 
 import { EmployeesModule } from "@/components/levytate-mvp/EmployeesModule";
 import { GuidanceCentreModule } from "@/components/levytate-mvp/GuidanceCentreModule";
 import { LearnersModule } from "@/components/levytate-mvp/LearnersModule";
+import { LevyFinanceModule } from "@/components/levytate-mvp/LevyFinanceModule";
 import { ManagerDirectReportDetail } from "@/components/levytate-mvp/ManagerDirectReportDetail";
 import { OperationsCentreModule } from "@/components/levytate-mvp/OperationsCentreModule";
 import { PlatformAdminSupportContextModule, PlatformAdminWorkspacesModule } from "@/components/levytate-mvp/PlatformAdminModules";
@@ -58,6 +60,7 @@ const modules = [
   { name: "People", icon: Users },
   { name: "Learners", icon: GraduationCap },
   { name: "Providers", icon: Building2 },
+  { name: "Finance", icon: Landmark },
   { name: "Programmes", icon: BookOpenCheck },
   { name: "Copilot", icon: Sparkles },
   { name: "Knowledge", icon: BellRing },
@@ -82,6 +85,7 @@ const modulePermissions = {
   People: "employees:read",
   Learners: "learnerLifecycle:read",
   Providers: "providers:read",
+  Finance: "finance:read",
   Programmes: "providers:read",
   Copilot: "copilot:use",
   Knowledge: "knowledge:read",
@@ -116,6 +120,7 @@ const moduleCopy: Record<ModuleName, string> = {
   People: "Employee and role records that shape workforce development decisions.",
   Learners: "Read-only lifecycle records covering eligibility, enrolment, progress, reviews and completion.",
   Providers: "Explore factual apprenticeship programme and provider information in one clear directory.",
+  Finance: "Understand levy funding, apprenticeship spend, balances and expired funds from DAS transaction data.",
   Programmes: "Review the factual programme catalogue available to your organisation.",
   Copilot: "Use LevyTate Copilot to explain, find, guide and create work inside the platform.",
   Knowledge: "Clear, practical guidance to help you manage apprenticeships confidently.",
@@ -496,6 +501,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
                   </ModuleStackNav>
                 : <ProvidersModule />
             ) : null}
+            {activeModule === "Finance" ? <LevyFinanceModule organisationId={meta?.organisationId ?? "local-demo"} demoMode={meta?.storageMode !== "supabase"} /> : null}
             {activeModule === "Programmes" ? <ProvidersModule /> : null}
             {activeModule === "Reports" ? <ReportsModule /> : null}
             {activeModule === "Support" ? <PlatformAdminSupportContextModule /> : null}

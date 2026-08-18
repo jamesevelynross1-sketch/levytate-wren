@@ -17,6 +17,7 @@ const suggestions: Partial<Record<CoreEarlyAccessModuleKey, readonly string[]>> 
   Approvals: ["Which applications need my review?", "Summarise the selected application", "What information is missing?", "Help me draft decision notes"],
   Learners: ["Show me overdue reviews", "Why is this learner flagged?", "Summarise this learner's current status", "What needs attention next?"],
   Providers: ["Summarise this provider", "What programmes do they offer here?", "Show outstanding actions", "Explain our current relationship"],
+  Finance: ["How much levy have we spent?", "What is our current levy balance?", "How much levy has expired?", "Compare spend with contributions"],
   Programmes: ["Summarise this programme", "Which employees are linked to it?", "What provider delivers it?", "Show current learner activity"],
   People: ["Summarise this employee", "What apprenticeship activity do they have?", "Show current applications", "Explain their current status"],
   "My Team": ["Who needs my support?", "Show direct reports behind target", "Which reviews are overdue?", "Help me draft a check-in"],
@@ -39,5 +40,6 @@ export function copilotPlaceholderFor(context: LevyTateCopilotContext) {
   if (context.entityType === "provider") return "Ask about this provider...";
   if (context.module === "Intelligence") return "Ask about today's apprenticeship market...";
   if (context.module === "Home") return "Ask about today's learner operations...";
+  if (context.module === "Finance") return "Ask about your levy position...";
   return `Ask about ${context.contextLabel.toLowerCase()}...`;
 }

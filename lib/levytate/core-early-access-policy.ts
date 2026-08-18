@@ -11,6 +11,7 @@ export type CoreEarlyAccessModuleKey =
   | "People"
   | "Learners"
   | "Providers"
+  | "Finance"
   | "Programmes"
   | "Copilot"
   | "Knowledge"
@@ -78,6 +79,7 @@ export const coreEarlyAccessPolicy: Readonly<Record<MvpUserRole, CoreEarlyAccess
       item("Copilot", "Copilot", "secondary", "help", "supporting"),
       item("Knowledge", "Guidance Centre", "secondary", "help", "supporting"),
       item("Providers", "Programmes & Providers", "hidden", undefined, "non-core"),
+      item("Finance", "Finance", "hidden", undefined, "role-denied"),
       item("Programmes", "Programmes", "hidden", undefined, "non-core"),
       item("Reports", "Reports", "deferred", undefined, "not-ready"),
     ],
@@ -93,6 +95,7 @@ export const coreEarlyAccessPolicy: Readonly<Record<MvpUserRole, CoreEarlyAccess
       item("Copilot", "Copilot", "secondary", "help", "supporting"),
       item("Knowledge", "Guidance Centre", "secondary", "help", "supporting"),
       item("Providers", "Programmes & Providers", "hidden", undefined, "non-core"),
+      item("Finance", "Finance", "hidden", undefined, "role-denied"),
       item("Programmes", "Programmes", "hidden", undefined, "non-core"),
       item("Reports", "Team Reporting", "deferred", undefined, "not-ready"),
     ],
@@ -107,6 +110,7 @@ export const coreEarlyAccessPolicy: Readonly<Record<MvpUserRole, CoreEarlyAccess
       item("Applications", "Applications", "enabled", "primary", "core"),
       item("Learners", "Learners", "enabled", "primary", "core"),
       item("Providers", "Providers", "enabled", "primary", "core"),
+      item("Finance", "Finance", "enabled", "primary", "core"),
       item("People", "People", "secondary", "administration", "supporting"),
       item("Programmes", "Programmes", "secondary", "administration", "supporting"),
       item("Settings", "Settings", "secondary", "administration", "supporting"),
@@ -123,6 +127,7 @@ export const coreEarlyAccessPolicy: Readonly<Record<MvpUserRole, CoreEarlyAccess
       item("Home", "Employer Workspaces", "enabled", "primary", "core"),
       item("Intelligence", "Intelligence", "hidden", undefined, "role-denied"),
       item("Providers", "Provider Catalogue", "enabled", "primary", "core"),
+      item("Finance", "Finance", "hidden", undefined, "role-denied"),
       item("Programmes", "Programmes", "hidden", undefined, "role-denied"),
       item("Settings", "Access & Tenant Support", "enabled", "primary", "core"),
       item("Knowledge", "Guidance Administration", "secondary", "secondary", "supporting"),
@@ -143,6 +148,7 @@ export const coreEarlyAccessPolicy: Readonly<Record<MvpUserRole, CoreEarlyAccess
       item("Applications", "Applications", "enabled", "primary", "core"),
       item("Learners", "Learners", "enabled", "primary", "core"),
       item("Providers", "Providers", "enabled", "primary", "core"),
+      item("Finance", "Finance", "enabled", "primary", "core"),
       item("People", "People", "secondary", "administration", "supporting"),
       item("Programmes", "Programmes", "secondary", "administration", "supporting"),
       item("Settings", "Settings", "secondary", "administration", "supporting"),
