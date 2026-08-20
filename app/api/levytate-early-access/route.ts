@@ -4,6 +4,13 @@ import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
 import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
 import { syncPersistentEarlyAccessState } from "@/lib/server/levytate-beta-access-grants";
 import {
+  buildEarlyAccessConfirmationEmail,
+  buildEarlyAccessNotificationEmail,
+  getEarlyAccessNotificationEmail,
+  levytateEmailSender,
+} from "@/lib/email/levytate-early-access";
+import { sendEmail } from "@/lib/server/resend";
+import {
   createEarlyAccessRequest,
   EarlyAccessStoreError,
   isValidEarlyAccessEmail,
@@ -61,6 +68,8 @@ export async function POST(request: Request) {
       // Allow the Early Access flow to continue when no shared store is configured.
     }
 
+    await sendEarlyAccessEmails(created);
+
     return NextResponse.json({
       ok: true,
       lead: created,
@@ -74,6 +83,33 @@ export async function POST(request: Request) {
       { status },
     );
   }
+}
+
+async function sendEarlyAccessEmails(lead: Awaited<ReturnType<typeof createEarlyAccessRequest>>) {
+  const notification = buildEarlyAccessNotificationEmail(lead);
+  const confirmation = buildEarlyAccessConfirmationEmail(lead);
+  const results = await Promise.allSettled([
+    sendEmail({
+      from: levytateEmailSender,
+      to: getEarlyAccessNotificationEmail(),
+      ...notification,
+    }),
+    sendEmail({
+      from: levytateEmailSender,
+      to: lead.email,
+      ...confirmation,
+    }),
+  ]);
+
+  results.forEach((result, index) => {
+    if (result.status === "rejected") {
+      console.error("LevyTate Early Access email failed", {
+        leadId: lead.id,
+        emailType: index === 0 ? "internal_notification" : "applicant_confirmation",
+        error: result.reason instanceof Error ? result.reason.message : "Unknown email error",
+      });
+    }
+  });
 }
 
 function getUserFacingError(error: unknown) {
