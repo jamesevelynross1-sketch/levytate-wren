@@ -74,13 +74,13 @@ export function RoleExperienceShowcase() {
                     </span>
                   ))}
                 </div>
-                <div className="grid gap-4 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-5">
+                <div className="grid gap-4 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_144px] sm:items-center sm:px-5">
                   <div className="min-w-0">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/[0.66]">{role.section}</p>
                     <p className="mt-2 text-[13px] font-semibold">{role.title}</p>
                     <p className="mt-1 text-[11px] leading-5 text-[#102c3d]/[0.66]">{role.detail}</p>
                   </div>
-                  <span className={`w-fit rounded-md px-2.5 py-1.5 text-[10px] font-semibold ${role.statusStyle}`}>{role.status}</span>
+                  <span className={`w-fit rounded-md px-2.5 py-1.5 text-[10px] font-semibold sm:justify-self-end ${role.statusStyle}`}>{role.status}</span>
                 </div>
               </div>
             </div>

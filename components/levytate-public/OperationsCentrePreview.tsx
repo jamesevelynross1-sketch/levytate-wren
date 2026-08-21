@@ -36,6 +36,7 @@ const actionRows = [
 
 const primaryNavigation = ["Operations Centre", "Applications", "Learners", "Providers"];
 const administrationNavigation = ["People", "Programmes", "Settings"];
+const actionTableColumns = "md:grid-cols-[minmax(0,1.05fr)_minmax(0,1.15fr)_minmax(0,1fr)_minmax(0,.85fr)_76px]";
 
 export function OperationsCentrePreview({ detailed = false }: { detailed?: boolean }) {
   return (
@@ -90,21 +91,27 @@ export function OperationsCentrePreview({ detailed = false }: { detailed?: boole
                 <button type="button" className="text-[11px] font-semibold text-[#0b6f63]">View all</button>
               </div>
 
-              <div className="hidden grid-cols-[1.05fr_1.15fr_1fr_.85fr_auto] gap-4 border-b border-[#102c3d]/[0.06] bg-[#fafcfb] px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#102c3d]/[0.66] md:grid">
-                <span>Learner</span><span>Programme</span><span>Next action</span><span>Owner</span><span>Status</span>
+              <div className={`hidden gap-4 border-b border-[#102c3d]/[0.06] bg-[#fafcfb] px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#102c3d]/[0.66] md:grid ${actionTableColumns}`}>
+                <span>Learner</span><span>Programme</span><span>Next action</span><span>Owner</span><span className="text-right">Status</span>
               </div>
 
               <div>
                 {actionRows.slice(0, detailed ? 3 : 2).map((row) => (
-                  <div key={row.learner} className="grid gap-3 border-b border-[#102c3d]/[0.06] px-4 py-4 last:border-b-0 sm:px-5 md:grid-cols-[1.05fr_1.15fr_1fr_.85fr_auto] md:items-center md:gap-4">
+                  <div key={row.learner} className={`grid gap-3 border-b border-[#102c3d]/[0.06] px-4 py-4 last:border-b-0 sm:px-5 md:items-center md:gap-4 ${actionTableColumns}`}>
                     <div className="min-w-0">
                       <p className="truncate text-[12px] font-semibold">{row.learner}</p>
                       <p className="mt-1 text-[10px] text-[#102c3d]/[0.66] md:hidden">{row.programme}</p>
                     </div>
                     <p className="hidden truncate text-[11px] text-[#102c3d]/[0.66] md:block">{row.programme}</p>
-                    <p className="text-[11px] font-medium text-[#102c3d]/[0.68]">{row.action}</p>
-                    <p className="text-[10px] text-[#102c3d]/[0.66] sm:text-[11px]">{row.owner}</p>
-                    <span className={`w-fit rounded-md px-2 py-1 text-[10px] font-semibold ${row.tone}`}>{row.status}</span>
+                    <div className="min-w-0">
+                      <p className="mb-1 text-[9px] font-semibold uppercase tracking-[0.08em] text-[#102c3d]/[0.48] md:hidden">Next action</p>
+                      <p className="text-[11px] font-medium leading-5 text-[#102c3d]/[0.68] md:truncate">{row.action}</p>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="mb-1 text-[9px] font-semibold uppercase tracking-[0.08em] text-[#102c3d]/[0.48] md:hidden">Owner</p>
+                      <p className="text-[10px] text-[#102c3d]/[0.66] sm:text-[11px] md:truncate">{row.owner}</p>
+                    </div>
+                    <span className={`w-fit rounded-md px-2 py-1 text-[10px] font-semibold md:justify-self-end ${row.tone}`}>{row.status}</span>
                   </div>
                 ))}
               </div>

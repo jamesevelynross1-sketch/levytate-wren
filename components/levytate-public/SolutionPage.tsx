@@ -164,10 +164,10 @@ function EmployerVisual({ items }: { items: SolutionVisualItem[] }) {
     <div className="overflow-hidden rounded-[14px] bg-white ring-1 ring-[#102c3d]/[0.07]">
       <div className="border-b border-[#102c3d]/[0.07] px-5 py-4"><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/[0.66]">Programme overview</p><p className="mt-2 text-[17px] font-semibold tracking-[-0.02em]">Today&apos;s operating view</p></div>
       {items.map((item) => (
-        <div key={item.label} className="grid gap-3 border-b border-[#102c3d]/[0.06] px-5 py-4 last:border-b-0 sm:grid-cols-[.55fr_1fr_auto] sm:items-center">
+        <div key={item.label} className="grid gap-3 border-b border-[#102c3d]/[0.06] px-5 py-4 last:border-b-0 sm:grid-cols-[minmax(0,.55fr)_minmax(0,1fr)_96px] sm:items-center">
           <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#102c3d]/[0.66]">{item.label}</p>
-          <div><p className="text-[12px] font-semibold">{item.value}</p><p className="mt-1 text-[10px] text-[#102c3d]/[0.66]">{item.detail}</p></div>
-          {item.status ? <span className="w-fit rounded-md bg-[#eaf7f2] px-2 py-1 text-[10px] font-semibold text-[#0b6f63]">{item.status}</span> : null}
+          <div className="min-w-0"><p className="text-[12px] font-semibold">{item.value}</p><p className="mt-1 text-[10px] leading-4 text-[#102c3d]/[0.66]">{item.detail}</p></div>
+          {item.status ? <span className="w-fit rounded-md bg-[#eaf7f2] px-2 py-1 text-[10px] font-semibold text-[#0b6f63] sm:justify-self-end">{item.status}</span> : <span className="hidden sm:block" aria-hidden="true" />}
         </div>
       ))}
     </div>
@@ -190,7 +190,7 @@ function ProviderVisual({ items }: { items: SolutionVisualItem[] }) {
     <div className="grid overflow-hidden rounded-[14px] bg-white ring-1 ring-[#102c3d]/[0.07] sm:grid-cols-[.82fr_1.18fr]">
       <div className="border-b border-[#102c3d]/[0.07] bg-[#102c3d] p-5 text-white sm:border-b-0 sm:border-r sm:border-white/[0.10]"><p className="text-[10px] uppercase tracking-[0.12em] text-[#c7f0e4]/[0.72]">{items[0]?.label}</p><p className="mt-4 text-[18px] font-semibold">{items[0]?.value}</p><p className="mt-2 text-[11px] leading-5 text-white/[0.66]">{items[0]?.detail}</p></div>
       <div className="divide-y divide-[#102c3d]/[0.06] px-5">
-        {items.slice(1).map((item) => <div key={item.label} className="grid grid-cols-[.65fr_1fr] gap-3 py-4"><p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#102c3d]/[0.66]">{item.label}</p><div><p className="text-[11px] font-semibold">{item.value}</p><p className="mt-1 text-[10px] leading-4 text-[#102c3d]/[0.66]">{item.detail}</p></div></div>)}
+        {items.slice(1).map((item) => <div key={item.label} className="grid grid-cols-[minmax(0,.65fr)_minmax(0,1fr)] items-start gap-3 py-4"><p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#102c3d]/[0.66]">{item.label}</p><div className="min-w-0"><p className="text-[11px] font-semibold">{item.value}</p><p className="mt-1 text-[10px] leading-4 text-[#102c3d]/[0.66]">{item.detail}</p></div></div>)}
       </div>
     </div>
   );
