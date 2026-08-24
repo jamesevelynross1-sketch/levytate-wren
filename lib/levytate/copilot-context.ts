@@ -1,6 +1,6 @@
 import type { CoreEarlyAccessModuleKey } from "@/lib/levytate/core-early-access-policy";
 
-export type LevyTateCopilotEntityType = "learner" | "application" | "provider" | "employee" | "programme";
+export type LevyTateCopilotEntityType = "learner" | "application" | "provider" | "employee" | "programme" | "intelligence_signal";
 
 export type LevyTateCopilotContext = {
   module: CoreEarlyAccessModuleKey;
@@ -28,6 +28,7 @@ const suggestions: Partial<Record<CoreEarlyAccessModuleKey, readonly string[]>> 
 };
 
 export function copilotSuggestionsFor(context: LevyTateCopilotContext) {
+  if (context.entityType === "intelligence_signal") return ["Why did you flag this?", "Show me the evidence", "Has this appeared before?", "What should I discuss with the manager?"];
   if (context.entityType === "learner") return ["Summarise this learner's current status", "Why is this learner flagged?", "What needs attention next?", "Explain this learner's latest review"];
   if (context.entityType === "application") return ["Summarise this application", "What information is missing?", "Explain the current approval status", "What needs to happen next?"];
   if (context.entityType === "provider") return ["Summarise this provider", "What programmes do they offer here?", "Show outstanding actions", "Explain our current relationship"];
@@ -35,6 +36,7 @@ export function copilotSuggestionsFor(context: LevyTateCopilotContext) {
 }
 
 export function copilotPlaceholderFor(context: LevyTateCopilotContext) {
+  if (context.entityType === "intelligence_signal") return "Ask about this Intelligence Signal...";
   if (context.entityType === "learner") return "Ask about this learner...";
   if (context.entityType === "application") return "Ask about this application...";
   if (context.entityType === "provider") return "Ask about this provider...";

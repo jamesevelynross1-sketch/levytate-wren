@@ -21,6 +21,7 @@ import { createIllustrativeFinanceFixture } from "@/lib/levytate/finance/fixture
 import { readFinanceState } from "@/lib/levytate/finance/storage";
 import { answerProviderIntelligenceQuestion } from "@/lib/levytate/provider-intelligence/copilot";
 import type { ProviderIntelligenceArticle } from "@/lib/levytate/provider-intelligence/domain";
+import { progressReviewDemoSignals } from "@/lib/levytate/intelligence/demo-progress-review-signals";
 
 type AssistantRole = Exclude<LevyTateRole, "Department Head">;
 type ChatMessage = {
@@ -667,6 +668,21 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
     const roleMessages = conversations[activeRole];
     const userMessage: ChatMessage = { id: messageId(), role: "user", content: trimmed };
     const nextMessages = [...roleMessages, userMessage];
+    if (context?.entityType === "intelligence_signal") {
+      const signal = progressReviewDemoSignals.find((item) => item.id === context.entityId);
+      const query = trimmed.toLowerCase();
+      const answer = !signal
+        ? "This Intelligence Signal is not available in the current permitted context."
+        : query.includes("evidence")
+          ? `${signal.title} is supported by ${signal.evidence.length} evidence items:\n\n${signal.evidence.map((item) => `• ${item.label} (${new Date(item.sourceDate).toLocaleDateString("en-GB")}): ${item.excerpt ?? item.metric?.value ?? "Structured source record"}`).join("\n")}\n\nOnly bounded evidence from this signal is included.`
+          : query.includes("before") || query.includes("appeared")
+            ? `${signal.evidence.filter((item) => item.sourceType === "provider_review").length} provider-review evidence points are linked to this signal. The earliest is dated ${new Date([...signal.evidence].sort((a,b) => a.sourceDate.localeCompare(b.sourceDate))[0].sourceDate).toLocaleDateString("en-GB")}.`
+            : query.includes("manager")
+              ? `Discuss the evidence, confirm whether the recorded support remains outstanding, and agree an accountable owner. LevyTate recommends: ${signal.recommendedAction}`
+              : `${signal.summary}\n\nLevyTate flagged this because ${signal.evidence.length} permitted evidence points support a ${signal.confidence.toLowerCase()}-confidence ${signal.category} signal. This is decision support and requires human review.`;
+      setConversations((current) => ({ ...current, [activeRole]: [...nextMessages, { id: messageId(), role: "assistant", content: answer }] }));
+      setInput(""); setError(""); return;
+    }
     if (context?.module === "Intelligence") {
       let answer = "Provider Intelligence has no verified cached articles available in this browser yet. Open Intelligence to load the current source-backed feed.";
       try {

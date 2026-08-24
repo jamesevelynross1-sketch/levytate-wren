@@ -471,7 +471,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
                 : meta?.userRole === "Platform Admin"
                   ? <PlatformAdminWorkspacesModule onNavigate={navigateTo} />
                   : isOperationsRole
-                  ? <OperationsCentreModule onOpenLearner={(target) => { setLearnerTarget(target); openModule("Learners"); }} />
+                  ? <OperationsCentreModule onOpenLearner={(target) => { setLearnerTarget(target); openModule("Learners"); }} onSignalContext={(signal) => setCopilotEntity(signal ? { type: "intelligence_signal", id: signal.id, label: `Signal: ${signal.title}` } : null)} />
                   : <DashboardModule onNavigate={navigateTo} />
             ) : null}
             {activeModule === "My Programme" ? <EmployeeProgrammeModule onNavigate={(target) => navigateTo(target)} /> : null}

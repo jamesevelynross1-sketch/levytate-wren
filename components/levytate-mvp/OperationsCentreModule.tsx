@@ -5,8 +5,10 @@ import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateActio
 import { EmptyState, StatusBadge } from "@/components/levytate-mvp/MvpUi";
 import { OperationalActionDetail } from "@/components/levytate-mvp/OperationalActionDetail";
 import { OperationalGovernanceView } from "@/components/levytate-mvp/OperationalGovernanceView";
+import { ProgressReviewIntelligencePanel } from "@/components/levytate-mvp/ProgressReviewIntelligencePanel";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { operationalActionStatusLabels, type OperationalActionStatus } from "@/lib/levytate/mvp/operational-actions";
+import type { IntelligenceSignal } from "@/lib/levytate/intelligence/progress-review";
 import {
   operationalQueueLabels,
   type OperationalActionType,
@@ -23,7 +25,7 @@ type LearnerAction = { learnerRecordId: string; actionType: OperationalActionTyp
 const queueOrder: OperationalQueueType[] = ["urgent", "ready_to_enrol", "assessment", "reviews", "progress", "breaks", "pre_enrolment"];
 const dueStatuses: Array<OperationalDueStatus | "All"> = ["All", "Overdue", "Due today", "Due soon", "No due date"];
 
-export function OperationsCentreModule({ onOpenLearner }: { onOpenLearner: (target: LearnerAction) => void }) {
+export function OperationsCentreModule({ onOpenLearner, onSignalContext }: { onOpenLearner: (target: LearnerAction) => void; onSignalContext?: (signal: IntelligenceSignal | null) => void }) {
   const { can, meta } = useMvpWorkspace();
   const authorised = can("learnerLifecycle:read") && ["Apprenticeship Lead", "Employer Admin"].includes(meta?.userRole ?? "");
   const [data, setData] = useState<OperationsResponse | null>(null);
@@ -114,6 +116,7 @@ export function OperationsCentreModule({ onOpenLearner }: { onOpenLearner: (targ
   return (
     <div className="grid min-w-0 gap-5" data-testid="operations-centre">
       <OperationsModeTabs value={workspaceView} onChange={setWorkspaceView} />
+      <ProgressReviewIntelligencePanel enabled={Boolean(meta?.userEmail?.endsWith(".test"))} onSignalContext={onSignalContext} />
       <section className="rounded-2xl border border-[#102c3d]/[0.075] bg-white p-5 shadow-[0_16px_42px_rgba(16,44,61,0.045)] sm:p-6">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div className="max-w-2xl">
