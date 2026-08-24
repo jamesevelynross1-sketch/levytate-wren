@@ -665,6 +665,17 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
     const roleMessages = conversations[activeRole];
     const userMessage: ChatMessage = { id: messageId(), role: "user", content: trimmed };
     const nextMessages = [...roleMessages, userMessage];
+    if (context?.module === "Intelligence") {
+      let answer = "Provider Intelligence has no verified cached articles available in this browser yet. Open Intelligence to load the current source-backed feed.";
+      try {
+        const cached = JSON.parse(sessionStorage.getItem("levytate-provider-intelligence-v1") || "{}") as { articles?: Array<{ providerId: string; title: string; canonicalUrl: string; publishedAt: string | null }> };
+        const terms = trimmed.toLowerCase().split(/\s+/).filter((term) => term.length > 3);
+        const matches = (cached.articles ?? []).filter((article) => terms.some((term) => article.title.toLowerCase().includes(term))).slice(0, 3);
+        if (matches.length) answer = `I found ${matches.length} relevant verified provider ${matches.length === 1 ? "article" : "articles"}:\n\n${matches.map((article) => { const provider = data.providers.find((item) => item.providerId === article.providerId)?.providerName ?? "Provider"; return `• ${provider}: ${article.title}${article.publishedAt ? ` (${new Date(article.publishedAt).toLocaleDateString("en-GB")})` : " (publication date unavailable)"}\n${article.canonicalUrl}`; }).join("\n\n")}\n\nThese are source-grounded links, not provider ratings or recommendations.`;
+      } catch {}
+      setConversations((current) => ({ ...current, [activeRole]: [...nextMessages, { id: messageId(), role: "assistant", content: answer }] }));
+      setInput(""); setError(""); return;
+    }
     if (context?.module === "Finance") {
       const persistence = meta?.storageMode === "supabase" ? "session" : "local";
       const financeState = readFinanceState(meta?.organisationId ?? "local-demo", persistence)

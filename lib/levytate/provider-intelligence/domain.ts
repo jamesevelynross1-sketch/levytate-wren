@@ -1,42 +1,10 @@
 export const intelligenceTopics = ["All", "AI & Data", "Leadership", "Digital", "Operations", "Commercial", "Procurement", "People"] as const;
-
 export type IntelligenceTopic = (typeof intelligenceTopics)[number];
 export type IntelligenceFeedTopic = Exclude<IntelligenceTopic, "All">;
 export type IntelligenceContentType = "Insight" | "Programme update" | "Event" | "Employer guide" | "Employer story" | "Market update" | "Policy" | "Performance update";
-export type IntelligenceImageType = "provider" | "programme" | "event" | "workplace" | "editorial" | "case-study";
 export type IntelligencePresentation = "feature" | "standard" | "split" | "compact" | "event" | "case-study";
-
-export type IntelligenceProvider = {
-  id: string;
-  name: string;
-  shortName: string;
-  accent: string;
-  premium: true;
-};
-
-export type ProviderIntelligenceUpdate = {
-  id: string;
-  rawTitle: string;
-  displayHeadline: string;
-  displaySummary: string;
-  contentType: IntelligenceContentType;
-  topics: readonly IntelligenceFeedTopic[];
-  programmes: readonly string[];
-  regions: readonly string[];
-  providerId: string;
-  publishedAt: string;
-  sourceType: "Provider editorial";
-  editorialStatus: "published" | "draft";
-  image: string;
-  imageAlt: string;
-  imageFocalPoint?: string;
-  imageType: IntelligenceImageType;
-  presentationHint?: IntelligencePresentation;
-};
-
-export type PresentedIntelligenceUpdate = ProviderIntelligenceUpdate & { presentation: IntelligencePresentation };
-
-export type FairFeedOptions = {
-  topic?: IntelligenceTopic;
-  limit?: number;
-};
+export type ProviderIntelligenceArticle = { id:string; fingerprint:string; providerId:string; sourceId:string; title:string; excerpt:string; canonicalUrl:string; imageUrl:string|null; publishedAt:string|null; discoveredAt:string; contentType:IntelligenceContentType; topics:readonly IntelligenceFeedTopic[]; status:"published"|"hidden" };
+export type ProviderIntelligenceSource = { id:string; providerId:string; label:string; sourceUrl:string; providerDomain:string; parser:"feed"|"html"; status:"active"|"needs-review"|"disabled"; lastSuccessfulFetchAt?:string|null; lastAttemptAt?:string|null; lastError?:string|null; etag?:string|null; lastModified?:string|null };
+export type ProviderIntelligencePayload = { articles:ProviderIntelligenceArticle[]; sources:ProviderIntelligenceSource[]; refreshedAt:string|null; stale:boolean };
+export type PresentedIntelligenceUpdate = ProviderIntelligenceArticle & { presentation:IntelligencePresentation };
+export type FairFeedOptions = { topic?:IntelligenceTopic; limit?:number };

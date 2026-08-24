@@ -57,6 +57,7 @@ export function PlatformAdminSupportContextModule() {
       <dl className="mt-6 grid gap-3 sm:grid-cols-2"><SafeFact label="Role" value={meta?.userRole ?? "Platform Admin"} /><SafeFact label="Workspace storage" value={meta?.storageMode === "supabase" ? "Persistent" : "Fallback"} /></dl>
     </section>
     <PlatformAdminServiceHealth />
+    <ProviderIntelligenceHealth />
     <section className="rounded-[1.5rem] border border-[#102c3d]/[0.08] bg-white p-6 shadow-[0_14px_34px_rgba(16,44,61,0.045)] sm:p-8">
       <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">Publication control</p>
       <h2 className="mt-2 text-xl font-semibold">Public trust-page status</h2>
@@ -72,6 +73,8 @@ export function PlatformAdminSupportContextModule() {
     </section></div>
   );
 }
+
+function ProviderIntelligenceHealth(){const [sources,setSources]=useState<Array<{id:string;label:string;status:string;lastSuccessfulFetchAt:string|null;lastError:string|null}>>([]);const [error,setError]=useState(false);useEffect(()=>{fetch("/api/levytate-platform/provider-intelligence",{cache:"no-store"}).then(async response=>{if(!response.ok)throw new Error("health");const body=await response.json() as {sources?:typeof sources};setSources(body.sources??[])}).catch(()=>setError(true));},[]);return <section className="rounded-[1.5rem] border border-[#102c3d]/[0.08] bg-white p-6 shadow-[0_14px_34px_rgba(16,44,61,0.045)] sm:p-8"><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">Provider Intelligence</p><h2 className="mt-2 text-xl font-semibold">Source health</h2><p className="mt-2 text-sm text-[#102c3d]/60">Read-only status for official provider sources. Refresh remains service-controlled.</p>{error?<p className="mt-4 text-sm text-[#ad344e]">Source health is unavailable.</p>:<div className="mt-5 grid gap-2 sm:grid-cols-2">{sources.map(source=><div key={source.id} className="rounded-xl bg-[#f6f9f7] p-4"><div className="flex items-center justify-between gap-2"><p className="text-sm font-semibold">{source.label}</p><span className="text-[10px] font-semibold uppercase text-[#0b6f63]">{source.status.replace("-"," ")}</span></div><p className="mt-2 text-xs text-[#102c3d]/48">{source.lastSuccessfulFetchAt?`Last success ${new Date(source.lastSuccessfulFetchAt).toLocaleString("en-GB")}`:"Awaiting first persisted refresh"}</p>{source.lastError?<p className="mt-1 text-xs text-[#ad344e]">Refresh needs attention</p>:null}</div>)}</div>}</section>}
 
 function PlatformAdminServiceHealth() {
   const [data, setData] = useState<Diagnostics | null>(null);

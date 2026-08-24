@@ -484,7 +484,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
                 : <EmployeesModule onOpenDirectReport={openDirectReport} onStartDiscovery={(employeeId) => { setAiEmployeeId(employeeId); openModule("Copilot"); }} />
             ) : null}
             {activeModule === "Approvals" ? <ApplicationsModule onOpenDirectReport={openDirectReport} initialApplicationId={managerReviewApplicationId} onApplicationSelectionChange={updateApplicationReviewSelection} /> : null}
-            {activeModule === "Intelligence" ? <ProviderIntelligenceModule /> : null}
+            {activeModule === "Intelligence" ? <ProviderIntelligenceModule onOpenProvider={() => openModule("Providers")} /> : null}
             {activeModule === "Applications" ? <ApplicationsModule onApplicationSelectionChange={updateApplicationReviewSelection} /> : null}
             {activeModule === "Learners" ? <LearnersModule initialLearnerRecordId={learnerTarget?.learnerRecordId} initialAction={learnerTarget?.actionType} onDeepLinkConsumed={() => setLearnerTarget(null)} onLearnerSelectionChange={updateLearnerCopilotSelection} /> : null}
             {activeModule === "People" ? (
