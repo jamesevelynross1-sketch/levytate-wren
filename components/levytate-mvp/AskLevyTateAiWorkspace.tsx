@@ -19,6 +19,8 @@ import { copilotPlaceholderFor, copilotSuggestionsFor, type LevyTateCopilotConte
 import { answerLevyFinanceQuestion } from "@/lib/levytate/finance/copilot";
 import { createIllustrativeFinanceFixture } from "@/lib/levytate/finance/fixtures";
 import { readFinanceState } from "@/lib/levytate/finance/storage";
+import { answerProviderIntelligenceQuestion } from "@/lib/levytate/provider-intelligence/copilot";
+import type { ProviderIntelligenceArticle } from "@/lib/levytate/provider-intelligence/domain";
 
 type AssistantRole = Exclude<LevyTateRole, "Department Head">;
 type ChatMessage = {
@@ -668,10 +670,8 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
     if (context?.module === "Intelligence") {
       let answer = "Provider Intelligence has no verified cached articles available in this browser yet. Open Intelligence to load the current source-backed feed.";
       try {
-        const cached = JSON.parse(sessionStorage.getItem("levytate-provider-intelligence-v1") || "{}") as { articles?: Array<{ providerId: string; title: string; canonicalUrl: string; publishedAt: string | null }> };
-        const terms = trimmed.toLowerCase().split(/\s+/).filter((term) => term.length > 3);
-        const matches = (cached.articles ?? []).filter((article) => terms.some((term) => article.title.toLowerCase().includes(term))).slice(0, 3);
-        if (matches.length) answer = `I found ${matches.length} relevant verified provider ${matches.length === 1 ? "article" : "articles"}:\n\n${matches.map((article) => { const provider = data.providers.find((item) => item.providerId === article.providerId)?.providerName ?? "Provider"; return `• ${provider}: ${article.title}${article.publishedAt ? ` (${new Date(article.publishedAt).toLocaleDateString("en-GB")})` : " (publication date unavailable)"}\n${article.canonicalUrl}`; }).join("\n\n")}\n\nThese are source-grounded links, not provider ratings or recommendations.`;
+        const cached = JSON.parse(sessionStorage.getItem("levytate-provider-intelligence-v1") || "{}") as { articles?: ProviderIntelligenceArticle[] };
+        if (cached.articles?.length) answer = answerProviderIntelligenceQuestion(trimmed, cached.articles, (providerId) => data.providers.find((item) => item.providerId === providerId)?.providerName ?? "Provider");
       } catch {}
       setConversations((current) => ({ ...current, [activeRole]: [...nextMessages, { id: messageId(), role: "assistant", content: answer }] }));
       setInput(""); setError(""); return;

@@ -20,7 +20,5 @@ revoke all on public.provider_intelligence_sources from anon, authenticated;
 revoke all on public.provider_intelligence_articles from anon, authenticated;
 grant all on public.provider_intelligence_sources to service_role;
 grant all on public.provider_intelligence_articles to service_role;
-drop policy if exists provider_intelligence_sources_service_role on public.provider_intelligence_sources;
 create policy provider_intelligence_sources_service_role on public.provider_intelligence_sources for all to service_role using (true) with check (true);
-drop policy if exists provider_intelligence_articles_service_role on public.provider_intelligence_articles;
 create policy provider_intelligence_articles_service_role on public.provider_intelligence_articles for all to service_role using (true) with check (true);
