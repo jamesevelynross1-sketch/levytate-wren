@@ -35,6 +35,8 @@ const prompts = [
   "Which providers offer AI programmes?",
   "Show Level 3 programmes.",
   "Which programmes are available nationally?",
+  "What programmes does QA offer?",
+  "What programmes does SRSCC offer?",
 ];
 
 for (const prompt of prompts) {
@@ -44,6 +46,11 @@ for (const prompt of prompts) {
   assert(`${prompt} contains no score fields or claims`, !/top match|match score|fit score|confidence|ranking|recommendation percentage/i.test(JSON.stringify(result)));
   assert(`${prompt} deep-links to programme and provider profiles`, result.structuredResult?.rows.every((row) => row.actions?.some((action) => action.url.includes("module=Providers&programme=")) && row.actions?.some((action) => action.url.includes("module=Providers&provider="))));
 }
+
+const qa = await ask(sessions.lead, "What programmes does QA offer?");
+assert("high-volume provider query returns the complete active QA catalogue", qa.structuredResult?.totalCount === 19 && qa.structuredResult.rows.every((row) => row.cells.provider === "QA"));
+const srscc = await ask(sessions.lead, "What programmes does SRSCC offer?");
+assert("specialist provider query returns the complete active SRSCC catalogue", srscc.structuredResult?.totalCount === 3 && srscc.structuredResult.rows.every((row) => row.cells.provider === "SRSCC"));
 
 const employeeResult = await ask(sessions.employee, "Show Level 3 programmes.", "Employee");
 assert("Employee Copilot can browse factual programmes", employeeResult.executionMode === "deterministic" && employeeResult.structuredResult?.type === "programme_results");
@@ -66,7 +73,7 @@ async function workspace(cookie) {
 async function ask(cookie, userMessage, role = "Apprenticeship Lead") {
   const response = await fetch(`${baseUrl}/api/levytate-ai`, {
     method: "POST",
-    headers: { "content-type": "application/json", cookie },
+    headers: { "content-type": "application/json", cookie, "x-forwarded-for": "198.51.100.184" },
     body: JSON.stringify({ role, userRole: role, selectedSite: "All sites", currentSection: "Copilot", employerContext: "Ground Control", userMessage, conversationHistory: [] }),
   });
   const body = await response.json();

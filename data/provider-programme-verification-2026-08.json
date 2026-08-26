@@ -1,0 +1,4305 @@
+{
+  "metadata": {
+    "verifiedAt": "2026-08-26",
+    "providerCount": 12,
+    "programmeCount": 151,
+    "activeProgrammeCount": 133,
+    "officialStandardSource": "Skills England apprenticeship standards snapshot held in LevyTate",
+    "duplicateRule": "A duplicate has the same provider, normalised commercial programme name and official standard code. Distinct named delivery or progression variants against one standard remain separate records."
+  },
+  "providers": [
+    {
+      "providerId": "provider-primary-goal",
+      "providerName": "Primary Goal",
+      "providerCatalogueUrl": "https://primarygoal.ac.uk/courses"
+    },
+    {
+      "providerId": "provider-qa",
+      "providerName": "QA",
+      "providerCatalogueUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/"
+    },
+    {
+      "providerId": "provider-baltic",
+      "providerName": "Baltic Apprenticeships",
+      "providerCatalogueUrl": "https://www.balticapprenticeships.com/programmes/"
+    },
+    {
+      "providerId": "provider-apprentify",
+      "providerName": "Apprentify",
+      "providerCatalogueUrl": "https://www.apprentify.com/courses/"
+    },
+    {
+      "providerId": "provider-learning-curve-group",
+      "providerName": "Learning Curve Group",
+      "providerCatalogueUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/"
+    },
+    {
+      "providerId": "provider-aicore",
+      "providerName": "AiCore",
+      "providerCatalogueUrl": "https://theaicore.com/employers"
+    },
+    {
+      "providerId": "provider-rhg-consult",
+      "providerName": "RHG Consult",
+      "providerCatalogueUrl": "https://www.rhgconsult.co.uk/apprenticeships/"
+    },
+    {
+      "providerId": "provider-the-marketing-trainer",
+      "providerName": "The Marketing Trainer",
+      "providerCatalogueUrl": "https://www.themarketingtrainer.co.uk/cim-apprenticeships"
+    },
+    {
+      "providerId": "provider-hbtc",
+      "providerName": "HBTC",
+      "providerCatalogueUrl": "https://www.hbtc.co.uk/product-category/training-provider/"
+    },
+    {
+      "providerId": "provider-staffordshire-university",
+      "providerName": "Staffordshire University Apprenticeships",
+      "providerCatalogueUrl": "https://www.staffs.ac.uk/apprenticeships/courses"
+    },
+    {
+      "providerId": "provider-learning-skills-partnership",
+      "providerName": "Learning Skills Partnership",
+      "providerCatalogueUrl": "https://www.learningskillspartnership.com/apprenticeships-available"
+    },
+    {
+      "providerId": "provider-srscc",
+      "providerName": "SRSCC",
+      "providerCatalogueUrl": "https://www.srscc.co.uk/apprenticeships/"
+    }
+  ],
+  "programmes": [
+    {
+      "id": "programme-qa-digital-and-ai-support",
+      "providerId": "provider-qa",
+      "providerName": "QA",
+      "providerProgrammeName": "Digital and AI Support",
+      "standardTitle": "Digital support technician",
+      "standardCode": "ST0120",
+      "standardLevel": 3,
+      "standardVersion": "1.1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "providerCatalogueUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "QA lists Digital and AI Support in its current apprenticeship catalogue; LevyTate maps it to the Digital support technician standard.",
+      "sourceUrls": [
+        "https://www.qa.com/apprenticeships/apprenticeships-for-employers/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-qa-ai-and-automation-specialist",
+      "providerId": "provider-qa",
+      "providerName": "QA",
+      "providerProgrammeName": "AI & Automation Specialist",
+      "standardTitle": "Artificial intelligence (AI) and automation practitioner",
+      "standardCode": "ST1512",
+      "standardLevel": 4,
+      "standardVersion": "2.1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "providerCatalogueUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "QA lists AI & Automation Specialist in its current apprenticeship catalogue; LevyTate maps it to the Artificial intelligence (AI) and automation practitioner standard.",
+      "sourceUrls": [
+        "https://www.qa.com/apprenticeships/apprenticeships-for-employers/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-qa-databricks-engineer",
+      "providerId": "provider-qa",
+      "providerName": "QA",
+      "providerProgrammeName": "Databricks Engineer",
+      "standardTitle": "Data engineer",
+      "standardCode": "ST1386",
+      "standardLevel": 5,
+      "standardVersion": "1",
+      "standardStatus": "In development",
+      "programmeUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "providerCatalogueUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "QA lists Databricks Engineer in its current apprenticeship catalogue; LevyTate maps it to the Data engineer standard.",
+      "sourceUrls": [
+        "https://www.qa.com/apprenticeships/apprenticeships-for-employers/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-qa-ai-engineer",
+      "providerId": "provider-qa",
+      "providerName": "QA",
+      "providerProgrammeName": "AI Engineer",
+      "standardTitle": "Machine learning engineer",
+      "standardCode": "ST1398",
+      "standardLevel": 6,
+      "standardVersion": "1",
+      "standardStatus": "Paused",
+      "programmeUrl": "https://www.qa.com/apprenticeships/ai/ai-engineer-level-6/",
+      "providerCatalogueUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "status": "Paused",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "QA lists AI Engineer in its current apprenticeship catalogue; LevyTate maps it to the Machine learning engineer standard.",
+      "sourceUrls": [
+        "https://www.qa.com/apprenticeships/ai/ai-engineer-level-6/",
+        "https://www.qa.com/apprenticeships/apprenticeships-for-employers/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-qa-nvidia-ai-engineer",
+      "providerId": "provider-qa",
+      "providerName": "QA",
+      "providerProgrammeName": "NVIDIA AI Engineer",
+      "standardTitle": "Machine learning engineer",
+      "standardCode": "ST1398",
+      "standardLevel": 6,
+      "standardVersion": "1",
+      "standardStatus": "Paused",
+      "programmeUrl": "https://www.qa.com/apprenticeships/ai/nvidia-ai-engineer-level-6/",
+      "providerCatalogueUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "status": "Paused",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "QA lists NVIDIA AI Engineer in its current apprenticeship catalogue; LevyTate maps it to the Machine learning engineer standard.",
+      "sourceUrls": [
+        "https://www.qa.com/apprenticeships/ai/nvidia-ai-engineer-level-6/",
+        "https://www.qa.com/apprenticeships/apprenticeships-for-employers/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-qa-aws-cloud-support-specialist",
+      "providerId": "provider-qa",
+      "providerName": "QA",
+      "providerProgrammeName": "AWS Cloud Support Specialist",
+      "standardTitle": "Information communications technician",
+      "standardCode": "ST0973",
+      "standardLevel": 3,
+      "standardVersion": "1.2",
+      "standardStatus": "In development",
+      "programmeUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "providerCatalogueUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "QA lists AWS Cloud Support Specialist in its current apprenticeship catalogue; LevyTate maps it to the Information communications technician standard.",
+      "sourceUrls": [
+        "https://www.qa.com/apprenticeships/apprenticeships-for-employers/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-qa-cloud-network-specialist",
+      "providerId": "provider-qa",
+      "providerName": "QA",
+      "providerProgrammeName": "Cloud Network Specialist",
+      "standardTitle": "Information communications technician",
+      "standardCode": "ST0973",
+      "standardLevel": 3,
+      "standardVersion": "1.2",
+      "standardStatus": "In development",
+      "programmeUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "providerCatalogueUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "QA lists Cloud Network Specialist in its current apprenticeship catalogue; LevyTate maps it to the Information communications technician standard.",
+      "sourceUrls": [
+        "https://www.qa.com/apprenticeships/apprenticeships-for-employers/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-qa-microsoft-azure-cloud-support-specialist",
+      "providerId": "provider-qa",
+      "providerName": "QA",
+      "providerProgrammeName": "Microsoft Azure Cloud Support Specialist",
+      "standardTitle": "Information communications technician",
+      "standardCode": "ST0973",
+      "standardLevel": 3,
+      "standardVersion": "1.2",
+      "standardStatus": "In development",
+      "programmeUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "providerCatalogueUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "QA lists Microsoft Azure Cloud Support Specialist in its current apprenticeship catalogue; LevyTate maps it to the Information communications technician standard.",
+      "sourceUrls": [
+        "https://www.qa.com/apprenticeships/apprenticeships-for-employers/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-qa-data-essentials",
+      "providerId": "provider-qa",
+      "providerName": "QA",
+      "providerProgrammeName": "Data Essentials",
+      "standardTitle": "Data technician",
+      "standardCode": "ST0795",
+      "standardLevel": 3,
+      "standardVersion": "1.1",
+      "standardStatus": "In development",
+      "programmeUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "providerCatalogueUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "QA lists Data Essentials in its current apprenticeship catalogue; LevyTate maps it to the Data technician standard.",
+      "sourceUrls": [
+        "https://www.qa.com/apprenticeships/apprenticeships-for-employers/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-qa-data-analyst",
+      "providerId": "provider-qa",
+      "providerName": "QA",
+      "providerProgrammeName": "Data Analyst",
+      "standardTitle": "Data analyst",
+      "standardCode": "ST0118",
+      "standardLevel": 4,
+      "standardVersion": "1.1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "providerCatalogueUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "QA lists Data Analyst in its current apprenticeship catalogue; LevyTate maps it to the Data analyst standard.",
+      "sourceUrls": [
+        "https://www.qa.com/apprenticeships/apprenticeships-for-employers/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-qa-data-engineer",
+      "providerId": "provider-qa",
+      "providerName": "QA",
+      "providerProgrammeName": "Data Engineer",
+      "standardTitle": "Data engineer",
+      "standardCode": "ST1386",
+      "standardLevel": 5,
+      "standardVersion": "1",
+      "standardStatus": "In development",
+      "programmeUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "providerCatalogueUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "QA lists Data Engineer in its current apprenticeship catalogue; LevyTate maps it to the Data engineer standard.",
+      "sourceUrls": [
+        "https://www.qa.com/apprenticeships/apprenticeships-for-employers/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-qa-bsc-hons-digital-technology-solutions",
+      "providerId": "provider-qa",
+      "providerName": "QA",
+      "providerProgrammeName": "BSc (Hons) Digital Technology Solutions",
+      "standardTitle": "Digital and technology solutions professional",
+      "standardCode": "ST0119",
+      "standardLevel": 6,
+      "standardVersion": "1.2",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "providerCatalogueUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "QA lists BSc (Hons) Digital Technology Solutions in its current apprenticeship catalogue; LevyTate maps it to the Digital and technology solutions professional standard.",
+      "sourceUrls": [
+        "https://www.qa.com/apprenticeships/apprenticeships-for-employers/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-qa-multi-channel-marketer",
+      "providerId": "provider-qa",
+      "providerName": "QA",
+      "providerProgrammeName": "Multi-Channel Marketer",
+      "standardTitle": "Multi-channel marketer",
+      "standardCode": "ST1031",
+      "standardLevel": 3,
+      "standardVersion": "1.1",
+      "standardStatus": "In development",
+      "programmeUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "providerCatalogueUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "QA lists Multi-Channel Marketer in its current apprenticeship catalogue; LevyTate maps it to the Multi-channel marketer standard.",
+      "sourceUrls": [
+        "https://www.qa.com/apprenticeships/apprenticeships-for-employers/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-qa-cyber-risk-analyst",
+      "providerId": "provider-qa",
+      "providerName": "QA",
+      "providerProgrammeName": "Cyber Risk Analyst",
+      "standardTitle": "Cyber security technologist (2021)",
+      "standardCode": "ST1021",
+      "standardLevel": 4,
+      "standardVersion": "1.1",
+      "standardStatus": "Retired",
+      "programmeUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "providerCatalogueUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "status": "Defunded / unavailable for new starts",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "QA lists Cyber Risk Analyst in its current apprenticeship catalogue; LevyTate maps it to the Cyber security technologist (2021) standard.",
+      "sourceUrls": [
+        "https://www.qa.com/apprenticeships/apprenticeships-for-employers/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-qa-cyber-defender-and-responder",
+      "providerId": "provider-qa",
+      "providerName": "QA",
+      "providerProgrammeName": "Cyber Defender & Responder",
+      "standardTitle": "Cyber security technologist (2021)",
+      "standardCode": "ST1021",
+      "standardLevel": 4,
+      "standardVersion": "1.1",
+      "standardStatus": "Retired",
+      "programmeUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "providerCatalogueUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "status": "Defunded / unavailable for new starts",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "QA lists Cyber Defender & Responder in its current apprenticeship catalogue; LevyTate maps it to the Cyber security technologist (2021) standard.",
+      "sourceUrls": [
+        "https://www.qa.com/apprenticeships/apprenticeships-for-employers/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-qa-cyber-security-engineer",
+      "providerId": "provider-qa",
+      "providerName": "QA",
+      "providerProgrammeName": "Cyber Security Engineer",
+      "standardTitle": "Cyber security technologist (2021)",
+      "standardCode": "ST1021",
+      "standardLevel": 4,
+      "standardVersion": "1.1",
+      "standardStatus": "Retired",
+      "programmeUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "providerCatalogueUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "status": "Defunded / unavailable for new starts",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "QA lists Cyber Security Engineer in its current apprenticeship catalogue; LevyTate maps it to the Cyber security technologist (2021) standard.",
+      "sourceUrls": [
+        "https://www.qa.com/apprenticeships/apprenticeships-for-employers/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-qa-devops-engineer",
+      "providerId": "provider-qa",
+      "providerName": "QA",
+      "providerProgrammeName": "DevOps Engineer",
+      "standardTitle": "DevOps engineer",
+      "standardCode": "ST0825",
+      "standardLevel": 4,
+      "standardVersion": "1.1",
+      "standardStatus": "In development",
+      "programmeUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "providerCatalogueUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "QA lists DevOps Engineer in its current apprenticeship catalogue; LevyTate maps it to the DevOps engineer standard.",
+      "sourceUrls": [
+        "https://www.qa.com/apprenticeships/apprenticeships-for-employers/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-qa-network-engineer",
+      "providerId": "provider-qa",
+      "providerName": "QA",
+      "providerProgrammeName": "Network Engineer",
+      "standardTitle": "Network engineer",
+      "standardCode": "ST0127",
+      "standardLevel": 4,
+      "standardVersion": "1.4",
+      "standardStatus": "In development",
+      "programmeUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "providerCatalogueUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "QA lists Network Engineer in its current apprenticeship catalogue; LevyTate maps it to the Network engineer standard.",
+      "sourceUrls": [
+        "https://www.qa.com/apprenticeships/apprenticeships-for-employers/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-qa-digital-product-manager",
+      "providerId": "provider-qa",
+      "providerName": "QA",
+      "providerProgrammeName": "Digital Product Manager",
+      "standardTitle": "Digital product manager",
+      "standardCode": "ST0964",
+      "standardLevel": 4,
+      "standardVersion": "1",
+      "standardStatus": "In development",
+      "programmeUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "providerCatalogueUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "QA lists Digital Product Manager in its current apprenticeship catalogue; LevyTate maps it to the Digital product manager standard.",
+      "sourceUrls": [
+        "https://www.qa.com/apprenticeships/apprenticeships-for-employers/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-qa-business-analyst",
+      "providerId": "provider-qa",
+      "providerName": "QA",
+      "providerProgrammeName": "Business Analyst",
+      "standardTitle": "Business analyst",
+      "standardCode": "ST0117",
+      "standardLevel": 4,
+      "standardVersion": "1.2",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.qa.com/apprenticeships/product-apprenticeships/business-analyst-level-4/",
+      "providerCatalogueUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "QA lists Business Analyst in its current apprenticeship catalogue; LevyTate maps it to the Business analyst standard.",
+      "sourceUrls": [
+        "https://www.qa.com/apprenticeships/product-apprenticeships/business-analyst-level-4/",
+        "https://www.qa.com/apprenticeships/apprenticeships-for-employers/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-qa-bsc-hons-project-management",
+      "providerId": "provider-qa",
+      "providerName": "QA",
+      "providerProgrammeName": "BSc (Hons) Project Management",
+      "standardTitle": "Project manager (integrated degree)",
+      "standardCode": "ST0411",
+      "standardLevel": 6,
+      "standardVersion": "1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "providerCatalogueUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "QA lists BSc (Hons) Project Management in its current apprenticeship catalogue; LevyTate maps it to the Project manager (integrated degree) standard.",
+      "sourceUrls": [
+        "https://www.qa.com/apprenticeships/apprenticeships-for-employers/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-qa-project-manager",
+      "providerId": "provider-qa",
+      "providerName": "QA",
+      "providerProgrammeName": "Project Manager",
+      "standardTitle": "Associate project manager",
+      "standardCode": "ST0310",
+      "standardLevel": 4,
+      "standardVersion": "1.5",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "providerCatalogueUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "QA lists Project Manager in its current apprenticeship catalogue; LevyTate maps it to the Associate project manager standard.",
+      "sourceUrls": [
+        "https://www.qa.com/apprenticeships/apprenticeships-for-employers/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-qa-junior-developer",
+      "providerId": "provider-qa",
+      "providerName": "QA",
+      "providerProgrammeName": "Junior Developer",
+      "standardTitle": "Software development technician",
+      "standardCode": "ST0128",
+      "standardLevel": 3,
+      "standardVersion": "1.1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "providerCatalogueUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "QA lists Junior Developer in its current apprenticeship catalogue; LevyTate maps it to the Software development technician standard.",
+      "sourceUrls": [
+        "https://www.qa.com/apprenticeships/apprenticeships-for-employers/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-qa-software-engineer",
+      "providerId": "provider-qa",
+      "providerName": "QA",
+      "providerProgrammeName": "Software Engineer",
+      "standardTitle": "Software developer",
+      "standardCode": "ST0116",
+      "standardLevel": 4,
+      "standardVersion": "1.2",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "providerCatalogueUrl": "https://www.qa.com/apprenticeships/apprenticeships-for-employers/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "QA lists Software Engineer in its current apprenticeship catalogue; LevyTate maps it to the Software developer standard.",
+      "sourceUrls": [
+        "https://www.qa.com/apprenticeships/apprenticeships-for-employers/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-baltic-ai-enablement",
+      "providerId": "provider-baltic",
+      "providerName": "Baltic Apprenticeships",
+      "providerProgrammeName": "AI Enablement",
+      "standardTitle": "Digital support technician",
+      "standardCode": "ST0120",
+      "standardLevel": 3,
+      "standardVersion": "1.1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.balticapprenticeships.com/programmes/ai-enablement/",
+      "providerCatalogueUrl": "https://www.balticapprenticeships.com/programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Baltic Apprenticeships lists AI Enablement in its current apprenticeship catalogue; LevyTate maps it to the Digital support technician standard.",
+      "sourceUrls": [
+        "https://www.balticapprenticeships.com/programmes/ai-enablement/",
+        "https://www.balticapprenticeships.com/programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-baltic-data-business-insights",
+      "providerId": "provider-baltic",
+      "providerName": "Baltic Apprenticeships",
+      "providerProgrammeName": "Data & Business Insights",
+      "standardTitle": "Data technician",
+      "standardCode": "ST0795",
+      "standardLevel": 3,
+      "standardVersion": "1.1",
+      "standardStatus": "In development",
+      "programmeUrl": "https://www.balticapprenticeships.com/programmes/data-and-business-insights/",
+      "providerCatalogueUrl": "https://www.balticapprenticeships.com/programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Baltic Apprenticeships lists Data & Business Insights in its current apprenticeship catalogue; LevyTate maps it to the Data technician standard.",
+      "sourceUrls": [
+        "https://www.balticapprenticeships.com/programmes/data-and-business-insights/",
+        "https://www.balticapprenticeships.com/programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-baltic-microsoft-it-support-technician",
+      "providerId": "provider-baltic",
+      "providerName": "Baltic Apprenticeships",
+      "providerProgrammeName": "Microsoft IT Support Technician",
+      "standardTitle": "Information communications technician",
+      "standardCode": "ST0973",
+      "standardLevel": 3,
+      "standardVersion": "1.2",
+      "standardStatus": "In development",
+      "programmeUrl": "https://www.balticapprenticeships.com/programmes/",
+      "providerCatalogueUrl": "https://www.balticapprenticeships.com/programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Baltic Apprenticeships lists Microsoft IT Support Technician in its current apprenticeship catalogue; LevyTate maps it to the Information communications technician standard.",
+      "sourceUrls": [
+        "https://www.balticapprenticeships.com/programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-baltic-multi-channel-marketer",
+      "providerId": "provider-baltic",
+      "providerName": "Baltic Apprenticeships",
+      "providerProgrammeName": "Multi-Channel Marketer",
+      "standardTitle": "Multi-channel marketer",
+      "standardCode": "ST1031",
+      "standardLevel": 3,
+      "standardVersion": "1.1",
+      "standardStatus": "In development",
+      "programmeUrl": "https://www.balticapprenticeships.com/programmes/",
+      "providerCatalogueUrl": "https://www.balticapprenticeships.com/programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Baltic Apprenticeships lists Multi-Channel Marketer in its current apprenticeship catalogue; LevyTate maps it to the Multi-channel marketer standard.",
+      "sourceUrls": [
+        "https://www.balticapprenticeships.com/programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-baltic-ai-and-digital-transformation",
+      "providerId": "provider-baltic",
+      "providerName": "Baltic Apprenticeships",
+      "providerProgrammeName": "AI & Digital Transformation",
+      "standardTitle": "Business analyst",
+      "standardCode": "ST0117",
+      "standardLevel": 4,
+      "standardVersion": "1.2",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.balticapprenticeships.com/programmes/",
+      "providerCatalogueUrl": "https://www.balticapprenticeships.com/programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Baltic Apprenticeships lists AI & Digital Transformation in its current apprenticeship catalogue; LevyTate maps it to the Business analyst standard.",
+      "sourceUrls": [
+        "https://www.balticapprenticeships.com/programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-baltic-ai-for-business-automation",
+      "providerId": "provider-baltic",
+      "providerName": "Baltic Apprenticeships",
+      "providerProgrammeName": "AI for Business Automation",
+      "standardTitle": "Artificial intelligence (AI) and automation practitioner",
+      "standardCode": "ST1512",
+      "standardLevel": 4,
+      "standardVersion": "2.1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.balticapprenticeships.com/programmes/",
+      "providerCatalogueUrl": "https://www.balticapprenticeships.com/programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Baltic Apprenticeships lists AI for Business Automation in its current apprenticeship catalogue; LevyTate maps it to the Artificial intelligence (AI) and automation practitioner standard.",
+      "sourceUrls": [
+        "https://www.balticapprenticeships.com/programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-baltic-sustainability-for-business-impact",
+      "providerId": "provider-baltic",
+      "providerName": "Baltic Apprenticeships",
+      "providerProgrammeName": "Sustainability for Business Impact",
+      "standardTitle": "Corporate responsibility and sustainability practitioner",
+      "standardCode": "ST0934",
+      "standardLevel": 4,
+      "standardVersion": "1.1",
+      "standardStatus": "In development",
+      "programmeUrl": "https://www.balticapprenticeships.com/programmes/",
+      "providerCatalogueUrl": "https://www.balticapprenticeships.com/programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Baltic Apprenticeships lists Sustainability for Business Impact in its current apprenticeship catalogue; LevyTate maps it to the Corporate responsibility and sustainability practitioner standard.",
+      "sourceUrls": [
+        "https://www.balticapprenticeships.com/programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-baltic-data-analyst",
+      "providerId": "provider-baltic",
+      "providerName": "Baltic Apprenticeships",
+      "providerProgrammeName": "Data Analyst",
+      "standardTitle": "Data analyst",
+      "standardCode": "ST0118",
+      "standardLevel": 4,
+      "standardVersion": "1.1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.balticapprenticeships.com/programmes/",
+      "providerCatalogueUrl": "https://www.balticapprenticeships.com/programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Baltic Apprenticeships lists Data Analyst in its current apprenticeship catalogue; LevyTate maps it to the Data analyst standard.",
+      "sourceUrls": [
+        "https://www.balticapprenticeships.com/programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-baltic-infrastructure-and-security-engineer",
+      "providerId": "provider-baltic",
+      "providerName": "Baltic Apprenticeships",
+      "providerProgrammeName": "Infrastructure & Security Engineer",
+      "standardTitle": "Network engineer",
+      "standardCode": "ST0127",
+      "standardLevel": 4,
+      "standardVersion": "1.4",
+      "standardStatus": "In development",
+      "programmeUrl": "https://www.balticapprenticeships.com/programmes/",
+      "providerCatalogueUrl": "https://www.balticapprenticeships.com/programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Baltic Apprenticeships lists Infrastructure & Security Engineer in its current apprenticeship catalogue; LevyTate maps it to the Network engineer standard.",
+      "sourceUrls": [
+        "https://www.balticapprenticeships.com/programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-baltic-marketing-executive",
+      "providerId": "provider-baltic",
+      "providerName": "Baltic Apprenticeships",
+      "providerProgrammeName": "Marketing Executive",
+      "standardTitle": "Marketing executive",
+      "standardCode": "ST0596",
+      "standardLevel": 4,
+      "standardVersion": "1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.balticapprenticeships.com/programmes/",
+      "providerCatalogueUrl": "https://www.balticapprenticeships.com/programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Baltic Apprenticeships lists Marketing Executive in its current apprenticeship catalogue; LevyTate maps it to the Marketing executive standard.",
+      "sourceUrls": [
+        "https://www.balticapprenticeships.com/programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-baltic-software-developer",
+      "providerId": "provider-baltic",
+      "providerName": "Baltic Apprenticeships",
+      "providerProgrammeName": "Software Developer",
+      "standardTitle": "Software developer",
+      "standardCode": "ST0116",
+      "standardLevel": 4,
+      "standardVersion": "1.2",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.balticapprenticeships.com/programmes/",
+      "providerCatalogueUrl": "https://www.balticapprenticeships.com/programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Baltic Apprenticeships lists Software Developer in its current apprenticeship catalogue; LevyTate maps it to the Software developer standard.",
+      "sourceUrls": [
+        "https://www.balticapprenticeships.com/programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-baltic-data-engineer",
+      "providerId": "provider-baltic",
+      "providerName": "Baltic Apprenticeships",
+      "providerProgrammeName": "Data Engineer",
+      "standardTitle": "Data engineer",
+      "standardCode": "ST1386",
+      "standardLevel": 5,
+      "standardVersion": "1",
+      "standardStatus": "In development",
+      "programmeUrl": "https://www.balticapprenticeships.com/programmes/",
+      "providerCatalogueUrl": "https://www.balticapprenticeships.com/programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Baltic Apprenticeships lists Data Engineer in its current apprenticeship catalogue; LevyTate maps it to the Data engineer standard.",
+      "sourceUrls": [
+        "https://www.balticapprenticeships.com/programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-apprentify-ai-leadership",
+      "providerId": "provider-apprentify",
+      "providerName": "Apprentify",
+      "providerProgrammeName": "AI Leadership",
+      "standardTitle": "",
+      "standardCode": "",
+      "standardLevel": null,
+      "standardVersion": "",
+      "standardStatus": "Unmapped",
+      "programmeUrl": "https://www.apprentify.com/courses/",
+      "providerCatalogueUrl": "https://www.apprentify.com/courses/",
+      "status": "Not available",
+      "recordStatus": "Archived",
+      "deliveryModels": [
+        "Online"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "The reviewed offer is an apprenticeship unit rather than a complete apprenticeship programme.",
+      "sourceUrls": [
+        "https://www.apprentify.com/courses/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Needs manual review"
+    },
+    {
+      "id": "programme-apprentify-ai-activator",
+      "providerId": "provider-apprentify",
+      "providerName": "Apprentify",
+      "providerProgrammeName": "AI Activator",
+      "standardTitle": "Digital support technician",
+      "standardCode": "ST0120",
+      "standardLevel": 3,
+      "standardVersion": "1.1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.apprentify.com/course/ai-activator/",
+      "providerCatalogueUrl": "https://www.apprentify.com/courses/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Apprentify lists AI Activator in its current apprenticeship catalogue; LevyTate maps it to the Digital support technician standard.",
+      "sourceUrls": [
+        "https://www.apprentify.com/course/ai-activator/",
+        "https://www.apprentify.com/courses/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-apprentify-ai-automation-practitioner",
+      "providerId": "provider-apprentify",
+      "providerName": "Apprentify",
+      "providerProgrammeName": "AI & Automation Practitioner",
+      "standardTitle": "Artificial intelligence (AI) and automation practitioner",
+      "standardCode": "ST1512",
+      "standardLevel": 4,
+      "standardVersion": "2.1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.apprentify.com/courses/",
+      "providerCatalogueUrl": "https://www.apprentify.com/courses/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Apprentify lists AI & Automation Practitioner in its current apprenticeship catalogue; LevyTate maps it to the Artificial intelligence (AI) and automation practitioner standard.",
+      "sourceUrls": [
+        "https://www.apprentify.com/courses/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-apprentify-business-analyst",
+      "providerId": "provider-apprentify",
+      "providerName": "Apprentify",
+      "providerProgrammeName": "Business Analyst",
+      "standardTitle": "Business analyst",
+      "standardCode": "ST0117",
+      "standardLevel": 4,
+      "standardVersion": "1.2",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.apprentify.com/courses/",
+      "providerCatalogueUrl": "https://www.apprentify.com/courses/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Apprentify lists Business Analyst in its current apprenticeship catalogue; LevyTate maps it to the Business analyst standard.",
+      "sourceUrls": [
+        "https://www.apprentify.com/courses/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-apprentify-data-technician",
+      "providerId": "provider-apprentify",
+      "providerName": "Apprentify",
+      "providerProgrammeName": "Data Technician",
+      "standardTitle": "Data technician",
+      "standardCode": "ST0795",
+      "standardLevel": 3,
+      "standardVersion": "1.1",
+      "standardStatus": "In development",
+      "programmeUrl": "https://www.apprentify.com/courses/",
+      "providerCatalogueUrl": "https://www.apprentify.com/courses/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Apprentify lists Data Technician in its current apprenticeship catalogue; LevyTate maps it to the Data technician standard.",
+      "sourceUrls": [
+        "https://www.apprentify.com/courses/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-apprentify-data-analyst",
+      "providerId": "provider-apprentify",
+      "providerName": "Apprentify",
+      "providerProgrammeName": "Data Analyst",
+      "standardTitle": "Data analyst",
+      "standardCode": "ST0118",
+      "standardLevel": 4,
+      "standardVersion": "1.1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.apprentify.com/courses/",
+      "providerCatalogueUrl": "https://www.apprentify.com/courses/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Apprentify lists Data Analyst in its current apprenticeship catalogue; LevyTate maps it to the Data analyst standard.",
+      "sourceUrls": [
+        "https://www.apprentify.com/courses/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-apprentify-cyber-security-technologist",
+      "providerId": "provider-apprentify",
+      "providerName": "Apprentify",
+      "providerProgrammeName": "Cyber Security Technologist",
+      "standardTitle": "Cyber security technologist (2021)",
+      "standardCode": "ST1021",
+      "standardLevel": 4,
+      "standardVersion": "1.1",
+      "standardStatus": "Retired",
+      "programmeUrl": "https://www.apprentify.com/courses/",
+      "providerCatalogueUrl": "https://www.apprentify.com/courses/",
+      "status": "Defunded / unavailable for new starts",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Apprentify lists Cyber Security Technologist in its current apprenticeship catalogue; LevyTate maps it to the Cyber security technologist (2021) standard.",
+      "sourceUrls": [
+        "https://www.apprentify.com/courses/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-apprentify-digital-support-technician",
+      "providerId": "provider-apprentify",
+      "providerName": "Apprentify",
+      "providerProgrammeName": "Information Communications Technician",
+      "standardTitle": "Information communications technician",
+      "standardCode": "ST0973",
+      "standardLevel": 3,
+      "standardVersion": "1.2",
+      "standardStatus": "In development",
+      "programmeUrl": "https://www.apprentify.com/courses/",
+      "providerCatalogueUrl": "https://www.apprentify.com/courses/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Apprentify lists Information Communications Technician in its current apprenticeship catalogue; LevyTate maps it to the Information communications technician standard.",
+      "sourceUrls": [
+        "https://www.apprentify.com/courses/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-apprentify-ai-catalyst",
+      "providerId": "provider-apprentify",
+      "providerName": "Apprentify",
+      "providerProgrammeName": "AI Catalyst",
+      "standardTitle": "Business analyst",
+      "standardCode": "ST0117",
+      "standardLevel": 4,
+      "standardVersion": "1.2",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.apprentify.com/course/ai-catalyst/",
+      "providerCatalogueUrl": "https://www.apprentify.com/courses/",
+      "status": "Needs verification",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "The provider confirms a Level 4 apprenticeship but does not identify the underlying standard on the reviewed page.",
+      "sourceUrls": [
+        "https://www.apprentify.com/course/ai-catalyst/",
+        "https://www.apprentify.com/courses/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Probable"
+    },
+    {
+      "id": "programme-apprentify-network-engineer",
+      "providerId": "provider-apprentify",
+      "providerName": "Apprentify",
+      "providerProgrammeName": "Network Engineer",
+      "standardTitle": "Network engineer",
+      "standardCode": "ST0127",
+      "standardLevel": 4,
+      "standardVersion": "1.4",
+      "standardStatus": "In development",
+      "programmeUrl": "https://www.apprentify.com/courses/",
+      "providerCatalogueUrl": "https://www.apprentify.com/courses/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Apprentify lists Network Engineer in its current apprenticeship catalogue; LevyTate maps it to the Network engineer standard.",
+      "sourceUrls": [
+        "https://www.apprentify.com/courses/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-apprentify-digital-learning-designer",
+      "providerId": "provider-apprentify",
+      "providerName": "Apprentify",
+      "providerProgrammeName": "Digital Learning Designer",
+      "standardTitle": "Digital learning designer",
+      "standardCode": "ST0974",
+      "standardLevel": 5,
+      "standardVersion": "1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.apprentify.com/courses/",
+      "providerCatalogueUrl": "https://www.apprentify.com/courses/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Apprentify lists Digital Learning Designer in its current apprenticeship catalogue; LevyTate maps it to the Digital learning designer standard.",
+      "sourceUrls": [
+        "https://www.apprentify.com/courses/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-apprentify-fundraiser",
+      "providerId": "provider-apprentify",
+      "providerName": "Apprentify",
+      "providerProgrammeName": "Fundraiser",
+      "standardTitle": "Fundraiser",
+      "standardCode": "ST0887",
+      "standardLevel": 3,
+      "standardVersion": "1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.apprentify.com/courses/",
+      "providerCatalogueUrl": "https://www.apprentify.com/courses/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Apprentify lists Fundraiser in its current apprenticeship catalogue; LevyTate maps it to the Fundraiser standard.",
+      "sourceUrls": [
+        "https://www.apprentify.com/courses/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-apprentify-pr-and-communications",
+      "providerId": "provider-apprentify",
+      "providerName": "Apprentify",
+      "providerProgrammeName": "PR and Communications",
+      "standardTitle": "Public relations and communications assistant",
+      "standardCode": "ST0311",
+      "standardLevel": 4,
+      "standardVersion": "1.3",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.apprentify.com/courses/",
+      "providerCatalogueUrl": "https://www.apprentify.com/courses/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Apprentify lists PR and Communications in its current apprenticeship catalogue; LevyTate maps it to the Public relations and communications assistant standard.",
+      "sourceUrls": [
+        "https://www.apprentify.com/courses/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-apprentify-multi-channel-marketer",
+      "providerId": "provider-apprentify",
+      "providerName": "Apprentify",
+      "providerProgrammeName": "Multi-Channel Marketer",
+      "standardTitle": "Multi-channel marketer",
+      "standardCode": "ST1031",
+      "standardLevel": 3,
+      "standardVersion": "1.1",
+      "standardStatus": "In development",
+      "programmeUrl": "https://www.apprentify.com/courses/",
+      "providerCatalogueUrl": "https://www.apprentify.com/courses/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Apprentify lists Multi-Channel Marketer in its current apprenticeship catalogue; LevyTate maps it to the Multi-channel marketer standard.",
+      "sourceUrls": [
+        "https://www.apprentify.com/courses/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-apprentify-content-creator",
+      "providerId": "provider-apprentify",
+      "providerName": "Apprentify",
+      "providerProgrammeName": "Content Creator",
+      "standardTitle": "Content creator",
+      "standardCode": "ST0105",
+      "standardLevel": 3,
+      "standardVersion": "1.1",
+      "standardStatus": "In development",
+      "programmeUrl": "https://www.apprentify.com/courses/",
+      "providerCatalogueUrl": "https://www.apprentify.com/courses/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Apprentify lists Content Creator in its current apprenticeship catalogue; LevyTate maps it to the Content creator standard.",
+      "sourceUrls": [
+        "https://www.apprentify.com/courses/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-learning-curve-project-manager",
+      "providerId": "provider-learning-curve-group",
+      "providerName": "Learning Curve Group",
+      "providerProgrammeName": "Associate Project Manager",
+      "standardTitle": "Associate project manager",
+      "standardCode": "ST0310",
+      "standardLevel": 4,
+      "standardVersion": "1.5",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "providerCatalogueUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Curve Group lists Associate Project Manager in its current apprenticeship catalogue; LevyTate maps it to the Associate project manager standard.",
+      "sourceUrls": [
+        "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-learning-curve-business-admin",
+      "providerId": "provider-learning-curve-group",
+      "providerName": "Learning Curve Group",
+      "providerProgrammeName": "Business Administrator",
+      "standardTitle": "Business administrator",
+      "standardCode": "ST0070",
+      "standardLevel": 3,
+      "standardVersion": "1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "providerCatalogueUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Curve Group lists Business Administrator in its current apprenticeship catalogue; LevyTate maps it to the Business administrator standard.",
+      "sourceUrls": [
+        "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-learning-curve-customer-service-practitioner",
+      "providerId": "provider-learning-curve-group",
+      "providerName": "Learning Curve Group",
+      "providerProgrammeName": "Customer Service Practitioner",
+      "standardTitle": "Customer service practitioner",
+      "standardCode": "ST0072",
+      "standardLevel": 2,
+      "standardVersion": "1.1",
+      "standardStatus": "Retired",
+      "programmeUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "providerCatalogueUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "status": "Defunded / unavailable for new starts",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Curve Group lists Customer Service Practitioner in its current apprenticeship catalogue; LevyTate maps it to the Customer service practitioner standard.",
+      "sourceUrls": [
+        "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-learning-curve-customer-service-specialist",
+      "providerId": "provider-learning-curve-group",
+      "providerName": "Learning Curve Group",
+      "providerProgrammeName": "Customer Service Specialist",
+      "standardTitle": "Customer service specialist",
+      "standardCode": "ST0071",
+      "standardLevel": 3,
+      "standardVersion": "1.3",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "providerCatalogueUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Curve Group lists Customer Service Specialist in its current apprenticeship catalogue; LevyTate maps it to the Customer service specialist standard.",
+      "sourceUrls": [
+        "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-learning-curve-bricklayer",
+      "providerId": "provider-learning-curve-group",
+      "providerName": "Learning Curve Group",
+      "providerProgrammeName": "Bricklayer",
+      "standardTitle": "Bricklayer",
+      "standardCode": "ST0095",
+      "standardLevel": 2,
+      "standardVersion": "1.2",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "providerCatalogueUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Curve Group lists Bricklayer in its current apprenticeship catalogue; LevyTate maps it to the Bricklayer standard.",
+      "sourceUrls": [
+        "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-learning-curve-carpentry-and-joinery",
+      "providerId": "provider-learning-curve-group",
+      "providerName": "Learning Curve Group",
+      "providerProgrammeName": "Carpentry and Joinery",
+      "standardTitle": "Carpentry and joinery",
+      "standardCode": "ST0264",
+      "standardLevel": 2,
+      "standardVersion": "1.4",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "providerCatalogueUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Curve Group lists Carpentry and Joinery in its current apprenticeship catalogue; LevyTate maps it to the Carpentry and joinery standard.",
+      "sourceUrls": [
+        "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-learning-curve-painter-and-decorator",
+      "providerId": "provider-learning-curve-group",
+      "providerName": "Learning Curve Group",
+      "providerProgrammeName": "Painter and Decorator",
+      "standardTitle": "Painter and decorator",
+      "standardCode": "ST0295",
+      "standardLevel": 2,
+      "standardVersion": "1.3",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "providerCatalogueUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Curve Group lists Painter and Decorator in its current apprenticeship catalogue; LevyTate maps it to the Painter and decorator standard.",
+      "sourceUrls": [
+        "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-learning-curve-advanced-and-creative-hair-professional",
+      "providerId": "provider-learning-curve-group",
+      "providerName": "Learning Curve Group",
+      "providerProgrammeName": "Advanced and Creative Hair Professional",
+      "standardTitle": "Advanced and creative hair professional",
+      "standardCode": "ST0214",
+      "standardLevel": 3,
+      "standardVersion": "1",
+      "standardStatus": "In development",
+      "programmeUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "providerCatalogueUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Curve Group lists Advanced and Creative Hair Professional in its current apprenticeship catalogue; LevyTate maps it to the Advanced and creative hair professional standard.",
+      "sourceUrls": [
+        "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-learning-curve-advanced-beauty-therapist",
+      "providerId": "provider-learning-curve-group",
+      "providerName": "Learning Curve Group",
+      "providerProgrammeName": "Advanced Beauty Therapist",
+      "standardTitle": "Advanced beauty therapist",
+      "standardCode": "ST0211",
+      "standardLevel": 3,
+      "standardVersion": "1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "providerCatalogueUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Curve Group lists Advanced Beauty Therapist in its current apprenticeship catalogue; LevyTate maps it to the Advanced beauty therapist standard.",
+      "sourceUrls": [
+        "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-learning-curve-barbering-professional",
+      "providerId": "provider-learning-curve-group",
+      "providerName": "Learning Curve Group",
+      "providerProgrammeName": "Barbering Professional",
+      "standardTitle": "Barbering professional",
+      "standardCode": "ST1273",
+      "standardLevel": 2,
+      "standardVersion": "1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "providerCatalogueUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Curve Group lists Barbering Professional in its current apprenticeship catalogue; LevyTate maps it to the Barbering professional standard.",
+      "sourceUrls": [
+        "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-learning-curve-beauty-therapist",
+      "providerId": "provider-learning-curve-group",
+      "providerName": "Learning Curve Group",
+      "providerProgrammeName": "Beauty Therapist",
+      "standardTitle": "Beauty therapist",
+      "standardCode": "ST0630",
+      "standardLevel": 2,
+      "standardVersion": "1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "providerCatalogueUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Curve Group lists Beauty Therapist in its current apprenticeship catalogue; LevyTate maps it to the Beauty therapist standard.",
+      "sourceUrls": [
+        "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-learning-curve-hairdressing-professional",
+      "providerId": "provider-learning-curve-group",
+      "providerName": "Learning Curve Group",
+      "providerProgrammeName": "Hairdressing Professional",
+      "standardTitle": "Hairdressing professional",
+      "standardCode": "ST0213",
+      "standardLevel": 2,
+      "standardVersion": "1.2",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "providerCatalogueUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Curve Group lists Hairdressing Professional in its current apprenticeship catalogue; LevyTate maps it to the Hairdressing professional standard.",
+      "sourceUrls": [
+        "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-learning-curve-nail-services-technician",
+      "providerId": "provider-learning-curve-group",
+      "providerName": "Learning Curve Group",
+      "providerProgrammeName": "Nail Services Technician",
+      "standardTitle": "Nail services technician",
+      "standardCode": "ST0635",
+      "standardLevel": 2,
+      "standardVersion": "1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "providerCatalogueUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Curve Group lists Nail Services Technician in its current apprenticeship catalogue; LevyTate maps it to the Nail services technician standard.",
+      "sourceUrls": [
+        "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-learning-curve-wellbeing-and-holistic-therapist",
+      "providerId": "provider-learning-curve-group",
+      "providerName": "Learning Curve Group",
+      "providerProgrammeName": "Wellbeing and Holistic Therapist",
+      "standardTitle": "Wellbeing and holistic therapist",
+      "standardCode": "ST0685",
+      "standardLevel": 3,
+      "standardVersion": "1.1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "providerCatalogueUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Curve Group lists Wellbeing and Holistic Therapist in its current apprenticeship catalogue; LevyTate maps it to the Wellbeing and holistic therapist standard.",
+      "sourceUrls": [
+        "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-learning-curve-adult-care-worker",
+      "providerId": "provider-learning-curve-group",
+      "providerName": "Learning Curve Group",
+      "providerProgrammeName": "Adult Care Worker",
+      "standardTitle": "Adult care worker",
+      "standardCode": "ST0005",
+      "standardLevel": 2,
+      "standardVersion": "2",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "providerCatalogueUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Curve Group lists Adult Care Worker in its current apprenticeship catalogue; LevyTate maps it to the Adult care worker standard.",
+      "sourceUrls": [
+        "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-learning-curve-early-years-educator",
+      "providerId": "provider-learning-curve-group",
+      "providerName": "Learning Curve Group",
+      "providerProgrammeName": "Early Years Educator",
+      "standardTitle": "Early years educator",
+      "standardCode": "ST0135",
+      "standardLevel": 3,
+      "standardVersion": "1.5",
+      "standardStatus": "In development",
+      "programmeUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "providerCatalogueUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Curve Group lists Early Years Educator in its current apprenticeship catalogue; LevyTate maps it to the Early years educator standard.",
+      "sourceUrls": [
+        "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-learning-curve-lead-adult-care-worker",
+      "providerId": "provider-learning-curve-group",
+      "providerName": "Learning Curve Group",
+      "providerProgrammeName": "Lead Adult Care Worker",
+      "standardTitle": "Lead adult care worker",
+      "standardCode": "ST0006",
+      "standardLevel": 3,
+      "standardVersion": "1.3",
+      "standardStatus": "In development",
+      "programmeUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "providerCatalogueUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Curve Group lists Lead Adult Care Worker in its current apprenticeship catalogue; LevyTate maps it to the Lead adult care worker standard.",
+      "sourceUrls": [
+        "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-learning-curve-leader-in-adult-care",
+      "providerId": "provider-learning-curve-group",
+      "providerName": "Learning Curve Group",
+      "providerProgrammeName": "Leader in Adult Care",
+      "standardTitle": "Leader in adult care",
+      "standardCode": "ST0008",
+      "standardLevel": 5,
+      "standardVersion": "1.2",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "providerCatalogueUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Curve Group lists Leader in Adult Care in its current apprenticeship catalogue; LevyTate maps it to the Leader in adult care standard.",
+      "sourceUrls": [
+        "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-learning-curve-housing-and-property-management-assistant",
+      "providerId": "provider-learning-curve-group",
+      "providerName": "Learning Curve Group",
+      "providerProgrammeName": "Housing and Property Management Assistant",
+      "standardTitle": "Housing and property management assistant",
+      "standardCode": "ST0235",
+      "standardLevel": 2,
+      "standardVersion": "1.4",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "providerCatalogueUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Curve Group lists Housing and Property Management Assistant in its current apprenticeship catalogue; LevyTate maps it to the Housing and property management assistant standard.",
+      "sourceUrls": [
+        "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-learning-curve-housing-and-property-management",
+      "providerId": "provider-learning-curve-group",
+      "providerName": "Learning Curve Group",
+      "providerProgrammeName": "Housing and Property Management",
+      "standardTitle": "Housing and property management",
+      "standardCode": "ST0234",
+      "standardLevel": 3,
+      "standardVersion": "1.5",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "providerCatalogueUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Curve Group lists Housing and Property Management in its current apprenticeship catalogue; LevyTate maps it to the Housing and property management standard.",
+      "sourceUrls": [
+        "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-learning-curve-senior-housing-and-property-management",
+      "providerId": "provider-learning-curve-group",
+      "providerName": "Learning Curve Group",
+      "providerProgrammeName": "Senior Housing and Property Management",
+      "standardTitle": "Senior housing and property management",
+      "standardCode": "ST0236",
+      "standardLevel": 4,
+      "standardVersion": "1.4",
+      "standardStatus": "In development",
+      "programmeUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "providerCatalogueUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Curve Group lists Senior Housing and Property Management in its current apprenticeship catalogue; LevyTate maps it to the Senior housing and property management standard.",
+      "sourceUrls": [
+        "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-learning-curve-content-creator",
+      "providerId": "provider-learning-curve-group",
+      "providerName": "Learning Curve Group",
+      "providerProgrammeName": "Content Creator",
+      "standardTitle": "Content creator",
+      "standardCode": "ST0105",
+      "standardLevel": 3,
+      "standardVersion": "1.1",
+      "standardStatus": "In development",
+      "programmeUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "providerCatalogueUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Curve Group lists Content Creator in its current apprenticeship catalogue; LevyTate maps it to the Content creator standard.",
+      "sourceUrls": [
+        "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-learning-curve-data-analyst",
+      "providerId": "provider-learning-curve-group",
+      "providerName": "Learning Curve Group",
+      "providerProgrammeName": "Data Analyst",
+      "standardTitle": "Data analyst",
+      "standardCode": "ST0118",
+      "standardLevel": 4,
+      "standardVersion": "1.1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "providerCatalogueUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Curve Group lists Data Analyst in its current apprenticeship catalogue; LevyTate maps it to the Data analyst standard.",
+      "sourceUrls": [
+        "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-learning-curve-data-technician",
+      "providerId": "provider-learning-curve-group",
+      "providerName": "Learning Curve Group",
+      "providerProgrammeName": "Data Technician",
+      "standardTitle": "Data technician",
+      "standardCode": "ST0795",
+      "standardLevel": 3,
+      "standardVersion": "1.1",
+      "standardStatus": "In development",
+      "programmeUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "providerCatalogueUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Curve Group lists Data Technician in its current apprenticeship catalogue; LevyTate maps it to the Data technician standard.",
+      "sourceUrls": [
+        "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-learning-curve-digital-support-technician",
+      "providerId": "provider-learning-curve-group",
+      "providerName": "Learning Curve Group",
+      "providerProgrammeName": "Digital Support Technician",
+      "standardTitle": "Digital support technician",
+      "standardCode": "ST0120",
+      "standardLevel": 3,
+      "standardVersion": "1.1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "providerCatalogueUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Curve Group lists Digital Support Technician in its current apprenticeship catalogue; LevyTate maps it to the Digital support technician standard.",
+      "sourceUrls": [
+        "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-learning-curve-information-communications-technician",
+      "providerId": "provider-learning-curve-group",
+      "providerName": "Learning Curve Group",
+      "providerProgrammeName": "Information Communications Technician",
+      "standardTitle": "Information communications technician",
+      "standardCode": "ST0973",
+      "standardLevel": 3,
+      "standardVersion": "1.2",
+      "standardStatus": "In development",
+      "programmeUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "providerCatalogueUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Curve Group lists Information Communications Technician in its current apprenticeship catalogue; LevyTate maps it to the Information communications technician standard.",
+      "sourceUrls": [
+        "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-learning-curve-multi-channel-marketer",
+      "providerId": "provider-learning-curve-group",
+      "providerName": "Learning Curve Group",
+      "providerProgrammeName": "Multi-Channel Marketer",
+      "standardTitle": "Multi-channel marketer",
+      "standardCode": "ST1031",
+      "standardLevel": 3,
+      "standardVersion": "1.1",
+      "standardStatus": "In development",
+      "programmeUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "providerCatalogueUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Curve Group lists Multi-Channel Marketer in its current apprenticeship catalogue; LevyTate maps it to the Multi-channel marketer standard.",
+      "sourceUrls": [
+        "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-learning-curve-large-goods-vehicle-lgv-driver-c-e",
+      "providerId": "provider-learning-curve-group",
+      "providerName": "Learning Curve Group",
+      "providerProgrammeName": "Large Goods Vehicle (LGV) Driver C + E",
+      "standardTitle": "Large goods vehicle (LGV) driver C + E",
+      "standardCode": "ST0257",
+      "standardLevel": 2,
+      "standardVersion": "1.4",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "providerCatalogueUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Curve Group lists Large Goods Vehicle (LGV) Driver C + E in its current apprenticeship catalogue; LevyTate maps it to the Large goods vehicle (LGV) driver C + E standard.",
+      "sourceUrls": [
+        "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-learning-curve-supply-chain-warehouse-operative",
+      "providerId": "provider-learning-curve-group",
+      "providerName": "Learning Curve Group",
+      "providerProgrammeName": "Supply Chain Warehouse Operative",
+      "standardTitle": "Supply chain warehouse operative",
+      "standardCode": "ST0259",
+      "standardLevel": 2,
+      "standardVersion": "1.1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "providerCatalogueUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Curve Group lists Supply Chain Warehouse Operative in its current apprenticeship catalogue; LevyTate maps it to the Supply chain warehouse operative standard.",
+      "sourceUrls": [
+        "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-learning-curve-transport-and-warehouse-operations-supervisor",
+      "providerId": "provider-learning-curve-group",
+      "providerName": "Learning Curve Group",
+      "providerProgrammeName": "Transport and Warehouse Operations Supervisor",
+      "standardTitle": "Transport and warehouse operations supervisor",
+      "standardCode": "ST0647",
+      "standardLevel": 3,
+      "standardVersion": "1.1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "providerCatalogueUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Curve Group lists Transport and Warehouse Operations Supervisor in its current apprenticeship catalogue; LevyTate maps it to the Transport and warehouse operations supervisor standard.",
+      "sourceUrls": [
+        "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-learning-curve-urban-driver",
+      "providerId": "provider-learning-curve-group",
+      "providerName": "Learning Curve Group",
+      "providerProgrammeName": "Urban Driver",
+      "standardTitle": "Urban driver",
+      "standardCode": "ST1025",
+      "standardLevel": 2,
+      "standardVersion": "1.1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "providerCatalogueUrl": "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Curve Group lists Urban Driver in its current apprenticeship catalogue; LevyTate maps it to the Urban driver standard.",
+      "sourceUrls": [
+        "https://www.learningcurvegroup.co.uk/employers/staff-training/apprenticeships/apprenticeship-programmes/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-primary-goal-information-communication-technician",
+      "providerId": "provider-primary-goal",
+      "providerName": "Primary Goal",
+      "providerProgrammeName": "Information Communication Technician",
+      "standardTitle": "Information communications technician",
+      "standardCode": "ST0973",
+      "standardLevel": 3,
+      "standardVersion": "1.2",
+      "standardStatus": "In development",
+      "programmeUrl": "https://primarygoal.ac.uk/courses/information-communication-technician",
+      "providerCatalogueUrl": "https://primarygoal.ac.uk/courses",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Primary Goal lists Information Communication Technician in its current apprenticeship catalogue; LevyTate maps it to the Information communications technician standard.",
+      "sourceUrls": [
+        "https://primarygoal.ac.uk/courses/information-communication-technician",
+        "https://primarygoal.ac.uk/courses"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-primary-goal-microsoft-365-digital-skills",
+      "providerId": "provider-primary-goal",
+      "providerName": "Primary Goal",
+      "providerProgrammeName": "Microsoft 365 Digital Skills",
+      "standardTitle": "Digital support technician",
+      "standardCode": "ST0120",
+      "standardLevel": 3,
+      "standardVersion": "1.1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://primarygoal.ac.uk/courses/microsoft-365-digital-skills",
+      "providerCatalogueUrl": "https://primarygoal.ac.uk/courses",
+      "status": "Needs verification",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "The provider confirms an apprenticeship but the reviewed page does not explicitly name the underlying standard.",
+      "sourceUrls": [
+        "https://primarygoal.ac.uk/courses/microsoft-365-digital-skills",
+        "https://primarygoal.ac.uk/courses"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Probable"
+    },
+    {
+      "id": "programme-primary-goal-microsoft-365-education-digital-skills",
+      "providerId": "provider-primary-goal",
+      "providerName": "Primary Goal",
+      "providerProgrammeName": "Microsoft 365 Education Digital Skills",
+      "standardTitle": "Digital support technician",
+      "standardCode": "ST0120",
+      "standardLevel": 3,
+      "standardVersion": "1.1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://primarygoal.ac.uk/courses/microsoft-365-education-digital-skills",
+      "providerCatalogueUrl": "https://primarygoal.ac.uk/courses",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Primary Goal lists Microsoft 365 Education Digital Skills in its current apprenticeship catalogue; LevyTate maps it to the Digital support technician standard.",
+      "sourceUrls": [
+        "https://primarygoal.ac.uk/courses/microsoft-365-education-digital-skills",
+        "https://primarygoal.ac.uk/courses"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-aicore-ai-upskilling",
+      "providerId": "provider-aicore",
+      "providerName": "AiCore",
+      "providerProgrammeName": "AI Upskilling for Business Teams",
+      "standardTitle": "",
+      "standardCode": "",
+      "standardLevel": null,
+      "standardVersion": "",
+      "standardStatus": "Unmapped",
+      "programmeUrl": "https://theaicore.com/employers",
+      "providerCatalogueUrl": "https://theaicore.com/employers",
+      "status": "Needs verification",
+      "recordStatus": "Archived",
+      "deliveryModels": [
+        "Online"
+      ],
+      "regions": [],
+      "programmeDescription": "No current official apprenticeship programme or standard mapping was evidenced on the reviewed provider site; the page describes commercial AI training.",
+      "sourceUrls": [
+        "https://theaicore.com/employers"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Needs manual review"
+    },
+    {
+      "id": "programme-rhg-service-designer",
+      "providerId": "provider-rhg-consult",
+      "providerName": "RHG Consult",
+      "providerProgrammeName": "Service Innovation Leader (Service Designer)",
+      "standardTitle": "Service designer",
+      "standardCode": "ST0894",
+      "standardLevel": 6,
+      "standardVersion": "1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.rhgconsult.co.uk/apprenticeships/",
+      "providerCatalogueUrl": "https://www.rhgconsult.co.uk/apprenticeships/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "RHG Consult lists Service Innovation Leader (Service Designer) in its current apprenticeship catalogue; LevyTate maps it to the Service designer standard.",
+      "sourceUrls": [
+        "https://www.rhgconsult.co.uk/apprenticeships/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-rhg-ai-and-automation-practitioner",
+      "providerId": "provider-rhg-consult",
+      "providerName": "RHG Consult",
+      "providerProgrammeName": "AI and Automation Practitioner",
+      "standardTitle": "Artificial intelligence (AI) and automation practitioner",
+      "standardCode": "ST1512",
+      "standardLevel": 4,
+      "standardVersion": "2.1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.rhgconsult.co.uk/apprenticeships/",
+      "providerCatalogueUrl": "https://www.rhgconsult.co.uk/apprenticeships/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "RHG Consult lists AI and Automation Practitioner in its current apprenticeship catalogue; LevyTate maps it to the Artificial intelligence (AI) and automation practitioner standard.",
+      "sourceUrls": [
+        "https://www.rhgconsult.co.uk/apprenticeships/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-rhg-multi-channel-marketer",
+      "providerId": "provider-rhg-consult",
+      "providerName": "RHG Consult",
+      "providerProgrammeName": "Multi-Channel Marketer",
+      "standardTitle": "Multi-channel marketer",
+      "standardCode": "ST1031",
+      "standardLevel": 3,
+      "standardVersion": "1.1",
+      "standardStatus": "In development",
+      "programmeUrl": "https://www.rhgconsult.co.uk/apprenticeships/",
+      "providerCatalogueUrl": "https://www.rhgconsult.co.uk/apprenticeships/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "RHG Consult lists Multi-Channel Marketer in its current apprenticeship catalogue; LevyTate maps it to the Multi-channel marketer standard.",
+      "sourceUrls": [
+        "https://www.rhgconsult.co.uk/apprenticeships/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-rhg-business-analyst",
+      "providerId": "provider-rhg-consult",
+      "providerName": "RHG Consult",
+      "providerProgrammeName": "Business Analyst",
+      "standardTitle": "Business analyst",
+      "standardCode": "ST0117",
+      "standardLevel": 4,
+      "standardVersion": "1.2",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.rhgconsult.co.uk/apprenticeships/",
+      "providerCatalogueUrl": "https://www.rhgconsult.co.uk/apprenticeships/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "RHG Consult lists Business Analyst in its current apprenticeship catalogue; LevyTate maps it to the Business analyst standard.",
+      "sourceUrls": [
+        "https://www.rhgconsult.co.uk/apprenticeships/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-rhg-business-administrator",
+      "providerId": "provider-rhg-consult",
+      "providerName": "RHG Consult",
+      "providerProgrammeName": "Business Administrator",
+      "standardTitle": "Business administrator",
+      "standardCode": "ST0070",
+      "standardLevel": 3,
+      "standardVersion": "1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.rhgconsult.co.uk/apprenticeships/",
+      "providerCatalogueUrl": "https://www.rhgconsult.co.uk/apprenticeships/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "RHG Consult lists Business Administrator in its current apprenticeship catalogue; LevyTate maps it to the Business administrator standard.",
+      "sourceUrls": [
+        "https://www.rhgconsult.co.uk/apprenticeships/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-rhg-corporate-responsibility",
+      "providerId": "provider-rhg-consult",
+      "providerName": "RHG Consult",
+      "providerProgrammeName": "Corporate Responsibility and Sustainability Practitioner",
+      "standardTitle": "Corporate responsibility and sustainability practitioner",
+      "standardCode": "ST0934",
+      "standardLevel": 4,
+      "standardVersion": "1.1",
+      "standardStatus": "In development",
+      "programmeUrl": "https://www.rhgconsult.co.uk/apprenticeships/",
+      "providerCatalogueUrl": "https://www.rhgconsult.co.uk/apprenticeships/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "RHG Consult lists Corporate Responsibility and Sustainability Practitioner in its current apprenticeship catalogue; LevyTate maps it to the Corporate responsibility and sustainability practitioner standard.",
+      "sourceUrls": [
+        "https://www.rhgconsult.co.uk/apprenticeships/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-rhg-bid-proposal",
+      "providerId": "provider-rhg-consult",
+      "providerName": "RHG Consult",
+      "providerProgrammeName": "Bid and Proposal Co-ordinator",
+      "standardTitle": "Bid and proposal co-ordinator",
+      "standardCode": "ST0056",
+      "standardLevel": 3,
+      "standardVersion": "1.1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.rhgconsult.co.uk/apprenticeships/",
+      "providerCatalogueUrl": "https://www.rhgconsult.co.uk/apprenticeships/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "RHG Consult lists Bid and Proposal Co-ordinator in its current apprenticeship catalogue; LevyTate maps it to the Bid and proposal co-ordinator standard.",
+      "sourceUrls": [
+        "https://www.rhgconsult.co.uk/apprenticeships/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-rhg-junior-management-consultant",
+      "providerId": "provider-rhg-consult",
+      "providerName": "RHG Consult",
+      "providerProgrammeName": "Junior Management Consultant",
+      "standardTitle": "Junior management consultant",
+      "standardCode": "ST0273",
+      "standardLevel": 4,
+      "standardVersion": "1.1",
+      "standardStatus": "Paused",
+      "programmeUrl": "https://www.rhgconsult.co.uk/apprenticeships/",
+      "providerCatalogueUrl": "https://www.rhgconsult.co.uk/apprenticeships/",
+      "status": "Paused",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "RHG Consult lists Junior Management Consultant in its current apprenticeship catalogue; LevyTate maps it to the Junior management consultant standard.",
+      "sourceUrls": [
+        "https://www.rhgconsult.co.uk/apprenticeships/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-rhg-she-tech",
+      "providerId": "provider-rhg-consult",
+      "providerName": "RHG Consult",
+      "providerProgrammeName": "Safety, Health and Environment Technician",
+      "standardTitle": "Safety, health and environment technician",
+      "standardCode": "ST0550",
+      "standardLevel": 3,
+      "standardVersion": "1.4",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.rhgconsult.co.uk/apprenticeships/",
+      "providerCatalogueUrl": "https://www.rhgconsult.co.uk/apprenticeships/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "RHG Consult lists Safety, Health and Environment Technician in its current apprenticeship catalogue; LevyTate maps it to the Safety, health and environment technician standard.",
+      "sourceUrls": [
+        "https://www.rhgconsult.co.uk/apprenticeships/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-marketing-trainer-multi-channel-marketer",
+      "providerId": "provider-the-marketing-trainer",
+      "providerName": "The Marketing Trainer",
+      "providerProgrammeName": "Multi-Channel Marketer",
+      "standardTitle": "Multi-channel marketer",
+      "standardCode": "ST1031",
+      "standardLevel": 3,
+      "standardVersion": "1.1",
+      "standardStatus": "In development",
+      "programmeUrl": "https://www.themarketingtrainer.co.uk/cim-apprenticeships",
+      "providerCatalogueUrl": "https://www.themarketingtrainer.co.uk/cim-apprenticeships",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "The Marketing Trainer lists Multi-Channel Marketer in its current apprenticeship catalogue; LevyTate maps it to the Multi-channel marketer standard.",
+      "sourceUrls": [
+        "https://www.themarketingtrainer.co.uk/cim-apprenticeships"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-marketing-trainer-market-research-executive",
+      "providerId": "provider-the-marketing-trainer",
+      "providerName": "The Marketing Trainer",
+      "providerProgrammeName": "Market Research Executive",
+      "standardTitle": "Market research executive",
+      "standardCode": "ST0883",
+      "standardLevel": 4,
+      "standardVersion": "1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.themarketingtrainer.co.uk/cim-apprenticeships",
+      "providerCatalogueUrl": "https://www.themarketingtrainer.co.uk/cim-apprenticeships",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "The Marketing Trainer lists Market Research Executive in its current apprenticeship catalogue; LevyTate maps it to the Market research executive standard.",
+      "sourceUrls": [
+        "https://www.themarketingtrainer.co.uk/cim-apprenticeships"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-hbtc-customer-service-practitioner",
+      "providerId": "provider-hbtc",
+      "providerName": "HBTC",
+      "providerProgrammeName": "Customer Service Practitioner",
+      "standardTitle": "Customer service practitioner",
+      "standardCode": "ST0072",
+      "standardLevel": 2,
+      "standardVersion": "1.1",
+      "standardStatus": "Retired",
+      "programmeUrl": "https://www.hbtc.co.uk/product-category/training-provider/",
+      "providerCatalogueUrl": "https://www.hbtc.co.uk/product-category/training-provider/",
+      "status": "Defunded / unavailable for new starts",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "Yorkshire and the Humber"
+      ],
+      "programmeDescription": "HBTC lists Customer Service Practitioner in its current apprenticeship catalogue; LevyTate maps it to the Customer service practitioner standard.",
+      "sourceUrls": [
+        "https://www.hbtc.co.uk/product-category/training-provider/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-hbtc-customer-service-specialist",
+      "providerId": "provider-hbtc",
+      "providerName": "HBTC",
+      "providerProgrammeName": "Customer Service Specialist",
+      "standardTitle": "Customer service specialist",
+      "standardCode": "ST0071",
+      "standardLevel": 3,
+      "standardVersion": "1.3",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.hbtc.co.uk/product-category/training-provider/",
+      "providerCatalogueUrl": "https://www.hbtc.co.uk/product-category/training-provider/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "Yorkshire and the Humber"
+      ],
+      "programmeDescription": "HBTC lists Customer Service Specialist in its current apprenticeship catalogue; LevyTate maps it to the Customer service specialist standard.",
+      "sourceUrls": [
+        "https://www.hbtc.co.uk/product-category/training-provider/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-hbtc-business-admin",
+      "providerId": "provider-hbtc",
+      "providerName": "HBTC",
+      "providerProgrammeName": "Business Administration",
+      "standardTitle": "Business administrator",
+      "standardCode": "ST0070",
+      "standardLevel": 3,
+      "standardVersion": "1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.hbtc.co.uk/product-category/training-provider/",
+      "providerCatalogueUrl": "https://www.hbtc.co.uk/product-category/training-provider/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "Yorkshire and the Humber"
+      ],
+      "programmeDescription": "HBTC lists Business Administration in its current apprenticeship catalogue; LevyTate maps it to the Business administrator standard.",
+      "sourceUrls": [
+        "https://www.hbtc.co.uk/product-category/training-provider/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-hbtc-digital-support-technician",
+      "providerId": "provider-hbtc",
+      "providerName": "HBTC",
+      "providerProgrammeName": "Digital Support Technician",
+      "standardTitle": "Digital support technician",
+      "standardCode": "ST0120",
+      "standardLevel": 3,
+      "standardVersion": "1.1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.hbtc.co.uk/product-category/training-provider/",
+      "providerCatalogueUrl": "https://www.hbtc.co.uk/product-category/training-provider/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "Yorkshire and the Humber"
+      ],
+      "programmeDescription": "HBTC lists Digital Support Technician in its current apprenticeship catalogue; LevyTate maps it to the Digital support technician standard.",
+      "sourceUrls": [
+        "https://www.hbtc.co.uk/product-category/training-provider/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-hbtc-information-communications-technician",
+      "providerId": "provider-hbtc",
+      "providerName": "HBTC",
+      "providerProgrammeName": "Information Communications Technician",
+      "standardTitle": "Information communications technician",
+      "standardCode": "ST0973",
+      "standardLevel": 3,
+      "standardVersion": "1.2",
+      "standardStatus": "In development",
+      "programmeUrl": "https://www.hbtc.co.uk/product-category/training-provider/",
+      "providerCatalogueUrl": "https://www.hbtc.co.uk/product-category/training-provider/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "Yorkshire and the Humber"
+      ],
+      "programmeDescription": "HBTC lists Information Communications Technician in its current apprenticeship catalogue; LevyTate maps it to the Information communications technician standard.",
+      "sourceUrls": [
+        "https://www.hbtc.co.uk/product-category/training-provider/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-hbtc-multi-channel-marketer",
+      "providerId": "provider-hbtc",
+      "providerName": "HBTC",
+      "providerProgrammeName": "Multi-Channel Marketer",
+      "standardTitle": "Multi-channel marketer",
+      "standardCode": "ST1031",
+      "standardLevel": 3,
+      "standardVersion": "1.1",
+      "standardStatus": "In development",
+      "programmeUrl": "https://www.hbtc.co.uk/product-category/training-provider/",
+      "providerCatalogueUrl": "https://www.hbtc.co.uk/product-category/training-provider/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "Yorkshire and the Humber"
+      ],
+      "programmeDescription": "HBTC lists Multi-Channel Marketer in its current apprenticeship catalogue; LevyTate maps it to the Multi-channel marketer standard.",
+      "sourceUrls": [
+        "https://www.hbtc.co.uk/product-category/training-provider/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-hbtc-teaching-assistant",
+      "providerId": "provider-hbtc",
+      "providerName": "HBTC",
+      "providerProgrammeName": "Teaching Assistant",
+      "standardTitle": "Teaching assistant",
+      "standardCode": "ST0454",
+      "standardLevel": 3,
+      "standardVersion": "1.1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.hbtc.co.uk/product-category/training-provider/",
+      "providerCatalogueUrl": "https://www.hbtc.co.uk/product-category/training-provider/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "Yorkshire and the Humber"
+      ],
+      "programmeDescription": "HBTC lists Teaching Assistant in its current apprenticeship catalogue; LevyTate maps it to the Teaching assistant standard.",
+      "sourceUrls": [
+        "https://www.hbtc.co.uk/product-category/training-provider/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-hbtc-team-leader",
+      "providerId": "provider-hbtc",
+      "providerName": "HBTC",
+      "providerProgrammeName": "Team Leader",
+      "standardTitle": "Team leader",
+      "standardCode": "ST0384",
+      "standardLevel": 3,
+      "standardVersion": "1.4",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.hbtc.co.uk/product-category/training-provider/",
+      "providerCatalogueUrl": "https://www.hbtc.co.uk/product-category/training-provider/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "Yorkshire and the Humber"
+      ],
+      "programmeDescription": "HBTC lists Team Leader in its current apprenticeship catalogue; LevyTate maps it to the Team leader standard.",
+      "sourceUrls": [
+        "https://www.hbtc.co.uk/product-category/training-provider/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-staffs-chartered-manager-degree-apprenticeship",
+      "providerId": "provider-staffordshire-university",
+      "providerName": "Staffordshire University Apprenticeships",
+      "providerProgrammeName": "Chartered Manager Degree Apprenticeship",
+      "standardTitle": "Chartered manager (degree)",
+      "standardCode": "ST0272",
+      "standardLevel": 6,
+      "standardVersion": "1.1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "providerCatalogueUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "University delivery"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Staffordshire University Apprenticeships lists Chartered Manager Degree Apprenticeship in its current apprenticeship catalogue; LevyTate maps it to the Chartered manager (degree) standard.",
+      "sourceUrls": [
+        "https://www.staffs.ac.uk/apprenticeships/courses"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-staffs-project-manager",
+      "providerId": "provider-staffordshire-university",
+      "providerName": "Staffordshire University Apprenticeships",
+      "providerProgrammeName": "Project Manager Degree Apprenticeship",
+      "standardTitle": "Project manager (integrated degree)",
+      "standardCode": "ST0411",
+      "standardLevel": 6,
+      "standardVersion": "1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "providerCatalogueUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "University delivery"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Staffordshire University Apprenticeships lists Project Manager Degree Apprenticeship in its current apprenticeship catalogue; LevyTate maps it to the Project manager (integrated degree) standard.",
+      "sourceUrls": [
+        "https://www.staffs.ac.uk/apprenticeships/courses"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-staffs-senior-leader-apprenticeship",
+      "providerId": "provider-staffordshire-university",
+      "providerName": "Staffordshire University Apprenticeships",
+      "providerProgrammeName": "Senior Leader Apprenticeship",
+      "standardTitle": "Senior leader",
+      "standardCode": "ST0480",
+      "standardLevel": 7,
+      "standardVersion": "1.2",
+      "standardStatus": "Retired",
+      "programmeUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "providerCatalogueUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "status": "Defunded / unavailable for new starts",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "University delivery"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Staffordshire University Apprenticeships lists Senior Leader Apprenticeship in its current apprenticeship catalogue; LevyTate maps it to the Senior leader standard.",
+      "sourceUrls": [
+        "https://www.staffs.ac.uk/apprenticeships/courses"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-staffs-dtsp",
+      "providerId": "provider-staffordshire-university",
+      "providerName": "Staffordshire University Apprenticeships",
+      "providerProgrammeName": "Digital & Technology Solutions Professional Degree Apprenticeship",
+      "standardTitle": "Digital and technology solutions professional",
+      "standardCode": "ST0119",
+      "standardLevel": 6,
+      "standardVersion": "1.2",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "providerCatalogueUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "University delivery"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Staffordshire University Apprenticeships lists Digital & Technology Solutions Professional Degree Apprenticeship in its current apprenticeship catalogue; LevyTate maps it to the Digital and technology solutions professional standard.",
+      "sourceUrls": [
+        "https://www.staffs.ac.uk/apprenticeships/courses"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-staffs-social-worker-degree-apprenticeship",
+      "providerId": "provider-staffordshire-university",
+      "providerName": "Staffordshire University Apprenticeships",
+      "providerProgrammeName": "Social Worker Degree Apprenticeship",
+      "standardTitle": "Social worker (integrated degree)",
+      "standardCode": "ST0510",
+      "standardLevel": 6,
+      "standardVersion": "2",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "providerCatalogueUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "University delivery"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Staffordshire University Apprenticeships lists Social Worker Degree Apprenticeship in its current apprenticeship catalogue; LevyTate maps it to the Social worker (integrated degree) standard.",
+      "sourceUrls": [
+        "https://www.staffs.ac.uk/apprenticeships/courses"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-staffs-specialist-teaching-assistant-apprenticeship",
+      "providerId": "provider-staffordshire-university",
+      "providerName": "Staffordshire University Apprenticeships",
+      "providerProgrammeName": "Specialist Teaching Assistant Apprenticeship",
+      "standardTitle": "Specialist teaching assistant",
+      "standardCode": "ST1414",
+      "standardLevel": 5,
+      "standardVersion": "1.1",
+      "standardStatus": "In development",
+      "programmeUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "providerCatalogueUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "University delivery"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Staffordshire University Apprenticeships lists Specialist Teaching Assistant Apprenticeship in its current apprenticeship catalogue; LevyTate maps it to the Specialist teaching assistant standard.",
+      "sourceUrls": [
+        "https://www.staffs.ac.uk/apprenticeships/courses"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-staffs-teacher-apprenticeship-postgraduate",
+      "providerId": "provider-staffordshire-university",
+      "providerName": "Staffordshire University Apprenticeships",
+      "providerProgrammeName": "Teacher Apprenticeship Postgraduate",
+      "standardTitle": "Teacher - Postgraduate",
+      "standardCode": "ST0490",
+      "standardLevel": 6,
+      "standardVersion": "1.1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "providerCatalogueUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "University delivery"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Staffordshire University Apprenticeships lists Teacher Apprenticeship Postgraduate in its current apprenticeship catalogue; LevyTate maps it to the Teacher - Postgraduate standard.",
+      "sourceUrls": [
+        "https://www.staffs.ac.uk/apprenticeships/courses"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-staffs-teacher-degree-apprenticeship-undergraduate-secondary-mathematics",
+      "providerId": "provider-staffordshire-university",
+      "providerName": "Staffordshire University Apprenticeships",
+      "providerProgrammeName": "Teacher Degree Apprenticeship Undergraduate Secondary Mathematics",
+      "standardTitle": "Teacher - Undergraduate",
+      "standardCode": "ST1502",
+      "standardLevel": 6,
+      "standardVersion": "1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "providerCatalogueUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "University delivery"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Staffordshire University Apprenticeships lists Teacher Degree Apprenticeship Undergraduate Secondary Mathematics in its current apprenticeship catalogue; LevyTate maps it to the Teacher - Undergraduate standard.",
+      "sourceUrls": [
+        "https://www.staffs.ac.uk/apprenticeships/courses"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-staffs-biomedical-scientist-degree-apprenticeship",
+      "providerId": "provider-staffordshire-university",
+      "providerName": "Staffordshire University Apprenticeships",
+      "providerProgrammeName": "Biomedical Scientist Degree Apprenticeship",
+      "standardTitle": "Biomedical scientist",
+      "standardCode": "ST1314",
+      "standardLevel": 6,
+      "standardVersion": "2",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "providerCatalogueUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "University delivery"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Staffordshire University Apprenticeships lists Biomedical Scientist Degree Apprenticeship in its current apprenticeship catalogue; LevyTate maps it to the Biomedical scientist standard.",
+      "sourceUrls": [
+        "https://www.staffs.ac.uk/apprenticeships/courses"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-staffs-midwife-degree-apprenticeship",
+      "providerId": "provider-staffordshire-university",
+      "providerName": "Staffordshire University Apprenticeships",
+      "providerProgrammeName": "Midwife Degree Apprenticeship",
+      "standardTitle": "Midwife (2019 NMC standards) (Integrated degree)",
+      "standardCode": "ST0948",
+      "standardLevel": 6,
+      "standardVersion": "2",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "providerCatalogueUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "University delivery"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Staffordshire University Apprenticeships lists Midwife Degree Apprenticeship in its current apprenticeship catalogue; LevyTate maps it to the Midwife (2019 NMC standards) (Integrated degree) standard.",
+      "sourceUrls": [
+        "https://www.staffs.ac.uk/apprenticeships/courses"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-staffs-nursing-associate-apprenticeship",
+      "providerId": "provider-staffordshire-university",
+      "providerName": "Staffordshire University Apprenticeships",
+      "providerProgrammeName": "Nursing Associate Apprenticeship",
+      "standardTitle": "Nursing associate (NMC 2018)",
+      "standardCode": "ST0827",
+      "standardLevel": 5,
+      "standardVersion": "2",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "providerCatalogueUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "University delivery"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Staffordshire University Apprenticeships lists Nursing Associate Apprenticeship in its current apprenticeship catalogue; LevyTate maps it to the Nursing associate (NMC 2018) standard.",
+      "sourceUrls": [
+        "https://www.staffs.ac.uk/apprenticeships/courses"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-staffs-operating-department-practitioner-degree-apprenticeship",
+      "providerId": "provider-staffordshire-university",
+      "providerName": "Staffordshire University Apprenticeships",
+      "providerProgrammeName": "Operating Department Practitioner Degree Apprenticeship",
+      "standardTitle": "Operating department practitioner",
+      "standardCode": "ST0582",
+      "standardLevel": 6,
+      "standardVersion": "2",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "providerCatalogueUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "University delivery"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Staffordshire University Apprenticeships lists Operating Department Practitioner Degree Apprenticeship in its current apprenticeship catalogue; LevyTate maps it to the Operating department practitioner standard.",
+      "sourceUrls": [
+        "https://www.staffs.ac.uk/apprenticeships/courses"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-staffs-operating-department-practitioner-degree-apprenticeship-progression-route",
+      "providerId": "provider-staffordshire-university",
+      "providerName": "Staffordshire University Apprenticeships",
+      "providerProgrammeName": "Operating Department Practitioner Degree Apprenticeship Progression Route",
+      "standardTitle": "Operating department practitioner",
+      "standardCode": "ST0582",
+      "standardLevel": 6,
+      "standardVersion": "2",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "providerCatalogueUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "University delivery"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Staffordshire University Apprenticeships lists Operating Department Practitioner Degree Apprenticeship Progression Route in its current apprenticeship catalogue; LevyTate maps it to the Operating department practitioner standard.",
+      "sourceUrls": [
+        "https://www.staffs.ac.uk/apprenticeships/courses"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-staffs-paramedic-degree-apprenticeship",
+      "providerId": "provider-staffordshire-university",
+      "providerName": "Staffordshire University Apprenticeships",
+      "providerProgrammeName": "Paramedic Degree Apprenticeship",
+      "standardTitle": "Paramedic",
+      "standardCode": "ST0567",
+      "standardLevel": 6,
+      "standardVersion": "2",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "providerCatalogueUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "University delivery"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Staffordshire University Apprenticeships lists Paramedic Degree Apprenticeship in its current apprenticeship catalogue; LevyTate maps it to the Paramedic standard.",
+      "sourceUrls": [
+        "https://www.staffs.ac.uk/apprenticeships/courses"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-staffs-paramedic-degree-apprenticeship-progression-route",
+      "providerId": "provider-staffordshire-university",
+      "providerName": "Staffordshire University Apprenticeships",
+      "providerProgrammeName": "Paramedic Degree Apprenticeship Progression Route",
+      "standardTitle": "Paramedic",
+      "standardCode": "ST0567",
+      "standardLevel": 6,
+      "standardVersion": "2",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "providerCatalogueUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "University delivery"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Staffordshire University Apprenticeships lists Paramedic Degree Apprenticeship Progression Route in its current apprenticeship catalogue; LevyTate maps it to the Paramedic standard.",
+      "sourceUrls": [
+        "https://www.staffs.ac.uk/apprenticeships/courses"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-staffs-registered-nurse-degree-apprenticeship",
+      "providerId": "provider-staffordshire-university",
+      "providerName": "Staffordshire University Apprenticeships",
+      "providerProgrammeName": "Registered Nurse Degree Apprenticeship",
+      "standardTitle": "Registered nurse degree (NMC 2018)",
+      "standardCode": "ST0781",
+      "standardLevel": 6,
+      "standardVersion": "2",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "providerCatalogueUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "University delivery"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Staffordshire University Apprenticeships lists Registered Nurse Degree Apprenticeship in its current apprenticeship catalogue; LevyTate maps it to the Registered nurse degree (NMC 2018) standard.",
+      "sourceUrls": [
+        "https://www.staffs.ac.uk/apprenticeships/courses"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-staffs-registered-nurse-degree-apprenticeship-progression-route",
+      "providerId": "provider-staffordshire-university",
+      "providerName": "Staffordshire University Apprenticeships",
+      "providerProgrammeName": "Registered Nurse Degree Apprenticeship Progression Route",
+      "standardTitle": "Registered nurse degree (NMC 2018)",
+      "standardCode": "ST0781",
+      "standardLevel": 6,
+      "standardVersion": "2",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "providerCatalogueUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "University delivery"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Staffordshire University Apprenticeships lists Registered Nurse Degree Apprenticeship Progression Route in its current apprenticeship catalogue; LevyTate maps it to the Registered nurse degree (NMC 2018) standard.",
+      "sourceUrls": [
+        "https://www.staffs.ac.uk/apprenticeships/courses"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-staffs-embedded-electronic-systems",
+      "providerId": "provider-staffordshire-university",
+      "providerName": "Staffordshire University Apprenticeships",
+      "providerProgrammeName": "Embedded Electronic Systems Design and Development Engineer Degree Apprenticeship",
+      "standardTitle": "Embedded electronic systems design and development engineer (degree)",
+      "standardCode": "ST0151",
+      "standardLevel": 6,
+      "standardVersion": "1.3",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "providerCatalogueUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "University delivery"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Staffordshire University Apprenticeships lists Embedded Electronic Systems Design and Development Engineer Degree Apprenticeship in its current apprenticeship catalogue; LevyTate maps it to the Embedded electronic systems design and development engineer (degree) standard.",
+      "sourceUrls": [
+        "https://www.staffs.ac.uk/apprenticeships/courses"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-staffs-manufacturing-engineer",
+      "providerId": "provider-staffordshire-university",
+      "providerName": "Staffordshire University Apprenticeships",
+      "providerProgrammeName": "Manufacturing Engineer Degree Apprenticeship",
+      "standardTitle": "Manufacturing engineer (degree)",
+      "standardCode": "ST0025",
+      "standardLevel": 6,
+      "standardVersion": "1.2",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "providerCatalogueUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "University delivery"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Staffordshire University Apprenticeships lists Manufacturing Engineer Degree Apprenticeship in its current apprenticeship catalogue; LevyTate maps it to the Manufacturing engineer (degree) standard.",
+      "sourceUrls": [
+        "https://www.staffs.ac.uk/apprenticeships/courses"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-staffs-police-constable-degree-apprenticeship",
+      "providerId": "provider-staffordshire-university",
+      "providerName": "Staffordshire University Apprenticeships",
+      "providerProgrammeName": "Police Constable Degree Apprenticeship",
+      "standardTitle": "Police constable (integrated degree)",
+      "standardCode": "ST0304",
+      "standardLevel": 6,
+      "standardVersion": "1.2",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "providerCatalogueUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "University delivery"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Staffordshire University Apprenticeships lists Police Constable Degree Apprenticeship in its current apprenticeship catalogue; LevyTate maps it to the Police constable (integrated degree) standard.",
+      "sourceUrls": [
+        "https://www.staffs.ac.uk/apprenticeships/courses"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-staffs-serious-and-complex-crime-investigator-degree-apprenticeship",
+      "providerId": "provider-staffordshire-university",
+      "providerName": "Staffordshire University Apprenticeships",
+      "providerProgrammeName": "Serious and Complex Crime Investigator Degree Apprenticeship",
+      "standardTitle": "Serious and complex crime investigator (integrated degree)",
+      "standardCode": "ST0512",
+      "standardLevel": 6,
+      "standardVersion": "1.1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "providerCatalogueUrl": "https://www.staffs.ac.uk/apprenticeships/courses",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "University delivery"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Staffordshire University Apprenticeships lists Serious and Complex Crime Investigator Degree Apprenticeship in its current apprenticeship catalogue; LevyTate maps it to the Serious and complex crime investigator (integrated degree) standard.",
+      "sourceUrls": [
+        "https://www.staffs.ac.uk/apprenticeships/courses"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-lsp-customer-service-sales",
+      "providerId": "provider-learning-skills-partnership",
+      "providerName": "Learning Skills Partnership",
+      "providerProgrammeName": "Customer Service and Sales",
+      "standardTitle": "",
+      "standardCode": "",
+      "standardLevel": null,
+      "standardVersion": "",
+      "standardStatus": "Unmapped",
+      "programmeUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "providerCatalogueUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "status": "Not available",
+      "recordStatus": "Archived",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Historical umbrella record replaced by standard-specific provider programmes.",
+      "sourceUrls": [
+        "https://www.learningskillspartnership.com/apprenticeships-available"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Needs manual review"
+    },
+    {
+      "id": "programme-lsp-business-administration",
+      "providerId": "provider-learning-skills-partnership",
+      "providerName": "Learning Skills Partnership",
+      "providerProgrammeName": "Business and Administration",
+      "standardTitle": "",
+      "standardCode": "",
+      "standardLevel": null,
+      "standardVersion": "",
+      "standardStatus": "Unmapped",
+      "programmeUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "providerCatalogueUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "status": "Not available",
+      "recordStatus": "Archived",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Historical umbrella record replaced by standard-specific provider programmes.",
+      "sourceUrls": [
+        "https://www.learningskillspartnership.com/apprenticeships-available"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Needs manual review"
+    },
+    {
+      "id": "programme-lsp-professional-accounting-technician",
+      "providerId": "provider-learning-skills-partnership",
+      "providerName": "Learning Skills Partnership",
+      "providerProgrammeName": "Professional Accounting Technician",
+      "standardTitle": "Professional accounting technician",
+      "standardCode": "ST0003",
+      "standardLevel": 4,
+      "standardVersion": "1.2",
+      "standardStatus": "In development",
+      "programmeUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "providerCatalogueUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Skills Partnership lists Professional Accounting Technician in its current apprenticeship catalogue; LevyTate maps it to the Professional accounting technician standard.",
+      "sourceUrls": [
+        "https://www.learningskillspartnership.com/apprenticeships-available"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-lsp-operations-manager",
+      "providerId": "provider-learning-skills-partnership",
+      "providerName": "Learning Skills Partnership",
+      "providerProgrammeName": "Operations Manager",
+      "standardTitle": "Operations manager",
+      "standardCode": "ST0385",
+      "standardLevel": 5,
+      "standardVersion": "1.4",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "providerCatalogueUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Skills Partnership lists Operations Manager in its current apprenticeship catalogue; LevyTate maps it to the Operations manager standard.",
+      "sourceUrls": [
+        "https://www.learningskillspartnership.com/apprenticeships-available"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-lsp-accounts-or-finance-assistant",
+      "providerId": "provider-learning-skills-partnership",
+      "providerName": "Learning Skills Partnership",
+      "providerProgrammeName": "Accounts or Finance Assistant",
+      "standardTitle": "Accounts or finance assistant",
+      "standardCode": "ST0608",
+      "standardLevel": 2,
+      "standardVersion": "1.4",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "providerCatalogueUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Skills Partnership lists Accounts or Finance Assistant in its current apprenticeship catalogue; LevyTate maps it to the Accounts or finance assistant standard.",
+      "sourceUrls": [
+        "https://www.learningskillspartnership.com/apprenticeships-available"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-lsp-assistant-accountant",
+      "providerId": "provider-learning-skills-partnership",
+      "providerName": "Learning Skills Partnership",
+      "providerProgrammeName": "Assistant Accountant",
+      "standardTitle": "Assistant accountant",
+      "standardCode": "ST0002",
+      "standardLevel": 3,
+      "standardVersion": "1.2",
+      "standardStatus": "In development",
+      "programmeUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "providerCatalogueUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Skills Partnership lists Assistant Accountant in its current apprenticeship catalogue; LevyTate maps it to the Assistant accountant standard.",
+      "sourceUrls": [
+        "https://www.learningskillspartnership.com/apprenticeships-available"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-lsp-business-administrator",
+      "providerId": "provider-learning-skills-partnership",
+      "providerName": "Learning Skills Partnership",
+      "providerProgrammeName": "Business Administrator",
+      "standardTitle": "Business administrator",
+      "standardCode": "ST0070",
+      "standardLevel": 3,
+      "standardVersion": "1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "providerCatalogueUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Skills Partnership lists Business Administrator in its current apprenticeship catalogue; LevyTate maps it to the Business administrator standard.",
+      "sourceUrls": [
+        "https://www.learningskillspartnership.com/apprenticeships-available"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-lsp-team-leader",
+      "providerId": "provider-learning-skills-partnership",
+      "providerName": "Learning Skills Partnership",
+      "providerProgrammeName": "Team Leader",
+      "standardTitle": "Team leader",
+      "standardCode": "ST0384",
+      "standardLevel": 3,
+      "standardVersion": "1.4",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "providerCatalogueUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Skills Partnership lists Team Leader in its current apprenticeship catalogue; LevyTate maps it to the Team leader standard.",
+      "sourceUrls": [
+        "https://www.learningskillspartnership.com/apprenticeships-available"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-lsp-trade-supplier",
+      "providerId": "provider-learning-skills-partnership",
+      "providerName": "Learning Skills Partnership",
+      "providerProgrammeName": "Trade Supplier",
+      "standardTitle": "Trade supplier",
+      "standardCode": "ST0334",
+      "standardLevel": 2,
+      "standardVersion": "1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "providerCatalogueUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Skills Partnership lists Trade Supplier in its current apprenticeship catalogue; LevyTate maps it to the Trade supplier standard.",
+      "sourceUrls": [
+        "https://www.learningskillspartnership.com/apprenticeships-available"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-lsp-customer-service-practitioner",
+      "providerId": "provider-learning-skills-partnership",
+      "providerName": "Learning Skills Partnership",
+      "providerProgrammeName": "Customer Service Practitioner",
+      "standardTitle": "Customer service practitioner",
+      "standardCode": "ST0072",
+      "standardLevel": 2,
+      "standardVersion": "1.1",
+      "standardStatus": "Retired",
+      "programmeUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "providerCatalogueUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "status": "Defunded / unavailable for new starts",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Skills Partnership lists Customer Service Practitioner in its current apprenticeship catalogue; LevyTate maps it to the Customer service practitioner standard.",
+      "sourceUrls": [
+        "https://www.learningskillspartnership.com/apprenticeships-available"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-lsp-customer-service-specialist",
+      "providerId": "provider-learning-skills-partnership",
+      "providerName": "Learning Skills Partnership",
+      "providerProgrammeName": "Customer Service Specialist",
+      "standardTitle": "Customer service specialist",
+      "standardCode": "ST0071",
+      "standardLevel": 3,
+      "standardVersion": "1.3",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "providerCatalogueUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Skills Partnership lists Customer Service Specialist in its current apprenticeship catalogue; LevyTate maps it to the Customer service specialist standard.",
+      "sourceUrls": [
+        "https://www.learningskillspartnership.com/apprenticeships-available"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-lsp-construction-quantity-surveying-technician",
+      "providerId": "provider-learning-skills-partnership",
+      "providerName": "Learning Skills Partnership",
+      "providerProgrammeName": "Construction Quantity Surveying Technician",
+      "standardTitle": "Construction quantity surveying technician",
+      "standardCode": "ST0049",
+      "standardLevel": 4,
+      "standardVersion": "1.1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "providerCatalogueUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Skills Partnership lists Construction Quantity Surveying Technician in its current apprenticeship catalogue; LevyTate maps it to the Construction quantity surveying technician standard.",
+      "sourceUrls": [
+        "https://www.learningskillspartnership.com/apprenticeships-available"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-lsp-civil-engineering-senior-technician",
+      "providerId": "provider-learning-skills-partnership",
+      "providerName": "Learning Skills Partnership",
+      "providerProgrammeName": "Civil Engineering Senior Technician",
+      "standardTitle": "Civil engineering senior technician",
+      "standardCode": "ST0046",
+      "standardLevel": 4,
+      "standardVersion": "1.3",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "providerCatalogueUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Skills Partnership lists Civil Engineering Senior Technician in its current apprenticeship catalogue; LevyTate maps it to the Civil engineering senior technician standard.",
+      "sourceUrls": [
+        "https://www.learningskillspartnership.com/apprenticeships-available"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-lsp-construction-site-supervisor",
+      "providerId": "provider-learning-skills-partnership",
+      "providerName": "Learning Skills Partnership",
+      "providerProgrammeName": "Construction Site Supervisor",
+      "standardTitle": "Construction site supervisor",
+      "standardCode": "ST0048",
+      "standardLevel": 4,
+      "standardVersion": "1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "providerCatalogueUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Skills Partnership lists Construction Site Supervisor in its current apprenticeship catalogue; LevyTate maps it to the Construction site supervisor standard.",
+      "sourceUrls": [
+        "https://www.learningskillspartnership.com/apprenticeships-available"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-lsp-construction-design-and-build-technician",
+      "providerId": "provider-learning-skills-partnership",
+      "providerName": "Learning Skills Partnership",
+      "providerProgrammeName": "Construction Design and Build Technician",
+      "standardTitle": "Construction design and build technician",
+      "standardCode": "ST0043",
+      "standardLevel": 4,
+      "standardVersion": "1.1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "providerCatalogueUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Skills Partnership lists Construction Design and Build Technician in its current apprenticeship catalogue; LevyTate maps it to the Construction design and build technician standard.",
+      "sourceUrls": [
+        "https://www.learningskillspartnership.com/apprenticeships-available"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-lsp-civil-engineering-technician",
+      "providerId": "provider-learning-skills-partnership",
+      "providerName": "Learning Skills Partnership",
+      "providerProgrammeName": "Civil Engineering Technician",
+      "standardTitle": "Civil engineering technician",
+      "standardCode": "ST0091",
+      "standardLevel": 3,
+      "standardVersion": "1.1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "providerCatalogueUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Skills Partnership lists Civil Engineering Technician in its current apprenticeship catalogue; LevyTate maps it to the Civil engineering technician standard.",
+      "sourceUrls": [
+        "https://www.learningskillspartnership.com/apprenticeships-available"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-lsp-construction-support-technician",
+      "providerId": "provider-learning-skills-partnership",
+      "providerName": "Learning Skills Partnership",
+      "providerProgrammeName": "Construction Support Technician",
+      "standardTitle": "Construction support technician",
+      "standardCode": "ST0960",
+      "standardLevel": 3,
+      "standardVersion": "1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "providerCatalogueUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Skills Partnership lists Construction Support Technician in its current apprenticeship catalogue; LevyTate maps it to the Construction support technician standard.",
+      "sourceUrls": [
+        "https://www.learningskillspartnership.com/apprenticeships-available"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-lsp-digital-engineering-technician",
+      "providerId": "provider-learning-skills-partnership",
+      "providerName": "Learning Skills Partnership",
+      "providerProgrammeName": "Digital Engineering Technician",
+      "standardTitle": "Digital engineering technician",
+      "standardCode": "ST0266",
+      "standardLevel": 3,
+      "standardVersion": "1.1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "providerCatalogueUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Skills Partnership lists Digital Engineering Technician in its current apprenticeship catalogue; LevyTate maps it to the Digital engineering technician standard.",
+      "sourceUrls": [
+        "https://www.learningskillspartnership.com/apprenticeships-available"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-lsp-surveying-technician",
+      "providerId": "provider-learning-skills-partnership",
+      "providerName": "Learning Skills Partnership",
+      "providerProgrammeName": "Surveying Technician",
+      "standardTitle": "Surveying technician",
+      "standardCode": "ST0332",
+      "standardLevel": 3,
+      "standardVersion": "1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "providerCatalogueUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Skills Partnership lists Surveying Technician in its current apprenticeship catalogue; LevyTate maps it to the Surveying technician standard.",
+      "sourceUrls": [
+        "https://www.learningskillspartnership.com/apprenticeships-available"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-lsp-associate-project-manager",
+      "providerId": "provider-learning-skills-partnership",
+      "providerName": "Learning Skills Partnership",
+      "providerProgrammeName": "Associate Project Manager",
+      "standardTitle": "Associate project manager",
+      "standardCode": "ST0310",
+      "standardLevel": 4,
+      "standardVersion": "1.5",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "providerCatalogueUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Skills Partnership lists Associate Project Manager in its current apprenticeship catalogue; LevyTate maps it to the Associate project manager standard.",
+      "sourceUrls": [
+        "https://www.learningskillspartnership.com/apprenticeships-available"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-lsp-project-controls-technician",
+      "providerId": "provider-learning-skills-partnership",
+      "providerName": "Learning Skills Partnership",
+      "providerProgrammeName": "Project Controls Technician",
+      "standardTitle": "Project controls technician",
+      "standardCode": "ST0163",
+      "standardLevel": 3,
+      "standardVersion": "1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "providerCatalogueUrl": "https://www.learningskillspartnership.com/apprenticeships-available",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "Learning Skills Partnership lists Project Controls Technician in its current apprenticeship catalogue; LevyTate maps it to the Project controls technician standard.",
+      "sourceUrls": [
+        "https://www.learningskillspartnership.com/apprenticeships-available"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-srscc-procurement-supply-assistant",
+      "providerId": "provider-srscc",
+      "providerName": "SRSCC",
+      "providerProgrammeName": "Procurement and Supply Assistant",
+      "standardTitle": "Procurement and supply assistant",
+      "standardCode": "ST0810",
+      "standardLevel": 3,
+      "standardVersion": "1.1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.srscc.co.uk/apprenticeships/",
+      "providerCatalogueUrl": "https://www.srscc.co.uk/apprenticeships/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "SRSCC lists Procurement and Supply Assistant in its current apprenticeship catalogue; LevyTate maps it to the Procurement and supply assistant standard.",
+      "sourceUrls": [
+        "https://www.srscc.co.uk/apprenticeships/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-srscc-supply-chain-practitioner",
+      "providerId": "provider-srscc",
+      "providerName": "SRSCC",
+      "providerProgrammeName": "Supply Chain Practitioner",
+      "standardTitle": "Supply chain practitioner (fast-moving consumer goods (FMCG))",
+      "standardCode": "ST0201",
+      "standardLevel": 3,
+      "standardVersion": "1.1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.srscc.co.uk/apprenticeships/",
+      "providerCatalogueUrl": "https://www.srscc.co.uk/apprenticeships/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "SRSCC lists Supply Chain Practitioner in its current apprenticeship catalogue; LevyTate maps it to the Supply chain practitioner (fast-moving consumer goods (FMCG)) standard.",
+      "sourceUrls": [
+        "https://www.srscc.co.uk/apprenticeships/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-srscc-procurement-supply-chain-practitioner",
+      "providerId": "provider-srscc",
+      "providerName": "SRSCC",
+      "providerProgrammeName": "Procurement and Supply Chain Practitioner",
+      "standardTitle": "Procurement and supply chain practitioner",
+      "standardCode": "ST0313",
+      "standardLevel": 4,
+      "standardVersion": "2.3",
+      "standardStatus": "Retired",
+      "programmeUrl": "https://www.srscc.co.uk/apprenticeships/",
+      "providerCatalogueUrl": "https://www.srscc.co.uk/apprenticeships/",
+      "status": "Defunded / unavailable for new starts",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "SRSCC lists Procurement and Supply Chain Practitioner in its current apprenticeship catalogue; LevyTate maps it to the Procurement and supply chain practitioner standard.",
+      "sourceUrls": [
+        "https://www.srscc.co.uk/apprenticeships/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    },
+    {
+      "id": "programme-srscc-senior-procurement-supply-chain-professional",
+      "providerId": "provider-srscc",
+      "providerName": "SRSCC",
+      "providerProgrammeName": "Senior Procurement and Supply Chain Professional",
+      "standardTitle": "Senior procurement and supply chain professional",
+      "standardCode": "ST0811",
+      "standardLevel": 6,
+      "standardVersion": "1",
+      "standardStatus": "Live",
+      "programmeUrl": "https://www.srscc.co.uk/apprenticeships/",
+      "providerCatalogueUrl": "https://www.srscc.co.uk/apprenticeships/",
+      "status": "Active",
+      "recordStatus": "Active",
+      "deliveryModels": [
+        "Online",
+        "Blended",
+        "Workplace learning"
+      ],
+      "regions": [
+        "England"
+      ],
+      "programmeDescription": "SRSCC lists Senior Procurement and Supply Chain Professional in its current apprenticeship catalogue; LevyTate maps it to the Senior procurement and supply chain professional standard.",
+      "sourceUrls": [
+        "https://www.srscc.co.uk/apprenticeships/"
+      ],
+      "verifiedAt": "2026-08-26",
+      "verificationStatus": "Verified"
+    }
+  ]
+}

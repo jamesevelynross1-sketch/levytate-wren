@@ -293,7 +293,8 @@ export function classifyOperationalCopilotQuery(
     && !/\b(team|direct reports?|represented|activity|active learners?|performance|reviews?|issues?)\b/.test(text)) {
     const level = text.match(/\blevel\s*(\d+)\b/)?.[1];
     const deliveryModel = text.match(/\b(remote|online|blended|classroom|workplace(?: learning)?)\b/)?.[1];
-    const query = /\bdata analyst\b/.test(text) ? "data analyst" : /\bai\b|artificial intelligence/.test(text) ? "ai" : undefined;
+    const namedProvider = text.match(/\b(?:does|do)\s+([a-z0-9&.' -]+?)\s+(?:offer|provide)\b/)?.[1]?.trim();
+    const query = /\bdata analyst\b/.test(text) ? "data analyst" : /\bai\b|artificial intelligence/.test(text) ? "ai" : namedProvider;
     return { intent: "programme_directory", filters: { query, level, deliveryModel, region: /\bnational|nationally\b/.test(text) ? "national" : undefined }, direct: true };
   }
   if (/\b(only|just)\b.*\bsignificantly behind\b|\bsignificantly behind\b/.test(text) && prior === "learners_behind_target") {
@@ -828,6 +829,7 @@ export async function getProgrammeDirectory(
     })
     .filter((item): item is NonNullable<typeof item> => Boolean(item))
     .filter((item) => !query || (query === "ai" ? /\b(ai|artificial intelligence)\b/.test(item.index) : item.index.includes(query)))
+    .filter((item) => !filters.provider || item.provider.providerName.toLowerCase() === filters.provider.toLowerCase())
     .filter((item) => !filters.level || String(item.level) === filters.level)
     .filter((item) => !filters.deliveryModel || item.delivery.some((value) => value.toLowerCase().includes(filters.deliveryModel!.toLowerCase())))
     .filter((item) => filters.region !== "national" || item.national)

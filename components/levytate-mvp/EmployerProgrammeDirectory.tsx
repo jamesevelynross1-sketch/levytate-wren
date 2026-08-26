@@ -33,6 +33,7 @@ type Filters = {
 
 const emptyFilters: Filters = { search: "", level: "All", provider: "All", delivery: "All", location: "All", category: "All" };
 const missingInformation = "Further programme information is being reviewed.";
+const directoryPageSize = 24;
 
 function clean(value: string | undefined | null) {
   return value?.trim() || "";
@@ -108,6 +109,7 @@ export function EmployerProgrammeDirectory() {
   const [programmeId, setProgrammeId] = useState<string | null>(null);
   const [providerId, setProviderId] = useState<string | null>(null);
   const [comparison, setComparison] = useState<string[]>([]);
+  const [visibleCount, setVisibleCount] = useState(directoryPageSize);
 
   const directory = useMemo(() => data.providerProgrammes
     .filter((programme) => programme.recordStatus === "Active" && programme.status === "Active")
@@ -150,6 +152,9 @@ export function EmployerProgrammeDirectory() {
       && (filters.location === "All" || coverageLabel(item.programme, item.provider) === filters.location)
       && (filters.category === "All" || categoryLabel(item) === filters.category);
   }), [directory, filters]);
+  const visibleResults = results.slice(0, visibleCount);
+
+  useEffect(() => setVisibleCount(directoryPageSize), [filters]);
 
   const selectedProgramme = programmeId ? directory.find((item) => item.programme.id === programmeId) ?? null : null;
   const selectedProvider = providerId ? data.providers.find((provider) => provider.providerId === providerId && provider.status === "Active") ?? null : null;
@@ -226,9 +231,11 @@ export function EmployerProgrammeDirectory() {
 
       {results.length ? (
         <section aria-label="Programme results" className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {results.map((item) => <ProgrammeCard key={item.programme.id} item={item} compared={comparison.includes(item.programme.id)} onOpen={() => openProgramme(item.programme.id)} onCompare={() => toggleComparison(item.programme.id)} />)}
+          {visibleResults.map((item) => <ProgrammeCard key={item.programme.id} item={item} compared={comparison.includes(item.programme.id)} onOpen={() => openProgramme(item.programme.id)} onCompare={() => toggleComparison(item.programme.id)} />)}
         </section>
       ) : <p className="rounded-2xl border border-dashed border-[#102c3d]/15 py-12 text-center text-sm text-[#102c3d]/55">No programmes match the selected filters.</p>}
+
+      {visibleResults.length < results.length ? <button type="button" onClick={() => setVisibleCount((current) => Math.min(current + directoryPageSize, results.length))} className="mx-auto min-h-11 rounded-full border border-[#102c3d]/10 bg-white px-5 text-sm font-semibold text-[#102c3d] hover:bg-[#edf7f3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159b8f]">Load more programmes</button> : null}
 
       {compared.length ? <ProgrammeComparison items={compared} onRemove={toggleComparison} onOpen={openProgramme} /> : null}
     </div>
