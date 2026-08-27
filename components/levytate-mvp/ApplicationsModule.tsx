@@ -18,6 +18,7 @@ import {
   TableHead,
   TableShell,
 } from "@/components/levytate-mvp/MvpUi";
+import { OperationalMetricRail, StageTracker } from "@/components/levytate-mvp/OperationalVisuals";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { displayEmployee, includesSearch, statusTone } from "@/components/levytate-mvp/module-utils";
 import { managerName } from "@/lib/levytate/mvp/workspace-insights";
@@ -177,13 +178,13 @@ export function ApplicationsModule({
   }
 
   return (
-    <div className="grid gap-5">
-      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <QueueCard label="Active applications" value={queueSummary.total} copy="Requests progressing through the live workflow." />
-        <QueueCard label="Manager review" value={queueSummary.manager} copy="Awaiting a line manager decision." tone="yellow" />
-        <QueueCard label="Lead review" value={queueSummary.lead} copy="Approved by managers and waiting for final approval." tone="yellow" />
-        <QueueCard label="Ready for enrolment" value={queueSummary.enrolment} copy="Approved applications ready for provider allocation." tone="green" />
-      </section>
+    <div className="grid min-w-0 gap-5">
+      <OperationalMetricRail items={[
+        { label: "Active applications", value: queueSummary.total },
+        { label: "Manager review", value: queueSummary.manager, tone: "watch" },
+        { label: "Lead review", value: queueSummary.lead, tone: "watch" },
+        { label: "Ready for enrolment", value: queueSummary.enrolment, tone: "healthy" },
+      ]} />
 
       <MvpPanel title="Applications" eyebrow="Approval workflow">
         <MvpToolbar
@@ -221,15 +222,15 @@ export function ApplicationsModule({
                   <tr key={application.id}>
                     <td className="px-4 py-3">
                       <p className="font-semibold">{displayEmployee(employee)}</p>
-                      <p className="mt-0.5 text-xs text-[#102c3d]/46">{employee?.department || "Department to confirm"} · {employee?.site || "Site to confirm"}</p>
+                      <p className="mt-0.5 text-xs text-[#102c3d]/[0.46]">{employee?.department || "Department to confirm"} · {employee?.site || "Site to confirm"}</p>
                     </td>
                     <td className="px-4 py-3">
-                      <p className="text-[#102c3d]/72">{standard?.title ?? application.apprenticeshipStandardId}</p>
-                      <p className="mt-0.5 text-xs text-[#102c3d]/42">{standard?.referenceCode ?? "Reference to confirm"}</p>
+                      <p className="text-[#102c3d]/[0.72]">{standard?.title ?? application.apprenticeshipStandardId}</p>
+                      <p className="mt-0.5 text-xs text-[#102c3d]/[0.42]">{standard?.referenceCode ?? "Reference to confirm"}</p>
                     </td>
-                    <td className="px-4 py-3"><StatusBadge tone="blue">{application.currentOwner}</StatusBadge></td>
-                    <td className="px-4 py-3"><StatusBadge tone={statusTone(application.status)}>{application.status}</StatusBadge></td>
-                    <td className="px-4 py-3 text-[#102c3d]/54">{application.submittedAt.slice(0, 10)}</td>
+                    <td className="px-4 py-3"><p className="text-sm font-semibold text-[#102c3d]">{application.currentOwner}</p></td>
+                    <td className="px-4 py-3"><StatusBadge tone={statusTone(application.status)}>{application.status}</StatusBadge><p className="mt-1 text-xs text-[#102c3d]/[0.45]">Stage {applicationStage(application.status) + 1} of 4</p></td>
+                    <td className="px-4 py-3 text-[#102c3d]/[0.54]">{application.submittedAt.slice(0, 10)}</td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-2">
                         <TableAction onClick={() => setSelectedId(application.id)}>View</TableAction>
@@ -352,12 +353,12 @@ function LineManagerApprovalsModule({ onOpenDirectReport, initialApplicationId, 
   const selectionFailed = Boolean(selectedId && !selectedApplication);
 
   return (
-    <div className="grid gap-5">
-      <section className="grid gap-3 md:grid-cols-3">
-        <QueueCard label="Awaiting review" value={queue.length} copy="Direct-report applications requiring your decision." tone={queue.length ? "yellow" : "green"} />
-        <QueueCard label="Returned to employee" value={supportCount} copy="Applications waiting for employee updates before you can decide." tone={supportCount ? "yellow" : "green"} />
-        <QueueCard label="Direct reports" value={directReports.length} copy="Your scoped team view in this workspace." />
-      </section>
+    <div className="grid min-w-0 gap-5">
+      <OperationalMetricRail items={[
+        { label: "Awaiting review", value: queue.length, tone: queue.length ? "watch" : "healthy" },
+        { label: "Returned to employee", value: supportCount, tone: supportCount ? "watch" : "healthy" },
+        { label: "Direct reports", value: directReports.length },
+      ]} />
 
       <MvpPanel title="Approvals" eyebrow="Line manager review">
         {selectionFailed ? (
@@ -378,13 +379,13 @@ function LineManagerApprovalsModule({ onOpenDirectReport, initialApplicationId, 
                         <h3 className="text-base font-semibold text-[#102c3d]">{displayEmployee(employee)}</h3>
                         <StatusBadge tone={statusTone(application.status)}>{application.status}</StatusBadge>
                       </div>
-                      <p className="mt-1 text-sm leading-6 text-[#102c3d]/58">{employee?.jobTitle || "Role to confirm"} - {employee?.department || "Department to confirm"} - {employee?.site || "Site to confirm"}</p>
+                      <p className="mt-1 text-sm leading-6 text-[#102c3d]/[0.58]">{employee?.jobTitle || "Role to confirm"} - {employee?.department || "Department to confirm"} - {employee?.site || "Site to confirm"}</p>
                       <p className="mt-3 text-sm font-semibold text-[#102c3d]">{standard?.title ?? application.apprenticeshipStandardId}</p>
-                      <p className="mt-1 line-clamp-2 text-sm leading-6 text-[#102c3d]/58">{application.reason || "No reason recorded yet."}</p>
-                      <p className="mt-2 text-xs font-medium text-[#102c3d]/42">Submitted {application.submittedAt.slice(0, 10)}</p>
+                      <p className="mt-1 line-clamp-2 text-sm leading-6 text-[#102c3d]/[0.58]">{application.reason || "No reason recorded yet."}</p>
+                      <p className="mt-2 text-xs font-medium text-[#102c3d]/[0.42]">Submitted {application.submittedAt.slice(0, 10)}</p>
                     </div>
                     <div className="flex flex-col items-stretch gap-2">
-                      <button type="button" onClick={() => selectApplication(application.id)} className="h-10 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/15">
+                      <button type="button" onClick={() => selectApplication(application.id)} className="h-10 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/[0.15]">
                         Review application
                       </button>
                       {employee ? <button type="button" onClick={() => onOpenDirectReport?.(employee.id)} className="px-2 py-1 text-xs font-semibold text-[#0b766b] transition hover:text-[#102c3d]">View apprenticeship journey</button> : null}
@@ -397,7 +398,7 @@ function LineManagerApprovalsModule({ onOpenDirectReport, initialApplicationId, 
         ) : (
           <div className="rounded-xl border border-dashed border-[#102c3d]/[0.14] bg-[#f8fbfa] px-5 py-10 text-center">
             <h3 className="text-base font-semibold text-[#102c3d]">No applications awaiting review</h3>
-            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#102c3d]/56">Applications will appear here only when a direct report has submitted or resubmitted a request for your decision.</p>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#102c3d]/[0.56]">Applications will appear here only when a direct report has submitted or resubmitted a request for your decision.</p>
           </div>
         )}
       </MvpPanel>
@@ -494,6 +495,7 @@ function ManagerReviewModal({ application, managerName: reviewerName, onClose, o
 
   return (
     <MvpModal title="Review application" eyebrow="Line manager decision" onClose={onClose} wide>
+      <div className="mb-5 border-y border-[#102c3d]/[0.07] py-4"><StageTracker stages={["Employee", "Manager", "Apprenticeship Lead", "Enrolment"]} currentIndex={applicationStage(application.status)} tone={application.status === "More information requested" ? "watch" : "info"} exceptionalStatus={application.status.startsWith("Declined") ? { label: application.status, tone: "risk" } : undefined} /></div>
       <div className="grid gap-5 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
         <div className="grid gap-4">
           <ReviewSection title="Employee">
@@ -509,7 +511,7 @@ function ManagerReviewModal({ application, managerName: reviewerName, onClose, o
 
           <ReviewSection title="Programme">
             <h3 className="text-lg font-semibold text-[#102c3d]">{programme?.programmeName ?? standard?.title ?? application.apprenticeshipStandardId}</h3>
-            <p className="mt-2 text-sm leading-6 text-[#102c3d]/58">{programme?.shortDescription || standard?.overview || "Programme summary will be confirmed by the Apprenticeship Lead."}</p>
+            <p className="mt-2 text-sm leading-6 text-[#102c3d]/[0.58]">{programme?.shortDescription || standard?.overview || "Programme summary will be confirmed by the Apprenticeship Lead."}</p>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <ReviewFact label="Provider" value={data.providers.find((provider) => provider.providerId === programme?.providerId)?.providerName ?? "Provider to confirm"} />
               <ReviewFact label="Duration" value={programme?.duration || standard?.typicalDuration || "Duration to confirm"} />
@@ -517,8 +519,8 @@ function ManagerReviewModal({ application, managerName: reviewerName, onClose, o
               <ReviewFact label="Time commitment" value="Manager to confirm protected learning time" />
             </div>
             <details className="mt-4 rounded-xl border border-[#102c3d]/[0.07] bg-white">
-              <summary className="cursor-pointer list-none px-4 py-3 text-xs font-semibold text-[#102c3d]/62">Funding and standard details</summary>
-              <div className="border-t border-[#102c3d]/[0.06] px-4 py-3 text-sm leading-6 text-[#102c3d]/58">
+              <summary className="cursor-pointer list-none px-4 py-3 text-xs font-semibold text-[#102c3d]/[0.62]">Funding and standard details</summary>
+              <div className="border-t border-[#102c3d]/[0.06] px-4 py-3 text-sm leading-6 text-[#102c3d]/[0.58]">
                 <p>{standard ? `Level ${standard.level} - ${standard.title} - ${standard.referenceCode}` : application.apprenticeshipStandardId}</p>
                 <p>{mapping?.fundingRoute ?? programme?.fundingRoute ?? "Potential funding route to confirm"}</p>
               </div>
@@ -526,7 +528,7 @@ function ManagerReviewModal({ application, managerName: reviewerName, onClose, o
           </ReviewSection>
 
           <ReviewSection title="Why this may fit">
-            <p className="text-sm leading-6 text-[#102c3d]/62">
+            <p className="text-sm leading-6 text-[#102c3d]/[0.62]">
               LevyTate identified a credible alignment between the {employee?.jobTitle || "current role"} responsibilities held by {employee?.name ?? "the employee"} and {standard?.title ?? "the selected programme"}. The manager should still confirm workload, role relevance and available support before approving.
             </p>
             <div className="mt-4 grid gap-3">
@@ -554,7 +556,7 @@ function ManagerReviewModal({ application, managerName: reviewerName, onClose, o
           </ReviewSection>
 
           <ReviewSection title="Manager considerations">
-            <ul className="grid gap-2 text-sm leading-6 text-[#102c3d]/62">
+            <ul className="grid gap-2 text-sm leading-6 text-[#102c3d]/[0.62]">
               {[
                 "Is the programme relevant to the employee's current or planned role?",
                 "Can the learning be applied in the workplace?",
@@ -568,7 +570,7 @@ function ManagerReviewModal({ application, managerName: reviewerName, onClose, o
 
           <ReviewSection title="Decision">
             {confirmation ? (
-              <div className="rounded-xl bg-[#edf7f3] p-4 text-sm font-semibold leading-6 text-[#0b6f63] ring-1 ring-[#159b8f]/15">{confirmation}</div>
+              <div className="rounded-xl bg-[#edf7f3] p-4 text-sm font-semibold leading-6 text-[#0b6f63] ring-1 ring-[#159b8f]/[0.15]">{confirmation}</div>
             ) : null}
             {!confirmation && canDecide ? (
               <form onSubmit={submitDecision}>
@@ -601,12 +603,12 @@ function ManagerReviewModal({ application, managerName: reviewerName, onClose, o
                 ) : null}
 
                 <div className="mt-4 flex flex-col gap-3 border-t border-[#102c3d]/[0.07] pt-4 sm:flex-row sm:items-center sm:justify-between">
-                  {error ? <p className="text-xs font-semibold text-[#b53c52]">{error}</p> : <p className="text-xs leading-5 text-[#102c3d]/48">Your decision will be recorded in the application history.</p>}
+                  {error ? <p className="text-xs font-semibold text-[#b53c52]">{error}</p> : <p className="text-xs leading-5 text-[#102c3d]/[0.48]">Your decision will be recorded in the application history.</p>}
                   <button className="h-10 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white">Confirm decision</button>
                 </div>
               </form>
             ) : null}
-            {!canDecide && !confirmation ? <p className="text-sm leading-6 text-[#102c3d]/56">This application is no longer awaiting a line manager decision.</p> : null}
+            {!canDecide && !confirmation ? <p className="text-sm leading-6 text-[#102c3d]/[0.56]">This application is no longer awaiting a line manager decision.</p> : null}
           </ReviewSection>
 
           <ReviewSection title="Application history">
@@ -616,11 +618,11 @@ function ManagerReviewModal({ application, managerName: reviewerName, onClose, o
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-[#102c3d]">{entry.status}</p>
-                      <p className="mt-1 whitespace-pre-line text-xs leading-5 text-[#102c3d]/54">{entry.note}</p>
+                      <p className="mt-1 whitespace-pre-line text-xs leading-5 text-[#102c3d]/[0.54]">{entry.note}</p>
                     </div>
-                    <StatusBadge tone="blue">{entry.owner}</StatusBadge>
+                    <span className="text-xs font-semibold text-[#102c3d]/[0.52]">{entry.owner}</span>
                   </div>
-                  <p className="mt-2 text-[11px] font-medium text-[#102c3d]/42">{entry.createdAt.slice(0, 10)}</p>
+                  <p className="mt-2 text-[11px] font-medium text-[#102c3d]/[0.42]">{entry.createdAt.slice(0, 10)}</p>
                 </div>
               ))}
             </div>
@@ -643,8 +645,8 @@ function ReviewSection({ title, children }: { title: string; children: ReactNode
 function ReviewFact({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-white px-3.5 py-3 ring-1 ring-[#102c3d]/[0.055]">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#102c3d]/38">{label}</p>
-      <p className="mt-1 line-clamp-2 text-sm font-semibold text-[#102c3d]/72">{value}</p>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#102c3d]/[0.38]">{label}</p>
+      <p className="mt-1 line-clamp-2 text-sm font-semibold text-[#102c3d]/[0.72]">{value}</p>
     </div>
   );
 }
@@ -653,7 +655,7 @@ function EvidenceItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-white px-4 py-3 ring-1 ring-[#102c3d]/[0.06]">
       <p className="text-xs font-semibold text-[#102c3d]">{label}</p>
-      <p className="mt-1 text-sm leading-6 text-[#102c3d]/58">{value}</p>
+      <p className="mt-1 text-sm leading-6 text-[#102c3d]/[0.58]">{value}</p>
     </div>
   );
 }
@@ -662,7 +664,7 @@ function AnswerBlock({ question, answer }: { question: string; answer: string })
   return (
     <div className="rounded-xl bg-white px-4 py-3 ring-1 ring-[#102c3d]/[0.06]">
       <p className="text-xs font-semibold text-[#102c3d]">{question}</p>
-      <p className="mt-1 text-sm leading-6 text-[#102c3d]/58">{answer || "No answer recorded yet."}</p>
+      <p className="mt-1 text-sm leading-6 text-[#102c3d]/[0.58]">{answer || "No answer recorded yet."}</p>
     </div>
   );
 }
@@ -674,24 +676,12 @@ function DecisionButton({ active, onClick, danger = false, children }: { active:
       onClick={onClick}
       className={`min-h-10 rounded-xl px-3 py-2 text-xs font-semibold ring-1 transition ${active
         ? danger
-          ? "bg-[#fff0f2] text-[#b13b51] ring-[#b13b51]/20"
+          ? "bg-[#fff0f2] text-[#b13b51] ring-[#b13b51]/[0.20]"
           : "bg-[#102c3d] text-white ring-[#102c3d]"
-        : "bg-white text-[#102c3d]/64 ring-[#102c3d]/[0.08] hover:text-[#102c3d]"}`}
+        : "bg-white text-[#102c3d]/[0.64] ring-[#102c3d]/[0.08] hover:text-[#102c3d]"}`}
     >
       {children}
     </button>
-  );
-}
-
-function QueueCard({ label, value, copy, tone = "neutral" }: { label: string; value: number; copy: string; tone?: "neutral" | "green" | "yellow" }) {
-  return (
-    <div className="rounded-xl border border-[#102c3d]/[0.07] bg-white px-4 py-4 shadow-[0_14px_32px_rgba(16,44,61,0.045)]">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#c95568]">{label}</p>
-        <StatusBadge tone={tone}>{value}</StatusBadge>
-      </div>
-      <p className="mt-3 text-sm leading-6 text-[#102c3d]/58">{copy}</p>
-    </div>
   );
 }
 
@@ -702,35 +692,36 @@ function ApplicationDetailModal({ application, onClose }: { application: MvpAppl
 
   return (
     <MvpModal title={displayEmployee(employee)} eyebrow="Application record" onClose={onClose} wide>
+      <div className="mb-5 border-y border-[#102c3d]/[0.07] py-4"><StageTracker stages={["Employee", "Manager", "Apprenticeship Lead", "Enrolment"]} currentIndex={applicationStage(application.status)} tone={application.status === "More information requested" ? "watch" : "info"} exceptionalStatus={application.status.startsWith("Declined") || application.status === "Withdrawn" || application.status === "Cancelled" ? { label: application.status, tone: "risk" } : undefined} /></div>
       <div className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <div className="space-y-4 rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4">
           <section>
             <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#c95568]">Application summary</p>
             <h3 className="mt-1 text-lg font-semibold text-[#102c3d]">{standard?.title ?? application.apprenticeshipStandardId}</h3>
-            <p className="mt-2 text-sm leading-6 text-[#102c3d]/56">{employee?.jobTitle || "Role to confirm"} · {employee?.department || "Department to confirm"} · {employee?.site || "Site to confirm"}</p>
+            <p className="mt-2 text-sm leading-6 text-[#102c3d]/[0.56]">{employee?.jobTitle || "Role to confirm"} · {employee?.department || "Department to confirm"} · {employee?.site || "Site to confirm"}</p>
           </section>
           <section>
             <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#0b6f63]">Workflow status</p>
             <div className="mt-2 flex flex-wrap gap-2">
               <StatusBadge tone={statusTone(application.status)}>{application.status}</StatusBadge>
-              <StatusBadge tone="blue">Owner: {application.currentOwner}</StatusBadge>
+              <span className="inline-flex items-center text-xs font-semibold text-[#102c3d]/[0.52]">Owner: {application.currentOwner}</span>
             </div>
-            <p className="mt-3 text-xs leading-5 text-[#102c3d]/54">Submitted {application.submittedAt.slice(0, 10)}</p>
+            <p className="mt-3 text-xs leading-5 text-[#102c3d]/[0.54]">Submitted {application.submittedAt.slice(0, 10)}</p>
           </section>
           <section>
             <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#0b6f63]">Business case</p>
             <div className="mt-2 space-y-3 rounded-xl bg-white p-4 ring-1 ring-[#102c3d]/[0.06]">
               <div>
                 <p className="text-xs font-semibold text-[#102c3d]">Reason for interest</p>
-                <p className="mt-1 text-sm leading-6 text-[#102c3d]/60">{application.reason || "No reason recorded yet."}</p>
+                <p className="mt-1 text-sm leading-6 text-[#102c3d]/[0.60]">{application.reason || "No reason recorded yet."}</p>
               </div>
               <div>
                 <p className="text-xs font-semibold text-[#102c3d]">Career goal</p>
-                <p className="mt-1 text-sm leading-6 text-[#102c3d]/60">{application.careerGoal || "No career goal recorded yet."}</p>
+                <p className="mt-1 text-sm leading-6 text-[#102c3d]/[0.60]">{application.careerGoal || "No career goal recorded yet."}</p>
               </div>
               <div>
                 <p className="text-xs font-semibold text-[#102c3d]">Support required</p>
-                <p className="mt-1 text-sm leading-6 text-[#102c3d]/60">{application.supportRequired || "No support needs recorded."}</p>
+                <p className="mt-1 text-sm leading-6 text-[#102c3d]/[0.60]">{application.supportRequired || "No support needs recorded."}</p>
               </div>
             </div>
           </section>
@@ -744,11 +735,11 @@ function ApplicationDetailModal({ application, onClose }: { application: MvpAppl
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-[#102c3d]">{entry.status}</p>
-                    <p className="mt-1 text-xs leading-5 text-[#102c3d]/54">{entry.note}</p>
+                    <p className="mt-1 text-xs leading-5 text-[#102c3d]/[0.54]">{entry.note}</p>
                   </div>
-                  <StatusBadge tone="blue">{entry.owner}</StatusBadge>
+                  <span className="text-xs font-semibold text-[#102c3d]/[0.52]">{entry.owner}</span>
                 </div>
-                <p className="mt-2 text-[11px] font-medium text-[#102c3d]/42">{entry.createdAt.slice(0, 10)}</p>
+                <p className="mt-2 text-[11px] font-medium text-[#102c3d]/[0.42]">{entry.createdAt.slice(0, 10)}</p>
               </div>
             ))}
           </div>
@@ -756,4 +747,11 @@ function ApplicationDetailModal({ application, onClose }: { application: MvpAppl
       </div>
     </MvpModal>
   );
+}
+
+function applicationStage(status: RequestStatus) {
+  if (["Approved for Enrolment", "Completed"].includes(status)) return 3;
+  if (["Approved by Line Manager", "Submitted to Apprenticeship Lead", "Awaiting Final Approval", "Declined by Apprenticeship Lead"].includes(status)) return 2;
+  if (["Submitted to Line Manager", "Awaiting Manager Review", "More information requested", "Declined by Line Manager"].includes(status)) return 1;
+  return 0;
 }

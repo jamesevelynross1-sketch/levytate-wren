@@ -353,7 +353,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
 
   const workspaceName = data.profile.employerName || "LevyTate beta employer";
   const workspaceLabel = data.profile.workspaceName || "Standalone employer workspace";
-  const storageStatus = meta?.storageMode === "supabase" ? "Supabase workspace" : "Local fallback";
+  const storageStatus = meta?.storageMode === "supabase" ? "Workspace connected" : "Limited access mode";
   const copilotContext = useMemo<LevyTateCopilotContext>(() => {
     const operationalLabel = activeModule === "Home" && isOperationsRole ? "Operations Centre" : earlyAccessPolicy.modules.find((entry) => entry.moduleKey === activeModule)?.label ?? activeModule;
     return {
@@ -367,7 +367,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
 
   return (
     <main className="min-h-screen bg-[#f4f7f5] text-[#102c3d]">
-      <header className="sticky top-0 z-40 border-b border-[#102c3d]/[0.08] bg-white/94 backdrop-blur-xl">
+      <header className="sticky top-0 z-40 border-b border-[#102c3d]/[0.08] bg-white/[0.94] backdrop-blur-xl">
         <div className="mx-auto flex min-h-20 max-w-[1540px] flex-wrap items-center justify-between gap-x-4 gap-y-3 px-4 py-3 sm:px-6 lg:px-8 lg:py-0">
           <div className="flex min-w-0 flex-1 items-center gap-3 lg:flex-none">
             <LevyTateLogo className="[--levytate-logo-size:2.2rem] lg:[--levytate-logo-size:2.45rem]" />
@@ -375,7 +375,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
             <div className="min-w-0">
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">Active workspace</p>
               <p className="truncate text-sm font-semibold text-[#102c3d]">{workspaceName}</p>
-              <p className="hidden truncate text-xs text-[#102c3d]/46 sm:block">{workspaceLabel}</p>
+              <p className="hidden truncate text-xs text-[#102c3d]/[0.46] sm:block">{workspaceLabel}</p>
             </div>
           </div>
 
@@ -385,7 +385,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
                 {availableModules.map((module) => <option key={module.name} value={module.name}>{moduleLabel(module.name)}</option>)}
               </select>
             </div>
-            <span className="hidden rounded-full border border-[#159b8f]/10 bg-[#edf7f3] px-3.5 py-2 text-xs font-semibold text-[#0b6f63] sm:inline-flex">
+            <span className="hidden rounded-full border border-[#159b8f]/[0.10] bg-[#edf7f3] px-3.5 py-2 text-xs font-semibold text-[#0b6f63] sm:inline-flex">
               {hydrated ? `${notifications.length} alerts` : "Loading"}
             </span>
             {meta?.prospectAccess?.status === "active" && meta.userRole === "Apprenticeship Lead" ? <ProspectGettingStarted access={meta.prospectAccess} onNavigate={navigateTo} /> : null}
@@ -403,21 +403,21 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
         <aside className="hidden border-r border-[#102c3d]/[0.08] bg-white lg:sticky lg:top-20 lg:flex lg:h-[calc(100vh-5rem)] lg:flex-col">
           <div className="flex min-h-0 flex-1 flex-col px-4 py-4">
             <div className="px-2 pb-3">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/36">Navigation</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/[0.36]">Navigation</p>
               <p className="mt-1 text-sm font-semibold text-[#102c3d]">Decision areas</p>
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto pr-1">
               <nav className="grid gap-4" aria-label="Core Early Access navigation">
                 {navigationGroups.map(({ group, modules: groupModules }) => <div key={group} className="grid gap-1">
-                  {group !== "primary" ? <p className="px-3 pb-1 pt-2 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/34">{navigationGroupLabel(group)}</p> : null}
+                  {group !== "primary" ? <p className="px-3 pb-1 pt-2 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/[0.34]">{navigationGroupLabel(group)}</p> : null}
                   {groupModules.map(({ name, icon: Icon }) => {
                     const active = activeModule === name;
                     const badge = moduleBadges[name as keyof typeof moduleBadges];
                     return (
-                      <button key={name} onClick={() => openModule(name)} className={`group flex min-h-[44px] items-center justify-between gap-3 rounded-xl px-3 text-left text-sm font-semibold transition ${active ? "bg-[#eaf5f1] text-[#102c3d] shadow-[inset_3px_0_0_#159b8f,0_10px_18px_rgba(21,155,143,0.06)]" : "text-[#102c3d]/58 hover:bg-[#f6f9f7] hover:text-[#102c3d]"}`}>
-                        <span className="flex min-w-0 items-center gap-3"><span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg transition ${active ? "bg-white text-[#0b8e82] ring-1 ring-[#159b8f]/12" : "bg-[#f7faf8] text-[#102c3d]/42 group-hover:bg-white group-hover:text-[#0b8e82] group-hover:ring-1 group-hover:ring-[#102c3d]/[0.06]"}`}><Icon size={16} strokeWidth={active ? 2 : 1.8} aria-hidden="true" /></span><span className="truncate">{moduleLabel(name)}</span></span>
-                        {badge ? <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-[#0b6f63] ring-1 ring-[#159b8f]/12">{badge}</span> : null}
+                      <button key={name} onClick={() => openModule(name)} className={`group flex min-h-[44px] items-center justify-between gap-3 rounded-xl px-3 text-left text-sm font-semibold transition ${active ? "bg-[#eaf5f1] text-[#102c3d] shadow-[inset_3px_0_0_#159b8f,0_10px_18px_rgba(21,155,143,0.06)]" : "text-[#102c3d]/[0.58] hover:bg-[#f6f9f7] hover:text-[#102c3d]"}`}>
+                        <span className="flex min-w-0 items-center gap-3"><span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg transition ${active ? "bg-white text-[#0b8e82] ring-1 ring-[#159b8f]/[0.12]" : "bg-[#f7faf8] text-[#102c3d]/[0.42] group-hover:bg-white group-hover:text-[#0b8e82] group-hover:ring-1 group-hover:ring-[#102c3d]/[0.06]"}`}><Icon size={16} strokeWidth={active ? 2 : 1.8} aria-hidden="true" /></span><span className="truncate">{moduleLabel(name)}</span></span>
+                        {badge ? <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-[#0b6f63] ring-1 ring-[#159b8f]/[0.12]">{badge}</span> : null}
                       </button>
                     );
                   })}
@@ -434,15 +434,15 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
                   <div className="min-w-0">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">Current role</p>
                     <p className="mt-1 truncate text-sm font-semibold text-[#102c3d]">{meta?.userRole ?? "Workspace user"}</p>
-                    <p className="mt-1 text-xs leading-5 text-[#102c3d]/52">People, providers and workspace setup.</p>
+                    <p className="mt-1 text-xs leading-5 text-[#102c3d]/[0.52]">People, providers and workspace setup.</p>
                   </div>
                 </div>
 
                 <div className="mt-4 rounded-2xl border border-[#102c3d]/[0.06] bg-white px-3.5 py-3">
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/34">Status</p>
-                      <p className="mt-1 truncate text-xs font-semibold text-[#102c3d]/68">{storageStatus}</p>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/[0.34]">Status</p>
+                      <p className="mt-1 truncate text-xs font-semibold text-[#102c3d]/[0.68]">{storageStatus}</p>
                     </div>
                     <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#edf7f3] px-2.5 py-1 text-[10px] font-semibold text-[#0b6f63]">
                       <span className="h-1.5 w-1.5 rounded-full bg-current" />
@@ -460,7 +460,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
             <section className="mb-5 border-b border-[#102c3d]/[0.07] pb-4">
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">Protected workspace</p>
               <h1 className="mt-1 text-2xl font-semibold tracking-[-0.025em]">{activeModule === "Home" && isOperationsRole ? "Operations Centre" : moduleLabel(activeModule)}</h1>
-              <p className="mt-1.5 max-w-3xl text-sm leading-6 text-[#102c3d]/56">{activeModule === "Home" && isOperationsRole ? "Prioritised learner operations showing what needs attention, why it matters and where to act next." : moduleCopy[activeModule]}</p>
+              <p className="mt-1.5 max-w-3xl text-sm leading-6 text-[#102c3d]/[0.56] max-sm:hidden">{activeModule === "Home" && isOperationsRole ? "Prioritised learner operations showing what needs attention, why it matters and where to act next." : moduleCopy[activeModule]}</p>
             </section>
 
             {activeModule === "Home" ? (
@@ -512,7 +512,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
               </ModuleStackNav>
             ) : null}
           </div>
-          <nav aria-label="Trust and support" className="mx-auto flex max-w-[1540px] flex-wrap gap-x-5 gap-y-2 px-4 pb-7 text-xs font-semibold text-[#102c3d]/48 sm:px-6 lg:px-8">
+          <nav aria-label="Trust and support" className="mx-auto flex max-w-[1540px] flex-wrap gap-x-5 gap-y-2 px-4 pb-7 text-xs font-semibold text-[#102c3d]/[0.48] sm:px-6 lg:px-8">
             <a href="/levytate/privacy" className="min-h-11 content-center hover:text-[#087c73]">Privacy</a>
             <a href="/levytate/early-access-terms" className="min-h-11 content-center hover:text-[#087c73]">Terms</a>
             <a href="/levytate/support" className="min-h-11 content-center hover:text-[#087c73]">Support</a>
@@ -544,7 +544,7 @@ function ModuleStackNav({
             key={item}
             type="button"
             onClick={() => onSelect(item)}
-            className={`rounded-full px-4 py-2 text-xs font-semibold transition ${active === item ? "bg-[#102c3d] text-white shadow-[0_8px_18px_rgba(16,44,61,0.12)]" : "text-[#102c3d]/58 hover:bg-[#f6f9f7] hover:text-[#102c3d]"}`}
+            className={`rounded-full px-4 py-2 text-xs font-semibold transition ${active === item ? "bg-[#102c3d] text-white shadow-[0_8px_18px_rgba(16,44,61,0.12)]" : "text-[#102c3d]/[0.58] hover:bg-[#f6f9f7] hover:text-[#102c3d]"}`}
           >
             {item}
           </button>

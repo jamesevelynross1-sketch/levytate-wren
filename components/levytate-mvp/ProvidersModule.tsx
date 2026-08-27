@@ -60,6 +60,7 @@ import {
 import { useLevyTateStandards } from "@/components/levytate-mvp/LevyTateStandardsProvider";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { EmployerProgrammeDirectory } from "@/components/levytate-mvp/EmployerProgrammeDirectory";
+import { OperationalMetricRail, SemanticStatus } from "@/components/levytate-mvp/OperationalVisuals";
 import {
   createMvpId,
   normaliseProviderProgramme,
@@ -205,17 +206,13 @@ function limitedTags(values: string[], limit = 4) {
   };
 }
 
-function providerCardSummary(provider: ProviderCatalogueRecord) {
-  return cleanDisplayText(provider.commercialProfile.positioningStatement) || fallbackProviderDescription(provider) || provider.providerType;
-}
-
 function providerCardTags(provider: ProviderCatalogueRecord, featuredProgramme?: ProviderProgramme) {
   return limitedTags([
     ...provider.specialisms,
     ...(featuredProgramme?.technologiesCovered ?? []),
     ...(featuredProgramme?.targetIndustries ?? []),
     ...provider.technologies,
-  ]);
+  ], 3);
 }
 
 function providerCardBadges(provider: ProviderCatalogueRecord, featuredProgramme?: ProviderProgramme) {
@@ -374,12 +371,12 @@ function MarketplaceFilterSelect({
 }) {
   const selectOptions = includeAll ? ["All", ...options.filter((option) => option !== "All")] : options;
   return (
-    <label className="grid gap-1 text-[10px] font-semibold uppercase tracking-[0.13em] text-[#102c3d]/42">
+    <label className="grid gap-1 text-[10px] font-semibold uppercase tracking-[0.13em] text-[#102c3d]/[0.42]">
       {label}
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-10 min-w-0 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-[12px] font-semibold normal-case tracking-normal text-[#102c3d]/78 outline-none transition focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10"
+        className="h-10 min-w-0 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-[12px] font-semibold normal-case tracking-normal text-[#102c3d]/[0.78] outline-none transition focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/[0.10]"
       >
         {selectOptions.map((option) => <option key={option} value={option}>{option}</option>)}
       </select>
@@ -451,7 +448,7 @@ function GuidedEmployerJourney({
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div>
             <h3 className="text-2xl font-semibold tracking-[-0.03em] text-[#102c3d]">What are you trying to achieve?</h3>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-[#102c3d]/58">Start with the business goal. LevyTate then connects workforce area, employer context and programme evidence before recommending a provider introduction.</p>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-[#102c3d]/[0.58]">Start with the business goal. LevyTate then connects workforce area, employer context and programme evidence before recommending a provider introduction.</p>
           </div>
           <div className="rounded-3xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4">
             <div className="flex items-center gap-3">
@@ -473,11 +470,11 @@ function GuidedEmployerJourney({
                 key={goal.id}
                 type="button"
                 onClick={() => onGoal(goal.id)}
-                className={`group rounded-3xl border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-[0_18px_34px_rgba(16,44,61,0.075)] ${selected ? "border-[#159b8f]/30 bg-[#edf7f3] shadow-[0_18px_34px_rgba(21,155,143,0.08)]" : "border-[#102c3d]/[0.07] bg-white"}`}
+                className={`group rounded-3xl border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-[0_18px_34px_rgba(16,44,61,0.075)] ${selected ? "border-[#159b8f]/[0.30] bg-[#edf7f3] shadow-[0_18px_34px_rgba(21,155,143,0.08)]" : "border-[#102c3d]/[0.07] bg-white"}`}
               >
                 <span className={`grid h-10 w-10 place-items-center rounded-2xl transition ${selected ? "bg-[#102c3d] text-white" : "bg-[#f5f7f3] text-[#0b8e82] group-hover:bg-[#edf7f3]"}`}><Icon size={18} /></span>
                 <h4 className="mt-4 text-base font-semibold tracking-[-0.01em] text-[#102c3d]">{goal.title}</h4>
-                <p className="mt-2 min-h-[48px] text-sm leading-6 text-[#102c3d]/58">{goal.description}</p>
+                <p className="mt-2 min-h-[48px] text-sm leading-6 text-[#102c3d]/[0.58]">{goal.description}</p>
                 <p className="mt-3 text-xs font-semibold leading-5 text-[#0b6f63]">{goal.outcome}</p>
               </button>
             );
@@ -490,10 +487,10 @@ function GuidedEmployerJourney({
         </section>
 
         {introRequest ? (
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-[#159b8f]/20 bg-[#edf7f3] px-5 py-4 text-sm text-[#102c3d]">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-[#159b8f]/[0.20] bg-[#edf7f3] px-5 py-4 text-sm text-[#102c3d]">
             <div>
               <p className="font-semibold">Introduction request prepared</p>
-              <p className="mt-1 text-[#102c3d]/62">LevyTate would qualify the need before introducing {introRequest.providerName}{introRequest.programmeName ? ` for ${introRequest.programmeName}` : ""}.</p>
+              <p className="mt-1 text-[#102c3d]/[0.62]">LevyTate would qualify the need before introducing {introRequest.providerName}{introRequest.programmeName ? ` for ${introRequest.programmeName}` : ""}.</p>
             </div>
             <button type="button" onClick={onDismissIntro} className="rounded-full bg-white px-4 py-2 text-xs font-semibold text-[#102c3d] ring-1 ring-[#102c3d]/[0.08]">Dismiss</button>
           </div>
@@ -508,7 +505,7 @@ function GuidedEmployerJourney({
                   <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">Recommended programme</p>
                   <h3 className="mt-3 text-3xl font-semibold tracking-[-0.035em] text-[#102c3d]">{primary.programme.programmeName}</h3>
                   <p className="mt-2 text-base font-semibold text-[#0b6f63]">{primary.provider.providerName}</p>
-                  <p className="mt-4 max-w-3xl text-sm leading-7 text-[#102c3d]/62">{primary.why}</p>
+                  <p className="mt-4 max-w-3xl text-sm leading-7 text-[#102c3d]/[0.62]">{primary.why}</p>
                   <div className="mt-5 grid gap-3 sm:grid-cols-3">
                     <MiniEvidenceBlock title="Business outcomes" items={primary.outcomes} />
                     <MiniEvidenceBlock title="Technologies" items={primary.technologies} />
@@ -517,20 +514,20 @@ function GuidedEmployerJourney({
                 </div>
                 <div className="grid gap-3 self-start rounded-3xl bg-[#f8fbfa] p-4 ring-1 ring-[#102c3d]/[0.06]">
                   <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/42">Match</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/[0.42]">Match</p>
                     <p className="mt-1 text-4xl font-semibold tracking-[-0.04em] text-[#102c3d]">{primary.matchScore}%</p>
                     <p className="mt-1 text-xs font-semibold text-[#0b6f63]">{primary.confidence} confidence</p>
                   </div>
                   <div className="h-2 rounded-full bg-[#e8f0ec]"><div className="h-2 rounded-full bg-[#0b8e82]" style={{ width: `${primary.matchScore}%` }} /></div>
                   <div className="grid gap-2 pt-1">
-                    {primary.evidence.slice(0, 3).map((item) => <div key={item} className="flex items-center gap-2 text-xs font-medium text-[#102c3d]/60"><CheckCircle2 size={13} className="text-[#0b8e82]" />{item}</div>)}
+                    {primary.evidence.slice(0, 3).map((item) => <div key={item} className="flex items-center gap-2 text-xs font-medium text-[#102c3d]/[0.60]"><CheckCircle2 size={13} className="text-[#0b8e82]" />{item}</div>)}
                   </div>
                 </div>
               </div>
               <div className="flex flex-wrap gap-2 border-t border-[#102c3d]/[0.06] bg-[#fbfcfa] px-6 py-4">
                 <button type="button" onClick={() => onRequestIntroduction(primary.provider.providerName, primary.programme.programmeName)} className="inline-flex h-10 items-center rounded-full bg-[#102c3d] px-4 text-sm font-semibold text-white shadow-[0_10px_20px_rgba(16,44,61,0.12)]">Request introduction</button>
                 <button type="button" onClick={() => onOpenProgramme(primary.provider.providerId, primary.programme.id)} className="inline-flex h-10 items-center rounded-full bg-white px-4 text-sm font-semibold text-[#102c3d] ring-1 ring-[#102c3d]/[0.08]">View programme</button>
-                <button type="button" onClick={() => onOpenProvider(primary.provider.providerId)} className="inline-flex h-10 items-center rounded-full bg-white px-4 text-sm font-semibold text-[#102c3d]/70 ring-1 ring-[#102c3d]/[0.08]">View provider</button>
+                <button type="button" onClick={() => onOpenProvider(primary.provider.providerId)} className="inline-flex h-10 items-center rounded-full bg-white px-4 text-sm font-semibold text-[#102c3d]/[0.70] ring-1 ring-[#102c3d]/[0.08]">View provider</button>
               </div>
             </article>
 
@@ -543,7 +540,7 @@ function GuidedEmployerJourney({
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="text-sm font-semibold text-[#102c3d]">{item.programme.programmeName}</p>
-                          <p className="mt-1 text-xs text-[#102c3d]/54">{item.provider.providerName}</p>
+                          <p className="mt-1 text-xs text-[#102c3d]/[0.54]">{item.provider.providerName}</p>
                         </div>
                         <StatusBadge tone={item.confidence === "High" ? "green" : item.confidence === "Medium" ? "blue" : "yellow"}>{item.matchScore}%</StatusBadge>
                       </div>
@@ -552,8 +549,8 @@ function GuidedEmployerJourney({
                 </div>
               </div>
               <div className="rounded-3xl border border-[#102c3d]/[0.07] bg-[#102c3d] p-5 text-white shadow-[0_18px_42px_rgba(16,44,61,0.12)]">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/56">Next steps</p>
-                <div className="mt-4 grid gap-3 text-sm text-white/78">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/[0.56]">Next steps</p>
+                <div className="mt-4 grid gap-3 text-sm text-white/[0.78]">
                   <p>1. Review programme evidence and fit.</p>
                   <p>2. Compare provider coverage if needed.</p>
                   <p>3. Ask LevyTate to qualify and introduce the provider.</p>
@@ -573,14 +570,14 @@ function GuidedEmployerJourney({
 function ChoiceGroup({ label, options, selected, onSelect }: { label: string; options: string[]; selected: string; onSelect: (value: string) => void }) {
   return (
     <div>
-      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#102c3d]/42">{label}</p>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#102c3d]/[0.42]">{label}</p>
       <div className="mt-3 flex flex-wrap gap-2">
         {options.map((option) => (
           <button
             key={option}
             type="button"
             onClick={() => onSelect(option)}
-            className={`rounded-full px-3 py-2 text-xs font-semibold transition ${selected === option ? "bg-[#102c3d] text-white" : "bg-[#f5f7f3] text-[#102c3d]/64 ring-1 ring-[#102c3d]/[0.06] hover:bg-white hover:text-[#102c3d]"}`}
+            className={`rounded-full px-3 py-2 text-xs font-semibold transition ${selected === option ? "bg-[#102c3d] text-white" : "bg-[#f5f7f3] text-[#102c3d]/[0.64] ring-1 ring-[#102c3d]/[0.06] hover:bg-white hover:text-[#102c3d]"}`}
           >
             {option}
           </button>
@@ -595,9 +592,9 @@ function MiniEvidenceBlock({ title, items }: { title: string; items: string[] })
   if (!visible.length) return null;
   return (
     <div className="rounded-2xl border border-[#102c3d]/[0.06] bg-[#f8fbfa] p-4">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/42">{title}</p>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/[0.42]">{title}</p>
       <div className="mt-3 grid gap-2">
-        {visible.map((item) => <p key={item} className="text-xs font-medium leading-5 text-[#102c3d]/64">{item}</p>)}
+        {visible.map((item) => <p key={item} className="text-xs font-medium leading-5 text-[#102c3d]/[0.64]">{item}</p>)}
       </div>
     </div>
   );
@@ -814,13 +811,13 @@ function ProviderAdministration() {
 
   return (
     <div className="grid gap-5">
-      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-        <SummaryCard label="Programme routes" value={providerStats.liveProgrammes} copy="Employer-facing programmes ready for guided discovery and matching." tone="blue" />
-        <SummaryCard label="Verified providers" value={providerStats.verifiedProviders} copy="Provider records carrying a verified source signal." tone="green" />
-        <SummaryCard label="Provider coverage" value={providerStats.activeProviders} copy="Active providers available for LevyTate-led introductions." tone="blue" />
-        <SummaryCard label="Profile quality" value={`${providerStats.providerCompletion}%`} copy="Average provider completeness across proof, reach and confidence signals." tone="green" />
-        <SummaryCard label="Programme quality" value={`${providerStats.programmeCompletion}%`} copy="Average programme completeness across audience, outcomes and compliance content." tone="yellow" />
-      </section>
+      <OperationalMetricRail items={[
+        { label: "Programme routes", value: providerStats.liveProgrammes, tone: "info" },
+        { label: "Verified providers", value: providerStats.verifiedProviders, tone: "healthy" },
+        { label: "Provider coverage", value: providerStats.activeProviders, tone: "info" },
+        { label: "Profile quality", value: `${providerStats.providerCompletion}%`, tone: "healthy" },
+        { label: "Programme quality", value: `${providerStats.programmeCompletion}%`, tone: "watch" },
+      ]} />
 
       <GuidedEmployerJourney
         selectedGoal={selectedGoal}
@@ -843,7 +840,7 @@ function ProviderAdministration() {
         <MvpPanel
           title="Provider comparison"
           eyebrow="Marketplace shortlist"
-          actions={<button type="button" onClick={() => setCompareProviderIds([])} className="inline-flex h-9 items-center rounded-full bg-[#f5f7f3] px-3 text-xs font-semibold text-[#102c3d]/64 ring-1 ring-[#102c3d]/[0.07]">Clear comparison</button>}
+          actions={<button type="button" onClick={() => setCompareProviderIds([])} className="inline-flex h-9 items-center rounded-full bg-[#f5f7f3] px-3 text-xs font-semibold text-[#102c3d]/[0.64] ring-1 ring-[#102c3d]/[0.07]">Clear comparison</button>}
         >
           <ProviderComparison providers={comparisonProviders} programmes={data.providerProgrammes} standards={selectableStandards} onOpenProfile={(providerId) => setProfileView({ providerId })} onOpenProgramme={(providerId, programmeId) => setProgrammeView({ providerId, programmeId })} />
         </MvpPanel>
@@ -867,34 +864,25 @@ function ProviderAdministration() {
               const compared = compareProviderIds.includes(provider.providerId);
               const cardTags = providerCardTags(provider, featuredProgramme);
               const cardBadges = providerCardBadges(provider, featuredProgramme);
-              const summary = providerCardSummary(provider);
               return (
-                <article key={provider.providerId} className="flex h-full flex-col overflow-hidden rounded-[26px] border border-[#102c3d]/[0.08] bg-white shadow-[0_16px_34px_rgba(16,44,61,0.045)] transition hover:-translate-y-0.5 hover:shadow-[0_24px_46px_rgba(16,44,61,0.08)]">
-                  <div className={`h-1.5 w-full bg-gradient-to-r ${providerTheme(provider.providerId)}`} />
+                <article key={provider.providerId} className="flex h-full flex-col border border-[#102c3d]/[0.08] bg-white shadow-[0_10px_24px_rgba(16,44,61,0.035)]">
+                  <div className={`h-1 w-full bg-gradient-to-r ${providerTheme(provider.providerId)}`} />
 
                   <div className="flex h-full flex-col p-5">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/42">{provider.providerType}</p>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/[0.42]">{provider.providerType}</p>
                         <h3 className="mt-2 text-[22px] font-semibold tracking-[-0.02em] text-[#102c3d]">{provider.providerName}</h3>
                       </div>
-                      <StatusBadge tone={provider.verificationStatus === "verified" ? "green" : "yellow"}>
-                        {provider.verificationStatus === "verified" ? "Verified" : "Review"}
-                      </StatusBadge>
+                      <SemanticStatus label={provider.verificationStatus === "verified" ? "Verified" : "Review"} tone={provider.verificationStatus === "verified" ? "healthy" : "watch"} />
                     </div>
 
-                    <p className="mt-3 min-h-[44px] text-sm font-medium leading-6 text-[#102c3d]/68" title={summary}>{summary}</p>
-
                     {cardBadges.length ? (
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {cardBadges.map((item) => (
-                          <StatusBadge key={item} tone={item === providerReachLabel(provider) ? "blue" : "neutral"}>{item}</StatusBadge>
-                        ))}
-                      </div>
+                      <p className="mt-3 text-xs font-semibold leading-5 text-[#102c3d]/[0.55]">{providerProgrammes.length} programme{providerProgrammes.length === 1 ? "" : "s"} · {cardBadges.join(" · ")}</p>
                     ) : null}
 
                     {cardTags.visible.length ? (
-                      <div className="mt-4 flex min-h-[68px] flex-wrap content-start gap-2 overflow-hidden">
+                      <div className="mt-4 flex min-h-[40px] flex-wrap content-start gap-2 overflow-hidden">
                         {cardTags.visible.map((item) => <Tag key={item}>{item}</Tag>)}
                         {cardTags.overflow ? <Tag tone="accent">{`+${cardTags.overflow} more`}</Tag> : null}
                       </div>
@@ -904,7 +892,7 @@ function ProviderAdministration() {
                       <button
                         type="button"
                         onClick={() => setProgrammeView({ providerId: provider.providerId, programmeId: featuredProgramme.id })}
-                        className="mt-5 min-h-[112px] rounded-2xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4 text-left transition hover:border-[#159b8f]/20 hover:bg-white"
+                        className="mt-4 min-h-[88px] border-l-2 border-[#4f7b95] bg-[#f8fbfa] p-4 text-left transition hover:bg-white"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
@@ -913,9 +901,6 @@ function ProviderAdministration() {
                           </div>
                           <StatusBadge tone={programmeTone(featuredProgramme.status)}>{featuredProgramme.status}</StatusBadge>
                         </div>
-                        <p className="mt-2 truncate text-sm text-[#102c3d]/56" title={featuredProgramme.commercialProfile.tagline || featuredProgramme.shortDescription}>
-                          {featuredProgramme.commercialProfile.tagline || featuredProgramme.shortDescription}
-                        </p>
                       </button>
                     ) : null}
 
@@ -930,7 +915,7 @@ function ProviderAdministration() {
                       <button
                         type="button"
                         onClick={() => toggleCompare(provider.providerId)}
-                        className={`inline-flex h-11 items-center justify-center rounded-full px-4 text-sm font-semibold ring-1 transition ${compared ? "bg-[#edf7f3] text-[#0b6f63] ring-[#159b8f]/16" : "bg-white text-[#102c3d]/70 ring-[#102c3d]/[0.08] hover:text-[#102c3d]"}`}
+                        className={`inline-flex h-11 items-center justify-center rounded-full px-4 text-sm font-semibold ring-1 transition ${compared ? "bg-[#edf7f3] text-[#0b6f63] ring-[#159b8f]/[0.16]" : "bg-white text-[#102c3d]/[0.70] ring-[#102c3d]/[0.08] hover:text-[#102c3d]"}`}
                       >
                         {compared ? "Compared" : "Compare"}
                       </button>
@@ -1064,13 +1049,13 @@ function ProviderProfileModal({
         <div className="grid gap-6 px-6 py-6 lg:grid-cols-[minmax(0,1fr)_280px] lg:px-7">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-white/14 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/74 ring-1 ring-white/12">Provider</span>
+              <span className="rounded-full bg-white/[0.14] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/[0.74] ring-1 ring-white/[0.12]">Provider</span>
               <StatusBadge tone={provider.verificationStatus === "verified" ? "green" : "yellow"}>{provider.verificationStatus === "verified" ? "Verified" : "Review needed"}</StatusBadge>
               <StatusBadge tone="blue">{provider.providerType}</StatusBadge>
             </div>
             <h3 className="mt-5 text-3xl font-semibold tracking-[-0.03em]">{provider.providerName}</h3>
-            {positioning ? <p className="mt-3 max-w-3xl text-base leading-7 text-white/86">{positioning}</p> : null}
-            {summary && summary !== positioning ? <p className="mt-3 max-w-3xl text-sm leading-6 text-white/72">{summary}</p> : null}
+            {positioning ? <p className="mt-3 max-w-3xl text-base leading-7 text-white/[0.86]">{positioning}</p> : null}
+            {summary && summary !== positioning ? <p className="mt-3 max-w-3xl text-sm leading-6 text-white/[0.72]">{summary}</p> : null}
             {heroSpecialisms.length ? (
               <div className="mt-5 flex flex-wrap gap-2">
                 {heroSpecialisms.map((item) => <Tag key={item}>{item}</Tag>)}
@@ -1078,7 +1063,7 @@ function ProviderProfileModal({
             ) : null}
           </div>
 
-          <div className="grid gap-3 self-start rounded-3xl bg-white/10 p-4 backdrop-blur-sm ring-1 ring-white/10">
+          <div className="grid gap-3 self-start rounded-3xl bg-white/[0.10] p-4 backdrop-blur-sm ring-1 ring-white/[0.10]">
             <MetricTile inverse label="Verification" value={provider.verificationStatus === "verified" ? "Source verified" : "Needs review"} />
             <MetricTile inverse label="Specialisms" value={String(heroSpecialisms.length || provider.specialisms.length || 0)} />
             <MetricTile inverse label="Delivery" value={cleanDisplayList(provider.deliveryModels).join(", ")} />
@@ -1154,7 +1139,7 @@ function ProgrammeDestination({
             </div>
             <h3 className="mt-5 text-3xl font-semibold tracking-[-0.03em] text-[#102c3d]">{programme.programmeName}</h3>
             {cleanDisplayText(programme.commercialProfile.tagline) ? <p className="mt-3 text-base font-medium text-[#0b6f63]">{cleanDisplayText(programme.commercialProfile.tagline)}</p> : null}
-            {cleanDisplayText(programme.fullDescription || programme.shortDescription) ? <p className="mt-4 max-w-3xl text-sm leading-7 text-[#102c3d]/60">{cleanDisplayText(programme.fullDescription || programme.shortDescription)}</p> : null}
+            {cleanDisplayText(programme.fullDescription || programme.shortDescription) ? <p className="mt-4 max-w-3xl text-sm leading-7 text-[#102c3d]/[0.60]">{cleanDisplayText(programme.fullDescription || programme.shortDescription)}</p> : null}
             <div className="mt-5 flex flex-wrap gap-2">
               {programme.targetIndustries.slice(0, 3).map((item) => <Tag key={item}>{item}</Tag>)}
               {programme.technologiesCovered.slice(0, 3).map((item) => <Tag key={item}>{item}</Tag>)}
@@ -1192,9 +1177,9 @@ function ProgrammeDestination({
         <div className="rounded-2xl border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_14px_32px_rgba(16,44,61,0.045)]">
           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">Funding and compliance</p>
           <h4 className="mt-2 text-base font-semibold text-[#102c3d]">{standard?.title || cleanDisplayText(programme.linkedStandardName) || "Linked standard under review"}</h4>
-          {standard ? <p className="mt-1 text-sm text-[#102c3d]/56">{`${standard.referenceCode} | Level ${standard.level}`}</p> : null}
-          <p className="mt-3 text-sm text-[#102c3d]/60">{standard ? formatFundingBand(standard) : programme.fundingRoute}</p>
-          {programme.commercialProfile.downloads.length ? <div className="mt-4 grid gap-2 text-sm text-[#102c3d]/58">{downloadLabels(programme.commercialProfile.downloads).map((item) => <div key={item} className="flex items-center gap-2"><Download size={14} className="text-[#0b8e82]" />{item}</div>)}</div> : null}
+          {standard ? <p className="mt-1 text-sm text-[#102c3d]/[0.56]">{`${standard.referenceCode} | Level ${standard.level}`}</p> : null}
+          <p className="mt-3 text-sm text-[#102c3d]/[0.60]">{standard ? formatFundingBand(standard) : programme.fundingRoute}</p>
+          {programme.commercialProfile.downloads.length ? <div className="mt-4 grid gap-2 text-sm text-[#102c3d]/[0.58]">{downloadLabels(programme.commercialProfile.downloads).map((item) => <div key={item} className="flex items-center gap-2"><Download size={14} className="text-[#0b8e82]" />{item}</div>)}</div> : null}
         </div>
       </section>
     </div>
@@ -1317,31 +1302,31 @@ function ProgrammeEditor({
 
         <FormSection title="Linked apprenticeship standards" copy="Keep standards underneath the programme proposition. The first selected standard becomes the primary funding record.">
           <div className="grid gap-4">
-            <label className="grid gap-1.5 text-xs font-semibold text-[#102c3d]/58">
+            <label className="grid gap-1.5 text-xs font-semibold text-[#102c3d]/[0.58]">
               Search standards
-              <input value={standardSearch} onChange={(event) => onStandardSearch(event.target.value)} placeholder="Search by title, reference or job title" className="h-11 rounded-lg border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 text-sm font-medium text-[#102c3d] outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10" />
+              <input value={standardSearch} onChange={(event) => onStandardSearch(event.target.value)} placeholder="Search by title, reference or job title" className="h-11 rounded-lg border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 text-sm font-medium text-[#102c3d] outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/[0.10]" />
             </label>
             {selectedStandards.length ? (
               <div className="flex flex-wrap gap-2">
                 {selectedStandards.map((standard) => (
-                  <button key={standard.id} type="button" onClick={() => toggleStandard(standard)} className="inline-flex items-center gap-2 rounded-full bg-[#edf7f3] px-3 py-1.5 text-xs font-semibold text-[#0b6f63] ring-1 ring-[#159b8f]/12">
+                  <button key={standard.id} type="button" onClick={() => toggleStandard(standard)} className="inline-flex items-center gap-2 rounded-full bg-[#edf7f3] px-3 py-1.5 text-xs font-semibold text-[#0b6f63] ring-1 ring-[#159b8f]/[0.12]">
                     {standard.title}
-                    <span className="text-[#0b6f63]/60">Remove</span>
+                    <span className="text-[#0b6f63]/[0.60]">Remove</span>
                   </button>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-[#102c3d]/52">No standards linked yet. Add at least one standard before saving.</p>
+              <p className="text-sm text-[#102c3d]/[0.52]">No standards linked yet. Add at least one standard before saving.</p>
             )}
             <div className="grid gap-2 rounded-2xl bg-[#f8fbfa] p-3 ring-1 ring-[#102c3d]/[0.06]">
               {filteredStandards.map((standard) => {
                 const active = draft.linkedStandardIds.includes(standard.id);
                 return (
-                  <button key={standard.id} type="button" onClick={() => toggleStandard(standard)} className={`rounded-xl border px-3 py-3 text-left transition ${active ? "border-[#159b8f]/30 bg-white shadow-[0_10px_18px_rgba(21,155,143,0.08)]" : "border-[#102c3d]/[0.07] bg-white hover:border-[#159b8f]/18"}`}>
+                  <button key={standard.id} type="button" onClick={() => toggleStandard(standard)} className={`rounded-xl border px-3 py-3 text-left transition ${active ? "border-[#159b8f]/[0.30] bg-white shadow-[0_10px_18px_rgba(21,155,143,0.08)]" : "border-[#102c3d]/[0.07] bg-white hover:border-[#159b8f]/[0.18]"}`}>
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="text-sm font-semibold text-[#102c3d]">{standard.title}</p>
-                        <p className="mt-1 text-xs text-[#102c3d]/48">{standard.referenceCode} | Level {standard.level} | {standard.occupationalRoute}</p>
+                        <p className="mt-1 text-xs text-[#102c3d]/[0.48]">{standard.referenceCode} | Level {standard.level} | {standard.occupationalRoute}</p>
                       </div>
                       <StatusBadge tone={active ? "green" : "neutral"}>{active ? "Selected" : "Add"}</StatusBadge>
                     </div>
@@ -1357,7 +1342,7 @@ function ProgrammeEditor({
             <TableAction onClick={onArchive} danger={draft.recordStatus === "Active"}>{draft.recordStatus === "Archived" ? "Restore programme" : "Archive programme"}</TableAction>
             <TableAction onClick={onRemove} danger>Remove programme</TableAction>
           </div>
-          <div className="min-w-[220px] text-right text-xs font-semibold text-[#102c3d]/48">{programmeProfileCompletion(draft.commercialProfile)}% programme completeness</div>
+          <div className="min-w-[220px] text-right text-xs font-semibold text-[#102c3d]/[0.48]">{programmeProfileCompletion(draft.commercialProfile)}% programme completeness</div>
         </div>
 
         <FormActions onCancel={onCancel} label="Save programme" error={error} />
@@ -1444,16 +1429,16 @@ function ProviderComparison({
         <div className="grid min-w-[980px] gap-3" style={{ gridTemplateColumns: `220px repeat(${cards.length}, minmax(0, 1fr))` }}>
           <div className="rounded-2xl border border-dashed border-[#102c3d]/[0.12] bg-[#f8fbfa] p-4">
             <p className="text-sm font-semibold text-[#102c3d]">Comparison focus</p>
-            <p className="mt-2 text-sm leading-6 text-[#102c3d]/56">Compare provider profiles the way an employer buyer would: proposition first, compliance after.</p>
+            <p className="mt-2 text-sm leading-6 text-[#102c3d]/[0.56]">Compare provider profiles the way an employer buyer would: proposition first, compliance after.</p>
           </div>
           {cards.map(({ provider, featuredProgramme, standard }) => (
             <div key={provider.providerId} className="rounded-2xl border border-[#102c3d]/[0.07] bg-white p-4 shadow-[0_14px_30px_rgba(16,44,61,0.045)]">
               <div className={`rounded-2xl bg-gradient-to-br ${providerTheme(provider.providerId)} p-4 text-white`}>
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-white/70">{provider.providerType}</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-white/[0.70]">{provider.providerType}</p>
                     <h3 className="mt-2 text-lg font-semibold">{provider.providerName}</h3>
-                    <p className="mt-2 text-sm text-white/78">{provider.commercialProfile.positioningStatement || fallbackProviderDescription(provider)}</p>
+                    <p className="mt-2 text-sm text-white/[0.78]">{provider.commercialProfile.positioningStatement || fallbackProviderDescription(provider)}</p>
                   </div>
                   <StatusBadge tone={provider.verificationStatus === "verified" ? "green" : "yellow"}>{provider.verificationStatus === "verified" ? "Verified" : "Review"}</StatusBadge>
                 </div>
@@ -1472,11 +1457,11 @@ function ProviderComparison({
           {rows.map((row) => (
             <div key={row.label} className="contents">
               <div className="rounded-2xl bg-[#f8fbfa] p-4 ring-1 ring-[#102c3d]/[0.06]">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/50">{row.label}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/[0.50]">{row.label}</p>
               </div>
               {cards.map((card) => (
                 <div key={`${row.label}-${card.provider.providerId}`} className="rounded-2xl bg-white p-4 ring-1 ring-[#102c3d]/[0.06]">
-                  <p className="text-sm leading-6 text-[#102c3d]/62">{row.render(card)}</p>
+                  <p className="text-sm leading-6 text-[#102c3d]/[0.62]">{row.render(card)}</p>
                 </div>
               ))}
             </div>
@@ -1510,7 +1495,7 @@ function ProgrammeMarketplaceCard({
         </div>
         <StatusBadge tone={programme.verificationStatus === "Needs manual verification" ? "yellow" : "green"}>{programme.commercialProfile.confidenceLabel || "High"}</StatusBadge>
       </div>
-      <p className="mt-3 text-sm leading-6 text-[#102c3d]/58">{programme.commercialProfile.tagline || programme.shortDescription || "Add employer-facing programme copy."}</p>
+      <p className="mt-3 text-sm leading-6 text-[#102c3d]/[0.58]">{programme.commercialProfile.tagline || programme.shortDescription || "Add employer-facing programme copy."}</p>
       <div className="mt-4 grid gap-2 sm:grid-cols-2">
         <MetricTile label="Delivery" value={programme.deliveryModels.join(", ") || "Not published"} compact />
         <MetricTile label="Standard" value={standard?.title || programme.linkedStandardName || "Needs verification"} compact />
@@ -1535,11 +1520,11 @@ function ProviderHeroCard({ provider, programmeCount }: { provider: ProviderCata
       <div className="grid gap-4 p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="inline-flex rounded-2xl bg-white/12 px-3 py-2 text-sm font-semibold backdrop-blur-sm">{providerWordmark(provider)}</div>
+            <div className="inline-flex rounded-2xl bg-white/[0.12] px-3 py-2 text-sm font-semibold backdrop-blur-sm">{providerWordmark(provider)}</div>
             <h3 className="mt-4 text-xl font-semibold">{provider.providerName || "Provider partner"}</h3>
-            <p className="mt-2 text-sm text-white/78">{provider.commercialProfile.positioningStatement || "Add a buyer-facing positioning statement."}</p>
+            <p className="mt-2 text-sm text-white/[0.78]">{provider.commercialProfile.positioningStatement || "Add a buyer-facing positioning statement."}</p>
           </div>
-          <BadgeCheck size={18} className="text-white/80" />
+          <BadgeCheck size={18} className="text-white/[0.80]" />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <MetricTile inverse label="Programmes" value={String(programmeCount)} compact />
@@ -1565,7 +1550,7 @@ function VerifiedSourcesCard({ urls, lastReviewed }: { urls: string[]; lastRevie
         <div className="mt-4 flex items-center gap-3 rounded-2xl bg-[#f8fbfa] px-3 py-3 ring-1 ring-[#102c3d]/[0.06]">
           <CalendarCheck size={15} className="shrink-0 text-[#0b8e82]" />
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#102c3d]/42">Last reviewed</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#102c3d]/[0.42]">Last reviewed</p>
             <p className="mt-0.5 text-sm font-semibold text-[#102c3d]">{reviewed}</p>
           </div>
         </div>
@@ -1573,12 +1558,12 @@ function VerifiedSourcesCard({ urls, lastReviewed }: { urls: string[]; lastRevie
       {sources.length ? (
         <div className="mt-3 grid gap-2">
           {sources.map((url) => (
-            <a key={url} href={url} target="_blank" rel="noreferrer" className="group flex items-center justify-between gap-3 rounded-2xl bg-[#f8fbfa] px-3 py-3 text-sm ring-1 ring-[#102c3d]/[0.06] transition hover:bg-white hover:ring-[#159b8f]/20">
+            <a key={url} href={url} target="_blank" rel="noreferrer" className="group flex items-center justify-between gap-3 rounded-2xl bg-[#f8fbfa] px-3 py-3 text-sm ring-1 ring-[#102c3d]/[0.06] transition hover:bg-white hover:ring-[#159b8f]/[0.20]">
               <span className="flex min-w-0 items-center gap-3">
                 <Globe2 size={15} className="shrink-0 text-[#0b8e82]" />
                 <span className="min-w-0">
                   <span className="block font-semibold text-[#102c3d]">Official provider website</span>
-                  <span className="block truncate text-xs text-[#102c3d]/48">{sourceHost(url)}</span>
+                  <span className="block truncate text-xs text-[#102c3d]/[0.48]">{sourceHost(url)}</span>
                 </span>
               </span>
               <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-[#0b6f63]">View source <ExternalLink size={13} /></span>
@@ -1603,13 +1588,13 @@ function DownloadsCard({ links, contactEmail }: { links: CommercialLink[]; conta
       </div>
       <div className="mt-4 grid gap-2">
         {downloads.map((link) => (
-          <div key={`${link.kind}-${link.label}`} className="flex items-center gap-3 rounded-2xl bg-[#f8fbfa] px-3 py-3 text-sm text-[#102c3d]/64 ring-1 ring-[#102c3d]/[0.06]">
+          <div key={`${link.kind}-${link.label}`} className="flex items-center gap-3 rounded-2xl bg-[#f8fbfa] px-3 py-3 text-sm text-[#102c3d]/[0.64] ring-1 ring-[#102c3d]/[0.06]">
             <Download size={14} className="shrink-0 text-[#0b8e82]" />
             <span>{cleanDisplayText(link.label)}</span>
           </div>
         ))}
         {email ? (
-          <div className="flex items-center gap-3 rounded-2xl bg-[#f8fbfa] px-3 py-3 text-sm text-[#102c3d]/64 ring-1 ring-[#102c3d]/[0.06]">
+          <div className="flex items-center gap-3 rounded-2xl bg-[#f8fbfa] px-3 py-3 text-sm text-[#102c3d]/[0.64] ring-1 ring-[#102c3d]/[0.06]">
             <Users size={14} className="shrink-0 text-[#0b8e82]" />
             <span>{email}</span>
           </div>
@@ -1624,12 +1609,12 @@ function MarketplaceSignalCard({ title, copy, items }: { title: string; copy: st
   return (
     <section className="rounded-2xl border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_14px_28px_rgba(16,44,61,0.045)]">
       <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">{title}</p>
-      <p className="mt-2 text-sm leading-6 text-[#102c3d]/58">{copy}</p>
+      <p className="mt-2 text-sm leading-6 text-[#102c3d]/[0.58]">{copy}</p>
       <div className="mt-4 grid gap-3">
         {values.map((item) => (
           <div key={item} className="flex items-start gap-3 rounded-2xl bg-[#f8fbfa] px-3 py-3 ring-1 ring-[#102c3d]/[0.06]">
             <Sparkles size={15} className="mt-0.5 shrink-0 text-[#0b8e82]" />
-            <p className="text-sm leading-6 text-[#102c3d]/60">{item}</p>
+            <p className="text-sm leading-6 text-[#102c3d]/[0.60]">{item}</p>
           </div>
         ))}
       </div>
@@ -1637,27 +1622,12 @@ function MarketplaceSignalCard({ title, copy, items }: { title: string; copy: st
   );
 }
 
-function SummaryCard({ label, value, copy, tone }: { label: string; value: string | number; copy: string; tone: "green" | "yellow" | "blue" }) {
-  const accent = {
-    green: "bg-[#e9f7f2] text-[#0b6f63]",
-    yellow: "bg-[#fff7cf] text-[#756000]",
-    blue: "bg-[#eef4f8] text-[#315e78]",
-  }[tone];
-  return (
-    <article className="rounded-xl border border-[#102c3d]/[0.07] bg-white p-4 shadow-[0_12px_26px_rgba(16,44,61,0.04)]">
-      <div className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${accent}`}>{label}</div>
-      <p className="mt-3 text-2xl font-semibold text-[#102c3d]">{value}</p>
-      <p className="mt-1 text-sm leading-6 text-[#102c3d]/58">{copy}</p>
-    </article>
-  );
-}
-
 function MetricTile({ label, value, inverse = false, compact = false }: { label: string; value: string; inverse?: boolean; compact?: boolean }) {
   const displayValue = cleanDisplayText(value);
   if (!displayValue) return null;
   return (
-    <div className={`rounded-2xl ${inverse ? "bg-white/10 ring-white/10 text-white" : "bg-[#f8fbfa] ring-[#102c3d]/[0.06] text-[#102c3d]"} ${compact ? "p-3" : "p-4"} ring-1`}>
-      <p className={`text-[10px] font-semibold uppercase tracking-[0.12em] ${inverse ? "text-white/62" : "text-[#102c3d]/42"}`}>{label}</p>
+    <div className={`rounded-2xl ${inverse ? "bg-white/[0.10] ring-white/[0.10] text-white" : "bg-[#f8fbfa] ring-[#102c3d]/[0.06] text-[#102c3d]"} ${compact ? "p-3" : "p-4"} ring-1`}>
+      <p className={`text-[10px] font-semibold uppercase tracking-[0.12em] ${inverse ? "text-white/[0.62]" : "text-[#102c3d]/[0.42]"}`}>{label}</p>
       <p className={`mt-2 ${compact ? "text-sm" : "text-base"} font-semibold ${inverse ? "text-white" : "text-[#102c3d]"}`}>{displayValue}</p>
     </div>
   );
@@ -1669,7 +1639,7 @@ function InfoSection({ title, copy }: { title: string; copy: string }) {
   return (
     <section className="rounded-2xl border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_14px_32px_rgba(16,44,61,0.045)]">
       <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">{title}</p>
-      <p className="mt-3 text-sm leading-7 text-[#102c3d]/60">{value}</p>
+      <p className="mt-3 text-sm leading-7 text-[#102c3d]/[0.60]">{value}</p>
     </section>
   );
 }
@@ -1694,7 +1664,7 @@ function Tag({ children, tone = "default" }: { children: string; tone?: "default
   const label = cleanDisplayText(children);
   if (!label) return null;
   return (
-    <span className={`inline-flex rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ${tone === "accent" ? "bg-[#edf7f3] text-[#0b6f63] ring-[#159b8f]/12" : "bg-white text-[#102c3d]/68 ring-[#102c3d]/[0.07]"}`}>
+    <span className={`inline-flex rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ${tone === "accent" ? "bg-[#edf7f3] text-[#0b6f63] ring-[#159b8f]/[0.12]" : "bg-white text-[#102c3d]/[0.68] ring-[#102c3d]/[0.07]"}`}>
       {label}
     </span>
   );
