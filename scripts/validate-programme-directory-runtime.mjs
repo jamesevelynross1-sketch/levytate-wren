@@ -44,7 +44,7 @@ for (const prompt of prompts) {
   assert(`${prompt} returns deterministic programme results`, result.executionMode === "deterministic" && ["programme_results", "no_results"].includes(result.structuredResult?.type));
   assert(`${prompt} uses factual directory title`, result.structuredResult?.title === "Programmes matching your selected filters");
   assert(`${prompt} contains no score fields or claims`, !/top match|match score|fit score|confidence|ranking|recommendation percentage/i.test(JSON.stringify(result)));
-  assert(`${prompt} deep-links to programme and provider profiles`, result.structuredResult?.rows.every((row) => row.actions?.some((action) => action.url.includes("module=Providers&programme=")) && row.actions?.some((action) => action.url.includes("module=Providers&provider="))));
+  assert(`${prompt} deep-links to Marketplace programme and provider profiles`, result.structuredResult?.rows.every((row) => row.actions?.some((action) => action.url.includes("module=Marketplace&programme=")) && row.actions?.some((action) => action.url.includes("module=Marketplace&provider="))));
 }
 
 const qa = await ask(sessions.lead, "What programmes does QA offer?");
@@ -52,8 +52,12 @@ assert("high-volume provider query returns the complete active QA catalogue", qa
 const srscc = await ask(sessions.lead, "What programmes does SRSCC offer?");
 assert("specialist provider query returns the complete active SRSCC catalogue", srscc.structuredResult?.totalCount === 3 && srscc.structuredResult.rows.every((row) => row.cells.provider === "SRSCC"));
 
-const employeeResult = await ask(sessions.employee, "Show Level 3 programmes.", "Employee");
-assert("Employee Copilot can browse factual programmes", employeeResult.executionMode === "deterministic" && employeeResult.structuredResult?.type === "programme_results");
+const employeeResult = await ask(sessions.employee, "Which programmes are available to employees?", "Employee");
+assert("Employee Copilot returns only active My Programmes", employeeResult.executionMode === "deterministic"
+  && employeeResult.structuredResult?.type === "programme_results"
+  && employeeResult.structuredResult?.title === "Programmes available to employees"
+  && employeeResult.structuredResult?.totalCount === workspaces.employee.data.organisationProgrammes.filter((selection) => selection.status === "Active").length
+  && employeeResult.structuredResult?.rows.every((row) => row.actions?.every((action) => action.url.includes("module=My%20Programmes"))));
 
 console.log(JSON.stringify({ ok: true, checksPassed: checks.length, programmeCounts: { employee: workspaces.employee.data.providerProgrammes.length, manager: workspaces.manager.data.providerProgrammes.length, lead: workspaces.lead.data.providerProgrammes.length }, prompts }, null, 2));
 

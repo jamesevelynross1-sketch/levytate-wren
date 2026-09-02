@@ -51,8 +51,8 @@ check("monthly spend is calculated", (summary.latest?.apprenticeshipSpendPence ?
 check("monthly expiry is calculated", (summary.latest?.expiredPence ?? 0) > 0);
 check("spend comparison is exact", summary.latest.spendVsContributionsPence === summary.latest.levyReceivedPence - summary.latest.apprenticeshipSpendPence);
 check("reported balance takes priority", summary.currentBalance.source === "reported");
-check("manual balance is second priority", calculateLevyFinance({ ...fixture, transactions: fixture.transactions.map(({ reportedBalancePence: _, ...item }) => item), manualBalancePence: 12300 }).currentBalance.source === "manual");
-check("balance can remain unconfirmed", calculateLevyFinance({ ...fixture, transactions: fixture.transactions.map(({ reportedBalancePence: _, ...item }) => item), manualBalancePence: undefined }).currentBalance.source === "unavailable");
+check("manual balance is second priority", calculateLevyFinance({ ...fixture, transactions: fixture.transactions.map(withoutReportedBalance), manualBalancePence: 12300 }).currentBalance.source === "manual");
+check("balance can remain unconfirmed", calculateLevyFinance({ ...fixture, transactions: fixture.transactions.map(withoutReportedBalance), manualBalancePence: undefined }).currentBalance.source === "unavailable");
 check("currency formatting is GBP", formatGbp(123456).startsWith("£1,235"));
 check("Apprenticeship Lead can read Finance", hasMvpPermission("Apprenticeship Lead", "finance:read"));
 check("Apprenticeship Lead can manage Finance", hasMvpPermission("Apprenticeship Lead", "finance:manage"));
@@ -65,12 +65,19 @@ const policy = await fs.readFile("lib/levytate/core-early-access-policy.ts", "ut
 const shell = await fs.readFile("components/levytate-mvp/LevyTateMvpApp.tsx", "utf8");
 const copilot = await fs.readFile("components/levytate-mvp/AskLevyTateAiWorkspace.tsx", "utf8");
 const financeCopilot = await fs.readFile("lib/levytate/finance/copilot.ts", "utf8");
-check("Finance is primary for Apprenticeship Lead", policy.slice(policy.indexOf('"Apprenticeship Lead":'), policy.indexOf('"Platform Admin":')).includes('item("Finance", "Finance", "enabled", "primary", "core")'));
+check("Finance is a managed core module for Apprenticeship Lead", policy.slice(policy.indexOf('"Apprenticeship Lead":'), policy.indexOf('"Platform Admin":')).includes('item("Finance", "Finance", "enabled", "manage", "core")'));
 check("Platform Admin Finance deep links are denied", policy.slice(policy.indexOf('"Platform Admin":'), policy.indexOf('"Employer Admin":')).includes('item("Finance", "Finance", "hidden", undefined, "role-denied")'));
 check("Finance module is wired into the shell", shell.includes('<LevyFinanceModule organisationId='));
 check("Finance Copilot bypasses the AI endpoint", copilot.indexOf('context?.module === "Finance"') < copilot.indexOf('fetch("/api/levytate-ai"'));
 check("Finance Copilot covers the six deterministic intents", ["spend", "received", "balance", "expired", "comparison", "summary"].every((intent) => financeCopilot.includes(`\"${intent}\"`)));
 check("Finance Copilot uses calculated summaries", financeCopilot.includes("calculateLevyFinance(state)") && !financeCopilot.includes("fetch("));
-check("no database migration was added", !(await fs.readdir("supabase/migrations")).some((file) => /finance/i.test(file)));
+const financeMigration = await fs.readFile("supabase/migrations/026_create_levy_finance_persistence.sql", "utf8");
+check("Finance persistence migration is additive and organisation scoped", financeMigration.includes("levytate_finance_imports") && financeMigration.includes("levytate_finance_transactions") && financeMigration.includes("organisation_id uuid not null") && !/\b(drop|truncate)\b|delete\s+from/i.test(financeMigration));
 
 console.log(`\nLevy Finance validation: ${passed}/${passed} checks passed`);
+
+function withoutReportedBalance(transaction) {
+  const copy = { ...transaction };
+  delete copy.reportedBalancePence;
+  return copy;
+}

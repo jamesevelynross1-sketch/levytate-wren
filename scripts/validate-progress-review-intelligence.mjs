@@ -36,7 +36,7 @@ assert.throws(()=>validateStructuredAnalysis({signals:[{signalType:"progress_det
 assert.throws(()=>validateStructuredAnalysis({signals:[{signalType:"unsupported",evidenceSourceIds:["real"]}]},new Set(["real"])),/Unsupported/);check("unsupported signal type rejected",true);
 const analyser=await fs.readFile("lib/levytate/intelligence/progress-review.ts","utf8");check("sensitive break notes excluded",!analyser.includes("reasonNotes")&&!analyser.includes("health_or_wellbeing"));
 const preserved=[...first];try{validateStructuredAnalysis(null,new Set());}catch{}check("analyser failure leaves existing signals intact",preserved.length===first.length&&preserved[0].id===first[0].id);
-const panel=await fs.readFile("components/levytate-mvp/ProgressReviewIntelligencePanel.tsx","utf8"),operations=await fs.readFile("components/levytate-mvp/OperationsCentreModule.tsx","utf8");check("Operations Centre remains independent of AI availability",operations.includes("/api/levytate-operations")&&panel.includes("progressReviewDemoSignals"));
-check("Preview signals restricted to fictional identities",operations.includes('userEmail?.endsWith(".test")'));
-check("migration is additive and unapplied source only",!migration.match(/\b(drop|truncate)\b|delete\s+from/i)&&migration.includes("on delete restrict"));
+const panel=await fs.readFile("components/levytate-mvp/ProgressReviewIntelligencePanel.tsx","utf8"),operations=await fs.readFile("components/levytate-mvp/OperationsCentreModule.tsx","utf8");check("Operations Centre remains independently data-backed",operations.includes("/api/levytate-operations")&&panel.includes("/api/levytate-intelligence/signals"));
+check("Real client signals are not gated by fictional identity",!operations.includes('userEmail?.endsWith(".test")')&&!panel.includes("progressReviewDemoSignals"));
+check("migration is additive and persistent",!migration.match(/\b(drop|truncate)\b|delete\s+from/i)&&migration.includes("on delete restrict"));
 console.log(`\nProgress Review Intelligence validation: ${passed}/${passed} checks passed`);

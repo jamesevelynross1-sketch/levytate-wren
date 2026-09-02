@@ -81,7 +81,7 @@ async function main() {
   assert("Unknown learner record returns safe not-found response", invalidDetailResponse.status === 404, await safeJson(invalidDetailResponse));
 
   const mutationResponse = await authedFetch("/api/levytate-learners", leadCookie, { method: "POST" });
-  assert("Learners endpoint does not expose write mutations", mutationResponse.status === 405 || mutationResponse.status === 404, await safeText(mutationResponse));
+  assert("Learner onboarding rejects malformed writes safely", mutationResponse.status === 400, await safeText(mutationResponse));
 
   console.log("Apprenticeship Lead learner record validation passed.");
   console.log(JSON.stringify({

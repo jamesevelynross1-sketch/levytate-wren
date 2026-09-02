@@ -4,7 +4,7 @@ const checks = [];
 const scenarios = [
   { email: "employee.demo@levytate.test", role: "Employee", labels: ["Home", "My Application", "My Apprenticeship", "Copilot", "Guidance Centre"], hidden: "Providers" },
   { email: "manager.demo@levytate.test", role: "Line Manager", labels: ["Home", "Approvals", "My Team", "Copilot", "Guidance Centre"], hidden: "Reports" },
-  { email: "apprenticeshiplead.demo@levytate.test", role: "Apprenticeship Lead", labels: ["Operations Centre", "Intelligence", "Applications", "Learners", "Providers", "Finance", "People", "Programmes", "Settings", "Copilot", "Guidance Centre"], hidden: "Reports" },
+  { email: "apprenticeshiplead.demo@levytate.test", role: "Apprenticeship Lead", labels: ["Home", "Applications", "Learners", "Operations Centre", "People", "My Providers", "My Programmes", "Finance", "Marketplace", "Intelligence", "Copilot", "Guidance Centre", "Settings"], hidden: "Reports" },
   { email: "hello@levytate.co.uk", role: "Platform Admin", labels: ["Employer Workspaces", "Provider Catalogue", "Access & Tenant Support", "Guidance Administration", "Support / Audit Context"], hidden: "Learners" },
 ];
 
