@@ -66,6 +66,14 @@ try {
   assert(afterSelectionA.data.organisationProgrammes.filter(active).length === 1 && afterSelectionB.data.organisationProgrammes.length === 0, "My Programmes selection is tenant-specific");
   assert(afterSelectionA.data.providers.length === globalCounts.providers && afterSelectionA.data.providerProgrammes.length === globalCounts.programmes, "employer selections do not copy or alter the global Marketplace");
 
+  await mutate(leadB.cookie, { type: "saveOrganisationProvider", selection: { providerId: qa.providerId, status: "Active", selectedAt: now, updatedAt: now } });
+  const independentlySelectedA = await workspace(leadA.cookie);
+  const independentlySelectedB = await workspace(leadB.cookie);
+  assert(independentlySelectedA.data.organisationProviders.filter(active).length === 1 && independentlySelectedB.data.organisationProviders.filter(active).length === 1, "both employers can independently select the same canonical provider");
+  await restJson(`levytate_organisation_providers?organisation_id=eq.${employerB.workspace.id}&provider_id=eq.${encodeURIComponent(qa.providerId)}`, { method: "DELETE", prefer: "return=minimal" });
+  const resetB = await workspace(leadB.cookie);
+  assert(resetB.data.organisationProviders.length === 0 && independentlySelectedA.data.organisationProviders.filter(active).length === 1, "test cleanup returns employer B to blank without affecting employer A");
+
   const roleId = `client-v1-role-${suffix}`;
   const leadEmployeeId = `client-v1-lead-${suffix}`;
   const managerEmployeeId = `client-v1-manager-${suffix}`;

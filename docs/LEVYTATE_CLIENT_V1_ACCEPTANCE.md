@@ -107,7 +107,7 @@ At the same time both employers could read the same global Marketplace and Provi
 
 ### Completed workflow
 
-Employer A added QA to `My Providers` and one QA programme to `My Programmes`; Employer B remained empty. The global records were unchanged. Employer A then added an Apprenticeship Lead, Line Manager and Employee, submitted and approved an employee application, onboarded the employee as a learner, recorded three progress updates and one provider review, generated and accepted one intelligence signal, completed its linked action, and imported two unique Finance transactions twice to prove duplicate protection.
+Employer A added QA to `My Providers` and one QA programme to `My Programmes`. Employer B independently selected the same canonical QA provider, proving that both relationships were organisation-owned; the temporary Employer B selection was then removed as test cleanup without affecting Employer A, so Employer B remained blank for the second-employer test. The global records were unchanged. Employer A then added an Apprenticeship Lead, Line Manager and Employee, submitted and approved an employee application, onboarded the employee as a learner, recorded three progress updates and one provider review, generated and accepted one intelligence signal, completed its linked action, and imported two unique Finance transactions twice to prove duplicate protection.
 
 Final Employer A acceptance state:
 
@@ -157,7 +157,7 @@ No Copilot validation transmitted employer data to an external model.
 
 The release candidate passed:
 
-- Client V1 live acceptance: 40/40 checks;
+- Client V1 live acceptance: 42/42 checks;
 - programme directory runtime: 64/64 checks;
 - reviews and progress workflow: 65/65 checks;
 - Core Early Access runtime: 20/20 checks;
