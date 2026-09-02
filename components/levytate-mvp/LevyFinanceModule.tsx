@@ -21,10 +21,26 @@ export function LevyFinanceModule({ organisationId, demoMode }: { organisationId
   const [upload, setUpload] = useState<{ fileName: string; csv: string; result: DasImportResult; mapping: DasColumnMapping } | null>(null);
   const [error, setError] = useState("");
   const [balanceInput, setBalanceInput] = useState("");
+  const [loading, setLoading] = useState(!demoMode);
 
   useEffect(() => {
-    const stored = readFinanceState(organisationId, demoMode ? "local" : "session");
-    setState(stored ?? (demoMode ? createIllustrativeFinanceFixture() : null));
+    if (demoMode) {
+      const stored = readFinanceState(organisationId, "local");
+      setState(stored ?? createIllustrativeFinanceFixture());
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    void fetch("/api/levytate-finance", { cache: "no-store" })
+      .then(async (response) => {
+        const body = await response.json() as { state?: LevyFinanceState; message?: string };
+        if (!response.ok || !body.state) throw new Error(body.message || "Finance unavailable.");
+        if (!cancelled) setState(body.state);
+      })
+      .catch(() => { if (!cancelled) setError("LevyTate Finance could not load safely. Try again."); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [demoMode, organisationId]);
 
   const summary = useMemo(() => state ? calculateLevyFinance(state) : null, [state]);
@@ -32,7 +48,7 @@ export function LevyFinanceModule({ organisationId, demoMode }: { organisationId
 
   function save(next: LevyFinanceState) {
     setState(next);
-    persistFinanceState(organisationId, next, demoMode ? "local" : "session");
+    if (demoMode) persistFinanceState(organisationId, next, "local");
   }
 
   async function chooseFile(file?: File) {
@@ -51,8 +67,15 @@ export function LevyFinanceModule({ organisationId, demoMode }: { organisationId
     setUpload({ ...upload, result });
   }
 
-  function importTransactions() {
+  async function importTransactions() {
     if (!upload || upload.result.needsMapping || !upload.result.transactions.length) return;
+    setError("");
+    if (!demoMode) {
+      const response = await fetch("/api/levytate-finance", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "import", fileName: upload.fileName, result: { transactions: upload.result.transactions, sourceRows: upload.result.sourceRows, dateRange: upload.result.dateRange } }) });
+      const body = await response.json() as { state?: LevyFinanceState; message?: string };
+      if (!response.ok || !body.state) { setError(body.message || "The DAS import could not be saved."); return; }
+      setState(body.state); setUpload(null); return;
+    }
     const current = state ?? { version: 1, mode: demoMode ? "local_import" : "session_import", transactions: [], imports: [] };
     const merged = mergeFinanceTransactions(current.transactions, upload.result.transactions);
     const next: LevyFinanceState = {
@@ -62,15 +85,22 @@ export function LevyFinanceModule({ organisationId, demoMode }: { organisationId
     save(next); setUpload(null);
   }
 
-  function confirmBalance() {
+  async function confirmBalance() {
     if (!state) return;
     const number = Number(balanceInput.replace(/[£,\s]/g, ""));
     if (!Number.isFinite(number) || number < 0) return setError("Enter the current DAS balance as a positive amount.");
-    save({ ...state, manualBalancePence: Math.round(number * 100), manualBalanceConfirmedAt: new Date().toISOString().slice(0, 10) });
+    const amountPence = Math.round(number * 100);
+    if (!demoMode) {
+      const response = await fetch("/api/levytate-finance", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "balance", amountPence }) });
+      const body = await response.json() as { state?: LevyFinanceState; message?: string };
+      if (!response.ok || !body.state) { setError(body.message || "The DAS balance could not be saved."); return; }
+      setState(body.state);
+    } else save({ ...state, manualBalancePence: amountPence, manualBalanceConfirmedAt: new Date().toISOString().slice(0, 10) });
     setBalanceInput(""); setError("");
   }
 
-  if (!state && !upload) return <EmptyFinance onFile={chooseFile} error={error} />;
+  if (loading) return <section className="grid min-h-[300px] place-items-center bg-white text-sm font-semibold text-[#102c3d]/[0.55]">Loading organisation finance…</section>;
+  if ((!state || !state.transactions.length) && !upload) return <EmptyFinance onFile={chooseFile} error={error} />;
   if (upload) return <ImportWorkspace upload={upload} setUpload={setUpload} onMapping={confirmMapping} onImport={importTransactions} onCancel={() => setUpload(null)} error={error} />;
   if (!state || !summary) return null;
 
@@ -114,7 +144,7 @@ export function LevyFinanceModule({ organisationId, demoMode }: { organisationId
   </div>;
 }
 
-function EmptyFinance({ onFile, error }: { onFile: (file?: File) => void; error: string }) { return <section className="grid min-h-[360px] place-items-center border border-[#102c3d]/[0.07] bg-white p-6 text-center"><div className="max-w-lg"><div className="mx-auto grid h-12 w-12 place-items-center bg-[#eaf5f1] text-[#0b776e]"><FileUp size={22} /></div><h2 className="mt-5 text-2xl font-semibold">Add DAS finance data</h2><p className="mt-3 text-sm leading-6 text-[#102c3d]/[0.56]">Upload the transaction history from your Apprenticeship Service account to calculate the monthly levy position.</p><label className="mt-5 inline-flex min-h-11 cursor-pointer items-center bg-[#102c3d] px-5 text-sm font-semibold text-white">Upload DAS transactions<input type="file" accept=".csv,text/csv" className="sr-only" onChange={(event) => void onFile(event.target.files?.[0])} /></label>{error ? <p className="mt-4 text-sm text-[#ad344e]">{error}</p> : null}</div></section>; }
+function EmptyFinance({ onFile, error }: { onFile: (file?: File) => void; error: string }) { return <section className="grid min-h-[360px] place-items-center border border-[#102c3d]/[0.07] bg-white p-6 text-center"><div className="max-w-lg"><div className="mx-auto grid h-12 w-12 place-items-center bg-[#eaf5f1] text-[#0b776e]"><FileUp size={22} /></div><h2 className="mt-5 text-2xl font-semibold">Bring your DAS finance data into LevyTate</h2><p className="mt-3 text-sm leading-6 text-[#102c3d]/[0.56]">Upload the transaction history from your Apprenticeship Service account to calculate the monthly levy position. Imports are stored only in this organisation.</p><label className="mt-5 inline-flex min-h-11 cursor-pointer items-center bg-[#102c3d] px-5 text-sm font-semibold text-white">Upload DAS transactions<input type="file" accept=".csv,text/csv" className="sr-only" onChange={(event) => void onFile(event.target.files?.[0])} /></label>{error ? <p className="mt-4 text-sm text-[#ad344e]">{error}</p> : null}</div></section>; }
 
 function ImportWorkspace({ upload, setUpload, onMapping, onImport, onCancel }: { upload: { fileName: string; csv: string; result: DasImportResult; mapping: DasColumnMapping }; setUpload: (value: typeof upload) => void; onMapping: () => void; onImport: () => void; onCancel: () => void; error: string }) {
   const review = upload.result.needsMapping;

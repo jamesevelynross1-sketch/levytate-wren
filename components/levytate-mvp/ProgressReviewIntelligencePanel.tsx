@@ -1,38 +1,58 @@
 "use client";
 
 import { ArrowRight, CheckCircle2, Eye, Lightbulb, ShieldAlert, TrendingDown, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { SemanticStatus, type OperationalTone } from "@/components/levytate-mvp/OperationalVisuals";
-import { progressReviewDemoScenarios } from "@/lib/levytate/intelligence/demo-progress-review";
-import { progressReviewDemoSignals } from "@/lib/levytate/intelligence/demo-progress-review-signals";
-import { acceptSignalAsOperationalAction, type IntelligenceDismissalReason, type IntelligenceSignal, type IntelligenceSignalStatus } from "@/lib/levytate/intelligence/progress-review";
+import { type IntelligenceDismissalReason, type IntelligenceSignal } from "@/lib/levytate/intelligence/progress-review";
 
 const dismissalReasons: IntelligenceDismissalReason[] = ["Already resolved", "Incorrect interpretation", "No action required", "Planned intervention already exists", "Other"];
-const scenarioNames = new Map(progressReviewDemoScenarios.map((input) => [input.learnerRecordId, input.learnerLabel ?? "Fictional learner"]));
-type SignalState = { status: IntelligenceSignalStatus; dismissalReason?: IntelligenceDismissalReason; linkedActionId?: string };
 
 export function ProgressReviewIntelligencePanel({ enabled, onSignalContext }: { enabled: boolean; onSignalContext?: (signal: IntelligenceSignal | null) => void }) {
-  const [states, setStates] = useState<Record<string, SignalState>>({});
+  const { data } = useMvpWorkspace();
+  const [signals, setSignals] = useState<IntelligenceSignal[]>([]);
   const [selected, setSelected] = useState<IntelligenceSignal | null>(null);
   const [dismissalReason, setDismissalReason] = useState<IntelligenceDismissalReason>("No action required");
   const [notice, setNotice] = useState("");
-  const signals = useMemo(() => progressReviewDemoSignals.filter((signal) => !["dismissed", "resolved"].includes(states[signal.id]?.status ?? signal.status)).slice(0, 4), [states]);
+  const [loading, setLoading] = useState(enabled);
+  const [error, setError] = useState("");
+  const scenarioNames = useMemo(() => new Map(data.learnerRecords.map((record) => [record.id, data.employees.find((employee) => employee.id === record.employeeId)?.name ?? "Learner"])), [data.employees, data.learnerRecords]);
+
+  useEffect(() => {
+    if (!enabled) return;
+    let cancelled = false;
+    setLoading(true);
+    void fetch("/api/levytate-intelligence/signals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "analyse" }) })
+      .then(async (response) => {
+        const body = await response.json() as { signals?: IntelligenceSignal[]; message?: string };
+        if (!response.ok) throw new Error(body.message || "Intelligence refresh failed.");
+        if (!cancelled) setSignals(body.signals ?? []);
+      })
+      .catch(() => { if (!cancelled) setError("Intelligence signals could not be refreshed safely."); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [enabled]);
   if (!enabled) return null;
 
-  const update = (signal: IntelligenceSignal, state: SignalState) => { setStates((current) => ({ ...current, [signal.id]: state })); setNotice(""); };
   const open = (signal: IntelligenceSignal) => { setSelected(signal); setNotice(""); };
   const close = () => { setSelected(null); setNotice(""); };
-  const accept = (signal: IntelligenceSignal) => {
-    const action = acceptSignalAsOperationalAction(signal);
-    update(signal, { status: "accepted", linkedActionId: action.id });
-    onSignalContext?.(signal);
-    setNotice("Action draft created for review.");
-  };
-  const primary = signals[0];
+  async function update(signal: IntelligenceSignal, action: "acknowledge" | "dismiss" | "accept", reason?: IntelligenceDismissalReason) {
+    setError("");
+    const response = await fetch("/api/levytate-intelligence/signals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, signalId: signal.id, reason }) });
+    const body = await response.json() as { signal?: IntelligenceSignal; message?: string };
+    if (!response.ok || !body.signal) { setError(body.message || "The signal could not be updated."); return; }
+    setSignals((current) => body.signal?.status === "dismissed" ? current.filter((item) => item.id !== signal.id) : current.map((item) => item.id === signal.id ? body.signal! : item));
+    setSelected(body.signal);
+    if (action === "accept") onSignalContext?.(body.signal);
+    setNotice(action === "accept" ? "Operational action created." : action === "acknowledge" ? "Signal acknowledged for human follow-up." : "Signal dismissed with its reason recorded.");
+    if (action === "dismiss") close();
+  }
+  const visibleSignals = signals.filter((signal) => !["dismissed", "resolved"].includes(signal.status)).slice(0, 4);
+  const primary = visibleSignals[0];
 
   return <section className="border-l-2 border-[#159b8f] bg-[#f4fbf8] px-5 py-5 sm:px-6" aria-labelledby="levytate-intelligence-title" data-testid="progress-review-intelligence">
     <div className="flex flex-wrap items-end justify-between gap-3">
-      <div><p className="text-[10px] font-semibold uppercase tracking-[.14em] text-[#0b6f63]">LevyTate Intelligence</p><h2 id="levytate-intelligence-title" className="mt-1 text-xl font-semibold tracking-[-.02em] text-[#102c3d]">LevyTate found {signals.length} things worth your attention</h2></div>
+      <div><p className="text-[10px] font-semibold uppercase tracking-[.14em] text-[#0b6f63]">LevyTate Intelligence</p><h2 id="levytate-intelligence-title" className="mt-1 text-xl font-semibold tracking-[-.02em] text-[#102c3d]">{loading ? "Reviewing live learner evidence" : `LevyTate found ${visibleSignals.length} things worth your attention`}</h2></div>
       <p className="text-xs font-semibold text-[#102c3d]/[0.48]">Human review required</p>
     </div>
 
@@ -42,8 +62,9 @@ export function ProgressReviewIntelligencePanel({ enabled, onSignalContext }: { 
       <button type="button" onClick={() => open(primary)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159b8f]">Review evidence <ArrowRight size={13} aria-hidden="true" /></button>
     </article> : null}
 
-    {signals.length > 1 ? <details className="mt-2"><summary className="min-h-11 cursor-pointer py-3 text-xs font-semibold text-[#0b6f63]">{signals.length - 1} more signal{signals.length === 2 ? "" : "s"}</summary><div className="grid gap-px bg-[#102c3d]/[.07] md:grid-cols-3">{signals.slice(1).map((signal) => <article key={signal.id} className="flex min-w-0 flex-col bg-[#f4fbf8] px-3 py-3"><SemanticStatus label={signal.priority} tone={categoryTone(signal.category)} /><h3 className="mt-2 text-sm font-semibold leading-5 text-[#102c3d]">{signal.title}</h3><p className="mt-1 text-xs text-[#102c3d]/[0.48]">{signal.evidence.length} evidence items</p><button type="button" onClick={() => open(signal)} className="mt-auto min-h-11 self-start text-xs font-semibold text-[#0b6f63] hover:text-[#102c3d]">Review evidence →</button></article>)}</div></details> : null}
-    {!signals.length ? <p className="mt-5 bg-white p-5 text-sm text-[#102c3d]/[0.56]">No new signals require review.</p> : null}
+    {visibleSignals.length > 1 ? <details className="mt-2"><summary className="min-h-11 cursor-pointer py-3 text-xs font-semibold text-[#0b6f63]">{visibleSignals.length - 1} more signal{visibleSignals.length === 2 ? "" : "s"}</summary><div className="grid gap-px bg-[#102c3d]/[.07] md:grid-cols-3">{visibleSignals.slice(1).map((signal) => <article key={signal.id} className="flex min-w-0 flex-col bg-[#f4fbf8] px-3 py-3"><SemanticStatus label={signal.priority} tone={categoryTone(signal.category)} /><h3 className="mt-2 text-sm font-semibold leading-5 text-[#102c3d]">{signal.title}</h3><p className="mt-1 text-xs text-[#102c3d]/[0.48]">{signal.evidence.length} evidence items</p><button type="button" onClick={() => open(signal)} className="mt-auto min-h-11 self-start text-xs font-semibold text-[#0b6f63] hover:text-[#102c3d]">Review evidence →</button></article>)}</div></details> : null}
+    {!loading && !visibleSignals.length ? <p className="mt-5 bg-white p-5 text-sm text-[#102c3d]/[0.56]">No signals need human review yet.</p> : null}
+    {error ? <p className="mt-4 bg-[#fff2f4] p-3 text-sm font-semibold text-[#ad344e]">{error}</p> : null}
 
     {selected ? <div className="fixed inset-0 z-[60] flex justify-end bg-[#102c3d]/[0.25]" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}><aside role="dialog" aria-modal="true" aria-labelledby="signal-detail-title" className="h-full w-full max-w-xl overflow-y-auto bg-white p-5 shadow-[-20px_0_55px_rgba(16,44,61,.18)] sm:p-7"><div className="flex items-start justify-between gap-4"><div><p className="text-[10px] font-semibold uppercase tracking-[.14em] text-[#0b6f63]">What changed</p><h3 id="signal-detail-title" className="mt-2 text-2xl font-semibold tracking-[-.025em] text-[#102c3d]">{selected.title}</h3></div><button type="button" onClick={close} aria-label="Close signal review" className="grid h-11 w-11 place-items-center rounded-lg text-[#102c3d]/[0.55] hover:bg-[#f3f7f5]"><X size={18} /></button></div>
       <div className="mt-5 border-y border-[#102c3d]/[.08] py-4"><SignalEvidenceSummary signal={selected} /></div>
@@ -52,7 +73,7 @@ export function ProgressReviewIntelligencePanel({ enabled, onSignalContext }: { 
       <section className="mt-6"><h4 className="flex items-center gap-2 text-sm font-semibold text-[#102c3d]"><Eye size={15} aria-hidden="true" />Evidence</h4><div className="mt-3 grid gap-2">{selected.evidence.map((item) => <article key={`${item.sourceType}:${item.sourceId}`} className="border-l-2 border-[#4f7b95] bg-[#f8fbfa] p-3"><p className="text-xs font-semibold text-[#102c3d]">{item.label} · {formatDate(item.sourceDate)}</p>{item.excerpt ? <p className="mt-2 text-sm leading-5 text-[#102c3d]/[0.58]">“{item.excerpt}”</p> : null}{item.metric ? <p className="mt-2 text-sm font-semibold text-[#a7354a]">{item.metric.label}: {item.metric.value}</p> : null}</article>)}</div></section>
       <section className="mt-6 border-l-2 border-[#159b8f] bg-[#f4fbf8] p-4"><h4 className="flex items-center gap-2 text-sm font-semibold text-[#102c3d]"><Lightbulb size={15} aria-hidden="true" />What next</h4><p className="mt-2 text-sm leading-6 text-[#102c3d]/[0.62]">{selected.recommendedAction}</p></section>
       {notice ? <p className="mt-4 bg-[#edf7f3] p-3 text-sm font-semibold text-[#0b6f63]">{notice}</p> : null}
-      <div className="mt-6 grid gap-3 border-t border-[#102c3d]/[.08] pt-5"><div className="flex flex-wrap gap-2"><button type="button" onClick={() => accept(selected)} disabled={selected.confidence === "Low"} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#0b6f63] px-4 text-xs font-semibold text-white disabled:opacity-40"><CheckCircle2 size={14} aria-hidden="true" />Accept action</button><button type="button" onClick={() => { update(selected, { status: "acknowledged" }); setNotice("Signal acknowledged for human follow-up."); }} className="min-h-11 rounded-full border border-[#102c3d]/[0.10] px-4 text-xs font-semibold text-[#102c3d]">Acknowledge</button></div><div className="flex flex-col gap-2 bg-[#fff8df] p-3 sm:flex-row"><label className="sr-only" htmlFor="signal-dismissal-reason">Dismissal reason</label><select id="signal-dismissal-reason" value={dismissalReason} onChange={(event) => setDismissalReason(event.target.value as IntelligenceDismissalReason)} className="min-h-11 flex-1 rounded-lg border border-[#102c3d]/[0.10] bg-white px-3 text-xs text-[#102c3d]">{dismissalReasons.map((reason) => <option key={reason}>{reason}</option>)}</select><button type="button" onClick={() => { update(selected, { status: "dismissed", dismissalReason }); close(); }} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-4 text-xs font-semibold text-[#765b00]"><ShieldAlert size={14} aria-hidden="true" />Dismiss</button></div></div>
+      <div className="mt-6 grid gap-3 border-t border-[#102c3d]/[.08] pt-5"><div className="flex flex-wrap gap-2"><button type="button" onClick={() => void update(selected, "accept")} disabled={selected.confidence === "Low"} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#0b6f63] px-4 text-xs font-semibold text-white disabled:opacity-40"><CheckCircle2 size={14} aria-hidden="true" />Accept action</button><button type="button" onClick={() => void update(selected, "acknowledge")} className="min-h-11 rounded-full border border-[#102c3d]/[0.10] px-4 text-xs font-semibold text-[#102c3d]">Acknowledge</button></div><div className="flex flex-col gap-2 bg-[#fff8df] p-3 sm:flex-row"><label className="sr-only" htmlFor="signal-dismissal-reason">Dismissal reason</label><select id="signal-dismissal-reason" value={dismissalReason} onChange={(event) => setDismissalReason(event.target.value as IntelligenceDismissalReason)} className="min-h-11 flex-1 rounded-lg border border-[#102c3d]/[0.10] bg-white px-3 text-xs text-[#102c3d]">{dismissalReasons.map((reason) => <option key={reason}>{reason}</option>)}</select><button type="button" onClick={() => void update(selected, "dismiss", dismissalReason)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-4 text-xs font-semibold text-[#765b00]"><ShieldAlert size={14} aria-hidden="true" />Dismiss</button></div></div>
     </aside></div> : null}
   </section>;
 }

@@ -43,7 +43,7 @@ export type LevyFinanceImportRecord = {
 
 export type LevyFinanceState = {
   version: 1;
-  mode: "fixture" | "local_import" | "session_import";
+  mode: "fixture" | "local_import" | "session_import" | "persistent";
   transactions: DasFinanceTransaction[];
   imports: LevyFinanceImportRecord[];
   manualBalancePence?: number;

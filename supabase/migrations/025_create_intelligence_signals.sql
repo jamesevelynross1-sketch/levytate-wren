@@ -1,4 +1,5 @@
--- PROPOSED ONLY: do not apply to the shared LevyTate project without explicit approval.
+-- Persistent organisation-scoped Progress Review Intelligence signals for LevyTate Client V1.
+-- Additive only: existing workspace and learner data is not altered.
 create table public.levytate_intelligence_signals (
   organisation_id uuid not null references public.levytate_organisations(id) on delete restrict,
   id text not null,
