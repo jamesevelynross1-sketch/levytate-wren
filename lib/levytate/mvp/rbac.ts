@@ -60,6 +60,8 @@ export type MvpWorkspaceMutationType =
   | "archiveProviderProgramme"
   | "removeProviderProgramme"
   | "saveProviderRelationship"
+  | "saveOrganisationProvider"
+  | "saveOrganisationProgramme"
   | "saveMatchingRequest"
   | "updateMatchingStatus"
   | "saveEnrolment"
@@ -75,8 +77,7 @@ export type MvpWorkspaceMutationType =
   | "recordWithdrawal"
   | "updateAssessmentReadiness"
   | "recordAchievement"
-  | "completeOperationalAction"
-  | "migrateWorkspaceSnapshot";
+  | "completeOperationalAction";
 
 const allPermissions = [
   "workspace:read",
@@ -204,6 +205,8 @@ export const mvpMutationPermission = {
   archiveProviderProgramme: "providers:archive",
   removeProviderProgramme: "providers:archive",
   saveProviderRelationship: "providerRelationships:write",
+  saveOrganisationProvider: "providerRelationships:write",
+  saveOrganisationProgramme: "providerRelationships:write",
   saveMatchingRequest: "providerMatching:write",
   updateMatchingStatus: "providerMatching:status",
   saveEnrolment: "enrolments:write",
@@ -220,7 +223,6 @@ export const mvpMutationPermission = {
   updateAssessmentReadiness: "learnerLifecycle:write",
   recordAchievement: "learnerLifecycle:status",
   completeOperationalAction: "learnerLifecycle:write",
-  migrateWorkspaceSnapshot: "workspace:migrate",
 } as const satisfies Record<MvpWorkspaceMutationType, MvpPermission>;
 
 export function normaliseMvpUserRole(role: string | null | undefined): MvpUserRole {

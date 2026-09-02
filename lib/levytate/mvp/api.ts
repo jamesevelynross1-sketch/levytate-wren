@@ -8,6 +8,8 @@ import type {
   MvpEnrolmentStatus,
   MvpMatchingRequest,
   MvpMatchingStatus,
+  MvpOrganisationProgramme,
+  MvpOrganisationProvider,
   MvpProviderRelationship,
   MvpRole,
   MvpWorkspaceData,
@@ -62,8 +64,9 @@ export type LevyTateWorkspaceMutation =
   | { type: "archiveProviderProgramme"; id: string }
   | { type: "removeProviderProgramme"; id: string }
   | { type: "saveProviderRelationship"; relationship: MvpProviderRelationship }
+  | { type: "saveOrganisationProvider"; selection: MvpOrganisationProvider }
+  | { type: "saveOrganisationProgramme"; selection: MvpOrganisationProgramme }
   | { type: "saveMatchingRequest"; request: MvpMatchingRequest }
   | { type: "updateMatchingStatus"; id: string; status: MvpMatchingStatus }
   | { type: "saveEnrolment"; enrolment: MvpEnrolment }
-  | { type: "updateEnrolmentStatus"; id: string; status: MvpEnrolmentStatus }
-  | { type: "migrateWorkspaceSnapshot"; snapshot: MvpWorkspaceData };
+  | { type: "updateEnrolmentStatus"; id: string; status: MvpEnrolmentStatus };

@@ -6,7 +6,6 @@ import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { PublicFooter, PublicHeader } from "@/components/levytate-public/PublicHeader";
 import {
   earlyAccessEmployeeBands,
-  earlyAccessStorageKey,
   type EarlyAccessRequest,
 } from "@/lib/levytate/early-access/domain";
 
@@ -85,7 +84,6 @@ export function EarlyAccessRequestPage() {
 
       setSubmittedLead(payload.lead);
       setForm(initialState);
-      persistSubmittedLead(payload.lead);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Early access is temporarily unavailable.");
     } finally {
@@ -276,17 +274,5 @@ function SuccessState({ organisation }: { organisation: string }) {
       </div>
     </div>
   );
-}
-
-function persistSubmittedLead(lead: EarlyAccessRequest) {
-  if (typeof window === "undefined") return;
-
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(earlyAccessStorageKey) ?? "[]") as EarlyAccessRequest[];
-    const next = [lead, ...parsed.filter((entry) => entry.id !== lead.id)];
-    window.localStorage.setItem(earlyAccessStorageKey, JSON.stringify(next));
-  } catch {
-    window.localStorage.setItem(earlyAccessStorageKey, JSON.stringify([lead]));
-  }
 }
 

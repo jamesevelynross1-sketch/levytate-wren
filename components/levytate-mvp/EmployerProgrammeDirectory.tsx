@@ -32,6 +32,8 @@ type Filters = {
   category: string;
 };
 
+type MarketplaceView = "Programmes" | "Providers";
+
 const emptyFilters: Filters = { search: "", level: "All", provider: "All", delivery: "All", location: "All", category: "All" };
 const missingInformation = "Further programme information is being reviewed.";
 const directoryPageSize = 24;
@@ -109,9 +111,10 @@ function matchesSearch(index: string, term: string) {
 }
 
 export function EmployerProgrammeDirectory() {
-  const { data } = useMvpWorkspace();
+  const { data, saveOrganisationProvider, saveOrganisationProgramme } = useMvpWorkspace();
   const { selectableStandards } = useLevyTateStandards();
   const [filters, setFilters] = useState<Filters>(emptyFilters);
+  const [view, setView] = useState<MarketplaceView>("Programmes");
   const [programmeId, setProgrammeId] = useState<string | null>(null);
   const [providerId, setProviderId] = useState<string | null>(null);
   const [comparison, setComparison] = useState<string[]>([]);
@@ -159,6 +162,8 @@ export function EmployerProgrammeDirectory() {
       && (filters.category === "All" || categoryLabel(item) === filters.category);
   }), [directory, filters]);
   const visibleResults = results.slice(0, visibleCount);
+  const providerResults = useMemo(() => [...new Map(results.map((item) => [item.provider.providerId, item.provider])).values()], [results]);
+  const visibleProviderResults = providerResults.slice(0, visibleCount);
 
   useEffect(() => setVisibleCount(directoryPageSize), [filters]);
 
@@ -172,7 +177,7 @@ export function EmployerProgrammeDirectory() {
   }
 
   function setUrl(next: { programme?: string; provider?: string }) {
-    const params = new URLSearchParams({ module: "Providers" });
+    const params = new URLSearchParams({ module: "Marketplace" });
     if (next.programme) params.set("programme", next.programme);
     if (next.provider) params.set("provider", next.provider);
     window.history.replaceState(null, "", `/levytate/app?${params.toString()}`);
@@ -202,15 +207,31 @@ export function EmployerProgrammeDirectory() {
     setComparison((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id].slice(-3));
   }
 
-  if (selectedProgramme) return <ProgrammeDetail item={selectedProgramme} onBack={back} onProvider={() => openProvider(selectedProgramme.provider.providerId)} />;
-  if (selectedProvider) return <ProviderProfile provider={selectedProvider} programmes={providerProgrammes} onBack={back} onProgramme={openProgramme} />;
+  function addProvider(id: string) {
+    const now = new Date().toISOString();
+    saveOrganisationProvider({ providerId: id, status: "Active", selectedAt: now, updatedAt: now });
+  }
+
+  function addProgramme(item: DirectoryProgramme) {
+    const now = new Date().toISOString();
+    saveOrganisationProgramme({ programmeId: item.programme.id, providerId: item.provider.providerId, status: "Active", selectedAt: now, updatedAt: now });
+  }
+
+  if (selectedProgramme) return <ProgrammeDetail item={selectedProgramme} selected={data.organisationProgrammes.some((item) => item.programmeId === selectedProgramme.programme.id && item.status === "Active")} onAdd={() => addProgramme(selectedProgramme)} onBack={back} onProvider={() => openProvider(selectedProgramme.provider.providerId)} />;
+  if (selectedProvider) return <ProviderProfile provider={selectedProvider} programmes={providerProgrammes} selected={data.organisationProviders.some((item) => item.providerId === selectedProvider.providerId && item.status === "Active")} onAdd={() => addProvider(selectedProvider.providerId)} onBack={back} onProgramme={openProgramme} />;
 
   const visibleProviders = new Set(results.map((item) => item.provider.providerId)).size;
   return (
     <div className="grid gap-6">
       <header>
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0b8e82]">Factual programme directory</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0b8e82]">Global factual marketplace</p>
+        <h1 className="mt-2 text-3xl font-semibold tracking-[-0.03em] text-[#102c3d]">Providers and apprenticeship programmes</h1>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-[#102c3d]/[0.58]">Browse LevyTate’s verified catalogue, then add only the providers and programmes your organisation uses.</p>
       </header>
+
+      <div className="flex w-fit rounded-full bg-[#edf3f0] p-1" role="tablist" aria-label="Marketplace view">
+        {(["Programmes", "Providers"] as MarketplaceView[]).map((item) => <button key={item} type="button" role="tab" aria-selected={view === item} onClick={() => { setView(item); setVisibleCount(directoryPageSize); }} className={`min-h-11 rounded-full px-5 text-sm font-semibold ${view === item ? "bg-white text-[#102c3d] shadow-sm" : "text-[#102c3d]/[0.58]"}`}>{item}</button>)}
+      </div>
 
       <section aria-label="Directory summary" className="grid grid-cols-2 border-y border-[#102c3d]/[0.08] sm:max-w-md">
         <Count label="Programmes" value={results.length} />
@@ -231,15 +252,25 @@ export function EmployerProgrammeDirectory() {
         {Object.values(filters).some((value) => value && value !== "All") ? <button type="button" onClick={() => setFilters(emptyFilters)} className="min-h-11 w-fit rounded-full px-4 text-sm font-semibold text-[#0b6f63] hover:bg-[#edf7f3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159b8f]">Clear filters</button> : null}
       </section>
 
-      {results.length ? (
+      {view === "Programmes" && results.length ? (
         <section aria-label="Programme results" className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {visibleResults.map((item) => <ProgrammeCard key={item.programme.id} item={item} compared={comparison.includes(item.programme.id)} onOpen={() => openProgramme(item.programme.id)} onCompare={() => toggleComparison(item.programme.id)} />)}
+          {visibleResults.map((item) => <ProgrammeCard key={item.programme.id} item={item} selected={data.organisationProgrammes.some((selection) => selection.programmeId === item.programme.id && selection.status === "Active")} compared={comparison.includes(item.programme.id)} onOpen={() => openProgramme(item.programme.id)} onAdd={() => addProgramme(item)} onCompare={() => toggleComparison(item.programme.id)} />)}
         </section>
-      ) : <p className="rounded-2xl border border-dashed border-[#102c3d]/[0.15] py-12 text-center text-sm text-[#102c3d]/[0.55]">No programmes match the selected filters.</p>}
+      ) : null}
 
-      {visibleResults.length < results.length ? <button type="button" onClick={() => setVisibleCount((current) => Math.min(current + directoryPageSize, results.length))} className="mx-auto min-h-11 rounded-full border border-[#102c3d]/[0.10] bg-white px-5 text-sm font-semibold text-[#102c3d] hover:bg-[#edf7f3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159b8f]">Load more programmes</button> : null}
+      {view === "Providers" && providerResults.length ? (
+        <section aria-label="Provider results" className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {visibleProviderResults.map((provider) => <ProviderCard key={provider.providerId} provider={provider} programmeCount={directory.filter((item) => item.provider.providerId === provider.providerId).length} selected={data.organisationProviders.some((selection) => selection.providerId === provider.providerId && selection.status === "Active")} onOpen={() => openProvider(provider.providerId)} onAdd={() => addProvider(provider.providerId)} />)}
+        </section>
+      ) : null}
 
-      {compared.length ? <ProgrammeComparison items={compared} onRemove={toggleComparison} onOpen={openProgramme} /> : null}
+      {view === "Programmes" && !results.length ? <p className="rounded-2xl border border-dashed border-[#102c3d]/[0.15] py-12 text-center text-sm text-[#102c3d]/[0.55]">No programmes match the selected filters.</p> : null}
+      {view === "Providers" && !providerResults.length ? <p className="rounded-2xl border border-dashed border-[#102c3d]/[0.15] py-12 text-center text-sm text-[#102c3d]/[0.55]">No providers match the selected filters.</p> : null}
+
+      {view === "Programmes" && visibleResults.length < results.length ? <button type="button" onClick={() => setVisibleCount((current) => Math.min(current + directoryPageSize, results.length))} className="mx-auto min-h-11 rounded-full border border-[#102c3d]/[0.10] bg-white px-5 text-sm font-semibold text-[#102c3d] hover:bg-[#edf7f3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159b8f]">Load more programmes</button> : null}
+      {view === "Providers" && visibleProviderResults.length < providerResults.length ? <button type="button" onClick={() => setVisibleCount((current) => Math.min(current + directoryPageSize, providerResults.length))} className="mx-auto min-h-11 rounded-full border border-[#102c3d]/[0.10] bg-white px-5 text-sm font-semibold text-[#102c3d] hover:bg-[#edf7f3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159b8f]">Load more providers</button> : null}
+
+      {view === "Programmes" && compared.length ? <ProgrammeComparison items={compared} onRemove={toggleComparison} onOpen={openProgramme} /> : null}
     </div>
   );
 }
@@ -252,14 +283,26 @@ function Filter({ label, value, values, onChange }: { label: string; value: stri
   return <label className="grid gap-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/[0.45]">{label}<select aria-label={label} value={value} onChange={(event) => onChange(event.target.value)} className="min-h-11 min-w-0 rounded-xl border border-[#102c3d]/[0.10] bg-white px-3 text-sm font-semibold normal-case tracking-normal text-[#102c3d]"><option>All</option>{values.map((item) => <option key={item}>{item}</option>)}</select></label>;
 }
 
-function ProgrammeCard({ item, compared, onOpen, onCompare }: { item: DirectoryProgramme; compared: boolean; onOpen: () => void; onCompare: () => void }) {
+function ProviderCard({ provider, programmeCount, selected, onOpen, onAdd }: { provider: ProviderCatalogueRecord; programmeCount: number; selected: boolean; onOpen: () => void; onAdd: () => void }) {
+  return (
+    <article className="flex min-h-[260px] flex-col border border-[#102c3d]/[0.08] bg-white p-5 shadow-[0_10px_24px_rgba(16,44,61,0.035)]">
+      <div className="flex items-start justify-between gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-[#eaf5f1] text-[#0b776e]"><Building2 size={19} /></span><SemanticStatus label={provider.verificationStatus === "verified" ? "Information verified" : "Information awaiting review"} tone={provider.verificationStatus === "verified" ? "healthy" : "watch"} /></div>
+      <h2 className="mt-4 text-xl font-semibold tracking-[-0.02em]">{provider.providerName}</h2>
+      <p className="mt-2 text-sm leading-6 text-[#102c3d]/[0.58]">{provider.specialisms.slice(0, 3).join(", ") || "Provider specialisms are being reviewed."}</p>
+      <dl className="mt-4 grid grid-cols-2 gap-3"><DetailFact label="Programmes" value={String(programmeCount)} /><DetailFact label="Coverage" value={provider.regions.slice(0, 2).join(", ") || "Being reviewed"} /></dl>
+      <div className="mt-auto grid gap-2 pt-5"><button type="button" onClick={onOpen} className="min-h-11 rounded-full bg-[#102c3d] px-4 text-sm font-semibold text-white">View provider</button><button type="button" disabled={selected} onClick={onAdd} className="min-h-11 rounded-full border border-[#159b8f]/[0.22] px-4 text-sm font-semibold text-[#0b6f63] disabled:bg-[#edf7f3] disabled:text-[#0b6f63]/70">{selected ? "In My Providers" : "Add to My Providers"}</button></div>
+    </article>
+  );
+}
+
+function ProgrammeCard({ item, selected, compared, onOpen, onAdd, onCompare }: { item: DirectoryProgramme; selected: boolean; compared: boolean; onOpen: () => void; onAdd: () => void; onCompare: () => void }) {
   return (
     <article className="flex min-h-[275px] flex-col border border-[#102c3d]/[0.08] bg-white p-5 shadow-[0_10px_24px_rgba(16,44,61,0.035)]">
       <div className="flex items-start justify-between gap-3"><span className="inline-flex h-9 min-w-9 items-center justify-center rounded-lg bg-[#eef5fa] px-2 text-sm font-semibold text-[#315d78]">{levelMarker(item)}</span><SemanticStatus label={verificationLabel(item.programme, item.provider)} tone={verificationLabel(item.programme, item.provider) === "Information verified" ? "healthy" : "watch"} /></div>
       <h2 className="mt-4 text-xl font-semibold tracking-[-0.02em]">{item.programme.programmeName}</h2>
       <p className="mt-2 text-sm font-semibold text-[#0b6f63]">{item.provider.providerName}</p>
       <dl className="mt-4 grid gap-2 text-xs text-[#102c3d]/[0.58]"><Fact icon={GraduationCap} value={standardLabel(item)} /><Fact icon={Timer} value={durationLabel(item.programme)} /><Fact icon={Building2} value={deliveryLabel(item.programme, item.provider)} /><Fact icon={MapPin} value={coverageLabel(item.programme, item.provider)} /></dl>
-      <div className="mt-auto grid grid-cols-[1fr_auto] gap-2 pt-5"><button type="button" onClick={onOpen} className="min-h-11 rounded-full bg-[#102c3d] px-4 text-sm font-semibold text-white hover:bg-[#17394d] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159b8f]">View programme</button><button type="button" aria-label={`${compared ? "Remove" : "Add"} ${item.programme.programmeName} ${compared ? "from" : "to"} comparison`} onClick={onCompare} className={`grid min-h-11 min-w-11 place-items-center rounded-full ring-1 ${compared ? "bg-[#edf7f3] text-[#0b6f63] ring-[#159b8f]/[0.20]" : "bg-white text-[#102c3d]/[0.60] ring-[#102c3d]/[0.10]"}`}><GitCompareArrows size={17} /></button></div>
+      <div className="mt-auto grid gap-2 pt-5"><button type="button" onClick={onOpen} className="min-h-11 rounded-full bg-[#102c3d] px-4 text-sm font-semibold text-white hover:bg-[#17394d] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159b8f]">View programme</button><div className="grid grid-cols-[1fr_auto] gap-2"><button type="button" disabled={selected} onClick={onAdd} className="min-h-11 rounded-full border border-[#159b8f]/[0.22] px-4 text-sm font-semibold text-[#0b6f63] disabled:bg-[#edf7f3] disabled:text-[#0b6f63]/70">{selected ? "In My Programmes" : "Add to My Programmes"}</button><button type="button" aria-label={`${compared ? "Remove" : "Add"} ${item.programme.programmeName} ${compared ? "from" : "to"} comparison`} onClick={onCompare} className={`grid min-h-11 min-w-11 place-items-center rounded-full ring-1 ${compared ? "bg-[#edf7f3] text-[#0b6f63] ring-[#159b8f]/[0.20]" : "bg-white text-[#102c3d]/[0.60] ring-[#102c3d]/[0.10]"}`}><GitCompareArrows size={17} /></button></div></div>
     </article>
   );
 }
@@ -268,25 +311,25 @@ function Fact({ icon: Icon, value }: { icon: typeof GraduationCap; value: string
   return <div className="flex items-start gap-2"><Icon size={14} className="mt-0.5 shrink-0 text-[#0b8e82]" aria-hidden="true" /><span>{value}</span></div>;
 }
 
-function ProgrammeDetail({ item, onBack, onProvider }: { item: DirectoryProgramme; onBack: () => void; onProvider: () => void }) {
+function ProgrammeDetail({ item, selected, onAdd, onBack, onProvider }: { item: DirectoryProgramme; selected: boolean; onAdd: () => void; onBack: () => void; onProvider: () => void }) {
   const overview = clean(item.programme.fullDescription) || clean(item.programme.shortDescription) || missingInformation;
   return (
     <div className="mx-auto grid max-w-5xl gap-5">
       <Back onClick={onBack}>Back to Programmes &amp; Providers</Back>
-      <header className="rounded-[1.6rem] bg-[#eaf5f1] p-6 sm:p-8"><div className="flex flex-wrap gap-2"><Badge>{levelLabel(item)}</Badge><Badge>{verificationLabel(item.programme, item.provider)}</Badge></div><h1 className="mt-4 text-3xl font-semibold tracking-[-0.03em]">{item.programme.programmeName}</h1><button type="button" onClick={onProvider} className="mt-2 min-h-11 text-left text-sm font-semibold text-[#0b6f63] underline-offset-4 hover:underline">Delivered by {item.provider.providerName}</button><p className="mt-3 max-w-3xl text-sm leading-7 text-[#102c3d]/[0.65]">{overview}</p></header>
+      <header className="rounded-[1.6rem] bg-[#eaf5f1] p-6 sm:p-8"><div className="flex flex-wrap gap-2"><Badge>{levelLabel(item)}</Badge><Badge>{verificationLabel(item.programme, item.provider)}</Badge></div><h1 className="mt-4 text-3xl font-semibold tracking-[-0.03em]">{item.programme.programmeName}</h1><button type="button" onClick={onProvider} className="mt-2 min-h-11 text-left text-sm font-semibold text-[#0b6f63] underline-offset-4 hover:underline">Delivered by {item.provider.providerName}</button><p className="mt-3 max-w-3xl text-sm leading-7 text-[#102c3d]/[0.65]">{overview}</p><button type="button" disabled={selected} onClick={onAdd} className="mt-5 min-h-11 rounded-full bg-[#102c3d] px-5 text-sm font-semibold text-white disabled:bg-[#0b6f63]">{selected ? "In My Programmes" : "Add provider and programme"}</button></header>
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><DetailFact label="Standard" value={standardLabel(item)} /><DetailFact label="Duration" value={durationLabel(item.programme)} /><DetailFact label="Delivery" value={deliveryLabel(item.programme, item.provider)} /><DetailFact label="Locations" value={coverageLabel(item.programme, item.provider)} /></section>
       <section className="grid gap-5 lg:grid-cols-2"><Info title="Typical learner activities" items={unique([...item.programme.skillsDeveloped, ...item.programme.technologiesCovered])} /><Info title="Suitable roles or teams" items={unique([...item.programme.targetJobRoles, ...item.programme.commercialProfile.typicalDepartments])} /><Copy title="Employer considerations" value={clean(item.programme.commercialProfile.employerCommitment) || missingInformation} /><Copy title="Learner support" value={clean(item.programme.commercialProfile.idealAudience) || missingInformation} /><Copy title="Assessment model" value={clean(item.programme.commercialProfile.assessmentApproach) || missingInformation} /><Info title="Programme outcomes" items={unique([...item.programme.commercialProfile.keyOutcomes, ...item.programme.expectedOutcomes])} /></section>
     </div>
   );
 }
 
-function ProviderProfile({ provider, programmes, onBack, onProgramme }: { provider: ProviderCatalogueRecord; programmes: DirectoryProgramme[]; onBack: () => void; onProgramme: (id: string) => void }) {
+function ProviderProfile({ provider, programmes, selected, onAdd, onBack, onProgramme }: { provider: ProviderCatalogueRecord; programmes: DirectoryProgramme[]; selected: boolean; onAdd: () => void; onBack: () => void; onProgramme: (id: string) => void }) {
   const overview = clean(provider.commercialProfile.organisationDescription) || clean(provider.commercialProfile.positioningStatement) || "Further provider information is being reviewed.";
   const employerSupport = unique(programmes.map((item) => item.programme.commercialProfile.employerCommitment));
   return (
     <div className="mx-auto grid max-w-5xl gap-5">
       <Back onClick={onBack}>Back to Programmes &amp; Providers</Back>
-      <header className="bg-[#102c3d] p-6 text-white sm:p-8"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#7ad1c5]">Provider profile</p><h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em]">{provider.providerName}</h1><dl className="mt-5 grid gap-3 sm:grid-cols-4"><QuickFact label="Programmes" value={String(programmes.length)} /><QuickFact label="Delivery" value={unique(provider.deliveryModels).slice(0, 2).join(", ") || "Being reviewed"} /><QuickFact label="Coverage" value={unique(provider.regions).slice(0, 2).join(", ") || "Being reviewed"} /><QuickFact label="Specialisms" value={unique(provider.specialisms).slice(0, 2).join(", ") || "Being reviewed"} /></dl><details className="mt-5 border-t border-white/[0.15] pt-3"><summary className="min-h-11 cursor-pointer py-3 text-xs font-semibold text-[#82d7c8]">About this provider</summary><p className="max-w-3xl text-sm leading-7 text-white/[0.72]">{overview}</p></details></header>
+      <header className="bg-[#102c3d] p-6 text-white sm:p-8"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#7ad1c5]">Provider profile</p><h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em]">{provider.providerName}</h1><dl className="mt-5 grid gap-3 sm:grid-cols-4"><QuickFact label="Programmes" value={String(programmes.length)} /><QuickFact label="Delivery" value={unique(provider.deliveryModels).slice(0, 2).join(", ") || "Being reviewed"} /><QuickFact label="Coverage" value={unique(provider.regions).slice(0, 2).join(", ") || "Being reviewed"} /><QuickFact label="Specialisms" value={unique(provider.specialisms).slice(0, 2).join(", ") || "Being reviewed"} /></dl><button type="button" disabled={selected} onClick={onAdd} className="mt-5 min-h-11 rounded-full bg-white px-5 text-sm font-semibold text-[#102c3d] disabled:bg-[#82d7c8]">{selected ? "In My Providers" : "Add to My Providers"}</button><details className="mt-5 border-t border-white/[0.15] pt-3"><summary className="min-h-11 cursor-pointer py-3 text-xs font-semibold text-[#82d7c8]">About this provider</summary><p className="max-w-3xl text-sm leading-7 text-white/[0.72]">{overview}</p></details></header>
       <section className="grid gap-5 lg:grid-cols-2"><Info title="Delivery approach" items={unique(provider.deliveryModels)} /><Info title="Geographic coverage" items={unique(provider.regions)} /><Info title="Learner support" items={unique(programmes.flatMap((item) => item.programme.commercialProfile.idealAudience ? [item.programme.commercialProfile.idealAudience] : []))} /><Info title="Employer support" items={employerSupport} /></section>
       {provider.website ? <a href={provider.website} target="_blank" rel="noreferrer" className="inline-flex min-h-11 w-fit items-center gap-2 rounded-full bg-[#edf7f3] px-4 text-sm font-semibold text-[#0b6f63]">Visit provider website <ExternalLink size={15} /></a> : null}
       <section className="rounded-[1.4rem] border border-[#102c3d]/[0.07] bg-white p-5 sm:p-6"><h2 className="text-xl font-semibold">Programmes available</h2>{programmes.length ? <div className="mt-4 grid gap-3 md:grid-cols-2">{programmes.map((item) => <button key={item.programme.id} type="button" onClick={() => onProgramme(item.programme.id)} className="min-h-24 rounded-2xl bg-[#f6f9f7] p-4 text-left hover:bg-[#edf7f3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159b8f]"><span className="block text-sm font-semibold">{item.programme.programmeName}</span><span className="mt-2 block text-xs text-[#102c3d]/[0.55]">{levelLabel(item)} · {deliveryLabel(item.programme, item.provider)}</span></button>)}</div> : <p className="mt-4 text-sm text-[#102c3d]/[0.55]">No active programmes are currently listed for this provider.</p>}</section>

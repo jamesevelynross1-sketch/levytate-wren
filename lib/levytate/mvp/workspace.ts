@@ -218,6 +218,21 @@ export type MvpEnrolment = {
   updatedAt: string;
 };
 
+export type MvpOrganisationProvider = {
+  providerId: string;
+  status: "Active" | "Inactive";
+  selectedAt: string;
+  updatedAt: string;
+};
+
+export type MvpOrganisationProgramme = {
+  programmeId: string;
+  providerId: string;
+  status: "Active" | "Inactive";
+  selectedAt: string;
+  updatedAt: string;
+};
+
 export type MvpWorkspaceData = LearnerLifecycleCollections & {
   version: 6;
   profile: MvpWorkspaceProfile;
@@ -228,6 +243,8 @@ export type MvpWorkspaceData = LearnerLifecycleCollections & {
   providers: ProviderCatalogueRecord[];
   providerProgrammes: ProviderProgramme[];
   providerRelationships: MvpProviderRelationship[];
+  organisationProviders: MvpOrganisationProvider[];
+  organisationProgrammes: MvpOrganisationProgramme[];
   matchingRequests: MvpMatchingRequest[];
   enrolments: MvpEnrolment[];
 };
@@ -257,6 +274,8 @@ export function createEmptyMvpWorkspace(): MvpWorkspaceData {
     providers: structuredClone(mvpProviderCatalogue).map(normaliseProviderRecord),
     providerProgrammes: structuredClone(mvpProviderProgrammes).map(normaliseProviderProgramme),
     providerRelationships: [],
+    organisationProviders: [],
+    organisationProgrammes: [],
     matchingRequests: [],
     enrolments: [],
     ...emptyLearnerLifecycleCollections(),
@@ -616,6 +635,8 @@ function migrateLegacyWorkspace(parsed: LegacyWorkspace): MvpWorkspaceData {
     providerRelationships: Array.isArray(parsed.providerRelationships)
       ? parsed.providerRelationships.map((relationship) => normaliseProviderRelationship(relationship as Partial<MvpProviderRelationship> & { id: string; preferredProviderId: string; category: MvpProviderRelationshipCategory }))
       : [],
+    organisationProviders: [],
+    organisationProgrammes: [],
     matchingRequests,
     enrolments,
   };
@@ -679,6 +700,8 @@ function parseStoredWorkspace(raw: string | null, previousRaw: string | null, le
       providerRelationships: Array.isArray(current.providerRelationships)
         ? current.providerRelationships.map((relationship) => normaliseProviderRelationship(relationship as Partial<MvpProviderRelationship> & { id: string; preferredProviderId: string; category: MvpProviderRelationshipCategory }))
         : [],
+      organisationProviders: Array.isArray(current.organisationProviders) ? current.organisationProviders : [],
+      organisationProgrammes: Array.isArray(current.organisationProgrammes) ? current.organisationProgrammes : [],
       matchingRequests: Array.isArray(current.matchingRequests)
         ? current.matchingRequests.map((request) => normaliseMatchingRequest(request as Partial<MvpMatchingRequest> & { roleNeed: string; id?: string }))
         : [],
@@ -758,7 +781,6 @@ export function normaliseApplication(application: MvpApplication): MvpApplicatio
     history,
   };
 }
-
 
 
 

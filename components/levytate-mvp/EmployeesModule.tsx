@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, Sparkles, UserPlus } from "lucide-react";
+import { ChevronDown, FileUp, Sparkles, UserPlus } from "lucide-react";
 import { useMemo, useState, type FormEvent } from "react";
 import {
   EmptyState,
@@ -19,6 +19,7 @@ import { includesSearch, statusTone } from "@/components/levytate-mvp/module-uti
 import type { LevyTateRecommendationResult } from "@/lib/levytate/ai/types";
 import { getApprenticeshipStandard } from "@/lib/levytate/domain";
 import { deriveEmployeeOperationalSummary } from "@/lib/levytate/mvp/employee-operational-summary";
+import { parsePeopleCsv, type PeopleImportResult } from "@/lib/levytate/mvp/people-import";
 import {
   employeeCurrentApplication,
   employeeDevelopmentInterests,
@@ -46,6 +47,8 @@ export function EmployeesModule({ onStartDiscovery, onOpenDirectReport }: {
   const [draft, setDraft] = useState<MvpEmployee | null>(null);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [peopleImport, setPeopleImport] = useState<{ fileName: string; result: PeopleImportResult } | null>(null);
+  const [importComplete, setImportComplete] = useState(0);
 
   const departments = useMemo(
     () => [...new Set(data.employees.map((employee) => employee.department).filter(Boolean))].sort(),
@@ -151,6 +154,29 @@ export function EmployeesModule({ onStartDiscovery, onOpenDirectReport }: {
     setDraft(employee ? { ...employee } : blankEmployee());
   }
 
+  async function choosePeopleFile(file?: File) {
+    setError(""); setImportComplete(0);
+    if (!file) return;
+    if (!/\.csv$/i.test(file.name) || file.size > 2 * 1024 * 1024) { setError("Choose a CSV file no larger than 2MB."); return; }
+    setPeopleImport({ fileName: file.name, result: parsePeopleCsv(await file.text()) });
+  }
+
+  function importPeople() {
+    if (!peopleImport?.result.rows.length) return;
+    const existingEmailIds = new Map(data.employees.map((employee) => [employee.email.trim().toLowerCase(), employee.id]));
+    const newIds = new Map(peopleImport.result.rows.map((row) => [row.email, createMvpId("employee")]));
+    let imported = 0;
+    for (const row of peopleImport.result.rows) {
+      if (existingEmailIds.has(row.email)) continue;
+      const managerId = row.managerEmail ? existingEmailIds.get(row.managerEmail) ?? newIds.get(row.managerEmail) ?? "" : "";
+      const matchedRole = data.roles.find((role) => role.status === "Active" && role.title.trim().toLowerCase() === row.jobTitle.toLowerCase());
+      const now = nowIso();
+      saveEmployee({ id: newIds.get(row.email)!, employeeNumber: row.employeeNumber || `EMP-${String(data.employees.length + imported + 1).padStart(4, "0")}`, name: row.name, email: row.email, jobTitle: row.jobTitle, roleId: matchedRole?.id ?? "", managerId, department: row.department, site: row.site, platformRole: row.platformRole, status: row.status, startDate: todayIso(), createdAt: now, updatedAt: now });
+      imported += 1;
+    }
+    setImportComplete(imported); setPeopleImport(null);
+  }
+
   return (
     <MvpPanel title={isLineManager ? "My Team" : "Employees"} eyebrow={isLineManager ? "Direct reports" : "Workforce records"}>
       <MvpToolbar
@@ -177,6 +203,7 @@ export function EmployeesModule({ onStartDiscovery, onOpenDirectReport }: {
           </div>
         }
       />
+      {canWriteEmployees ? <div className="mb-4 flex flex-wrap items-center gap-3"><label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border border-[#102c3d]/[0.10] bg-white px-4 text-xs font-semibold text-[#102c3d]"><FileUp size={15} />Import CSV<input type="file" accept=".csv,text/csv" className="sr-only" onChange={(event) => void choosePeopleFile(event.target.files?.[0])} /></label><span className="text-xs text-[#102c3d]/[0.48]">Required: name, work email, job title, department.</span>{importComplete ? <span className="text-xs font-semibold text-[#0b6f63]">{importComplete} employee{importComplete === 1 ? "" : "s"} imported.</span> : null}</div> : null}
 
       {visible.length ? (
         <div className="grid gap-4 xl:grid-cols-2">
@@ -327,6 +354,8 @@ export function EmployeesModule({ onStartDiscovery, onOpenDirectReport }: {
           </form>
         </MvpModal>
       ) : null}
+
+      {peopleImport ? <MvpModal title="Review employee import" eyebrow={peopleImport.fileName} onClose={() => setPeopleImport(null)} wide><div className="grid gap-4"><div className="grid gap-3 sm:grid-cols-3"><DecisionFact label="Valid rows" value={String(peopleImport.result.rows.length)} /><DecisionFact label="Rows needing correction" value={String(peopleImport.result.issues.length)} /><DecisionFact label="Existing emails skipped" value={String(peopleImport.result.rows.filter((row) => data.employees.some((employee) => employee.email.trim().toLowerCase() === row.email)).length)} /></div>{peopleImport.result.issues.length ? <div className="max-h-48 overflow-y-auto rounded-xl bg-[#fff8df] p-4 text-xs text-[#765b00]">{peopleImport.result.issues.slice(0, 30).map((issue) => <p key={`${issue.sourceRow}:${issue.message}`} className="py-1">Row {issue.sourceRow}: {issue.message}</p>)}</div> : null}<div className="flex flex-wrap gap-3"><button type="button" disabled={!peopleImport.result.rows.length} onClick={importPeople} className="min-h-11 rounded-full bg-[#102c3d] px-5 text-sm font-semibold text-white disabled:opacity-40">Import valid employees</button><button type="button" onClick={() => setPeopleImport(null)} className="min-h-11 rounded-full px-4 text-sm font-semibold text-[#102c3d]/[0.55]">Cancel</button></div></div></MvpModal> : null}
 
       {selectedEmployee ? (
         <MvpModal title={selectedEmployee.name} eyebrow="Employee apprenticeship record" onClose={() => setSelectedEmployeeId(null)} wide>

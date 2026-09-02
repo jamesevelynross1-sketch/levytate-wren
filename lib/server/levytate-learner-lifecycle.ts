@@ -24,6 +24,7 @@ import {
   assertLearnerLifecycleTransition,
   calculateLearnerProgressVariance,
   createLearnerLifecycleEvent,
+  emptyLearnerLifecycleCollections,
   englandWorkingHoursDeclarationVersion,
   englandWorkingHoursDeclarationWording,
   getLatestLAndDCheckIn as latestLAndDCheckInFromCollections,
@@ -381,6 +382,8 @@ const achievementsTable = "levytate_learner_achievements";
 const operationalActionsTable = "levytate_learner_operational_actions";
 const lifecycleEventsTable = "levytate_learner_lifecycle_events";
 const persistentOperationalActionsTable = "levytate_operational_actions";
+const organisationProvidersTable = "levytate_organisation_providers";
+const organisationProgrammesTable = "levytate_organisation_programmes";
 
 export class LevyTateLearnerLifecycleError extends Error {
   constructor(message: string) {
@@ -575,24 +578,36 @@ export async function createLearnerRecord(
 ) {
   const context = await contextForSession(session);
   assertPermission(context, "learnerLifecycle:write");
-  await assertCanAccessEmployee(context, input.employeeId, "write");
-  await assertNoDuplicateActiveLearnerRecord(context.organisation.id, input.employeeId, input.applicationId);
+  const employeeId = requiredText(input.employeeId, "Employee");
+  const applicationId = cleanText(input.applicationId);
+  const programmeId = requiredText(input.programmeId, "Programme");
+  const providerId = requiredText(input.providerId, "Provider");
+  const enrolmentId = cleanText(input.enrolmentId);
+  assertEnum(input.lifecycleStatus, ["pre_enrolment", "enrolled", "break_in_learning", "withdrawn", "assessment_preparation", "in_assessment", "achieved", "completed_without_achievement"], "lifecycle status");
+  assertEnum(input.employmentRoute, ["not_confirmed", "existing_employee_upskill", "recruited_as_apprentice"], "employment route");
+  const expectedStartDate = assertValidDate(requiredText(input.expectedStartDate, "Expected start date"), "Expected start date");
+  const actualStartDate = input.actualStartDate ? assertValidDate(input.actualStartDate, "Actual start date") : "";
+  const expectedEndDate = assertValidDate(requiredText(input.expectedEndDate, "Expected end date"), "Expected end date");
+  const actualEndDate = input.actualEndDate ? assertValidDate(input.actualEndDate, "Actual end date") : "";
+  await assertCanAccessEmployee(context, employeeId, "write");
+  await assertNoDuplicateActiveLearnerRecord(context.organisation.id, employeeId, applicationId);
+  await assertOrganisationCatalogueSelection(context.organisation.id, providerId, programmeId);
 
   const timestamp = nowIso();
   const record: LearnerRecord = {
     id: input.id ?? createMvpId("learner"),
     organisationId: context.organisation.id,
-    employeeId: input.employeeId,
-    applicationId: input.applicationId,
-    programmeId: input.programmeId,
-    providerId: input.providerId,
-    enrolmentId: input.enrolmentId,
+    employeeId,
+    applicationId,
+    programmeId,
+    providerId,
+    enrolmentId,
     lifecycleStatus: input.lifecycleStatus,
     employmentRoute: input.employmentRoute,
-    expectedStartDate: input.expectedStartDate,
-    actualStartDate: input.actualStartDate,
-    expectedEndDate: input.expectedEndDate,
-    actualEndDate: input.actualEndDate,
+    expectedStartDate,
+    actualStartDate,
+    expectedEndDate,
+    actualEndDate,
     createdAt: timestamp,
     updatedAt: timestamp,
     createdBy: context.user.email,
@@ -604,6 +619,16 @@ export async function createLearnerRecord(
   await upsertLearnerRecord(record);
   await recordLifecycleEvent(context, record.id, "learner_record_created", "", record.lifecycleStatus, "Learner lifecycle record created.", { employeeId: record.employeeId, applicationId: record.applicationId });
   return record;
+}
+
+async function assertOrganisationCatalogueSelection(organisationId: string, providerId: string, programmeId: string) {
+  const [providers, programmes] = await Promise.all([
+    selectMany<{ provider_id: string; status: string }>(organisationProvidersTable, organisationId, `provider_id=eq.${providerId}&status=eq.Active`, "selected_at.desc"),
+    selectMany<{ programme_id: string; provider_id: string; status: string }>(organisationProgrammesTable, organisationId, `programme_id=eq.${programmeId}&provider_id=eq.${providerId}&status=eq.Active`, "selected_at.desc"),
+  ]);
+  if (!providers.length || !programmes.length) {
+    throw new LevyTateLearnerLifecycleValidationError("Existing learners can only be onboarded to an active My Provider and My Programme.");
+  }
 }
 
 export async function updateLearnerLifecycleStatus(
@@ -1183,6 +1208,30 @@ export async function listOrganisationLearnerLifecycleDetails(session: LevyTateB
   return rows
     .map(learnerRecordFromRow)
     .map((record) => buildLearnerRecordDetail(record, scopedCollections(collections, record.id), lookups));
+}
+
+export async function getOrganisationLearnerLifecycleCollectionsForWorkspace(
+  session: LevyTateBetaSession,
+): Promise<LearnerLifecycleCollections> {
+  const context = await contextForSession(session);
+  assertPermission(context, "learnerLifecycle:read");
+  const role = normaliseMvpUserRole(context.user.role);
+  let employeeFilter = "";
+  if (role !== "Employer Admin" && role !== "Apprenticeship Lead") {
+    const employees = await selectMany<EmployeeRow>(employeesTable, context.organisation.id, "status=eq.Active", "id.asc");
+    const currentEmployee = employees.find((employee) => employee.email.trim().toLowerCase() === context.user.email.trim().toLowerCase());
+    if (!currentEmployee) return emptyLearnerLifecycleCollections();
+    const permittedEmployeeIds = role === "Line Manager"
+      ? [currentEmployee.id, ...employees.filter((employee) => employee.manager_id === currentEmployee.id).map((employee) => employee.id)]
+      : [currentEmployee.id];
+    employeeFilter = `employee_id=in.(${permittedEmployeeIds.join(",")})`;
+  }
+  const records = await selectMany<LearnerRecordRow>(learnerRecordsTable, context.organisation.id, employeeFilter, "updated_at.desc");
+  if (!records.length) {
+    return emptyLearnerLifecycleCollections();
+  }
+
+  return loadLearnerLifecycleCollectionsForOrganisation(context.organisation.id, records);
 }
 
 export async function listManagerDirectReportLearnerLifecycleDetails(
@@ -1771,13 +1820,22 @@ function notificationDate(notified: boolean, value: unknown, label: string) {
 }
 
 async function assertProviderInOrganisation(context: LifecycleContext, providerId: string) {
-  const provider = await selectOne<ProviderViewRow>("levytate_providers", new URLSearchParams({
-    select: "provider_id,provider_name",
-    organisation_id: `eq.${context.organisation.id}`,
-    provider_id: `eq.${providerId}`,
-    limit: "1",
-  }));
-  if (!provider) throw new LevyTateLearnerLifecycleValidationError("The selected provider is not available in this organisation.");
+  const [legacyProvider, selectedProvider] = await Promise.all([
+    selectOne<ProviderViewRow>("levytate_providers", new URLSearchParams({
+      select: "provider_id,provider_name",
+      organisation_id: `eq.${context.organisation.id}`,
+      provider_id: `eq.${providerId}`,
+      limit: "1",
+    })),
+    selectOne<{ provider_id: string }>(organisationProvidersTable, new URLSearchParams({
+      select: "provider_id",
+      organisation_id: `eq.${context.organisation.id}`,
+      provider_id: `eq.${providerId}`,
+      status: "eq.Active",
+      limit: "1",
+    })),
+  ]);
+  if (!legacyProvider && !selectedProvider) throw new LevyTateLearnerLifecycleValidationError("The selected provider is not available in this organisation.");
 }
 
 function reviewEventType(reviewType: LearnerReviewType): LearnerLifecycleEventType {

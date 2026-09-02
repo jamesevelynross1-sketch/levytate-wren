@@ -34,6 +34,7 @@ type EmployeeContext = {
   profile: MvpEmployeeDevelopmentProfile | null;
   application: MvpApplication | null;
   mapping: MvpPathwayMapping | null;
+  programmeAvailable: boolean;
   standardTitle: string;
   standardLevel: string;
   programmeName: string;
@@ -146,6 +147,7 @@ export function EmployeeProgrammeModule({ onNavigate }: { onNavigate: (target: E
   ].filter(Boolean).slice(0, 8);
 
   if (!context.employee) return <EmployeeSetupNotice />;
+  if (!context.application && !context.programmeAvailable) return <EmployeeProgrammeUnavailable onNavigate={onNavigate} />;
 
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -212,6 +214,18 @@ export function EmployeeApplicationModule() {
   const [savedMessage, setSavedMessage] = useState("");
 
   if (!context.employee) return <EmployeeSetupNotice />;
+
+  if (!existing && !context.programmeAvailable) {
+    return (
+      <MvpPanel title="My application" eyebrow="Employee workflow">
+        <div className="rounded-xl border border-dashed border-[#102c3d]/[0.14] bg-white p-6 text-center">
+          <GraduationCap className="mx-auto text-[#0b776e]" size={24} aria-hidden="true" />
+          <h2 className="mt-4 text-xl font-semibold text-[#102c3d]">Your organisation has not published any apprenticeship programmes yet.</h2>
+          <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-[#102c3d]/58">When an Apprenticeship Lead publishes a programme that is relevant to your role, you will be able to review it and start an application here.</p>
+        </div>
+      </MvpPanel>
+    );
+  }
 
   const primaryAction = stateContent.primaryAction;
   const showReadOnly = existing && !editable;
@@ -372,13 +386,17 @@ function buildEmployeeContext(data: MvpWorkspaceData): EmployeeContext {
   const profile = data.employeeDevelopmentProfiles.find((item) => item.employeeId === employee?.id) ?? null;
   const application = employee ? employeeCurrentApplication(data, employee.id) : null;
   const mappings = role ? [...role.pathwayMappings].sort((left, right) => left.priority - right.priority) : [];
+  const activeProgrammeIds = new Set(data.organisationProgrammes.filter((item) => item.status === "Active").map((item) => item.programmeId));
+  const availableProgrammeForMapping = (candidate: MvpPathwayMapping) => data.providerProgrammes.find((item) =>
+    activeProgrammeIds.has(item.id) && (item.linkedStandardId === candidate.apprenticeshipStandardId || item.linkedStandardIds.includes(candidate.apprenticeshipStandardId))
+  ) ?? null;
   const mapping = application
     ? mappings.find((item) => item.apprenticeshipStandardId === application.apprenticeshipStandardId) ?? mappings[0] ?? null
-    : mappings[0] ?? null;
+    : mappings.find((item) => availableProgrammeForMapping(item)) ?? null;
   const standard = mapping ? getApprenticeshipStandard(mapping.apprenticeshipStandardId) : null;
-  const programme = mapping ? data.providerProgrammes.find((item) =>
-    item.linkedStandardId === mapping.apprenticeshipStandardId || item.linkedStandardIds.includes(mapping.apprenticeshipStandardId)
-  ) ?? null : null;
+  const programme = mapping ? (application
+    ? data.providerProgrammes.find((item) => item.linkedStandardId === mapping.apprenticeshipStandardId || item.linkedStandardIds.includes(mapping.apprenticeshipStandardId)) ?? null
+    : availableProgrammeForMapping(mapping)) : null;
 
   return {
     employee,
@@ -386,11 +404,25 @@ function buildEmployeeContext(data: MvpWorkspaceData): EmployeeContext {
     profile,
     application,
     mapping,
+    programmeAvailable: Boolean(programme && activeProgrammeIds.has(programme.id)),
     standardTitle: standard?.title ?? mapping?.apprenticeshipStandardId ?? "Programme to confirm",
     standardLevel: standard?.level ? `Level ${standard.level}` : "Level to confirm",
-    programmeName: programme?.programmeName ?? standard?.title ?? "Recommended programme to confirm",
+    programmeName: programme?.programmeName ?? (application ? standard?.title : null) ?? "No published programme",
     providerName: providerLabel(data, programme?.providerId),
   };
+}
+
+function EmployeeProgrammeUnavailable({ onNavigate }: { onNavigate: (target: EmployeeModuleTarget) => void }) {
+  return (
+    <MvpPanel title="My programme" eyebrow="Employee workspace">
+      <div className="rounded-xl border border-dashed border-[#102c3d]/[0.14] bg-white p-6 text-center">
+        <GraduationCap className="mx-auto text-[#0b776e]" size={24} aria-hidden="true" />
+        <h2 className="mt-4 text-xl font-semibold text-[#102c3d]">Your organisation has not published any apprenticeship programmes yet.</h2>
+        <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-[#102c3d]/58">Your Apprenticeship Lead manages the programmes available to employees.</p>
+        <button type="button" onClick={() => onNavigate("Copilot")} className="mt-5 min-h-11 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white">Ask LevyTate Copilot</button>
+      </div>
+    </MvpPanel>
+  );
 }
 
 function buildEmployeeDraft(context: EmployeeContext, existing: MvpApplication | null): Pick<MvpApplication, "reason" | "careerGoal" | "supportRequired" | "managerNote"> {
@@ -777,6 +809,15 @@ function applicationStateContent(context: EmployeeContext, data: MvpWorkspaceDat
 }
 
 function nextEmployeeAction(context: EmployeeContext, data: MvpWorkspaceData): EmployeeActionSummary {
+  if (!context.application && !context.programmeAvailable) {
+    return {
+      primaryLabel: "View programme status",
+      target: "My Programme",
+      heading: "No apprenticeship programme is available yet.",
+      copy: "Your Apprenticeship Lead needs to publish a relevant programme before you can start an application.",
+      owner: "Apprenticeship Lead",
+    };
+  }
   const content = applicationStateContent(context, data);
   return {
     primaryLabel: content.primaryAction,

@@ -67,8 +67,12 @@ export function ApplicationsModule({
   const [status, setStatus] = useState("All");
   const [ownerFilter, setOwnerFilter] = useState("All");
   const [draft, setDraft] = useState<MvpApplication | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialApplicationId ?? null);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    setSelectedId(initialApplicationId ?? null);
+  }, [initialApplicationId]);
 
   useEffect(() => {
     onApplicationSelectionChange?.(selectedId);

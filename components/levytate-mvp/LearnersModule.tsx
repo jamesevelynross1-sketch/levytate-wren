@@ -18,6 +18,7 @@ import {
 } from "@/lib/levytate/mvp/assessment-readiness";
 import {
   formatProgressVariance,
+  buildLearnerListSummary,
   deriveProgressPositionFromVariance,
   operationalActionLabel,
   type LearnerListSummary,
@@ -40,6 +41,8 @@ import {
   type LearnerSupportActionType,
   type LearnerBreakReasonCategory,
   type LearnerAssessmentModel,
+  type LearnerEmploymentRoute,
+  type LearnerLifecycleStatus,
 } from "@/lib/levytate/mvp/learner-lifecycle";
 
 type LearnerListResponse = {
@@ -80,7 +83,7 @@ const progressOptions: Array<LearnerProgressPosition | typeof allOption> = [
 type LearnerDeepLinkAction = "open_learner" | "complete_pre_enrolment" | "complete_enrolment" | "record_review" | "add_progress" | "manage_break" | "return_learner" | "manage_assessment";
 
 export function LearnersModule({ initialLearnerRecordId = "", initialAction = "open_learner", onDeepLinkConsumed, onLearnerSelectionChange }: { initialLearnerRecordId?: string; initialAction?: LearnerDeepLinkAction; onDeepLinkConsumed?: () => void; onLearnerSelectionChange?: (learnerRecordId: string | null, learnerName?: string) => void }) {
-  const { can, meta } = useMvpWorkspace();
+  const { can, meta, data } = useMvpWorkspace();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [learners, setLearners] = useState<LearnerOperationalSummary[]>([]);
@@ -99,10 +102,17 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
   const [attentionOnly, setAttentionOnly] = useState(false);
   const [sortMode, setSortMode] = useState<SortMode>("Operational priority");
   const [moreFilters, setMoreFilters] = useState(false);
+  const [onboarding, setOnboarding] = useState<{ employeeId: string; programmeId: string; lifecycleStatus: LearnerLifecycleStatus; employmentRoute: LearnerEmploymentRoute; expectedStartDate: string; actualStartDate: string; expectedEndDate: string; latestProgressDate: string; targetProgress: string; actualProgress: string; nextReviewDate: string } | null>(null);
 
   const mayReadOrganisationLearners = can("learnerLifecycle:read") && (meta?.userRole === "Apprenticeship Lead" || meta?.userRole === "Employer Admin");
   const mayMutatePreEnrolment = can("learnerLifecycle:write") && can("learnerLifecycle:status") && (meta?.userRole === "Apprenticeship Lead" || meta?.userRole === "Employer Admin");
   const mayMutateLearnerActivity = can("learnerLifecycle:write") && (meta?.userRole === "Apprenticeship Lead" || meta?.userRole === "Employer Admin");
+  const activeProgrammes = data.organisationProgrammes.filter((selection) => selection.status === "Active").flatMap((selection) => {
+    const programme = data.providerProgrammes.find((item) => item.id === selection.programmeId && item.recordStatus === "Active" && item.status === "Active");
+    return programme ? [programme] : [];
+  });
+  const learnerEmployeeIds = new Set(data.learnerRecords.filter((record) => record.recordStatus === "Active").map((record) => record.employeeId));
+  const eligibleEmployees = data.employees.filter((employee) => employee.status === "Active" && !learnerEmployeeIds.has(employee.id));
 
   useEffect(() => {
     if (initialLearnerRecordId) setSelectedId(initialLearnerRecordId);
@@ -213,6 +223,43 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
       return 0;
     }), [attentionOnly, departmentFilter, learners, progressFilter, programmeFilter, providerFilter, routeFilter, search, siteFilter, sortMode, statusFilter]);
 
+  function beginOnboarding() {
+    setError("");
+    setOnboarding({ employeeId: eligibleEmployees[0]?.id ?? "", programmeId: activeProgrammes[0]?.id ?? "", lifecycleStatus: "enrolled", employmentRoute: "existing_employee_upskill", expectedStartDate: "", actualStartDate: "", expectedEndDate: "", latestProgressDate: "", targetProgress: "", actualProgress: "", nextReviewDate: "" });
+  }
+
+  async function createExistingLearner(event: FormEvent) {
+    event.preventDefault();
+    if (!onboarding?.employeeId || !onboarding.programmeId) { setError("Select an employee and an active My Programme."); return; }
+    const progressSupplied = Boolean(onboarding.latestProgressDate || onboarding.targetProgress || onboarding.actualProgress);
+    const target = onboarding.targetProgress === "" ? null : Number(onboarding.targetProgress);
+    const actual = onboarding.actualProgress === "" ? null : Number(onboarding.actualProgress);
+    if (progressSupplied && (!onboarding.latestProgressDate || target === null || actual === null || !Number.isFinite(target) || !Number.isFinite(actual) || target < 0 || target > 100 || actual < 0 || actual > 100)) { setError("Supply a progress date and target and actual percentages between 0 and 100."); return; }
+    const programme = activeProgrammes.find((item) => item.id === onboarding.programmeId);
+    if (!programme) { setError("The selected programme is no longer active."); return; }
+    const application = data.applications.find((item) => item.employeeId === onboarding.employeeId && (programme.linkedStandardId === item.apprenticeshipStandardId || programme.linkedStandardIds.includes(item.apprenticeshipStandardId)));
+    const enrolment = data.enrolments.find((item) => item.employeeId === onboarding.employeeId && item.providerId === programme.providerId);
+    const response = await fetch("/api/levytate-learners", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ employeeId: onboarding.employeeId, applicationId: application?.id ?? "", programmeId: programme.id, providerId: programme.providerId, enrolmentId: enrolment?.id ?? "", lifecycleStatus: onboarding.lifecycleStatus, employmentRoute: onboarding.employmentRoute, expectedStartDate: onboarding.expectedStartDate, actualStartDate: onboarding.actualStartDate, expectedEndDate: onboarding.expectedEndDate, actualEndDate: "" }) });
+    const payload = await response.json() as LearnerMutationResponse;
+    if (!response.ok || !payload.learner) { setError(payload.message ?? "The learner record could not be created."); return; }
+    let learner = payload.learner;
+    if (onboarding.latestProgressDate && target !== null && actual !== null) {
+      const progressResponse = await fetch(`/api/levytate-learners/${encodeURIComponent(learner.learnerRecordId)}/progress`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expectedActivityVersion: learner.activityVersion, idempotencyKey: activityKey(), updateDate: onboarding.latestProgressDate, targetProgressPercentage: target, actualProgressPercentage: actual, progressSource: "manual", sourceReference: "Client onboarding import", summary: "Latest progress position supplied during learner onboarding.", supportAction: "" }) });
+      const progressPayload = await progressResponse.json() as LearnerMutationResponse;
+      if (!progressResponse.ok || !progressPayload.learner) { setError(progressPayload.message ?? "The learner was created, but the supplied progress update could not be recorded."); return; }
+      learner = progressPayload.learner;
+    }
+    if (onboarding.nextReviewDate) {
+      const breakReview = onboarding.lifecycleStatus === "break_in_learning";
+      const reviewResponse = await fetch(`/api/levytate-learners/${encodeURIComponent(learner.learnerRecordId)}/reviews`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expectedActivityVersion: learner.activityVersion, idempotencyKey: activityKey(), reviewType: breakReview ? "l_and_d_check_in" : "provider_review", reviewDate: todayDate(), nextReviewDate: onboarding.nextReviewDate, reviewerName: breakReview ? "L&D review schedule" : "Provider review schedule", providerId: breakReview ? "" : programme.providerId, summary: "Next review date supplied during learner onboarding.", actions: [], supportRequired: "", status: "scheduled" }) });
+      const reviewPayload = await reviewResponse.json() as LearnerMutationResponse;
+      if (!reviewResponse.ok || !reviewPayload.learner) { setError(reviewPayload.message ?? "The learner was created, but the supplied review date could not be recorded."); return; }
+      learner = reviewPayload.learner;
+    }
+    setLearners((current) => { const next = [learner, ...current]; setSummary(buildLearnerListSummary(next)); return next; });
+    setOnboarding(null); setError("");
+  }
+
   if (!mayReadOrganisationLearners) {
     return <EmptyState title="Learners is not available for this role" copy="Organisation-wide learner lifecycle records are available to Apprenticeship Leads and platform administrators only." actionLabel="Return home" onAction={() => window.scrollTo({ top: 0, behavior: "smooth" })} />;
   }
@@ -252,6 +299,7 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
       ]} />
 
       <MvpPanel title="Learners" eyebrow="Lifecycle operations">
+        {mayMutatePreEnrolment ? <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[#102c3d]/[0.07] pb-4"><p className="text-xs leading-5 text-[#102c3d]/[0.52]">Bring existing apprentices into the same organisation-scoped lifecycle record.</p><button type="button" onClick={beginOnboarding} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white"><Plus size={15} />Import existing learner</button></div> : null}
         <div className="mb-4 grid gap-3 xl:grid-cols-[minmax(260px,1fr)_minmax(0,1.4fr)]">
           <label className="flex h-11 min-w-0 items-center gap-2 rounded-lg border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 focus-within:border-[#159b8f] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#159b8f]/[0.10]">
             <Search size={16} strokeWidth={1.8} className="shrink-0 text-[#102c3d]/[0.38]" aria-hidden="true" />
@@ -325,12 +373,13 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
         ) : (
           <div className="grid min-h-52 place-items-center rounded-xl border border-dashed border-[#102c3d]/[0.14] bg-[#f8fbfa] px-5 py-10 text-center">
             <div className="max-w-md">
-              <h3 className="text-base font-semibold text-[#102c3d]">{learners.length ? "No learners match the selected filters." : "No learner lifecycle records have been created yet."}</h3>
-              <p className="mt-2 text-sm leading-6 text-[#102c3d]/[0.56]">Adjust the filters or search to review existing learner records.</p>
+              <h3 className="text-base font-semibold text-[#102c3d]">{learners.length ? "No learners match the selected filters." : "No learner records yet"}</h3>
+              <p className="mt-2 text-sm leading-6 text-[#102c3d]/[0.56]">{learners.length ? "Adjust the filters or search to review existing learner records." : "Import an existing apprentice when your people, provider and programme selections are ready."}</p>
             </div>
           </div>
         )}
       </MvpPanel>
+      {onboarding ? <MvpModal title="Import existing learner" eyebrow="Organisation lifecycle record" onClose={() => setOnboarding(null)}><form onSubmit={(event) => void createExistingLearner(event)}><FormGrid><FormSelect label="Employee" value={onboarding.employeeId} onChange={(value) => setOnboarding({ ...onboarding, employeeId: value })} options={[{ value: "", label: eligibleEmployees.length ? "Select employee" : "Add an eligible employee first" }, ...eligibleEmployees.map((employee) => ({ value: employee.id, label: `${employee.name} — ${employee.jobTitle}` }))]} /><FormSelect label="My Programme" value={onboarding.programmeId} onChange={(value) => setOnboarding({ ...onboarding, programmeId: value })} options={[{ value: "", label: activeProgrammes.length ? "Select programme" : "Publish a programme first" }, ...activeProgrammes.map((programme) => ({ value: programme.id, label: programme.programmeName }))]} /><FormSelect label="Lifecycle status" value={onboarding.lifecycleStatus} onChange={(value) => setOnboarding({ ...onboarding, lifecycleStatus: value as LearnerLifecycleStatus })} options={[{ value: "pre_enrolment", label: "Pre-enrolment" }, { value: "enrolled", label: "Enrolled" }, { value: "break_in_learning", label: "Break in learning" }, { value: "assessment_preparation", label: "Assessment preparation" }, { value: "in_assessment", label: "In assessment" }]} /><FormSelect label="Employment route" value={onboarding.employmentRoute} onChange={(value) => setOnboarding({ ...onboarding, employmentRoute: value as LearnerEmploymentRoute })} options={[{ value: "existing_employee_upskill", label: "Existing employee — upskill" }, { value: "recruited_as_apprentice", label: "Recruited as apprentice" }, { value: "not_confirmed", label: "Not yet confirmed" }]} /><FormField label="Expected start" type="date" value={onboarding.expectedStartDate} onChange={(value) => setOnboarding({ ...onboarding, expectedStartDate: value })} /><FormField label="Actual start" type="date" value={onboarding.actualStartDate} onChange={(value) => setOnboarding({ ...onboarding, actualStartDate: value })} /><FormField label="Expected end" type="date" value={onboarding.expectedEndDate} onChange={(value) => setOnboarding({ ...onboarding, expectedEndDate: value })} />{onboarding.lifecycleStatus !== "pre_enrolment" ? <><FormField label="Latest progress date" type="date" value={onboarding.latestProgressDate} onChange={(value) => setOnboarding({ ...onboarding, latestProgressDate: value })} /><FormField label="Target progress %" type="number" value={onboarding.targetProgress} onChange={(value) => setOnboarding({ ...onboarding, targetProgress: value })} /><FormField label="Actual progress %" type="number" value={onboarding.actualProgress} onChange={(value) => setOnboarding({ ...onboarding, actualProgress: value })} /><FormField label="Next provider review" type="date" value={onboarding.nextReviewDate} onChange={(value) => setOnboarding({ ...onboarding, nextReviewDate: value })} /></> : null}</FormGrid><FormActions onCancel={() => setOnboarding(null)} submit="Create learner record" saving={false} error={error} /></form></MvpModal> : null}
     </div>
   );
 }

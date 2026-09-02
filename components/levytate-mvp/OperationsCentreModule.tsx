@@ -117,7 +117,7 @@ export function OperationsCentreModule({ onOpenLearner, onSignalContext }: { onO
   return (
     <div className="grid min-w-0 gap-5" data-testid="operations-centre">
       <OperationsModeTabs value={workspaceView} onChange={setWorkspaceView} />
-      <ProgressReviewIntelligencePanel enabled={Boolean(meta?.userEmail?.endsWith(".test"))} onSignalContext={onSignalContext} />
+      <ProgressReviewIntelligencePanel enabled={Boolean(meta?.storageMode === "supabase")} onSignalContext={onSignalContext} />
       <section>
         <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
           <div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">Daily learner operations</p><h2 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-[#102c3d]">Operational status</h2></div>
@@ -164,7 +164,7 @@ export function OperationsCentreModule({ onOpenLearner, onSignalContext }: { onO
           {!data.totalAttentionItems ? (
             <section className="rounded-2xl border border-[#159b8f]/[0.15] bg-[#f4fbf8] p-6 text-center">
               <CheckCircle2 className="mx-auto text-[#159b8f]" size={28} aria-hidden="true" />
-              <h3 className="mt-3 text-lg font-semibold text-[#102c3d]">{assignment === "mine" ? "You do not currently own any active actions." : hasFilters ? "No actions match the selected filters." : "No active operational actions currently require attention."}</h3>
+              <h3 className="mt-3 text-lg font-semibold text-[#102c3d]">{assignment === "mine" ? "You do not currently own any active actions." : hasFilters ? "No actions match the selected filters." : "Nothing needs your attention yet"}</h3>
               <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[#102c3d]/[0.56]">{nextUpcoming ? `${nextUpcoming.learnerName}: ${nextUpcoming.reason}` : data.recentActivity[0] ? `Most recent completion: ${data.recentActivity[0].action}` : "New reviews and lifecycle changes will appear here as they are recorded."}</p>
             </section>
           ) : null}

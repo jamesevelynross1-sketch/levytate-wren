@@ -22,6 +22,7 @@ import {
   type MvpEmployerPriorityName,
   type MvpWorkspaceProfile,
 } from "@/lib/levytate/mvp/workspace";
+import type { WorkspaceAccessUser } from "@/lib/server/levytate-workspace-access";
 
 const importanceOptions: Array<{ value: MvpEmployerPriorityImportance; copy: string }> = [
   { value: "Critical", copy: "A defining business priority for the next 12 months." },
@@ -45,6 +46,18 @@ export function DashboardModule({ onNavigate }: { onNavigate: (module: string) =
       : providerIssues[0]
         ? { label: "Improve provider coverage", target: "Provider Relationships" }
         : { label: "Open LevyTate Copilot", target: "LevyTate Copilot" };
+
+  const setupSteps = [
+    { label: "Add your first employee", complete: data.employees.length > 0, target: "Employees" },
+    { label: "Add a provider", complete: data.organisationProviders.some((item) => item.status === "Active"), target: "Marketplace" },
+    { label: "Publish a programme", complete: data.organisationProgrammes.some((item) => item.status === "Active"), target: "Marketplace" },
+    { label: "Import an existing learner", complete: data.learnerRecords.length > 0, target: "Learners" },
+    { label: "Bring in DAS finance data", complete: false, target: "Finance" },
+  ];
+
+  if (data.employees.length === 0 && data.applications.length === 0 && data.learnerRecords.length === 0) {
+    return <ClientSetupHome steps={setupSteps} onNavigate={onNavigate} />;
+  }
 
   if (!data.profile.priorities.length) {
     if (!can("settings:write")) {
@@ -118,6 +131,14 @@ export function DashboardModule({ onNavigate }: { onNavigate: (module: string) =
       </div>
     </div>
   );
+}
+
+function ClientSetupHome({ steps, onNavigate }: { steps: Array<{ label: string; complete: boolean; target: string }>; onNavigate: (module: string) => void }) {
+  const complete = steps.filter((step) => step.complete).length;
+  return <div className="grid gap-5" data-testid="blank-employer-home">
+    <section className="rounded-[1.25rem] bg-[#102c3d] p-6 text-white sm:p-7"><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8fe0d2]">Client workspace</p><h2 className="mt-2 text-2xl font-semibold">Set up your LevyTate workspace</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-white/65">Start with your people and the providers and programmes you want employees to use. No demonstration records have been added.</p><p className="mt-5 text-sm font-semibold">{complete} of {steps.length} setup steps complete</p></section>
+    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{steps.map((step, index) => <button key={step.label} type="button" onClick={() => onNavigate(step.target)} className="flex min-h-28 items-start gap-4 border border-[#102c3d]/[0.08] bg-white p-5 text-left shadow-[0_10px_24px_rgba(16,44,61,0.035)] hover:border-[#159b8f]/30"><span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-xs font-semibold ${step.complete ? "bg-[#159b8f] text-white" : "bg-[#edf7f3] text-[#0b6f63]"}`}>{step.complete ? <Check size={15} /> : index + 1}</span><span><strong className="block text-sm">{step.label}</strong><span className="mt-2 block text-xs text-[#102c3d]/[0.48]">{step.complete ? "Complete" : "Open setup"}</span></span></button>)}</section>
+  </div>;
 }
 
 export function LineManagerHomeModule({ onNavigate, onOpenApplicationReview }: {
@@ -358,9 +379,24 @@ export function SettingsModule() {
   const { data, saveProfile, can } = useMvpWorkspace();
   const [draft, setDraft] = useState<MvpWorkspaceProfile>(data.profile);
   const [saved, setSaved] = useState(false);
+  const [accessUsers, setAccessUsers] = useState<WorkspaceAccessUser[] | null>(null);
+  const [accessError, setAccessError] = useState("");
   const canEdit = can("settings:write");
 
   useEffect(() => { setDraft(data.profile); }, [data.profile]);
+  useEffect(() => {
+    let active = true;
+    void fetch("/api/levytate-workspace/access", { cache: "no-store" })
+      .then(async (response) => {
+        const body = await response.json() as { users?: WorkspaceAccessUser[]; message?: string };
+        if (!response.ok) throw new Error(body.message || "Workspace access could not be loaded.");
+        if (active) setAccessUsers(body.users ?? []);
+      })
+      .catch((error: unknown) => {
+        if (active) setAccessError(error instanceof Error ? error.message : "Workspace access could not be loaded.");
+      });
+    return () => { active = false; };
+  }, []);
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -416,6 +452,26 @@ export function SettingsModule() {
           </div>
         )}
       </details>
+      <MvpPanel title="Authorised users" eyebrow="Access">
+        {accessError ? (
+          <p className="text-sm leading-6 text-[#ad344e]">{accessError}</p>
+        ) : accessUsers === null ? (
+          <p className="text-sm leading-6 text-[#102c3d]/56">Loading authorised users...</p>
+        ) : accessUsers.length ? (
+          <div className="grid gap-2">
+            {accessUsers.map((user) => (
+              <div key={user.id} className="grid gap-3 rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center">
+                <div className="min-w-0"><p className="truncate text-sm font-semibold text-[#102c3d]">{user.displayName}</p><p className="truncate text-xs text-[#102c3d]/52">{user.email}</p></div>
+                <StatusBadge tone="blue">{user.role}</StatusBadge>
+                <StatusBadge tone={user.accessState === "Active" ? "green" : "red"}>{user.accessState} · {user.authenticationState}</StatusBadge>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm leading-6 text-[#102c3d]/56">No authorised users are configured.</p>
+        )}
+        <p className="mt-4 border-t border-[#102c3d]/[0.07] pt-4 text-xs leading-5 text-[#102c3d]/48">Platform Admin controls user provisioning, roles and access state. Workspace settings never expose authentication credentials.</p>
+      </MvpPanel>
     </div>
   );
 }

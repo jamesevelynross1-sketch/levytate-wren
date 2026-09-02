@@ -23,6 +23,8 @@ import {
   type MvpEnrolmentStatus,
   type MvpMatchingRequest,
   type MvpMatchingStatus,
+  type MvpOrganisationProgramme,
+  type MvpOrganisationProvider,
   type MvpProviderRelationship,
   type MvpRole,
   type MvpWorkspaceData,
@@ -48,6 +50,8 @@ type MvpWorkspaceStore = {
   archiveProviderProgramme: (id: string) => void;
   removeProviderProgramme: (id: string) => void;
   saveProviderRelationship: (relationship: MvpProviderRelationship) => void;
+  saveOrganisationProvider: (selection: MvpOrganisationProvider) => void;
+  saveOrganisationProgramme: (selection: MvpOrganisationProgramme) => void;
   saveMatchingRequest: (request: MvpMatchingRequest) => void;
   updateMatchingStatus: (id: string, status: MvpMatchingStatus) => void;
   saveEnrolment: (enrolment: MvpEnrolment) => void;
@@ -66,17 +70,6 @@ function upsert<T>(items: T[], item: T, key: keyof T) {
   return items.some((current) => current[key] === item[key])
     ? items.map((current) => current[key] === item[key] ? item : current)
     : [item, ...items];
-}
-
-function isWorkspaceEmpty(data: MvpWorkspaceData) {
-  return !data.profile.employerName
-    && data.employees.length === 0
-    && data.employeeDevelopmentProfiles.length === 0
-    && data.roles.length === 0
-    && data.applications.length === 0
-    && data.providerRelationships.length === 0
-    && data.matchingRequests.length === 0
-    && data.enrolments.length === 0;
 }
 
 function appendWarning(meta: LevyTateWorkspaceMeta | null, message: string) {
@@ -143,6 +136,10 @@ function applyMutationLocally(current: MvpWorkspaceData, mutation: LevyTateWorks
       return { ...current, providerProgrammes: current.providerProgrammes.filter((programme) => programme.id !== mutation.id) };
     case "saveProviderRelationship":
       return { ...current, providerRelationships: upsert(current.providerRelationships, normaliseProviderRelationship(mutation.relationship), "id") };
+    case "saveOrganisationProvider":
+      return { ...current, organisationProviders: upsert(current.organisationProviders, mutation.selection, "providerId") };
+    case "saveOrganisationProgramme":
+      return { ...current, organisationProgrammes: upsert(current.organisationProgrammes, mutation.selection, "programmeId") };
     case "saveMatchingRequest":
       return { ...current, matchingRequests: upsert(current.matchingRequests, normaliseMatchingRequest(mutation.request), "id") };
     case "updateMatchingStatus":
@@ -157,23 +154,20 @@ function applyMutationLocally(current: MvpWorkspaceData, mutation: LevyTateWorks
         ...current,
         enrolments: current.enrolments.map((enrolment) => enrolment.id === mutation.id ? { ...enrolment, status: mutation.status, updatedAt: nowIso() } : enrolment),
       };
-    case "migrateWorkspaceSnapshot":
-      return mutation.snapshot;
     default:
       return current;
   }
 }
 
-export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal = true }: { children: ReactNode; initialWorkspace?: LevyTateWorkspaceBootstrap | null; persistLocal?: boolean }) {
+export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal = false }: { children: ReactNode; initialWorkspace?: LevyTateWorkspaceBootstrap | null; persistLocal?: boolean }) {
   const [data, setData] = useState<MvpWorkspaceData>(initialWorkspace?.data ?? createEmptyMvpWorkspace());
   const [meta, setMeta] = useState<LevyTateWorkspaceMeta | null>(initialWorkspace?.meta ?? null);
   const [hydrated, setHydrated] = useState(Boolean(initialWorkspace));
   const mutationQueue = useRef(Promise.resolve());
-  const attemptedMigration = useRef(false);
 
   useEffect(() => {
     if (initialWorkspace) {
-      if (persistLocal) persistLocalWorkspace(initialWorkspace.data);
+      if (persistLocal && initialWorkspace.meta.storageMode === "local_fallback") persistLocalWorkspace(initialWorkspace.data);
       return;
     }
 
@@ -187,34 +181,34 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
         if (!cancelled && response.ok && payload.workspace) {
           setData(payload.workspace.data);
           setMeta(payload.workspace.meta);
-          persistLocalWorkspace(payload.workspace.data);
+          if (persistLocal && payload.workspace.meta.storageMode === "local_fallback") persistLocalWorkspace(payload.workspace.data);
         }
 
         if (!cancelled && (!response.ok || !payload.workspace)) {
-          const local = readLocalWorkspace();
+          const local = persistLocal ? readLocalWorkspace() : createEmptyMvpWorkspace();
           setData(local);
           setMeta({
             organisationId: "local-fallback",
             organisationName: "LevyTate employer workspace",
             userEmail: "",
-            userRole: "Employer Admin",
-            permissions: permissionsForMvpRole("Employer Admin"),
+            userRole: "Employee",
+            permissions: [],
             storageMode: "local_fallback",
-            warnings: [payload.message ?? "LevyTate workspace persistence is unavailable. Local fallback is active."],
+            warnings: [payload.message ?? "LevyTate workspace persistence is unavailable."],
           });
         }
       } catch {
         if (!cancelled) {
-          const local = readLocalWorkspace();
+          const local = persistLocal ? readLocalWorkspace() : createEmptyMvpWorkspace();
           setData(local);
           setMeta({
             organisationId: "local-fallback",
             organisationName: "LevyTate employer workspace",
             userEmail: "",
-            userRole: "Employer Admin",
-            permissions: permissionsForMvpRole("Employer Admin"),
+            userRole: "Employee",
+            permissions: [],
             storageMode: "local_fallback",
-            warnings: ["LevyTate workspace persistence is unavailable. Local fallback is active."],
+            warnings: ["LevyTate workspace persistence is unavailable."],
           });
         }
       } finally {
@@ -232,9 +226,9 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
   }, [initialWorkspace, persistLocal]);
 
   useEffect(() => {
-    if (!hydrated || !persistLocal) return;
+    if (!hydrated || !persistLocal || meta?.storageMode !== "local_fallback") return;
     persistLocalWorkspace(data);
-  }, [data, hydrated, persistLocal]);
+  }, [data, hydrated, meta?.storageMode, persistLocal]);
 
 
   const syncMutation = useCallback((mutation: LevyTateWorkspaceMutation) => {
@@ -253,15 +247,14 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
 
           const payload = (await response.json()) as WorkspaceResponse;
           if (!response.ok || !payload.workspace) {
-            setMeta((current) => appendWarning(current, payload.message ?? "LevyTate could not confirm the latest save. The local workspace has been kept."));
+            setMeta((current) => appendWarning(current, payload.message ?? "LevyTate could not confirm the latest save. No client-side copy was written."));
             return;
           }
 
           setData(payload.workspace.data);
           setMeta(payload.workspace.meta);
-          persistLocalWorkspace(payload.workspace.data);
         } catch {
-          setMeta((current) => appendWarning(current, "LevyTate could not confirm the latest save. The local workspace has been kept."));
+          setMeta((current) => appendWarning(current, "LevyTate could not confirm the latest save. No client-side copy was written."));
         }
       })
       .catch(() => undefined);
@@ -307,28 +300,16 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
       }
     }
 
-    if (!alreadyOptimistic) {
+    if (!alreadyOptimistic && meta?.storageMode !== "supabase") {
       setData((current) => {
         const next = applyMutationLocally(current, mutation);
-        persistLocalWorkspace(next);
+        if (persistLocal) persistLocalWorkspace(next);
         return next;
       });
     }
 
     syncMutation(mutation);
-  }, [data.applications, syncMutation, meta]);
-
-  useEffect(() => {
-    if (!hydrated || attemptedMigration.current || meta?.storageMode !== "supabase" || !isWorkspaceEmpty(data) || typeof window === "undefined") {
-      return;
-    }
-
-    const local = readLocalWorkspace();
-    if (isWorkspaceEmpty(local)) return;
-
-    attemptedMigration.current = true;
-    commitMutation({ type: "migrateWorkspaceSnapshot", snapshot: local }, true);
-  }, [data, hydrated, meta, commitMutation]);
+  }, [data.applications, syncMutation, meta, persistLocal]);
 
   const value = useMemo<MvpWorkspaceStore>(() => ({
     data,
@@ -349,6 +330,8 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
     archiveProviderProgramme: (id) => commitMutation({ type: "archiveProviderProgramme", id }),
     removeProviderProgramme: (id) => commitMutation({ type: "removeProviderProgramme", id }),
     saveProviderRelationship: (relationship) => commitMutation({ type: "saveProviderRelationship", relationship }),
+    saveOrganisationProvider: (selection) => commitMutation({ type: "saveOrganisationProvider", selection }),
+    saveOrganisationProgramme: (selection) => commitMutation({ type: "saveOrganisationProgramme", selection }),
     saveMatchingRequest: (request) => commitMutation({ type: "saveMatchingRequest", request }),
     updateMatchingStatus: (id, status) => commitMutation({ type: "updateMatchingStatus", id, status }),
     saveEnrolment: (enrolment) => commitMutation({ type: "saveEnrolment", enrolment }),
@@ -363,4 +346,3 @@ export function useMvpWorkspace() {
   if (!context) throw new Error("useMvpWorkspace must be used inside MvpWorkspaceProvider");
   return context;
 }
-

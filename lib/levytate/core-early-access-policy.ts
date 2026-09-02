@@ -6,11 +6,15 @@ export type CoreEarlyAccessModuleKey =
   | "My Application"
   | "My Team"
   | "Approvals"
+  | "Operations"
   | "Intelligence"
   | "Applications"
   | "People"
   | "Learners"
   | "Providers"
+  | "My Providers"
+  | "My Programmes"
+  | "Marketplace"
   | "Finance"
   | "Programmes"
   | "Copilot"
@@ -20,7 +24,7 @@ export type CoreEarlyAccessModuleKey =
   | "Support";
 
 export type CoreEarlyAccessAvailability = "enabled" | "secondary" | "hidden" | "deferred";
-export type CoreEarlyAccessNavigationGroup = "primary" | "administration" | "help" | "secondary";
+export type CoreEarlyAccessNavigationGroup = "operate" | "manage" | "discover" | "support";
 
 export type CoreEarlyAccessCapability =
   | "employee-own-journey"
@@ -73,11 +77,11 @@ export const coreEarlyAccessPolicy: Readonly<Record<MvpUserRole, CoreEarlyAccess
   Employee: {
     role: "Employee",
     modules: [
-      item("Home", "Home", "enabled", "primary", "core"),
-      item("My Application", "My Application", "enabled", "primary", "core"),
-      item("My Programme", "My Apprenticeship", "enabled", "primary", "core"),
-      item("Copilot", "Copilot", "secondary", "help", "supporting"),
-      item("Knowledge", "Guidance Centre", "secondary", "help", "supporting"),
+      item("Home", "Home", "enabled", "operate", "core"),
+      item("My Application", "My Application", "enabled", "operate", "core"),
+      item("My Programme", "My Apprenticeship", "enabled", "operate", "core"),
+      item("Copilot", "Copilot", "secondary", "support", "supporting"),
+      item("Knowledge", "Guidance Centre", "secondary", "support", "supporting"),
       item("Providers", "Programmes & Providers", "hidden", undefined, "non-core"),
       item("Finance", "Finance", "hidden", undefined, "role-denied"),
       item("Programmes", "Programmes", "hidden", undefined, "non-core"),
@@ -89,11 +93,11 @@ export const coreEarlyAccessPolicy: Readonly<Record<MvpUserRole, CoreEarlyAccess
   "Line Manager": {
     role: "Line Manager",
     modules: [
-      item("Home", "Home", "enabled", "primary", "core"),
-      item("Approvals", "Approvals", "enabled", "primary", "core"),
-      item("My Team", "My Team", "enabled", "primary", "core"),
-      item("Copilot", "Copilot", "secondary", "help", "supporting"),
-      item("Knowledge", "Guidance Centre", "secondary", "help", "supporting"),
+      item("Home", "Home", "enabled", "operate", "core"),
+      item("Approvals", "Approvals", "enabled", "operate", "core"),
+      item("My Team", "My Team", "enabled", "operate", "core"),
+      item("Copilot", "Copilot", "secondary", "support", "supporting"),
+      item("Knowledge", "Guidance Centre", "secondary", "support", "supporting"),
       item("Providers", "Programmes & Providers", "hidden", undefined, "non-core"),
       item("Finance", "Finance", "hidden", undefined, "role-denied"),
       item("Programmes", "Programmes", "hidden", undefined, "non-core"),
@@ -105,17 +109,19 @@ export const coreEarlyAccessPolicy: Readonly<Record<MvpUserRole, CoreEarlyAccess
   "Apprenticeship Lead": {
     role: "Apprenticeship Lead",
     modules: [
-      item("Home", "Operations Centre", "enabled", "primary", "core"),
-      item("Intelligence", "Intelligence", "enabled", "primary", "core"),
-      item("Applications", "Applications", "enabled", "primary", "core"),
-      item("Learners", "Learners", "enabled", "primary", "core"),
-      item("Providers", "Providers", "enabled", "primary", "core"),
-      item("Finance", "Finance", "enabled", "primary", "core"),
-      item("People", "People", "secondary", "administration", "supporting"),
-      item("Programmes", "Programmes", "secondary", "administration", "supporting"),
-      item("Settings", "Settings", "secondary", "administration", "supporting"),
-      item("Copilot", "Copilot", "secondary", "help", "supporting"),
-      item("Knowledge", "Guidance Centre", "secondary", "help", "supporting"),
+      item("Home", "Home", "enabled", "operate", "core"),
+      item("Applications", "Applications", "enabled", "operate", "core"),
+      item("Learners", "Learners", "enabled", "operate", "core"),
+      item("Operations", "Operations Centre", "enabled", "operate", "core"),
+      item("People", "People", "enabled", "manage", "core"),
+      item("My Providers", "My Providers", "enabled", "manage", "core"),
+      item("My Programmes", "My Programmes", "enabled", "manage", "core"),
+      item("Finance", "Finance", "enabled", "manage", "core"),
+      item("Marketplace", "Marketplace", "enabled", "discover", "core"),
+      item("Intelligence", "Intelligence", "enabled", "discover", "core"),
+      item("Copilot", "Copilot", "secondary", "support", "supporting"),
+      item("Knowledge", "Guidance Centre", "secondary", "support", "supporting"),
+      item("Settings", "Settings", "secondary", "support", "supporting"),
       item("Reports", "Reports", "deferred", undefined, "not-ready"),
     ],
     permittedCapabilities: ["employer-organisation-operations"],
@@ -124,14 +130,14 @@ export const coreEarlyAccessPolicy: Readonly<Record<MvpUserRole, CoreEarlyAccess
   "Platform Admin": {
     role: "Platform Admin",
     modules: [
-      item("Home", "Employer Workspaces", "enabled", "primary", "core"),
+      item("Home", "Employer Workspaces", "enabled", "manage", "core"),
       item("Intelligence", "Intelligence", "hidden", undefined, "role-denied"),
-      item("Providers", "Provider Catalogue", "enabled", "primary", "core"),
+      item("Providers", "Provider Catalogue", "enabled", "manage", "core"),
       item("Finance", "Finance", "hidden", undefined, "role-denied"),
       item("Programmes", "Programmes", "hidden", undefined, "role-denied"),
-      item("Settings", "Access & Tenant Support", "enabled", "primary", "core"),
-      item("Knowledge", "Guidance Administration", "secondary", "secondary", "supporting"),
-      item("Support", "Support / Audit Context", "secondary", "secondary", "supporting"),
+      item("Settings", "Access & Tenant Support", "enabled", "manage", "core"),
+      item("Knowledge", "Guidance Administration", "secondary", "support", "supporting"),
+      item("Support", "Support / Audit Context", "secondary", "support", "supporting"),
       item("Applications", "Applications", "hidden", undefined, "role-denied"),
       item("Learners", "Learners", "hidden", undefined, "role-denied"),
       item("Reports", "Reports", "hidden", undefined, "role-denied"),
@@ -143,17 +149,19 @@ export const coreEarlyAccessPolicy: Readonly<Record<MvpUserRole, CoreEarlyAccess
   "Employer Admin": {
     role: "Employer Admin",
     modules: [
-      item("Home", "Operations Centre", "enabled", "primary", "core"),
-      item("Intelligence", "Intelligence", "enabled", "primary", "core"),
-      item("Applications", "Applications", "enabled", "primary", "core"),
-      item("Learners", "Learners", "enabled", "primary", "core"),
-      item("Providers", "Providers", "enabled", "primary", "core"),
-      item("Finance", "Finance", "enabled", "primary", "core"),
-      item("People", "People", "secondary", "administration", "supporting"),
-      item("Programmes", "Programmes", "secondary", "administration", "supporting"),
-      item("Settings", "Settings", "secondary", "administration", "supporting"),
-      item("Copilot", "Copilot", "secondary", "help", "supporting"),
-      item("Knowledge", "Guidance Centre", "secondary", "help", "supporting"),
+      item("Home", "Home", "enabled", "operate", "core"),
+      item("Applications", "Applications", "enabled", "operate", "core"),
+      item("Learners", "Learners", "enabled", "operate", "core"),
+      item("Operations", "Operations Centre", "enabled", "operate", "core"),
+      item("People", "People", "enabled", "manage", "core"),
+      item("My Providers", "My Providers", "enabled", "manage", "core"),
+      item("My Programmes", "My Programmes", "enabled", "manage", "core"),
+      item("Finance", "Finance", "enabled", "manage", "core"),
+      item("Marketplace", "Marketplace", "enabled", "discover", "core"),
+      item("Intelligence", "Intelligence", "enabled", "discover", "core"),
+      item("Copilot", "Copilot", "secondary", "support", "supporting"),
+      item("Knowledge", "Guidance Centre", "secondary", "support", "supporting"),
+      item("Settings", "Settings", "secondary", "support", "supporting"),
       item("Reports", "Reports", "deferred", undefined, "not-ready"),
     ],
     permittedCapabilities: ["employer-organisation-operations"],

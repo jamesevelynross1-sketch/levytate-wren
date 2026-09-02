@@ -595,6 +595,23 @@ async function main() {
   await upsert(config, "levytate_applications", groundControlApplications.map((application) => withOrg(application, organisation.id)), "organisation_id,id");
   await upsert(config, "levytate_application_history", applicationHistoryRows(groundControlApplications, organisation.id), "organisation_id,id");
   await upsert(config, "levytate_enrolments", groundControlEnrolments.map((enrolment) => withOrg(enrolment, organisation.id)), "organisation_id,id");
+  await upsert(config, "levytate_organisation_providers", [{
+    organisation_id: organisation.id,
+    provider_id: "provider-qa",
+    status: "Active",
+    selected_by: "apprenticeshiplead.demo@levytate.test",
+    selected_at: now,
+    updated_at: now,
+  }], "organisation_id,provider_id");
+  await upsert(config, "levytate_organisation_programmes", [{
+    organisation_id: organisation.id,
+    programme_id: "programme-qa-data-analyst",
+    provider_id: "provider-qa",
+    status: "Active",
+    selected_by: "apprenticeshiplead.demo@levytate.test",
+    selected_at: now,
+    updated_at: now,
+  }], "organisation_id,programme_id");
   await seedLifecycleRecords(config, organisation.id);
 
   await upsert(config, "levytate_roles", [{

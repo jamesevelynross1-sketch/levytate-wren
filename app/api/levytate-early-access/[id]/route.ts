@@ -2,13 +2,12 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createLevyTateApprovalToken, isLevyTateApprovalStatus, levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
 import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
-import { isEarlyAccessStatus, type EarlyAccessRequest, type EarlyAccessStatus } from "@/lib/levytate/early-access/domain";
+import { isEarlyAccessStatus } from "@/lib/levytate/early-access/domain";
 import { syncPersistentEarlyAccessState } from "@/lib/server/levytate-beta-access-grants";
 import { EarlyAccessStoreError, updateEarlyAccessStatus } from "@/lib/server/levytate-early-access";
 
 type PatchBody = {
   status?: unknown;
-  lead?: Partial<EarlyAccessRequest>;
 };
 
 export async function PATCH(
@@ -35,28 +34,9 @@ export async function PATCH(
       );
     }
 
-    const fallbackLead = buildFallbackLead(body.lead, body.status);
-    let updated: EarlyAccessRequest | null = null;
-
-    try {
-      const { id } = await params;
-      updated = await updateEarlyAccessStatus(id, body.status);
-    } catch (error) {
-      if (!(error instanceof EarlyAccessStoreError) || !fallbackLead) {
-        throw error;
-      }
-    }
-
-    const leadForAccess = updated ?? fallbackLead;
-    if (!leadForAccess) {
-      throw new EarlyAccessStoreError("Lead could not be found.");
-    }
-
-    try {
-      await syncPersistentEarlyAccessState(leadForAccess.email, body.status);
-    } catch {
-      // The demo can still issue a signed approval token when server-side persistence is unavailable.
-    }
+    const { id } = await params;
+    const leadForAccess = await updateEarlyAccessStatus(id, body.status);
+    await syncPersistentEarlyAccessState(leadForAccess.email, body.status);
 
     const approvalToken = isLevyTateApprovalStatus(body.status)
       ? await createLevyTateApprovalToken(leadForAccess.email, body.status)
@@ -75,23 +55,4 @@ export async function PATCH(
       { status },
     );
   }
-}
-
-function buildFallbackLead(lead: Partial<EarlyAccessRequest> | undefined, status: EarlyAccessStatus) {
-  if (!lead || typeof lead.email !== "string") return null;
-
-  const email = lead.email.trim().toLowerCase();
-  if (!email) return null;
-
-  return {
-    id: typeof lead.id === "string" && lead.id.trim() ? lead.id : `local-${email}`,
-    organisation: typeof lead.organisation === "string" ? lead.organisation : "",
-    contactName: typeof lead.contactName === "string" ? lead.contactName : "",
-    email,
-    employeeCount: typeof lead.employeeCount === "string" ? lead.employeeCount : "",
-    biggestChallenge: typeof lead.biggestChallenge === "string" ? lead.biggestChallenge : "",
-    consent: lead.consent !== false,
-    submittedAt: typeof lead.submittedAt === "string" && lead.submittedAt ? lead.submittedAt : new Date().toISOString(),
-    status,
-  } satisfies EarlyAccessRequest;
 }

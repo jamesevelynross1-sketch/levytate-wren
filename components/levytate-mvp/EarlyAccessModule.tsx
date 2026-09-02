@@ -4,9 +4,7 @@ import { Building2, Mail, Search, UserRound } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { MvpPanel } from "@/components/levytate-mvp/MvpUi";
 import {
-  earlyAccessApprovalTokenStorageKey,
   earlyAccessStatuses,
-  earlyAccessStorageKey,
   type EarlyAccessRequest,
   type EarlyAccessStatus,
 } from "@/lib/levytate/early-access/domain";
@@ -30,18 +28,12 @@ export function EarlyAccessModule() {
           message?: string;
         };
 
-        const serverLeads = response.ok && Array.isArray(payload.leads) ? payload.leads : [];
-        const localLeads = readLocalLeads();
-        const merged = mergeLeads(serverLeads, localLeads);
-
-        if (!cancelled) {
-          setLeads(merged);
-          setError(response.ok ? "" : payload.message || "Early access leads could not be loaded.");
-        }
+        if (!response.ok || !Array.isArray(payload.leads)) throw new Error(payload.message || "Early access leads could not be loaded.");
+        if (!cancelled) { setLeads(payload.leads); setError(""); }
       } catch {
         if (!cancelled) {
-          setLeads(readLocalLeads());
-          setError("Live lead storage is unavailable, showing locally captured requests only.");
+          setLeads([]);
+          setError("Early access leads are temporarily unavailable.");
         }
       } finally {
         if (!cancelled) {
@@ -86,13 +78,12 @@ export function EarlyAccessModule() {
     setError("");
 
     try {
-      const currentLead = leads.find((lead) => lead.id === id) ?? null;
       const response = await fetch(`/api/levytate-early-access/${id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ status, lead: currentLead }),
+        body: JSON.stringify({ status }),
       });
 
       const payload = (await response.json()) as {
@@ -105,16 +96,10 @@ export function EarlyAccessModule() {
         throw new Error(payload.message || "Lead status could not be updated.");
       }
 
-      persistApprovalToken(payload.lead.email, payload.approvalToken ?? null, payload.lead.status);
-
       const next = leads.map((lead) => lead.id === id ? payload.lead! : lead);
       setLeads(next);
-      persistLocalLeads(next);
     } catch (updateError) {
-      const next = leads.map((lead) => lead.id === id ? { ...lead, status } : lead);
-      setLeads(next);
-      persistLocalLeads(next);
-      setError(updateError instanceof Error ? `${updateError.message} Showing the updated status from local beta storage.` : "Lead status could not be updated in live storage. Showing the updated status from local beta storage.");
+      setError(updateError instanceof Error ? updateError.message : "Lead status could not be updated.");
     } finally {
       setUpdatingId(null);
     }
@@ -272,60 +257,4 @@ function formatSubmittedDate(value: string) {
     month: "short",
     year: "numeric",
   }).format(date);
-}
-
-function mergeLeads(serverLeads: EarlyAccessRequest[], localLeads: EarlyAccessRequest[]) {
-  const seen = new Map<string, EarlyAccessRequest>();
-
-  [...serverLeads, ...localLeads].forEach((lead) => {
-    if (!seen.has(lead.id)) {
-      seen.set(lead.id, lead);
-    }
-  });
-
-  return Array.from(seen.values()).sort((left, right) =>
-    right.submittedAt.localeCompare(left.submittedAt),
-  );
-}
-
-function readLocalLeads() {
-  if (typeof window === "undefined") return [];
-
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(earlyAccessStorageKey) ?? "[]") as EarlyAccessRequest[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function persistLocalLeads(leads: EarlyAccessRequest[]) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(earlyAccessStorageKey, JSON.stringify(leads));
-}
-
-function persistApprovalToken(email: string, approvalToken: string | null, status: EarlyAccessStatus) {
-  if (typeof window === "undefined") return;
-
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(earlyAccessApprovalTokenStorageKey) ?? "{}") as Record<string, string>;
-    const next = { ...parsed };
-
-    if (approvalToken && (status === "Approved" || status === "Onboarded")) {
-      next[email.toLowerCase()] = approvalToken;
-    } else {
-      delete next[email.toLowerCase()];
-    }
-
-    window.localStorage.setItem(earlyAccessApprovalTokenStorageKey, JSON.stringify(next));
-  } catch {
-    if (approvalToken && (status === "Approved" || status === "Onboarded")) {
-      window.localStorage.setItem(
-        earlyAccessApprovalTokenStorageKey,
-        JSON.stringify({ [email.toLowerCase()]: approvalToken }),
-      );
-    } else {
-      window.localStorage.removeItem(earlyAccessApprovalTokenStorageKey);
-    }
-  }
 }

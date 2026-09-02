@@ -11,9 +11,11 @@ import {
   LayoutDashboard,
   Landmark,
   LogOut,
+  Network,
   Newspaper,
   Settings,
   Sparkles,
+  Store,
   UserRound,
   Users,
 } from "lucide-react";
@@ -25,6 +27,7 @@ import { DashboardModule, LineManagerHomeModule, SettingsModule } from "@/compon
 import { EarlyAccessModule } from "@/components/levytate-mvp/EarlyAccessModule";
 import { EmployeeApplicationModule, EmployeeHomeModule, EmployeeProgrammeModule } from "@/components/levytate-mvp/EmployeeExperienceModule";
 import { EmployeesModule } from "@/components/levytate-mvp/EmployeesModule";
+import { MyProgrammesModule, MyProvidersModule } from "@/components/levytate-mvp/EmployerPortfolioModules";
 import { GuidanceCentreModule } from "@/components/levytate-mvp/GuidanceCentreModule";
 import { LearnersModule } from "@/components/levytate-mvp/LearnersModule";
 import { LevyFinanceModule } from "@/components/levytate-mvp/LevyFinanceModule";
@@ -55,11 +58,15 @@ const modules = [
   { name: "My Application", icon: ClipboardCheck },
   { name: "My Team", icon: Users },
   { name: "Approvals", icon: ClipboardCheck },
+  { name: "Operations", icon: BellRing },
   { name: "Intelligence", icon: Newspaper },
   { name: "Applications", icon: ClipboardCheck },
   { name: "People", icon: Users },
   { name: "Learners", icon: GraduationCap },
   { name: "Providers", icon: Building2 },
+  { name: "My Providers", icon: Network },
+  { name: "My Programmes", icon: GraduationCap },
+  { name: "Marketplace", icon: Store },
   { name: "Finance", icon: Landmark },
   { name: "Programmes", icon: BookOpenCheck },
   { name: "Copilot", icon: Sparkles },
@@ -80,11 +87,15 @@ const modulePermissions = {
   "My Application": "applications:read",
   "My Team": "employees:read",
   Approvals: "applications:read",
+  Operations: "operationalActions:read",
   Intelligence: "providers:read",
   Applications: "applications:read",
   People: "employees:read",
   Learners: "learnerLifecycle:read",
   Providers: "providers:read",
+  "My Providers": "providerRelationships:read",
+  "My Programmes": "providerRelationships:read",
+  Marketplace: "providers:read",
   Finance: "finance:read",
   Programmes: "providers:read",
   Copilot: "copilot:use",
@@ -115,11 +126,15 @@ const moduleCopy: Record<ModuleName, string> = {
   "My Application": "Start, save and track your current apprenticeship application.",
   "My Team": "Direct reports, development status and current application activity.",
   Approvals: "Review direct-report apprenticeship applications and record fair manager decisions.",
+  Operations: "Prioritised learner operations showing what needs attention, why it matters and where to act next.",
   Intelligence: "A balanced editorial view of provider updates, programme changes and apprenticeship market themes.",
   Applications: "Organisation application flow, final approval work and learner handoff readiness.",
   People: "Employee and role records that shape workforce development decisions.",
   Learners: "Read-only lifecycle records covering eligibility, enrolment, progress, reviews and completion.",
   Providers: "Explore factual apprenticeship programme and provider information in one clear directory.",
+  "My Providers": "Manage the providers your organisation works with and review their current activity.",
+  "My Programmes": "Manage the programmes your organisation has published for employees.",
+  Marketplace: "Explore the global factual provider and programme catalogue.",
   Finance: "Understand levy funding, apprenticeship spend, balances and expired funds from DAS transaction data.",
   Programmes: "Review the factual programme catalogue available to your organisation.",
   Copilot: "Use LevyTate Copilot to explain, find, guide and create work inside the platform.",
@@ -129,7 +144,7 @@ const moduleCopy: Record<ModuleName, string> = {
   Support: "Safe platform support and audit context without employer operational data.",
 };
 
-export function LevyTateMvpApp({ initialWorkspace, persistLocal = true, initialManagerDirectReportDetail = null }: {
+export function LevyTateMvpApp({ initialWorkspace, persistLocal = false, initialManagerDirectReportDetail = null }: {
   initialWorkspace?: LevyTateWorkspaceBootstrap | null;
   persistLocal?: boolean;
   initialManagerDirectReportDetail?: ManagerDirectReportLearnerDetail | null;
@@ -153,14 +168,13 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
   const notifications = useMemo(() => buildNotifications(data), [data]);
   const permissions = meta?.permissions ?? permissionsForMvpRole(meta?.userRole);
   const can = (permission: MvpPermission) => hasMvpPermission(permissions, permission);
-  const isOperationsRole = meta?.userRole === "Apprenticeship Lead" || meta?.userRole === "Employer Admin";
   const earlyAccessPolicy = meta?.coreEarlyAccess ?? getCoreEarlyAccessPolicy(meta?.userRole ?? "Employee");
   const availableModules = earlyAccessPolicy.modules
     .filter((status) => status.availability === "enabled" || status.availability === "secondary")
     .map((status) => modules.find((module) => module.name === status.moduleKey))
     .filter((module): module is (typeof modules)[number] => Boolean(module))
     .filter((module) => can(modulePermissions[module.name]));
-  const navigationGroups = (["primary", "administration", "help", "secondary"] as const)
+  const navigationGroups = (["operate", "manage", "discover", "support"] as const)
     .map((group) => ({
       group,
       modules: availableModules.filter((module) => earlyAccessPolicy.modules.find((entry) => entry.moduleKey === module.name)?.group === group),
@@ -188,7 +202,11 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
       const access = resolveCoreEarlyAccessRouteAccess(meta?.userRole ?? "Employee", requested);
       const resolved = access.module as ModuleName;
       setActiveModule(resolved);
-      setManagerReviewApplicationId(access.permitted && resolved === "Approvals" ? searchParams.get("application") : null);
+      setManagerReviewApplicationId(
+        access.permitted && (resolved === "Approvals" || resolved === "Applications")
+          ? searchParams.get("application")
+          : null,
+      );
       if (!access.permitted) window.history.replaceState(null, "", access.safeRedirect);
     }
     deepLinkHandled.current = true;
@@ -234,15 +252,16 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
     setManagerReviewApplicationId(applicationId);
     const application = applicationId ? data.applications.find((item) => item.id === applicationId) : null;
     const employee = application ? data.employees.find((item) => item.id === application.employeeId) : null;
+    const applicationModule = meta?.userRole === "Line Manager" ? "Approvals" : "Applications";
     setCopilotEntity(applicationId ? { type: "application", id: applicationId, label: `Application: ${employee?.name ?? "Selected record"}` } : null);
     window.history.replaceState(
       null,
       "",
       applicationId
-        ? `/levytate/app?module=Approvals&application=${encodeURIComponent(applicationId)}`
-        : "/levytate/app?module=Approvals",
+        ? `/levytate/app?module=${applicationModule}&application=${encodeURIComponent(applicationId)}`
+        : `/levytate/app?module=${applicationModule}`,
     );
-  }, [data.applications, data.employees]);
+  }, [data.applications, data.employees, meta?.userRole]);
 
   const updateLearnerCopilotSelection = useCallback((id: string | null, name?: string) => {
     setCopilotEntity(id ? { type: "learner", id, label: `Learner: ${name ?? "Selected record"}` } : null);
@@ -259,10 +278,10 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
 
   function navigateTo(target: string) {
     if (target === "Programmes & Providers" || target.startsWith("Programmes & Providers:")) {
-      openModule("Providers");
+      openModule("Marketplace");
       const [, kind, id] = target.split(":");
       if (kind && id) {
-        window.history.replaceState(null, "", `/levytate/app?module=Providers&${encodeURIComponent(kind)}=${encodeURIComponent(id)}`);
+        window.history.replaceState(null, "", `/levytate/app?module=Marketplace&${encodeURIComponent(kind)}=${encodeURIComponent(id)}`);
         if (kind.toLowerCase().includes("provider")) {
           const provider = data.providers.find((item) => item.providerId === id);
           setCopilotEntity({ type: "provider", id, label: `Provider: ${provider?.providerName ?? "Selected record"}` });
@@ -317,9 +336,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
       return;
     }
     if (target === "Provider Partners") {
-      if (!providerItems.includes("Programmes")) return;
-      setProviderView("Programmes");
-      openModule("Providers");
+      openModule("My Providers");
       return;
     }
     if (target === "Provider Relationships") {
@@ -355,7 +372,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
   const workspaceLabel = data.profile.workspaceName || "Standalone employer workspace";
   const storageStatus = meta?.storageMode === "supabase" ? "Workspace connected" : "Limited access mode";
   const copilotContext = useMemo<LevyTateCopilotContext>(() => {
-    const operationalLabel = activeModule === "Home" && isOperationsRole ? "Operations Centre" : earlyAccessPolicy.modules.find((entry) => entry.moduleKey === activeModule)?.label ?? activeModule;
+    const operationalLabel = earlyAccessPolicy.modules.find((entry) => entry.moduleKey === activeModule)?.label ?? activeModule;
     return {
       module: activeModule,
       route: activeModule === "Home" ? "/levytate/app" : `/levytate/app?module=${encodeURIComponent(activeModule)}`,
@@ -363,7 +380,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
       entityType: copilotEntity?.type,
       entityId: copilotEntity?.id,
     };
-  }, [activeModule, copilotEntity, earlyAccessPolicy.modules, isOperationsRole]);
+  }, [activeModule, copilotEntity, earlyAccessPolicy.modules]);
 
   return (
     <main className="min-h-screen bg-[#f4f7f5] text-[#102c3d]">
@@ -410,7 +427,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
             <div className="min-h-0 flex-1 overflow-y-auto pr-1">
               <nav className="grid gap-4" aria-label="Core Early Access navigation">
                 {navigationGroups.map(({ group, modules: groupModules }) => <div key={group} className="grid gap-1">
-                  {group !== "primary" ? <p className="px-3 pb-1 pt-2 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/[0.34]">{navigationGroupLabel(group)}</p> : null}
+                  <p className="px-3 pb-1 pt-2 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/[0.34]">{navigationGroupLabel(group)}</p>
                   {groupModules.map(({ name, icon: Icon }) => {
                     const active = activeModule === name;
                     const badge = moduleBadges[name as keyof typeof moduleBadges];
@@ -459,8 +476,8 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
           <div className="mx-auto max-w-[1540px] px-4 py-5 sm:px-6 lg:px-8">
             <section className="mb-5 border-b border-[#102c3d]/[0.07] pb-4">
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">Protected workspace</p>
-              <h1 className="mt-1 text-2xl font-semibold tracking-[-0.025em]">{activeModule === "Home" && isOperationsRole ? "Operations Centre" : moduleLabel(activeModule)}</h1>
-              <p className="mt-1.5 max-w-3xl text-sm leading-6 text-[#102c3d]/[0.56] max-sm:hidden">{activeModule === "Home" && isOperationsRole ? "Prioritised learner operations showing what needs attention, why it matters and where to act next." : moduleCopy[activeModule]}</p>
+              <h1 className="mt-1 text-2xl font-semibold tracking-[-0.025em]">{moduleLabel(activeModule)}</h1>
+              <p className="mt-1.5 max-w-3xl text-sm leading-6 text-[#102c3d]/[0.56] max-sm:hidden">{moduleCopy[activeModule]}</p>
             </section>
 
             {activeModule === "Home" ? (
@@ -470,8 +487,6 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
                   ? <LineManagerHomeModule onNavigate={(target) => navigateTo(target)} onOpenApplicationReview={openApplicationReview} />
                 : meta?.userRole === "Platform Admin"
                   ? <PlatformAdminWorkspacesModule onNavigate={navigateTo} />
-                  : isOperationsRole
-                  ? <OperationsCentreModule onOpenLearner={(target) => { setLearnerTarget(target); openModule("Learners"); }} onSignalContext={(signal) => setCopilotEntity(signal ? { type: "intelligence_signal", id: signal.id, label: `Signal: ${signal.title}` } : null)} />
                   : <DashboardModule onNavigate={navigateTo} />
             ) : null}
             {activeModule === "My Programme" ? <EmployeeProgrammeModule onNavigate={(target) => navigateTo(target)} /> : null}
@@ -484,8 +499,9 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
                 : <EmployeesModule onOpenDirectReport={openDirectReport} onStartDiscovery={(employeeId) => { setAiEmployeeId(employeeId); openModule("Copilot"); }} />
             ) : null}
             {activeModule === "Approvals" ? <ApplicationsModule onOpenDirectReport={openDirectReport} initialApplicationId={managerReviewApplicationId} onApplicationSelectionChange={updateApplicationReviewSelection} /> : null}
-            {activeModule === "Intelligence" ? <ProviderIntelligenceModule onOpenProvider={() => openModule("Providers")} /> : null}
-            {activeModule === "Applications" ? <ApplicationsModule onApplicationSelectionChange={updateApplicationReviewSelection} /> : null}
+            {activeModule === "Operations" ? <OperationsCentreModule onOpenLearner={(target) => { setLearnerTarget(target); openModule("Learners"); }} onSignalContext={(signal) => setCopilotEntity(signal ? { type: "intelligence_signal", id: signal.id, label: `Signal: ${signal.title}` } : null)} /> : null}
+            {activeModule === "Intelligence" ? <ProviderIntelligenceModule onOpenProvider={() => openModule("Marketplace")} /> : null}
+            {activeModule === "Applications" ? <ApplicationsModule initialApplicationId={managerReviewApplicationId} onApplicationSelectionChange={updateApplicationReviewSelection} /> : null}
             {activeModule === "Learners" ? <LearnersModule initialLearnerRecordId={learnerTarget?.learnerRecordId} initialAction={learnerTarget?.actionType} onDeepLinkConsumed={() => setLearnerTarget(null)} onLearnerSelectionChange={updateLearnerCopilotSelection} /> : null}
             {activeModule === "People" ? (
               <ModuleStackNav items={peopleItems} active={peopleView} onSelect={(item) => setPeopleView(item as PeopleView)}>
@@ -501,6 +517,9 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
                   </ModuleStackNav>
                 : <ProvidersModule />
             ) : null}
+            {activeModule === "My Providers" ? <MyProvidersModule onOpenMarketplace={() => openModule("Marketplace")} /> : null}
+            {activeModule === "My Programmes" ? <MyProgrammesModule onOpenMarketplace={() => openModule("Marketplace")} /> : null}
+            {activeModule === "Marketplace" ? <ProvidersModule /> : null}
             {activeModule === "Finance" ? <LevyFinanceModule organisationId={meta?.organisationId ?? "local-demo"} demoMode={meta?.storageMode !== "supabase"} /> : null}
             {activeModule === "Programmes" ? <ProvidersModule /> : null}
             {activeModule === "Reports" ? <ReportsModule /> : null}
@@ -556,8 +575,8 @@ function ModuleStackNav({
 }
 
 function navigationGroupLabel(group: CoreEarlyAccessNavigationGroup) {
-  if (group === "administration") return "Administration";
-  if (group === "help") return "Help";
-  if (group === "secondary") return "Secondary";
-  return "Primary";
+  if (group === "operate") return "Operate";
+  if (group === "manage") return "Manage";
+  if (group === "discover") return "Discover";
+  return "Support";
 }

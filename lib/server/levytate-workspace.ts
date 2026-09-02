@@ -9,7 +9,6 @@ import {
   serialiseProgrammeRecordNotes,
   serialiseProviderRecordNotes,
 } from "@/lib/levytate/domain";
-import { mvpProviderCatalogue, mvpProviderProgrammes } from "@/lib/levytate/data/mvp/provider-catalogue";
 import type { LevyTateBetaSession } from "@/lib/levytate/config/beta-access";
 import type { LevyTateWorkspaceBootstrap, LevyTateWorkspaceMeta, LevyTateWorkspaceMutation } from "@/lib/levytate/mvp/api";
 import {
@@ -28,6 +27,8 @@ import {
   type MvpEmployeeDevelopmentProfile,
   type MvpEnrolment,
   type MvpMatchingRequest,
+  type MvpOrganisationProgramme,
+  type MvpOrganisationProvider,
   type MvpPathwayMapping,
   type MvpProviderRelationship,
   type MvpRole,
@@ -52,6 +53,7 @@ import { getEarlyAccessRequestByEmail } from "@/lib/server/levytate-early-access
 import { getPersistentEarlyAccessState } from "@/lib/server/levytate-beta-access-grants";
 import { getProspectAccessForSession } from "@/lib/server/levytate-prospect-access";
 import { synchroniseApplicationReviewOperationalActions } from "@/lib/server/levytate-operational-actions";
+import { getOrganisationLearnerLifecycleCollectionsForWorkspace } from "@/lib/server/levytate-learner-lifecycle";
 import { isBetaApprovedEarlyAccessStatus } from "@/lib/levytate/early-access/domain";
 
 type OrganisationRow = {
@@ -249,6 +251,25 @@ type ProviderRelationshipRow = {
   last_used_date: string;
 };
 
+type OrganisationProviderRow = {
+  organisation_id: string;
+  provider_id: string;
+  status: MvpOrganisationProvider["status"];
+  selected_by?: string;
+  selected_at: string;
+  updated_at: string;
+};
+
+type OrganisationProgrammeRow = {
+  organisation_id: string;
+  programme_id: string;
+  provider_id: string;
+  status: MvpOrganisationProgramme["status"];
+  selected_by?: string;
+  selected_at: string;
+  updated_at: string;
+};
+
 type MatchingRequestRow = {
   organisation_id: string;
   id: string;
@@ -317,6 +338,8 @@ const applicationHistoryTable = "levytate_application_history";
 const providersTable = "levytate_providers";
 const providerProgrammesTable = "levytate_provider_programmes";
 const providerRelationshipsTable = "levytate_provider_relationships";
+const organisationProvidersTable = "levytate_organisation_providers";
+const organisationProgrammesTable = "levytate_organisation_programmes";
 const matchingRequestsTable = "levytate_matching_requests";
 const enrolmentsTable = "levytate_enrolments";
 const auditEventsTable = "levytate_audit_events";
@@ -341,18 +364,13 @@ export async function getWorkspaceBootstrapForSession(session: LevyTateBetaSessi
   const config = getLevyTateSupabaseConfig();
 
   if (!config) {
-    return {
-      data: createEmptyMvpWorkspace(),
-      meta: buildFallbackMeta(session, [
-        "Supabase environment variables are not configured. LevyTate is running in local fallback mode.",
-      ]),
-    };
+    throw new LevyTateWorkspacePersistenceError("Supabase environment variables are not configured.");
   }
 
   try {
     const context = await ensureWorkspaceContext(session);
     await assertWorkspaceReadAllowed(context);
-    const data = await loadWorkspaceData(context);
+    const data = await loadWorkspaceData(context, session);
     const userRole = normaliseMvpUserRole(context.user.role);
     const prospectAccess = await getProspectAccessForSession(session);
     const warnings = [...context.warnings];
@@ -396,13 +414,7 @@ export async function getWorkspaceBootstrapForSession(session: LevyTateBetaSessi
     }
 
     const message = error instanceof Error ? error.message : "Unknown Supabase workspace bootstrap error.";
-    return {
-      data: createEmptyMvpWorkspace(),
-      meta: buildFallbackMeta(session, [
-        "Supabase workspace bootstrap failed. LevyTate is running in local fallback mode.",
-        message,
-      ]),
-    };
+    throw new LevyTateWorkspacePersistenceError(`Supabase workspace bootstrap failed. ${message}`);
   }
 }
 
@@ -477,6 +489,14 @@ export async function applyWorkspaceMutationForSession(
       await saveProviderRelationship(organisationId, mutation.relationship);
       await recordAuditEvent(context, "provider_relationship", mutation.relationship.id, "provider_relationship.saved", "Provider relationship record saved.");
       break;
+    case "saveOrganisationProvider":
+      await saveOrganisationProviderSelection(context, mutation.selection);
+      await recordAuditEvent(context, "organisation_provider", mutation.selection.providerId, "organisation_provider.saved", `Organisation provider selection set to ${mutation.selection.status}.`);
+      break;
+    case "saveOrganisationProgramme":
+      await saveOrganisationProgrammeSelection(context, mutation.selection);
+      await recordAuditEvent(context, "organisation_programme", mutation.selection.programmeId, "organisation_programme.saved", `Organisation programme selection set to ${mutation.selection.status}.`);
+      break;
     case "saveMatchingRequest":
       await saveMatchingRequest(organisationId, mutation.request);
       await recordAuditEvent(context, "provider_matching_request", mutation.request.id, "provider_matching_request.saved", "Provider matching request saved.");
@@ -499,10 +519,6 @@ export async function applyWorkspaceMutationForSession(
       });
       await recordAuditEvent(context, "enrolment", mutation.id, "enrolment.status_updated", `Enrolment moved to ${mutation.status}.`);
       break;
-    case "migrateWorkspaceSnapshot":
-      await replaceWorkspaceSnapshot(organisationId, mutation.snapshot);
-      await recordAuditEvent(context, "workspace", organisationId, "workspace.migrated", "Legacy browser workspace snapshot migrated into Supabase.");
-      break;
     default:
       throw new LevyTateWorkspacePersistenceError("Mutation type is not supported.");
   }
@@ -510,24 +526,10 @@ export async function applyWorkspaceMutationForSession(
   return getWorkspaceBootstrapForSession(session);
 }
 
-function buildFallbackMeta(session: LevyTateBetaSession, warnings: string[]): LevyTateWorkspaceMeta {
-  const userRole = session.accessLevel === "beta_admin" ? "Platform Admin" : "Employer Admin";
-  return {
-    organisationId: "local-fallback",
-    organisationName: session.accessLevel === "beta_admin" ? "LevyTate Internal" : "LevyTate employer workspace",
-    userEmail: session.email,
-    userRole,
-    permissions: permissionsForMvpRole(userRole),
-    coreEarlyAccess: getCoreEarlyAccessPolicy(userRole),
-    storageMode: "local_fallback",
-    warnings,
-  };
-}
-
 async function assertMutationAllowed(context: WorkspaceContext, mutation: LevyTateWorkspaceMutation) {
   const role = normaliseMvpUserRole(context.user.role);
   if (role === "Platform Admin") {
-    const workspaceAdministration = ["saveProfile", "migrateWorkspaceSnapshot"].includes(mutation.type);
+    const workspaceAdministration = mutation.type === "saveProfile";
     const providerCatalogueAdministration = ["saveProvider", "archiveProvider", "saveProviderProgramme", "archiveProviderProgramme", "removeProviderProgramme"].includes(mutation.type);
     if (
       (!workspaceAdministration || !hasCoreEarlyAccessCapability(role, "platform-workspace-administration")) &&
@@ -647,6 +649,10 @@ async function assertEmployeeCanSaveApplication(
     throw new LevyTateWorkspacePermissionError("Submitted applications cannot be edited unless more information has been requested.");
   }
 
+  if (!existing) {
+    await assertOrganisationProgrammeAllowsApplication(organisationId, application.apprenticeshipStandardId);
+  }
+
   const employee = employees.find((item) => item.id === application.employeeId);
   if (!employee?.role_id) {
     throw new LevyTateWorkspacePermissionError("Your employee record is not linked to a role library entry.");
@@ -665,6 +671,36 @@ async function assertEmployeeCanSaveApplication(
 
   if (!mapping) {
     throw new LevyTateWorkspacePermissionError("Employees can only apply for programmes mapped to their assigned role.");
+  }
+}
+
+async function assertOrganisationProgrammeAllowsApplication(organisationId: string, apprenticeshipStandardId: string) {
+  const selections = await selectMany<OrganisationProgrammeRow>(
+    organisationProgrammesTable,
+    organisationId,
+    "programme_id,provider_id,status,selected_at,updated_at",
+    "selected_at.desc",
+  );
+  const activeProgrammeIds = new Set(selections.filter((selection) => selection.status === "Active").map((selection) => selection.programme_id));
+  if (!activeProgrammeIds.size) {
+    throw new LevyTateWorkspacePermissionError("Your organisation has not published any apprenticeship programmes yet.");
+  }
+
+  const canonicalOrganisationId = await getCanonicalCatalogueOrganisationId();
+  const programmes = await selectMany<ProviderProgrammeRow>(
+    providerProgrammesTable,
+    canonicalOrganisationId,
+    "id,linked_standard_id,linked_standard_ids,status,record_status",
+    "created_at.asc",
+  );
+  const permitted = programmes.some((programme) =>
+    activeProgrammeIds.has(programme.id) &&
+    programme.status === "Active" &&
+    programme.record_status === "Active" &&
+    (programme.linked_standard_id === apprenticeshipStandardId || stringArray(programme.linked_standard_ids).includes(apprenticeshipStandardId))
+  );
+  if (!permitted) {
+    throw new LevyTateWorkspacePermissionError("Employees can only apply for an active programme in My Programmes.");
   }
 }
 
@@ -785,6 +821,8 @@ function scopeWorkspaceDataForContext(workspace: MvpWorkspaceData, context: Work
       roles: [],
       applications: [],
       providerRelationships: [],
+      organisationProviders: [],
+      organisationProgrammes: [],
       matchingRequests: [],
       enrolments: [],
       learnerRecords: [],
@@ -844,6 +882,19 @@ function scopeWorkspaceDataForContext(workspace: MvpWorkspaceData, context: Work
   const readProviderMatching = hasMvpPermission(role, "providerMatching:read");
   const readEnrolments = hasMvpPermission(role, "enrolments:read");
 
+  const activeOrganisationProgrammes = workspace.organisationProgrammes.filter((selection) => selection.status === "Active");
+  const visibleOrganisationProgrammeIds = new Set(activeOrganisationProgrammes.map((selection) => selection.programmeId));
+  const historicalStandardIds = new Set(visibleApplications.map((application) => application.apprenticeshipStandardId).filter(Boolean));
+  const visibleProgrammes = safeProgrammes.filter((programme) =>
+    visibleOrganisationProgrammeIds.has(programme.id) ||
+    historicalStandardIds.has(programme.linkedStandardId) ||
+    programme.linkedStandardIds.some((id) => historicalStandardIds.has(id))
+  );
+  const visibleProviderIds = new Set([
+    ...workspace.organisationProviders.filter((selection) => selection.status === "Active").map((selection) => selection.providerId),
+    ...visibleProgrammes.map((programme) => programme.providerId),
+  ]);
+
   return {
     ...workspace,
     profile: scopedProfile(workspace.profile, visibleEmployees, hasMvpPermission(role, "settings:read")),
@@ -851,18 +902,11 @@ function scopeWorkspaceDataForContext(workspace: MvpWorkspaceData, context: Work
     employeeDevelopmentProfiles: workspace.employeeDevelopmentProfiles.filter((profile) => visibleEmployeeIds.has(profile.employeeId)),
     roles: visibleRoles,
     applications: visibleApplications,
-    providers: readProviders ? safeProviders : [],
-    providerProgrammes: readProviders
-      ? safeProgrammes
-      : workspace.providerProgrammes.filter((programme) =>
-          visibleStandardIds.has(programme.linkedStandardId) || programme.linkedStandardIds.some((id) => visibleStandardIds.has(id))
-        ).map((programme) => ({
-          ...programme,
-          commercialNotes: "",
-          notes: "",
-          sourceUrl: "",
-        })),
+    providers: readProviders ? safeProviders.filter((provider) => visibleProviderIds.has(provider.providerId)) : [],
+    providerProgrammes: visibleProgrammes,
     providerRelationships: readProviderRelationships ? workspace.providerRelationships : [],
+    organisationProviders: workspace.organisationProviders.filter((selection) => selection.status === "Active" && visibleProviderIds.has(selection.providerId)),
+    organisationProgrammes: activeOrganisationProgrammes.filter((selection) => visibleOrganisationProgrammeIds.has(selection.programmeId)),
     matchingRequests: readProviderMatching ? workspace.matchingRequests : [],
     enrolments: readEnrolments ? workspace.enrolments : workspace.enrolments.filter((enrolment) =>
       visibleEmployeeIds.has(enrolment.employeeId) || visibleApplicationIds.has(enrolment.applicationId)
@@ -944,10 +988,6 @@ async function ensureWorkspaceContext(session: LevyTateBetaSession): Promise<Wor
   if (existingOrganisation) {
     await updateOrganisationDefaults(organisation.id, seed);
   }
-  if (organisation.workspace_template !== "levytate-prospect-sandbox") {
-    await syncSeedProviderCatalogue(organisation.id);
-  }
-
   const userRole = resolveSessionWorkspaceRole(session, seed.userRole, existingUser?.role);
   const nextUser: UserRow = existingUser
     ? {
@@ -1000,6 +1040,25 @@ async function ensureWorkspaceContext(session: LevyTateBetaSession): Promise<Wor
 
 async function assertSessionStillAllowed(session: LevyTateBetaSession) {
   if (session.accessLevel === "beta_admin") return;
+
+  // Normal client users are authorised by an active, Auth-bound membership.
+  // Early Access approval remains an additional gate only for prospect/demo access.
+  if (session.authMode === "supabase_email" && session.authSubject) {
+    const membership = await selectOne<UserRow>(
+      usersTable,
+      new URLSearchParams({
+        select: "id,organisation_id,email,role,access_level,display_name,active,auth_subject,last_login_at,created_at,updated_at",
+        email: `eq.${session.email}`,
+        auth_subject: `eq.${session.authSubject}`,
+        active: "eq.true",
+        limit: "1",
+      }),
+    );
+    if (membership) {
+      await getProspectAccessForSession(session);
+      return;
+    }
+  }
 
   const [lead, persistentState] = await Promise.all([
     getEarlyAccessRequestByEmail(session.email),
@@ -1147,102 +1206,17 @@ async function updateOrganisationDefaults(
   });
 }
 
-async function syncSeedProviderCatalogue(organisationId: string) {
-  await removeLegacySeedProviders(organisationId);
-  await seedOrganisationProviders(organisationId);
-}
-
-async function removeLegacySeedProviders(organisationId: string) {
-  const config = assertSupabase();
-  const legacyProviderIds = ["provider-multiverse", "provider-sr-apprenticeships"];
-  if (!legacyProviderIds.length) return;
-  const legacyQuery = `${buildOrganisationQuery(organisationId)}&provider_id=in.(${legacyProviderIds.join(",")})`;
-  await supabaseDelete(config, providerProgrammesTable, legacyQuery);
-  await supabaseDelete(config, providersTable, legacyQuery);
-}
-
-async function seedOrganisationProviders(organisationId: string) {
-  if (!mvpProviderCatalogue.length) return;
-
-  const config = assertSupabase();
-  const seededProviderIds = mvpProviderCatalogue.map((provider) => provider.providerId);
-  const seededProgrammeQuery = `${buildOrganisationQuery(organisationId)}&provider_id=in.(${seededProviderIds.join(",")})`;
-  await supabaseDelete(config, providerProgrammesTable, seededProgrammeQuery);
-
-  const providerRows: ProviderRow[] = mvpProviderCatalogue.map((provider) => ({
-    organisation_id: organisationId,
-    provider_id: provider.providerId,
-    provider_name: provider.providerName,
-    website: provider.website,
-    provider_type: provider.providerType,
-    sectors: provider.sectors,
-    industries: provider.industries,
-    technologies: provider.technologies,
-    delivery_models: provider.deliveryModels,
-    regions: provider.regions,
-    employer_types: provider.employerTypes,
-    specialisms: provider.specialisms,
-    contact_name: provider.contactName,
-    contact_email: provider.contactEmail,
-    ofsted_rating: provider.ofstedRating,
-    status: provider.status,
-    source_urls: provider.sourceUrls,
-    notes: serialiseProviderRecordNotes(provider.notes, provider.commercialProfile),
-    last_verified: provider.lastVerified,
-    verification_status: provider.verificationStatus,
-  }));
-
-  const programmeRows: ProviderProgrammeRow[] = mvpProviderProgrammes.map((programme) => ({
-    organisation_id: organisationId,
-    id: programme.id,
-    provider_id: programme.providerId,
-    programme_name: programme.programmeName,
-    short_description: programme.shortDescription,
-    full_description: programme.fullDescription,
-    status: programme.status,
-    verification_status: programme.verificationStatus,
-    target_organisations: programme.targetOrganisations,
-    target_industries: programme.targetIndustries,
-    target_job_roles: programme.targetJobRoles,
-    seniority: programme.seniority,
-    employer_size: programme.employerSize,
-    business_problems_solved: programme.businessProblemsSolved,
-    skills_developed: programme.skillsDeveloped,
-    technologies_covered: programme.technologiesCovered,
-    expected_outcomes: programme.expectedOutcomes,
-    delivery_models: programme.deliveryModels,
-    regions: programme.regions,
-    duration: programme.duration,
-    cohort_options: programme.cohortOptions,
-    commercial_notes: programme.commercialNotes,
-    apprenticeship_standard_id: programme.linkedStandardId || programme.linkedStandardIds[0] || '',
-    linked_standard_id: programme.linkedStandardId || programme.linkedStandardIds[0] || null,
-    linked_standard_ids: programme.linkedStandardIds,
-    linked_standard_name: programme.linkedStandardName,
-    level: programme.level,
-    route: programme.route,
-    funding_band: programme.fundingBand,
-    official_url: programme.officialUrl,
-    source_url: programme.sourceUrl,
-    notes: serialiseProgrammeRecordNotes(programme.notes, programme.commercialProfile),
-    funding_route: programme.fundingRoute,
-    record_status: programme.recordStatus,
-    created_at: programme.createdAt,
-    updated_at: programme.updatedAt,
-  }));
-
-  await supabaseInsert<ProviderRow>(config, providersTable, providerRows, {
-    query: "on_conflict=organisation_id,provider_id",
-    prefer: "resolution=merge-duplicates,return=minimal",
-  });
-  await supabaseInsert<ProviderProgrammeRow>(config, providerProgrammesTable, programmeRows, {
-    query: "on_conflict=organisation_id,id",
-    prefer: "resolution=merge-duplicates,return=minimal",
-  });
-}
-
-async function loadWorkspaceData(context: WorkspaceContext): Promise<MvpWorkspaceData> {
+async function loadWorkspaceData(context: WorkspaceContext, session: LevyTateBetaSession): Promise<MvpWorkspaceData> {
   const organisationId = context.organisation.id;
+  const canonicalOrganisation = await selectOne<OrganisationRow>(
+    organisationsTable,
+    new URLSearchParams({
+      select: "id,slug",
+      slug: "eq.levytate-internal",
+      limit: "1",
+    }),
+  );
+  const canonicalOrganisationId = canonicalOrganisation?.id;
   const [
     organisation,
     employees,
@@ -1254,8 +1228,11 @@ async function loadWorkspaceData(context: WorkspaceContext): Promise<MvpWorkspac
     providers,
     providerProgrammes,
     providerRelationships,
+    organisationProviders,
+    organisationProgrammes,
     matchingRequests,
     enrolments,
+    lifecycle,
   ] = await Promise.all([
     selectOne<OrganisationRow>(organisationsTable, new URLSearchParams({
       select: "id,name,slug,workspace_name,primary_contact,contact_email,default_site,sites,departments,priorities,status,created_at,updated_at",
@@ -1268,11 +1245,20 @@ async function loadWorkspaceData(context: WorkspaceContext): Promise<MvpWorkspac
     selectMany<RoleMappingRow>(roleMappingsTable, organisationId, "id,role_id,apprenticeship_standard_id,recommendation_type,priority,business_rationale,funding_route,delivery_preference", "priority.asc"),
     selectMany<ApplicationRow>(applicationsTable, organisationId, "id,employee_id,apprenticeship_standard_id,status,current_owner,reason,career_goal,support_required,manager_note,submitted_at,updated_at", "submitted_at.desc"),
     selectMany<ApplicationHistoryRow>(applicationHistoryTable, organisationId, "id,application_id,status,owner,note,created_at", "created_at.asc"),
-    selectMany<ProviderRow>(providersTable, organisationId, "provider_id,provider_name,website,provider_type,sectors,industries,technologies,delivery_models,regions,employer_types,specialisms,contact_name,contact_email,ofsted_rating,status,source_urls,notes,last_verified,verification_status", "provider_name.asc"),
-    selectMany<ProviderProgrammeRow>(providerProgrammesTable, organisationId, "id,provider_id,programme_name,short_description,full_description,status,verification_status,target_organisations,target_industries,target_job_roles,seniority,employer_size,business_problems_solved,skills_developed,technologies_covered,expected_outcomes,delivery_models,regions,duration,cohort_options,commercial_notes,apprenticeship_standard_id,linked_standard_id,linked_standard_ids,linked_standard_name,level,route,funding_band,official_url,source_url,notes,funding_route,record_status,created_at,updated_at", "created_at.asc"),
+    canonicalOrganisationId
+      ? selectMany<ProviderRow>(providersTable, canonicalOrganisationId, "provider_id,provider_name,website,provider_type,sectors,industries,technologies,delivery_models,regions,employer_types,specialisms,contact_name,contact_email,ofsted_rating,status,source_urls,notes,last_verified,verification_status", "provider_name.asc")
+      : Promise.resolve([]),
+    canonicalOrganisationId
+      ? selectMany<ProviderProgrammeRow>(providerProgrammesTable, canonicalOrganisationId, "id,provider_id,programme_name,short_description,full_description,status,verification_status,target_organisations,target_industries,target_job_roles,seniority,employer_size,business_problems_solved,skills_developed,technologies_covered,expected_outcomes,delivery_models,regions,duration,cohort_options,commercial_notes,apprenticeship_standard_id,linked_standard_id,linked_standard_ids,linked_standard_name,level,route,funding_band,official_url,source_url,notes,funding_route,record_status,created_at,updated_at", "created_at.asc")
+      : Promise.resolve([]),
     selectMany<ProviderRelationshipRow>(providerRelationshipsTable, organisationId, "id,category,preferred_provider_id,backup_provider_ids,apprenticeship_standard_ids,programme_ids,status,notes,review_date,last_used_date", "review_date.asc"),
+    selectMany<OrganisationProviderRow>(organisationProvidersTable, organisationId, "provider_id,status,selected_at,updated_at", "selected_at.desc"),
+    selectMany<OrganisationProgrammeRow>(organisationProgrammesTable, organisationId, "programme_id,provider_id,status,selected_at,updated_at", "selected_at.desc"),
     selectMany<MatchingRequestRow>(matchingRequestsTable, organisationId, "id,role_need,department,future_capability,employer_size,programme_id,linked_standard_id,learner_count,sites,delivery_preference,funding_position,urgency,notes,business_problems,target_roles,technologies,industries,status,shortlist_provider_ids,created_at,updated_at", "created_at.desc"),
     selectMany<EnrolmentRow>(enrolmentsTable, organisationId, "id,application_id,employee_id,provider_id,apprenticeship_standard_id,status,start_date,notes,created_at,updated_at", "created_at.desc"),
+    normaliseMvpUserRole(context.user.role) === "Platform Admin"
+      ? Promise.resolve(null)
+      : getOrganisationLearnerLifecycleCollectionsForWorkspace(session),
   ]);
 
   const workspace = createEmptyMvpWorkspace();
@@ -1288,8 +1274,34 @@ async function loadWorkspaceData(context: WorkspaceContext): Promise<MvpWorkspac
   workspace.providers = providers.map(providerRowToRecord);
   workspace.providerProgrammes = providerProgrammes.map(providerProgrammeRowToRecord);
   workspace.providerRelationships = providerRelationships.map(providerRelationshipRowToRecord);
+  workspace.organisationProviders = organisationProviders.map((selection) => ({
+    providerId: selection.provider_id,
+    status: selection.status,
+    selectedAt: selection.selected_at,
+    updatedAt: selection.updated_at,
+  }));
+  workspace.organisationProgrammes = organisationProgrammes.map((selection) => ({
+    programmeId: selection.programme_id,
+    providerId: selection.provider_id,
+    status: selection.status,
+    selectedAt: selection.selected_at,
+    updatedAt: selection.updated_at,
+  }));
   workspace.matchingRequests = matchingRequests.map(matchingRequestRowToRecord);
   workspace.enrolments = enrolments.map(enrolmentRowToRecord);
+  if (lifecycle) {
+    workspace.learnerRecords = lifecycle.learnerRecords;
+    workspace.eligibilityDeclarations = lifecycle.eligibilityDeclarations;
+    workspace.preEnrolmentChecks = lifecycle.preEnrolmentChecks;
+    workspace.breaksInLearning = lifecycle.breaksInLearning;
+    workspace.withdrawals = lifecycle.withdrawals;
+    workspace.learnerReviews = lifecycle.learnerReviews;
+    workspace.progressUpdates = lifecycle.progressUpdates;
+    workspace.assessmentReadiness = lifecycle.assessmentReadiness;
+    workspace.achievements = lifecycle.achievements;
+    workspace.operationalActions = lifecycle.operationalActions;
+    workspace.lifecycleEvents = lifecycle.lifecycleEvents;
+  }
 
   return scopeWorkspaceDataForContext(workspace, context);
 }
@@ -1591,6 +1603,89 @@ async function saveProviderRelationship(organisationId: string, relationship: Mv
   });
 }
 
+async function getCanonicalCatalogueOrganisationId() {
+  const organisation = await selectOne<OrganisationRow>(
+    organisationsTable,
+    new URLSearchParams({ select: "id", slug: "eq.levytate-internal", limit: "1" }),
+  );
+  if (!organisation) {
+    throw new LevyTateWorkspacePersistenceError("The canonical LevyTate catalogue is unavailable.");
+  }
+  return organisation.id;
+}
+
+async function saveOrganisationProviderSelection(context: WorkspaceContext, selection: MvpOrganisationProvider) {
+  const canonicalOrganisationId = await getCanonicalCatalogueOrganisationId();
+  const provider = await selectOne<ProviderRow>(providersTable, new URLSearchParams({
+    select: "provider_id,status",
+    organisation_id: `eq.${canonicalOrganisationId}`,
+    provider_id: `eq.${selection.providerId}`,
+    limit: "1",
+  }));
+  if (!provider || provider.status !== "Active") {
+    throw new LevyTateWorkspacePermissionError("Only an active canonical provider can be added to My Providers.");
+  }
+
+  const row: OrganisationProviderRow = {
+    organisation_id: context.organisation.id,
+    provider_id: selection.providerId,
+    status: selection.status,
+    selected_by: context.user.email,
+    selected_at: selection.selectedAt || nowIso(),
+    updated_at: nowIso(),
+  };
+  await supabaseInsert<OrganisationProviderRow>(assertSupabase(), organisationProvidersTable, [row], {
+    query: "on_conflict=organisation_id,provider_id",
+    prefer: "resolution=merge-duplicates,return=minimal",
+  });
+  if (selection.status === "Inactive") {
+    await supabaseUpdate(
+      assertSupabase(),
+      organisationProgrammesTable,
+      `organisation_id=eq.${context.organisation.id}&provider_id=eq.${encodeURIComponent(selection.providerId)}&status=eq.Active`,
+      { status: "Inactive", updated_at: nowIso() },
+      { prefer: "return=minimal" },
+    );
+  }
+}
+
+async function saveOrganisationProgrammeSelection(context: WorkspaceContext, selection: MvpOrganisationProgramme) {
+  const canonicalOrganisationId = await getCanonicalCatalogueOrganisationId();
+  const programme = await selectOne<ProviderProgrammeRow>(providerProgrammesTable, new URLSearchParams({
+    select: "id,provider_id,status,record_status",
+    organisation_id: `eq.${canonicalOrganisationId}`,
+    id: `eq.${selection.programmeId}`,
+    provider_id: `eq.${selection.providerId}`,
+    limit: "1",
+  }));
+  if (!programme || programme.status !== "Active" || programme.record_status !== "Active") {
+    throw new LevyTateWorkspacePermissionError("Only an active canonical programme can be added to My Programmes.");
+  }
+
+  const now = nowIso();
+  if (selection.status === "Active") {
+    await saveOrganisationProviderSelection(context, {
+      providerId: programme.provider_id,
+      status: "Active",
+      selectedAt: selection.selectedAt || now,
+      updatedAt: now,
+    });
+  }
+  const row: OrganisationProgrammeRow = {
+    organisation_id: context.organisation.id,
+    programme_id: selection.programmeId,
+    provider_id: programme.provider_id,
+    status: selection.status,
+    selected_by: context.user.email,
+    selected_at: selection.selectedAt || now,
+    updated_at: now,
+  };
+  await supabaseInsert<OrganisationProgrammeRow>(assertSupabase(), organisationProgrammesTable, [row], {
+    query: "on_conflict=organisation_id,programme_id",
+    prefer: "resolution=merge-duplicates,return=minimal",
+  });
+}
+
 async function saveMatchingRequest(organisationId: string, request: MvpMatchingRequest) {
   const normalised = normaliseMatchingRequest(request);
   const row: MatchingRequestRow = {
@@ -1642,73 +1737,6 @@ async function saveEnrolment(organisationId: string, enrolment: MvpEnrolment) {
     query: "on_conflict=organisation_id,id",
     prefer: "resolution=merge-duplicates,return=minimal",
   });
-}
-
-async function replaceWorkspaceSnapshot(organisationId: string, snapshot: MvpWorkspaceData) {
-  await saveProfile(organisationId, snapshot.profile);
-
-  await purgeWorkspace(organisationId);
-
-  if (snapshot.employees.length) {
-    for (const employee of snapshot.employees) {
-      await saveEmployee(organisationId, employee);
-    }
-  }
-  if (snapshot.employeeDevelopmentProfiles.length) {
-    for (const profile of snapshot.employeeDevelopmentProfiles) {
-      await saveEmployeeDevelopmentProfile(organisationId, profile);
-    }
-  }
-  if (snapshot.roles.length) {
-    for (const role of snapshot.roles) {
-      await saveRole(organisationId, role);
-    }
-  }
-  if (snapshot.applications.length) {
-    for (const application of snapshot.applications) {
-      await saveApplication(organisationId, application);
-    }
-  }
-  if (snapshot.providers.length) {
-    for (const provider of snapshot.providers) {
-      await saveProvider(organisationId, provider);
-    }
-  }
-  if (snapshot.providerProgrammes.length) {
-    for (const programme of snapshot.providerProgrammes) {
-      await saveProviderProgramme(organisationId, programme);
-    }
-  }
-  if (snapshot.providerRelationships.length) {
-    for (const relationship of snapshot.providerRelationships) {
-      await saveProviderRelationship(organisationId, relationship);
-    }
-  }
-  if (snapshot.matchingRequests.length) {
-    for (const request of snapshot.matchingRequests) {
-      await saveMatchingRequest(organisationId, request);
-    }
-  }
-  if (snapshot.enrolments.length) {
-    for (const enrolment of snapshot.enrolments) {
-      await saveEnrolment(organisationId, enrolment);
-    }
-  }
-}
-
-async function purgeWorkspace(organisationId: string) {
-  const config = assertSupabase();
-  await supabaseDelete(config, applicationHistoryTable, buildOrganisationQuery(organisationId));
-  await supabaseDelete(config, applicationsTable, buildOrganisationQuery(organisationId));
-  await supabaseDelete(config, employeeProfilesTable, buildOrganisationQuery(organisationId));
-  await supabaseDelete(config, roleMappingsTable, buildOrganisationQuery(organisationId));
-  await supabaseDelete(config, rolesTable, buildOrganisationQuery(organisationId));
-  await supabaseDelete(config, enrolmentsTable, buildOrganisationQuery(organisationId));
-  await supabaseDelete(config, matchingRequestsTable, buildOrganisationQuery(organisationId));
-  await supabaseDelete(config, providerRelationshipsTable, buildOrganisationQuery(organisationId));
-  await supabaseDelete(config, providerProgrammesTable, buildOrganisationQuery(organisationId));
-  await supabaseDelete(config, providersTable, buildOrganisationQuery(organisationId));
-  await supabaseDelete(config, employeesTable, buildOrganisationQuery(organisationId));
 }
 
 async function recordAuditEvent(
