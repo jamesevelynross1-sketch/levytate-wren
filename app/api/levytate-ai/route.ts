@@ -83,7 +83,7 @@ function mergeGeneratedGuidance(fallback: LevyTateAiResponse, generated: LevyTat
 
   return {
     ...fallback,
-    source: generated.assistantMessage && aligned ? "openai" : "mock",
+    source: generated.assistantMessage && aligned ? "openai" : "deterministic",
     assistantMessage: aligned
       ? generatedMessage
       : recommendationResult
@@ -235,7 +235,19 @@ function sanitiseCopilotRequest(request: LevyTateAiRequest, workspace: LevyTateW
   const employee = resolveScopedEmployee(data.employees, request, role);
   const roleRecord = employee ? data.roles.find((item) => item.id === employee.roleId) ?? null : null;
   const application = employee ? latestApplicationForEmployee(data.applications, employee.id) : null;
-  const standardId = application?.apprenticeshipStandardId ?? roleRecord?.pathwayMappings[0]?.apprenticeshipStandardId;
+  const activeOrganisationProgrammeIds = new Set(
+    data.organisationProgrammes.filter((item) => item.status === "Active").map((item) => item.programmeId),
+  );
+  const employeeVisibleStandardIds = new Set(
+    data.providerProgrammes
+      .filter((programme) => activeOrganisationProgrammeIds.has(programme.id))
+      .flatMap((programme) => [programme.linkedStandardId, ...programme.linkedStandardIds].filter(Boolean)),
+  );
+  if (application?.apprenticeshipStandardId) employeeVisibleStandardIds.add(application.apprenticeshipStandardId);
+  const visibleRoleRecord = roleRecord && role === "Employee"
+    ? { ...roleRecord, pathwayMappings: roleRecord.pathwayMappings.filter((mapping) => employeeVisibleStandardIds.has(mapping.apprenticeshipStandardId)) }
+    : roleRecord;
+  const standardId = application?.apprenticeshipStandardId ?? visibleRoleRecord?.pathwayMappings[0]?.apprenticeshipStandardId;
   const standard = standardId ? getApprenticeshipStandard(standardId) : null;
   const employeeProfile = employee ? data.employeeDevelopmentProfiles.find((profile) => profile.employeeId === employee.id) ?? null : null;
   const providerProgramme = providerProgrammeForStandard(data, standardId);
@@ -269,8 +281,8 @@ function sanitiseCopilotRequest(request: LevyTateAiRequest, workspace: LevyTateW
       submittedDate: application.submittedAt.slice(0, 10),
       decisionNotes: application.managerNote,
     } : null,
-    roleMappings: roleRecord ? roleMappingContext(roleRecord) : [],
-    availablePathways: roleRecord ? pathwayContext(roleRecord) : [],
+    roleMappings: visibleRoleRecord ? roleMappingContext(visibleRoleRecord) : [],
+    availablePathways: visibleRoleRecord ? pathwayContext(visibleRoleRecord) : [],
     providerCatalogue: role === "Apprenticeship Lead" || role === "LevyTate Admin"
       ? data.providers.filter((provider) => provider.status === "Active").slice(0, 16).map((provider) => ({
           providerName: provider.providerName,

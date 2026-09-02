@@ -576,7 +576,7 @@ export function buildFallbackResponse(request: LevyTateAiRequest): LevyTateAiRes
       : null;
 
     return {
-      source: "mock",
+      source: "deterministic",
       assistantMessage: employeeAssistantMessage(persona, guidance, activeApplication),
       recommendedActions: employeeActions(guidance, activeApplication),
       recommendedPathways: employeeRecommendedPathways(guidance),
@@ -604,7 +604,7 @@ export function buildFallbackResponse(request: LevyTateAiRequest): LevyTateAiRes
     const pending = teamRequests.filter((item) => item.status === "Submitted to Line Manager" || item.status === "Awaiting Manager Review");
     const guidance = getManagerGuidance(request.userMessage, teamRequests);
     return {
-      source: "mock",
+      source: "deterministic",
       assistantMessage: managerAssistantMessage(guidance, pending.length),
       recommendedActions: [
         { label: "Review Applications", type: "open_review_queue", target: "Applications to Review" },
@@ -624,7 +624,7 @@ export function buildFallbackResponse(request: LevyTateAiRequest): LevyTateAiRes
   if (request.role === "Department Head") {
     const guidance = getDepartmentGuidance(request.userMessage, safeRequests);
     return {
-      source: "mock",
+      source: "deterministic",
       assistantMessage: departmentAssistantMessage(guidance),
       recommendedActions: [
         { label: "View Department Analytics", type: "open_department_analytics", target: "Department Analytics" },
@@ -643,7 +643,7 @@ export function buildFallbackResponse(request: LevyTateAiRequest): LevyTateAiRes
 
   const guidance = getLeadGuidance(request.userMessage);
   return {
-    source: "mock",
+    source: "deterministic",
     assistantMessage: leadAssistantMessage(guidance),
     recommendedActions: [
       { label: "Review Final Approvals", type: "open_final_approvals", target: "Applications for Final Approval" },
@@ -662,4 +662,3 @@ export function buildFallbackResponse(request: LevyTateAiRequest): LevyTateAiRes
     leadGuidance: guidance,
   };
 }
-

@@ -447,7 +447,7 @@ function employeeWorkspaceFallback(request: LevyTateAiRequest): LevyTateAiRespon
   const isPlatformTask = typeof direct !== "string";
   const status = employeeCurrentStatus(request);
   return {
-    source: "mock",
+    source: "deterministic",
     assistantMessage: directMessage,
     followUpQuestion: null,
     quickReplies: typeof direct === "string" ? employeeQuickRepliesForState(request) : direct.quickReplies,
@@ -516,7 +516,7 @@ function adminRoleEmployeeFallback(request: LevyTateAiRequest): LevyTateAiRespon
       };
 
   return {
-    source: "mock",
+    source: "deterministic",
     assistantMessage: "That sounds like a role moving beyond routine administration into data and workflow improvement. Level 3 Data Technician is the clearest route to explore if reporting, spreadsheets and data quality are becoming a bigger part of the job. Improvement Practitioner may also be useful if the priority is automation, process improvement and measurable workplace change.",
     followUpQuestion: "Is the bigger goal better reporting and analysis, or reducing manual work through automation?",
     quickReplies: ["Better reporting", "Reduce manual work", "Compare both routes", "Prepare a manager message"],
@@ -543,7 +543,7 @@ function genericEmployeeFallback(): LevyTateAiResponse {
     { label: "Explain my career goal", type: "ask_follow_up" },
   ];
   return {
-    source: "mock",
+    source: "deterministic",
     assistantMessage: "I can help, but I do not yet have an employee record or approved role mapping to ground a recommendation. The useful starting point is your current role, the work you do most often and the kind of progression you want.",
     followUpQuestion: "What is your current role, and are you trying to deepen it or move into something new?",
     quickReplies: ["Develop in my current role", "Move into a new role", "Build data and AI skills", "Prepare a manager conversation"],
@@ -684,5 +684,4 @@ export function buildLevyTateAiFallbackResponse(request: LevyTateAiRequest): Lev
     applicationDraft: response.applicationPrefill,
   };
 }
-
 

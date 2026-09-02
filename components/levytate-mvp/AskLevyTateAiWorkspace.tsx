@@ -17,11 +17,10 @@ import { updateEmployeeDiscovery } from "@/lib/levytate/mvp/progressive-profilin
 import { activeApplicationStatuses, createEmployeeDevelopmentProfile, nowIso, type MvpEmployee, type MvpRole, type MvpWorkspaceData } from "@/lib/levytate/mvp/workspace";
 import { copilotPlaceholderFor, copilotSuggestionsFor, type LevyTateCopilotContext } from "@/lib/levytate/copilot-context";
 import { answerLevyFinanceQuestion } from "@/lib/levytate/finance/copilot";
-import { createIllustrativeFinanceFixture } from "@/lib/levytate/finance/fixtures";
-import { readFinanceState } from "@/lib/levytate/finance/storage";
+import type { LevyFinanceState } from "@/lib/levytate/finance/types";
 import { answerProviderIntelligenceQuestion } from "@/lib/levytate/provider-intelligence/copilot";
 import type { ProviderIntelligenceArticle } from "@/lib/levytate/provider-intelligence/domain";
-import { progressReviewDemoSignals } from "@/lib/levytate/intelligence/demo-progress-review-signals";
+import type { IntelligenceSignal } from "@/lib/levytate/intelligence/progress-review";
 
 type AssistantRole = Exclude<LevyTateRole, "Department Head">;
 type ChatMessage = {
@@ -669,7 +668,12 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
     const userMessage: ChatMessage = { id: messageId(), role: "user", content: trimmed };
     const nextMessages = [...roleMessages, userMessage];
     if (context?.entityType === "intelligence_signal") {
-      const signal = progressReviewDemoSignals.find((item) => item.id === context.entityId);
+      let signal: IntelligenceSignal | undefined;
+      try {
+        const response = await fetch("/api/levytate-intelligence/signals", { cache: "no-store" });
+        const payload = await response.json() as { signals?: IntelligenceSignal[] };
+        if (response.ok) signal = payload.signals?.find((item) => item.id === context.entityId);
+      } catch {}
       const query = trimmed.toLowerCase();
       const answer = !signal
         ? "This Intelligence Signal is not available in the current permitted context."
@@ -684,18 +688,23 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
       setInput(""); setError(""); return;
     }
     if (context?.module === "Intelligence") {
-      let answer = "Provider Intelligence has no verified cached articles available in this browser yet. Open Intelligence to load the current source-backed feed.";
+      let answer = "Provider Intelligence is temporarily unavailable.";
       try {
-        const cached = JSON.parse(sessionStorage.getItem("levytate-provider-intelligence-v1") || "{}") as { articles?: ProviderIntelligenceArticle[] };
-        if (cached.articles?.length) answer = answerProviderIntelligenceQuestion(trimmed, cached.articles, (providerId) => data.providers.find((item) => item.providerId === providerId)?.providerName ?? "Provider");
+        const response = await fetch("/api/levytate-provider-intelligence", { cache: "no-store" });
+        const payload = await response.json() as { articles?: ProviderIntelligenceArticle[] };
+        if (response.ok && payload.articles?.length) answer = answerProviderIntelligenceQuestion(trimmed, payload.articles, (providerId) => data.providers.find((item) => item.providerId === providerId)?.providerName ?? "Provider");
+        else if (response.ok) answer = "There are no current published Provider Intelligence articles to summarise.";
       } catch {}
       setConversations((current) => ({ ...current, [activeRole]: [...nextMessages, { id: messageId(), role: "assistant", content: answer }] }));
       setInput(""); setError(""); return;
     }
     if (context?.module === "Finance") {
-      const persistence = meta?.storageMode === "supabase" ? "session" : "local";
-      const financeState = readFinanceState(meta?.organisationId ?? "local-demo", persistence)
-        ?? (persistence === "local" ? createIllustrativeFinanceFixture() : null);
+      let financeState: LevyFinanceState | null = null;
+      try {
+        const response = await fetch("/api/levytate-finance", { cache: "no-store" });
+        const payload = await response.json() as { state?: LevyFinanceState };
+        if (response.ok && payload.state) financeState = payload.state;
+      } catch {}
       const answer = financeState
         ? answerLevyFinanceQuestion(trimmed, financeState).message
         : "There is no imported DAS transaction data to summarise yet. Upload a DAS CSV in Finance first.";
@@ -711,13 +720,27 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
     const resolvedContext = buildWorkspaceEmployeeResolution(data, trimmed, selectedEmployeeId);
     const contextEmployee = resolvedContext.employee;
     const roleRecord = resolvedContext.roleRecord ?? (activeRole === "Employee" ? selectedRoleRecord : null);
+    const activeOrganisationProgrammeIds = new Set(
+      data.organisationProgrammes.filter((item) => item.status === "Active").map((item) => item.programmeId),
+    );
+    const employeeVisibleStandardIds = new Set(
+      data.providerProgrammes
+        .filter((programme) => activeOrganisationProgrammeIds.has(programme.id))
+        .flatMap((programme) => [programme.linkedStandardId, ...programme.linkedStandardIds].filter(Boolean)),
+    );
+    if (resolvedContext.application?.apprenticeshipStandardId) {
+      employeeVisibleStandardIds.add(resolvedContext.application.apprenticeshipStandardId);
+    }
+    const pathwayMappings = roleRecord
+      ? roleRecord.pathwayMappings.filter((mapping) => activeRole !== "Employee" || employeeVisibleStandardIds.has(mapping.apprenticeshipStandardId))
+      : [];
     const existingDevelopmentProfile = resolvedContext.developmentProfile;
     const shouldUpdateSelectedEmployeeProfile = activeRole === "Employee" && selectedEmployee && contextEmployee?.id === selectedEmployee.id;
     const developmentProfile = shouldUpdateSelectedEmployeeProfile && contextEmployee
       ? updateEmployeeDiscovery(existingDevelopmentProfile ?? createEmployeeDevelopmentProfile(contextEmployee.id), contextEmployee.id, trimmed)
       : existingDevelopmentProfile;
     const availablePathways = roleRecord
-      ? roleRecord.pathwayMappings
+      ? pathwayMappings
           .slice()
           .sort((left, right) => left.priority - right.priority)
           .flatMap((mapping) => {
@@ -730,16 +753,16 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
             }] : [];
           })
       : [];
-    const primaryMapping = roleRecord?.pathwayMappings
+    const primaryMapping = pathwayMappings
       .slice()
       .sort((left, right) => left.priority - right.priority)
       .find((mapping) => mapping.recommendationType === "Primary")
-      ?? roleRecord?.pathwayMappings.slice().sort((left, right) => left.priority - right.priority)[0];
+      ?? pathwayMappings.slice().sort((left, right) => left.priority - right.priority)[0];
     const roleMappings = roleRecord && primaryMapping
       ? [{
           roleTitle: roleRecord.title,
           primaryPathway: getApprenticeshipStandard(primaryMapping.apprenticeshipStandardId)?.title ?? primaryMapping.apprenticeshipStandardId,
-          alternativePathways: roleRecord.pathwayMappings
+          alternativePathways: pathwayMappings
             .filter((mapping) => mapping.id !== primaryMapping.id)
             .flatMap((mapping) => {
               const standard = getApprenticeshipStandard(mapping.apprenticeshipStandardId);

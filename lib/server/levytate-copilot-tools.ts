@@ -104,8 +104,11 @@ export async function routeOperationalCopilotQuery(
       { intentClassificationMs, dataRetrievalMs: 0, startedAt },
     );
   }
+  if (role === "Employee" && /\b(?:my|current)\s+(?:programme|program|pathway)\b/i.test(request.userMessage)) return null;
   if (managerOnlyIntents.has(classification.intent) && role !== "Line Manager") return null;
-  if (!operationalRoles.has(role) && classification.intent !== "programme_directory") {
+  const employeeProgrammeIntent = role === "Employee"
+    && (classification.intent === "programme_directory" || classification.intent === "organisation_programmes");
+  if (!operationalRoles.has(role) && !employeeProgrammeIntent) {
     return responseForPayload(
       request,
       classification,
@@ -146,6 +149,27 @@ export async function routeOperationalCopilotQuery(
     }
     return response;
   };
+
+  if (employeeProgrammeIntent) {
+    const retrievalStarted = performance.now();
+    try {
+      return auditedResponse(
+        await getOrganisationProgrammes(session, classification.filters),
+        { dataRetrievalMs: elapsed(retrievalStarted) },
+        true,
+      );
+    } catch (error) {
+      console.error("LevyTate employee programme Copilot retrieval failed", { error });
+      return auditedResponse({
+        type: "data_unavailable",
+        title: "Programme data unavailable",
+        columns: [],
+        rows: [],
+        emptyMessage: "I couldn't retrieve your organisation's available programmes just now. Please try again.",
+        toolName: "getOrganisationProgrammes",
+      }, { dataRetrievalMs: elapsed(retrievalStarted) }, false);
+    }
+  }
 
   if (classification.intent === "access_boundary") {
     return auditedResponse(
@@ -288,6 +312,16 @@ export function classifyOperationalCopilotQuery(
   if (/\b(which providers?|providers?)\b/.test(text) && /\b(they|them|those|these learners?)\b/.test(text) && prior) {
     return { intent: "provider_operational_summary", filters: { ...priorFilters, actionType: `context:${prior}` }, direct: true, contextResultKeys: previous?.resultKeys };
   }
+  const providerLearnerCount = text.match(/\bhow many\s+([a-z0-9&.' -]+?)\s+learners?\b/);
+  if (providerLearnerCount) {
+    return { intent: "provider_operational_summary", filters: { provider: providerLearnerCount[1].trim() }, direct: true };
+  }
+  if (/\b(which|what|show|list)\b.*\b(providers?)\b.*\b(we use|our|my providers?)\b|\b(my|our) providers?\b/.test(text)) {
+    return { intent: "organisation_providers", filters: {}, direct: true };
+  }
+  if (/\bprogrammes\b.*\b(available to|published for)\b.*\b(our )?employees?\b|\b(my|our) programmes\b/.test(text)) {
+    return { intent: "organisation_programmes", filters: {}, direct: true };
+  }
   if (/\b(programmes?|providers?)\b/.test(text)
     && /\b(show|which|find|browse|available|offer|offers|level|nationally|national|remote|online|blended|classroom|workplace)\b/.test(text)
     && !/\b(team|direct reports?|represented|activity|active learners?|performance|reviews?|issues?)\b/.test(text)) {
@@ -410,6 +444,8 @@ async function executeTool(
     case "operational_actions": return getOperationalActions(session, query.filters);
     case "provider_operational_summary": return getProviderOperationalSummary(session, query.filters, query.contextResultKeys);
     case "programme_operational_summary": return getProgrammeOperationalSummary(session);
+    case "organisation_providers": return getOrganisationProviders(session);
+    case "organisation_programmes": return getOrganisationProgrammes(session);
     case "programme_directory": return getProgrammeDirectory(session, query.filters);
     case "access_boundary": throw new Error("Access boundary is handled before tool execution.");
   }
@@ -441,6 +477,9 @@ async function executeManagerTool(
     case "assessment_readiness": return getAssessmentReadiness(session, query.filters, scope);
     case "operational_actions": return getManagerOperationalActions(session, query.filters, scope);
     case "provider_operational_summary": return getProviderOperationalSummary(session, query.filters, query.contextResultKeys, scope);
+    case "organisation_providers":
+    case "organisation_programmes":
+      return managerAccessBoundary("Employer catalogue administration is available to Apprenticeship Leads. I can show provider and programme context for your direct reports.");
     case "programme_operational_summary": return getProgrammeOperationalSummary(session, scope);
     case "programme_directory": return getProgrammeDirectory(session, query.filters);
     case "team_summary": return getManagerTeamSummary(session, scope);
@@ -762,9 +801,10 @@ export async function getProviderOperationalSummary(session: LevyTateBetaSession
     return {
       key: provider,
       cells: { provider, activeLearners: learners.filter(isActiveLearner).length, behindTarget: behind, overdueReviews: overdue, latestActivity: displayDate(latest), upcomingReview: displayDate(upcoming) },
-      actions: managerScope ? [{ label: "Open team view", url: "/levytate/app?module=My%20Team" }] : [{ label: "Open providers", url: "/levytate/app?module=Providers" }],
+      actions: managerScope ? [{ label: "Open team view", url: "/levytate/app?module=My%20Team" }] : [{ label: "Open My Providers", url: "/levytate/app?module=My%20Providers" }],
     };
   }).sort((left, right) => Number(right.cells.overdueReviews) - Number(left.cells.overdueReviews) || Number(right.cells.behindTarget) - Number(left.cells.behindTarget));
+  if (filters.provider) rows = rows.filter((row) => String(row.cells.provider).toLowerCase() === filters.provider!.toLowerCase());
   if (filters.reviewType === "provider_review") rows = rows.filter((row) => Number(row.cells.overdueReviews) > 0);
   return payloadFromRows({
     type: "provider_results",
@@ -773,7 +813,7 @@ export async function getProviderOperationalSummary(session: LevyTateBetaSession
     columns: [col("provider", "Provider"), col("activeLearners", "Active learners", "right"), col("behindTarget", "Behind target", "right"), col("overdueReviews", "Overdue reviews", "right"), col("latestActivity", "Latest activity"), col("upcomingReview", "Upcoming review")],
     interpretation: "Provider figures reflect current learner progress and provider-review records, not a predictive performance score.",
     emptyMessage: "No provider activity matches the current query.",
-    viewAllUrl: managerScope ? "/levytate/app?module=My%20Team" : "/levytate/app?module=Providers",
+    viewAllUrl: managerScope ? "/levytate/app?module=My%20Team" : "/levytate/app?module=My%20Providers",
     toolName: managerScope ? "getManagerDirectReportProviderContext" : "getProviderOperationalSummary",
   });
 }
@@ -849,15 +889,91 @@ export async function getProgrammeDirectory(
         standard: item.standard?.title || item.programme.linkedStandardName || "Being reviewed",
       },
       actions: [
-        { label: "View programme", url: `/levytate/app?module=Providers&programme=${encodeURIComponent(item.programme.id)}` },
-        { label: "View provider", url: `/levytate/app?module=Providers&provider=${encodeURIComponent(item.provider.providerId)}` },
+        { label: "View programme", url: `/levytate/app?module=Marketplace&programme=${encodeURIComponent(item.programme.id)}` },
+        { label: "View provider", url: `/levytate/app?module=Marketplace&provider=${encodeURIComponent(item.provider.providerId)}` },
       ],
     })),
     columns: [col("programme", "Programme"), col("provider", "Provider"), col("level", "Level"), col("delivery", "Delivery"), col("location", "Location"), col("standard", "Standard")],
     interpretation: "Results use factual active programme and provider catalogue fields in alphabetical order.",
     emptyMessage: "No programmes match the selected filters.",
-    viewAllUrl: "/levytate/app?module=Providers",
+    viewAllUrl: "/levytate/app?module=Marketplace",
     toolName: "getProgrammeDirectory",
+  });
+}
+
+export async function getOrganisationProviders(session: LevyTateBetaSession): Promise<ToolPayload> {
+  const { data } = await getWorkspaceBootstrapForSession(session);
+  const selectedProviderIds = new Set(
+    data.organisationProviders.filter((selection) => selection.status === "Active").map((selection) => selection.providerId),
+  );
+  const activeProgrammeSelections = data.organisationProgrammes.filter((selection) => selection.status === "Active");
+  const rows = data.providers
+    .filter((provider) => selectedProviderIds.has(provider.providerId))
+    .sort((left, right) => left.providerName.localeCompare(right.providerName))
+    .map((provider) => ({
+      key: provider.providerId,
+      cells: {
+        provider: provider.providerName,
+        programmes: activeProgrammeSelections.filter((selection) => selection.providerId === provider.providerId).length,
+        learners: data.learnerRecords.filter((learner) => learner.providerId === provider.providerId && learner.recordStatus === "Active").length,
+        relationship: "Active",
+      },
+      actions: [{ label: "Open My Providers", url: "/levytate/app?module=My%20Providers" }],
+    }));
+
+  return payloadFromRows({
+    type: "provider_results",
+    title: "My Providers",
+    rows,
+    columns: [col("provider", "Provider"), col("programmes", "Active programmes", "right"), col("learners", "Learners", "right"), col("relationship", "Relationship")],
+    interpretation: "These are the active provider relationships selected by your organisation, not the global Marketplace.",
+    emptyMessage: "Your organisation has not added any providers yet.",
+    viewAllUrl: "/levytate/app?module=My%20Providers",
+    toolName: "getOrganisationProviders",
+  });
+}
+
+export async function getOrganisationProgrammes(
+  session: LevyTateBetaSession,
+  filters: LevyTateOperationalCopilotFilters = {},
+): Promise<ToolPayload> {
+  const { data } = await getWorkspaceBootstrapForSession(session);
+  const activeSelections = new Map(
+    data.organisationProgrammes.filter((selection) => selection.status === "Active").map((selection) => [selection.programmeId, selection]),
+  );
+  const rows = data.providerProgrammes
+    .filter((programme) => activeSelections.has(programme.id))
+    .filter((programme) => !filters.level || String(programme.level) === filters.level)
+    .filter((programme) => !filters.provider || data.providers.some((provider) => provider.providerId === programme.providerId && provider.providerName.toLowerCase() === filters.provider!.toLowerCase()))
+    .filter((programme) => !filters.query || [programme.programmeName, programme.linkedStandardName, ...programme.targetJobRoles, ...programme.skillsDeveloped]
+      .join(" ")
+      .toLowerCase()
+      .includes(filters.query.toLowerCase()))
+    .sort((left, right) => left.programmeName.localeCompare(right.programmeName))
+    .map((programme) => {
+      const provider = data.providers.find((candidate) => candidate.providerId === programme.providerId);
+      const standard = getApprenticeshipStandard(programme.linkedStandardId || programme.linkedStandardIds[0]);
+      return {
+        key: programme.id,
+        cells: {
+          programme: programme.programmeName,
+          provider: provider?.providerName ?? "Provider unavailable",
+          level: programme.level ? `Level ${programme.level}` : standard?.level ? `Level ${standard.level}` : "Being reviewed",
+          employees: "Available",
+        },
+        actions: [{ label: "Open My Programmes", url: "/levytate/app?module=My%20Programmes" }],
+      };
+    });
+
+  return payloadFromRows({
+    type: "programme_results",
+    title: "Programmes available to employees",
+    rows,
+    columns: [col("programme", "Programme"), col("provider", "Provider"), col("level", "Level"), col("employees", "Employee access")],
+    interpretation: "These are active My Programmes selected by your organisation. The wider Marketplace is not included.",
+    emptyMessage: "Your organisation has not published any apprenticeship programmes yet.",
+    viewAllUrl: "/levytate/app?module=My%20Programmes",
+    toolName: "getOrganisationProgrammes",
   });
 }
 
@@ -1224,7 +1340,7 @@ function responseForPayload(
     evaluatedAt,
   };
   return {
-    source: "mock",
+    source: "deterministic",
     executionMode: "deterministic",
     assistantMessage,
     followUpQuestion: payload.followUpQuestion ?? followUpFor(query.intent, query.filters, empty),

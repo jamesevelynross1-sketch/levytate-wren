@@ -256,6 +256,8 @@ export type LevyTateOperationalCopilotIntent =
   | "operational_actions"
   | "provider_operational_summary"
   | "programme_operational_summary"
+  | "organisation_providers"
+  | "organisation_programmes"
   | "programme_directory"
   | "team_summary"
   | "access_boundary";
@@ -673,7 +675,7 @@ export type LevyTateAiRequest = {
 };
 
 export type LevyTateAiResponse = {
-  source: "openai" | "mock";
+  source: "openai" | "deterministic";
   assistantMessage: string;
   followUpQuestion?: string | null;
   quickReplies?: string[];
