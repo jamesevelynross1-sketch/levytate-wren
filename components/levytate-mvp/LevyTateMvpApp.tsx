@@ -370,7 +370,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
 
   const workspaceName = data.profile.employerName || "LevyTate beta employer";
   const workspaceLabel = data.profile.workspaceName || "Standalone employer workspace";
-  const storageStatus = meta?.storageMode === "supabase" ? "Workspace connected" : "Limited access mode";
+  const storageStatus = meta?.storageMode === "supabase" ? "Connected" : "Limited mode";
   const copilotContext = useMemo<LevyTateCopilotContext>(() => {
     const operationalLabel = earlyAccessPolicy.modules.find((entry) => entry.moduleKey === activeModule)?.label ?? activeModule;
     return {
@@ -383,7 +383,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
   }, [activeModule, copilotEntity, earlyAccessPolicy.modules]);
 
   return (
-    <main className="min-h-screen bg-[#f4f7f5] text-[#102c3d]">
+    <main data-testid="levytate-app-shell" className="min-h-screen w-full min-w-0 bg-[#f4f7f5] text-[#102c3d]">
       <header className="sticky top-0 z-40 border-b border-[#102c3d]/[0.08] bg-white/[0.94] backdrop-blur-xl">
         <div className="mx-auto flex min-h-20 max-w-[1540px] flex-wrap items-center justify-between gap-x-4 gap-y-3 px-4 py-3 sm:px-6 lg:px-8 lg:py-0">
           <div className="flex min-w-0 flex-1 items-center gap-3 lg:flex-none">
@@ -416,8 +416,8 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
         </div>
       </header>
 
-      <div className="grid min-h-[calc(100vh-5rem)] lg:grid-cols-[244px_minmax(0,1fr)]">
-        <aside className="hidden border-r border-[#102c3d]/[0.08] bg-white lg:sticky lg:top-20 lg:flex lg:h-[calc(100vh-5rem)] lg:flex-col">
+      <div className="grid min-h-[calc(100vh-5rem)] w-full min-w-0 grid-cols-[minmax(0,1fr)] lg:grid-cols-[244px_minmax(0,1fr)]">
+        <aside data-testid="levytate-sidebar" className="hidden min-w-0 border-r border-[#102c3d]/[0.08] bg-white lg:sticky lg:top-20 lg:flex lg:h-[calc(100vh-5rem)] lg:flex-col">
           <div className="flex min-h-0 flex-1 flex-col px-4 py-4">
             <div className="px-2 pb-3">
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/[0.36]">Navigation</p>
@@ -442,26 +442,26 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
               </nav>
             </div>
 
-            <div className="mt-4 border-t border-[#102c3d]/[0.07] pt-4">
-              <div className="rounded-2xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4 shadow-[0_12px_26px_rgba(16,44,61,0.04)]">
+            <div className="mt-3 shrink-0 border-t border-[#102c3d]/[0.07] pt-3">
+              <div className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-3.5 shadow-[0_12px_26px_rgba(16,44,61,0.04)]">
                 <div className="flex items-start gap-3">
                   <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#102c3d] text-white shadow-[0_8px_18px_rgba(16,44,61,0.12)]">
                     <UserRound size={17} strokeWidth={1.8} aria-hidden="true" />
                   </div>
                   <div className="min-w-0">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">Current role</p>
-                    <p className="mt-1 truncate text-sm font-semibold text-[#102c3d]">{meta?.userRole ?? "Workspace user"}</p>
+                    <p data-testid="current-role" className="mt-1 break-words text-sm font-semibold leading-5 text-[#102c3d]">{meta?.userRole ?? "Workspace user"}</p>
                     <p className="mt-1 text-xs leading-5 text-[#102c3d]/[0.52]">People, providers and workspace setup.</p>
                   </div>
                 </div>
 
-                <div className="mt-4 rounded-2xl border border-[#102c3d]/[0.06] bg-white px-3.5 py-3">
-                  <div className="flex items-center justify-between gap-3">
+                <div className="mt-3 rounded-xl border border-[#102c3d]/[0.06] bg-white px-3 py-2.5">
+                  <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/[0.34]">Status</p>
-                      <p className="mt-1 truncate text-xs font-semibold text-[#102c3d]/[0.68]">{storageStatus}</p>
+                      <p className="mt-1 text-[11px] font-semibold leading-4 text-[#102c3d]/[0.68]">{storageStatus}</p>
                     </div>
-                    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#edf7f3] px-2.5 py-1 text-[10px] font-semibold text-[#0b6f63]">
+                    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[#edf7f3] px-2 py-1 text-[10px] font-semibold text-[#0b6f63]">
                       <span className="h-1.5 w-1.5 rounded-full bg-current" />
                       Live
                     </span>
@@ -472,12 +472,12 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
           </div>
         </aside>
 
-        <section className="min-w-0">
-          <div className="mx-auto max-w-[1540px] px-4 py-5 sm:px-6 lg:px-8">
-            <section className="mb-5 border-b border-[#102c3d]/[0.07] pb-4">
+        <section className="w-full min-w-0 max-w-full">
+          <div className="mx-auto w-full min-w-0 max-w-[1540px] px-4 py-4 sm:px-6 lg:px-8">
+            <section className="mb-4 border-b border-[#102c3d]/[0.07] pb-3">
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">Protected workspace</p>
               <h1 className="mt-1 text-2xl font-semibold tracking-[-0.025em]">{moduleLabel(activeModule)}</h1>
-              <p className="mt-1.5 max-w-3xl text-sm leading-6 text-[#102c3d]/[0.56] max-sm:hidden">{moduleCopy[activeModule]}</p>
+              <p className="mt-1 max-w-3xl text-sm leading-5 text-[#102c3d]/[0.56] max-sm:hidden">{moduleCopy[activeModule]}</p>
             </section>
 
             {activeModule === "Home" ? (
@@ -531,7 +531,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
               </ModuleStackNav>
             ) : null}
           </div>
-          <nav aria-label="Trust and support" className="mx-auto flex max-w-[1540px] flex-wrap gap-x-5 gap-y-2 px-4 pb-7 text-xs font-semibold text-[#102c3d]/[0.48] sm:px-6 lg:px-8">
+          <nav aria-label="Trust and support" className="mx-auto mt-4 flex max-w-[1540px] flex-wrap gap-x-5 gap-y-1 border-t border-[#102c3d]/[0.06] px-4 pb-5 pt-3 text-xs font-semibold text-[#102c3d]/[0.48] sm:px-6 lg:px-8">
             <a href="/levytate/privacy" className="min-h-11 content-center hover:text-[#087c73]">Privacy</a>
             <a href="/levytate/early-access-terms" className="min-h-11 content-center hover:text-[#087c73]">Terms</a>
             <a href="/levytate/support" className="min-h-11 content-center hover:text-[#087c73]">Support</a>

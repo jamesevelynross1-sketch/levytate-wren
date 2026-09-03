@@ -75,21 +75,22 @@ export function DashboardModule({ onNavigate }: { onNavigate: (module: string) =
 
   return (
     <div className="grid gap-5">
-      <section className="rounded-[1.25rem] border border-[#102c3d]/[0.07] bg-[#102c3d] p-5 text-white shadow-[0_20px_55px_rgba(16,44,61,0.12)] sm:p-6">
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+      <section data-testid="home-attention-hero" className="rounded-[1.25rem] border border-[#102c3d]/[0.07] bg-[#102c3d] p-4 text-white shadow-[0_20px_55px_rgba(16,44,61,0.12)] sm:p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-2xl">
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8fe0d2]">Today</p>
-            <h2 className="mt-2 text-2xl font-semibold">What needs attention?</h2>
-            <p className="mt-2 text-sm leading-6 text-white/62">A short operating briefing. Open the next decision, then let LevyTate handle the detail.</p>
+            <h2 className="mt-1.5 text-2xl font-semibold">What needs attention?</h2>
+            <p className="mt-1.5 text-sm leading-5 text-white/62">A short operating briefing. Open the next decision, then let LevyTate handle the detail.</p>
           </div>
-          <button type="button" onClick={() => onNavigate(primaryAction.target)} className="h-11 self-start rounded-full bg-[#ffde59] px-5 text-sm font-semibold text-[#102c3d] transition hover:-translate-y-0.5 xl:self-center">
+          <button type="button" onClick={() => onNavigate(primaryAction.target)} className="h-10 self-start rounded-lg bg-[#ffde59] px-4 text-sm font-semibold text-[#102c3d] transition hover:-translate-y-0.5 lg:self-center">
             {primaryAction.label}
           </button>
         </div>
       </section>
 
-      <div className="grid gap-5 xl:grid-cols-3">
-        <MvpPanel title="Urgent approvals" eyebrow="Decision">
+      <div data-testid="home-attention-grid" className="grid items-start gap-4 xl:grid-cols-3">
+        <div data-testid="home-urgent-card" className="min-w-0 self-start">
+          <MvpPanel title="Urgent approvals" eyebrow="Decision">
           {notifications.length ? (
             <div className="grid gap-3">
               {notifications.slice(0, 4).map((notification) => (
@@ -107,9 +108,11 @@ export function DashboardModule({ onNavigate }: { onNavigate: (module: string) =
           ) : (
             <p className="text-sm leading-6 text-[#102c3d]/56">Nothing urgent is waiting. Use LevyTate Copilot if you want to plan the next development move.</p>
           )}
-        </MvpPanel>
+          </MvpPanel>
+        </div>
 
-        <MvpPanel title="Employees requiring attention" eyebrow="People">
+        <div data-testid="home-employee-card" className="min-w-0 self-start">
+          <MvpPanel title="Employees requiring attention" eyebrow="People">
           <div className="grid gap-3">
             {support.length ? support.slice(0, 4).map((employee) => (
               <button key={employee.id} type="button" onClick={() => onNavigate("Employees")} className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] px-4 py-3 text-left transition hover:border-[#159b8f]/18 hover:bg-white">
@@ -118,16 +121,19 @@ export function DashboardModule({ onNavigate }: { onNavigate: (module: string) =
               </button>
             )) : <p className="text-sm leading-6 text-[#102c3d]/56">Employee records look ready. New recommendations will appear as AI conversations progress.</p>}
           </div>
-        </MvpPanel>
+          </MvpPanel>
+        </div>
 
-        <MvpPanel title="Provider issues" eyebrow="Coverage">
+        <div data-testid="home-provider-card" className="min-w-0 self-start">
+          <MvpPanel title="Provider issues" eyebrow="Coverage">
           <div className="grid gap-3">
             {providerIssues.length ? providerIssues.map((issue) => (
               <ActionCard key={issue} title={issue} copy="Preferred provider coverage is not complete for this category." cta="Resolve" onClick={() => onNavigate("Provider Relationships")} />
             )) : <p className="text-sm leading-6 text-[#102c3d]/56">Provider coverage is in place for the current priority areas.</p>}
             {enrolments.length ? <ActionCard title="Approved learners need handoff" copy={`${enrolments.length} enrolment record${enrolments.length === 1 ? "" : "s"} need dates, provider or learner readiness checked.`} cta="Open enrolments" onClick={() => onNavigate("Enrolments")} /> : null}
           </div>
-        </MvpPanel>
+          </MvpPanel>
+        </div>
       </div>
     </div>
   );

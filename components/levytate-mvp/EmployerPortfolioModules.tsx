@@ -61,7 +61,7 @@ export function MyProgrammesModule({ onOpenMarketplace }: { onOpenMarketplace: (
 }
 
 function EmptyPortfolio({ icon: Icon, title, copy, action, onAction }: { icon: typeof Store; title: string; copy: string; action: string; onAction: () => void }) {
-  return <section className="grid min-h-[360px] place-items-center border border-dashed border-[#102c3d]/[0.14] bg-white p-6 text-center"><div className="max-w-md"><div className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-[#eaf5f1] text-[#0b776e]"><Icon size={22} /></div><h2 className="mt-5 text-2xl font-semibold">{title}</h2><p className="mt-3 text-sm leading-6 text-[#102c3d]/[0.56]">{copy}</p><button type="button" onClick={onAction} className="mt-5 min-h-11 rounded-full bg-[#102c3d] px-5 text-sm font-semibold text-white">{action}</button></div></section>;
+  return <section className="grid min-h-[280px] place-items-center border border-dashed border-[#102c3d]/[0.14] bg-white p-6 text-center"><div className="max-w-md"><div className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-[#eaf5f1] text-[#0b776e]"><Icon size={22} /></div><h2 className="mt-4 text-2xl font-semibold">{title}</h2><p className="mt-2 text-sm leading-6 text-[#102c3d]/[0.56]">{copy}</p><button type="button" onClick={onAction} className="mt-4 min-h-11 rounded-lg bg-[#102c3d] px-5 text-sm font-semibold text-white">{action}</button></div></section>;
 }
 
 function Fact({ label, value }: { label: string; value: string }) {

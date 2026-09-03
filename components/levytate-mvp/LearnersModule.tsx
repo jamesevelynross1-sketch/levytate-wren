@@ -325,51 +325,67 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
         {loading ? (
           <div className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] px-5 py-10 text-center text-sm font-semibold text-[#102c3d]/[0.54]">Loading learner lifecycle records.</div>
         ) : visible.length ? (
-          <TableShell>
-            <TableHead>
-              <tr>
-                <th className="px-4 py-3">Learner</th>
-                <th className="px-4 py-3">Programme</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Progress</th>
-                <th className="px-4 py-3">Latest reviews</th>
-                <th className="px-4 py-3">Next action</th>
-                <th className="px-4 py-3 text-right">Action</th>
-              </tr>
-            </TableHead>
-            <TableBody>
-              {visible.map((learner) => (
-                <tr key={learner.learnerRecordId}>
-                  <td className="px-4 py-3">
-                    <p className="font-semibold text-[#102c3d]">{learner.learner.name}</p>
-                    <p className="mt-1 text-xs leading-5 text-[#102c3d]/[0.52]">{learner.learner.jobTitle}</p>
-                    <p className="text-xs leading-5 text-[#102c3d]/[0.42]">{learner.learner.department} - {learner.learner.site}</p>
-                  </td>
-                  <td className="px-4 py-3">
-                    <p className="max-w-[18rem] font-semibold text-[#102c3d]/[0.78]">{learner.programme.programmeName}</p>
-                    <p className="mt-1 text-xs text-[#102c3d]/[0.48]">{learner.programme.providerName}</p>
-                    <p className="mt-1 text-xs text-[#102c3d]/[0.42]">{learner.employmentRouteLabel}</p>
-                  </td>
-                  <td className="px-4 py-3">
-                    <StatusBadge tone={statusTone(learner.lifecycleStatusLabel)}>{learner.lifecycleStatusLabel}</StatusBadge>
-                    {learner.activeBreak ? <div className="mt-2 text-xs leading-5 text-[#102c3d]/[0.52]"><p>Expected return: {learner.activeBreak.expectedReturnUnknown ? "Not confirmed" : formatDate(learner.activeBreak.expectedReturnDate)}</p><p>{learner.breakAttention.daysOnBreak} days on break</p><p>{learnerBreakReasonLabels[learner.activeBreak.reasonCategory]}</p></div> : null}
-                  </td>
-                  <td className="px-4 py-3">
-                    <ProgressMini learner={learner} />
-                  </td>
-                  <td className="px-4 py-3 text-xs leading-5 text-[#102c3d]/[0.56]">
-                    <p>Provider: {formatDate(learner.latestProviderReview?.reviewDate) || "No review"}</p>
-                    <p>L&D: {formatDate(learner.latestLAndDCheckIn?.reviewDate) || "No check-in"}</p>
-                  </td>
-                  <td className="px-4 py-3">
-                    <p className="max-w-[16rem] text-sm font-semibold text-[#102c3d]/[0.72]">{learner.attention.label}</p>
-                    {learner.attention.needsAttention ? <p className="mt-1 text-xs text-[#b13b51]">{learner.attention.reasons.length} item{learner.attention.reasons.length === 1 ? "" : "s"} flagged</p> : null}
-                  </td>
-                  <td className="px-4 py-3 text-right"><TableAction onClick={() => setSelectedId(learner.learnerRecordId)}>Open learner record</TableAction></td>
-                </tr>
-              ))}
-            </TableBody>
-          </TableShell>
+          <>
+            <div className="hidden min-w-0 md:block">
+              <TableShell testId="learners-table-scroll" minimumWidthClass="min-w-[1040px]" tableClassName="table-fixed">
+                <colgroup>
+                  <col className="w-[16%]" />
+                  <col className="w-[20%]" />
+                  <col className="w-[12%]" />
+                  <col className="w-[16%]" />
+                  <col className="w-[13%]" />
+                  <col className="w-[14%]" />
+                  <col className="w-[9%]" />
+                </colgroup>
+                <TableHead>
+                  <tr>
+                    <th className="px-3 py-2.5">Learner</th>
+                    <th className="px-3 py-2.5">Programme</th>
+                    <th className="px-3 py-2.5">Status</th>
+                    <th className="px-3 py-2.5">Progress</th>
+                    <th className="px-3 py-2.5">Latest reviews</th>
+                    <th className="px-3 py-2.5">Next action</th>
+                    <th className="px-3 py-2.5 text-right">Action</th>
+                  </tr>
+                </TableHead>
+                <TableBody>
+                  {visible.map((learner) => (
+                    <tr key={learner.learnerRecordId} data-testid="learner-row" className="align-top">
+                      <td className="px-3 py-2.5">
+                        <p className="font-semibold leading-[1.15rem] text-[#102c3d]">{learner.learner.name}</p>
+                        <p className="mt-0.5 text-xs leading-[1.1rem] text-[#102c3d]/[0.52]">{learner.learner.jobTitle}</p>
+                        <p className="text-[11px] leading-[1.05rem] text-[#102c3d]/[0.42]">{learner.learner.department} · {learner.learner.site}</p>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <p className="font-semibold leading-[1.15rem] text-[#102c3d]/[0.78]">{learner.programme.programmeName}</p>
+                        <p className="mt-0.5 text-xs leading-[1.1rem] text-[#102c3d]/[0.48]">{learner.programme.providerName}</p>
+                        <p className="mt-0.5 text-[11px] leading-[1.05rem] text-[#102c3d]/[0.42]">{learner.employmentRouteLabel}</p>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <StatusBadge testId="learner-status-badge" tone={statusTone(learner.lifecycleStatusLabel)}>{learner.lifecycleStatusLabel}</StatusBadge>
+                        {learner.activeBreak ? <div className="mt-1.5 text-[11px] leading-[1.05rem] text-[#102c3d]/[0.52]"><p>Return · {learner.activeBreak.expectedReturnUnknown ? "Not confirmed" : formatDate(learner.activeBreak.expectedReturnDate)}</p><p>{learner.breakAttention.daysOnBreak} days · {learnerBreakReasonLabels[learner.activeBreak.reasonCategory]}</p></div> : null}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <ProgressMini learner={learner} />
+                      </td>
+                      <td className="px-3 py-2.5 text-[11px] leading-5 text-[#102c3d]/[0.56]">
+                        <p>Provider · {formatDate(learner.latestProviderReview?.reviewDate) || "No review"}</p>
+                        <p>L&amp;D · {formatDate(learner.latestLAndDCheckIn?.reviewDate) || "No check-in"}</p>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <p className="text-xs font-semibold leading-[1.1rem] text-[#102c3d]/[0.72]">{learner.attention.label}</p>
+                        {learner.attention.needsAttention ? <p className="mt-0.5 text-[11px] leading-4 text-[#b13b51]">{learner.attention.reasons.length} item{learner.attention.reasons.length === 1 ? "" : "s"} flagged</p> : null}
+                      </td>
+                      <td className="px-3 py-2.5 text-right"><TableAction testId="learner-open-record" onClick={() => setSelectedId(learner.learnerRecordId)}>Open record</TableAction></td>
+                    </tr>
+                  ))}
+                </TableBody>
+              </TableShell>
+            </div>
+            <div className="grid min-w-0 gap-3 md:hidden" data-testid="learners-mobile-list">
+              {visible.map((learner) => <LearnerMobileCard key={learner.learnerRecordId} learner={learner} onOpen={() => setSelectedId(learner.learnerRecordId)} />)}
+            </div>
+          </>
         ) : (
           <div className="grid min-h-52 place-items-center rounded-xl border border-dashed border-[#102c3d]/[0.14] bg-[#f8fbfa] px-5 py-10 text-center">
             <div className="max-w-md">
@@ -1455,19 +1471,56 @@ function CompactSelect({ label, value, options, onChange }: { label: string; val
   );
 }
 
+function LearnerMobileCard({ learner, onOpen }: { learner: LearnerOperationalSummary; onOpen: () => void }) {
+  return (
+    <article data-testid="learner-card" className="min-w-0 rounded-xl border border-[#102c3d]/[0.07] bg-white p-4 shadow-[0_10px_24px_rgba(16,44,61,0.035)]">
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="font-semibold leading-5 text-[#102c3d]">{learner.learner.name}</h3>
+          <p className="mt-0.5 text-xs leading-[1.1rem] text-[#102c3d]/[0.54]">{learner.learner.jobTitle}</p>
+          <p className="text-[11px] leading-[1.05rem] text-[#102c3d]/[0.42]">{learner.learner.department} · {learner.learner.site}</p>
+        </div>
+        <div className="max-w-[9rem] shrink-0 text-right">
+          <StatusBadge testId="learner-status-badge" tone={statusTone(learner.lifecycleStatusLabel)}>{learner.lifecycleStatusLabel}</StatusBadge>
+        </div>
+      </div>
+
+      <div className="mt-3 border-t border-[#102c3d]/[0.06] pt-3">
+        <p className="text-sm font-semibold leading-5 text-[#102c3d]/[0.78]">{learner.programme.programmeName}</p>
+        <p className="mt-0.5 text-xs text-[#102c3d]/[0.48]">{learner.programme.providerName} · {learner.employmentRouteLabel}</p>
+      </div>
+
+      {learner.activeBreak ? <div className="mt-3 rounded-lg bg-[#fff8df] px-3 py-2 text-xs leading-5 text-[#756000]"><p>Expected return · {learner.activeBreak.expectedReturnUnknown ? "Not confirmed" : formatDate(learner.activeBreak.expectedReturnDate)}</p><p>{learner.breakAttention.daysOnBreak} days on break · {learnerBreakReasonLabels[learner.activeBreak.reasonCategory]}</p></div> : <div className="mt-3"><ProgressMini learner={learner} /></div>}
+
+      <dl className="mt-3 grid grid-cols-2 gap-2 rounded-lg bg-[#f8fbfa] px-3 py-2 text-[11px] leading-5 text-[#102c3d]/[0.56]">
+        <div><dt className="font-semibold text-[#102c3d]/[0.42]">Provider review</dt><dd>{formatDate(learner.latestProviderReview?.reviewDate) || "No review"}</dd></div>
+        <div><dt className="font-semibold text-[#102c3d]/[0.42]">L&amp;D check-in</dt><dd>{formatDate(learner.latestLAndDCheckIn?.reviewDate) || "No check-in"}</dd></div>
+      </dl>
+
+      <div className="mt-3 flex items-center justify-between gap-3 border-t border-[#102c3d]/[0.06] pt-3">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold leading-[1.1rem] text-[#102c3d]/[0.72]">{learner.attention.label}</p>
+          {learner.attention.needsAttention ? <p className="mt-0.5 text-[11px] text-[#b13b51]">{learner.attention.reasons.length} item{learner.attention.reasons.length === 1 ? "" : "s"} flagged</p> : null}
+        </div>
+        <button data-testid="learner-open-record" type="button" onClick={onOpen} className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg bg-[#102c3d] px-3 text-xs font-semibold text-white transition hover:bg-[#17394d]">Open record</button>
+      </div>
+    </article>
+  );
+}
+
 function ProgressMini({ learner }: { learner: LearnerOperationalSummary }) {
-  if (learner.activeBreak) return <div className="min-w-[9rem] text-xs leading-5 text-[#756000]"><p className="font-semibold">Progress paused</p><p>{learner.breakAttention.label}</p></div>;
+  if (learner.activeBreak) return <div className="min-w-0 text-[11px] leading-[1.05rem] text-[#756000]"><p className="font-semibold">Progress paused</p><p>{learner.breakAttention.label}</p></div>;
   if (!learner.latestProgress) return <p className="text-xs text-[#102c3d]/[0.46]">No progress data</p>;
   return (
-    <div className="min-w-[9rem]">
-      <div className="flex items-center justify-between gap-2 text-xs font-semibold text-[#102c3d]/[0.62]">
+    <div className="min-w-0">
+      <div className="flex items-start justify-between gap-2 text-[11px] font-semibold leading-4 text-[#102c3d]/[0.62]">
         <span>{learner.latestProgress.actualProgressPercentage}% actual</span>
-        <span>{learner.progressPosition}</span>
+        <span className="text-right">{learner.progressPosition}</span>
       </div>
-      <div className="mt-2 h-2 rounded-full bg-[#edf3ef]">
-        <div className={`h-2 rounded-full ${learner.latestProgress.variancePercentage <= -3 ? "bg-[#c95568]" : "bg-[#159b8f]"}`} style={{ width: `${Math.min(100, Math.max(0, learner.latestProgress.actualProgressPercentage))}%` }} />
+      <div className="mt-1.5 h-1.5 rounded-full bg-[#edf3ef]">
+        <div className={`h-1.5 rounded-full ${learner.latestProgress.variancePercentage <= -3 ? "bg-[#c95568]" : "bg-[#159b8f]"}`} style={{ width: `${Math.min(100, Math.max(0, learner.latestProgress.actualProgressPercentage))}%` }} />
       </div>
-      <p className="mt-1 text-xs text-[#102c3d]/[0.42]">Target {learner.latestProgress.targetProgressPercentage}% · {learner.latestProgress.variancePercentage > 0 ? "+" : ""}{learner.latestProgress.variancePercentage} pts</p>
+      <p className="mt-1 text-[11px] leading-4 text-[#102c3d]/[0.42]">Target {learner.latestProgress.targetProgressPercentage}% · {learner.latestProgress.variancePercentage > 0 ? "+" : ""}{learner.latestProgress.variancePercentage} pts</p>
     </div>
   );
 }
