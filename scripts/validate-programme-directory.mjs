@@ -20,6 +20,12 @@ check("Platform Admin label remains distinct", policy.includes('item("Providers"
 check("employee and manager directory is hidden in Core Early Access", (policy.match(/item\("Providers", "Programmes & Providers", "hidden"/g) ?? []).length === 2);
 check("marketplace landing copy", directory.includes("Browse LevyTate’s verified catalogue"));
 for (const filter of ["Level", "Provider", "Delivery", "Location", "Category"]) check(`factual filter: ${filter}`, directory.includes(`label="${filter}"`));
+check("native selectors have deliberate cross-browser styling", directory.includes("appearance-none") && directory.includes("<ChevronDown"));
+check("advanced filter disclosure is controlled and labelled", directory.includes("aria-expanded={advancedFiltersOpen}") && directory.includes('aria-controls="marketplace-advanced-filters"'));
+check("active filters remain removable when advanced controls are closed", directory.includes("activeSelectFilters.map") && directory.includes("<FilterChip") && directory.includes("onRemove={() => updateFilter(filter.key, \"All\")}"));
+check("search has an independent clear action", directory.includes('aria-label="Clear search"') && directory.includes('updateFilter("search", "")'));
+check("tabs retain keyboard and panel semantics", directory.includes("onViewKeyDown") && directory.includes('role="tabpanel"') && directory.includes('aria-controls="marketplace-results"'));
+check("result summary is derived from filtered records", directory.includes("resultSummary") && directory.includes("results.length") && directory.includes("visibleProviders"));
 for (const field of ["Standard", "Duration", "Delivery", "Locations", "Typical learner activities", "Suitable roles or teams", "Employer considerations", "Learner support", "Assessment model"]) check(`programme detail: ${field}`, directory.includes(field));
 for (const field of ["Delivery approach", "Geographic coverage", "Learner support", "Employer support", "Programmes available"]) check(`provider profile: ${field}`, directory.includes(field));
 check("programme comparison is capped", directory.includes("[...current, id].slice(-3)"));

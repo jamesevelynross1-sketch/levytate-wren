@@ -4,14 +4,17 @@ import {
   ArrowLeft,
   Building2,
   Check,
+  ChevronDown,
   ExternalLink,
   GitCompareArrows,
   GraduationCap,
   MapPin,
   Search,
+  SlidersHorizontal,
   Timer,
+  X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { useLevyTateStandards } from "@/components/levytate-mvp/LevyTateStandardsProvider";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { SemanticStatus } from "@/components/levytate-mvp/OperationalVisuals";
@@ -33,10 +36,19 @@ type Filters = {
 };
 
 type MarketplaceView = "Programmes" | "Providers";
+type SelectFilterKey = Exclude<keyof Filters, "search">;
 
 const emptyFilters: Filters = { search: "", level: "All", provider: "All", delivery: "All", location: "All", category: "All" };
 const missingInformation = "Further programme information is being reviewed.";
 const directoryPageSize = 24;
+const marketplaceViews: MarketplaceView[] = ["Programmes", "Providers"];
+const selectFilterLabels: Record<SelectFilterKey, string> = {
+  level: "Level",
+  provider: "Provider",
+  delivery: "Delivery",
+  location: "Location",
+  category: "Category",
+};
 
 function clean(value: string | undefined | null) {
   return value?.trim() || "";
@@ -119,6 +131,7 @@ export function EmployerProgrammeDirectory() {
   const [providerId, setProviderId] = useState<string | null>(null);
   const [comparison, setComparison] = useState<string[]>([]);
   const [visibleCount, setVisibleCount] = useState(directoryPageSize);
+  const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
 
   const directory = useMemo(() => data.providerProgrammes
     .filter((programme) => programme.recordStatus === "Active" && programme.status === "Active")
@@ -164,6 +177,10 @@ export function EmployerProgrammeDirectory() {
   const visibleResults = results.slice(0, visibleCount);
   const providerResults = useMemo(() => [...new Map(results.map((item) => [item.provider.providerId, item.provider])).values()], [results]);
   const visibleProviderResults = providerResults.slice(0, visibleCount);
+  const activeSelectFilters = (Object.keys(selectFilterLabels) as SelectFilterKey[])
+    .filter((key) => filters[key] !== "All")
+    .map((key) => ({ key, label: selectFilterLabels[key], value: filters[key] }));
+  const hasFilters = Boolean(filters.search.trim()) || activeSelectFilters.length > 0;
 
   useEffect(() => setVisibleCount(directoryPageSize), [filters]);
 
@@ -174,6 +191,25 @@ export function EmployerProgrammeDirectory() {
 
   function updateFilter(key: keyof Filters, value: string) {
     setFilters((current) => ({ ...current, [key]: value }));
+  }
+
+  function selectView(nextView: MarketplaceView) {
+    setView(nextView);
+    setVisibleCount(directoryPageSize);
+  }
+
+  function onViewKeyDown(event: KeyboardEvent<HTMLButtonElement>, currentView: MarketplaceView) {
+    const currentIndex = marketplaceViews.indexOf(currentView);
+    let nextIndex = currentIndex;
+    if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % marketplaceViews.length;
+    if (event.key === "ArrowLeft") nextIndex = (currentIndex - 1 + marketplaceViews.length) % marketplaceViews.length;
+    if (event.key === "Home") nextIndex = 0;
+    if (event.key === "End") nextIndex = marketplaceViews.length - 1;
+    if (nextIndex === currentIndex) return;
+    event.preventDefault();
+    const nextView = marketplaceViews[nextIndex];
+    selectView(nextView);
+    event.currentTarget.parentElement?.querySelector<HTMLButtonElement>(`#marketplace-tab-${nextView.toLowerCase()}`)?.focus();
   }
 
   function setUrl(next: { programme?: string; provider?: string }) {
@@ -221,51 +257,85 @@ export function EmployerProgrammeDirectory() {
   if (selectedProvider) return <ProviderProfile provider={selectedProvider} programmes={providerProgrammes} selected={data.organisationProviders.some((item) => item.providerId === selectedProvider.providerId && item.status === "Active")} onAdd={() => addProvider(selectedProvider.providerId)} onBack={back} onProgramme={openProgramme} />;
 
   const visibleProviders = new Set(results.map((item) => item.provider.providerId)).size;
+  const resultSummary = view === "Programmes"
+    ? `${results.length} programme${results.length === 1 ? "" : "s"} from ${visibleProviders} provider${visibleProviders === 1 ? "" : "s"}`
+    : `${providerResults.length} provider${providerResults.length === 1 ? "" : "s"} offering ${results.length} programme${results.length === 1 ? "" : "s"}`;
   return (
-    <div className="grid gap-6">
-      <header>
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0b8e82]">Global factual marketplace</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-[-0.03em] text-[#102c3d]">Providers and apprenticeship programmes</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-[#102c3d]/[0.58]">Browse LevyTate’s verified catalogue, then add only the providers and programmes your organisation uses.</p>
-      </header>
+    <div className="grid gap-5 text-[#27456a]">
+      <section aria-labelledby="marketplace-directory-heading" className="grid gap-4 rounded-2xl border border-[#27456a]/[0.08] bg-[#fbf6f1] p-4 shadow-[0_12px_30px_rgba(39,69,106,0.035)] sm:p-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#17786e]">Global factual catalogue</p>
+          <h2 id="marketplace-directory-heading" className="mt-1.5 text-2xl font-semibold tracking-[-0.025em] text-[#27456a]">Find providers and apprenticeship programmes</h2>
+          <p className="mt-1.5 max-w-2xl text-sm leading-6 text-[#52677d]">Browse LevyTate’s verified catalogue information, then choose only the programmes and providers your organisation uses.</p>
+        </div>
 
-      <div className="flex w-fit rounded-full bg-[#edf3f0] p-1" role="tablist" aria-label="Marketplace view">
-        {(["Programmes", "Providers"] as MarketplaceView[]).map((item) => <button key={item} type="button" role="tab" aria-selected={view === item} onClick={() => { setView(item); setVisibleCount(directoryPageSize); }} className={`min-h-11 rounded-full px-5 text-sm font-semibold ${view === item ? "bg-white text-[#102c3d] shadow-sm" : "text-[#102c3d]/[0.58]"}`}>{item}</button>)}
-      </div>
-
-      <section aria-label="Directory summary" className="grid grid-cols-2 border-y border-[#102c3d]/[0.08] sm:max-w-md">
-        <Count label="Programmes" value={results.length} />
-        <Count label="Providers" value={visibleProviders} />
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between lg:flex-col lg:items-end">
+          <div className="inline-flex w-fit rounded-xl bg-[#e6eee9] p-1" role="tablist" aria-label="Marketplace view">
+            {marketplaceViews.map((item) => (
+              <button
+                key={item}
+                id={`marketplace-tab-${item.toLowerCase()}`}
+                type="button"
+                role="tab"
+                aria-selected={view === item}
+                aria-controls="marketplace-results"
+                tabIndex={view === item ? 0 : -1}
+                onClick={() => selectView(item)}
+                onKeyDown={(event) => onViewKeyDown(event, item)}
+                className={`min-h-11 rounded-lg px-5 text-sm font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#17786e] focus-visible:ring-offset-2 ${view === item ? "bg-white text-[#27456a] shadow-[0_5px_14px_rgba(39,69,106,0.08)]" : "text-[#5b6e7f] hover:bg-white/60 hover:text-[#27456a]"}`}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+          <p aria-live="polite" className="text-sm font-semibold tabular-nums text-[#52677d]">{resultSummary}</p>
+        </div>
       </section>
 
-      <section aria-label="Programme directory filters" className="grid gap-3 border-y border-[#102c3d]/[0.07] bg-white py-4">
+      <section aria-label="Programme directory filters" className="rounded-2xl border border-[#27456a]/[0.09] bg-white p-4 shadow-[0_14px_34px_rgba(39,69,106,0.045)] sm:p-5">
         <label className="relative block">
-          <Search className="absolute left-4 top-3.5 text-[#102c3d]/[0.40]" size={18} aria-hidden="true" />
+          <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#607487]" size={18} aria-hidden="true" />
           <span className="sr-only">Search programmes and providers</span>
-          <input value={filters.search} onChange={(event) => updateFilter("search", event.target.value)} placeholder="Search programmes, providers, standards, roles or skills" className="min-h-12 w-full rounded-xl border border-[#102c3d]/[0.10] bg-[#fbfcfb] pl-11 pr-4 text-sm outline-none transition focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/[0.10]" />
+          <input value={filters.search} onChange={(event) => updateFilter("search", event.target.value)} placeholder="Search programmes, providers, standards, roles or skills" className="h-12 w-full rounded-xl border border-[#8492a1] bg-[#fbfcfb] pl-11 pr-12 text-sm text-[#27456a] outline-none transition-[border-color,box-shadow,background-color] duration-150 placeholder:text-[#607487] hover:border-[#607487] focus:border-[#17786e] focus:bg-white focus:ring-4 focus:ring-[#17786e]/[0.12]" />
+          {filters.search ? <button type="button" aria-label="Clear search" onClick={() => updateFilter("search", "")} className="absolute right-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-lg text-[#607487] transition-colors duration-150 hover:bg-[#e6eee9] hover:text-[#27456a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#17786e]"><X size={16} aria-hidden="true" /></button> : null}
         </label>
-        <div className="grid gap-2 sm:grid-cols-2 lg:max-w-2xl">
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <Filter label="Level" value={filters.level} values={options.levels} onChange={(value) => updateFilter("level", value)} />
           <Filter label="Provider" value={filters.provider} values={options.providers} onChange={(value) => updateFilter("provider", value)} />
         </div>
-        <details><summary className="min-h-11 w-fit cursor-pointer py-3 text-xs font-semibold text-[#0b6f63]">More filters</summary><div className="grid gap-2 border-t border-[#102c3d]/[0.06] pt-3 sm:grid-cols-3"><Filter label="Delivery" value={filters.delivery} values={options.delivery} onChange={(value) => updateFilter("delivery", value)} /><Filter label="Location" value={filters.location} values={options.locations} onChange={(value) => updateFilter("location", value)} /><Filter label="Category" value={filters.category} values={options.categories} onChange={(value) => updateFilter("category", value)} /></div></details>
-        {Object.values(filters).some((value) => value && value !== "All") ? <button type="button" onClick={() => setFilters(emptyFilters)} className="min-h-11 w-fit rounded-full px-4 text-sm font-semibold text-[#0b6f63] hover:bg-[#edf7f3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159b8f]">Clear filters</button> : null}
+
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#27456a]/[0.08] pt-3">
+          <button type="button" aria-expanded={advancedFiltersOpen} aria-controls="marketplace-advanced-filters" onClick={() => setAdvancedFiltersOpen((current) => !current)} className="inline-flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm font-semibold text-[#17786e] transition-colors duration-150 hover:bg-[#e6eee9]/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#17786e]"><SlidersHorizontal size={16} aria-hidden="true" />{advancedFiltersOpen ? "Fewer filters" : "More filters"}<ChevronDown size={15} className={`transition-transform duration-150 ${advancedFiltersOpen ? "rotate-180" : ""}`} aria-hidden="true" /></button>
+
+          <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2">
+            {activeSelectFilters.map((filter) => <FilterChip key={filter.key} label={filter.label} value={filter.value} onRemove={() => updateFilter(filter.key, "All")} />)}
+            {hasFilters ? <button type="button" onClick={() => setFilters(emptyFilters)} className="min-h-11 rounded-lg px-3 text-sm font-semibold text-[#52677d] underline decoration-[#52677d]/40 underline-offset-4 transition-colors duration-150 hover:text-[#27456a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#17786e]">Clear all filters</button> : null}
+          </div>
+        </div>
+
+        {advancedFiltersOpen ? <div id="marketplace-advanced-filters" className="mt-3 grid gap-3 border-t border-[#27456a]/[0.08] pt-4 sm:grid-cols-2 lg:grid-cols-3"><Filter label="Delivery" value={filters.delivery} values={options.delivery} onChange={(value) => updateFilter("delivery", value)} /><Filter label="Location" value={filters.location} values={options.locations} onChange={(value) => updateFilter("location", value)} /><Filter label="Category" value={filters.category} values={options.categories} onChange={(value) => updateFilter("category", value)} /></div> : null}
       </section>
 
+      <div className="flex flex-wrap items-baseline justify-between gap-2 px-1">
+        <h2 className="text-lg font-semibold text-[#27456a]">{view}</h2>
+        <p className="text-xs font-semibold text-[#607487]">Showing {view === "Programmes" ? visibleResults.length : visibleProviderResults.length} of {view === "Programmes" ? results.length : providerResults.length}</p>
+      </div>
+
       {view === "Programmes" && results.length ? (
-        <section aria-label="Programme results" className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <section id="marketplace-results" role="tabpanel" aria-labelledby="marketplace-tab-programmes" aria-label="Programme results" className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {visibleResults.map((item) => <ProgrammeCard key={item.programme.id} item={item} selected={data.organisationProgrammes.some((selection) => selection.programmeId === item.programme.id && selection.status === "Active")} compared={comparison.includes(item.programme.id)} onOpen={() => openProgramme(item.programme.id)} onAdd={() => addProgramme(item)} onCompare={() => toggleComparison(item.programme.id)} />)}
         </section>
       ) : null}
 
       {view === "Providers" && providerResults.length ? (
-        <section aria-label="Provider results" className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <section id="marketplace-results" role="tabpanel" aria-labelledby="marketplace-tab-providers" aria-label="Provider results" className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {visibleProviderResults.map((provider) => <ProviderCard key={provider.providerId} provider={provider} programmeCount={directory.filter((item) => item.provider.providerId === provider.providerId).length} selected={data.organisationProviders.some((selection) => selection.providerId === provider.providerId && selection.status === "Active")} onOpen={() => openProvider(provider.providerId)} onAdd={() => addProvider(provider.providerId)} />)}
         </section>
       ) : null}
 
-      {view === "Programmes" && !results.length ? <p className="rounded-2xl border border-dashed border-[#102c3d]/[0.15] py-12 text-center text-sm text-[#102c3d]/[0.55]">No programmes match the selected filters.</p> : null}
-      {view === "Providers" && !providerResults.length ? <p className="rounded-2xl border border-dashed border-[#102c3d]/[0.15] py-12 text-center text-sm text-[#102c3d]/[0.55]">No providers match the selected filters.</p> : null}
+      {view === "Programmes" && !results.length ? <NoResults copy="No programmes match the selected filters." onClear={() => setFilters(emptyFilters)} /> : null}
+      {view === "Providers" && !providerResults.length ? <NoResults copy="No providers match the selected filters." onClear={() => setFilters(emptyFilters)} /> : null}
 
       {view === "Programmes" && visibleResults.length < results.length ? <button type="button" onClick={() => setVisibleCount((current) => Math.min(current + directoryPageSize, results.length))} className="mx-auto min-h-11 rounded-full border border-[#102c3d]/[0.10] bg-white px-5 text-sm font-semibold text-[#102c3d] hover:bg-[#edf7f3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159b8f]">Load more programmes</button> : null}
       {view === "Providers" && visibleProviderResults.length < providerResults.length ? <button type="button" onClick={() => setVisibleCount((current) => Math.min(current + directoryPageSize, providerResults.length))} className="mx-auto min-h-11 rounded-full border border-[#102c3d]/[0.10] bg-white px-5 text-sm font-semibold text-[#102c3d] hover:bg-[#edf7f3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159b8f]">Load more providers</button> : null}
@@ -275,40 +345,58 @@ export function EmployerProgrammeDirectory() {
   );
 }
 
-function Count({ label, value }: { label: string; value: number }) {
-  return <div className="border-r border-[#102c3d]/[0.08] px-4 py-3 last:border-r-0"><p className="text-2xl font-semibold tabular-nums text-[#102c3d]">{value}</p><p className="mt-1 text-xs font-semibold text-[#102c3d]/[0.55]">{label}</p></div>;
+function Filter({ label, value, values, onChange }: { label: string; value: string; values: string[]; onChange: (value: string) => void }) {
+  return <label className="grid gap-1.5 text-xs font-semibold text-[#52677d]">{label}<span className="relative block"><select aria-label={label} value={value} onChange={(event) => onChange(event.target.value)} className="h-11 w-full min-w-0 appearance-none rounded-xl border border-[#8492a1] bg-[#fbfcfb] px-3 pr-10 text-sm font-semibold text-[#27456a] outline-none transition-[border-color,box-shadow,background-color] duration-150 hover:border-[#607487] focus:border-[#17786e] focus:bg-white focus:ring-4 focus:ring-[#17786e]/[0.12]"><option>All</option>{values.map((item) => <option key={item}>{item}</option>)}</select><ChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#607487]" aria-hidden="true" /></span></label>;
 }
 
-function Filter({ label, value, values, onChange }: { label: string; value: string; values: string[]; onChange: (value: string) => void }) {
-  return <label className="grid gap-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/[0.45]">{label}<select aria-label={label} value={value} onChange={(event) => onChange(event.target.value)} className="min-h-11 min-w-0 rounded-xl border border-[#102c3d]/[0.10] bg-white px-3 text-sm font-semibold normal-case tracking-normal text-[#102c3d]"><option>All</option>{values.map((item) => <option key={item}>{item}</option>)}</select></label>;
+function FilterChip({ label, value, onRemove }: { label: string; value: string; onRemove: () => void }) {
+  return <button type="button" onClick={onRemove} aria-label={`Remove ${label.toLowerCase()} filter: ${value}`} className="inline-flex min-h-9 max-w-full items-center gap-1.5 rounded-lg bg-[#e6eee9] px-3 text-xs font-semibold text-[#27456a] transition-colors duration-150 hover:bg-[#cfe9de] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#17786e]"><span className="truncate"><span className="text-[#52677d]">{label}:</span> {value}</span><X size={13} className="shrink-0" aria-hidden="true" /></button>;
+}
+
+function NoResults({ copy, onClear }: { copy: string; onClear: () => void }) {
+  return <section aria-live="polite" className="grid min-h-52 place-items-center rounded-2xl border border-dashed border-[#27456a]/20 bg-white px-5 py-10 text-center"><div className="max-w-md"><span className="mx-auto grid h-11 w-11 place-items-center rounded-xl bg-[#e6eee9] text-[#17786e]"><Search size={19} aria-hidden="true" /></span><h2 className="mt-4 text-lg font-semibold text-[#27456a]">Nothing matches yet</h2><p className="mt-1.5 text-sm leading-6 text-[#52677d]">{copy}</p><button type="button" onClick={onClear} className="mt-4 min-h-11 rounded-xl bg-[#27456a] px-4 text-sm font-semibold text-white transition-colors duration-150 hover:bg-[#1d3654] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#17786e] focus-visible:ring-offset-2">Clear all filters</button></div></section>;
 }
 
 function ProviderCard({ provider, programmeCount, selected, onOpen, onAdd }: { provider: ProviderCatalogueRecord; programmeCount: number; selected: boolean; onOpen: () => void; onAdd: () => void }) {
+  const overview = clean(provider.commercialProfile.organisationDescription)
+    || clean(provider.commercialProfile.positioningStatement)
+    || provider.specialisms.slice(0, 3).join(", ")
+    || "Provider information is being reviewed.";
   return (
-    <article className="flex min-h-[260px] flex-col border border-[#102c3d]/[0.08] bg-white p-5 shadow-[0_10px_24px_rgba(16,44,61,0.035)]">
-      <div className="flex items-start justify-between gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-[#eaf5f1] text-[#0b776e]"><Building2 size={19} /></span><SemanticStatus label={provider.verificationStatus === "verified" ? "Information verified" : "Information awaiting review"} tone={provider.verificationStatus === "verified" ? "healthy" : "watch"} /></div>
-      <h2 className="mt-4 text-xl font-semibold tracking-[-0.02em]">{provider.providerName}</h2>
-      <p className="mt-2 text-sm leading-6 text-[#102c3d]/[0.58]">{provider.specialisms.slice(0, 3).join(", ") || "Provider specialisms are being reviewed."}</p>
-      <dl className="mt-4 grid grid-cols-2 gap-3"><DetailFact label="Programmes" value={String(programmeCount)} /><DetailFact label="Coverage" value={provider.regions.slice(0, 2).join(", ") || "Being reviewed"} /></dl>
-      <div className="mt-auto grid gap-2 pt-5"><button type="button" onClick={onOpen} className="min-h-11 rounded-full bg-[#102c3d] px-4 text-sm font-semibold text-white">View provider</button><button type="button" disabled={selected} onClick={onAdd} className="min-h-11 rounded-full border border-[#159b8f]/[0.22] px-4 text-sm font-semibold text-[#0b6f63] disabled:bg-[#edf7f3] disabled:text-[#0b6f63]/70">{selected ? "In My Providers" : "Add to My Providers"}</button></div>
+    <article className="flex h-full min-h-[320px] flex-col rounded-2xl border border-[#27456a]/[0.09] bg-white p-5 shadow-[0_12px_30px_rgba(39,69,106,0.045)] transition-[border-color,box-shadow] duration-150 hover:border-[#27456a]/[0.16] hover:shadow-[0_16px_34px_rgba(39,69,106,0.07)] sm:p-6">
+      <div className="flex items-start justify-between gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#e6eee9] text-[#17786e]"><Building2 size={19} aria-hidden="true" /></span><span className="rounded-lg bg-[#f2f7f4] px-2.5 py-1.5"><SemanticStatus label={provider.verificationStatus === "verified" ? "Information verified" : "Information awaiting review"} tone={provider.verificationStatus === "verified" ? "healthy" : "watch"} /></span></div>
+      <h2 className="mt-4 text-xl font-semibold tracking-[-0.02em] text-[#27456a]">{provider.providerName}</h2>
+      <p className="mt-2 text-sm leading-6 text-[#52677d]">{overview}</p>
+      <dl className="mt-5 grid grid-cols-2 gap-3"><CardDetail label="Programmes" value={String(programmeCount)} /><CardDetail label="Coverage" value={provider.regions.slice(0, 2).join(", ") || "Being reviewed"} /></dl>
+      <div className="mt-auto grid gap-2 pt-5"><button type="button" onClick={onOpen} className="min-h-11 rounded-xl bg-[#27456a] px-4 text-sm font-semibold text-white transition-colors duration-150 hover:bg-[#1d3654] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#17786e] focus-visible:ring-offset-2">View provider</button><button type="button" disabled={selected} onClick={onAdd} className="min-h-11 rounded-xl border border-[#8492a1] bg-white px-4 text-sm font-semibold text-[#176d65] transition-colors duration-150 hover:bg-[#e6eee9]/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#17786e] disabled:cursor-not-allowed disabled:bg-[#e6eee9] disabled:text-[#52677d]">{selected ? "In My Providers" : "Add to My Providers"}</button></div>
     </article>
   );
 }
 
 function ProgrammeCard({ item, selected, compared, onOpen, onAdd, onCompare }: { item: DirectoryProgramme; selected: boolean; compared: boolean; onOpen: () => void; onAdd: () => void; onCompare: () => void }) {
+  const description = clean(item.programme.shortDescription) || clean(item.programme.fullDescription) || missingInformation;
   return (
-    <article className="flex min-h-[275px] flex-col border border-[#102c3d]/[0.08] bg-white p-5 shadow-[0_10px_24px_rgba(16,44,61,0.035)]">
-      <div className="flex items-start justify-between gap-3"><span className="inline-flex h-9 min-w-9 items-center justify-center rounded-lg bg-[#eef5fa] px-2 text-sm font-semibold text-[#315d78]">{levelMarker(item)}</span><SemanticStatus label={verificationLabel(item.programme, item.provider)} tone={verificationLabel(item.programme, item.provider) === "Information verified" ? "healthy" : "watch"} /></div>
-      <h2 className="mt-4 text-xl font-semibold tracking-[-0.02em]">{item.programme.programmeName}</h2>
-      <p className="mt-2 text-sm font-semibold text-[#0b6f63]">{item.provider.providerName}</p>
-      <dl className="mt-4 grid gap-2 text-xs text-[#102c3d]/[0.58]"><Fact icon={GraduationCap} value={standardLabel(item)} /><Fact icon={Timer} value={durationLabel(item.programme)} /><Fact icon={Building2} value={deliveryLabel(item.programme, item.provider)} /><Fact icon={MapPin} value={coverageLabel(item.programme, item.provider)} /></dl>
-      <div className="mt-auto grid gap-2 pt-5"><button type="button" onClick={onOpen} className="min-h-11 rounded-full bg-[#102c3d] px-4 text-sm font-semibold text-white hover:bg-[#17394d] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159b8f]">View programme</button><div className="grid grid-cols-[1fr_auto] gap-2"><button type="button" disabled={selected} onClick={onAdd} className="min-h-11 rounded-full border border-[#159b8f]/[0.22] px-4 text-sm font-semibold text-[#0b6f63] disabled:bg-[#edf7f3] disabled:text-[#0b6f63]/70">{selected ? "In My Programmes" : "Add to My Programmes"}</button><button type="button" aria-label={`${compared ? "Remove" : "Add"} ${item.programme.programmeName} ${compared ? "from" : "to"} comparison`} onClick={onCompare} className={`grid min-h-11 min-w-11 place-items-center rounded-full ring-1 ${compared ? "bg-[#edf7f3] text-[#0b6f63] ring-[#159b8f]/[0.20]" : "bg-white text-[#102c3d]/[0.60] ring-[#102c3d]/[0.10]"}`}><GitCompareArrows size={17} /></button></div></div>
+    <article className="flex h-full min-h-[390px] flex-col rounded-2xl border border-[#27456a]/[0.09] bg-white p-5 shadow-[0_12px_30px_rgba(39,69,106,0.045)] transition-[border-color,box-shadow] duration-150 hover:border-[#27456a]/[0.16] hover:shadow-[0_16px_34px_rgba(39,69,106,0.07)] sm:p-6">
+      <div className="flex items-start justify-between gap-3"><span className="inline-flex h-9 min-w-9 shrink-0 items-center justify-center rounded-lg bg-[#eef4f8] px-2 text-sm font-semibold text-[#315d78]">{levelMarker(item)}</span><span className="rounded-lg bg-[#f2f7f4] px-2.5 py-1.5"><SemanticStatus label={verificationLabel(item.programme, item.provider)} tone={verificationLabel(item.programme, item.provider) === "Information verified" ? "healthy" : "watch"} /></span></div>
+      <h2 className="mt-4 text-xl font-semibold leading-7 tracking-[-0.02em] text-[#27456a]">{item.programme.programmeName}</h2>
+      <p className="mt-1.5 text-sm font-semibold leading-6 text-[#176d65]">{item.provider.providerName}</p>
+      <p className="mt-2 text-sm leading-6 text-[#52677d]">{description}</p>
+      <div className="mt-4 rounded-xl bg-[#f2f7f4] p-3">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#607487]">Apprenticeship standard</p>
+        <p className="mt-1 text-sm font-semibold leading-5 text-[#27456a]">{standardLabel(item)}</p>
+      </div>
+      <dl className="mt-4 grid gap-2.5 text-sm text-[#52677d]"><Fact icon={Timer} label="Duration" value={durationLabel(item.programme)} /><Fact icon={Building2} label="Delivery" value={deliveryLabel(item.programme, item.provider)} /><Fact icon={MapPin} label="Coverage" value={coverageLabel(item.programme, item.provider)} /></dl>
+      <div className="mt-auto grid gap-2 pt-5"><button type="button" onClick={onOpen} className="min-h-11 rounded-xl bg-[#27456a] px-4 text-sm font-semibold text-white transition-colors duration-150 hover:bg-[#1d3654] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#17786e] focus-visible:ring-offset-2">View programme</button><div className="grid grid-cols-[1fr_auto] gap-2"><button type="button" disabled={selected} onClick={onAdd} className="min-h-11 rounded-xl border border-[#8492a1] bg-white px-4 text-sm font-semibold text-[#176d65] transition-colors duration-150 hover:bg-[#e6eee9]/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#17786e] disabled:cursor-not-allowed disabled:bg-[#e6eee9] disabled:text-[#52677d]">{selected ? "In My Programmes" : "Add to My Programmes"}</button><button type="button" aria-pressed={compared} aria-label={`${compared ? "Remove" : "Add"} ${item.programme.programmeName} ${compared ? "from" : "to"} comparison`} onClick={onCompare} className={`grid min-h-11 min-w-11 place-items-center rounded-xl ring-1 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#17786e] ${compared ? "bg-[#cfe9de] text-[#176d65] ring-[#17786e]" : "bg-white text-[#52677d] ring-[#8492a1] hover:bg-[#e6eee9]/70 hover:text-[#27456a]"}`}><GitCompareArrows size={17} aria-hidden="true" /></button></div></div>
     </article>
   );
 }
 
-function Fact({ icon: Icon, value }: { icon: typeof GraduationCap; value: string }) {
-  return <div className="flex items-start gap-2"><Icon size={14} className="mt-0.5 shrink-0 text-[#0b8e82]" aria-hidden="true" /><span>{value}</span></div>;
+function Fact({ icon: Icon, label, value }: { icon: typeof GraduationCap; label: string; value: string }) {
+  return <div className="flex items-start gap-2"><Icon size={15} className="mt-0.5 shrink-0 text-[#17786e]" aria-hidden="true" /><span><span className="sr-only">{label}: </span>{value}</span></div>;
+}
+
+function CardDetail({ label, value }: { label: string; value: string }) {
+  return <div className="rounded-xl bg-[#f2f7f4] p-3"><dt className="text-[11px] font-semibold uppercase tracking-[0.09em] text-[#607487]">{label}</dt><dd className="mt-1 text-sm font-semibold leading-5 text-[#27456a]">{value}</dd></div>;
 }
 
 function ProgrammeDetail({ item, selected, onAdd, onBack, onProvider }: { item: DirectoryProgramme; selected: boolean; onAdd: () => void; onBack: () => void; onProvider: () => void }) {
@@ -316,7 +404,7 @@ function ProgrammeDetail({ item, selected, onAdd, onBack, onProvider }: { item: 
   return (
     <div className="mx-auto grid max-w-5xl gap-5">
       <Back onClick={onBack}>Back to Programmes &amp; Providers</Back>
-      <header className="rounded-[1.6rem] bg-[#eaf5f1] p-6 sm:p-8"><div className="flex flex-wrap gap-2"><Badge>{levelLabel(item)}</Badge><Badge>{verificationLabel(item.programme, item.provider)}</Badge></div><h1 className="mt-4 text-3xl font-semibold tracking-[-0.03em]">{item.programme.programmeName}</h1><button type="button" onClick={onProvider} className="mt-2 min-h-11 text-left text-sm font-semibold text-[#0b6f63] underline-offset-4 hover:underline">Delivered by {item.provider.providerName}</button><p className="mt-3 max-w-3xl text-sm leading-7 text-[#102c3d]/[0.65]">{overview}</p><button type="button" disabled={selected} onClick={onAdd} className="mt-5 min-h-11 rounded-full bg-[#102c3d] px-5 text-sm font-semibold text-white disabled:bg-[#0b6f63]">{selected ? "In My Programmes" : "Add provider and programme"}</button></header>
+      <header className="rounded-2xl border border-[#27456a]/[0.08] bg-[#e6eee9] p-6 text-[#27456a] shadow-[0_14px_34px_rgba(39,69,106,0.04)] sm:p-8"><div className="flex flex-wrap gap-2"><Badge>{levelLabel(item)}</Badge><Badge>{verificationLabel(item.programme, item.provider)}</Badge></div><h1 className="mt-4 text-3xl font-semibold tracking-[-0.03em]">{item.programme.programmeName}</h1><button type="button" onClick={onProvider} className="mt-2 min-h-11 text-left text-sm font-semibold text-[#176d65] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#17786e]">Delivered by {item.provider.providerName}</button><p className="mt-3 max-w-3xl text-sm leading-7 text-[#52677d]">{overview}</p><button type="button" disabled={selected} onClick={onAdd} className="mt-5 min-h-11 rounded-xl bg-[#27456a] px-5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-[#1d3654] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#17786e] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-[#607487]">{selected ? "In My Programmes" : "Add provider and programme"}</button></header>
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><DetailFact label="Standard" value={standardLabel(item)} /><DetailFact label="Duration" value={durationLabel(item.programme)} /><DetailFact label="Delivery" value={deliveryLabel(item.programme, item.provider)} /><DetailFact label="Locations" value={coverageLabel(item.programme, item.provider)} /></section>
       <section className="grid gap-5 lg:grid-cols-2"><Info title="Typical learner activities" items={unique([...item.programme.skillsDeveloped, ...item.programme.technologiesCovered])} /><Info title="Suitable roles or teams" items={unique([...item.programme.targetJobRoles, ...item.programme.commercialProfile.typicalDepartments])} /><Copy title="Employer considerations" value={clean(item.programme.commercialProfile.employerCommitment) || missingInformation} /><Copy title="Learner support" value={clean(item.programme.commercialProfile.idealAudience) || missingInformation} /><Copy title="Assessment model" value={clean(item.programme.commercialProfile.assessmentApproach) || missingInformation} /><Info title="Programme outcomes" items={unique([...item.programme.commercialProfile.keyOutcomes, ...item.programme.expectedOutcomes])} /></section>
     </div>
@@ -329,7 +417,7 @@ function ProviderProfile({ provider, programmes, selected, onAdd, onBack, onProg
   return (
     <div className="mx-auto grid max-w-5xl gap-5">
       <Back onClick={onBack}>Back to Programmes &amp; Providers</Back>
-      <header className="bg-[#102c3d] p-6 text-white sm:p-8"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#7ad1c5]">Provider profile</p><h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em]">{provider.providerName}</h1><dl className="mt-5 grid gap-3 sm:grid-cols-4"><QuickFact label="Programmes" value={String(programmes.length)} /><QuickFact label="Delivery" value={unique(provider.deliveryModels).slice(0, 2).join(", ") || "Being reviewed"} /><QuickFact label="Coverage" value={unique(provider.regions).slice(0, 2).join(", ") || "Being reviewed"} /><QuickFact label="Specialisms" value={unique(provider.specialisms).slice(0, 2).join(", ") || "Being reviewed"} /></dl><button type="button" disabled={selected} onClick={onAdd} className="mt-5 min-h-11 rounded-full bg-white px-5 text-sm font-semibold text-[#102c3d] disabled:bg-[#82d7c8]">{selected ? "In My Providers" : "Add to My Providers"}</button><details className="mt-5 border-t border-white/[0.15] pt-3"><summary className="min-h-11 cursor-pointer py-3 text-xs font-semibold text-[#82d7c8]">About this provider</summary><p className="max-w-3xl text-sm leading-7 text-white/[0.72]">{overview}</p></details></header>
+      <header className="rounded-2xl bg-[#27456a] p-6 text-white shadow-[0_16px_36px_rgba(39,69,106,0.14)] sm:p-8"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#b8e1d3]">Provider profile</p><h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em]">{provider.providerName}</h1><dl className="mt-5 grid gap-3 sm:grid-cols-4"><QuickFact label="Programmes" value={String(programmes.length)} /><QuickFact label="Delivery" value={unique(provider.deliveryModels).slice(0, 2).join(", ") || "Being reviewed"} /><QuickFact label="Coverage" value={unique(provider.regions).slice(0, 2).join(", ") || "Being reviewed"} /><QuickFact label="Specialisms" value={unique(provider.specialisms).slice(0, 2).join(", ") || "Being reviewed"} /></dl><button type="button" disabled={selected} onClick={onAdd} className="mt-5 min-h-11 rounded-xl bg-white px-5 text-sm font-semibold text-[#27456a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#cfe9de] focus-visible:ring-offset-2 focus-visible:ring-offset-[#27456a] disabled:bg-[#cfe9de]">{selected ? "In My Providers" : "Add to My Providers"}</button><details className="mt-5 border-t border-white/20 pt-3"><summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold text-[#cfe9de] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#cfe9de]">About this provider</summary><p className="max-w-3xl text-sm leading-7 text-white/80">{overview}</p></details></header>
       <section className="grid gap-5 lg:grid-cols-2"><Info title="Delivery approach" items={unique(provider.deliveryModels)} /><Info title="Geographic coverage" items={unique(provider.regions)} /><Info title="Learner support" items={unique(programmes.flatMap((item) => item.programme.commercialProfile.idealAudience ? [item.programme.commercialProfile.idealAudience] : []))} /><Info title="Employer support" items={employerSupport} /></section>
       {provider.website ? <a href={provider.website} target="_blank" rel="noreferrer" className="inline-flex min-h-11 w-fit items-center gap-2 rounded-full bg-[#edf7f3] px-4 text-sm font-semibold text-[#0b6f63]">Visit provider website <ExternalLink size={15} /></a> : null}
       <section className="rounded-[1.4rem] border border-[#102c3d]/[0.07] bg-white p-5 sm:p-6"><h2 className="text-xl font-semibold">Programmes available</h2>{programmes.length ? <div className="mt-4 grid gap-3 md:grid-cols-2">{programmes.map((item) => <button key={item.programme.id} type="button" onClick={() => onProgramme(item.programme.id)} className="min-h-24 rounded-2xl bg-[#f6f9f7] p-4 text-left hover:bg-[#edf7f3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159b8f]"><span className="block text-sm font-semibold">{item.programme.programmeName}</span><span className="mt-2 block text-xs text-[#102c3d]/[0.55]">{levelLabel(item)} · {deliveryLabel(item.programme, item.provider)}</span></button>)}</div> : <p className="mt-4 text-sm text-[#102c3d]/[0.55]">No active programmes are currently listed for this provider.</p>}</section>
