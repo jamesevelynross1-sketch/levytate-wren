@@ -4,12 +4,13 @@ type SendEmailInput = {
   subject: string;
   html: string;
   text: string;
+  idempotencyKey?: string;
 };
 
 const verifiedDomainFrom = "MPR Consulting <updates@mprconsulting.co.uk>";
 const resendFallbackFrom = "MPR Consulting <onboarding@resend.dev>";
 
-export async function sendEmail({ from: requestedFrom, to, subject, html, text }: SendEmailInput) {
+export async function sendEmail({ from: requestedFrom, to, subject, html, text, idempotencyKey }: SendEmailInput) {
   const apiKey = process.env.RESEND_API_KEY;
 
   if (!apiKey) {
@@ -24,10 +25,11 @@ export async function sendEmail({ from: requestedFrom, to, subject, html, text }
     subject,
     html,
     text,
+    idempotencyKey,
   });
 
   if (response.ok) {
-    return;
+    return getResendMessageId(response);
   }
 
   if (!requestedFrom && !process.env.RESEND_FROM_EMAIL && from !== resendFallbackFrom) {
@@ -38,10 +40,11 @@ export async function sendEmail({ from: requestedFrom, to, subject, html, text }
       subject,
       html,
       text,
+      idempotencyKey,
     });
 
     if (fallbackResponse.ok) {
-      return;
+      return getResendMessageId(fallbackResponse);
     }
 
     throw new Error(await getResendError(fallbackResponse));
@@ -57,12 +60,14 @@ async function sendResendRequest({
   subject,
   html,
   text,
+  idempotencyKey,
 }: Omit<SendEmailInput, "from"> & { apiKey: string; from: string }) {
   return fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
+      ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
     },
     body: JSON.stringify({
       from,
@@ -72,6 +77,15 @@ async function sendResendRequest({
       text,
     }),
   });
+}
+
+async function getResendMessageId(response: Response) {
+  try {
+    const payload = (await response.json()) as { id?: unknown };
+    return typeof payload.id === "string" ? payload.id : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 async function getResendError(response: Response) {
