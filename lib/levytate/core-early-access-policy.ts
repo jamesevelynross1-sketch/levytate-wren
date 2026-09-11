@@ -14,6 +14,7 @@ export type CoreEarlyAccessModuleKey =
   | "Providers"
   | "My Providers"
   | "My Programmes"
+  | "Requests"
   | "Marketplace"
   | "Finance"
   | "Programmes"
@@ -37,6 +38,7 @@ export type CoreEarlyAccessCapability =
   | "platform-guidance-administration"
   | "platform-audit-context"
   | "provider-matching"
+  | "service-requests"
   | "copilot-write-actions"
   | "public-self-service-registration";
 
@@ -69,6 +71,7 @@ const item = (
 
 const commonDeferred = [
   "provider-matching",
+  "service-requests",
   "copilot-write-actions",
   "public-self-service-registration",
 ] as const satisfies readonly CoreEarlyAccessCapability[];
@@ -116,6 +119,7 @@ export const coreEarlyAccessPolicy: Readonly<Record<MvpUserRole, CoreEarlyAccess
       item("People", "People", "enabled", "manage", "core"),
       item("My Providers", "My Providers", "enabled", "manage", "core"),
       item("My Programmes", "My Programmes", "enabled", "manage", "core"),
+      item("Requests", "Requests", "hidden", undefined, "non-core"),
       item("Finance", "Finance", "enabled", "manage", "core"),
       item("Marketplace", "Marketplace", "enabled", "discover", "core"),
       item("Intelligence", "Intelligence", "enabled", "discover", "core"),
@@ -156,6 +160,7 @@ export const coreEarlyAccessPolicy: Readonly<Record<MvpUserRole, CoreEarlyAccess
       item("People", "People", "enabled", "manage", "core"),
       item("My Providers", "My Providers", "enabled", "manage", "core"),
       item("My Programmes", "My Programmes", "enabled", "manage", "core"),
+      item("Requests", "Requests", "hidden", undefined, "non-core"),
       item("Finance", "Finance", "enabled", "manage", "core"),
       item("Marketplace", "Marketplace", "enabled", "discover", "core"),
       item("Intelligence", "Intelligence", "enabled", "discover", "core"),
@@ -169,12 +174,31 @@ export const coreEarlyAccessPolicy: Readonly<Record<MvpUserRole, CoreEarlyAccess
   },
 };
 
-export function getCoreEarlyAccessPolicy(role: MvpUserRole): CoreEarlyAccessRolePolicy {
-  return coreEarlyAccessPolicy[role];
+export function getCoreEarlyAccessPolicy(
+  role: MvpUserRole,
+  options: { requestsEnabled?: boolean } = {},
+): CoreEarlyAccessRolePolicy {
+  const policy = coreEarlyAccessPolicy[role];
+  if (!options.requestsEnabled || (role !== "Employer Admin" && role !== "Apprenticeship Lead")) {
+    return policy;
+  }
+
+  return {
+    ...policy,
+    modules: policy.modules.map((module) => module.moduleKey === "Requests"
+      ? { ...module, availability: "enabled", group: "manage", reasonCode: "core" }
+      : module),
+    permittedCapabilities: [...policy.permittedCapabilities, "service-requests"],
+    deniedCapabilities: policy.deniedCapabilities.filter((capability) => capability !== "service-requests"),
+  };
 }
 
-export function resolveCoreEarlyAccessRouteAccess(role: MvpUserRole, requestedModule: string | null | undefined) {
-  const policy = getCoreEarlyAccessPolicy(role);
+export function resolveCoreEarlyAccessRouteAccess(
+  role: MvpUserRole,
+  requestedModule: string | null | undefined,
+  resolvedPolicy: CoreEarlyAccessRolePolicy = getCoreEarlyAccessPolicy(role),
+) {
+  const policy = resolvedPolicy;
   const requested = policy.modules.find((entry) => entry.moduleKey === requestedModule);
   const first = policy.modules.find((entry) => entry.availability === "enabled")!;
   const permitted = requested && (requested.availability === "enabled" || requested.availability === "secondary");

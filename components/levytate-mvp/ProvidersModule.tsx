@@ -599,9 +599,9 @@ function MiniEvidenceBlock({ title, items }: { title: string; items: string[] })
     </div>
   );
 }
-export function ProvidersModule() {
+export function ProvidersModule({ onRequest }: { onRequest?: (context: { programmeId?: string; providerId?: string }) => void } = {}) {
   const { meta } = useMvpWorkspace();
-  if (meta?.userRole !== "Platform Admin") return <EmployerProgrammeDirectory />;
+  if (meta?.userRole !== "Platform Admin") return <EmployerProgrammeDirectory onRequest={onRequest} />;
   return <ProviderAdministration />;
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
+import dynamic from "next/dynamic";
 import {
   BellRing,
   BookOpenCheck,
@@ -8,6 +9,7 @@ import {
   ChartNoAxesCombined,
   ClipboardCheck,
   GraduationCap,
+  Handshake,
   LayoutDashboard,
   Landmark,
   LogOut,
@@ -52,6 +54,11 @@ import { hasMvpPermission, permissionsForMvpRole, type MvpPermission } from "@/l
 import { buildNotifications } from "@/lib/levytate/mvp/workspace-insights";
 import type { LevyTateCopilotContext, LevyTateCopilotEntityType } from "@/lib/levytate/copilot-context";
 
+const EmployerRequestsContainer = dynamic(
+  () => import("@/components/levytate-mvp/EmployerRequestsContainer").then((module) => module.EmployerRequestsContainer),
+  { loading: () => <div role="status" className="rounded-2xl border border-[#27456a]/[0.09] bg-white p-6 text-sm text-[#52677d]">Loading Requests…</div> },
+);
+
 const modules = [
   { name: "Home", icon: LayoutDashboard },
   { name: "My Programme", icon: BookOpenCheck },
@@ -66,6 +73,7 @@ const modules = [
   { name: "Providers", icon: Building2 },
   { name: "My Providers", icon: Network },
   { name: "My Programmes", icon: GraduationCap },
+  { name: "Requests", icon: Handshake },
   { name: "Marketplace", icon: Store },
   { name: "Finance", icon: Landmark },
   { name: "Programmes", icon: BookOpenCheck },
@@ -95,6 +103,7 @@ const modulePermissions = {
   Providers: "providers:read",
   "My Providers": "providerRelationships:read",
   "My Programmes": "providerRelationships:read",
+  Requests: "serviceRequests:read",
   Marketplace: "providers:read",
   Finance: "finance:read",
   Programmes: "providers:read",
@@ -134,6 +143,7 @@ const moduleCopy: Record<ModuleName, string> = {
   Providers: "Explore factual apprenticeship programme and provider information in one clear directory.",
   "My Providers": "Manage the providers your organisation works with and review their current activity.",
   "My Programmes": "Manage the programmes your organisation has published for employees.",
+  Requests: "Create one approved brief, compare provider proposals and hand over only the option your organisation confirms.",
   Marketplace: "Explore the global factual provider and programme catalogue.",
   Finance: "Understand levy funding, apprenticeship spend, balances and expired funds from DAS transaction data.",
   Programmes: "Review the factual programme catalogue available to your organisation.",
@@ -199,7 +209,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
     const searchParams = new URLSearchParams(window.location.search);
     const requested = searchParams.get("module") as ModuleName | null;
     if (requested) {
-      const access = resolveCoreEarlyAccessRouteAccess(meta?.userRole ?? "Employee", requested);
+      const access = resolveCoreEarlyAccessRouteAccess(meta?.userRole ?? "Employee", requested, earlyAccessPolicy);
       const resolved = access.module as ModuleName;
       setActiveModule(resolved);
       setManagerReviewApplicationId(
@@ -210,7 +220,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
       if (!access.permitted) window.history.replaceState(null, "", access.safeRedirect);
     }
     deepLinkHandled.current = true;
-  }, [availableModules, hydrated, meta?.userRole]);
+  }, [availableModules, earlyAccessPolicy, hydrated, meta?.userRole]);
 
   useEffect(() => {
     if (peopleItems.includes(peopleView)) return;
@@ -234,6 +244,18 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
     setCopilotEntity(null);
     window.history.replaceState(null, "", `/levytate/app?module=${encodeURIComponent(module)}`);
     setActiveModule(module);
+  }
+
+  function openRequest(context: { programmeId?: string; providerId?: string }) {
+    if (!availableModules.some((item) => item.name === "Requests")) return;
+    setManagerDirectReportDetail(null);
+    setManagerReviewApplicationId(null);
+    setCopilotEntity(null);
+    setActiveModule("Requests");
+    const params = new URLSearchParams({ module: "Requests" });
+    if (context.programmeId) params.set("programme", context.programmeId);
+    if (context.providerId) params.set("provider", context.providerId);
+    window.history.replaceState(null, "", `/levytate/app?${params.toString()}`);
   }
 
   function moduleLabel(module: ModuleName) {
@@ -517,9 +539,10 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
                   </ModuleStackNav>
                 : <ProvidersModule />
             ) : null}
-            {activeModule === "My Providers" ? <MyProvidersModule onOpenMarketplace={() => openModule("Marketplace")} /> : null}
-            {activeModule === "My Programmes" ? <MyProgrammesModule onOpenMarketplace={() => openModule("Marketplace")} /> : null}
-            {activeModule === "Marketplace" ? <ProvidersModule /> : null}
+            {activeModule === "My Providers" ? <MyProvidersModule onOpenMarketplace={() => openModule("Marketplace")} onRequest={meta?.requestsEnabled ? (providerId) => openRequest({ providerId }) : undefined} /> : null}
+            {activeModule === "My Programmes" ? <MyProgrammesModule onOpenMarketplace={() => openModule("Marketplace")} onRequest={meta?.requestsEnabled ? (programmeId, providerId) => openRequest({ programmeId, providerId }) : undefined} /> : null}
+            {activeModule === "Requests" ? <EmployerRequestsContainer onOpenMarketplace={() => openModule("Marketplace")} onOpenMyProviders={() => openModule("My Providers")} onOpenMyProgrammes={() => openModule("My Programmes")} /> : null}
+            {activeModule === "Marketplace" ? <ProvidersModule onRequest={openRequest} /> : null}
             {activeModule === "Finance" ? <LevyFinanceModule organisationId={meta?.organisationId ?? "local-demo"} demoMode={meta?.storageMode !== "supabase"} /> : null}
             {activeModule === "Programmes" ? <ProvidersModule /> : null}
             {activeModule === "Reports" ? <ReportsModule /> : null}

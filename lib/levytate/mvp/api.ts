@@ -38,6 +38,7 @@ export type LevyTateWorkspaceMeta = {
   userRole: MvpUserRole;
   permissions?: MvpPermission[];
   coreEarlyAccess?: CoreEarlyAccessRolePolicy;
+  requestsEnabled?: boolean;
   directReportOperationalSummaries?: EmployeeOperationalSummary[];
   prospectAccess?: ProspectAccessMeta | null;
   storageMode: MvpWorkspaceStorageMode;

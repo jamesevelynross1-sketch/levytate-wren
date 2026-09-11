@@ -55,6 +55,7 @@ import { getProspectAccessForSession } from "@/lib/server/levytate-prospect-acce
 import { synchroniseApplicationReviewOperationalActions } from "@/lib/server/levytate-operational-actions";
 import { getOrganisationLearnerLifecycleCollectionsForWorkspace } from "@/lib/server/levytate-learner-lifecycle";
 import { isBetaApprovedEarlyAccessStatus } from "@/lib/levytate/early-access/domain";
+import { isRequestsEnabledForOrganisation } from "@/lib/server/levytate-request-capability";
 
 type OrganisationRow = {
   id: string;
@@ -370,7 +371,10 @@ export async function getWorkspaceBootstrapForSession(session: LevyTateBetaSessi
   try {
     const context = await ensureWorkspaceContext(session);
     await assertWorkspaceReadAllowed(context);
-    const data = await loadWorkspaceData(context, session);
+    const [data, requestsEnabled] = await Promise.all([
+      loadWorkspaceData(context, session),
+      isRequestsEnabledForOrganisation(context.organisation.id),
+    ]);
     const userRole = normaliseMvpUserRole(context.user.role);
     const prospectAccess = await getProspectAccessForSession(session);
     const warnings = [...context.warnings];
@@ -392,7 +396,8 @@ export async function getWorkspaceBootstrapForSession(session: LevyTateBetaSessi
         userEmail: session.email,
         userRole,
         permissions: permissionsForMvpRole(context.user.role),
-        coreEarlyAccess: getCoreEarlyAccessPolicy(userRole),
+        coreEarlyAccess: getCoreEarlyAccessPolicy(userRole, { requestsEnabled }),
+        requestsEnabled,
         directReportOperationalSummaries,
         prospectAccess: prospectAccess ? {
           id: prospectAccess.id,

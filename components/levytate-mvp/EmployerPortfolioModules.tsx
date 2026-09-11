@@ -3,7 +3,7 @@
 import { Building2, CalendarDays, GraduationCap, Store } from "lucide-react";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 
-export function MyProvidersModule({ onOpenMarketplace }: { onOpenMarketplace: () => void }) {
+export function MyProvidersModule({ onOpenMarketplace, onRequest }: { onOpenMarketplace: () => void; onRequest?: (providerId: string) => void }) {
   const { data, saveOrganisationProvider } = useMvpWorkspace();
   const active = data.organisationProviders.filter((selection) => selection.status === "Active");
   const providers = active.flatMap((selection) => {
@@ -27,13 +27,13 @@ export function MyProvidersModule({ onOpenMarketplace }: { onOpenMarketplace: ()
         <p className="mt-2 text-sm text-[#102c3d]/[0.56]">{provider.deliveryModels.slice(0, 2).join(", ") || "Delivery details under review"} · {provider.regions.slice(0, 2).join(", ") || "Coverage under review"}</p>
         <dl className="mt-4 grid grid-cols-2 gap-3 text-sm"><Fact label="My programmes" value={String(programmeIds.size)} /><Fact label="Learners" value={String(learnerCount)} /><Fact label="Latest review" value={reviews[0] ? displayDate(reviews[0].reviewDate) : "Not recorded"} /><Fact label="Next review" value={relationship?.reviewDate ? displayDate(relationship.reviewDate) : reviews[0]?.nextReviewDate ? displayDate(reviews[0].nextReviewDate) : "Not scheduled"} /></dl>
         {reviews[0]?.supportRequired ? <p className="mt-4 border-t border-[#102c3d]/[0.07] pt-3 text-xs leading-5 text-[#102c3d]/[0.56]"><strong>Support:</strong> {reviews[0].supportRequired}</p> : null}
-        <button type="button" onClick={() => saveOrganisationProvider({ ...selection, status: "Inactive", updatedAt: new Date().toISOString() })} className="mt-5 min-h-11 rounded-full px-3 text-xs font-semibold text-[#ad344e] hover:bg-[#fff2f4]">Remove from My Providers</button>
+        <div className="mt-5 flex flex-wrap gap-2">{onRequest ? <button type="button" onClick={() => onRequest(provider.providerId)} className="min-h-11 rounded-full bg-[#edf7f3] px-4 text-xs font-semibold text-[#0b6f63]">Request proposal</button> : null}<button type="button" onClick={() => saveOrganisationProvider({ ...selection, status: "Inactive", updatedAt: new Date().toISOString() })} className="min-h-11 rounded-full px-3 text-xs font-semibold text-[#ad344e] hover:bg-[#fff2f4]">Remove from My Providers</button></div>
       </article>;
     })}
   </div>;
 }
 
-export function MyProgrammesModule({ onOpenMarketplace }: { onOpenMarketplace: () => void }) {
+export function MyProgrammesModule({ onOpenMarketplace, onRequest }: { onOpenMarketplace: () => void; onRequest?: (programmeId: string, providerId: string) => void }) {
   const { data, saveOrganisationProgramme } = useMvpWorkspace();
   const programmes = data.organisationProgrammes.filter((selection) => selection.status === "Active").flatMap((selection) => {
     const programme = data.providerProgrammes.find((item) => item.id === selection.programmeId);
@@ -54,7 +54,7 @@ export function MyProgrammesModule({ onOpenMarketplace }: { onOpenMarketplace: (
         <h2 className="mt-4 text-xl font-semibold">{programme.programmeName}</h2><p className="mt-2 text-sm font-semibold text-[#0b6f63]">{provider.providerName}</p>
         <p className="mt-3 text-sm leading-6 text-[#102c3d]/[0.56]">{programme.shortDescription || "Programme details are available in Marketplace."}</p>
         <dl className="mt-4 grid grid-cols-2 gap-3"><Fact label="Applications" value={String(applicationCount)} /><Fact label="Learners" value={String(learnerCount)} /><Fact label="Duration" value={programme.duration || "To confirm"} /><Fact label="Level" value={programme.level ? `Level ${programme.level}` : "To confirm"} /></dl>
-        <button type="button" onClick={() => saveOrganisationProgramme({ ...selection, status: "Inactive", updatedAt: new Date().toISOString() })} className="mt-5 min-h-11 rounded-full px-3 text-xs font-semibold text-[#ad344e] hover:bg-[#fff2f4]">Unpublish programme</button>
+        <div className="mt-5 flex flex-wrap gap-2">{onRequest ? <button type="button" onClick={() => onRequest(programme.id, provider.providerId)} className="min-h-11 rounded-full bg-[#edf7f3] px-4 text-xs font-semibold text-[#0b6f63]">Request proposals</button> : null}<button type="button" onClick={() => saveOrganisationProgramme({ ...selection, status: "Inactive", updatedAt: new Date().toISOString() })} className="min-h-11 rounded-full px-3 text-xs font-semibold text-[#ad344e] hover:bg-[#fff2f4]">Unpublish programme</button></div>
       </article>;
     })}
   </div>;

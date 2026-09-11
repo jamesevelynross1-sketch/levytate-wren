@@ -28,6 +28,10 @@ export type MvpPermission =
   | "providerMatching:read"
   | "providerMatching:write"
   | "providerMatching:status"
+  | "serviceRequests:read"
+  | "serviceRequests:write"
+  | "serviceRequests:publish"
+  | "serviceRequests:decide"
   | "enrolments:read"
   | "enrolments:write"
   | "enrolments:status"
@@ -102,6 +106,10 @@ const allPermissions = [
   "providerMatching:read",
   "providerMatching:write",
   "providerMatching:status",
+  "serviceRequests:read",
+  "serviceRequests:write",
+  "serviceRequests:publish",
+  "serviceRequests:decide",
   "enrolments:read",
   "enrolments:write",
   "enrolments:status",
@@ -153,6 +161,10 @@ export const mvpRolePermissions = {
     "providerMatching:read",
     "providerMatching:write",
     "providerMatching:status",
+    "serviceRequests:read",
+    "serviceRequests:write",
+    "serviceRequests:publish",
+    "serviceRequests:decide",
     "enrolments:read",
     "enrolments:write",
     "enrolments:status",

@@ -32,7 +32,11 @@ export default async function LevyTateAppPage({ searchParams }: { searchParams: 
     const query = await searchParams;
     const requestedModule = typeof query.module === "string" ? query.module : null;
     if (requestedModule) {
-      const access = resolveCoreEarlyAccessRouteAccess(initialWorkspace.meta.userRole, requestedModule);
+      const access = resolveCoreEarlyAccessRouteAccess(
+        initialWorkspace.meta.userRole,
+        requestedModule,
+        initialWorkspace.meta.coreEarlyAccess,
+      );
       if (!access.permitted) redirect(access.safeRedirect);
     }
     return <LevyTateMvpApp initialWorkspace={initialWorkspace} />;
