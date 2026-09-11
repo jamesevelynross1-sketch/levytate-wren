@@ -4,6 +4,7 @@ import { Activity, BookOpenCheck, Building2, KeyRound, RefreshCw, ShieldCheck } 
 import { useEffect, useState } from "react";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { ClientWorkspaceAdminModule } from "@/components/levytate-mvp/ClientWorkspaceAdminModule";
+import { ProviderAccessAdminModule } from "@/components/levytate-mvp/ProviderAccessAdminModule";
 
 type PublicationMetadata = { slug: string; title: string; version: string; effectiveDate: string; lastReviewedDate: string; reviewStatus: string; internalOwner: string; active: boolean };
 type TermsAcceptanceStatus = { organisation: string; currentTermsVersion: string; accepted: boolean; acceptedAt: string | null; acceptingUser: string | null; roleSnapshot: string | null; reacceptanceRequired: boolean };
@@ -30,6 +31,7 @@ export function PlatformAdminWorkspacesModule({ onNavigate }: { onNavigate: (mod
         {cards.map(({ title, copy, target, icon: Icon }) => <button key={title} type="button" onClick={() => onNavigate(target)} className="min-h-44 rounded-[1.35rem] border border-[#102c3d]/[0.08] bg-white p-5 text-left shadow-[0_14px_34px_rgba(16,44,61,0.045)] transition hover:-translate-y-0.5 hover:border-[#159b8f]/25"><Icon size={20} className="text-[#0b8e82]" /><h3 className="mt-5 text-lg font-semibold">{title}</h3><p className="mt-2 text-sm leading-6 text-[#102c3d]/58">{copy}</p></button>)}
       </section>
       <ClientWorkspaceAdminModule />
+      <ProviderAccessAdminModule />
     </div>
   );
 }
