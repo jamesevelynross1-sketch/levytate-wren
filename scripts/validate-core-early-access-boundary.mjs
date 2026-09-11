@@ -25,10 +25,11 @@ const roleBlock = (role) => {
 };
 
 check("one central policy contract exists", policy.includes("coreEarlyAccessPolicy") && policy.includes("resolveCoreEarlyAccessRouteAccess"));
-check("server returns the central policy", workspace.includes("coreEarlyAccess: getCoreEarlyAccessPolicy(userRole)"));
+check("server returns the capability-resolved central policy", workspace.includes("coreEarlyAccess: getCoreEarlyAccessPolicy(userRole, { requestsEnabled })") && workspace.includes("requestsEnabled,"));
 check("client consumes the server policy", shell.includes("meta?.coreEarlyAccess ?? getCoreEarlyAccessPolicy"));
 check("server route uses the shared resolver", page.includes("resolveCoreEarlyAccessRouteAccess") && page.includes("redirect(access.safeRedirect)"));
 check("client manipulated modules use the shared resolver", shell.includes("resolveCoreEarlyAccessRouteAccess(meta?.userRole"));
+check("Requests is enabled only by resolved server capability", policy.includes('options: { requestsEnabled?: boolean }') && policy.includes('availability: "enabled", group: "manage"'));
 check("application review deep links preserve the role-specific module", shell.includes('const applicationModule = meta?.userRole === "Line Manager" ? "Approvals" : "Applications";') && shell.includes('resolved === "Approvals" || resolved === "Applications"') && shell.includes('<ApplicationsModule initialApplicationId={managerReviewApplicationId} onApplicationSelectionChange={updateApplicationReviewSelection} />') && applications.includes('useState<string | null>(initialApplicationId ?? null)'));
 
 const employee = roleBlock("Employee");
@@ -41,6 +42,7 @@ check("Line Manager exact primary navigation", ordered(manager, ["Home", "Approv
 check("Team Reporting is deferred", manager.includes('item("Reports", "Team Reporting", "deferred"'));
 
 const lead = roleBlock("Apprenticeship Lead");
+check("Requests remains hidden in the accepted Client V1 policy", lead.includes('item("Requests", "Requests", "hidden"'));
 check("Lead exact Client V1 navigation", ordered(lead, ["Home", "Applications", "Learners", "Operations", "People", "My Providers", "My Programmes", "Finance", "Marketplace", "Intelligence", "Knowledge", "Settings"]));
 check("Lead employer catalogue navigation is distinct", lead.includes('item("My Providers", "My Providers", "enabled", "manage"') && lead.includes('item("My Programmes", "My Programmes", "enabled", "manage"') && lead.includes('item("Marketplace", "Marketplace", "enabled", "discover"'));
 check("Lead reports are deferred", lead.includes('item("Reports", "Reports", "deferred"'));
@@ -54,7 +56,7 @@ check("Platform Admin employer modules are hidden", ["Applications", "Learners",
 const platformPermissions = rbac.match(/"Platform Admin": \[([\s\S]*?)\n  \],/)?.[1] ?? "";
 check("Platform Admin no longer inherits allPermissions", !rbac.includes('"Platform Admin": allPermissions'));
 check("Platform Admin keeps catalogue, guidance, access and workspace permissions", ["workspace:read", "workspace:migrate", "settings:read", "settings:write", "providers:read", "providers:write", "providers:archive", "knowledge:read", "knowledge:manage", "earlyAccess:manage"].every((permission) => platformPermissions.includes(`"${permission}"`)));
-check("Platform Admin has no employer operational permissions", ["applications:read", "applications:write", "applications:status", "enrolments:read", "enrolments:write", "enrolments:status", "learnerLifecycle:read", "learnerLifecycle:write", "learnerLifecycle:status", "operationalActions:read", "operationalActions:write", "providerRelationships:read", "providerRelationships:write", "reports:read", "copilot:use"].every((permission) => !platformPermissions.includes(`"${permission}"`)));
+check("Platform Admin has no employer operational permissions", ["applications:read", "applications:write", "applications:status", "enrolments:read", "enrolments:write", "enrolments:status", "learnerLifecycle:read", "learnerLifecycle:write", "learnerLifecycle:status", "operationalActions:read", "operationalActions:write", "providerRelationships:read", "providerRelationships:write", "serviceRequests:read", "serviceRequests:write", "serviceRequests:publish", "serviceRequests:decide", "reports:read", "copilot:use"].every((permission) => !platformPermissions.includes(`"${permission}"`)));
 
 check("Platform Admin workspace payload excludes employer operations", ["employees: []", "applications: []", "learnerRecords: []", "operationalActions: []", "providerRelationships: []"].every((value) => workspace.includes(value)));
 check("workspace mutations consult the central capability policy", workspace.includes("hasCoreEarlyAccessCapability") && workspace.includes("Platform Admin cannot perform employer operational mutations"));
