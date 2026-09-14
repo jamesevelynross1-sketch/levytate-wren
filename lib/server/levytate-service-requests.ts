@@ -852,7 +852,6 @@ async function providerCatalogueName(providerId: string) {
     organisation_id: `eq.${organisationId}`,
     provider_id: `eq.${providerId}`,
     status: "eq.Active",
-    order: "updated_at.desc",
     limit: "1",
   }));
   return rows[0] ? text(rows[0], "provider_name") : "Provider workspace";

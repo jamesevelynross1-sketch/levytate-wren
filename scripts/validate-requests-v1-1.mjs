@@ -471,6 +471,7 @@ const requestPrivilegeMigrationHistory = (
 const domain = await fs.readFile("lib/levytate/requests/domain.ts", "utf8");
 const workflow = await fs.readFile("lib/levytate/requests/workflow.ts", "utf8");
 const service = await fs.readFile("lib/server/levytate-service-requests.ts", "utf8");
+const providerCatalogueLookup = service.match(/async function providerCatalogueName[\s\S]*?\n}\n\nasync function providerProgrammeOptions/)?.[0] ?? "";
 const capability = await fs.readFile("lib/server/levytate-request-capability.ts", "utf8");
 const providerAuth = await fs.readFile("lib/server/levytate-provider-auth.ts", "utf8");
 const providerAccessAdmin = await fs.readFile("lib/server/levytate-provider-access-admin.ts", "utf8");
@@ -1401,10 +1402,13 @@ check(
     && visibleEmployerQuestion.visibility === "provider_specific",
 );
 check(
-  "197 provider catalogue lookup is scoped to the active canonical catalogue organisation",
-  service.includes("async function canonicalCatalogueOrganisationId()")
-    && service.includes('slug: "eq.levytate-internal"')
-    && service.match(/organisation_id: `eq\.\$\{organisationId\}`/g)?.length >= 2,
+  "197 provider catalogue lookup is unique-scoped without relying on an updated_at column",
+  providerCatalogueLookup.includes('select: "provider_id,provider_name"')
+    && providerCatalogueLookup.includes("organisation_id: `eq.${organisationId}`")
+    && providerCatalogueLookup.includes("provider_id: `eq.${providerId}`")
+    && providerCatalogueLookup.includes('status: "eq.Active"')
+    && providerCatalogueLookup.includes('limit: "1"')
+    && !providerCatalogueLookup.includes("updated_at"),
 );
 check(
   "198 every Requests browser JSON endpoint uses a streaming byte-bounded parser",
