@@ -589,7 +589,8 @@ function ClarificationsPanel({ opportunity, onUpdate }: { opportunity: ProviderO
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const canAsk = opportunity.bucket === "open" && opportunity.response?.status !== "declined";
+  const canAsk = ["open", "responded"].includes(opportunity.bucket)
+    && opportunity.response?.status !== "declined";
 
   async function askQuestion(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

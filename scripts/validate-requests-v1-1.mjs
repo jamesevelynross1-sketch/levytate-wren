@@ -1495,5 +1495,10 @@ check(
   documentation.includes("Supabase default table privileges")
     && documentation.includes("029_correct_service_request_privileges.sql"),
 );
+check(
+  "206 providers can ask a clarification after submitting a response",
+  providerUi.includes('["open", "responded"].includes(opportunity.bucket)')
+    && providerUi.includes('opportunity.response?.status !== "declined"'),
+);
 
 console.log(`\nLevyTate Requests V1.1 validation: ${passed}/${passed} checks passed`);
