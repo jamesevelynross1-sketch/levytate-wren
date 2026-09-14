@@ -13,20 +13,35 @@ const resendFallbackFrom = "MPR Consulting <onboarding@resend.dev>";
 export async function sendEmail({ from: requestedFrom, to, subject, html, text, idempotencyKey }: SendEmailInput) {
   const apiKey = process.env.RESEND_API_KEY;
 
+  console.info({
+    component: "requests-email-preflight",
+    hasResendApiKey: Boolean(process.env.RESEND_API_KEY),
+    resendApiKeyLengthPresent: Boolean(process.env.RESEND_API_KEY?.length),
+    vercelEnv: process.env.VERCEL_ENV ?? "unset",
+    gitCommitRef: process.env.VERCEL_GIT_COMMIT_REF ?? "unset",
+    senderDomain: "levytate.co.uk",
+  });
+
   if (!apiKey) {
     throw new Error("Resend API key is not configured.");
   }
 
   const from = requestedFrom ?? process.env.RESEND_FROM_EMAIL ?? verifiedDomainFrom;
-  const response = await sendResendRequest({
-    apiKey,
-    from,
-    to,
-    subject,
-    html,
-    text,
-    idempotencyKey,
-  });
+  let response: Response;
+  try {
+    response = await sendResendRequest({
+      apiKey,
+      from,
+      to,
+      subject,
+      html,
+      text,
+      idempotencyKey,
+    });
+  } catch {
+    console.error({ component: "requests-email-delivery", category: "network_failure" });
+    throw new Error("Resend email request failed.");
+  }
 
   if (response.ok) {
     return getResendMessageId(response);
@@ -50,7 +65,21 @@ export async function sendEmail({ from: requestedFrom, to, subject, html, text, 
     throw new Error(await getResendError(fallbackResponse));
   }
 
+  console.error({
+    component: "requests-email-delivery",
+    category: resendErrorCategory(response.status),
+    status: response.status,
+  });
   throw new Error(await getResendError(response));
+}
+
+function resendErrorCategory(status: number) {
+  if (status === 401) return "resend_401";
+  if (status === 403) return "resend_403";
+  if (status === 422) return "resend_422";
+  if (status === 429) return "resend_429";
+  if (status >= 500) return "resend_5xx";
+  return "resend_other";
 }
 
 async function sendResendRequest({
