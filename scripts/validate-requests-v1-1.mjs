@@ -459,6 +459,15 @@ check("80 event idempotency keys are unique per Request", new Set(store.events.m
 check("81 event metadata has no private employer notes", !JSON.stringify(store.events).includes("Private decision note") && !JSON.stringify(store.events).includes("private-employee"));
 
 const migration = await fs.readFile("supabase/migrations/028_create_service_requests.sql", "utf8");
+const correctiveMigration = await fs.readFile("supabase/migrations/029_correct_service_request_privileges.sql", "utf8");
+const requestPrivilegeMigrationHistory = (
+  await Promise.all(
+    (await fs.readdir("supabase/migrations"))
+      .filter((fileName) => /^0(?:28|29|[3-9][0-9])_.*\.sql$/.test(fileName))
+      .sort()
+      .map((fileName) => fs.readFile(`supabase/migrations/${fileName}`, "utf8")),
+  )
+).join("\n");
 const domain = await fs.readFile("lib/levytate/requests/domain.ts", "utf8");
 const workflow = await fs.readFile("lib/levytate/requests/workflow.ts", "utf8");
 const service = await fs.readFile("lib/server/levytate-service-requests.ts", "utf8");
@@ -1425,6 +1434,62 @@ check(
   workflow.includes("if (invitationAdded) request.updatedAt = timestamp")
     && service.includes("typeof item.request_id === \"string\"")
     && service.includes("guardedRequestIds.add(item.request_id)"),
+);
+
+const intendedServiceRolePrivileges = new Map([
+  ["levytate_organisation_capabilities", ["insert", "select", "update"]],
+  ["levytate_provider_memberships", ["insert", "select", "update"]],
+  ["levytate_service_requests", ["insert", "select", "update"]],
+  ["levytate_service_request_versions", ["insert", "select"]],
+  ["levytate_service_request_invitations", ["insert", "select", "update"]],
+  ["levytate_provider_access_invites", ["insert", "select", "update"]],
+  ["levytate_service_request_responses", ["insert", "select", "update"]],
+  ["levytate_service_request_response_versions", ["insert", "select"]],
+  ["levytate_service_request_clarifications", ["insert", "select", "update"]],
+  ["levytate_service_request_decisions", ["insert", "select", "update"]],
+  ["levytate_service_request_agreements", ["insert", "select"]],
+  ["levytate_service_request_handovers", ["insert", "select"]],
+  ["levytate_service_request_events", ["insert", "select"]],
+]);
+const correctiveStatements = correctiveMigration
+  .split(";")
+  .map((statement) => statement.replace(/^\s*--.*$/gm, "").trim())
+  .filter(Boolean);
+const trackedServiceRoleAclStatements = requestPrivilegeMigrationHistory
+  .split(";")
+  .map((statement) => statement.replace(/^\s*--.*$/gm, "").trim())
+  .filter((statement) => /^(?:revoke all(?: privileges)?|grant .+) on table public\.levytate_[a-z0-9_]+ (?:from|to) service_role$/i.test(statement));
+check(
+  "202 corrective migration is privilege-only and limited to the thirteen Requests tables",
+  correctiveStatements.length === intendedServiceRolePrivileges.size * 2
+    && correctiveStatements.every((statement) => /^(?:revoke all privileges|grant (?:select|insert|update)(?:, (?:select|insert|update))*) on table public\.levytate_[a-z0-9_]+ (?:from|to) service_role$/i.test(statement))
+    && correctiveStatements.every((statement) => intendedServiceRolePrivileges.has(statement.match(/public\.([a-z0-9_]+)/i)?.[1])),
+);
+check(
+  "203 corrective migration resets every inherited service-role ACL before re-granting",
+  [...intendedServiceRolePrivileges.keys()].every((table) => {
+    const revoke = `revoke all privileges on table public.${table} from service_role`;
+    const grant = correctiveStatements.find((statement) => statement.toLowerCase().includes(`on table public.${table} to service_role`));
+    return correctiveMigration.indexOf(revoke) >= 0 && grant && correctiveMigration.indexOf(revoke) < correctiveMigration.indexOf(grant);
+  }),
+);
+check(
+  "204 effective tracked service-role grants match the explicit least-privilege contract",
+  [...intendedServiceRolePrivileges.entries()].every(([table, expected]) => {
+    const effective = new Set();
+    for (const statement of trackedServiceRoleAclStatements) {
+      if (!statement.toLowerCase().includes(`on table public.${table} `)) continue;
+      if (/^revoke all(?: privileges)?/i.test(statement)) effective.clear();
+      const granted = statement.match(/^grant (.+) on table/i)?.[1];
+      if (granted) granted.split(",").map((privilege) => privilege.trim().toLowerCase()).forEach((privilege) => effective.add(privilege));
+    }
+    return JSON.stringify([...effective].sort()) === JSON.stringify(expected);
+  }),
+);
+check(
+  "205 Requests documentation records Supabase inherited service-role ACL handling",
+  documentation.includes("Supabase default table privileges")
+    && documentation.includes("029_correct_service_request_privileges.sql"),
 );
 
 console.log(`\nLevyTate Requests V1.1 validation: ${passed}/${passed} checks passed`);

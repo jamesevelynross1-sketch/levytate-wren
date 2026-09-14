@@ -303,6 +303,12 @@ After approval, the authorised operator must:
 
 Do not perform step 8 without the approval in step 7. Do not apply through the SQL editor ad hoc, edit ledger history, enable Production, or seed Request records.
 
+### Supabase service-role privilege correction
+
+Supabase default table privileges grant `service_role` a broader table ACL when a table is created. A later narrow `GRANT` adds privileges; it does not remove inherited `UPDATE`, `DELETE`, `TRUNCATE`, `REFERENCES`, `TRIGGER` or `MAINTAIN` privileges. Migration `029_correct_service_request_privileges.sql` therefore revokes all inherited `service_role` privileges from each of the thirteen Requests tables and immediately re-grants the exact mutable or immutable access defined by the Requests persistence contract. It deliberately does not alter project-wide PostgreSQL default privileges, existing RLS policies, functions or business data.
+
+The Requests validation suite models the final ACL across the tracked Requests migration history and fails if any Requests table retains a grant outside its explicit allow-list. Live activation must additionally inspect PostgreSQL ACLs after migration and prove that immutable updates and all service-role deletes/truncates are denied.
+
 ## Automated build-stage evidence
 
 `node scripts/validate-requests-v1-1.mjs` exercises the exact fictional main scenario and validates:
