@@ -7,6 +7,7 @@ import { OperationalMetricRail, SemanticStatus, type OperationalTone } from "@/c
 import { OperationalActionDetail } from "@/components/levytate-mvp/OperationalActionDetail";
 import { OperationalGovernanceView } from "@/components/levytate-mvp/OperationalGovernanceView";
 import { ProgressReviewIntelligencePanel } from "@/components/levytate-mvp/ProgressReviewIntelligencePanel";
+import { AutopilotOperationsPanel } from "@/components/levytate-mvp/AutopilotOperationsPanel";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { operationalActionStatusLabels, type OperationalActionStatus } from "@/lib/levytate/mvp/operational-actions";
 import type { IntelligenceSignal } from "@/lib/levytate/intelligence/progress-review";
@@ -44,13 +45,13 @@ export function OperationsCentreModule({ onOpenLearner, onSignalContext }: { onO
   const [assignment, setAssignment] = useState<"all" | "mine" | "unassigned" | "shared">("all");
   const [moreFilters, setMoreFilters] = useState(false);
   const [selectedActionId, setSelectedActionId] = useState("");
-  const [workspaceView, setWorkspaceView] = useState<"active" | "closed">("active");
+  const [workspaceView, setWorkspaceView] = useState<"autopilot" | "active" | "closed">("autopilot");
   const [refreshKey, setRefreshKey] = useState(0);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({ urgent: true, ready_to_enrol: true });
   const initialSynchronisationPending = useRef(true);
 
   useEffect(() => {
-    if (!authorised) {
+    if (!authorised || workspaceView !== "active") {
       setLoading(false);
       return;
     }
@@ -92,7 +93,7 @@ export function OperationsCentreModule({ onOpenLearner, onSignalContext }: { onO
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [actionType, assignment, authorised, dueStatus, learner, owner, priority, programme, queue, refreshKey, search, status]);
+  }, [actionType, assignment, authorised, dueStatus, learner, owner, priority, programme, queue, refreshKey, search, status, workspaceView]);
 
   const hasFilters = Boolean(search.trim()) || priority !== "All" || queue !== "All" || owner !== "All" || dueStatus !== "All" || status !== "All" || actionType !== "All" || learner !== "All" || programme !== "All" || assignment !== "all";
   const nextUpcoming = useMemo(() => data ? queueOrder.flatMap((key) => data.queues[key]).find((item) => item.dueStatus === "Due soon") : undefined, [data]);
@@ -108,6 +109,10 @@ export function OperationsCentreModule({ onOpenLearner, onSignalContext }: { onO
 
   if (selectedActionId) {
     return <OperationalActionDetail actionId={selectedActionId} onBack={() => setSelectedActionId("")} onOpenAction={setSelectedActionId} onOpenLearner={onOpenLearner} onChanged={() => setRefreshKey((current) => current + 1)} />;
+  }
+
+  if (workspaceView === "autopilot") {
+    return <div className="grid min-w-0 gap-4"><OperationsModeTabs value={workspaceView} onChange={setWorkspaceView} /><AutopilotOperationsPanel onOpenAction={setSelectedActionId} /></div>;
   }
 
   if (workspaceView === "closed") {
@@ -176,8 +181,8 @@ export function OperationsCentreModule({ onOpenLearner, onSignalContext }: { onO
   );
 }
 
-function OperationsModeTabs({ value, onChange }: { value: "active" | "closed"; onChange: (value: "active" | "closed") => void }) {
-  return <nav className="flex w-fit gap-1 rounded-xl border border-[#102c3d]/[0.07] bg-[#f3f7f5] p-1" aria-label="Operations Centre views">{([['active', 'Active work'], ['closed', 'Closed actions']] as const).map(([id, label]) => <button key={id} type="button" onClick={() => onChange(id)} aria-current={value === id ? "page" : undefined} className={`rounded-lg px-4 py-2 text-xs font-semibold transition ${value === id ? "bg-white text-[#102c3d] shadow-[0_5px_14px_rgba(16,44,61,0.08)]" : "text-[#102c3d]/[0.52] hover:text-[#0b6f63]"}`}>{label}</button>)}</nav>;
+function OperationsModeTabs({ value, onChange }: { value: "autopilot" | "active" | "closed"; onChange: (value: "autopilot" | "active" | "closed") => void }) {
+  return <nav className="flex w-fit max-w-full gap-1 overflow-x-auto rounded-xl border border-[#102c3d]/[0.07] bg-[#f3f7f5] p-1" aria-label="Operations Centre views">{([['autopilot', 'Autopilot'], ['active', 'Active work'], ['closed', 'Closed actions']] as const).map(([id, label]) => <button key={id} type="button" onClick={() => onChange(id)} aria-current={value === id ? "page" : undefined} className={`whitespace-nowrap rounded-lg px-4 py-2 text-xs font-semibold transition ${value === id ? "bg-white text-[#102c3d] shadow-[0_5px_14px_rgba(16,44,61,0.08)]" : "text-[#102c3d]/[0.52] hover:text-[#0b6f63]"}`}>{label}</button>)}</nav>;
 }
 
 function QueueSection({ queue, items, expanded, onToggle, onOpenLearner, onOpenAction }: { queue: OperationalQueueType; items: OperationalItem[]; expanded: boolean; onToggle: () => void; onOpenLearner: (target: LearnerAction) => void; onOpenAction: (actionId: string) => void }) {
