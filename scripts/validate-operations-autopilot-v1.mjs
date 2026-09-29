@@ -75,6 +75,7 @@ check("migration retains legacy signal types", migration.includes("repeated_work
 check("migration constrains Autopilot lanes", migration.includes("levytate_intelligence_signals_lane_check"));
 
 const server = await fs.readFile("lib/server/levytate-autopilot.ts", "utf8");
+const operationalActionsServer = await fs.readFile("lib/server/levytate-operational-actions.ts", "utf8");
 const route = await fs.readFile("app/api/levytate-autopilot/route.ts", "utf8");
 const panel = await fs.readFile("components/levytate-mvp/AutopilotOperationsPanel.tsx", "utf8");
 check("organisation-wide access is role restricted", server.includes('"Employer Admin", "Apprenticeship Lead"') && server.includes("operationalActions:write"));
@@ -82,6 +83,7 @@ check("mutations enforce same origin", route.includes('request.headers.get("orig
 check("request bodies are bounded", route.includes("readBoundedJson(request, 16 * 1024)"));
 check("communication remains an unsent draft", server.includes("communicationSent: false") && panel.includes("Communication draft (not sent)"));
 check("human approval is explicit", panel.includes("Human approval required") && panel.includes("Create action"));
+check("accepted application actions retain detail context without an active manager", operationalActionsServer.includes("includeApplicationsWithoutActiveManager: true") && operationalActionsServer.includes("(!manager && !options.includeApplicationsWithoutActiveManager)"));
 check("no automatic scheduling is configured", !server.includes("cron") && !route.includes("schedule"));
 
 const productSources = `${await fs.readFile("lib/levytate/autopilot/operations-autopilot.ts", "utf8")}\n${panel}\n${server}`;

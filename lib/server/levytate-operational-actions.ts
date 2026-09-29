@@ -497,7 +497,11 @@ async function applicationReviewActionContext(session: LevyTateBetaSession): Pro
   return { ...context, actorDisplayName: actors[0]?.name || context.user.email };
 }
 
-async function loadOrganisationApplicationReviewApplications(organisationId: string, applicationIds?: string[]) {
+async function loadOrganisationApplicationReviewApplications(
+  organisationId: string,
+  applicationIds?: string[],
+  options: { includeApplicationsWithoutActiveManager?: boolean } = {},
+) {
   const config = requireConfig();
   const applicationQuery = new URLSearchParams({
     select: "id,employee_id,apprenticeship_standard_id,status,current_owner,reason,submitted_at,updated_at",
@@ -543,7 +547,7 @@ async function loadOrganisationApplicationReviewApplications(organisationId: str
   return applications.flatMap((application): ManagerDirectReportApplication[] => {
     const employee = employeeById.get(application.employee_id);
     const manager = employee ? managerById.get(employee.manager_id) : undefined;
-    if (!employee || employee.status !== "Active" || !manager) return [];
+    if (!employee || employee.status !== "Active" || (!manager && !options.includeApplicationsWithoutActiveManager)) return [];
     return [{
       id: application.id,
       employee: {
@@ -568,7 +572,8 @@ async function loadOrganisationApplicationReviewApplications(organisationId: str
       history: history.filter((entry) => entry.application_id === application.id).map(applicationHistoryFromRow),
     }];
   }).map((application) => {
-    const manager = managerById.get(application.employee.managerId)!;
+    const manager = managerById.get(application.employee.managerId);
+    if (!manager) return application;
     const user = userByEmail.get(manager.email.trim().toLowerCase());
     return Object.assign(application, { managerOwner: { employeeId: manager.id, userId: user?.id ?? "", name: manager.name } });
   });
@@ -698,7 +703,9 @@ export async function getOperationalActionManagementDetail(
   const action = await requireScopedAction(context, actionId);
   if (action.actionType === "review_application") {
     const [applications, history, allOccurrences, ownerOptions] = await Promise.all([
-      loadOrganisationApplicationReviewApplications(context.organisation.id, [action.applicationId]),
+      loadOrganisationApplicationReviewApplications(context.organisation.id, [action.applicationId], {
+        includeApplicationsWithoutActiveManager: true,
+      }),
       selectActionHistory(context.organisation.id, actionId),
       selectActions(context.organisation.id, { includeTerminal: true }),
       buildOwnerOptions(context, action),
