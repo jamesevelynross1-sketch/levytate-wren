@@ -421,7 +421,6 @@ export async function recordMicrosoftCopilotAudit(input: {
     error_code: input.errorCode ?? null,
     result_count: input.resultCount ?? null,
     duration_ms: Math.max(0, Math.round(input.durationMs ?? 0)),
-    metadata: {},
     created_at: new Date().toISOString(),
   }], { prefer: "return=minimal" });
 }

@@ -32,6 +32,8 @@ create table if not exists public.levytate_external_tenant_connections (
     check (status <> 'active' or connected_at is not null),
   constraint levytate_external_tenant_connections_provider_tenant_unique
     unique (provider, external_tenant_id),
+  constraint levytate_external_tenant_connections_org_provider_tenant_unique
+    unique (organisation_id, provider, external_tenant_id),
   constraint levytate_external_tenant_connections_organisation_provider_unique
     unique (organisation_id, provider)
 );
@@ -73,8 +75,8 @@ create table if not exists public.levytate_external_identities (
   constraint levytate_external_identities_user_provider_unique
     unique (organisation_id, levytate_user_id, provider),
   constraint levytate_external_identities_connection_fk
-    foreign key (provider, external_tenant_id)
-    references public.levytate_external_tenant_connections (provider, external_tenant_id)
+    foreign key (organisation_id, provider, external_tenant_id)
+    references public.levytate_external_tenant_connections (organisation_id, provider, external_tenant_id)
     on delete restrict
 );
 
@@ -98,7 +100,6 @@ create table if not exists public.levytate_external_connector_events (
   error_code text,
   result_count integer,
   duration_ms integer not null default 0,
-  metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default timezone('utc', now()),
   constraint levytate_external_connector_events_provider_check
     check (provider in ('microsoft_entra')),
@@ -113,9 +114,7 @@ create table if not exists public.levytate_external_connector_events (
   constraint levytate_external_connector_events_result_count_check
     check (result_count is null or result_count >= 0),
   constraint levytate_external_connector_events_duration_check
-    check (duration_ms >= 0),
-  constraint levytate_external_connector_events_metadata_shape_check
-    check (jsonb_typeof(metadata) = 'object')
+    check (duration_ms >= 0)
 );
 
 create index if not exists levytate_external_connector_events_org_recent_idx
@@ -128,6 +127,66 @@ create index if not exists levytate_external_connector_events_correlation_idx
 comment on table public.levytate_external_connector_events is
   'Metadata-only audit trail for allowed and denied external connector requests. Tokens, request bodies and returned employer data are never stored.';
 
+create or replace function public.levytate_enforce_external_tenant_connection_identity()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+begin
+  if new.id is distinct from old.id
+    or new.organisation_id is distinct from old.organisation_id
+    or new.provider is distinct from old.provider
+    or new.external_tenant_id is distinct from old.external_tenant_id
+    or new.created_at is distinct from old.created_at
+  then
+    raise exception using
+      errcode = '23514',
+      message = 'External tenant connection identity fields are immutable.';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists levytate_external_tenant_connections_identity_immutable
+  on public.levytate_external_tenant_connections;
+create trigger levytate_external_tenant_connections_identity_immutable
+  before update on public.levytate_external_tenant_connections
+  for each row execute function public.levytate_enforce_external_tenant_connection_identity();
+
+create or replace function public.levytate_enforce_external_identity_key()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+begin
+  if new.id is distinct from old.id
+    or new.organisation_id is distinct from old.organisation_id
+    or new.levytate_user_id is distinct from old.levytate_user_id
+    or new.provider is distinct from old.provider
+    or new.external_tenant_id is distinct from old.external_tenant_id
+    or new.external_object_id is distinct from old.external_object_id
+    or new.email_hint is distinct from old.email_hint
+    or new.binding_method is distinct from old.binding_method
+    or new.first_bound_at is distinct from old.first_bound_at
+    or new.created_at is distinct from old.created_at
+  then
+    raise exception using
+      errcode = '23514',
+      message = 'External identity binding fields are immutable.';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists levytate_external_identities_key_immutable
+  on public.levytate_external_identities;
+create trigger levytate_external_identities_key_immutable
+  before update on public.levytate_external_identities
+  for each row execute function public.levytate_enforce_external_identity_key();
+
+revoke all on function public.levytate_enforce_external_tenant_connection_identity() from public, anon, authenticated, service_role;
+revoke all on function public.levytate_enforce_external_identity_key() from public, anon, authenticated, service_role;
+
 alter table public.levytate_external_tenant_connections enable row level security;
 alter table public.levytate_external_tenant_connections force row level security;
 alter table public.levytate_external_identities enable row level security;
@@ -138,19 +197,40 @@ alter table public.levytate_external_connector_events force row level security;
 revoke all on table public.levytate_external_tenant_connections from public, anon, authenticated;
 revoke all on table public.levytate_external_identities from public, anon, authenticated;
 revoke all on table public.levytate_external_connector_events from public, anon, authenticated;
+revoke all privileges on table public.levytate_external_tenant_connections from service_role;
+revoke all privileges on table public.levytate_external_identities from service_role;
+revoke all privileges on table public.levytate_external_connector_events from service_role;
 
 grant select, insert, update on table public.levytate_external_tenant_connections to service_role;
 grant select, insert, update on table public.levytate_external_identities to service_role;
 grant select, insert on table public.levytate_external_connector_events to service_role;
 
 drop policy if exists levytate_external_tenant_connections_service_role_all on public.levytate_external_tenant_connections;
-create policy levytate_external_tenant_connections_service_role_all
-  on public.levytate_external_tenant_connections for all to service_role
+drop policy if exists levytate_external_tenant_connections_service_role_select on public.levytate_external_tenant_connections;
+create policy levytate_external_tenant_connections_service_role_select
+  on public.levytate_external_tenant_connections for select to service_role
+  using (auth.role() = 'service_role');
+drop policy if exists levytate_external_tenant_connections_service_role_insert on public.levytate_external_tenant_connections;
+create policy levytate_external_tenant_connections_service_role_insert
+  on public.levytate_external_tenant_connections for insert to service_role
+  with check (auth.role() = 'service_role');
+drop policy if exists levytate_external_tenant_connections_service_role_update on public.levytate_external_tenant_connections;
+create policy levytate_external_tenant_connections_service_role_update
+  on public.levytate_external_tenant_connections for update to service_role
   using (auth.role() = 'service_role') with check (auth.role() = 'service_role');
 
 drop policy if exists levytate_external_identities_service_role_all on public.levytate_external_identities;
-create policy levytate_external_identities_service_role_all
-  on public.levytate_external_identities for all to service_role
+drop policy if exists levytate_external_identities_service_role_select on public.levytate_external_identities;
+create policy levytate_external_identities_service_role_select
+  on public.levytate_external_identities for select to service_role
+  using (auth.role() = 'service_role');
+drop policy if exists levytate_external_identities_service_role_insert on public.levytate_external_identities;
+create policy levytate_external_identities_service_role_insert
+  on public.levytate_external_identities for insert to service_role
+  with check (auth.role() = 'service_role');
+drop policy if exists levytate_external_identities_service_role_update on public.levytate_external_identities;
+create policy levytate_external_identities_service_role_update
+  on public.levytate_external_identities for update to service_role
   using (auth.role() = 'service_role') with check (auth.role() = 'service_role');
 
 drop policy if exists levytate_external_connector_events_service_role_select on public.levytate_external_connector_events;

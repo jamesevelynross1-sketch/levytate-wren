@@ -62,13 +62,17 @@ async function main() {
   check("migration is additive", !/\b(drop\s+table|truncate|delete\s+from)\b/i.test(migration));
   check("migration adds organisation capability default off", /microsoft_copilot_enabled boolean not null default false/i.test(migration));
   check("migration creates tenant connections", migration.includes("create table if not exists public.levytate_external_tenant_connections"));
-  check("tenant to organisation mapping is unique", migration.includes("levytate_external_tenant_connections_provider_tenant_unique"));
+  check("tenant to organisation mapping is unique and immutable", migration.includes("levytate_external_tenant_connections_provider_tenant_unique") && migration.includes("levytate_external_tenant_connections_identity_immutable"));
   check("migration creates durable external identities", migration.includes("create table if not exists public.levytate_external_identities"));
-  check("external identity uses tenant and object key", migration.includes("levytate_external_identities_subject_unique"));
-  check("migration creates metadata-only audit", migration.includes("create table if not exists public.levytate_external_connector_events"));
+  check("external identity uses immutable tenant and object key", migration.includes("levytate_external_identities_subject_unique") && migration.includes("levytate_external_identities_key_immutable"));
+  check("migration creates fixed-column metadata-only audit", migration.includes("create table if not exists public.levytate_external_connector_events") && !migration.includes("metadata jsonb"));
   check("connector tables force RLS", occurrences(migration, "force row level security") === 3);
-  check("anon and authenticated roles are revoked", occurrences(migration, "from public, anon, authenticated") === 3);
-  check("audit table is append-only for service role", migration.includes("grant select, insert on table public.levytate_external_connector_events to service_role"));
+  check("anon and authenticated roles are revoked from all connector tables", [
+    "levytate_external_tenant_connections",
+    "levytate_external_identities",
+    "levytate_external_connector_events",
+  ].every((table) => migration.includes(`revoke all on table public.${table} from public, anon, authenticated`)));
+  check("audit table is explicitly append-only for service role", migration.includes("revoke all privileges on table public.levytate_external_connector_events from service_role") && migration.includes("grant select, insert on table public.levytate_external_connector_events to service_role"));
 
   const { publicKey, privateKey } = await generateKeyPair("RS256");
   const validToken = await sign(privateKey);
