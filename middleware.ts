@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { levytateBetaSessionCookie, readLevyTateBetaSession } from "@/lib/levytate/config/beta-access";
+import {
+  isAllowedLevyTateMcpStagingRequest,
+  isLevyTateMcpStagingOnly,
+  levyTateMcpStagingNotFound,
+} from "@/lib/server/levytate-mcp-staging";
 
 const levytateHosts = new Set(["levytate.co.uk", "www.levytate.co.uk"]);
 const publicTrustPaths = new Set(["/privacy", "/early-access-terms", "/data-processing", "/support", "/account-help", "/data-rights"]);
@@ -16,6 +21,12 @@ function clearInvalidBetaSession(response: NextResponse) {
 }
 
 export async function middleware(request: NextRequest) {
+  if (isLevyTateMcpStagingOnly()) {
+    return isAllowedLevyTateMcpStagingRequest(request.nextUrl.pathname, request.method)
+      ? NextResponse.next()
+      : levyTateMcpStagingNotFound();
+  }
+
   if (!isLevyTateHost(request)) {
     if (request.nextUrl.pathname === "/levytate" || request.nextUrl.pathname.startsWith("/levytate/")) {
       const requestHeaders = new Headers(request.headers);
@@ -63,5 +74,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|brand|fonts|api).*)"],
+  matcher: ["/:path*"],
 };

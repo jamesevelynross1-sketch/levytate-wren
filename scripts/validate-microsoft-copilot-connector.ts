@@ -2,10 +2,13 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import { generateKeyPair, SignJWT } from "jose";
+import { NextRequest } from "next/server";
+import { GET as getMcpHealth } from "../app/api/mcp/health/route";
 import { microsoftCopilotToolNames, type MicrosoftCopilotActor } from "../lib/levytate/microsoft-copilot";
 import { permissionsForMvpRole } from "../lib/levytate/mvp/rbac";
 import { createMicrosoftCopilotMcpServer } from "../lib/server/levytate-microsoft-copilot-mcp";
 import { verifyEntraAccessToken } from "../lib/server/levytate-microsoft-copilot-identity";
+import { middleware } from "../middleware";
 
 const root = process.cwd();
 const checks: string[] = [];
@@ -17,19 +20,25 @@ const issuer = `https://login.microsoftonline.com/${tenantId}/v2.0`;
 const now = Math.floor(Date.now() / 1000);
 
 async function main() {
-  const [identitySource, routeSource, toolsSource, mcpSource, migration, envExample] = await Promise.all([
+  const [identitySource, routeSource, toolsSource, mcpSource, migration, envExample, middlewareSource, healthSource] = await Promise.all([
     source("lib/server/levytate-microsoft-copilot-identity.ts"),
     source("app/api/mcp/levytate/route.ts"),
     source("lib/server/levytate-microsoft-copilot-tools.ts"),
     source("lib/server/levytate-microsoft-copilot-mcp.ts"),
     source("supabase/migrations/031_create_microsoft_copilot_connector_foundation.sql"),
     source(".env.example"),
+    source("middleware.ts"),
+    source("app/api/mcp/health/route.ts"),
   ]);
 
   check("runtime feature flag defaults closed", envExample.includes("LEVYTATE_MICROSOFT_COPILOT_ENABLED=false"));
   check("Entra client ID is server configured", envExample.includes("LEVYTATE_ENTRA_CLIENT_ID="));
   check("Entra audience is server configured", envExample.includes("LEVYTATE_ENTRA_AUDIENCE="));
   check("MCP base URL is server configured", envExample.includes("LEVYTATE_MCP_BASE_URL="));
+  check("MCP staging-only mode defaults closed", envExample.includes("LEVYTATE_MCP_STAGING_ONLY=false"));
+  check("staging-only mode is enforced at the request boundary", middlewareSource.includes("isAllowedLevyTateMcpStagingRequest"));
+  check("request boundary covers API routes", middlewareSource.includes('matcher: ["/:path*"]'));
+  check("health response is bounded to approved metadata", healthSource.includes('service: "levytate-mcp"') && healthSource.includes('environment: "staging"') && healthSource.includes('status: "ready"'));
   check("tenant IDs are not hard-coded in connector source", !/tenant[_-]?id\s*=\s*["'][0-9a-f]{8}-/i.test(identitySource));
   check("JWT signature uses jose jwtVerify", identitySource.includes("jwtVerify(token, jwks"));
   check("remote Microsoft JWKS is configured", identitySource.includes("/common/discovery/v2.0/keys"));
@@ -41,6 +50,8 @@ async function main() {
   check("subject claim is required", identitySource.includes('"sub"'));
   check("bearer tokens are not written to audit records", !/external_connector_events[\s\S]{0,1200}\btoken\b/i.test(migration));
   check("connector endpoint is POST only", routeSource.includes('Allow: "POST"'));
+  check("MCP route does not use LevyTate or provider cookie authentication", !routeSource.includes("levytateBetaSessionCookie") && !routeSource.includes("levytateProviderSessionCookie"));
+  check("request host validation only requires the MCP base URL", routeSource.includes("getMicrosoftCopilotConnectorBaseUrl"));
   check("connector response removes cookies", routeSource.includes('headers.delete("set-cookie")'));
   check("connector responses disable caching", routeSource.includes('"Cache-Control", "no-store, max-age=0"'));
   check("connector body is bounded to 64 KiB", mcpSource.includes("maxRequestBodySize: 64 * 1024"));
@@ -73,6 +84,27 @@ async function main() {
     "levytate_external_connector_events",
   ].every((table) => migration.includes(`revoke all on table public.${table} from public, anon, authenticated`)));
   check("audit table is explicitly append-only for service role", migration.includes("revoke all privileges on table public.levytate_external_connector_events from service_role") && migration.includes("grant select, insert on table public.levytate_external_connector_events to service_role"));
+
+  const originalStagingOnly = process.env.LEVYTATE_MCP_STAGING_ONLY;
+  process.env.LEVYTATE_MCP_STAGING_ONLY = "true";
+  try {
+    await stagingDenied("staging root is hidden", "/");
+    await stagingDenied("staging LevyTate login is hidden", "/levytate/login");
+    await stagingDenied("staging LevyTate application is hidden", "/levytate/app");
+    await stagingDenied("staging provider workspace is hidden", "/levytate/provider");
+    await stagingDenied("staging ordinary employer APIs are hidden", "/api/levytate-workspace");
+    await stagingAllowed("staging MCP POST is allowed through the request boundary", "/api/mcp/levytate", "POST");
+    await stagingDenied("staging MCP GET is hidden", "/api/mcp/levytate");
+    await stagingAllowed("staging health GET is allowed through the request boundary", "/api/mcp/health");
+    const health = getMcpHealth();
+    check("staging health returns only approved ready metadata", health.status === 200 && JSON.stringify(await health.json()) === JSON.stringify({ service: "levytate-mcp", environment: "staging", status: "ready" }));
+  } finally {
+    if (originalStagingOnly === undefined) delete process.env.LEVYTATE_MCP_STAGING_ONLY;
+    else process.env.LEVYTATE_MCP_STAGING_ONLY = originalStagingOnly;
+  }
+  check("health endpoint is unavailable outside staging-only mode", getMcpHealth().status === 404);
+  const ordinaryPreview = await middleware(new NextRequest("https://preview.example.test/levytate/login"));
+  check("normal Preview routing remains unchanged when staging-only mode is off", ordinaryPreview.status === 200 && ordinaryPreview.headers.get("x-middleware-next") === "1");
 
   const { publicKey, privateKey } = await generateKeyPair("RS256");
   const validToken = await sign(privateKey);
@@ -112,7 +144,7 @@ async function main() {
   await client.close();
   await server.close();
 
-  assert.equal(checks.length, 56, `Expected exactly 56 connector checks, received ${checks.length}.`);
+  assert.equal(checks.length, 73, `Expected exactly 73 connector checks, received ${checks.length}.`);
   console.log(`Microsoft 365 Copilot connector validation passed (${checks.length}/${checks.length}).`);
 }
 
@@ -149,6 +181,16 @@ async function rejects(name: string, action: () => Promise<unknown>) {
 function check(name: string, condition: unknown) {
   assert.ok(condition, name);
   checks.push(name);
+}
+
+async function stagingDenied(name: string, pathname: string, method = "GET") {
+  const response = await middleware(new NextRequest(`https://mcp.example.test${pathname}`, { method }));
+  check(name, response.status === 404 && response.headers.get("cache-control")?.includes("no-store"));
+}
+
+async function stagingAllowed(name: string, pathname: string, method = "GET") {
+  const response = await middleware(new NextRequest(`https://mcp.example.test${pathname}`, { method }));
+  check(name, response.status === 200 && response.headers.get("x-middleware-next") === "1");
 }
 
 function sameMembers(left: string[], right: string[]) {

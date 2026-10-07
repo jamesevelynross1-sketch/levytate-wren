@@ -6,7 +6,7 @@ import {
   checkMicrosoftCopilotRequestLimits,
 } from "@/lib/server/levytate-auth-rate-limit";
 import {
-  getMicrosoftCopilotConnectorConfig,
+  getMicrosoftCopilotConnectorBaseUrl,
   isMicrosoftCopilotConnectorRuntimeEnabled,
 } from "@/lib/server/levytate-microsoft-copilot-config";
 import {
@@ -25,14 +25,14 @@ export async function POST(request: Request) {
     if (!isMicrosoftCopilotConnectorRuntimeEnabled()) {
       throw new MicrosoftCopilotConnectorError("connector_disabled", "The connector is disabled.", 404);
     }
-    const config = getMicrosoftCopilotConnectorConfig();
+    const baseUrl = getMicrosoftCopilotConnectorBaseUrl();
     const allowedHosts = process.env.NODE_ENV === "production"
-      ? [config.baseUrl.hostname]
-      : [config.baseUrl.hostname, "localhost", "127.0.0.1"];
+      ? [baseUrl.hostname]
+      : [baseUrl.hostname, "localhost", "127.0.0.1"];
     const hostRejected = hostHeaderValidationResponse(request, allowedHosts);
     if (hostRejected) return secureResponse(hostRejected, correlationId);
     const originRejected = originValidationResponse(request, [
-      config.baseUrl.hostname,
+      baseUrl.hostname,
       "teams.microsoft.com",
       "m365.cloud.microsoft",
       "copilot.microsoft.com",
