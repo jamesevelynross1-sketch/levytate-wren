@@ -364,6 +364,19 @@ export async function listManagerDirectReportOperationalActions(session: LevyTat
   };
 }
 
+/**
+ * Returns existing manager-scoped actions without deriving, creating, updating,
+ * or resolving operational-action records. External read-only integrations must
+ * use this path rather than the interactive workspace synchronisation path.
+ */
+export async function listManagerDirectReportOperationalActionsReadOnly(session: LevyTateBetaSession) {
+  const context = await managerOperationalActionContext(session);
+  const directReportIds = new Set(context.scope.directReports.map((employee) => employee.id));
+  const actions = (await selectActions(context.scope.organisation.id, { includeTerminal: false }))
+    .filter((action) => directReportIds.has(action.employeeId) && isManagerRelevantPersistentAction(action, context.scope.user.id));
+  return { scope: context.scope, details: context.details, actions };
+}
+
 export async function getManagerDirectReportOperationalAction(session: LevyTateBetaSession, actionId: string) {
   const context = await managerOperationalActionContext(session);
   const action = await requireManagerScopedAction(context, actionId);

@@ -10,6 +10,7 @@ import {
   serialiseProviderRecordNotes,
 } from "@/lib/levytate/domain";
 import type { LevyTateBetaSession } from "@/lib/levytate/config/beta-access";
+import type { MicrosoftCopilotActor } from "@/lib/levytate/microsoft-copilot";
 import type { LevyTateWorkspaceBootstrap, LevyTateWorkspaceMeta, LevyTateWorkspaceMutation } from "@/lib/levytate/mvp/api";
 import {
   activeApplicationStatuses,
@@ -421,6 +422,73 @@ export async function getWorkspaceBootstrapForSession(session: LevyTateBetaSessi
     const message = error instanceof Error ? error.message : "Unknown Supabase workspace bootstrap error.";
     throw new LevyTateWorkspacePersistenceError(`Supabase workspace bootstrap failed. ${message}`);
   }
+}
+
+/**
+ * Builds the existing role-scoped workspace read model for an identity that
+ * has already been authenticated and bound by a trusted server integration.
+ * Unlike the interactive bootstrap this path never provisions users,
+ * refreshes login metadata or creates demo workspace state.
+ */
+export async function getWorkspaceBootstrapForMicrosoftCopilotActor(
+  actor: MicrosoftCopilotActor,
+): Promise<LevyTateWorkspaceBootstrap> {
+  if (!getLevyTateSupabaseConfig()) {
+    throw new LevyTateWorkspacePersistenceError("Supabase environment variables are not configured.");
+  }
+
+  const user = await selectOne<UserRow>(usersTable, new URLSearchParams({
+    select: "id,organisation_id,email,role,access_level,display_name,active,auth_subject,last_login_at,created_at,updated_at",
+    id: `eq.${actor.userId}`,
+    organisation_id: `eq.${actor.organisationId}`,
+    email: `eq.${actor.email}`,
+    active: "eq.true",
+    limit: "1",
+  }));
+  if (!user || normaliseMvpUserRole(user.role) !== actor.role) {
+    throw new LevyTateWorkspacePermissionError("The bound LevyTate membership is no longer active or has changed.");
+  }
+
+  const organisation = await selectOne<OrganisationRow>(organisationsTable, new URLSearchParams({
+    select: "id,name,slug,workspace_name,primary_contact,contact_email,default_site,sites,departments,priorities,logo_reference,workspace_template,status,created_at,updated_at",
+    id: `eq.${actor.organisationId}`,
+    limit: "1",
+  }));
+  if (!organisation) throw new LevyTateWorkspacePermissionError("The bound LevyTate workspace could not be found.");
+
+  const context: WorkspaceContext = { organisation, user, warnings: [] };
+  await assertWorkspaceReadAllowed(context);
+  const session = microsoftCopilotActorSession(actor);
+  const [data, requestsEnabled] = await Promise.all([
+    loadWorkspaceData(context, session),
+    isRequestsEnabledForOrganisation(actor.organisationId),
+  ]);
+
+  return {
+    data,
+    meta: {
+      organisationId: organisation.id,
+      organisationName: organisation.name,
+      userEmail: actor.email,
+      userRole: actor.role,
+      permissions: permissionsForMvpRole(actor.role),
+      coreEarlyAccess: getCoreEarlyAccessPolicy(actor.role, { requestsEnabled }),
+      requestsEnabled,
+      directReportOperationalSummaries: undefined,
+      prospectAccess: null,
+      storageMode: "supabase",
+      warnings: [],
+    },
+  };
+}
+
+export function microsoftCopilotActorSession(actor: MicrosoftCopilotActor): LevyTateBetaSession {
+  return {
+    email: actor.email,
+    accessLevel: "beta_user",
+    issuedAt: 0,
+    expiresAt: Number.MAX_SAFE_INTEGER,
+  };
 }
 
 export async function applyWorkspaceMutationForSession(

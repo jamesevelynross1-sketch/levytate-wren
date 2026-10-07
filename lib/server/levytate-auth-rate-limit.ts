@@ -41,6 +41,44 @@ export async function checkSessionRefreshLimit(request: Request) {
   ]);
 }
 
+export async function checkMicrosoftCopilotPreAuthenticationLimit(request: Request) {
+  return consumeChecks([
+    check(
+      "microsoft_copilot.preauth.network.minute",
+      networkRateLimitKey(request),
+      "/api/mcp/levytate",
+      "microsoft_copilot_authentication_rate_limited",
+      levyTateAuthRateLimits.microsoftCopilotPreAuthenticationNetworkMinute,
+    ),
+  ]);
+}
+
+export async function checkMicrosoftCopilotRequestLimits(request: Request, tenantId: string, objectId: string) {
+  return consumeChecks([
+    check(
+      "microsoft_copilot.identity.minute",
+      rateLimitKey("microsoft_identity", `${tenantId}:${objectId}`),
+      "/api/mcp/levytate",
+      "microsoft_copilot_rate_limited",
+      levyTateAuthRateLimits.microsoftCopilotIdentityMinute,
+    ),
+    check(
+      "microsoft_copilot.network.minute",
+      networkRateLimitKey(request),
+      "/api/mcp/levytate",
+      "microsoft_copilot_rate_limited",
+      levyTateAuthRateLimits.microsoftCopilotNetworkMinute,
+    ),
+    check(
+      "microsoft_copilot.global.minute",
+      rateLimitKey("global", "all-microsoft-copilot-requests"),
+      "/api/mcp/levytate",
+      "microsoft_copilot_rate_limited",
+      levyTateAuthRateLimits.microsoftCopilotGlobalMinute,
+    ),
+  ]);
+}
+
 export function networkRateLimitKey(request: Request) {
   const source = request.headers.get("x-real-ip")?.trim()
     || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()

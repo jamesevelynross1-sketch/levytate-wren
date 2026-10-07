@@ -9,6 +9,10 @@ export const levyTateAuthRateLimits = {
   betaLoginIdentity: { limit: 10, windowSeconds: 15 * 60 },
   betaLoginNetwork: { limit: 50, windowSeconds: 15 * 60 },
   sessionRefreshNetwork: { limit: 60, windowSeconds: 10 * 60 },
+  microsoftCopilotPreAuthenticationNetworkMinute: { limit: 600, windowSeconds: 60 },
+  microsoftCopilotIdentityMinute: { limit: 120, windowSeconds: 60 },
+  microsoftCopilotNetworkMinute: { limit: 300, windowSeconds: 60 },
+  microsoftCopilotGlobalMinute: { limit: 1200, windowSeconds: 60 },
 } as const;
 
 export type LevyTateRateLimitEnvironment = "local" | "preview" | "production";

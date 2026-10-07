@@ -23,6 +23,7 @@ import {
   type MvpWorkspaceProfile,
 } from "@/lib/levytate/mvp/workspace";
 import type { WorkspaceAccessUser } from "@/lib/server/levytate-workspace-access";
+import type { MicrosoftCopilotConnectionStatus } from "@/lib/levytate/microsoft-copilot";
 
 const importanceOptions: Array<{ value: MvpEmployerPriorityImportance; copy: string }> = [
   { value: "Critical", copy: "A defining business priority for the next 12 months." },
@@ -382,11 +383,13 @@ function EmployerPrioritiesSetup({ compact = false, readOnly = false }: { compac
 }
 
 export function SettingsModule() {
-  const { data, saveProfile, can } = useMvpWorkspace();
+  const { data, saveProfile, can, meta } = useMvpWorkspace();
   const [draft, setDraft] = useState<MvpWorkspaceProfile>(data.profile);
   const [saved, setSaved] = useState(false);
   const [accessUsers, setAccessUsers] = useState<WorkspaceAccessUser[] | null>(null);
   const [accessError, setAccessError] = useState("");
+  const [microsoftCopilot, setMicrosoftCopilot] = useState<MicrosoftCopilotConnectionStatus | null>(null);
+  const [microsoftCopilotError, setMicrosoftCopilotError] = useState("");
   const canEdit = can("settings:write");
 
   useEffect(() => { setDraft(data.profile); }, [data.profile]);
@@ -403,6 +406,20 @@ export function SettingsModule() {
       });
     return () => { active = false; };
   }, []);
+  useEffect(() => {
+    if (meta?.userRole !== "Employer Admin") return;
+    let active = true;
+    void fetch("/api/levytate-workspace/integrations/microsoft-copilot", { cache: "no-store" })
+      .then(async (response) => {
+        const body = await response.json() as { connection?: MicrosoftCopilotConnectionStatus; message?: string };
+        if (!response.ok) throw new Error(body.message || "Microsoft 365 Copilot status could not be loaded.");
+        if (active) setMicrosoftCopilot(body.connection ?? null);
+      })
+      .catch((error: unknown) => {
+        if (active) setMicrosoftCopilotError(error instanceof Error ? error.message : "Microsoft 365 Copilot status could not be loaded.");
+      });
+    return () => { active = false; };
+  }, [meta?.userRole]);
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -478,6 +495,30 @@ export function SettingsModule() {
         )}
         <p className="mt-4 border-t border-[#102c3d]/[0.07] pt-4 text-xs leading-5 text-[#102c3d]/48">Platform Admin controls user provisioning, roles and access state. Workspace settings never expose authentication credentials.</p>
       </MvpPanel>
+      {meta?.userRole === "Employer Admin" ? (
+        <MvpPanel title="Microsoft 365 Copilot" eyebrow="Integrations">
+          {microsoftCopilotError ? (
+            <p className="text-sm leading-6 text-[#ad344e]">{microsoftCopilotError}</p>
+          ) : microsoftCopilot === null ? (
+            <p className="text-sm leading-6 text-[#102c3d]/56">Loading connection status...</p>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
+              <div>
+                <p className="text-sm font-semibold text-[#102c3d]">{microsoftCopilot.displayName || "LevyTate for Microsoft 365 Copilot"}</p>
+                <p className="mt-1 text-sm leading-6 text-[#102c3d]/56">Read-only access to role-scoped LevyTate operations through your organisation&apos;s Microsoft tenant.</p>
+                <p className="mt-3 text-xs leading-5 text-[#102c3d]/48">Connection identifiers, bearer tokens and credentials are never displayed here. Setup and tenant consent are completed by an authorised administrator.</p>
+              </div>
+              <StatusBadge tone={microsoftCopilot.status === "active" && microsoftCopilot.runtimeEnabled && microsoftCopilot.organisationEnabled ? "green" : "blue"}>
+                {microsoftCopilot.status === "active" && microsoftCopilot.runtimeEnabled && microsoftCopilot.organisationEnabled ? "Connected" : microsoftCopilot.status === "suspended" ? "Suspended" : "Not active"}
+              </StatusBadge>
+              <div className="grid gap-2 border-t border-[#102c3d]/[0.07] pt-4 text-xs text-[#102c3d]/54 sm:col-span-2 sm:grid-cols-2">
+                <p>Connected: <span className="font-semibold text-[#102c3d]">{microsoftCopilot.connectedAt ? new Date(microsoftCopilot.connectedAt).toLocaleDateString("en-GB") : "Not configured"}</span></p>
+                <p>Last activity: <span className="font-semibold text-[#102c3d]">{microsoftCopilot.lastSuccessfulActivityAt ? new Date(microsoftCopilot.lastSuccessfulActivityAt).toLocaleString("en-GB") : "No activity recorded"}</span></p>
+              </div>
+            </div>
+          )}
+        </MvpPanel>
+      ) : null}
     </div>
   );
 }
