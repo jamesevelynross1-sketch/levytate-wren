@@ -118,14 +118,18 @@ export async function authenticateMicrosoftCopilotRequest(
 
 export async function verifyEntraAccessToken(token: string, verification?: {
   audience: string;
+  allowedClientId?: string;
   issuerBaseUrl: URL;
   key: CryptoKey;
+  requiredScope: string;
 }): Promise<VerifiedEntraIdentity> {
   const config = verification ? null : getMicrosoftCopilotConnectorConfig();
   const unverified = decodeJwt(token);
   const tenantId = requiredGuidClaim(unverified, "tid");
   const issuerBaseUrl = verification?.issuerBaseUrl ?? config!.issuerBaseUrl;
   const expectedAudience = verification?.audience ?? config!.audience;
+  const allowedClientId = verification ? (verification.allowedClientId ?? "") : config!.allowedClientId;
+  const requiredScope = verification?.requiredScope ?? config!.requiredScope;
   const verifiedIssuer = new URL(`/${tenantId}/v2.0`, issuerBaseUrl).toString().replace(/\/$/, "");
   const jwksUrl = new URL("/common/discovery/v2.0/keys", issuerBaseUrl);
   const jwks = verification?.key ?? jwksByIssuer.get(jwksUrl.toString()) ?? createRemoteJWKSet(jwksUrl, {
@@ -140,7 +144,7 @@ export async function verifyEntraAccessToken(token: string, verification?: {
     audience: expectedAudience,
     issuer: verifiedIssuer,
     clockTolerance: 30,
-    requiredClaims: ["aud", "exp", "iat", "iss", "nbf", "sub", "tid"],
+    requiredClaims: ["aud", "exp", "iat", "iss", "nbf", "sub", "tid", "ver"],
   });
   const verifiedTenantId = requiredGuidClaim(payload, "tid");
   const objectId = requiredGuidClaim(payload, "oid");
@@ -150,6 +154,15 @@ export async function verifyEntraAccessToken(token: string, verification?: {
   if (typeof payload.exp !== "number") throw new Error("Missing token expiry.");
   const tokenAudience = Array.isArray(payload.aud) ? payload.aud[0] : payload.aud;
   if (!tokenAudience) throw new Error("Missing token audience.");
+  if (payload.ver !== "2.0") throw new Error("Only Entra v2 access tokens are accepted.");
+  const scopes = typeof payload.scp === "string" ? payload.scp.split(/\s+/).filter(Boolean) : [];
+  if (!scopes.includes(requiredScope)) throw new Error("Required delegated scope is absent.");
+  if (
+    allowedClientId
+    && (typeof payload.azp !== "string" || payload.azp.toLowerCase() !== allowedClientId.toLowerCase())
+  ) {
+    throw new Error("The calling application is not authorised.");
+  }
 
   return {
     token,
@@ -158,7 +171,7 @@ export async function verifyEntraAccessToken(token: string, verification?: {
     subject: payload.sub,
     emailHint: emailHintFromClaims(payload),
     expiresAt: payload.exp,
-    scopes: typeof payload.scp === "string" ? payload.scp.split(/\s+/).filter(Boolean) : [],
+    scopes,
     audience: tokenAudience,
   };
 }

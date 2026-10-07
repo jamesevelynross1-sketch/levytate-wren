@@ -4,7 +4,7 @@
 
 This is the read-only foundation for a Microsoft 365 Copilot custom federated connector. It is disabled by default and is not a Microsoft Graph content sync, public API, provider connector, write assistant or autonomous decision service.
 
-No Microsoft tenant is connected by this change. Migration `031_create_microsoft_copilot_connector_foundation.sql` must be reviewed and approved before any schema-dependent deployment. Production must remain disabled until an Entra application, a Microsoft 365 connector registration, legal metadata, operational ownership and a controlled pilot tenant have all been approved.
+No Microsoft tenant is connected by this change. Production must remain disabled until an Entra application, a Microsoft 365 connector registration, legal metadata, operational ownership and a controlled pilot tenant have all been approved.
 
 ## Architecture
 
@@ -28,9 +28,12 @@ All values are server-only except the existing public Supabase URL. Do not put v
 | Variable | Purpose |
 | --- | --- |
 | `LEVYTATE_MICROSOFT_COPILOT_ENABLED` | Global kill switch. Only the exact value `true` enables requests. Default is off. |
-| `LEVYTATE_ENTRA_CLIENT_ID` | LevyTate Entra application/client identifier used in MCP auth context. |
-| `LEVYTATE_ENTRA_AUDIENCE` | Exact access-token audience accepted by LevyTate. |
-| `LEVYTATE_MCP_BASE_URL` | Fixed HTTPS public LevyTate origin used for host validation and canonical links. |
+| `LEVYTATE_ENTRA_CLIENT_ID` | LevyTate API app registration's client ID GUID. |
+| `LEVYTATE_ENTRA_AUDIENCE` | Exact v2 access-token audience. Set to the same client ID GUID as `LEVYTATE_ENTRA_CLIENT_ID`, not the Application ID URI. |
+| `LEVYTATE_ENTRA_REQUIRED_SCOPE` | Delegated scope value required in the v2 token's space-delimited `scp` claim. Use `LevyTate.Read`. |
+| `LEVYTATE_ENTRA_ALLOWED_CLIENT_ID` | Optional exact v2 `azp` allowlist for the calling Microsoft client. Leave unset until the pilot client is confirmed; when set, missing or different `azp` values fail closed. |
+| `LEVYTATE_MCP_BASE_URL` | Fixed HTTPS public MCP service origin used only for request host validation. |
+| `LEVYTATE_APP_BASE_URL` | Fixed HTTPS LevyTate application origin used only for links returned by tools. For the pilot, use the stable protected feature Preview origin. |
 | `LEVYTATE_ENTRA_ISSUER_BASE_URL` | Optional issuer base for an approved sovereign cloud. Defaults to `https://login.microsoftonline.com`. |
 | `LEVYTATE_AUTH_RATE_LIMIT_SECRET` | Existing secret used to HMAC rate-limit dimensions. |
 | `NEXT_PUBLIC_SUPABASE_URL` | Existing Supabase project URL. |
@@ -46,15 +49,23 @@ Missing configuration, an absent connection or either disabled gate fails closed
 
 ## Entra application and SSO registration
 
-1. Create or select the approved multi-tenant Entra web API application.
-2. Expose the API and configure the exact audience placed in `LEVYTATE_ENTRA_AUDIENCE`.
-3. Configure delegated user access for the Microsoft 365 Copilot SSO flow; do not use a shared application key as end-user identity.
-4. Configure access-token optional claims only where needed for the first JIT email hint. Email, UPN and `preferred_username` are mutable and must never be the durable identity key.
-5. Add the token audience to the Microsoft federated connector SSO registration in the Teams Developer Portal.
-6. Register the LevyTate MCP base URL in the Microsoft 365 admin centre and use staged rollout for a controlled test group.
-7. Record the external tenant ID against exactly one LevyTate organisation. Do not encode tenant IDs in application code or environment variables.
+1. Create or select the LevyTate web API app registration. For the first pilot, use a single-tenant registration. Multi-tenant onboarding requires a later, separately approved tenancy design.
+2. Under **Expose an API**, set the Application ID URI to `api://<LEVYTATE_ENTRA_CLIENT_ID>` and expose the delegated scope `LevyTate.Read`.
+3. Configure the app to issue v2 access tokens (`requestedAccessTokenVersion: 2`). A v2 token's `aud` is the API app client ID GUID, so set both `LEVYTATE_ENTRA_CLIENT_ID` and `LEVYTATE_ENTRA_AUDIENCE` to that GUID. The scope request remains `api://<client-id>/LevyTate.Read`; the Application ID URI is not the accepted `aud` value.
+4. Authorise or preauthorise the Microsoft Enterprise token store client application under **Expose an API** for `LevyTate.Read`. Its documented client ID is `ab3be6b7-f5df-413d-ac2d-abf1e3fd9c0b`. Configure this value in `LEVYTATE_ENTRA_ALLOWED_CLIENT_ID` only after the actual pilot token has confirmed that it is the intended `azp`.
+5. Add `https://teams.microsoft.com/api/platform/v1.0/oAuthConsentRedirect` as the Entra Web redirect URI used by the Microsoft SSO consent flow.
+6. Register the SSO client in the Teams Developer Portal using the exact MCP base URL and record the generated SSO registration ID. Do not place secrets or access tokens in the app package.
+7. Configure the custom federated connector in the Microsoft 365 admin centre with the exact MCP endpoint and the SSO registration ID. Roll it out only to the named pilot test user.
+8. Configure access-token optional claims only where needed for the first JIT email hint. Email, UPN and `preferred_username` are mutable and must never be the durable identity key.
+9. Record the external tenant ID against exactly one LevyTate organisation. Do not encode tenant IDs in application code or environment variables.
 
-The API validates the JWT signature using Microsoft signing keys, the exact tenant-specific v2 issuer, exact audience, `exp`, `nbf`, `iat`, `tid`, `oid` and `sub`. Only `tid + oid` is durable. Tokens are held only for request verification and are never logged, persisted or copied into audit metadata.
+The API validates the JWT signature using Microsoft signing keys, the exact tenant-specific v2 issuer, the client-ID GUID audience, `exp`, `nbf`, `iat`, `tid`, `oid`, `sub`, `ver = 2.0` and delegated `scp`. App-only tokens do not contain `scp` and are denied. If `LEVYTATE_ENTRA_ALLOWED_CLIENT_ID` is configured, the exact v2 `azp` is also required. Only `tid + oid` is durable. Tokens are held only for request verification and are never logged, persisted or copied into audit metadata.
+
+### Audience, scope and caller are distinct
+
+- **Audience (`aud`)** identifies the LevyTate API receiving the v2 token. It is the API app's client ID GUID.
+- **Scope (`scp`)** authorises delegated user access. It must include `LevyTate.Read`; application-role (`roles`) tokens do not satisfy this check.
+- **Authorised party (`azp`)** identifies the client application that obtained the token. The optional server allowlist can bind the pilot to the confirmed Microsoft Enterprise token store client.
 
 ## External identity binding
 
@@ -101,7 +112,7 @@ All tools advertise `readOnlyHint: true`, `destructiveHint: false`, `idempotentH
 
 There is no raw table query, SQL tool, search-across-tenants tool, mutation tool, Copilot write action or Platform Admin override. Returned records are explicit projections rather than raw database rows. Limits are capped at 50 records.
 
-Links are generated on the server from the fixed configured base URL and known LevyTate routes. User input cannot select a host.
+Links are generated on the server from `LEVYTATE_APP_BASE_URL` and known LevyTate routes. The MCP service independently validates its host against `LEVYTATE_MCP_BASE_URL`. User and tool input cannot select either host, and an absolute, protocol-relative or non-HTTP URL falls back to the safe LevyTate application route.
 
 ## Rate limiting, audit and diagnostics
 
@@ -118,7 +129,7 @@ The Employer Admin Settings view exposes only a restrained connection status, di
 
 ## Failure behaviour
 
-- Missing/invalid/expired/wrong-audience/wrong-issuer tokens: `401` or a safe MCP tool error.
+- Missing/invalid/expired/wrong-audience/wrong-issuer/wrong-scope/wrong-caller tokens: `401` or a safe MCP tool error. Responses do not reveal the expected audience, scope or caller.
 - Unconnected/suspended tenant, disabled organisation or invalid binding: `403` with a generic message.
 - Unsupported role or out-of-scope record: denied/not found without confirming cross-tenant existence.
 - Rate limit exceeded: `429`.
@@ -143,15 +154,22 @@ The current LevyTate public privacy, terms and support routes provide a foundati
 
 ## Controlled rollout checklist
 
-1. Approve and apply migration `031` through the migration process.
-2. Configure non-Production server variables and keep the global gate off.
-3. Create an isolated fictional employer organisation and test users.
-4. Insert one inactive connection, verify fail-closed behaviour, then activate it with explicit approval.
-5. Enable the organisation capability only for that workspace.
-6. Test signature, issuer, audience, expiry, tenant and identity failure cases.
-7. Test all four employer roles plus Platform Admin and provider-user denial.
-8. Run the MCP initialize → tools/list → tools/call contract test from a Microsoft-compatible client.
-9. Confirm audit records and verify that no token, tool payload or result is persisted.
-10. Complete legal/security review and only then stage the Microsoft 365 connector to a controlled group.
+1. Confirm the Entra app is single-tenant for the pilot and uses access-token version 2.
+2. Confirm the Application ID URI is `api://<client-id>` and expose the delegated `LevyTate.Read` scope.
+3. Authorise or preauthorise the Microsoft Enterprise token store client for that delegated scope.
+4. Register the Teams/Microsoft consent redirect URI exactly as documented above.
+5. Create the Teams Developer Portal SSO registration against the exact public MCP base URL and record its SSO registration ID.
+6. Set the non-secret client-ID GUID as both `LEVYTATE_ENTRA_CLIENT_ID` and `LEVYTATE_ENTRA_AUDIENCE`; set `LEVYTATE_ENTRA_REQUIRED_SCOPE=LevyTate.Read`.
+7. Inspect one controlled pilot token before enabling `LEVYTATE_ENTRA_ALLOWED_CLIENT_ID`; then set it only to the confirmed caller client ID.
+8. Configure the Microsoft 365 admin centre custom federated connector with the exact MCP endpoint and SSO registration ID.
+9. Restrict staged rollout to one approved pilot test user. Do not connect a real customer organisation.
+10. Insert one inactive fictional tenant connection, verify fail-closed behaviour, then activate it with explicit approval.
+11. Enable the organisation capability only for that fictional pilot workspace.
+12. Test signature, issuer, GUID audience, delegated scope, optional caller, expiry, tenant and identity failure cases.
+13. Test all four employer roles plus Platform Admin and provider-user denial.
+14. Run the MCP initialize → tools/list → tools/call contract test from a Microsoft-compatible client.
+15. Confirm returned links use the protected LevyTate app origin rather than the public MCP host.
+16. Confirm audit records and verify that no token, tool payload or result is persisted.
+17. Complete legal/security review and only then stage the Microsoft 365 connector to the controlled group.
 
 Production activation is a separate approved change. It must never be inferred from deployment of this foundation.

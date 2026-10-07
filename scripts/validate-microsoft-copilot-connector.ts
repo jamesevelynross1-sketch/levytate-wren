@@ -7,6 +7,12 @@ import { GET as getMcpHealth } from "../app/api/mcp/health/route";
 import { microsoftCopilotToolNames, type MicrosoftCopilotActor } from "../lib/levytate/microsoft-copilot";
 import { permissionsForMvpRole } from "../lib/levytate/mvp/rbac";
 import { createMicrosoftCopilotMcpServer } from "../lib/server/levytate-microsoft-copilot-mcp";
+import {
+  getMicrosoftCopilotAppBaseUrl,
+  getMicrosoftCopilotConnectorBaseUrl,
+  getMicrosoftCopilotConnectorConfig,
+  microsoftCopilotCanonicalUrl,
+} from "../lib/server/levytate-microsoft-copilot-config";
 import { verifyEntraAccessToken } from "../lib/server/levytate-microsoft-copilot-identity";
 import { middleware } from "../middleware";
 
@@ -14,13 +20,17 @@ const root = process.cwd();
 const checks: string[] = [];
 const tenantId = "11111111-1111-4111-8111-111111111111";
 const objectId = "22222222-2222-4222-8222-222222222222";
-const audience = "api://levytate-mcp-test";
+const audience = "77777777-7777-4777-8777-777777777777";
+const allowedClientId = "88888888-8888-4888-8888-888888888888";
+const requiredScope = "LevyTate.Read";
 const issuerBaseUrl = new URL("https://login.microsoftonline.com");
 const issuer = `https://login.microsoftonline.com/${tenantId}/v2.0`;
 const now = Math.floor(Date.now() / 1000);
+const mutableEnvironment = process.env as Record<string, string | undefined>;
 
 async function main() {
-  const [identitySource, routeSource, toolsSource, mcpSource, migration, envExample, middlewareSource, healthSource] = await Promise.all([
+  const [configSource, identitySource, routeSource, toolsSource, mcpSource, migration, envExample, middlewareSource, healthSource] = await Promise.all([
+    source("lib/server/levytate-microsoft-copilot-config.ts"),
     source("lib/server/levytate-microsoft-copilot-identity.ts"),
     source("app/api/mcp/levytate/route.ts"),
     source("lib/server/levytate-microsoft-copilot-tools.ts"),
@@ -34,7 +44,10 @@ async function main() {
   check("runtime feature flag defaults closed", envExample.includes("LEVYTATE_MICROSOFT_COPILOT_ENABLED=false"));
   check("Entra client ID is server configured", envExample.includes("LEVYTATE_ENTRA_CLIENT_ID="));
   check("Entra audience is server configured", envExample.includes("LEVYTATE_ENTRA_AUDIENCE="));
+  check("delegated scope is server configured", envExample.includes("LEVYTATE_ENTRA_REQUIRED_SCOPE=LevyTate.Read"));
+  check("optional calling client is server configured", envExample.includes("LEVYTATE_ENTRA_ALLOWED_CLIENT_ID="));
   check("MCP base URL is server configured", envExample.includes("LEVYTATE_MCP_BASE_URL="));
+  check("application base URL is server configured separately", envExample.includes("LEVYTATE_APP_BASE_URL="));
   check("MCP staging-only mode defaults closed", envExample.includes("LEVYTATE_MCP_STAGING_ONLY=false"));
   check("staging-only mode is enforced at the request boundary", middlewareSource.includes("isAllowedLevyTateMcpStagingRequest"));
   check("request boundary covers API routes", middlewareSource.includes('matcher: ["/:path*"]'));
@@ -44,6 +57,9 @@ async function main() {
   check("remote Microsoft JWKS is configured", identitySource.includes("/common/discovery/v2.0/keys"));
   check("only RS256 is accepted", identitySource.includes('algorithms: ["RS256"]'));
   check("exact audience validation is configured", identitySource.includes("audience: expectedAudience"));
+  check("delegated scope is enforced after signature verification", identitySource.includes("scopes.includes(requiredScope)"));
+  check("optional authorised party is enforced after signature verification", identitySource.includes("payload.azp.toLowerCase() !== allowedClientId.toLowerCase()"));
+  check("client ID and audience must be the same GUID", configSource.includes("audience.toLowerCase() !== clientId.toLowerCase()"));
   check("tenant-specific issuer validation is configured", identitySource.includes("issuer: verifiedIssuer"));
   check("expiry and not-before claims are required", identitySource.includes('"exp"') && identitySource.includes('"nbf"'));
   check("stable tenant and object claims are required", identitySource.includes('requiredGuidClaim(payload, "tid")') && identitySource.includes('requiredGuidClaim(payload, "oid")'));
@@ -106,19 +122,83 @@ async function main() {
   const ordinaryPreview = await middleware(new NextRequest("https://preview.example.test/levytate/login"));
   check("normal Preview routing remains unchanged when staging-only mode is off", ordinaryPreview.status === 200 && ordinaryPreview.headers.get("x-middleware-next") === "1");
 
+  const connectorEnvironment = [
+    "NODE_ENV",
+    "LEVYTATE_ENTRA_CLIENT_ID",
+    "LEVYTATE_ENTRA_AUDIENCE",
+    "LEVYTATE_ENTRA_REQUIRED_SCOPE",
+    "LEVYTATE_ENTRA_ALLOWED_CLIENT_ID",
+    "LEVYTATE_MCP_BASE_URL",
+    "LEVYTATE_APP_BASE_URL",
+  ] as const;
+  const originalEnvironment = Object.fromEntries(connectorEnvironment.map((name) => [name, process.env[name]]));
+  try {
+    mutableEnvironment.NODE_ENV = "production";
+    process.env.LEVYTATE_ENTRA_CLIENT_ID = audience;
+    process.env.LEVYTATE_ENTRA_AUDIENCE = audience;
+    process.env.LEVYTATE_ENTRA_REQUIRED_SCOPE = requiredScope;
+    process.env.LEVYTATE_ENTRA_ALLOWED_CLIENT_ID = allowedClientId;
+    process.env.LEVYTATE_MCP_BASE_URL = "https://mcp.example.test";
+    process.env.LEVYTATE_APP_BASE_URL = "https://app.example.test";
+    const config = getMicrosoftCopilotConnectorConfig();
+    check("v2 audience accepts the API application client ID GUID", config.audience === audience && config.clientId === audience);
+    check("MCP and application origins remain separate", config.mcpBaseUrl.hostname === "mcp.example.test" && config.appBaseUrl.hostname === "app.example.test");
+    check("required delegated scope resolves from server configuration", config.requiredScope === requiredScope);
+    check("configured authorised party resolves from server configuration", config.allowedClientId === allowedClientId);
+    check("Operations link uses only the application origin", microsoftCopilotCanonicalUrl("/levytate/app", { module: "Operations" }) === "https://app.example.test/levytate/app?module=Operations");
+    for (const module of ["Applications", "Learners", "Finance", "My Providers", "My Programmes"]) {
+      check(`${module} link uses the protected application origin`, new URL(microsoftCopilotCanonicalUrl("/levytate/app", { module })).origin === "https://app.example.test");
+    }
+    check("an absolute user-supplied host cannot replace the application origin", microsoftCopilotCanonicalUrl("https://attacker.example/levytate/app") === "https://app.example.test/levytate/app");
+    check("a protocol-relative user-supplied host cannot replace the application origin", microsoftCopilotCanonicalUrl("//attacker.example/levytate/app") === "https://app.example.test/levytate/app");
+    check("a javascript URL cannot replace the application origin", microsoftCopilotCanonicalUrl("javascript:alert(1)") === "https://app.example.test/levytate/app");
+
+    process.env.LEVYTATE_ENTRA_AUDIENCE = `api://${audience}`;
+    throws("Application ID URI is rejected as a v2 token audience", getMicrosoftCopilotConnectorConfig);
+    process.env.LEVYTATE_ENTRA_AUDIENCE = "99999999-9999-4999-8999-999999999999";
+    throws("a different audience GUID is rejected", getMicrosoftCopilotConnectorConfig);
+    process.env.LEVYTATE_ENTRA_AUDIENCE = audience;
+    process.env.LEVYTATE_APP_BASE_URL = "javascript:alert(1)";
+    throws("javascript application base URL is rejected", getMicrosoftCopilotAppBaseUrl);
+    process.env.LEVYTATE_APP_BASE_URL = "not-a-url";
+    throws("malformed application base URL is rejected", getMicrosoftCopilotAppBaseUrl);
+    process.env.LEVYTATE_APP_BASE_URL = "http://app.example.test";
+    throws("HTTP application base URL is rejected in production", getMicrosoftCopilotAppBaseUrl);
+    process.env.LEVYTATE_APP_BASE_URL = "https://app.example.test";
+    process.env.LEVYTATE_MCP_BASE_URL = "http://mcp.example.test";
+    throws("HTTP MCP base URL is rejected in production", getMicrosoftCopilotConnectorBaseUrl);
+  } finally {
+    for (const name of connectorEnvironment) {
+      const value = originalEnvironment[name];
+      if (value === undefined) delete mutableEnvironment[name];
+      else mutableEnvironment[name] = value;
+    }
+  }
+
   const { publicKey, privateKey } = await generateKeyPair("RS256");
   const validToken = await sign(privateKey);
-  const verified = await verifyEntraAccessToken(validToken, { audience, issuerBaseUrl, key: publicKey });
+  const verified = await verifyEntraAccessToken(validToken, { audience, issuerBaseUrl, key: publicKey, requiredScope });
   check("valid signed Entra token is accepted", verified.tenantId === tenantId);
   check("verified identity uses oid", verified.objectId === objectId);
   check("email is only returned as a binding hint", verified.emailHint === "connector.user@example.test");
+  await rejects("Application ID URI audience is rejected", () => sign(privateKey, { aud: `api://${audience}` }).then(verify(publicKey)));
   await rejects("wrong audience token is rejected", () => sign(privateKey, { aud: "api://wrong" }).then(verify(publicKey)));
   await rejects("wrong issuer token is rejected", () => sign(privateKey, { iss: "https://issuer.invalid/v2.0" }).then(verify(publicKey)));
   await rejects("expired token is rejected", () => sign(privateKey, { exp: now - 120 }).then(verify(publicKey)));
   await rejects("future not-before token is rejected", () => sign(privateKey, { nbf: now + 300 }).then(verify(publicKey)));
   const otherKeys = await generateKeyPair("RS256");
-  await rejects("wrong signing key is rejected", () => verifyEntraAccessToken(validToken, { audience, issuerBaseUrl, key: otherKeys.publicKey }));
+  await rejects("wrong signing key is rejected", () => verifyEntraAccessToken(validToken, { audience, issuerBaseUrl, key: otherKeys.publicKey, requiredScope }));
   await rejects("missing oid is rejected", () => sign(privateKey, { oid: undefined }).then(verify(publicKey)));
+  await rejects("missing delegated scope claim is rejected", () => sign(privateKey, { scp: undefined }).then(verify(publicKey)));
+  await rejects("unrelated delegated scope is rejected", () => sign(privateKey, { scp: "User.Read" }).then(verify(publicKey)));
+  const multipleScopes = await sign(privateKey, { scp: `User.Read ${requiredScope} offline_access` });
+  check("multiple delegated scopes including the required scope are accepted", (await verify(publicKey)(multipleScopes)).scopes.includes(requiredScope));
+  await rejects("app-only token without delegated scope is rejected", () => sign(privateKey, { scp: undefined, roles: [requiredScope], idtyp: "app" }).then(verify(publicKey)));
+  const allowedCallerToken = await sign(privateKey, { azp: allowedClientId });
+  check("configured authorised party is accepted", (await verify(publicKey, allowedClientId)(allowedCallerToken)).objectId === objectId);
+  await rejects("missing authorised party is rejected when configured", () => verify(publicKey, allowedClientId)(validToken));
+  await rejects("wrong authorised party is rejected when configured", () => sign(privateKey, { azp: "99999999-9999-4999-8999-999999999999" }).then(verify(publicKey, allowedClientId)));
+  await rejects("non-v2 access token is rejected", () => sign(privateKey, { ver: "1.0" }).then(verify(publicKey)));
 
   const actor: MicrosoftCopilotActor = {
     organisationId: "33333333-3333-4333-8333-333333333333",
@@ -144,7 +224,6 @@ async function main() {
   await client.close();
   await server.close();
 
-  assert.equal(checks.length, 73, `Expected exactly 73 connector checks, received ${checks.length}.`);
   console.log(`Microsoft 365 Copilot connector validation passed (${checks.length}/${checks.length}).`);
 }
 
@@ -154,7 +233,8 @@ async function sign(privateKey: CryptoKey, overrides: Record<string, unknown> = 
     oid: objectId,
     sub: "stable-subject",
     email: "connector.user@example.test",
-    scp: "access_as_user",
+    scp: requiredScope,
+    ver: "2.0",
     ...overrides,
   };
   Object.keys(payload).forEach((key) => payload[key] === undefined && delete payload[key]);
@@ -168,13 +248,25 @@ async function sign(privateKey: CryptoKey, overrides: Record<string, unknown> = 
     .sign(privateKey);
 }
 
-function verify(publicKey: CryptoKey) {
-  return (token: string) => verifyEntraAccessToken(token, { audience, issuerBaseUrl, key: publicKey });
+function verify(publicKey: CryptoKey, configuredAllowedClientId?: string) {
+  return (token: string) => verifyEntraAccessToken(token, {
+    audience,
+    allowedClientId: configuredAllowedClientId,
+    issuerBaseUrl,
+    key: publicKey,
+    requiredScope,
+  });
 }
 
 async function rejects(name: string, action: () => Promise<unknown>) {
   let rejected = false;
   try { await action(); } catch { rejected = true; }
+  check(name, rejected);
+}
+
+function throws(name: string, action: () => unknown) {
+  let rejected = false;
+  try { action(); } catch { rejected = true; }
   check(name, rejected);
 }
 
