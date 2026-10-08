@@ -1,0 +1,45 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/teams/v1.30/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.30",
+  "version": "1.0.0",
+  "id": "259dd8b4-5958-4c2c-8f77-38a93ef7634d",
+  "developer": {
+    "name": "Control My Costs Ltd (LevyTate)",
+    "websiteUrl": "https://www.levytate.co.uk/",
+    "privacyUrl": "https://www.levytate.co.uk/privacy",
+    "termsOfUseUrl": "https://www.levytate.co.uk/early-access-terms"
+  },
+  "name": {
+    "short": "LevyTate",
+    "full": "LevyTate"
+  },
+  "description": {
+    "short": "Live apprenticeship intelligence in Microsoft 365 Copilot.",
+    "full": "LevyTate gives authorised apprenticeship teams live, permission-aware access to their apprenticeship operation directly through Microsoft 365 Copilot, including learners, applications, reviews, operational priorities, programmes, providers and levy information."
+  },
+  "icons": {
+    "color": "assets/color.png",
+    "outline": "assets/outline.png"
+  },
+  "accentColor": "#17325C",
+  "publisherDocsUrl": "https://www.levytate.co.uk/support",
+  "validDomains": [
+    "levytate-mcp-staging.vercel.app"
+  ],
+  "agentConnectors": [
+    {
+      "id": "levytate-mcp-staging",
+      "displayName": "LevyTate",
+      "description": "Read-only, permission-aware apprenticeship intelligence from LevyTate.",
+      "toolSource": {
+        "remoteMcpServer": {
+          "mcpServerUrl": "https://levytate-mcp-staging.vercel.app/api/mcp/levytate",
+          "authorization": {
+            "type": "OAuthPluginVault",
+            "referenceId": "YzU2NzM5ZDAtY2ExZi00NDVhLWI0MDMtMjk4OTlmY2U2ZTVmIyNmODg0NTllMC00NmM3LTRhOTItYTlhYS0wZDg3NWQ1NjFjNWE="
+          }
+        }
+      }
+    }
+  ]
+}

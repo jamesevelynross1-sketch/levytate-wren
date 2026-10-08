@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "package:microsoft-copilot": "node scripts/build-levytate-microsoft-copilot-package.mjs",
     "start": "next start",
     "prospect:sandbox": "node scripts/prospect-sandbox.mjs",
     "validate:prospect-sandbox": "node scripts/validate-prospect-sandbox.mjs",
