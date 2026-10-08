@@ -46,6 +46,7 @@ import { ProviderIntelligenceModule } from "@/components/levytate-mvp/ProviderIn
 import { ProvidersModule } from "@/components/levytate-mvp/ProvidersModule";
 import { ReportsModule } from "@/components/levytate-mvp/ReportsModule";
 import { RolesModule } from "@/components/levytate-mvp/RolesModule";
+import { LevyTateDesktopAppPanel } from "@/components/levytate-pwa/LevyTatePwa";
 import type { LevyTateWorkspaceBootstrap } from "@/lib/levytate/mvp/api";
 import { getCoreEarlyAccessPolicy, resolveCoreEarlyAccessRouteAccess, type CoreEarlyAccessNavigationGroup } from "@/lib/levytate/core-early-access-policy";
 import type { ManagerDirectReportLearnerDetail } from "@/lib/levytate/mvp/manager-learner-detail";
@@ -87,7 +88,7 @@ const modules = [
 type ModuleName = (typeof modules)[number]["name"];
 type PeopleView = "Employees" | "Roles";
 type ProviderView = "Programmes" | "Relationships";
-type SettingsView = "Workspace" | "Early Access";
+type SettingsView = "Workspace" | "Desktop App" | "Early Access";
 
 const modulePermissions = {
   Home: "workspace:read",
@@ -126,6 +127,7 @@ const providerViewPermissions = {
 
 const settingsViewPermissions = {
   Workspace: "settings:read",
+  "Desktop App": "settings:read",
   "Early Access": "earlyAccess:manage",
 } as const satisfies Record<SettingsView, MvpPermission>;
 
@@ -192,7 +194,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
     .filter((entry) => entry.modules.length);
   const peopleItems = (["Employees", "Roles"] as PeopleView[]).filter((item) => can(peopleViewPermissions[item]));
   const providerItems = (["Programmes", "Relationships"] as ProviderView[]).filter((item) => can(providerViewPermissions[item]));
-  const settingsItems = (["Workspace", "Early Access"] as SettingsView[]).filter((item) => can(settingsViewPermissions[item]));
+  const settingsItems = (["Workspace", "Desktop App", "Early Access"] as SettingsView[]).filter((item) => can(settingsViewPermissions[item]));
   const moduleBadges = useMemo(() => ({
     People: notifications.filter((item) => item.module === "Applications" || item.module === "Enrolments").length,
     Providers: notifications.filter((item) => item.module === "Provider Relationships").length,
@@ -550,6 +552,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
             {activeModule === "Settings" ? (
               <ModuleStackNav items={settingsItems} active={settingsView} onSelect={(item) => setSettingsView(item as SettingsView)}>
                 {settingsView === "Workspace" ? <SettingsModule /> : null}
+                {settingsView === "Desktop App" ? <LevyTateDesktopAppPanel /> : null}
                 {settingsView === "Early Access" ? <div className="grid gap-5"><ProspectAccessAdminModule /><EarlyAccessModule /></div> : null}
               </ModuleStackNav>
             ) : null}
