@@ -5,6 +5,7 @@ import { generateKeyPair, SignJWT } from "jose";
 import { NextRequest } from "next/server";
 import { GET as getMcpHealth } from "../app/api/mcp/health/route";
 import { microsoftCopilotToolNames, type MicrosoftCopilotActor } from "../lib/levytate/microsoft-copilot";
+import { buildMicrosoftCopilotOperationsPortfolio } from "../lib/levytate/microsoft-copilot-portfolio";
 import { permissionsForMvpRole } from "../lib/levytate/mvp/rbac";
 import { createMicrosoftCopilotMcpServer } from "../lib/server/levytate-microsoft-copilot-mcp";
 import {
@@ -78,6 +79,10 @@ async function main() {
   check("tools advertise read-only annotations", mcpSource.includes("readOnlyHint: true"));
   check("tools advertise non-destructive annotations", mcpSource.includes("destructiveHint: false"));
   check("tool result lists are capped at 50", toolsSource.includes("boundedLimit(args.limit, 20, 50)"));
+  check("Operations Brief retains its existing attention summary", toolsSource.includes("brief: workspace.brief") && toolsSource.includes("topAttention") && toolsSource.includes("openSignalCount"));
+  check("Operations Brief now includes the deterministic portfolio summary", toolsSource.includes("portfolio: buildMicrosoftCopilotOperationsPortfolio"));
+  check("Microsoft Operations reads use the durable actor path", toolsSource.includes("getAutopilotWorkspaceForMicrosoftCopilotActor(actor)") && !toolsSource.includes("getAutopilotWorkspace(session)"));
+  check("Operations Brief description covers portfolio and operational attention", mcpSource.includes("apprenticeship portfolio position") && mcpSource.includes("current operational attention"));
   check("Line Manager actions use read-only direct-report service", toolsSource.includes("listManagerDirectReportOperationalActionsReadOnly"));
   check("learner detail reuses lifecycle service", toolsSource.includes("getOrganisationLearnerLifecycleRecordDetail"));
   check("Finance reuses existing Finance service", toolsSource.includes("getOrganisationFinanceState"));
@@ -100,6 +105,8 @@ async function main() {
     "levytate_external_connector_events",
   ].every((table) => migration.includes(`revoke all on table public.${table} from public, anon, authenticated`)));
   check("audit table is explicitly append-only for service role", migration.includes("revoke all privileges on table public.levytate_external_connector_events from service_role") && migration.includes("grant select, insert on table public.levytate_external_connector_events to service_role"));
+
+  validateOperationsPortfolio();
 
   const originalStagingOnly = process.env.LEVYTATE_MCP_STAGING_ONLY;
   process.env.LEVYTATE_MCP_STAGING_ONLY = "true";
@@ -146,8 +153,8 @@ async function main() {
     check("required delegated scope resolves from server configuration", config.requiredScope === requiredScope);
     check("configured authorised party resolves from server configuration", config.allowedClientId === allowedClientId);
     check("Operations link uses only the application origin", microsoftCopilotCanonicalUrl("/levytate/app", { module: "Operations" }) === "https://app.example.test/levytate/app?module=Operations");
-    for (const module of ["Applications", "Learners", "Finance", "My Providers", "My Programmes"]) {
-      check(`${module} link uses the protected application origin`, new URL(microsoftCopilotCanonicalUrl("/levytate/app", { module })).origin === "https://app.example.test");
+    for (const moduleName of ["Applications", "Learners", "Finance", "My Providers", "My Programmes"]) {
+      check(`${moduleName} link uses the protected application origin`, new URL(microsoftCopilotCanonicalUrl("/levytate/app", { module: moduleName })).origin === "https://app.example.test");
     }
     check("an absolute user-supplied host cannot replace the application origin", microsoftCopilotCanonicalUrl("https://attacker.example/levytate/app") === "https://app.example.test/levytate/app");
     check("a protocol-relative user-supplied host cannot replace the application origin", microsoftCopilotCanonicalUrl("//attacker.example/levytate/app") === "https://app.example.test/levytate/app");
@@ -291,6 +298,86 @@ function sameMembers(left: string[], right: string[]) {
 
 function occurrences(value: string, search: string) {
   return value.split(search).length - 1;
+}
+
+function validateOperationsPortfolio() {
+  const today = "2026-10-08";
+  const input = {
+    learnerRecords: [
+      learner("learner-1", "application-live", "programme-1", "enrolled"),
+      learner("learner-2", "application-complete-2", "programme-1", "break_in_learning"),
+      learner("learner-3", "application-complete-3", "programme-2", "assessment_preparation"),
+      learner("learner-4", "application-complete-4", "programme-3", "in_assessment"),
+      learner("learner-5", "application-pre", "programme-3", "pre_enrolment"),
+      learner("learner-6", "application-achieved", "programme-3", "achieved"),
+      { ...learner("learner-7", "application-archived", "programme-3", "enrolled"), recordStatus: "Archived" },
+    ],
+    applications: [
+      application("application-live", "Approved for Enrolment"),
+      application("application-pipeline-1", "Awaiting Manager Review"),
+      application("application-pipeline-2", "Approved for Enrolment"),
+      application("application-terminal", "Completed"),
+    ],
+    learnerReviews: [
+      review("review-1-old", "learner-1", "2026-08-01", "2026-10-10"),
+      review("review-1-latest", "learner-1", "2026-09-01", "2026-10-30"),
+      review("review-2-old", "learner-2", "2026-08-15", "2026-10-11"),
+      review("review-2-latest", "learner-2", "2026-09-15", "2026-10-12"),
+      review("review-3", "learner-3", "2026-09-20", "2026-10-22"),
+      review("review-4", "learner-4", "2026-09-20", "2026-10-23"),
+      { ...review("review-cancelled", "learner-4", "2026-09-21", "2026-10-09"), status: "cancelled" },
+    ],
+    organisationProviders: [
+      { providerId: "provider-1", status: "Active" },
+      { providerId: "provider-2", status: "Active" },
+      { providerId: "provider-3", status: "Inactive" },
+    ],
+    organisationProgrammes: [
+      { programmeId: "programme-1", providerId: "provider-1", status: "Active" },
+      { programmeId: "programme-2", providerId: "provider-1", status: "Active" },
+      { programmeId: "programme-3", providerId: "provider-2", status: "Active" },
+      { programmeId: "programme-hidden", providerId: "provider-3", status: "Inactive" },
+    ],
+    providerProgrammes: [
+      { id: "programme-1", programmeName: "AI & Automation Practitioner" },
+      { id: "programme-2", programmeName: "Data Analyst" },
+      { id: "programme-3", programmeName: "Team Leader" },
+    ],
+  } as unknown as Parameters<typeof buildMicrosoftCopilotOperationsPortfolio>[0];
+  const portfolio = buildMicrosoftCopilotOperationsPortfolio(input, today);
+  check("portfolio counts active learner lifecycle states only", portfolio.activeLearners === 4);
+  check("portfolio counts non-terminal applications without live learner records", portfolio.preEnrolmentApplications === 2);
+  check("portfolio counts each active learner's latest due provider review once", portfolio.providerReviewsDueNext14Days === 2);
+  check("portfolio counts active organisation provider selections", portfolio.selectedProviderCount === 2);
+  check("portfolio counts active organisation programme selections", portfolio.selectedProgrammeCount === 3);
+  check("portfolio aggregates programme mix without learner detail", JSON.stringify(portfolio.programmeMix) === JSON.stringify([
+    { programmeName: "AI & Automation Practitioner", activeLearnerCount: 2 },
+    { programmeName: "Data Analyst", activeLearnerCount: 1 },
+    { programmeName: "Team Leader", activeLearnerCount: 1 },
+  ]));
+  check("portfolio contains no learner PII fields", !/employee|email|learnerName|manager/i.test(JSON.stringify(portfolio)));
+  const empty = buildMicrosoftCopilotOperationsPortfolio({ applications: [], learnerRecords: [], learnerReviews: [], organisationProviders: [], organisationProgrammes: [], providerProgrammes: [] }, today);
+  check("portfolio zero-data behaviour is stable", Object.values({ ...empty, programmeMix: undefined }).every((value) => value === 0 || value === undefined) && empty.programmeMix.length === 0);
+
+  const manyProgrammes = Array.from({ length: 25 }, (_, index) => ({ id: `bounded-${index}`, programmeName: `Programme ${String(index).padStart(2, "0")}` }));
+  const bounded = buildMicrosoftCopilotOperationsPortfolio({
+    applications: [], learnerReviews: [], organisationProviders: [], organisationProgrammes: [],
+    providerProgrammes: manyProgrammes,
+    learnerRecords: manyProgrammes.map((programme, index) => learner(`bounded-learner-${index}`, `bounded-application-${index}`, programme.id, "enrolled")),
+  } as unknown as Parameters<typeof buildMicrosoftCopilotOperationsPortfolio>[0], today);
+  check("programme mix is bounded", bounded.programmeMix.length === 20);
+}
+
+function learner(id: string, applicationId: string, programmeId: string, lifecycleStatus: string) {
+  return { id, applicationId, programmeId, lifecycleStatus, recordStatus: "Active" };
+}
+
+function application(id: string, status: string) {
+  return { id, status };
+}
+
+function review(id: string, learnerRecordId: string, reviewDate: string, nextReviewDate: string) {
+  return { id, learnerRecordId, reviewType: "provider_review", reviewDate, nextReviewDate, status: "completed", updatedAt: `${reviewDate}T09:00:00.000Z` };
 }
 
 function source(path: string) {

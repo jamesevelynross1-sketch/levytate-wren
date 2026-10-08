@@ -3,9 +3,10 @@ import {
   type MicrosoftCopilotActor,
   type MicrosoftCopilotToolName,
 } from "@/lib/levytate/microsoft-copilot";
+import { buildMicrosoftCopilotOperationsPortfolio } from "@/lib/levytate/microsoft-copilot-portfolio";
 import { getApprenticeshipStandard } from "@/lib/levytate/domain";
 import { hasMvpPermission } from "@/lib/levytate/mvp/rbac";
-import { getAutopilotWorkspace } from "@/lib/server/levytate-autopilot";
+import { getAutopilotWorkspaceForMicrosoftCopilotActor } from "@/lib/server/levytate-autopilot";
 import { getOrganisationFinanceState } from "@/lib/server/levytate-finance";
 import { getOrganisationLearnerLifecycleRecordDetail } from "@/lib/server/levytate-learner-lifecycle";
 import {
@@ -60,7 +61,10 @@ async function dispatchTool(actor: MicrosoftCopilotActor, toolName: MicrosoftCop
   switch (toolName) {
     case "get_operations_brief": {
       requireOrganisationOperationsRole(actor);
-      const workspace = await getAutopilotWorkspace(session);
+      const [workspace, { data }] = await Promise.all([
+        getAutopilotWorkspaceForMicrosoftCopilotActor(actor),
+        getWorkspaceBootstrapForMicrosoftCopilotActor(actor),
+      ]);
       const topAttention = Object.values(workspace.lanes)
         .flat()
         .filter((signal) => !["resolved", "dismissed"].includes(signal.status))
@@ -68,6 +72,7 @@ async function dispatchTool(actor: MicrosoftCopilotActor, toolName: MicrosoftCop
         .map((signal) => ({ title: signal.title, priority: signal.priority, nextStep: signal.recommendedAction }));
       return {
         generatedAt: workspace.generatedAt,
+        portfolio: buildMicrosoftCopilotOperationsPortfolio(data, workspace.generatedAt.slice(0, 10)),
         brief: workspace.brief,
         topAttention,
         openSignalCount: Object.values(workspace.lanes).flat().filter((signal) => !["resolved", "dismissed"].includes(signal.status)).length,
@@ -76,7 +81,7 @@ async function dispatchTool(actor: MicrosoftCopilotActor, toolName: MicrosoftCop
     }
     case "list_autopilot_signals": {
       requireOrganisationOperationsRole(actor);
-      const workspace = await getAutopilotWorkspace(session);
+      const workspace = await getAutopilotWorkspaceForMicrosoftCopilotActor(actor);
       const lane = optionalText(args.lane);
       const priority = optionalText(args.priority);
       const limit = boundedLimit(args.limit, 20, 50);

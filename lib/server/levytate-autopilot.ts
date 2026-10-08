@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { MicrosoftCopilotActor } from "@/lib/levytate/microsoft-copilot";
 import type { LevyTateBetaSession } from "@/lib/levytate/config/beta-access";
 import { interpretAutopilotSignal } from "@/lib/levytate/autopilot/ai";
 import {
@@ -17,7 +18,7 @@ import type { OperationalOwnerType, OperationalPriorityLevel } from "@/lib/levyt
 import { getLearnerLifecycleServerContext, listOrganisationLearnerLifecycleDetails, LevyTateLearnerLifecyclePermissionError } from "@/lib/server/levytate-learner-lifecycle";
 import { listOperationalActions } from "@/lib/server/levytate-operational-actions";
 import { getLevyTateSupabaseConfig, supabaseInsert, supabaseSelect, supabaseUpdate } from "@/lib/server/levytate-supabase";
-import { getWorkspaceBootstrapForSession } from "@/lib/server/levytate-workspace";
+import { getWorkspaceBootstrapForMicrosoftCopilotActor, getWorkspaceBootstrapForSession } from "@/lib/server/levytate-workspace";
 
 const signalsTable = "levytate_intelligence_signals";
 const eventsTable = "levytate_intelligence_signal_events";
@@ -40,6 +41,10 @@ type SignalRow = {
 
 type LearnerLinkRow = { employee_id: string; application_id: string };
 type ExistingActionRow = { id: string };
+type MicrosoftActionRow = {
+  id: string; learner_record_id: string | null; application_id: string; employee_id: string; title: string; description: string;
+  action_type: string; owner_type: OperationalOwnerType; due_date: string | null; status: string; source_url: string; updated_at: string;
+};
 
 export class LevyTateAutopilotError extends Error {
   constructor(message: string, public readonly status = 400) { super(message); this.name = "LevyTateAutopilotError"; }
@@ -48,6 +53,15 @@ export class LevyTateAutopilotError extends Error {
 export async function getAutopilotWorkspace(session: LevyTateBetaSession) {
   const context = await autopilotContext(session, false);
   const rows = await selectRows(context.organisation.id);
+  const cutoff = Date.now() - 14 * 86_400_000;
+  const signals = rows.map(fromRow).filter((signal) => signal.status !== "dismissed" && (signal.status !== "resolved" || Date.parse(signal.resolvedAt ?? "") >= cutoff));
+  return presentWorkspace(signals, new Date().toISOString());
+}
+
+export async function getAutopilotWorkspaceForMicrosoftCopilotActor(actor: MicrosoftCopilotActor) {
+  await getWorkspaceBootstrapForMicrosoftCopilotActor(actor);
+  assertMicrosoftCopilotAutopilotRole(actor, false);
+  const rows = await selectRows(actor.organisationId);
   const cutoff = Date.now() - 14 * 86_400_000;
   const signals = rows.map(fromRow).filter((signal) => signal.status !== "dismissed" && (signal.status !== "resolved" || Date.parse(signal.resolvedAt ?? "") >= cutoff));
   return presentWorkspace(signals, new Date().toISOString());
@@ -93,6 +107,60 @@ export async function refreshAutopilotWorkspace(session: LevyTateBetaSession) {
   }));
   const reconciled = reconcileAutopilotSignals(existing, enriched, now);
   await persistReconciliation(context.organisation.id, context.user.id, context.user.email, existing, reconciled);
+  return presentWorkspace(reconciled.filter((signal) => signal.status !== "dismissed"), now);
+}
+
+export async function refreshAutopilotWorkspaceForMicrosoftCopilotActor(actor: MicrosoftCopilotActor) {
+  assertMicrosoftCopilotAutopilotRole(actor, true);
+  const [{ data }, actionRows, existingRows] = await Promise.all([
+    getWorkspaceBootstrapForMicrosoftCopilotActor(actor),
+    supabaseSelect<MicrosoftActionRow>(requireConfig(), "levytate_operational_actions", new URLSearchParams({
+      select: "id,learner_record_id,application_id,employee_id,title,description,action_type,owner_type,due_date,status,source_url,updated_at",
+      organisation_id: `eq.${actor.organisationId}`,
+      order: "updated_at.desc",
+      limit: "1000",
+    })),
+    selectRows(actor.organisationId),
+  ]);
+  const now = new Date().toISOString();
+  const employees = new Map(data.employees.map((employee) => [employee.id, employee.name]));
+  const programmes = new Map(data.providerProgrammes.map((programme) => [programme.id, programme]));
+  const detected = analyseOperationsAutopilot({
+    organisationId: actor.organisationId,
+    now,
+    learners: data.learnerRecords.map((record) => {
+      const programme = programmes.get(record.programmeId);
+      return {
+        learnerRecordId: record.id,
+        learnerName: employees.get(record.employeeId) ?? "Employee",
+        providerId: record.providerId,
+        providerName: data.providers.find((provider) => provider.providerId === record.providerId)?.providerName ?? "Provider",
+        programmeId: record.programmeId,
+        programmeName: programme?.programmeName ?? "Programme",
+        reviews: data.learnerReviews
+          .filter((review) => review.learnerRecordId === record.id && ["provider_review", "l_and_d_check_in", "manager_check_in"].includes(review.reviewType))
+          .map((review) => ({ id: review.id, type: review.reviewType as "provider_review" | "l_and_d_check_in" | "manager_check_in", nextReviewDate: review.nextReviewDate, reviewDate: review.reviewDate, status: review.status })),
+      };
+    }),
+    actions: actionRows.map((action) => ({
+      id: action.id, learnerRecordId: action.learner_record_id ?? "", applicationId: action.application_id, employeeId: action.employee_id,
+      title: action.title, description: action.description, actionType: action.action_type, ownerType: action.owner_type,
+      dueDate: action.due_date ?? "", status: action.status, sourceUrl: action.source_url, updatedAt: action.updated_at,
+    })),
+    applications: data.applications.map((application) => ({
+      id: application.id, employeeId: application.employeeId, employeeName: employees.get(application.employeeId) ?? "Employee",
+      status: application.status, currentOwner: application.currentOwner, updatedAt: application.updatedAt,
+    })),
+  });
+  const existing = existingRows.map(fromRow);
+  const existingByKey = new Map(existing.map((signal) => [signal.signalKey, signal]));
+  const enriched = await Promise.all(detected.map(async (signal) => {
+    const prior = existingByKey.get(signal.signalKey);
+    if (prior && prior.fingerprint === signal.fingerprint) return { ...signal, interpretation: prior.interpretation };
+    return { ...signal, interpretation: await interpretAutopilotSignal(signal) };
+  }));
+  const reconciled = reconcileAutopilotSignals(existing, enriched, now);
+  await persistReconciliation(actor.organisationId, actor.userId, actor.email, existing, reconciled);
   return presentWorkspace(reconciled.filter((signal) => signal.status !== "dismissed"), now);
 }
 
@@ -163,6 +231,13 @@ async function autopilotContext(session: LevyTateBetaSession, write: boolean) {
     throw new LevyTateLearnerLifecyclePermissionError(`${role} cannot access organisation Operations Autopilot.`);
   }
   return context;
+}
+
+function assertMicrosoftCopilotAutopilotRole(actor: MicrosoftCopilotActor, write: boolean) {
+  const permission = write ? "operationalActions:write" : "operationalActions:read";
+  if (!["Employer Admin", "Apprenticeship Lead"].includes(actor.role) || !hasMvpPermission(actor.role, permission)) {
+    throw new LevyTateLearnerLifecyclePermissionError(`${actor.role} cannot access organisation Operations Autopilot.`);
+  }
 }
 
 async function persistReconciliation(organisationId: string, actorUserId: string, actorName: string, existing: AutopilotPersistedSignal[], reconciled: AutopilotPersistedSignal[]) {

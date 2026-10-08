@@ -37,7 +37,7 @@ export function createMicrosoftCopilotMcpServer(
 
   register(server, actor, correlationId, execute, "get_operations_brief", {
     title: "Get operations brief",
-    description: "Return the caller's current LevyTate operations brief and a link to Operations Centre.",
+    description: "Return the caller's apprenticeship portfolio position, enrolment pipeline, upcoming provider reviews, current operational attention and a link to Operations Centre.",
     inputSchema: noInput,
   });
   register(server, actor, correlationId, execute, "list_autopilot_signals", {
