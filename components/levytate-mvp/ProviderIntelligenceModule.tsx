@@ -55,7 +55,7 @@ export function ProviderIntelligenceModule({ onOpenProvider }: { onOpenProvider?
       {!loading && error ? <IntelligenceState title="Provider Intelligence is temporarily unavailable" copy={error} action="Try again" onAction={() => void load()} /> : null}
 
       {!loading && payload ? <>
-        {payload.stale ? <p className="mb-4 border-l-2 border-[#d6a62d] bg-[#fff8df] px-4 py-3 text-sm text-[#765b00]">Update pending. The most recent persisted provider articles remain available while sources refresh.</p> : null}
+        {payload.stale ? <p className="mb-4 border-l-2 border-[#d6a62d] bg-[#fff8df] px-4 py-3 text-sm text-[#765b00]">Provider intelligence may be out of date.{payload.refreshedAt ? ` Last successful refresh ${formatRelativeRefresh(payload.refreshedAt)}.` : " No source has refreshed successfully yet."}</p> : null}
         <section className="grid gap-5 border border-[#102c3d]/[0.10] bg-[#102c3d] p-6 text-white md:grid-cols-[1.4fr_1fr]">
           <div><p className="text-[10px] font-bold uppercase tracking-[.18em] text-[#82d7c8]">Morning brief</p><h3 className="mt-3 text-2xl font-semibold">{counts.updates} verified updates across {counts.providers} providers</h3></div>
           <dl className="grid grid-cols-2 gap-4">{[[counts.programmes, "programme updates"], [counts.guides, "employer guides"], [counts.providers, "providers covered"], [payload.sources.filter((source) => source.status === "needs-review").length, "sources to review"]].map(([value, label]) => <div key={String(label)} className="border-l border-white/[0.20] pl-4"><dt className="text-2xl font-semibold">{value}</dt><dd className="text-xs text-white/[0.55]">{label}</dd></div>)}</dl>
@@ -79,4 +79,11 @@ function IntelligenceState({ title, copy, action, onAction }: { title: string; c
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" }).format(new Date(value));
+}
+
+function formatRelativeRefresh(value: string) {
+  const elapsedDays = Math.max(0, Math.floor((Date.now() - Date.parse(value)) / (24 * 60 * 60 * 1000)));
+  if (elapsedDays === 0) return "today";
+  if (elapsedDays === 1) return "1 day ago";
+  return `${elapsedDays} days ago`;
 }

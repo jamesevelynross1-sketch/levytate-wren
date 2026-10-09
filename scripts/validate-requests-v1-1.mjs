@@ -195,11 +195,16 @@ check("27 employer selects exactly three providers", invitations.length === 3 &&
 check("28 invitations use UUID identifiers", invitations.every((invitation) => isUuid(invitation.id)));
 const duplicateInvitations = inviteProviders(store, leadA, request.id, [fixture.providers[0].providerId], {
   idempotencyKey: "duplicate-invite",
+  now: "2026-09-11T08:03:30.000Z",
 });
 check("29 duplicate provider invitation prevented", duplicateInvitations[0].id === invitations[0].id && store.invitations.length === 3);
 throwsCode(
   "30 maximum five-provider anti-spam boundary",
-  () => inviteProviders(store, leadA, request.id, ["provider-four", "provider-five", "provider-six"], { idempotencyKey: "too-many" }),
+  () =>
+    inviteProviders(store, leadA, request.id, ["provider-four", "provider-five", "provider-six"], {
+      idempotencyKey: "too-many",
+      now: "2026-09-11T08:03:45.000Z",
+    }),
   "provider_limit_exceeded",
 );
 check("31 configured provider limit is five", SERVICE_REQUEST_MAX_PROVIDERS === 5);
@@ -421,12 +426,17 @@ for (const membership of versionFixture.providerMemberships) addProviderMembersh
 const deadlineRequest = createServiceRequestDraft(deadlineStore, versionFixture.employerActors.leadA, {
   content: versionFixture.requestContent,
   idempotencyKey: "deadline-request",
+  now: "2026-09-11T09:00:00.000Z",
 });
 publishServiceRequest(deadlineStore, versionFixture.employerActors.leadA, deadlineRequest.id, {
   organisationName: versionFixture.organisationNames.employerA,
   idempotencyKey: "deadline-publish",
+  now: "2026-09-11T09:01:00.000Z",
 });
-const deadlineInvitation = inviteProviders(deadlineStore, versionFixture.employerActors.leadA, deadlineRequest.id, ["provider-qa"], { idempotencyKey: "deadline-invite" })[0];
+const deadlineInvitation = inviteProviders(deadlineStore, versionFixture.employerActors.leadA, deadlineRequest.id, ["provider-qa"], {
+  idempotencyKey: "deadline-invite",
+  now: "2026-09-11T09:02:00.000Z",
+})[0];
 deadlineInvitation.invitedProviderMembershipId = versionFixture.providerMemberships[0].id;
 recordInvitationDelivery(deadlineStore, versionFixture.employerActors.leadA, deadlineInvitation.id, { accepted: true, idempotencyKey: "deadline-send" });
 check("74 passed deadline marks access without deleting draft/history", markPastDeadlineInvitations(deadlineStore, "2026-10-02")[0].status === "deadline_passed");
@@ -441,10 +451,12 @@ const cancelStore = createEmptyServiceRequestStore(versionFixture.capabilities);
 const cancelRequest = createServiceRequestDraft(cancelStore, versionFixture.employerActors.leadA, {
   content: versionFixture.requestContent,
   idempotencyKey: "cancel-request",
+  now: "2026-09-11T09:00:00.000Z",
 });
 publishServiceRequest(cancelStore, versionFixture.employerActors.leadA, cancelRequest.id, {
   organisationName: versionFixture.organisationNames.employerA,
   idempotencyKey: "cancel-publish",
+  now: "2026-09-11T09:01:00.000Z",
 });
 cancelServiceRequest(cancelStore, versionFixture.employerActors.leadA, cancelRequest.id, {
   reason: "Requirement paused by the employer.",

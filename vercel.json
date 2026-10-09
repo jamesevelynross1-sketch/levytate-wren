@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/daily-stock-scan",
       "schedule": "0 7 * * 1-5"
+    },
+    {
+      "path": "/api/internal/provider-intelligence/refresh",
+      "schedule": "15 6 * * *"
     }
   ]
 }
