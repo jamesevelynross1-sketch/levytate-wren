@@ -643,7 +643,8 @@ function ReadonlyField({ label, value }: { label: string; value: string }) {
 
 function ApplicationProgress({ application, compact = false }: { application: MvpApplication | null; compact?: boolean }) {
   const rows = timelineRows(application);
-  const current = applicationStage(application);
+  const configuredStep = application?.workflow?.version.steps.find((step) => step.id === application.workflow?.instance.currentStepId);
+  const current = application?.workflow?.instance.state === "needs_information" ? "More information requested" : configuredStep?.label ?? applicationStage(application);
 
   return (
     <section className="rounded-xl border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_14px_34px_rgba(16,44,61,0.04)]">
@@ -673,10 +674,10 @@ function ApplicationProgress({ application, compact = false }: { application: Mv
           );
         })}
       </div>
-      {application?.history.length ? (
+      {application && (application.workflow?.events?.length || application.history.length) ? (
         <div className="mt-4 rounded-xl bg-[#f8fbfa] p-3">
           <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/36">Latest comment</p>
-          <p className="mt-1 text-xs leading-5 text-[#102c3d]/58">{application.history.at(-1)?.note}</p>
+          <p className="mt-1 text-xs leading-5 text-[#102c3d]/58">{application.workflow?.events?.at(-1)?.note || application.history.at(-1)?.note || "Application progressed to the next workflow step."}</p>
         </div>
       ) : null}
     </section>
@@ -870,6 +871,12 @@ function statusToneFromState(tone: "blue" | "green" | "yellow" | "red" | "neutra
 }
 
 function timelineRows(application: MvpApplication | null) {
+  if (application?.workflow) {
+    const { instance, version } = application.workflow;
+    const currentIndex = Math.max(0, version.steps.findIndex((step) => step.id === instance.currentStepId));
+    if (instance.state === "declined") return [...version.steps.slice(0, currentIndex).map((step) => ({ stage: step.label, kind: "complete" as const })), { stage: "Declined", kind: "declined" as const }];
+    return version.steps.map((step, index) => ({ stage: instance.state === "needs_information" && index === currentIndex ? "More information requested" : step.label, kind: index < currentIndex ? "complete" as const : index === currentIndex ? "current" as const : "future" as const }));
+  }
   const current = applicationStage(application);
   const currentIndex = applicationStages.indexOf(current);
   if (current === "Declined") {

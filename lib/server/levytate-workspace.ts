@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { isApplicationWorkflowsEnabledForOrganisation } from "@/lib/server/levytate-application-workflow-capability";
+import { attachApplicationWorkflowContexts, hasPublishedApplicationWorkflow, startApplicationWorkflow, transitionApplicationWorkflowForSession } from "@/lib/server/levytate-application-workflows";
 import { listManagerDirectReportOperationalSummaries } from "@/lib/server/levytate-manager-operational-summaries";
 import type {
   ProviderCatalogueRecord,
@@ -372,11 +374,13 @@ export async function getWorkspaceBootstrapForSession(session: LevyTateBetaSessi
   try {
     const context = await ensureWorkspaceContext(session);
     await assertWorkspaceReadAllowed(context);
-    const [data, requestsEnabled] = await Promise.all([
+    const [data, requestsEnabled, applicationWorkflowsEnabled] = await Promise.all([
       loadWorkspaceData(context, session),
       isRequestsEnabledForOrganisation(context.organisation.id),
+      isApplicationWorkflowsEnabledForOrganisation(context.organisation.id),
     ]);
     const userRole = normaliseMvpUserRole(context.user.role);
+    if (applicationWorkflowsEnabled) data.applications = await attachApplicationWorkflowContexts(context.organisation.id, data.applications);
     const prospectAccess = await getProspectAccessForSession(session);
     const warnings = [...context.warnings];
     let directReportOperationalSummaries;
@@ -399,6 +403,7 @@ export async function getWorkspaceBootstrapForSession(session: LevyTateBetaSessi
         permissions: permissionsForMvpRole(context.user.role),
         coreEarlyAccess: getCoreEarlyAccessPolicy(userRole, { requestsEnabled }),
         requestsEnabled,
+        applicationWorkflowsEnabled,
         directReportOperationalSummaries,
         prospectAccess: prospectAccess ? {
           id: prospectAccess.id,
@@ -530,6 +535,13 @@ export async function applyWorkspaceMutationForSession(
       break;
     case "saveApplication":
       await saveApplication(organisationId, mutation.application);
+      if (normaliseMvpUserRole(context.user.role) === "Employee" && await isApplicationWorkflowsEnabledForOrganisation(organisationId)) {
+        if (mutation.application.workflow?.instance.state === "needs_information") {
+          await transitionApplicationWorkflowForSession(session, { applicationId: mutation.application.id, action: "resubmit", note: "Application information resubmitted.", idempotencyKey: `resubmit:${mutation.application.id}:${mutation.application.workflow.instance.lockVersion}`, expectedLockVersion: mutation.application.workflow.instance.lockVersion });
+        } else if (["Submitted to Line Manager", "Awaiting Manager Review"].includes(mutation.application.status) && await hasPublishedApplicationWorkflow(organisationId)) {
+          await startApplicationWorkflow(session, mutation.application.id, `submit:${mutation.application.id}`);
+        }
+      }
       await synchroniseApplicationReviewOperationalActions(session, [mutation.application.id]);
       await recordAuditEvent(context, "application", mutation.application.id, "application.saved", "Application record saved.");
       break;
@@ -619,6 +631,14 @@ async function assertMutationAllowed(context: WorkspaceContext, mutation: LevyTa
 
   if (mutation.type === "saveApplication") {
     await assertOneActiveApplication(context.organisation.id, mutation.application);
+  }
+
+  if ((mutation.type === "saveApplication" || mutation.type === "updateApplicationStatus") && await isApplicationWorkflowsEnabledForOrganisation(context.organisation.id)) {
+    const applicationId = mutation.type === "saveApplication" ? mutation.application.id : mutation.id;
+    const instances = await supabaseSelect<{ id: string }>(assertSupabase(), "levytate_application_workflow_instances", new URLSearchParams({ select: "id", organisation_id: `eq.${context.organisation.id}`, application_id: `eq.${applicationId}`, limit: "1" }));
+    if (instances[0] && (mutation.type === "updateApplicationStatus" || role !== "Employee")) {
+      throw new LevyTateWorkspacePermissionError("This application uses a versioned workflow and must be progressed through its current workflow decision.");
+    }
   }
 
   if (role === "Employer Admin" || role === "Apprenticeship Lead") return;

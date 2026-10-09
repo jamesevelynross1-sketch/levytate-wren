@@ -137,6 +137,14 @@ Help employers understand school reach, pupil interest, challenge completion and
 
 ## Priority 4 - Integrations
 
+### Configurable Application Workflows V1
+
+- Additive migration 032 prepared; application is required before capability activation.
+- One published version per employer, immutable version history and in-flight version pinning.
+- Bounded employee submission, employer decision and provider handoff steps.
+- Server-enforced role, direct-manager, tenant, idempotency and optimistic-concurrency controls.
+- Capability remains off by default and unavailable in Production until separately approved.
+
 ### LMS Integrations
 
 ### HR System Integrations

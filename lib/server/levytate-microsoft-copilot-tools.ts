@@ -6,6 +6,7 @@ import {
 import { buildMicrosoftCopilotOperationsPortfolio } from "@/lib/levytate/microsoft-copilot-portfolio";
 import { getApprenticeshipStandard } from "@/lib/levytate/domain";
 import { hasMvpPermission } from "@/lib/levytate/mvp/rbac";
+import { deriveApplicationWorkflowCompatibility } from "@/lib/levytate/application-workflows/compatibility";
 import { getAutopilotWorkspaceForMicrosoftCopilotActor } from "@/lib/server/levytate-autopilot";
 import { getOrganisationFinanceState } from "@/lib/server/levytate-finance";
 import { getOrganisationLearnerLifecycleRecordDetail } from "@/lib/server/levytate-learner-lifecycle";
@@ -236,18 +237,22 @@ async function dispatchTool(actor: MicrosoftCopilotActor, toolName: MicrosoftCop
       const limit = boundedLimit(args.limit, 20, 50);
       const employees = new Map(data.employees.map((employee) => [employee.id, employee]));
       const applications = data.applications
-        .filter((application) => !status || application.status === status)
-        .filter((application) => !owner || application.currentOwner.toLowerCase() === owner)
+        .filter((application) => !status || deriveApplicationWorkflowCompatibility(application).status === status)
+        .filter((application) => !owner || deriveApplicationWorkflowCompatibility(application).currentOwner.toLowerCase() === owner)
         .filter((application) => !attentionOnly || !["Draft", "Approved", "Declined", "Withdrawn", "Cancelled"].includes(application.status))
         .slice(0, limit)
         .map((application) => {
           const standard = getApprenticeshipStandard(application.apprenticeshipStandardId);
+          const workflow = deriveApplicationWorkflowCompatibility(application);
           return {
             id: application.id,
             employeeName: employees.get(application.employeeId)?.name ?? "Employee",
             programme: standard?.title ?? application.apprenticeshipStandardId,
-            status: application.status,
-            currentOwner: application.currentOwner,
+            status: workflow.status,
+            currentOwner: workflow.currentOwner,
+            currentWorkflowStep: workflow.currentStepLabel,
+            currentResponsibleRole: workflow.currentResponsibleRole,
+            lastProgressedAt: workflow.lastProgressedAt,
             submittedAt: application.submittedAt,
             updatedAt: application.updatedAt,
             link: microsoftCopilotCanonicalUrl("/levytate/app", {

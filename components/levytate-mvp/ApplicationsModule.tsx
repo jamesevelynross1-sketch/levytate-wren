@@ -200,7 +200,7 @@ export function ApplicationsModule({
           filters={
             <div className="grid gap-2 sm:grid-cols-2">
               <select value={status} onChange={(event) => setStatus(event.target.value)} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-sm font-semibold"><option>All</option>{requestStatuses.map((item) => <option key={item}>{item}</option>)}</select>
-              <select value={ownerFilter} onChange={(event) => setOwnerFilter(event.target.value)} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-sm font-semibold"><option>All</option><option>Employee</option><option>Line Manager</option><option>Apprenticeship Lead</option><option>Provider Partner</option><option>Completed</option></select>
+              <select value={ownerFilter} onChange={(event) => setOwnerFilter(event.target.value)} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-sm font-semibold"><option>All</option><option>Employee</option><option>Line Manager</option><option>Apprenticeship Lead</option><option>Employer Admin</option><option>Provider Partner</option><option>Completed</option></select>
             </div>
           }
         />
@@ -233,20 +233,20 @@ export function ApplicationsModule({
                       <p className="mt-0.5 text-xs text-[#102c3d]/[0.42]">{standard?.referenceCode ?? "Reference to confirm"}</p>
                     </td>
                     <td className="px-4 py-3"><p className="text-sm font-semibold text-[#102c3d]">{application.currentOwner}</p></td>
-                    <td className="px-4 py-3"><StatusBadge tone={statusTone(application.status)}>{application.status}</StatusBadge><p className="mt-1 text-xs text-[#102c3d]/[0.45]">Stage {applicationStage(application.status) + 1} of 4</p></td>
+                    <td className="px-4 py-3"><StatusBadge tone={statusTone(application.status)}>{application.status}</StatusBadge><p className="mt-1 text-xs text-[#102c3d]/[0.45]">Stage {applicationTracker(application).currentIndex + 1} of {applicationTracker(application).stages.length}</p></td>
                     <td className="px-4 py-3 text-[#102c3d]/[0.54]">{application.submittedAt.slice(0, 10)}</td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-2">
                         <TableAction onClick={() => setSelectedId(application.id)}>View</TableAction>
-                        <TableAction onClick={() => setDraft({ ...application })}>Edit</TableAction>
-                        {application.status === "Draft" ? <TableAction onClick={() => submitToManager(application)}>Submit</TableAction> : null}
-                        {reviewableManagerStatuses.includes(application.status) ? (
+                        {!application.workflow ? <TableAction onClick={() => setDraft({ ...application })}>Edit</TableAction> : null}
+                        {application.status === "Draft" && !application.workflow ? <TableAction onClick={() => submitToManager(application)}>Submit</TableAction> : null}
+                        {!application.workflow && reviewableManagerStatuses.includes(application.status) ? (
                           <>
                             <TableAction onClick={() => approveManager(application)}>Approve</TableAction>
                             <TableAction onClick={() => declineManager(application)} danger>Decline</TableAction>
                           </>
                         ) : null}
-                        {reviewableLeadStatuses.includes(application.status) ? (
+                        {!application.workflow && reviewableLeadStatuses.includes(application.status) ? (
                           <>
                             <TableAction onClick={() => approveLead(application)}>Final approve</TableAction>
                             <TableAction onClick={() => declineLead(application)} danger>Decline</TableAction>
@@ -319,7 +319,9 @@ export function ApplicationsModule({
         </MvpModal>
       ) : null}
 
-      {selectedApplication ? (
+      {selectedApplication ? selectedApplication.workflow ? (
+        <ConfigurableWorkflowDecisionModal application={selectedApplication} onClose={() => setSelectedId(null)} />
+      ) : (
         <ApplicationDetailModal application={selectedApplication} onClose={() => setSelectedId(null)} />
       ) : null}
     </div>
@@ -408,7 +410,7 @@ function LineManagerApprovalsModule({ onOpenDirectReport, initialApplicationId, 
       </MvpPanel>
 
       {selectedApplication ? (
-        <ManagerReviewModal
+        selectedApplication.workflow ? <ConfigurableWorkflowDecisionModal application={selectedApplication} onClose={() => selectApplication(null)} /> : <ManagerReviewModal
           application={selectedApplication}
           managerName={manager?.name ?? "Line Manager"}
           onClose={() => selectApplication(null)}
@@ -499,7 +501,7 @@ function ManagerReviewModal({ application, managerName: reviewerName, onClose, o
 
   return (
     <MvpModal title="Review application" eyebrow="Line manager decision" onClose={onClose} wide>
-      <div className="mb-5 border-y border-[#102c3d]/[0.07] py-4"><StageTracker stages={["Employee", "Manager", "Apprenticeship Lead", "Enrolment"]} currentIndex={applicationStage(application.status)} tone={application.status === "More information requested" ? "watch" : "info"} exceptionalStatus={application.status.startsWith("Declined") ? { label: application.status, tone: "risk" } : undefined} /></div>
+      <div className="mb-5 border-y border-[#102c3d]/[0.07] py-4"><StageTracker {...applicationTracker(application)} tone={application.status === "More information requested" ? "watch" : "info"} exceptionalStatus={application.status.startsWith("Declined") ? { label: application.status, tone: "risk" } : undefined} /></div>
       <div className="grid gap-5 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
         <div className="grid gap-4">
           <ReviewSection title="Employee">
@@ -637,6 +639,48 @@ function ManagerReviewModal({ application, managerName: reviewerName, onClose, o
   );
 }
 
+function ConfigurableWorkflowDecisionModal({ application, onClose }: { application: MvpApplication; onClose: () => void }) {
+  const { meta } = useMvpWorkspace();
+  const [note, setNote] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const workflow = application.workflow;
+  if (!workflow) return null;
+  const step = workflow.version.steps.find((item) => item.id === workflow.instance.currentStepId);
+  const authorised = step?.responsibleRole === meta?.userRole;
+  const actions = step?.type === "role_review" ? [{ action: "continue", label: "Continue" }] : step?.type === "role_approval" ? [{ action: "approve", label: "Approve" }] : [];
+  if (step?.allowDecline) actions.push({ action: "decline", label: "Decline" });
+  if (["role_review", "role_approval"].includes(step?.type ?? "")) actions.splice(actions.length - (step?.allowDecline ? 1 : 0), 0, { action: "request_information", label: "Request information" });
+
+  async function decide(action: string) {
+    if (!authorised || busy) return;
+    setBusy(true); setError("");
+    try {
+      const response = await fetch("/api/levytate-application-workflows", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "transition", transitionAction: action, applicationId: application.id, note, idempotencyKey: crypto.randomUUID(), expectedLockVersion: workflow!.instance.lockVersion }) });
+      const body = await response.json() as { message?: string };
+      if (!response.ok) throw new Error(body.message ?? "The workflow decision could not be recorded.");
+      window.location.reload();
+    } catch (caught) { setError(caught instanceof Error ? caught.message : "The workflow decision could not be recorded."); setBusy(false); }
+  }
+
+  return <MvpModal title={step?.label ?? "Application decision"} eyebrow="Application workflow" onClose={onClose} wide>
+    <div className="mb-5 border-y border-[#102c3d]/[0.07] py-4"><StageTracker {...applicationTracker(application)} tone="info" /></div>
+    <p className="text-sm leading-6 text-[#102c3d]/60">Responsible role: <strong>{step?.responsibleRole}</strong>. This decision is recorded against workflow version {workflow.version.version}.</p>
+    <label className="mt-5 block text-xs font-semibold text-[#102c3d]">Decision note<textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={2000} className="mt-2 min-h-28 w-full rounded-xl border border-[#102c3d]/10 p-3 text-sm font-normal" /></label>
+    {!authorised ? <p className="mt-4 text-sm text-[#102c3d]/55">This step can only be completed by {step?.responsibleRole}.</p> : <div className="mt-5 flex flex-wrap gap-2">{actions.map((item) => <button key={item.action} type="button" disabled={busy} onClick={() => void decide(item.action)} className="h-10 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white disabled:opacity-40">{item.label}</button>)}</div>}
+    {error ? <p role="alert" className="mt-4 text-xs font-semibold text-red-700">{error}</p> : null}
+    {workflow.events?.length ? <section className="mt-6 border-t border-[#102c3d]/[0.07] pt-5"><p className="text-xs font-semibold uppercase tracking-[0.13em] text-[#102c3d]/45">Workflow history</p><div className="mt-3 grid gap-2">{workflow.events.map((event) => { const eventStep = workflow.version.steps.find((item) => item.id === event.stepId); return <div key={event.id} className="rounded-xl bg-[#f8fbfa] px-4 py-3"><p className="text-sm font-semibold text-[#102c3d]">{workflowEventLabel(event.action, eventStep?.label)}</p><p className="mt-1 text-xs text-[#102c3d]/55">{new Date(event.createdAt).toLocaleDateString("en-GB")} · {event.actorLabel ?? event.actorRole}</p>{event.note ? <p className="mt-2 text-xs leading-5 text-[#102c3d]/60">{event.note}</p> : null}</div>; })}</div></section> : null}
+  </MvpModal>;
+}
+
+function workflowEventLabel(action: string, stepLabel?: string) {
+  if (action === "submit") return "Employee submitted application";
+  if (action === "request_information") return `${stepLabel ?? "Review"}: more information requested`;
+  if (action === "resubmit") return "Employee resubmitted information";
+  if (action === "decline") return `${stepLabel ?? "Application"} declined`;
+  return `${stepLabel ?? "Workflow step"} ${action === "approve" ? "approved" : "completed"}`;
+}
+
 function ReviewSection({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="rounded-xl border border-[#102c3d]/[0.07] bg-[#fbfcfb] p-4">
@@ -696,7 +740,7 @@ function ApplicationDetailModal({ application, onClose }: { application: MvpAppl
 
   return (
     <MvpModal title={displayEmployee(employee)} eyebrow="Application record" onClose={onClose} wide>
-      <div className="mb-5 border-y border-[#102c3d]/[0.07] py-4"><StageTracker stages={["Employee", "Manager", "Apprenticeship Lead", "Enrolment"]} currentIndex={applicationStage(application.status)} tone={application.status === "More information requested" ? "watch" : "info"} exceptionalStatus={application.status.startsWith("Declined") || application.status === "Withdrawn" || application.status === "Cancelled" ? { label: application.status, tone: "risk" } : undefined} /></div>
+      <div className="mb-5 border-y border-[#102c3d]/[0.07] py-4"><StageTracker {...applicationTracker(application)} tone={application.status === "More information requested" ? "watch" : "info"} exceptionalStatus={application.status.startsWith("Declined") || application.status === "Withdrawn" || application.status === "Cancelled" ? { label: application.status, tone: "risk" } : undefined} /></div>
       <div className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <div className="space-y-4 rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4">
           <section>
@@ -704,6 +748,7 @@ function ApplicationDetailModal({ application, onClose }: { application: MvpAppl
             <h3 className="mt-1 text-lg font-semibold text-[#102c3d]">{standard?.title ?? application.apprenticeshipStandardId}</h3>
             <p className="mt-2 text-sm leading-6 text-[#102c3d]/[0.56]">{employee?.jobTitle || "Role to confirm"} · {employee?.department || "Department to confirm"} · {employee?.site || "Site to confirm"}</p>
           </section>
+          {application.workflow ? <WorkflowDecisionSummary application={application} /> : null}
           <section>
             <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#0b6f63]">Workflow status</p>
             <div className="mt-2 flex flex-wrap gap-2">
@@ -753,9 +798,23 @@ function ApplicationDetailModal({ application, onClose }: { application: MvpAppl
   );
 }
 
+function WorkflowDecisionSummary({ application }: { application: MvpApplication }) {
+  const step = application.workflow?.version.steps.find((item) => item.id === application.workflow?.instance.currentStepId);
+  return <section className="rounded-xl border border-[#087c73]/15 bg-[#eef7f5] p-4"><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#087c73]">Versioned workflow</p><p className="mt-2 text-sm font-semibold text-[#102c3d]">{step?.label}</p><p className="mt-1 text-xs text-[#102c3d]/55">Version {application.workflow?.version.version} · {step?.responsibleRole}</p></section>;
+}
+
 function applicationStage(status: RequestStatus) {
   if (["Approved for Enrolment", "Completed"].includes(status)) return 3;
   if (["Approved by Line Manager", "Submitted to Apprenticeship Lead", "Awaiting Final Approval", "Declined by Apprenticeship Lead"].includes(status)) return 2;
   if (["Submitted to Line Manager", "Awaiting Manager Review", "More information requested", "Declined by Line Manager"].includes(status)) return 1;
   return 0;
+}
+
+function applicationTracker(application: MvpApplication) {
+  if (application.workflow) {
+    const steps = application.workflow.version.steps;
+    const index = steps.findIndex((step) => step.id === application.workflow?.instance.currentStepId);
+    return { stages: steps.map((step) => step.label), currentIndex: Math.max(0, index) };
+  }
+  return { stages: ["Employee", "Manager", "Apprenticeship Lead", "Enrolment"], currentIndex: applicationStage(application.status) };
 }

@@ -117,6 +117,8 @@ export type AutopilotApplicationInput = {
   status: string;
   currentOwner: MvpApplicationOwner;
   updatedAt: string;
+  currentStepLabel?: string;
+  currentResponsibleRole?: string;
 };
 
 export type AutopilotAnalysisInput = {
@@ -218,8 +220,8 @@ export function analyseOperationsAutopilot(input: AutopilotAnalysisInput) {
       signals.push(buildSignal(input, {
         key: `application:${application.id}:stalled`, type: "application_stalled", category: "applications", lane: "needs_your_decision", priority: age >= 14 ? "action_now" : "this_week",
         entityType: "application", entityId: application.id, application, subjectLabel: application.employeeName, title: "Application has not progressed",
-        summary: `${application.employeeName}'s application has remained at ${application.status} for ${age} days.`, recommendedAction: "Review the application state and confirm the next responsible owner.",
-        ownerType: "Apprenticeship Lead", dueDate: today, actionType: "review_application", evidence, payload: { rule: "application_stalled", daysInState: age, status: application.status, currentOwner: application.currentOwner }, linkedOperationalActionId: matchingApplicationAction?.id,
+        summary: `${application.employeeName}'s application has remained at ${application.currentStepLabel ?? application.status} for ${age} days.`, recommendedAction: "Review the application state and confirm the next responsible owner.",
+        ownerType: "Apprenticeship Lead", dueDate: today, actionType: "review_application", evidence, payload: { rule: "application_stalled", daysInState: age, status: application.status, currentOwner: application.currentOwner, currentStepLabel: application.currentStepLabel }, linkedOperationalActionId: matchingApplicationAction?.id,
       }));
     }
   }

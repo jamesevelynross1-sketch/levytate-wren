@@ -128,7 +128,7 @@ export type MvpRole = {
   updatedAt: string;
 };
 
-export type MvpApplicationOwner = "Employee" | "Line Manager" | "Apprenticeship Lead" | "Provider Partner" | "Completed";
+export type MvpApplicationOwner = "Employee" | "Line Manager" | "Apprenticeship Lead" | "Employer Admin" | "Provider Partner" | "Completed";
 
 export type MvpApplicationHistoryEntry = {
   id: string;
@@ -151,6 +151,7 @@ export type MvpApplication = {
   submittedAt: string;
   updatedAt: string;
   history: MvpApplicationHistoryEntry[];
+  workflow?: import("@/lib/levytate/application-workflows/compatibility").ApplicationWorkflowContext;
 };
 
 export type MvpProviderRelationshipCategory =
@@ -781,8 +782,6 @@ export function normaliseApplication(application: MvpApplication): MvpApplicatio
     history,
   };
 }
-
-
 
 
 

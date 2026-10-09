@@ -26,6 +26,7 @@ import { LevyTateLogo } from "@/components/levytate-demo/PlatformShell";
 import { ApplicationsModule } from "@/components/levytate-mvp/ApplicationsModule";
 import { AskLevyTateAiWorkspace } from "@/components/levytate-mvp/AskLevyTateAiWorkspace";
 import { DashboardModule, LineManagerHomeModule, SettingsModule } from "@/components/levytate-mvp/DashboardSettingsModules";
+import { ApplicationWorkflowSettings } from "@/components/levytate-mvp/ApplicationWorkflowSettings";
 import { EarlyAccessModule } from "@/components/levytate-mvp/EarlyAccessModule";
 import { EmployeeApplicationModule, EmployeeHomeModule, EmployeeProgrammeModule } from "@/components/levytate-mvp/EmployeeExperienceModule";
 import { EmployeesModule } from "@/components/levytate-mvp/EmployeesModule";
@@ -88,7 +89,7 @@ const modules = [
 type ModuleName = (typeof modules)[number]["name"];
 type PeopleView = "Employees" | "Roles";
 type ProviderView = "Programmes" | "Relationships";
-type SettingsView = "Workspace" | "Desktop App" | "Early Access";
+type SettingsView = "Workspace" | "Workflows" | "Desktop App" | "Early Access";
 
 const modulePermissions = {
   Home: "workspace:read",
@@ -127,6 +128,7 @@ const providerViewPermissions = {
 
 const settingsViewPermissions = {
   Workspace: "settings:read",
+  Workflows: "applicationWorkflows:manage",
   "Desktop App": "settings:read",
   "Early Access": "earlyAccess:manage",
 } as const satisfies Record<SettingsView, MvpPermission>;
@@ -194,7 +196,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
     .filter((entry) => entry.modules.length);
   const peopleItems = (["Employees", "Roles"] as PeopleView[]).filter((item) => can(peopleViewPermissions[item]));
   const providerItems = (["Programmes", "Relationships"] as ProviderView[]).filter((item) => can(providerViewPermissions[item]));
-  const settingsItems = (["Workspace", "Desktop App", "Early Access"] as SettingsView[]).filter((item) => can(settingsViewPermissions[item]));
+  const settingsItems = (["Workspace", "Workflows", "Desktop App", "Early Access"] as SettingsView[]).filter((item) => can(settingsViewPermissions[item]) && (item !== "Workflows" || meta?.applicationWorkflowsEnabled === true));
   const moduleBadges = useMemo(() => ({
     People: notifications.filter((item) => item.module === "Applications" || item.module === "Enrolments").length,
     Providers: notifications.filter((item) => item.module === "Provider Relationships").length,
@@ -552,6 +554,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
             {activeModule === "Settings" ? (
               <ModuleStackNav items={settingsItems} active={settingsView} onSelect={(item) => setSettingsView(item as SettingsView)}>
                 {settingsView === "Workspace" ? <SettingsModule /> : null}
+                {settingsView === "Workflows" ? <ApplicationWorkflowSettings /> : null}
                 {settingsView === "Desktop App" ? <LevyTateDesktopAppPanel /> : null}
                 {settingsView === "Early Access" ? <div className="grid gap-5"><ProspectAccessAdminModule /><EarlyAccessModule /></div> : null}
               </ModuleStackNav>

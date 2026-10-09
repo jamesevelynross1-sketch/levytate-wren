@@ -10,6 +10,7 @@ export type MvpPermission =
   | "workspace:migrate"
   | "settings:read"
   | "settings:write"
+  | "applicationWorkflows:manage"
   | "employees:read"
   | "employees:write"
   | "employees:archive"
@@ -88,6 +89,7 @@ const allPermissions = [
   "workspace:migrate",
   "settings:read",
   "settings:write",
+  "applicationWorkflows:manage",
   "employees:read",
   "employees:write",
   "employees:archive",
@@ -146,6 +148,7 @@ export const mvpRolePermissions = {
   "Apprenticeship Lead": [
     "workspace:read",
     "settings:read",
+    "applicationWorkflows:manage",
     "employees:read",
     "employees:write",
     "employeeDevelopment:write",

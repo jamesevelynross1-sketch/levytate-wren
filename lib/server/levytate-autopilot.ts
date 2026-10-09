@@ -14,6 +14,7 @@ import {
   type DetectedAutopilotSignal,
 } from "@/lib/levytate/autopilot/operations-autopilot";
 import { hasMvpPermission, normaliseMvpUserRole } from "@/lib/levytate/mvp/rbac";
+import { deriveApplicationWorkflowCompatibility } from "@/lib/levytate/application-workflows/compatibility";
 import type { OperationalOwnerType, OperationalPriorityLevel } from "@/lib/levytate/mvp/operations-centre";
 import { getLearnerLifecycleServerContext, listOrganisationLearnerLifecycleDetails, LevyTateLearnerLifecyclePermissionError } from "@/lib/server/levytate-learner-lifecycle";
 import { listOperationalActions } from "@/lib/server/levytate-operational-actions";
@@ -82,10 +83,14 @@ export async function refreshAutopilotWorkspace(session: LevyTateBetaSession) {
     title: action.title, description: action.description, actionType: action.actionType, ownerType: action.ownerType, dueDate: action.dueDate,
     status: action.status, sourceUrl: action.sourceUrl, updatedAt: action.updatedAt,
   }));
-  const applicationInputs: AutopilotApplicationInput[] = bootstrap.data.applications.map((application) => ({
-    id: application.id, employeeId: application.employeeId, employeeName: employees.get(application.employeeId) ?? "Employee",
-    status: application.status, currentOwner: application.currentOwner, updatedAt: application.updatedAt,
-  }));
+  const applicationInputs: AutopilotApplicationInput[] = bootstrap.data.applications.map((application) => {
+    const workflow = deriveApplicationWorkflowCompatibility(application);
+    return {
+      id: application.id, employeeId: application.employeeId, employeeName: employees.get(application.employeeId) ?? "Employee",
+      status: workflow.status, currentOwner: workflow.currentOwner, updatedAt: workflow.lastProgressedAt,
+      currentStepLabel: workflow.currentStepLabel, currentResponsibleRole: workflow.currentResponsibleRole,
+    };
+  });
   const detected = analyseOperationsAutopilot({
     organisationId: context.organisation.id, now,
     learners: details.map((detail) => ({
@@ -147,10 +152,10 @@ export async function refreshAutopilotWorkspaceForMicrosoftCopilotActor(actor: M
       title: action.title, description: action.description, actionType: action.action_type, ownerType: action.owner_type,
       dueDate: action.due_date ?? "", status: action.status, sourceUrl: action.source_url, updatedAt: action.updated_at,
     })),
-    applications: data.applications.map((application) => ({
-      id: application.id, employeeId: application.employeeId, employeeName: employees.get(application.employeeId) ?? "Employee",
-      status: application.status, currentOwner: application.currentOwner, updatedAt: application.updatedAt,
-    })),
+    applications: data.applications.map((application) => {
+      const workflow = deriveApplicationWorkflowCompatibility(application);
+      return { id: application.id, employeeId: application.employeeId, employeeName: employees.get(application.employeeId) ?? "Employee", status: workflow.status, currentOwner: workflow.currentOwner, updatedAt: workflow.lastProgressedAt, currentStepLabel: workflow.currentStepLabel, currentResponsibleRole: workflow.currentResponsibleRole };
+    }),
   });
   const existing = existingRows.map(fromRow);
   const existingByKey = new Map(existing.map((signal) => [signal.signalKey, signal]));

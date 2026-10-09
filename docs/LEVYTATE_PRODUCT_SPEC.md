@@ -166,7 +166,11 @@ Can:
 
 ## Approval Workflow
 
+The default and legacy journey remains:
+
 Employee submits application -> Line Manager reviews -> Line Manager approves or declines -> Apprenticeship Lead gives final approval -> Approved for enrolment
+
+Where the server-controlled configurable-workflows capability is enabled, an employer may publish a bounded version of the internal decision steps. Employee submission remains first and provider handoff remains last. Supported decision owners are Line Manager, Apprenticeship Lead and, where explicitly configured, Employer Admin. A Line Manager decision always resolves to the employee's current direct manager. In-flight applications remain pinned to the version on which they started; publishing affects new applications only.
 
 Department Head is not part of the approval workflow.
 
@@ -470,5 +474,4 @@ LevyTate maintains a seeded provider catalogue for LevyTate-led provider matchin
 Provider matching remains a LevyTate-led service. Employers submit needs and LevyTate prepares a controlled shortlist using programme fit, sector fit, delivery model, region, employer need and provider status. It must not be positioned as an open public provider marketplace.
 
 Provider funding language must use `potentially levy-funded` or `potentially funded through levy/co-investment`. Withdrawn standards must not be active recommendations for new starts.
-
 
