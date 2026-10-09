@@ -464,10 +464,12 @@ export async function getWorkspaceBootstrapForMicrosoftCopilotActor(
   const context: WorkspaceContext = { organisation, user, warnings: [] };
   await assertWorkspaceReadAllowed(context);
   const session = microsoftCopilotActorSession(actor);
-  const [data, requestsEnabled] = await Promise.all([
+  const [data, requestsEnabled, applicationWorkflowsEnabled] = await Promise.all([
     loadWorkspaceData(context, session),
     isRequestsEnabledForOrganisation(actor.organisationId),
+    isApplicationWorkflowsEnabledForOrganisation(actor.organisationId),
   ]);
+  if (applicationWorkflowsEnabled) data.applications = await attachApplicationWorkflowContexts(actor.organisationId, data.applications);
 
   return {
     data,
@@ -479,6 +481,7 @@ export async function getWorkspaceBootstrapForMicrosoftCopilotActor(
       permissions: permissionsForMvpRole(actor.role),
       coreEarlyAccess: getCoreEarlyAccessPolicy(actor.role, { requestsEnabled }),
       requestsEnabled,
+      applicationWorkflowsEnabled,
       directReportOperationalSummaries: undefined,
       prospectAccess: null,
       storageMode: "supabase",
@@ -739,7 +742,19 @@ async function assertEmployeeCanSaveApplication(
   );
 
   if (existing && !employeeEditableStatuses.includes(existing.status)) {
-    throw new LevyTateWorkspacePermissionError("Submitted applications cannot be edited unless more information has been requested.");
+    const workflowInstances = await supabaseSelect<{ state: string }>(
+      assertSupabase(),
+      "levytate_application_workflow_instances",
+      new URLSearchParams({
+        select: "state",
+        organisation_id: `eq.${organisationId}`,
+        application_id: `eq.${application.id}`,
+        limit: "1",
+      }),
+    );
+    if (workflowInstances[0]?.state !== "needs_information") {
+      throw new LevyTateWorkspacePermissionError("Submitted applications cannot be edited unless more information has been requested.");
+    }
   }
 
   if (!existing) {
