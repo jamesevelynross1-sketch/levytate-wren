@@ -60,6 +60,7 @@ create table if not exists public.levytate_application_workflow_instances (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (organisation_id, application_id),
+  unique (organisation_id, application_id, workflow_version_id),
   foreign key (organisation_id, application_id) references public.levytate_applications(organisation_id, id),
   foreign key (organisation_id, workflow_version_id) references public.levytate_application_workflow_versions(organisation_id, id)
 );
@@ -80,7 +81,9 @@ create table if not exists public.levytate_application_workflow_events (
   created_at timestamptz not null default now(),
   unique (organisation_id, application_id, idempotency_key),
   foreign key (organisation_id, application_id) references public.levytate_applications(organisation_id, id),
-  foreign key (organisation_id, workflow_version_id) references public.levytate_application_workflow_versions(organisation_id, id)
+  foreign key (organisation_id, workflow_version_id) references public.levytate_application_workflow_versions(organisation_id, id),
+  foreign key (organisation_id, application_id, workflow_version_id)
+    references public.levytate_application_workflow_instances(organisation_id, application_id, workflow_version_id)
 );
 
 create index if not exists levytate_application_workflow_versions_org_idx on public.levytate_application_workflow_versions(organisation_id, workflow_id, version_number desc);
@@ -127,17 +130,33 @@ create or replace function public.levytate_protect_application_workflow_version(
 returns trigger language plpgsql as $$
 begin
   if old.status = 'published' and new.status = 'superseded'
-    and new.steps = old.steps and new.workflow_id = old.workflow_id
-    and new.organisation_id = old.organisation_id and new.version_number = old.version_number
+    and (to_jsonb(new) - 'status') = (to_jsonb(old) - 'status')
   then return new; end if;
   if old.status <> 'draft' then raise exception 'Published application workflow versions are immutable'; end if;
-  if new.workflow_id <> old.workflow_id or new.organisation_id <> old.organisation_id or new.version_number <> old.version_number then raise exception 'Workflow version identity is immutable'; end if;
+  if new.id <> old.id or new.workflow_id <> old.workflow_id or new.organisation_id <> old.organisation_id
+    or new.version_number <> old.version_number or new.created_by is distinct from old.created_by
+    or new.created_at <> old.created_at
+  then raise exception 'Workflow version identity is immutable'; end if;
   return new;
 end;
 $$;
 
 drop trigger if exists levytate_application_workflow_versions_immutable on public.levytate_application_workflow_versions;
 create trigger levytate_application_workflow_versions_immutable before update on public.levytate_application_workflow_versions for each row execute function public.levytate_protect_application_workflow_version();
+
+create or replace function public.levytate_protect_application_workflow_instance_identity()
+returns trigger language plpgsql as $$
+begin
+  if new.id <> old.id or new.organisation_id <> old.organisation_id
+    or new.application_id <> old.application_id or new.workflow_version_id <> old.workflow_version_id
+    or new.created_at <> old.created_at
+  then raise exception 'Application workflow instance identity and pinned version are immutable'; end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists levytate_application_workflow_instances_identity_immutable on public.levytate_application_workflow_instances;
+create trigger levytate_application_workflow_instances_identity_immutable before update on public.levytate_application_workflow_instances for each row execute function public.levytate_protect_application_workflow_instance_identity();
 
 create or replace function public.levytate_reject_application_workflow_event_mutation()
 returns trigger language plpgsql as $$ begin raise exception 'Application workflow events are append-only'; end; $$;
@@ -284,15 +303,21 @@ revoke all on table public.levytate_application_workflows from public, anon, aut
 revoke all on table public.levytate_application_workflow_versions from public, anon, authenticated, service_role;
 revoke all on table public.levytate_application_workflow_instances from public, anon, authenticated, service_role;
 revoke all on table public.levytate_application_workflow_events from public, anon, authenticated, service_role;
-grant select, insert, update on table public.levytate_application_workflows to service_role;
-grant select, insert, update on table public.levytate_application_workflow_versions to service_role;
-grant select, insert, update on table public.levytate_application_workflow_instances to service_role;
-grant select, insert on table public.levytate_application_workflow_events to service_role;
-revoke all on function public.levytate_publish_application_workflow(uuid, uuid, uuid) from public, anon, authenticated;
+grant select, insert on table public.levytate_application_workflows to service_role;
+grant select, insert on table public.levytate_application_workflow_versions to service_role;
+grant update (steps) on table public.levytate_application_workflow_versions to service_role;
+grant select on table public.levytate_application_workflow_instances to service_role;
+grant select on table public.levytate_application_workflow_events to service_role;
+revoke all on function public.levytate_validate_application_workflow_steps(jsonb) from public, anon, authenticated, service_role;
+grant execute on function public.levytate_validate_application_workflow_steps(jsonb) to service_role;
+revoke all on function public.levytate_protect_application_workflow_version() from public, anon, authenticated, service_role;
+revoke all on function public.levytate_protect_application_workflow_instance_identity() from public, anon, authenticated, service_role;
+revoke all on function public.levytate_reject_application_workflow_event_mutation() from public, anon, authenticated, service_role;
+revoke all on function public.levytate_publish_application_workflow(uuid, uuid, uuid) from public, anon, authenticated, service_role;
 grant execute on function public.levytate_publish_application_workflow(uuid, uuid, uuid) to service_role;
-revoke all on function public.levytate_transition_application_workflow(uuid, text, uuid, text, text, text, integer) from public, anon, authenticated;
+revoke all on function public.levytate_transition_application_workflow(uuid, text, uuid, text, text, text, integer) from public, anon, authenticated, service_role;
 grant execute on function public.levytate_transition_application_workflow(uuid, text, uuid, text, text, text, integer) to service_role;
-revoke all on function public.levytate_start_application_workflow(uuid, text, uuid, text) from public, anon, authenticated;
+revoke all on function public.levytate_start_application_workflow(uuid, text, uuid, text) from public, anon, authenticated, service_role;
 grant execute on function public.levytate_start_application_workflow(uuid, text, uuid, text) to service_role;
 
 drop policy if exists levytate_application_workflows_service_role_all on public.levytate_application_workflows;

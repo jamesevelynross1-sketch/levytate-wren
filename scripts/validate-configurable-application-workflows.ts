@@ -108,7 +108,9 @@ for (const role of ["Platform Admin", "Line Manager", "Employee"] as const) chec
 const migration = readFileSync(resolve("supabase/migrations/032_create_configurable_application_workflows.sql"), "utf8");
 for (const text of ["application_workflows_enabled boolean not null default false", "force row level security", "revoke all on table", "from public, anon, authenticated, service_role", "append-only", "idempotency_key", "lock_version", "published application workflow versions are immutable"]) check(migration.toLowerCase().includes(text), `migration contains ${text}`);
 for (const text of ["levytate_publish_application_workflow", "levytate_start_application_workflow", "levytate_transition_application_workflow", "only the current direct manager may act", "foreign key (organisation_id, application_id)"]) check(migration.toLowerCase().includes(text), `migration contains ${text}`);
+for (const text of ["unique (organisation_id, application_id, workflow_version_id)", "foreign key (organisation_id, application_id, workflow_version_id)", "instance identity and pinned version are immutable", "grant update (steps)", "from public, anon, authenticated, service_role"]) check(migration.toLowerCase().includes(text), `migration contains hardened invariant ${text}`);
 check(!/\b(drop table|truncate table|delete from)\b/i.test(migration), "migration contains no destructive data statement");
 check(!/grant\s+(?:all|delete|truncate).*authenticated/i.test(migration), "authenticated clients receive no broad workflow grants");
+check(!/grant\s+(?:all|delete|truncate|references|trigger)/i.test(migration), "workflow tables receive no broad or destructive grants");
 
 console.log(`Configurable application workflows: ${assertions} assertions passed.`);
