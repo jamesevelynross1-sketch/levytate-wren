@@ -37,6 +37,7 @@ import {
 import { deriveManagerOperationalContext } from "@/lib/server/levytate-manager-learner-detail";
 import { listManagerActions } from "@/lib/server/levytate-manager-actions";
 import { getOrganisationOperationsSummary } from "@/lib/server/levytate-operations";
+import { getLearningTimeWorkspace } from "@/lib/server/levytate-off-the-job";
 import { getWorkspaceBootstrapForSession } from "@/lib/server/levytate-workspace";
 
 const resultLimit = 25;
@@ -108,7 +109,8 @@ export async function routeOperationalCopilotQuery(
   if (managerOnlyIntents.has(classification.intent) && role !== "Line Manager") return null;
   const employeeProgrammeIntent = role === "Employee"
     && (classification.intent === "programme_directory" || classification.intent === "organisation_programmes");
-  if (!operationalRoles.has(role) && !employeeProgrammeIntent) {
+  const learningTimeIntent = classification.intent === "learning_time_summary" || classification.intent === "learning_time_attention";
+  if (!operationalRoles.has(role) && !employeeProgrammeIntent && !learningTimeIntent) {
     return responseForPayload(
       request,
       classification,
@@ -309,6 +311,12 @@ export function classifyOperationalCopilotQuery(
       contextResultKeys: previous?.resultKeys,
     };
   }
+  if (/\b(learning time|off[- ]the[- ]job|otj).{0,35}(attention|needs attention|missing|overdue|awaiting|clarification|confirmation)\b|\b(attention|missing|awaiting).{0,35}(learning time|off[- ]the[- ]job|otj)\b/.test(text)) {
+    return { intent: "learning_time_attention", filters: {}, direct: true };
+  }
+  if (/\b(learning time|off[- ]the[- ]job|otj).{0,35}(summary|position|hours|time|progress|remaining|confirmed)\b|\b(summary|how much|remaining).{0,35}(learning time|off[- ]the[- ]job|otj)\b/.test(text)) {
+    return { intent: "learning_time_summary", filters: { employeeName }, direct: true };
+  }
   if (/\b(which providers?|providers?)\b/.test(text) && /\b(they|them|those|these learners?)\b/.test(text) && prior) {
     return { intent: "provider_operational_summary", filters: { ...priorFilters, actionType: `context:${prior}` }, direct: true, contextResultKeys: previous?.resultKeys };
   }
@@ -447,6 +455,8 @@ async function executeTool(
     case "organisation_providers": return getOrganisationProviders(session);
     case "organisation_programmes": return getOrganisationProgrammes(session);
     case "programme_directory": return getProgrammeDirectory(session, query.filters);
+    case "learning_time_summary": return getLearningTimeCopilotSummary(session, query.filters);
+    case "learning_time_attention": return getLearningTimeCopilotAttention(session);
     case "access_boundary": throw new Error("Access boundary is handled before tool execution.");
   }
 }
@@ -482,12 +492,59 @@ async function executeManagerTool(
       return managerAccessBoundary("Employer catalogue administration is available to Apprenticeship Leads. I can show provider and programme context for your direct reports.");
     case "programme_operational_summary": return getProgrammeOperationalSummary(session, scope);
     case "programme_directory": return getProgrammeDirectory(session, query.filters);
+    case "learning_time_summary": return getLearningTimeCopilotSummary(session, query.filters);
+    case "learning_time_attention": return getLearningTimeCopilotAttention(session);
     case "team_summary": return getManagerTeamSummary(session, scope);
     case "ready_to_enrol":
     case "pre_enrolment_blockers":
       return managerAccessBoundary("This enrolment workflow is managed by the Apprenticeship Lead.");
     case "access_boundary": return managerAccessBoundary("I can only show apprenticeship information for your direct reports.");
   }
+}
+
+async function getLearningTimeCopilotSummary(session: LevyTateBetaSession, filters: LevyTateOperationalCopilotFilters): Promise<ToolPayload> {
+  const workspace = await getLearningTimeWorkspace(session);
+  const named = filters.employeeName?.toLowerCase();
+  const learners = workspace.learners.filter((learner) => !named || learner.learnerName.toLowerCase().includes(named)).slice(0, resultLimit);
+  return {
+    type: learners.length ? "summary_metrics" : "no_results",
+    title: "Learning Time summary",
+    columns: [
+      { key: "learner", label: "Learner" }, { key: "recorded", label: "Learner recorded", align: "right" },
+      { key: "checked", label: "Employer checked", align: "right" }, { key: "confirmed", label: "Provider confirmed", align: "right" },
+      { key: "remaining", label: "Remaining", align: "right" },
+    ],
+    rows: learners.map((learner) => ({ key: learner.learnerRecordId, cells: {
+      learner: learner.learnerName, recorded: minutesLabel(learner.totals.learnerRecordedMinutes),
+      checked: minutesLabel(learner.totals.employerCheckedMinutes), confirmed: minutesLabel(learner.totals.providerConfirmedMinutes),
+      remaining: learner.plan ? minutesLabel(learner.totals.remainingMinutes) : "Plan required",
+    }, actions: [{ label: "Open Learning Time", url: `/levytate/app?module=Learning%20Time&learner=${encodeURIComponent(learner.learnerRecordId)}` }] })),
+    totalCount: learners.length,
+    interpretation: "Learner-recorded, employer-checked and provider-confirmed amounts are separate evidence states.",
+    emptyMessage: "No learner Learning Time record is available in your current scope.",
+    viewAllUrl: "/levytate/app?module=Learning%20Time",
+    toolName: "getLearningTimeSummary",
+  };
+}
+
+async function getLearningTimeCopilotAttention(session: LevyTateBetaSession): Promise<ToolPayload> {
+  const workspace = await getLearningTimeWorkspace(session);
+  const rows = workspace.learners.flatMap((learner) => learner.attention.map((attention) => ({ learner, attention }))).slice(0, resultLimit);
+  return {
+    type: rows.length ? "learner_results" : "no_results",
+    title: "Learning Time attention",
+    columns: [{ key: "learner", label: "Learner" }, { key: "attention", label: "Attention" }, { key: "detail", label: "Why" }],
+    rows: rows.map(({ learner, attention }) => ({ key: `${learner.learnerRecordId}:${attention.type}`, cells: { learner: learner.learnerName, attention: attention.label, detail: attention.detail }, actions: [{ label: "Open Learning Time", url: `/levytate/app?module=Learning%20Time&learner=${encodeURIComponent(learner.learnerRecordId)}` }] })),
+    totalCount: rows.length,
+    emptyMessage: "No deterministic Learning Time attention items are currently present in your scope.",
+    viewAllUrl: "/levytate/app?module=Learning%20Time",
+    toolName: "listLearningTimeAttention",
+  };
+}
+
+function minutesLabel(minutes: number) {
+  const hours = Math.floor(minutes / 60); const remainder = minutes % 60;
+  return remainder ? `${hours}h ${remainder}m` : `${hours}h`;
 }
 
 export async function getLearnersBehindTarget(

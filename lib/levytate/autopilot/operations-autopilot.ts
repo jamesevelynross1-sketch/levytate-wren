@@ -5,7 +5,7 @@ export const autopilotAnalyserVersion = "operations-autopilot-v1";
 export const autopilotLanes = ["needs_your_decision", "ready_to_action", "waiting_externally", "upcoming", "recently_resolved"] as const;
 export type AutopilotLane = typeof autopilotLanes[number];
 export type AutopilotPriority = "action_now" | "this_week" | "upcoming";
-export type AutopilotCategory = "reviews" | "actions" | "manager_actions" | "applications" | "provider_dependencies";
+export type AutopilotCategory = "reviews" | "actions" | "manager_actions" | "applications" | "provider_dependencies" | "learning_time";
 export type AutopilotSignalType =
   | "review_overdue"
   | "review_due_with_outstanding_actions"
@@ -16,11 +16,17 @@ export type AutopilotSignalType =
   | "application_stalled"
   | "application_awaiting_manager"
   | "application_awaiting_provider"
-  | "provider_dependency_overdue";
+  | "provider_dependency_overdue"
+  | "otj_plan_missing"
+  | "otj_activity_needs_information"
+  | "otj_submission_awaiting_employer_check"
+  | "otj_provider_confirmation_pending"
+  | "otj_working_hours_clarification"
+  | "otj_no_recent_activity";
 export type AutopilotEntityType = "learner" | "application" | "review" | "operational_action";
 
 export type AutopilotEvidence = {
-  sourceType: "application" | "learner_review" | "operational_action";
+  sourceType: "application" | "learner_review" | "operational_action" | "learning_time";
   sourceId: string;
   sourceDate: string;
   label: string;
@@ -129,6 +135,18 @@ export type AutopilotAnalysisInput = {
   applications: AutopilotApplicationInput[];
 };
 
+export type LearningTimeAutopilotInput = {
+  organisationId: string;
+  now: string;
+  learners: Array<{
+    learnerRecordId: string;
+    learnerName: string;
+    providerId: string;
+    programmeId: string;
+    attention: Array<{ type: AutopilotSignalType; label: string; detail: string }>;
+  }>;
+};
+
 const terminalActionStatuses = new Set(["completed", "dismissed", "cancelled"]);
 const prohibitedInterpretationLanguage = /\b(risk score|high[- ]risk learner|low[- ]quality provider|predict(?:s|ed|ion)?|guarantee(?:d)?|automatically (?:send|change|close|complete))\b/i;
 
@@ -227,6 +245,31 @@ export function analyseOperationsAutopilot(input: AutopilotAnalysisInput) {
   }
 
   return signals.sort(compareSignals);
+}
+
+export function analyseLearningTimeAutopilot(input: LearningTimeAutopilotInput): DetectedAutopilotSignal[] {
+  const today = isoDate(input.now);
+  return input.learners.flatMap((learner) => learner.attention
+    .filter((attention) => attention.type.startsWith("otj_"))
+    .map((attention) => buildSignal({ organisationId: input.organisationId, now: input.now, learners: [], actions: [], applications: [] }, {
+      key: `learning-time:${learner.learnerRecordId}:${attention.type}`,
+      type: attention.type,
+      category: "learning_time",
+      lane: attention.type === "otj_provider_confirmation_pending" ? "waiting_externally" : attention.type === "otj_no_recent_activity" ? "upcoming" : "ready_to_action",
+      priority: attention.type === "otj_plan_missing" || attention.type === "otj_submission_awaiting_employer_check" ? "action_now" : attention.type === "otj_no_recent_activity" ? "upcoming" : "this_week",
+      entityType: "learner",
+      entityId: learner.learnerRecordId,
+      learner: { learnerRecordId: learner.learnerRecordId, learnerName: learner.learnerName, providerId: learner.providerId, providerName: "", programmeId: learner.programmeId, programmeName: "", reviews: [] },
+      subjectLabel: learner.learnerName,
+      title: attention.label,
+      summary: `${learner.learnerName}: ${attention.detail}`,
+      recommendedAction: learningTimeRecommendedAction(attention.type),
+      ownerType: attention.type === "otj_activity_needs_information" ? "Employee" : attention.type === "otj_provider_confirmation_pending" ? "Provider" : "Apprenticeship Lead",
+      dueDate: today,
+      actionType: "",
+      evidence: [{ sourceType: "learning_time", sourceId: learner.learnerRecordId, sourceDate: today, label: attention.label, value: attention.detail, url: `/levytate/app?module=Learning%20Time&learner=${encodeURIComponent(learner.learnerRecordId)}` }],
+      payload: { rule: attention.type, learnerRecordId: learner.learnerRecordId },
+    })));
 }
 
 export function reconcileAutopilotSignals(existing: AutopilotPersistedSignal[], detected: DetectedAutopilotSignal[], now = new Date().toISOString()) {
@@ -362,6 +405,14 @@ function stableHash(value: string) {
   return (hash >>> 0).toString(16).padStart(8, "0");
 }
 function actionTrackingLane(ownerType: OperationalOwnerType): AutopilotLane { return ownerType === "Provider" ? "waiting_externally" : "ready_to_action"; }
+function learningTimeRecommendedAction(type: AutopilotSignalType) {
+  if (type === "otj_plan_missing") return "Review the agreed training plan and publish a versioned Learning Time plan.";
+  if (type === "otj_activity_needs_information") return "Ask the learner to clarify the returned candidate evidence before resubmission.";
+  if (type === "otj_submission_awaiting_employer_check") return "Review the submitted candidate evidence against the deterministic eligibility tests.";
+  if (type === "otj_provider_confirmation_pending") return "Obtain and record an attributable provider confirmation without treating candidate time as confirmed.";
+  if (type === "otj_working_hours_clarification") return "Confirm the working-hours basis and any attributable compensated exception.";
+  return "Review the learner's agreed plan and recent activity with the learner, manager and provider.";
+}
 function cleanInterpretationField(value: unknown, maximum: number) { return typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, maximum) : ""; }
 function introducesUnsupportedNumber(generated: string, signal: DetectedAutopilotSignal) {
   const allowedSource = JSON.stringify({ summary: signal.summary, recommendation: signal.recommendedAction, evidence: signal.evidence, payload: signal.deterministicPayload });

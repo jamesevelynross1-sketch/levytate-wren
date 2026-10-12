@@ -74,7 +74,7 @@ async function main() {
   check("connector body is bounded to 64 KiB", mcpSource.includes("maxRequestBodySize: 64 * 1024"));
   check("distributed identity rate limiting is used", routeSource.includes("checkMicrosoftCopilotRequestLimits"));
   check("correlation IDs are returned", routeSource.includes("X-LevyTate-Correlation-Id"));
-  check("all ten approved tools are declared", microsoftCopilotToolNames.length === 10);
+  check("all twelve approved read-only tools are declared", microsoftCopilotToolNames.length === 12);
   check("MCP surface contains no mutation tool names", microsoftCopilotToolNames.every((name) => !/create|update|delete|approve|decline|complete|write|send/.test(name)));
   check("tools advertise read-only annotations", mcpSource.includes("readOnlyHint: true"));
   check("tools advertise non-destructive annotations", mcpSource.includes("destructiveHint: false"));
@@ -225,7 +225,7 @@ async function main() {
   await client.connect(clientTransport);
   const toolList = await client.listTools();
   check("official MCP initialize handshake completes", client.getServerVersion()?.name === "LevyTate");
-  check("official MCP tools/list returns ten tools", toolList.tools.length === 10);
+  check("official MCP tools/list returns twelve tools", toolList.tools.length === 12);
   check("official MCP tools/list returns exact approved names", sameMembers(toolList.tools.map((tool) => tool.name), [...microsoftCopilotToolNames]));
   check("official MCP tools/call returns structured content", Boolean((await client.callTool({ name: "get_operations_brief", arguments: {} })).structuredContent));
   await client.close();

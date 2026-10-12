@@ -260,6 +260,8 @@ export type LevyTateOperationalCopilotIntent =
   | "organisation_programmes"
   | "programme_directory"
   | "team_summary"
+  | "learning_time_summary"
+  | "learning_time_attention"
   | "access_boundary";
 
 export type LevyTateOperationalCopilotFilters = {
@@ -766,6 +768,8 @@ const operationalIntents: LevyTateOperationalCopilotIntent[] = [
   "provider_operational_summary",
   "programme_operational_summary",
   "team_summary",
+  "learning_time_summary",
+  "learning_time_attention",
   "access_boundary",
 ];
 

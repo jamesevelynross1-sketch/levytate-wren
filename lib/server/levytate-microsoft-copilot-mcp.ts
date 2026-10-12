@@ -73,6 +73,16 @@ export function createMicrosoftCopilotMcpServer(
     description: "Return a role-scoped learner lifecycle summary from LevyTate.",
     inputSchema: z.object({ learnerRecordId: z.string().trim().min(1).max(120) }).strict(),
   });
+  register(server, actor, correlationId, execute, "get_learning_time_summary", {
+    title: "Get learning time summary",
+    description: "Return separate learner-recorded, employer-checked and provider-confirmed learning-time totals for a learner in the caller's existing role scope.",
+    inputSchema: z.object({ learnerRecordId: z.string().trim().min(1).max(120) }).strict(),
+  });
+  register(server, actor, correlationId, execute, "list_learning_time_attention", {
+    title: "List learning time attention",
+    description: "List deterministic Learning Time attention items visible under the caller's existing role and organisation scope.",
+    inputSchema: listInput,
+  });
   register(server, actor, correlationId, execute, "list_applications", {
     title: "List applications",
     description: "List apprenticeship applications visible to the caller under LevyTate RBAC.",

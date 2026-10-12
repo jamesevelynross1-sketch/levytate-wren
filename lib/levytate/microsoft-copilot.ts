@@ -12,6 +12,8 @@ export const microsoftCopilotToolNames = [
   "list_my_providers",
   "list_my_programmes",
   "get_provider_summary",
+  "get_learning_time_summary",
+  "list_learning_time_attention",
 ] as const;
 
 export type MicrosoftCopilotToolName = (typeof microsoftCopilotToolNames)[number];

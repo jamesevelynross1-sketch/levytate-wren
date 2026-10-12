@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { isApplicationWorkflowsEnabledForOrganisation } from "@/lib/server/levytate-application-workflow-capability";
+import { isOffTheJobAssistantEnabledForOrganisation } from "@/lib/server/levytate-off-the-job-capability";
 import {
   attachApplicationWorkflowContexts,
   getPublishedApplicationWorkflowPolicy,
@@ -428,10 +429,11 @@ export async function getWorkspaceBootstrapForSession(session: LevyTateBetaSessi
   try {
     const context = await ensureWorkspaceContext(session);
     await assertWorkspaceReadAllowed(context);
-    const [data, requestsEnabled, applicationWorkflowsEnabled] = await Promise.all([
+    const [data, requestsEnabled, applicationWorkflowsEnabled, offTheJobAssistantEnabled] = await Promise.all([
       loadWorkspaceData(context, session),
       isRequestsEnabledForOrganisation(context.organisation.id),
       isApplicationWorkflowsEnabledForOrganisation(context.organisation.id),
+      isOffTheJobAssistantEnabledForOrganisation(context.organisation.id),
     ]);
     const userRole = normaliseMvpUserRole(context.user.role);
     const applicationWorkflowPublished = applicationWorkflowsEnabled
@@ -458,10 +460,11 @@ export async function getWorkspaceBootstrapForSession(session: LevyTateBetaSessi
         userEmail: session.email,
         userRole,
         permissions: permissionsForMvpRole(context.user.role),
-        coreEarlyAccess: getCoreEarlyAccessPolicy(userRole, { requestsEnabled }),
+        coreEarlyAccess: getCoreEarlyAccessPolicy(userRole, { requestsEnabled, offTheJobAssistantEnabled }),
         requestsEnabled,
         applicationWorkflowsEnabled,
         applicationWorkflowPublished,
+        offTheJobAssistantEnabled,
         directReportOperationalSummaries,
         prospectAccess: prospectAccess ? {
           id: prospectAccess.id,
@@ -522,10 +525,11 @@ export async function getWorkspaceBootstrapForMicrosoftCopilotActor(
   const context: WorkspaceContext = { organisation, user, warnings: [] };
   await assertWorkspaceReadAllowed(context);
   const session = microsoftCopilotActorSession(actor);
-  const [data, requestsEnabled, applicationWorkflowsEnabled] = await Promise.all([
+  const [data, requestsEnabled, applicationWorkflowsEnabled, offTheJobAssistantEnabled] = await Promise.all([
     loadWorkspaceData(context, session),
     isRequestsEnabledForOrganisation(actor.organisationId),
     isApplicationWorkflowsEnabledForOrganisation(actor.organisationId),
+    isOffTheJobAssistantEnabledForOrganisation(actor.organisationId),
   ]);
   const applicationWorkflowPublished = applicationWorkflowsEnabled
     ? await hasPublishedApplicationWorkflow(actor.organisationId)
@@ -540,10 +544,11 @@ export async function getWorkspaceBootstrapForMicrosoftCopilotActor(
       userEmail: actor.email,
       userRole: actor.role,
       permissions: permissionsForMvpRole(actor.role),
-      coreEarlyAccess: getCoreEarlyAccessPolicy(actor.role, { requestsEnabled }),
+      coreEarlyAccess: getCoreEarlyAccessPolicy(actor.role, { requestsEnabled, offTheJobAssistantEnabled }),
       requestsEnabled,
       applicationWorkflowsEnabled,
       applicationWorkflowPublished,
+      offTheJobAssistantEnabled,
       directReportOperationalSummaries: undefined,
       prospectAccess: null,
       storageMode: "supabase",

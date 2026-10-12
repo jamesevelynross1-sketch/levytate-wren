@@ -25,11 +25,12 @@ const roleBlock = (role) => {
 };
 
 check("one central policy contract exists", policy.includes("coreEarlyAccessPolicy") && policy.includes("resolveCoreEarlyAccessRouteAccess"));
-check("server returns the capability-resolved central policy", workspace.includes("coreEarlyAccess: getCoreEarlyAccessPolicy(userRole, { requestsEnabled })") && workspace.includes("requestsEnabled,"));
+check("server returns the capability-resolved central policy", workspace.includes("coreEarlyAccess: getCoreEarlyAccessPolicy(userRole, { requestsEnabled, offTheJobAssistantEnabled })") && workspace.includes("requestsEnabled,") && workspace.includes("offTheJobAssistantEnabled,"));
 check("client consumes the server policy", shell.includes("meta?.coreEarlyAccess ?? getCoreEarlyAccessPolicy"));
 check("server route uses the shared resolver", page.includes("resolveCoreEarlyAccessRouteAccess") && page.includes("redirect(access.safeRedirect)"));
 check("client manipulated modules use the shared resolver", shell.includes("resolveCoreEarlyAccessRouteAccess(meta?.userRole"));
-check("Requests is enabled only by resolved server capability", policy.includes('options: { requestsEnabled?: boolean }') && policy.includes('availability: "enabled", group: "manage"'));
+check("Requests is enabled only by resolved server capability", policy.includes("requestsEnabled?: boolean") && policy.includes('availability: "enabled", group: "manage"'));
+check("Learning Time is enabled only by resolved server capability", policy.includes("offTheJobAssistantEnabled?: boolean") && policy.includes('module.moduleKey === "Learning Time"'));
 check("application review deep links preserve the role-specific module", shell.includes('const applicationModule = meta?.userRole === "Line Manager" ? "Approvals" : "Applications";') && shell.includes('resolved === "Approvals" || resolved === "Applications"') && shell.includes('<ApplicationsModule initialApplicationId={managerReviewApplicationId} onApplicationSelectionChange={updateApplicationReviewSelection} />') && applications.includes('useState<string | null>(initialApplicationId ?? null)'));
 
 const employee = roleBlock("Employee");

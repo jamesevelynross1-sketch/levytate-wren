@@ -39,6 +39,9 @@ export type MvpPermission =
   | "learnerLifecycle:read"
   | "learnerLifecycle:write"
   | "learnerLifecycle:status"
+  | "learningTime:read"
+  | "learningTime:write"
+  | "learningTime:manage"
   | "operationalActions:read"
   | "operationalActions:write"
   | "copilot:use"
@@ -118,6 +121,9 @@ const allPermissions = [
   "learnerLifecycle:read",
   "learnerLifecycle:write",
   "learnerLifecycle:status",
+  "learningTime:read",
+  "learningTime:write",
+  "learningTime:manage",
   "operationalActions:read",
   "operationalActions:write",
   "copilot:use",
@@ -174,6 +180,9 @@ export const mvpRolePermissions = {
     "learnerLifecycle:read",
     "learnerLifecycle:write",
     "learnerLifecycle:status",
+    "learningTime:read",
+    "learningTime:write",
+    "learningTime:manage",
     "operationalActions:read",
     "operationalActions:write",
     "copilot:use",
@@ -189,6 +198,7 @@ export const mvpRolePermissions = {
     "applications:read",
     "applications:status",
     "learnerLifecycle:read",
+    "learningTime:read",
     "providers:read",
     "copilot:use",
     "knowledge:read",
@@ -199,6 +209,8 @@ export const mvpRolePermissions = {
     "applications:read",
     "applications:write",
     "learnerLifecycle:read",
+    "learningTime:read",
+    "learningTime:write",
     "providers:read",
     "copilot:use",
     "knowledge:read",

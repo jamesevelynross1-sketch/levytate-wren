@@ -10,6 +10,7 @@ import { deriveApplicationWorkflowCompatibility } from "@/lib/levytate/applicati
 import { getAutopilotWorkspaceForMicrosoftCopilotActor } from "@/lib/server/levytate-autopilot";
 import { getOrganisationFinanceState } from "@/lib/server/levytate-finance";
 import { getOrganisationLearnerLifecycleRecordDetail } from "@/lib/server/levytate-learner-lifecycle";
+import { getLearningTimeWorkspace } from "@/lib/server/levytate-off-the-job";
 import {
   listManagerDirectReportOperationalActionsReadOnly,
   listOperationalActions,
@@ -227,6 +228,43 @@ async function dispatchTool(actor: MicrosoftCopilotActor, toolName: MicrosoftCop
         attention: detail.attention,
         link: microsoftCopilotCanonicalUrl("/levytate/app", { module: "Learners", learner: learnerRecordId }),
       };
+    }
+    case "get_learning_time_summary": {
+      requirePermission(actor, "learningTime:read");
+      const learnerRecordId = requiredText(args.learnerRecordId, "learnerRecordId");
+      const workspace = await getLearningTimeWorkspace(session);
+      const learner = workspace.learners.find((entry) => entry.learnerRecordId === learnerRecordId);
+      if (!learner) throw new MicrosoftCopilotConnectorError("not_found", "The learner was not found in the caller's Learning Time scope.", 404);
+      return {
+        asOf: workspace.generatedAt,
+        learnerRecordId: learner.learnerRecordId,
+        learnerName: learner.learnerName,
+        programmeName: learner.programmeName,
+        planStatus: learner.plan?.status ?? "not_configured",
+        individualMinimumMinutes: learner.plan?.individualMinimumMinutes ?? null,
+        learnerRecordedMinutes: learner.totals.learnerRecordedMinutes,
+        employerCheckedMinutes: learner.totals.employerCheckedMinutes,
+        providerConfirmedMinutes: learner.totals.providerConfirmedMinutes,
+        remainingMinutes: learner.plan ? learner.totals.remainingMinutes : null,
+        lastActivityDate: learner.lastActivityDate,
+        attentionCount: learner.attention.length,
+        link: microsoftCopilotCanonicalUrl("/levytate/app", { module: "Learning Time", learner: learner.learnerRecordId }),
+      };
+    }
+    case "list_learning_time_attention": {
+      requirePermission(actor, "learningTime:read");
+      const limit = boundedLimit(args.limit, 20, 50);
+      const workspace = await getLearningTimeWorkspace(session);
+      const items = workspace.learners.flatMap((learner) => learner.attention.map((attention) => ({
+        learnerRecordId: learner.learnerRecordId,
+        learnerName: learner.learnerName,
+        programmeName: learner.programmeName,
+        type: attention.type,
+        label: attention.label,
+        detail: attention.detail,
+        link: microsoftCopilotCanonicalUrl("/levytate/app", { module: "Learning Time", learner: learner.learnerRecordId }),
+      }))).slice(0, limit);
+      return { asOf: workspace.generatedAt, count: items.length, items };
     }
     case "list_applications": {
       requirePermission(actor, "applications:read");

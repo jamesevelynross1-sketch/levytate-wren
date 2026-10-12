@@ -4,6 +4,7 @@ import type { LevyTateBetaSession } from "@/lib/levytate/config/beta-access";
 import { interpretAutopilotSignal } from "@/lib/levytate/autopilot/ai";
 import {
   analyseOperationsAutopilot,
+  analyseLearningTimeAutopilot,
   autopilotAnalyserVersion,
   buildOperationsBrief,
   reconcileAutopilotSignals,
@@ -12,6 +13,7 @@ import {
   type AutopilotLane,
   type AutopilotPersistedSignal,
   type DetectedAutopilotSignal,
+  type AutopilotSignalType,
 } from "@/lib/levytate/autopilot/operations-autopilot";
 import { hasMvpPermission, normaliseMvpUserRole } from "@/lib/levytate/mvp/rbac";
 import { deriveApplicationWorkflowCompatibility } from "@/lib/levytate/application-workflows/compatibility";
@@ -19,7 +21,8 @@ import type { OperationalOwnerType, OperationalPriorityLevel } from "@/lib/levyt
 import { getLearnerLifecycleServerContext, listOrganisationLearnerLifecycleDetails, LevyTateLearnerLifecyclePermissionError } from "@/lib/server/levytate-learner-lifecycle";
 import { listOperationalActions } from "@/lib/server/levytate-operational-actions";
 import { getLevyTateSupabaseConfig, supabaseInsert, supabaseSelect, supabaseUpdate } from "@/lib/server/levytate-supabase";
-import { getWorkspaceBootstrapForMicrosoftCopilotActor, getWorkspaceBootstrapForSession } from "@/lib/server/levytate-workspace";
+import { getWorkspaceBootstrapForMicrosoftCopilotActor, getWorkspaceBootstrapForSession, microsoftCopilotActorSession } from "@/lib/server/levytate-workspace";
+import { getLearningTimeWorkspace } from "@/lib/server/levytate-off-the-job";
 
 const signalsTable = "levytate_intelligence_signals";
 const eventsTable = "levytate_intelligence_signal_events";
@@ -77,6 +80,7 @@ export async function refreshAutopilotWorkspace(session: LevyTateBetaSession) {
     selectRows(context.organisation.id),
   ]);
   const now = new Date().toISOString();
+  const learningTime = bootstrap.meta.offTheJobAssistantEnabled ? await getLearningTimeWorkspace(session) : null;
   const employees = new Map(bootstrap.data.employees.map((employee) => [employee.id, employee.name]));
   const actionInputs: AutopilotActionInput[] = actions.map((action) => ({
     id: action.id, learnerRecordId: action.learnerRecordId, applicationId: action.applicationId, employeeId: action.employeeId,
@@ -91,7 +95,8 @@ export async function refreshAutopilotWorkspace(session: LevyTateBetaSession) {
       currentStepLabel: workflow.currentStepLabel, currentResponsibleRole: workflow.currentResponsibleRole,
     };
   });
-  const detected = analyseOperationsAutopilot({
+  const detected = [
+    ...analyseOperationsAutopilot({
     organisationId: context.organisation.id, now,
     learners: details.map((detail) => ({
       learnerRecordId: detail.learnerRecordId, learnerName: detail.learner.name,
@@ -101,8 +106,17 @@ export async function refreshAutopilotWorkspace(session: LevyTateBetaSession) {
         .filter((review) => ["provider_review", "l_and_d_check_in", "manager_check_in"].includes(review.reviewType))
         .map((review) => ({ id: review.id, type: review.reviewType as "provider_review" | "l_and_d_check_in" | "manager_check_in", nextReviewDate: review.nextReviewDate, reviewDate: review.reviewDate, status: review.status })),
     })),
-    actions: actionInputs, applications: applicationInputs,
-  });
+      actions: actionInputs, applications: applicationInputs,
+    }),
+    ...(learningTime ? analyseLearningTimeAutopilot({
+      organisationId: context.organisation.id, now,
+      learners: learningTime.learners.map((learner) => ({
+        learnerRecordId: learner.learnerRecordId, learnerName: learner.learnerName,
+        providerId: learner.providerId, programmeId: learner.programmeId,
+        attention: learner.attention.map((item) => ({ ...item, type: item.type as AutopilotSignalType })),
+      })),
+    }) : []),
+  ];
   const existing = existingRows.map(fromRow);
   const existingByKey = new Map(existing.map((signal) => [signal.signalKey, signal]));
   const enriched = await Promise.all(detected.map(async (signal) => {
@@ -117,7 +131,7 @@ export async function refreshAutopilotWorkspace(session: LevyTateBetaSession) {
 
 export async function refreshAutopilotWorkspaceForMicrosoftCopilotActor(actor: MicrosoftCopilotActor) {
   assertMicrosoftCopilotAutopilotRole(actor, true);
-  const [{ data }, actionRows, existingRows] = await Promise.all([
+  const [bootstrap, actionRows, existingRows] = await Promise.all([
     getWorkspaceBootstrapForMicrosoftCopilotActor(actor),
     supabaseSelect<MicrosoftActionRow>(requireConfig(), "levytate_operational_actions", new URLSearchParams({
       select: "id,learner_record_id,application_id,employee_id,title,description,action_type,owner_type,due_date,status,source_url,updated_at",
@@ -127,10 +141,15 @@ export async function refreshAutopilotWorkspaceForMicrosoftCopilotActor(actor: M
     })),
     selectRows(actor.organisationId),
   ]);
+  const { data, meta } = bootstrap;
   const now = new Date().toISOString();
+  const learningTime = meta.offTheJobAssistantEnabled
+    ? await getLearningTimeWorkspace(microsoftCopilotActorSession(actor))
+    : null;
   const employees = new Map(data.employees.map((employee) => [employee.id, employee.name]));
   const programmes = new Map(data.providerProgrammes.map((programme) => [programme.id, programme]));
-  const detected = analyseOperationsAutopilot({
+  const detected = [
+    ...analyseOperationsAutopilot({
     organisationId: actor.organisationId,
     now,
     learners: data.learnerRecords.map((record) => {
@@ -155,8 +174,17 @@ export async function refreshAutopilotWorkspaceForMicrosoftCopilotActor(actor: M
     applications: data.applications.map((application) => {
       const workflow = deriveApplicationWorkflowCompatibility(application);
       return { id: application.id, employeeId: application.employeeId, employeeName: employees.get(application.employeeId) ?? "Employee", status: workflow.status, currentOwner: workflow.currentOwner, updatedAt: workflow.lastProgressedAt, currentStepLabel: workflow.currentStepLabel, currentResponsibleRole: workflow.currentResponsibleRole };
+      }),
     }),
-  });
+    ...(learningTime ? analyseLearningTimeAutopilot({
+      organisationId: actor.organisationId, now,
+      learners: learningTime.learners.map((learner) => ({
+        learnerRecordId: learner.learnerRecordId, learnerName: learner.learnerName,
+        providerId: learner.providerId, programmeId: learner.programmeId,
+        attention: learner.attention.map((item) => ({ ...item, type: item.type as AutopilotSignalType })),
+      })),
+    }) : []),
+  ];
   const existing = existingRows.map(fromRow);
   const existingByKey = new Map(existing.map((signal) => [signal.signalKey, signal]));
   const enriched = await Promise.all(detected.map(async (signal) => {

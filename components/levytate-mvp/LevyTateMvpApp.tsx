@@ -10,6 +10,7 @@ import {
   ClipboardCheck,
   GraduationCap,
   Handshake,
+  Hourglass,
   LayoutDashboard,
   Landmark,
   LogOut,
@@ -61,6 +62,11 @@ const EmployerRequestsContainer = dynamic(
   { loading: () => <div role="status" className="rounded-2xl border border-[#27456a]/[0.09] bg-white p-6 text-sm text-[#52677d]">Loading Requests…</div> },
 );
 
+const LearningTimeModule = dynamic(
+  () => import("@/components/levytate-mvp/LearningTimeModule").then((module) => module.LearningTimeModule),
+  { loading: () => <div role="status" className="rounded-2xl border border-[#27456a]/[0.09] bg-white p-6 text-sm text-[#52677d]">Loading Learning Time…</div> },
+);
+
 const modules = [
   { name: "Home", icon: LayoutDashboard },
   { name: "My Programme", icon: BookOpenCheck },
@@ -72,6 +78,7 @@ const modules = [
   { name: "Applications", icon: ClipboardCheck },
   { name: "People", icon: Users },
   { name: "Learners", icon: GraduationCap },
+  { name: "Learning Time", icon: Hourglass },
   { name: "Providers", icon: Building2 },
   { name: "My Providers", icon: Network },
   { name: "My Programmes", icon: GraduationCap },
@@ -102,6 +109,7 @@ const modulePermissions = {
   Applications: "applications:read",
   People: "employees:read",
   Learners: "learnerLifecycle:read",
+  "Learning Time": "learningTime:read",
   Providers: "providers:read",
   "My Providers": "providerRelationships:read",
   "My Programmes": "providerRelationships:read",
@@ -144,6 +152,7 @@ const moduleCopy: Record<ModuleName, string> = {
   Applications: "Organisation application flow, final approval work and learner handoff readiness.",
   People: "Employee and role records that shape workforce development decisions.",
   Learners: "Read-only lifecycle records covering eligibility, enrolment, progress, reviews and completion.",
+  "Learning Time": "Plan, prepare and review off-the-job learning activity with clear candidate, employer and provider evidence states.",
   Providers: "Explore factual apprenticeship programme and provider information in one clear directory.",
   "My Providers": "Manage the providers your organisation works with and review their current activity.",
   "My Programmes": "Manage the programmes your organisation has published for employees.",
@@ -529,6 +538,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
             {activeModule === "Intelligence" ? <ProviderIntelligenceModule onOpenProvider={() => openModule("Marketplace")} /> : null}
             {activeModule === "Applications" ? <ApplicationsModule initialApplicationId={managerReviewApplicationId} onApplicationSelectionChange={updateApplicationReviewSelection} /> : null}
             {activeModule === "Learners" ? <LearnersModule initialLearnerRecordId={learnerTarget?.learnerRecordId} initialAction={learnerTarget?.actionType} onDeepLinkConsumed={() => setLearnerTarget(null)} onLearnerSelectionChange={updateLearnerCopilotSelection} /> : null}
+            {activeModule === "Learning Time" ? <LearningTimeModule /> : null}
             {activeModule === "People" ? (
               <ModuleStackNav items={peopleItems} active={peopleView} onSelect={(item) => setPeopleView(item as PeopleView)}>
                 {peopleView === "Employees" ? <EmployeesModule onStartDiscovery={(employeeId) => { setAiEmployeeId(employeeId); openModule("Copilot"); }} /> : null}
