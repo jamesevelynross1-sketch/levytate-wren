@@ -93,7 +93,7 @@ function deterministicResponse(request: LearningTimeAssistantRequest, learner: A
   const hardExcluded = category ? (excludedActivityCategories as readonly string[]).includes(category) : false;
   const outcome = assessment?.outcome ?? (hardExcluded ? "likely_ineligible" : "needs_clarification");
   const missing = assessment?.clarificationItems ?? eligibilityQuestions(request, category, learner);
-  const priorities = learner.priorities.filter((entry) => entry.status === "active").slice(0, 4);
+  const priorities = learner.priorities.filter((entry) => entry.status === "active").slice(0, 3);
   const title = bounded(request.candidate?.title || request.prompt.split(/[.!?]/)[0] || "Learning activity", 180);
   return {
     mode: request.mode,
@@ -170,7 +170,7 @@ function normaliseSuggested(value: unknown): LearningTimeAssistantResponse["sugg
 
 function normalisePlanning(value: unknown, allowedPriorityIds: ReadonlySet<string>): LearningTimeAssistantResponse["planningSuggestions"] {
   if (!Array.isArray(value)) return [];
-  return value.slice(0, 6).flatMap((entry) => {
+  return value.slice(0, 3).flatMap((entry) => {
     if (!entry || typeof entry !== "object") return [];
     const item = entry as Record<string, unknown>;
     const title = bounded(item.title, 180); if (!title) return [];

@@ -311,6 +311,21 @@ export async function saveLearningTimeActivity(session: LevyTateBetaSession, inp
 
 export async function submitLearningTimeActivity(session: LevyTateBetaSession, input: { activityId: string; lockVersion: number; idempotencyKey: string }) {
   const { organisation, user } = await authorisedContext(session);
+  const [activity] = await supabaseSelect<Pick<ActivityRow, "id" | "lock_version" | "deterministic_reasons">>(
+    requireConfig(),
+    "levytate_otj_activities",
+    new URLSearchParams({
+      select: "id,lock_version,deterministic_reasons",
+      organisation_id: `eq.${organisation.id}`,
+      id: `eq.${input.activityId}`,
+      created_by_user_id: `eq.${user.id}`,
+      status: "in.(draft,needs_information)",
+      limit: "1",
+    }),
+  );
+  if (activity?.lock_version === input.lockVersion && stringArray(activity.deterministic_reasons).some((reason) => reason.toLowerCase().includes("overlaps another learning activity"))) {
+    throw new LevyTateLearningTimeError("Overlapping activity requires resolution before submission.", 409);
+  }
   return rpc<ActivityRow>("levytate_submit_otj_activity", {
     p_organisation_id: organisation.id, p_activity_id: input.activityId, p_actor_user_id: user.id,
     p_idempotency_key: idempotency(input.idempotencyKey), p_expected_lock_version: input.lockVersion,

@@ -60,6 +60,7 @@ check("migration uses force RLS for evidence tables", (migration.match(/force ro
 check("migration does not grant evidence access to authenticated or anon", !/grant\s+(?:select|insert|update|delete)[^;]+\s+to\s+(?:authenticated|anon)/i.test(migration));
 check("confirmation and event ledgers are append-only", migration.includes("Learning-time audit and confirmation records are append-only"));
 check("conflicting idempotency replays are rejected", migration.includes("Conflicting learning-time idempotency key") && migration.includes("Conflicting learning-time confirmation idempotency key"));
+check("overlapping time is blocked from the only browser submission path", server.includes("Overlapping activity requires resolution before submission") && server.includes('status: "in.(draft,needs_information)"'));
 check("provider confirmation is tied to the learner provider", migration.includes("Provider confirmation must match the learner provider"));
 check("published plan versions are immutable", migration.includes("Published learning-time plan versions are immutable"));
 check("post-policy floor is enforced in storage workflow", migration.includes("greatest(11220, published_standard_minimum_minutes - prior_learning_reduction_minutes)"));
@@ -71,6 +72,7 @@ check("ST1512 remains fail-closed pending reliable official-source parsing", st1
 check("writes resolve organisation and employee scope server-side", server.includes("organisation_id") && server.includes("manager_id") && server.includes("created_by_user_id"));
 check("assistant cannot override deterministic ineligibility", assistant.includes('fallback.assessment === "likely_ineligible"'));
 check("AI planning may reference only existing bounded priority IDs", assistant.includes("allowedPriorityIds.has(id)"));
+check("assistant planning returns no more than three suggestions", assistant.includes("slice(0, 3)"));
 check("private learner drafts stay out of employer and manager workspaces", server.includes('role === "Employee" || activity.status !== "draft"'));
 check("inactivity attention is suppressed during a break", server.includes("if (!activeBreak && plan)"));
 check("Production capability is fail-closed", capability.includes('process.env.VERCEL_ENV === "production"'));
