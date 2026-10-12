@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { createDefaultApplicationWorkflow, validateApplicationWorkflowSteps, type ApplicationWorkflowStep, type ApplicationWorkflowVersion } from "../lib/levytate/application-workflows/domain";
 import type { ApplicationWorkflowEvent } from "../lib/levytate/application-workflows/domain";
 import { createApplicationWorkflowInstance, transitionApplicationWorkflow } from "../lib/levytate/application-workflows/engine";
-import { deriveApplicationWorkflowCompatibility } from "../lib/levytate/application-workflows/compatibility";
+import { applicationRequiresPublishedWorkflow, deriveApplicationWorkflowCompatibility } from "../lib/levytate/application-workflows/compatibility";
 import { hasMvpPermission } from "../lib/levytate/mvp/rbac";
 
 const now = "2026-10-09T09:00:00.000Z";
@@ -53,6 +53,7 @@ const custom = version([
 ]);
 const journeyB = advance(custom, "application-b");
 journeyB.act("Employee", "submit", "journey-b-submit");
+check(journeyB.instance.currentStepId === "lead-check", "employee submission reaches the published workflow's actual first employer step");
 journeyB.act("Apprenticeship Lead", "continue", "journey-b-lead-check");
 journeyB.act("Line Manager", "request_information", "journey-b-info", true);
 check(journeyB.instance.state === "needs_information" && journeyB.instance.returnStepId === "manager-approval", "information request records exact return step");
@@ -94,10 +95,18 @@ check(compatibility.configurable && compatibility.currentStepLabel === "Apprenti
 check(compatibility.currentResponsibleRole === "Apprenticeship Lead", "compatibility adapter exposes responsible role");
 const applicationV1 = createApplicationWorkflowInstance("application-version-one", defaultWorkflow, now);
 const applicationV2 = createApplicationWorkflowInstance("application-version-two", { ...custom, id: "version-2", version: 2 }, now);
+const adminDraftSubmission = createApplicationWorkflowInstance("admin-created-draft", custom, now);
+const employeeCreatedSubmission = createApplicationWorkflowInstance("employee-created-application", custom, now);
+check(adminDraftSubmission.workflowVersionId === employeeCreatedSubmission.workflowVersionId, "admin-created and employee-created applications use the same published workflow at submission");
 check(applicationV1.workflowVersionId === defaultWorkflow.id && applicationV2.workflowVersionId === "version-2", "new applications pin the published version active at submission");
 check(applicationV1.workflowVersionId !== applicationV2.workflowVersionId, "publishing a new version does not mutate an in-flight instance");
 const legacy = deriveApplicationWorkflowCompatibility({ status: "Awaiting Manager Review", currentOwner: "Line Manager", updatedAt: now });
 check(!legacy.configurable && legacy.currentOwner === "Line Manager", "legacy application semantics remain unchanged");
+const publicationBoundary = "2026-10-10T09:00:00.000Z";
+check(applicationRequiresPublishedWorkflow({ status: "Draft", submittedAt: "2026-10-01T09:00:00.000Z", history: [{ status: "Draft", createdAt: "2026-10-01T09:00:00.000Z" }] }, publicationBoundary), "an unsubmitted draft pins the workflow available at submission, not creation");
+check(!applicationRequiresPublishedWorkflow({ status: "Awaiting Manager Review", submittedAt: "2026-10-01T09:00:00.000Z", history: [{ status: "Submitted to Line Manager", createdAt: "2026-10-01T09:00:00.000Z" }] }, publicationBoundary), "a demonstrably pre-publication application remains legacy");
+check(applicationRequiresPublishedWorkflow({ status: "Submitted to Line Manager", submittedAt: "2026-10-11T09:00:00.000Z", history: [{ status: "Draft", createdAt: "2026-10-11T08:55:00.000Z" }, { status: "Submitted to Line Manager", createdAt: "2026-10-11T09:00:00.000Z" }] }, publicationBoundary), "a post-publication legacy status is recognised as a bypass attempt");
+check(applicationRequiresPublishedWorkflow({ status: "Submitted to Line Manager", submittedAt: "invalid", history: [] }, publicationBoundary), "missing progression evidence fails closed");
 
 // RBAC boundary.
 check(hasMvpPermission("Employer Admin", "applicationWorkflows:manage"), "Employer Admin may configure workflows");
@@ -113,7 +122,23 @@ for (const text of ["unique (organisation_id, application_id, workflow_version_i
 check(!/\b(drop table|truncate table|delete from)\b/i.test(migration), "migration contains no destructive data statement");
 check(!/grant\s+(?:all|delete|truncate).*authenticated/i.test(migration), "authenticated clients receive no broad workflow grants");
 check(!/grant\s+(?:all|delete|truncate|references|trigger)/i.test(migration), "workflow tables receive no broad or destructive grants");
-check(workspaceServer.includes('workflowInstances[0]?.state !== "needs_information"'), "employee resubmission recognises the authoritative workflow information-return state");
+check(workspaceServer.includes('protection.instance?.state !== "needs_information"'), "employee resubmission recognises the authoritative workflow information-return state");
 check(workspaceServer.includes("if (applicationWorkflowsEnabled) data.applications = await attachApplicationWorkflowContexts(actor.organisationId, data.applications)"), "Microsoft workspace bootstrap attaches authoritative configurable workflow contexts");
+check(workspaceServer.includes("only the employee can submit it into the configured approval workflow"), "server rejects employer impersonation of employee submission");
+check(workspaceServer.includes("This application must be submitted by the employee"), "server rejects direct legacy progression for a protected unpinned application");
+check(workspaceServer.indexOf("await saveApplication(organisationId, safeBeforeTransition)") < workspaceServer.indexOf("await startApplicationWorkflow(session, application.id"), "employee submission persists a safe draft before workflow startup");
+check(workspaceServer.includes("A failure can leave a retryable draft, never a submitted legacy record"), "submission orchestration documents its failure-safe invariant");
+check(workspaceServer.includes("recoverableUnpinnedSubmission"), "employee submission can safely recover a post-publication record written through the retired bypass");
+
+const workflowServer = readFileSync(resolve("lib/server/levytate-application-workflows.ts"), "utf8");
+check(workflowServer.includes('status: "Draft" as const') && workflowServer.includes('currentOwner: "Employee" as const'), "post-publication unpinned records are presented as employee-owned drafts without mutating persistence");
+
+const applicationsUi = readFileSync(resolve("components/levytate-mvp/ApplicationsModule.tsx"), "utf8");
+const employeeUi = readFileSync(resolve("components/levytate-mvp/EmployeeExperienceModule.tsx"), "utf8");
+check(applicationsUi.includes("Awaiting employee submission"), "admin application queue identifies employee-owned drafts");
+check(applicationsUi.includes("Workflow begins when employee submits"), "admin draft record previews the unpinned workflow journey");
+check(applicationsUi.includes("!application.workflowPreview && reviewableManagerStatuses"), "post-publication unpinned records do not expose legacy manager actions");
+check(employeeUi.includes('configurableWorkflow ? "Submit application" : "Submit to line manager"'), "employee submission copy is workflow-aware");
+check(employeeUi.includes("Your application is now with"), "employee status exposes the configured current step");
 
 console.log(`Configurable application workflows: ${assertions} assertions passed.`);

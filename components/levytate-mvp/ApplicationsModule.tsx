@@ -63,6 +63,7 @@ export function ApplicationsModule({
   onApplicationSelectionChange,
 }: ApplicationsModuleProps = {}) {
   const { data, saveApplication, updateApplicationStatus, meta } = useMvpWorkspace();
+  const configurableWorkflowPublished = meta?.applicationWorkflowPublished === true;
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("All");
   const [ownerFilter, setOwnerFilter] = useState("All");
@@ -104,6 +105,9 @@ export function ApplicationsModule({
   const selectedApplication = selectedId
     ? data.applications.find((application) => application.id === selectedId) ?? null
     : null;
+  const draftUsesConfigurableWorkflow = Boolean(draft && configurableWorkflowPublished && (
+    draft.workflowPreview || !data.applications.some((application) => application.id === draft.id)
+  ));
 
   function pathwaysForEmployee(employeeId: string) {
     const employee = data.employees.find((item) => item.id === employeeId);
@@ -154,7 +158,8 @@ export function ApplicationsModule({
     }
     saveApplication({
       ...draft,
-      currentOwner: applicationOwnerForStatus(draft.status),
+      status: draftUsesConfigurableWorkflow ? "Draft" : draft.status,
+      currentOwner: draftUsesConfigurableWorkflow ? "Employee" : applicationOwnerForStatus(draft.status),
       updatedAt: nowIso(),
     });
     setDraft(null);
@@ -238,15 +243,16 @@ export function ApplicationsModule({
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-2">
                         <TableAction onClick={() => setSelectedId(application.id)}>View</TableAction>
-                        {!application.workflow ? <TableAction onClick={() => setDraft({ ...application })}>Edit</TableAction> : null}
-                        {application.status === "Draft" && !application.workflow ? <TableAction onClick={() => submitToManager(application)}>Submit</TableAction> : null}
-                        {!application.workflow && reviewableManagerStatuses.includes(application.status) ? (
+                        {!application.workflow && (!application.workflowPreview || application.status === "Draft") ? <TableAction onClick={() => setDraft({ ...application })}>Edit</TableAction> : null}
+                        {application.status === "Draft" && application.workflowPreview ? <span className="self-center text-xs font-semibold text-[#102c3d]/45">Awaiting employee submission</span> : null}
+                        {application.status === "Draft" && !application.workflow && !application.workflowPreview ? <TableAction onClick={() => submitToManager(application)}>Submit</TableAction> : null}
+                        {!application.workflow && !application.workflowPreview && reviewableManagerStatuses.includes(application.status) ? (
                           <>
                             <TableAction onClick={() => approveManager(application)}>Approve</TableAction>
                             <TableAction onClick={() => declineManager(application)} danger>Decline</TableAction>
                           </>
                         ) : null}
-                        {!application.workflow && reviewableLeadStatuses.includes(application.status) ? (
+                        {!application.workflow && !application.workflowPreview && reviewableLeadStatuses.includes(application.status) ? (
                           <>
                             <TableAction onClick={() => approveLead(application)}>Final approve</TableAction>
                             <TableAction onClick={() => declineLead(application)} danger>Decline</TableAction>
@@ -289,7 +295,12 @@ export function ApplicationsModule({
                 required
                 options={[{ value: "", label: "Select employee" }, ...data.employees.filter((item) => item.status === "Active").map((item) => ({ value: item.id, label: item.name }))]}
               />
-              <FormSelect label="Status" value={draft.status} onChange={(value) => setDraft({ ...draft, status: value as RequestStatus })} options={requestStatuses} />
+              {draftUsesConfigurableWorkflow ? (
+                <div className="grid gap-1.5 text-xs font-semibold text-[#102c3d]/58">
+                  Status
+                  <div className="min-h-11 rounded-lg border border-[#102c3d]/[0.07] bg-[#f8fbfa] px-3 py-3 text-sm font-medium text-[#102c3d]">Draft · Owner: Employee</div>
+                </div>
+              ) : <FormSelect label="Status" value={draft.status} onChange={(value) => setDraft({ ...draft, status: value as RequestStatus })} options={requestStatuses} />}
               <FormSelect
                 label="Apprenticeship standard"
                 value={draft.apprenticeshipStandardId}
@@ -314,7 +325,8 @@ export function ApplicationsModule({
               <FormTextArea label="Support required" value={draft.supportRequired} onChange={(value) => setDraft({ ...draft, supportRequired: value })} wide />
               <FormTextArea label="Decision note" value={draft.managerNote} onChange={(value) => setDraft({ ...draft, managerNote: value })} wide />
             </FormGrid>
-            <FormActions onCancel={() => setDraft(null)} label="Save application" error={error} />
+            {draftUsesConfigurableWorkflow ? <p className="mt-4 rounded-xl bg-[#eef7f5] px-4 py-3 text-xs font-semibold leading-5 text-[#0b6f63]">Application draft created for the employee. The employee needs to review and submit it before the approval workflow begins.</p> : null}
+            <FormActions onCancel={() => setDraft(null)} label={draftUsesConfigurableWorkflow ? "Save draft" : "Save application"} error={error} />
           </form>
         </MvpModal>
       ) : null}
@@ -347,7 +359,7 @@ function LineManagerApprovalsModule({ onOpenDirectReport, initialApplicationId, 
   const directReports = data.employees.filter((employee) => employee.managerId === manager?.id);
   const directReportIds = new Set(directReports.map((employee) => employee.id));
   const queue = data.applications
-    .filter((application) => directReportIds.has(application.employeeId) && reviewableManagerStatuses.includes(application.status))
+    .filter((application) => directReportIds.has(application.employeeId) && !application.workflowPreview && reviewableManagerStatuses.includes(application.status))
     .sort((a, b) => {
       const statusRank = reviewableManagerStatuses.indexOf(a.status) - reviewableManagerStatuses.indexOf(b.status);
       return statusRank || a.submittedAt.localeCompare(b.submittedAt);
@@ -748,7 +760,7 @@ function ApplicationDetailModal({ application, onClose }: { application: MvpAppl
             <h3 className="mt-1 text-lg font-semibold text-[#102c3d]">{standard?.title ?? application.apprenticeshipStandardId}</h3>
             <p className="mt-2 text-sm leading-6 text-[#102c3d]/[0.56]">{employee?.jobTitle || "Role to confirm"} · {employee?.department || "Department to confirm"} · {employee?.site || "Site to confirm"}</p>
           </section>
-          {application.workflow ? <WorkflowDecisionSummary application={application} /> : null}
+          {application.workflow ? <WorkflowDecisionSummary application={application} /> : application.workflowPreview ? <WorkflowPreviewSummary application={application} /> : null}
           <section>
             <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#0b6f63]">Workflow status</p>
             <div className="mt-2 flex flex-wrap gap-2">
@@ -803,6 +815,11 @@ function WorkflowDecisionSummary({ application }: { application: MvpApplication 
   return <section className="rounded-xl border border-[#087c73]/15 bg-[#eef7f5] p-4"><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#087c73]">Versioned workflow</p><p className="mt-2 text-sm font-semibold text-[#102c3d]">{step?.label}</p><p className="mt-1 text-xs text-[#102c3d]/55">Version {application.workflow?.version.version} · {step?.responsibleRole}</p></section>;
 }
 
+function WorkflowPreviewSummary({ application }: { application: MvpApplication }) {
+  const version = application.workflowPreview?.version;
+  return <section className="rounded-xl border border-[#087c73]/15 bg-[#eef7f5] p-4"><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#087c73]">Configured workflow</p><p className="mt-2 text-sm font-semibold text-[#102c3d]">Workflow begins when employee submits</p><p className="mt-1 text-xs leading-5 text-[#102c3d]/55">The workflow version published at submission will be pinned. Current preview: version {version?.version}.</p></section>;
+}
+
 function applicationStage(status: RequestStatus) {
   if (["Approved for Enrolment", "Completed"].includes(status)) return 3;
   if (["Approved by Line Manager", "Submitted to Apprenticeship Lead", "Awaiting Final Approval", "Declined by Apprenticeship Lead"].includes(status)) return 2;
@@ -815,6 +832,9 @@ function applicationTracker(application: MvpApplication) {
     const steps = application.workflow.version.steps;
     const index = steps.findIndex((step) => step.id === application.workflow?.instance.currentStepId);
     return { stages: steps.map((step) => step.label), currentIndex: Math.max(0, index) };
+  }
+  if (application.workflowPreview) {
+    return { stages: application.workflowPreview.version.steps.map((step) => step.label), currentIndex: 0 };
   }
   return { stages: ["Employee", "Manager", "Apprenticeship Lead", "Enrolment"], currentIndex: applicationStage(application.status) };
 }

@@ -1,6 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { isApplicationWorkflowsEnabledForOrganisation } from "@/lib/server/levytate-application-workflow-capability";
-import { attachApplicationWorkflowContexts, hasPublishedApplicationWorkflow, startApplicationWorkflow, transitionApplicationWorkflowForSession } from "@/lib/server/levytate-application-workflows";
+import {
+  attachApplicationWorkflowContexts,
+  getPublishedApplicationWorkflowPolicy,
+  hasPublishedApplicationWorkflow,
+  startApplicationWorkflow,
+  transitionApplicationWorkflowForSession,
+} from "@/lib/server/levytate-application-workflows";
+import { applicationRequiresPublishedWorkflow } from "@/lib/levytate/application-workflows/compatibility";
 import { listManagerDirectReportOperationalSummaries } from "@/lib/server/levytate-manager-operational-summaries";
 import type {
   ProviderCatalogueRecord,
@@ -364,6 +371,53 @@ export class LevyTateWorkspacePermissionError extends Error {
   }
 }
 
+type WorkflowInstanceGuardRow = {
+  id: string;
+  state: "active" | "needs_information" | "declined" | "ready_for_provider";
+  lock_version: number;
+};
+
+async function getApplicationWorkflowProtection(organisationId: string, applicationId: string) {
+  const [policy, instances, existing] = await Promise.all([
+    getPublishedApplicationWorkflowPolicy(organisationId),
+    supabaseSelect<WorkflowInstanceGuardRow>(assertSupabase(), "levytate_application_workflow_instances", new URLSearchParams({
+      select: "id,state,lock_version",
+      organisation_id: `eq.${organisationId}`,
+      application_id: `eq.${applicationId}`,
+      limit: "1",
+    })),
+    selectOne<ApplicationRow>(applicationsTable, new URLSearchParams({
+      select: "id,employee_id,apprenticeship_standard_id,status,current_owner,reason,career_goal,support_required,manager_note,submitted_at,updated_at",
+      organisation_id: `eq.${organisationId}`,
+      id: `eq.${applicationId}`,
+      limit: "1",
+    })),
+  ]);
+  const historyRows = existing ? await supabaseSelect<ApplicationHistoryRow>(
+    assertSupabase(),
+    applicationHistoryTable,
+    new URLSearchParams({
+      select: "id,application_id,status,owner,note,created_at",
+      organisation_id: `eq.${organisationId}`,
+      application_id: `eq.${applicationId}`,
+      order: "created_at.asc",
+    }),
+  ) : [];
+  const history = historyRows.map((entry) => ({
+    id: entry.id,
+    status: entry.status,
+    owner: entry.owner,
+    note: entry.note,
+    createdAt: entry.created_at,
+  }));
+  const requiresPublishedWorkflow = Boolean(policy && (!existing || applicationRequiresPublishedWorkflow({
+    status: existing.status,
+    submittedAt: existing.submitted_at,
+    history,
+  }, policy.firstPublishedAt)));
+  return { policy, instance: instances[0] ?? null, existing, history, requiresPublishedWorkflow };
+}
+
 export async function getWorkspaceBootstrapForSession(session: LevyTateBetaSession): Promise<LevyTateWorkspaceBootstrap> {
   const config = getLevyTateSupabaseConfig();
 
@@ -380,6 +434,9 @@ export async function getWorkspaceBootstrapForSession(session: LevyTateBetaSessi
       isApplicationWorkflowsEnabledForOrganisation(context.organisation.id),
     ]);
     const userRole = normaliseMvpUserRole(context.user.role);
+    const applicationWorkflowPublished = applicationWorkflowsEnabled
+      ? await hasPublishedApplicationWorkflow(context.organisation.id)
+      : false;
     if (applicationWorkflowsEnabled) data.applications = await attachApplicationWorkflowContexts(context.organisation.id, data.applications);
     const prospectAccess = await getProspectAccessForSession(session);
     const warnings = [...context.warnings];
@@ -404,6 +461,7 @@ export async function getWorkspaceBootstrapForSession(session: LevyTateBetaSessi
         coreEarlyAccess: getCoreEarlyAccessPolicy(userRole, { requestsEnabled }),
         requestsEnabled,
         applicationWorkflowsEnabled,
+        applicationWorkflowPublished,
         directReportOperationalSummaries,
         prospectAccess: prospectAccess ? {
           id: prospectAccess.id,
@@ -469,6 +527,9 @@ export async function getWorkspaceBootstrapForMicrosoftCopilotActor(
     isRequestsEnabledForOrganisation(actor.organisationId),
     isApplicationWorkflowsEnabledForOrganisation(actor.organisationId),
   ]);
+  const applicationWorkflowPublished = applicationWorkflowsEnabled
+    ? await hasPublishedApplicationWorkflow(actor.organisationId)
+    : false;
   if (applicationWorkflowsEnabled) data.applications = await attachApplicationWorkflowContexts(actor.organisationId, data.applications);
 
   return {
@@ -482,6 +543,7 @@ export async function getWorkspaceBootstrapForMicrosoftCopilotActor(
       coreEarlyAccess: getCoreEarlyAccessPolicy(actor.role, { requestsEnabled }),
       requestsEnabled,
       applicationWorkflowsEnabled,
+      applicationWorkflowPublished,
       directReportOperationalSummaries: undefined,
       prospectAccess: null,
       storageMode: "supabase",
@@ -537,13 +599,10 @@ export async function applyWorkspaceMutationForSession(
       await recordAuditEvent(context, "role", mutation.id, "role.archived", "Role archive state changed.");
       break;
     case "saveApplication":
-      await saveApplication(organisationId, mutation.application);
-      if (normaliseMvpUserRole(context.user.role) === "Employee" && await isApplicationWorkflowsEnabledForOrganisation(organisationId)) {
-        if (mutation.application.workflow?.instance.state === "needs_information") {
-          await transitionApplicationWorkflowForSession(session, { applicationId: mutation.application.id, action: "resubmit", note: "Application information resubmitted.", idempotencyKey: `resubmit:${mutation.application.id}:${mutation.application.workflow.instance.lockVersion}`, expectedLockVersion: mutation.application.workflow.instance.lockVersion });
-        } else if (["Submitted to Line Manager", "Awaiting Manager Review"].includes(mutation.application.status) && await hasPublishedApplicationWorkflow(organisationId)) {
-          await startApplicationWorkflow(session, mutation.application.id, `submit:${mutation.application.id}`);
-        }
+      if (normaliseMvpUserRole(context.user.role) === "Employee" && await shouldSubmitApplicationThroughPublishedWorkflow(organisationId, mutation.application)) {
+        await submitApplicationThroughPublishedWorkflow(context, session, mutation.application);
+      } else {
+        await saveApplication(organisationId, await normaliseEmployerCreatedWorkflowDraft(context, mutation.application));
       }
       await synchroniseApplicationReviewOperationalActions(session, [mutation.application.id]);
       await recordAuditEvent(context, "application", mutation.application.id, "application.saved", "Application record saved.");
@@ -638,9 +697,17 @@ async function assertMutationAllowed(context: WorkspaceContext, mutation: LevyTa
 
   if ((mutation.type === "saveApplication" || mutation.type === "updateApplicationStatus") && await isApplicationWorkflowsEnabledForOrganisation(context.organisation.id)) {
     const applicationId = mutation.type === "saveApplication" ? mutation.application.id : mutation.id;
-    const instances = await supabaseSelect<{ id: string }>(assertSupabase(), "levytate_application_workflow_instances", new URLSearchParams({ select: "id", organisation_id: `eq.${context.organisation.id}`, application_id: `eq.${applicationId}`, limit: "1" }));
-    if (instances[0] && (mutation.type === "updateApplicationStatus" || role !== "Employee")) {
+    const protection = await getApplicationWorkflowProtection(context.organisation.id, applicationId);
+    if (protection.instance && (mutation.type === "updateApplicationStatus" || role !== "Employee")) {
       throw new LevyTateWorkspacePermissionError("This application uses a versioned workflow and must be progressed through its current workflow decision.");
+    }
+    if (!protection.instance && protection.policy && protection.requiresPublishedWorkflow) {
+      if (mutation.type === "updateApplicationStatus") {
+        throw new LevyTateWorkspacePermissionError("This application must be submitted by the employee before its configured approval workflow can begin.");
+      }
+      if (role !== "Employee" && (mutation.application.status !== "Draft" || mutation.application.currentOwner !== "Employee")) {
+        throw new LevyTateWorkspacePermissionError("Employer users may prepare this draft, but only the employee can submit it into the configured approval workflow.");
+      }
     }
   }
 
@@ -742,17 +809,9 @@ async function assertEmployeeCanSaveApplication(
   );
 
   if (existing && !employeeEditableStatuses.includes(existing.status)) {
-    const workflowInstances = await supabaseSelect<{ state: string }>(
-      assertSupabase(),
-      "levytate_application_workflow_instances",
-      new URLSearchParams({
-        select: "state",
-        organisation_id: `eq.${organisationId}`,
-        application_id: `eq.${application.id}`,
-        limit: "1",
-      }),
-    );
-    if (workflowInstances[0]?.state !== "needs_information") {
+    const protection = await getApplicationWorkflowProtection(organisationId, application.id);
+    const recoverableUnpinnedSubmission = !protection.instance && Boolean(protection.policy && protection.requiresPublishedWorkflow);
+    if (protection.instance?.state !== "needs_information" && !recoverableUnpinnedSubmission) {
       throw new LevyTateWorkspacePermissionError("Submitted applications cannot be edited unless more information has been requested.");
     }
   }
@@ -1518,6 +1577,104 @@ async function saveRole(organisationId: string, role: MvpRole) {
       prefer: "resolution=merge-duplicates,return=minimal",
     });
   }
+}
+
+async function normaliseEmployerCreatedWorkflowDraft(context: WorkspaceContext, application: MvpApplication) {
+  const role = normaliseMvpUserRole(context.user.role);
+  if (role !== "Apprenticeship Lead" && role !== "Employer Admin") return application;
+  if (!await isApplicationWorkflowsEnabledForOrganisation(context.organisation.id)) return application;
+  const protection = await getApplicationWorkflowProtection(context.organisation.id, application.id);
+  if (!protection.policy || protection.instance || !protection.requiresPublishedWorkflow) return application;
+  const now = application.updatedAt || nowIso();
+  const actor = context.user.display_name?.trim() || role;
+  const history: MvpApplicationHistoryEntry[] = protection.existing ? protection.history : [{
+    id: `history-${randomUUID()}`,
+    status: "Draft" as const,
+    owner: role,
+    note: `Application draft created by ${actor}. The employee needs to review and submit it before the approval workflow begins.`,
+    createdAt: now,
+  }];
+  return {
+    ...application,
+    status: "Draft" as const,
+    currentOwner: "Employee" as const,
+    history,
+  };
+}
+
+async function shouldSubmitApplicationThroughPublishedWorkflow(organisationId: string, application: MvpApplication) {
+  if (!["Submitted to Line Manager", "Awaiting Manager Review"].includes(application.status)) return false;
+  if (!await isApplicationWorkflowsEnabledForOrganisation(organisationId)) return false;
+  const protection = await getApplicationWorkflowProtection(organisationId, application.id);
+  if (protection.instance) return protection.instance.state === "needs_information" || protection.instance.state === "active";
+  return Boolean(protection.policy && protection.requiresPublishedWorkflow);
+}
+
+async function submitApplicationThroughPublishedWorkflow(
+  context: WorkspaceContext,
+  session: LevyTateBetaSession,
+  application: MvpApplication,
+) {
+  const organisationId = context.organisation.id;
+  const protection = await getApplicationWorkflowProtection(organisationId, application.id);
+  if (!protection.instance && (!protection.policy || !protection.requiresPublishedWorkflow)) {
+    throw new LevyTateWorkspacePermissionError("This application is not eligible for the configured workflow.");
+  }
+  const now = nowIso();
+  const draftHistory = protection.history.length ? protection.history : [{
+    id: `history-${randomUUID()}`,
+    status: "Draft" as const,
+    owner: "Employee" as const,
+    note: "Employee saved an application draft.",
+    createdAt: now,
+  }];
+  const safeBeforeTransition: MvpApplication = {
+    ...application,
+    status: protection.instance?.state === "needs_information" ? "More information requested" : "Draft",
+    currentOwner: "Employee",
+    submittedAt: protection.existing?.submitted_at ?? application.submittedAt,
+    updatedAt: now,
+    history: draftHistory,
+    workflow: undefined,
+    workflowPreview: undefined,
+  };
+
+  // Persist answers in a non-progressed state first. The migration-032 RPC then
+  // pins the published version and records the employee transition atomically.
+  // A failure can leave a retryable draft, never a submitted legacy record.
+  await saveApplication(organisationId, safeBeforeTransition);
+  if (!protection.instance) {
+    await startApplicationWorkflow(session, application.id, `submit:${application.id}`);
+  } else if (protection.instance.state === "needs_information") {
+    await transitionApplicationWorkflowForSession(session, {
+      applicationId: application.id,
+      action: "resubmit",
+      note: "Application information resubmitted.",
+      idempotencyKey: `resubmit:${application.id}:${protection.instance.lock_version}`,
+      expectedLockVersion: protection.instance.lock_version,
+    });
+  }
+
+  const [workflowApplication] = await attachApplicationWorkflowContexts(organisationId, [safeBeforeTransition]);
+  if (!workflowApplication.workflow) {
+    throw new LevyTateWorkspacePersistenceError("The configured application workflow could not be confirmed after submission.");
+  }
+  const currentStep = workflowApplication.workflow.version.steps.find((step) => step.id === workflowApplication.workflow?.instance.currentStepId);
+  const action = protection.instance?.state === "needs_information" ? "resubmitted" : "submitted";
+  const historyNote = `Employee ${action} application. Workflow moved to ${currentStep?.label ?? "the next configured step"}.`;
+  const history = draftHistory.some((entry) => entry.note === historyNote) ? draftHistory : [
+    ...draftHistory,
+    buildApplicationHistoryEntry(workflowApplication.status, historyNote, workflowApplication.workflow.instance.lastProgressedAt),
+  ];
+  const submittedAt = workflowApplication.workflow.events?.find((event) => event.action === "submit")?.createdAt ?? now;
+  await saveApplication(organisationId, {
+    ...safeBeforeTransition,
+    status: workflowApplication.status,
+    currentOwner: workflowApplication.currentOwner,
+    submittedAt,
+    updatedAt: workflowApplication.workflow.instance.lastProgressedAt,
+    history,
+  });
 }
 
 async function saveApplication(organisationId: string, application: MvpApplication) {

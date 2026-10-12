@@ -136,7 +136,7 @@ export function EmployeeHomeModule({ onNavigate }: { onNavigate: (target: Employ
 }
 
 export function EmployeeProgrammeModule({ onNavigate }: { onNavigate: (target: EmployeeModuleTarget) => void }) {
-  const { data } = useMvpWorkspace();
+  const { data, meta } = useMvpWorkspace();
   const context = useEmployeeContext(data);
   const standard = context.mapping ? getApprenticeshipStandard(context.mapping.apprenticeshipStandardId) : null;
   const capabilities = [
@@ -195,19 +195,20 @@ export function EmployeeProgrammeModule({ onNavigate }: { onNavigate: (target: E
 
       <aside className="grid gap-4 content-start">
         <SideCard icon={GraduationCap} title="What you need to do" copy="Review the programme, complete your application answers and speak with your manager about support and workload." />
-        <SideCard icon={ShieldCheck} title="Employer support" copy="Your manager and apprenticeship lead will review fit, work impact and readiness before any enrolment." />
+        <SideCard icon={ShieldCheck} title="Employer support" copy={meta?.applicationWorkflowPublished ? "Your application will follow your organisation's configured approval workflow before provider handoff." : "Your manager and apprenticeship lead will review fit, work impact and readiness before any enrolment."} />
       </aside>
     </div>
   );
 }
 
 export function EmployeeApplicationModule() {
-  const { data, saveApplication } = useMvpWorkspace();
+  const { data, saveApplication, meta } = useMvpWorkspace();
   const context = useEmployeeContext(data);
   const existing = context.application;
   const state = employeeApplicationState(existing);
   const editable = state === "none" || state === "draft" || state === "more-info";
-  const stateContent = applicationStateContent(context, data);
+  const configurableWorkflow = meta?.applicationWorkflowPublished === true;
+  const stateContent = applicationStateContent(context, data, configurableWorkflow);
   const [draft, setDraft] = useState(() => buildEmployeeDraft(context, existing));
   const [formOpen, setFormOpen] = useState(() => state === "draft" || state === "more-info");
   const [error, setError] = useState("");
@@ -268,7 +269,7 @@ export function EmployeeApplicationModule() {
     };
     saveApplication(next);
     setError("");
-    setSavedMessage(status === "Draft" ? "Draft saved." : "Application submitted to your line manager.");
+    setSavedMessage(status === "Draft" ? "Draft saved." : configurableWorkflow ? "Application submitted to your organisation's approval workflow." : "Application submitted to your line manager.");
     if (status !== "Draft") setFormOpen(false);
   }
 
@@ -278,7 +279,7 @@ export function EmployeeApplicationModule() {
   }
 
   function submitCurrent() {
-    save("Submitted to Line Manager", existing?.status === "More information requested" ? "Employee responded to the manager request and resubmitted." : "Employee submitted the application to line manager.");
+    save("Submitted to Line Manager", existing?.status === "More information requested" ? "Employee responded to the information request and resubmitted." : configurableWorkflow ? "Employee submitted the application." : "Employee submitted the application to line manager.");
   }
 
   return (
@@ -318,7 +319,7 @@ export function EmployeeApplicationModule() {
           {!showForm && !showReadOnly ? (
             <ActionCard
               title="You have not started an application yet."
-              copy="Start when you are ready. You can save a draft before anything is sent to your line manager."
+              copy={configurableWorkflow ? "Start when you are ready. You can save a draft before submitting it to your organisation's approval workflow." : "Start when you are ready. You can save a draft before anything is sent to your line manager."}
               primaryLabel={primaryAction}
               onPrimary={() => setFormOpen(true)}
               secondaryLabel="View programme"
@@ -336,7 +337,7 @@ export function EmployeeApplicationModule() {
                 <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-[#102c3d]">{state === "more-info" ? "Provide requested information" : state === "draft" ? "Continue application" : "Start application"}</p>
-                    <p className="mt-1 text-xs leading-5 text-[#102c3d]/52">You can save this as a draft. It will not be sent to {manager} until you submit it.</p>
+                    <p className="mt-1 text-xs leading-5 text-[#102c3d]/52">{configurableWorkflow ? "You can save this as a draft. The approval workflow begins only when you submit it." : <>You can save this as a draft. It will not be sent to {manager} until you submit it.</>}</p>
                   </div>
                   <StatusBadge tone={state === "more-info" ? "yellow" : "blue"}>{state === "more-info" ? "Reopened" : existing?.status ?? "Not started"}</StatusBadge>
                 </div>
@@ -359,7 +360,7 @@ export function EmployeeApplicationModule() {
                 <div className="flex flex-wrap justify-end gap-2">
                   <button type="submit" className="h-10 rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.1]">Save draft</button>
                   <button type="button" onClick={submitCurrent} className="h-10 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white">
-                    {state === "more-info" ? "Respond and resubmit" : "Submit to line manager"}
+                    {state === "more-info" ? "Respond and resubmit" : configurableWorkflow ? "Submit application" : "Submit to line manager"}
                   </button>
                 </div>
               </div>
@@ -708,7 +709,7 @@ function employeeApplicationState(application: MvpApplication | null): EmployeeA
   return "manager-review";
 }
 
-function applicationStateContent(context: EmployeeContext, data: MvpWorkspaceData): {
+function applicationStateContent(context: EmployeeContext, data: MvpWorkspaceData, configurableWorkflow = false): {
   title: string;
   copy: string;
   supportingCopy: string;
@@ -724,7 +725,7 @@ function applicationStateContent(context: EmployeeContext, data: MvpWorkspaceDat
   if (state === "none") {
     return {
       title: "You have not started an application yet.",
-      copy: "Start one application when you are ready. You can save it as a draft before it goes to your line manager.",
+      copy: configurableWorkflow ? "Start one application when you are ready. You can save it as a draft before submitting it to your organisation's approval workflow." : "Start one application when you are ready. You can save it as a draft before it goes to your line manager.",
       supportingCopy: "You can still view your recommended programme and ask LevyTate Copilot for guidance.",
       primaryAction: "Start application",
       owner,
@@ -735,12 +736,24 @@ function applicationStateContent(context: EmployeeContext, data: MvpWorkspaceDat
   if (state === "draft") {
     return {
       title: "Your application is saved as a draft.",
-      copy: "It has not been sent to your line manager yet. Continue when you are ready to complete the required answers.",
+      copy: configurableWorkflow ? "The approval workflow has not started. Review the selected programme and complete the required answers before you submit." : "It has not been sent to your line manager yet. Continue when you are ready to complete the required answers.",
       supportingCopy: "Draft answers remain editable until you submit.",
       primaryAction: "Continue application",
       owner,
       tone: "blue",
       icon: FileText,
+    };
+  }
+  if (context.application?.workflow && state !== "more-info" && state !== "approved-enrolment" && state !== "declined") {
+    const step = context.application.workflow.version.steps.find((candidate) => candidate.id === context.application?.workflow?.instance.currentStepId);
+    return {
+      title: `Your application is now with ${step?.label ?? "the next approval step"}.`,
+      copy: `Your answers are locked while ${step?.responsibleRole ?? "the responsible reviewer"} completes this configured step.`,
+      supportingCopy: "You can track each stage of your organisation's approval workflow here.",
+      primaryAction: "Track application",
+      owner,
+      tone: "blue",
+      icon: LockKeyhole,
     };
   }
   if (state === "manager-review") {

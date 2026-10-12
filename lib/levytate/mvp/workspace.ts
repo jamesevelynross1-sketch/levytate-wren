@@ -152,6 +152,7 @@ export type MvpApplication = {
   updatedAt: string;
   history: MvpApplicationHistoryEntry[];
   workflow?: import("@/lib/levytate/application-workflows/compatibility").ApplicationWorkflowContext;
+  workflowPreview?: import("@/lib/levytate/application-workflows/compatibility").ApplicationWorkflowPreview;
 };
 
 export type MvpProviderRelationshipCategory =

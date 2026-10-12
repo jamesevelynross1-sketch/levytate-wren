@@ -8,6 +8,7 @@ import {
 } from "@/lib/levytate/application-workflows/domain";
 import { hasMvpPermission, normaliseMvpUserRole } from "@/lib/levytate/mvp/rbac";
 import { deriveApplicationWorkflowCompatibility } from "@/lib/levytate/application-workflows/compatibility";
+import { applicationRequiresPublishedWorkflow } from "@/lib/levytate/application-workflows/compatibility";
 import type { MvpApplication } from "@/lib/levytate/mvp/workspace";
 import { getLearnerLifecycleServerContext } from "@/lib/server/levytate-learner-lifecycle";
 import { isApplicationWorkflowsEnabledForOrganisation } from "@/lib/server/levytate-application-workflow-capability";
@@ -19,28 +20,59 @@ type InstanceRow = { id: string; organisation_id: string; application_id: string
 type EventRow = { id: string; organisation_id: string; application_id: string; workflow_version_id: string; step_id: string; action: "submit" | "approve" | "continue" | "request_information" | "resubmit" | "decline"; actor_user_id: string; actor_role: "Employee" | "Line Manager" | "Apprenticeship Lead" | "Employer Admin"; note: string; idempotency_key: string; from_lock_version: number; to_lock_version: number; created_at: string };
 type ActorRow = { id: string; display_name: string; email: string };
 
+export type PublishedApplicationWorkflowPolicy = {
+  current: ApplicationWorkflowVersion;
+  firstPublishedAt: string;
+};
+
 export class ApplicationWorkflowServiceError extends Error {
   constructor(message: string, readonly status = 400) { super(message); this.name = "ApplicationWorkflowServiceError"; }
 }
 
 export async function hasPublishedApplicationWorkflow(organisationId: string) {
-  const rows = await supabaseSelect<{ id: string }>(requiredConfig(), "levytate_application_workflows", new URLSearchParams({ select: "id", organisation_id: `eq.${organisationId}`, published_version_id: "not.is.null", limit: "1" }));
-  return rows.length === 1;
+  return Boolean(await getPublishedApplicationWorkflowPolicy(organisationId));
+}
+
+export async function getPublishedApplicationWorkflowPolicy(organisationId: string): Promise<PublishedApplicationWorkflowPolicy | null> {
+  const config = requiredConfig();
+  const workflows = await supabaseSelect<WorkflowRow>(config, "levytate_application_workflows", new URLSearchParams({
+    select: "id,organisation_id,name,published_version_id,created_at,updated_at",
+    organisation_id: `eq.${organisationId}`,
+    published_version_id: "not.is.null",
+    limit: "1",
+  }));
+  const workflow = workflows[0];
+  if (!workflow?.published_version_id) return null;
+  const versions = await supabaseSelect<VersionRow>(config, "levytate_application_workflow_versions", new URLSearchParams({
+    select: "id,organisation_id,workflow_id,version_number,status,steps,created_at,published_at",
+    organisation_id: `eq.${organisationId}`,
+    workflow_id: `eq.${workflow.id}`,
+    status: "in.(published,superseded)",
+    published_at: "not.is.null",
+    order: "published_at.asc",
+  }));
+  const current = versions.find((version) => version.id === workflow.published_version_id);
+  const firstPublishedAt = versions[0]?.published_at;
+  if (!current || !firstPublishedAt) return null;
+  return { current: fromVersionRow(current), firstPublishedAt };
 }
 
 export async function attachApplicationWorkflowContexts(organisationId: string, applications: MvpApplication[]) {
   if (!applications.length) return applications;
   const config = requiredConfig();
-  const instances = await supabaseSelect<InstanceRow>(config, "levytate_application_workflow_instances", new URLSearchParams({
-    select: "id,organisation_id,application_id,workflow_version_id,current_step_id,state,return_step_id,lock_version,last_progressed_at",
-    organisation_id: `eq.${organisationId}`,
-    application_id: `in.(${applications.map((application) => application.id).join(",")})`,
-  }));
-  if (!instances.length) return applications;
+  const [instances, policy] = await Promise.all([
+    supabaseSelect<InstanceRow>(config, "levytate_application_workflow_instances", new URLSearchParams({
+      select: "id,organisation_id,application_id,workflow_version_id,current_step_id,state,return_step_id,lock_version,last_progressed_at",
+      organisation_id: `eq.${organisationId}`,
+      application_id: `in.(${applications.map((application) => application.id).join(",")})`,
+    })),
+    getPublishedApplicationWorkflowPolicy(organisationId),
+  ]);
+  if (!instances.length && !policy) return applications;
   const versionIds = [...new Set(instances.map((instance) => instance.workflow_version_id))];
   const [versions, events] = await Promise.all([
-    supabaseSelect<VersionRow>(config, "levytate_application_workflow_versions", new URLSearchParams({ select: "id,organisation_id,workflow_id,version_number,status,steps,created_at,published_at", id: `in.(${versionIds.join(",")})` })),
-    supabaseSelect<EventRow>(config, "levytate_application_workflow_events", new URLSearchParams({ select: "id,organisation_id,application_id,workflow_version_id,step_id,action,actor_user_id,actor_role,note,idempotency_key,from_lock_version,to_lock_version,created_at", organisation_id: `eq.${organisationId}`, application_id: `in.(${applications.map((application) => application.id).join(",")})`, order: "created_at.asc" })),
+    versionIds.length ? supabaseSelect<VersionRow>(config, "levytate_application_workflow_versions", new URLSearchParams({ select: "id,organisation_id,workflow_id,version_number,status,steps,created_at,published_at", id: `in.(${versionIds.join(",")})` })) : Promise.resolve([]),
+    instances.length ? supabaseSelect<EventRow>(config, "levytate_application_workflow_events", new URLSearchParams({ select: "id,organisation_id,application_id,workflow_version_id,step_id,action,actor_user_id,actor_role,note,idempotency_key,from_lock_version,to_lock_version,created_at", organisation_id: `eq.${organisationId}`, application_id: `in.(${applications.map((application) => application.id).join(",")})`, order: "created_at.asc" })) : Promise.resolve([]),
   ]);
   const actorIds = [...new Set(events.map((event) => event.actor_user_id))];
   const actors = actorIds.length ? await supabaseSelect<ActorRow>(config, "levytate_users", new URLSearchParams({ select: "id,display_name,email", organisation_id: `eq.${organisationId}`, id: `in.(${actorIds.join(",")})` })) : [];
@@ -50,7 +82,18 @@ export async function attachApplicationWorkflowContexts(organisationId: string, 
   return applications.map((application) => {
     const instance = byInstance.get(application.id);
     const version = instance ? byVersion.get(instance.workflow_version_id) : undefined;
-    if (!instance || !version) return application;
+    if (!instance || !version) {
+      if (!policy || !applicationRequiresPublishedWorkflow(application, policy.firstPublishedAt)) return application;
+      // A post-publication status written through the retired legacy path is
+      // presented as the employee-owned draft it should always have been. The
+      // persisted row is left untouched until the employee explicitly submits.
+      return {
+        ...application,
+        status: "Draft" as const,
+        currentOwner: "Employee" as const,
+        workflowPreview: { version: policy.current, appliesAtSubmission: true as const },
+      };
+    }
     const enriched = { ...application, workflow: { version, instance: { id: instance.id, organisationId: instance.organisation_id, applicationId: instance.application_id, workflowVersionId: instance.workflow_version_id, currentStepId: instance.current_step_id, state: instance.state, returnStepId: instance.return_step_id ?? undefined, lockVersion: instance.lock_version, lastProgressedAt: instance.last_progressed_at }, events: events.filter((event) => event.application_id === application.id).map((event) => ({ id: event.id, organisationId: event.organisation_id, applicationId: event.application_id, workflowVersionId: event.workflow_version_id, stepId: event.step_id, action: event.action, actorRole: event.actor_role, actorLabel: actorById.get(event.actor_user_id), note: event.note || undefined, idempotencyKey: event.idempotency_key, fromLockVersion: event.from_lock_version, toLockVersion: event.to_lock_version, createdAt: event.created_at })) } };
     const compatible = deriveApplicationWorkflowCompatibility(enriched);
     return { ...enriched, status: compatible.status, currentOwner: compatible.currentOwner, updatedAt: compatible.lastProgressedAt };
