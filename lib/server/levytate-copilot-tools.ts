@@ -38,6 +38,7 @@ import { deriveManagerOperationalContext } from "@/lib/server/levytate-manager-l
 import { listManagerActions } from "@/lib/server/levytate-manager-actions";
 import { getOrganisationOperationsSummary } from "@/lib/server/levytate-operations";
 import { getLearningTimeWorkspace } from "@/lib/server/levytate-off-the-job";
+import { runLearningTimeAssistant } from "@/lib/server/levytate-off-the-job-assistant";
 import { getWorkspaceBootstrapForSession } from "@/lib/server/levytate-workspace";
 
 const resultLimit = 25;
@@ -109,7 +110,7 @@ export async function routeOperationalCopilotQuery(
   if (managerOnlyIntents.has(classification.intent) && role !== "Line Manager") return null;
   const employeeProgrammeIntent = role === "Employee"
     && (classification.intent === "programme_directory" || classification.intent === "organisation_programmes");
-  const learningTimeIntent = classification.intent === "learning_time_summary" || classification.intent === "learning_time_attention";
+  const learningTimeIntent = classification.intent === "learning_time_summary" || classification.intent === "learning_time_attention" || classification.intent === "learning_time_planning";
   if (!operationalRoles.has(role) && !employeeProgrammeIntent && !learningTimeIntent) {
     return responseForPayload(
       request,
@@ -311,10 +312,10 @@ export function classifyOperationalCopilotQuery(
       contextResultKeys: previous?.resultKeys,
     };
   }
-  if (/\b(learning time|off[- ]the[- ]job|otj).{0,35}(attention|needs attention|missing|overdue|awaiting|clarification|confirmation)\b|\b(attention|missing|awaiting).{0,35}(learning time|off[- ]the[- ]job|otj)\b/.test(text)) {
+  if (/\b(learning[- ]time|off[- ]the[- ]job|otj).{0,35}(attention|needs attention|missing|overdue|awaiting|clarification|confirmation)\b|\b(attention|missing|awaiting).{0,35}(learning[- ]time|off[- ]the[- ]job|otj)\b/.test(text)) {
     return { intent: "learning_time_attention", filters: {}, direct: true };
   }
-  if (/\b(learning time|off[- ]the[- ]job|otj).{0,35}(summary|position|hours|time|progress|remaining|confirmed)\b|\b(summary|how much|remaining).{0,35}(learning time|off[- ]the[- ]job|otj)\b/.test(text)) {
+  if (/\b(learning[- ]time|off[- ]the[- ]job|otj).{0,35}(summary|position|hours|time|progress|remaining|confirmed)\b|\b(summary|how much|remaining).{0,35}(learning[- ]time|off[- ]the[- ]job|otj)\b|\bprovider[- ]confirmed learning hours?\b/.test(text)) {
     return { intent: "learning_time_summary", filters: { employeeName }, direct: true };
   }
   if (/\b(which providers?|providers?)\b/.test(text) && /\b(they|them|those|these learners?)\b/.test(text) && prior) {
@@ -456,7 +457,8 @@ async function executeTool(
     case "organisation_programmes": return getOrganisationProgrammes(session);
     case "programme_directory": return getProgrammeDirectory(session, query.filters);
     case "learning_time_summary": return getLearningTimeCopilotSummary(session, query.filters);
-    case "learning_time_attention": return getLearningTimeCopilotAttention(session);
+    case "learning_time_attention": return getLearningTimeCopilotAttention(session, query.filters);
+    case "learning_time_planning": return getLearningTimeCopilotPlanning(session);
     case "access_boundary": throw new Error("Access boundary is handled before tool execution.");
   }
 }
@@ -493,7 +495,8 @@ async function executeManagerTool(
     case "programme_operational_summary": return getProgrammeOperationalSummary(session, scope);
     case "programme_directory": return getProgrammeDirectory(session, query.filters);
     case "learning_time_summary": return getLearningTimeCopilotSummary(session, query.filters);
-    case "learning_time_attention": return getLearningTimeCopilotAttention(session);
+    case "learning_time_attention": return getLearningTimeCopilotAttention(session, query.filters);
+    case "learning_time_planning": return managerAccessBoundary("Learning-time planning is available to the employee for their own published plan.");
     case "team_summary": return getManagerTeamSummary(session, scope);
     case "ready_to_enrol":
     case "pre_enrolment_blockers":
@@ -527,9 +530,12 @@ async function getLearningTimeCopilotSummary(session: LevyTateBetaSession, filte
   };
 }
 
-async function getLearningTimeCopilotAttention(session: LevyTateBetaSession): Promise<ToolPayload> {
+async function getLearningTimeCopilotAttention(session: LevyTateBetaSession, filters: LevyTateOperationalCopilotFilters): Promise<ToolPayload> {
   const workspace = await getLearningTimeWorkspace(session);
-  const rows = workspace.learners.flatMap((learner) => learner.attention.map((attention) => ({ learner, attention }))).slice(0, resultLimit);
+  const attentionType = filters.actionType;
+  const rows = workspace.learners.flatMap((learner) => learner.attention
+    .filter((attention) => !attentionType || attention.type === attentionType)
+    .map((attention) => ({ learner, attention }))).slice(0, resultLimit);
   return {
     type: rows.length ? "learner_results" : "no_results",
     title: "Learning Time attention",
@@ -539,6 +545,50 @@ async function getLearningTimeCopilotAttention(session: LevyTateBetaSession): Pr
     emptyMessage: "No deterministic Learning Time attention items are currently present in your scope.",
     viewAllUrl: "/levytate/app?module=Learning%20Time",
     toolName: "listLearningTimeAttention",
+  };
+}
+
+async function getLearningTimeCopilotPlanning(session: LevyTateBetaSession): Promise<ToolPayload> {
+  const workspace = await getLearningTimeWorkspace(session);
+  const learner = workspace.learners[0];
+  if (!learner) {
+    return {
+      type: "no_results", title: "Learning Time planning", columns: [], rows: [],
+      emptyMessage: "No learner Learning Time record is available in your current scope.",
+      viewAllUrl: "/levytate/app?module=Learning%20Time", toolName: "planLearningTime",
+    };
+  }
+  const guidance = await runLearningTimeAssistant(session, {
+    learnerRecordId: learner.learnerRecordId,
+    mode: "planning",
+    prompt: "Plan up to three grounded learning activities for three hours of protected learning time.",
+  });
+  return {
+    type: guidance.planningSuggestions.length ? "programme_results" : "no_results",
+    title: "Learning Time planning",
+    columns: [
+      { key: "objective", label: "Learning objective" },
+      { key: "time", label: "Estimated time", align: "right" },
+      { key: "why", label: "Why relevant" },
+      { key: "evidence", label: "Evidence to capture" },
+      { key: "support", label: "Support needed" },
+    ],
+    rows: guidance.planningSuggestions.slice(0, 3).map((suggestion, index) => ({
+      key: `${learner.learnerRecordId}:planning:${index + 1}`,
+      cells: {
+        objective: suggestion.title,
+        time: minutesLabel(suggestion.estimatedMinutes),
+        why: suggestion.purpose,
+        evidence: suggestion.evidenceToCapture.join("; "),
+        support: suggestion.supportNeeded,
+      },
+      actions: [{ label: "Open Learning Time", url: `/levytate/app?module=Learning%20Time&learner=${encodeURIComponent(learner.learnerRecordId)}` }],
+    })),
+    totalCount: guidance.planningSuggestions.length,
+    interpretation: "These are planning prompts, not provider-confirmed learning time.",
+    emptyMessage: "No agreed learning priorities are available for planning yet.",
+    viewAllUrl: "/levytate/app?module=Learning%20Time",
+    toolName: "planLearningTime",
   };
 }
 

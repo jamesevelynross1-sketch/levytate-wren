@@ -262,6 +262,7 @@ export type LevyTateOperationalCopilotIntent =
   | "team_summary"
   | "learning_time_summary"
   | "learning_time_attention"
+  | "learning_time_planning"
   | "access_boundary";
 
 export type LevyTateOperationalCopilotFilters = {
@@ -770,6 +771,7 @@ const operationalIntents: LevyTateOperationalCopilotIntent[] = [
   "team_summary",
   "learning_time_summary",
   "learning_time_attention",
+  "learning_time_planning",
   "access_boundary",
 ];
 

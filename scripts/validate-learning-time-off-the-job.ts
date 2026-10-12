@@ -7,6 +7,7 @@ import {
   policyRegimeForOriginalStartDate,
 } from "../lib/levytate/off-the-job/domain";
 import { analyseLearningTimeAutopilot } from "../lib/levytate/autopilot/operations-autopilot";
+import { resolveContextualCopilotIntent } from "../lib/levytate/contextual-copilot-intent";
 import { getCoreEarlyAccessPolicy } from "../lib/levytate/core-early-access-policy";
 import { hasMvpPermission } from "../lib/levytate/mvp/rbac";
 
@@ -53,6 +54,12 @@ check("Platform Admin remains denied even if capability is enabled", getCoreEarl
 
 const signals = analyseLearningTimeAutopilot({ organisationId: "00000000-0000-4000-8000-000000000001", now: "2026-10-12T12:00:00Z", learners: [{ learnerRecordId: "learner-1", learnerName: "Fictional Learner", providerId: "provider-1", programmeId: "programme-1", attention: [{ type: "otj_provider_confirmation_pending", label: "Provider confirmation pending", detail: "Candidate evidence has not been confirmed." }] }] });
 check("deterministic Learning Time Autopilot signal is read-only until human approval", signals.length === 1 && signals[0].lane === "waiting_externally" && signals[0].suggestedActionType === "");
+
+check("Learning Time context routes provider-confirmed hours to the scoped summary", resolveContextualCopilotIntent({ message: "How many provider-confirmed learning hours do I have?", currentSection: "Learning Time" })?.intent === "learning_time_summary");
+check("Learning Time context routes generic confirmation wording to deterministic attention", resolveContextualCopilotIntent({ message: "What is waiting for confirmation?", currentSection: "Learning Time" })?.intent === "learning_time_attention");
+check("Learning Time context routes exact employee planning wording to bounded planning", resolveContextualCopilotIntent({ message: "What could I work on for three hours?", currentSection: "Learning Time" })?.intent === "learning_time_planning");
+check("Learning Time context routes employer review wording to the employer-check queue", resolveContextualCopilotIntent({ message: "Which learners have activity waiting for review?", currentSection: "Learning Time" })?.filters.actionType === "otj_submission_awaiting_employer_check");
+check("Learning Time context routes provider-confirmation wording to the provider queue", resolveContextualCopilotIntent({ message: "Which learning-time items need provider confirmation?", currentSection: "Learning Time" })?.filters.actionType === "otj_provider_confirmation_pending");
 
 for (const table of ["levytate_standard_otj_requirements", "levytate_otj_plans", "levytate_otj_plan_versions", "levytate_otj_learning_priorities", "levytate_otj_activities", "levytate_otj_activity_confirmations", "levytate_otj_activity_events"]) check(`migration creates ${table}`, migration.includes(`public.${table}`));
 check("migration capability is off by default", /off_the_job_assistant_enabled boolean not null default false/.test(migration));
