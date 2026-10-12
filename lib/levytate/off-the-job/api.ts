@@ -185,6 +185,32 @@ export type LearningTimeAssistantResponse = {
   warnings: string[];
   source: "deterministic" | "openai";
   deterministicAssessment?: CandidateActivityAssessment;
+  conversationState: LearningTimeAssistantConversationState;
+  candidateFacts: string[];
+  currentQuestion: LearningTimeAssistantQuestion | null;
+  suggestedDurationMinutes: number | null;
+};
+
+export type LearningTimeAssistantConversationState = {
+  turn: number;
+  durationMinutes: number | null;
+  categoryCandidate: OtjActivityCategory | "";
+  suppliedDescription: string;
+  newLearningEvidence: string;
+  standardRelevanceEvidence: string;
+  workingHoursBasis: OtjWorkingHoursBasis;
+  compensationNote: string;
+  separateFromProductiveWork: boolean | null;
+  productiveWorkAnswer: "" | "partly" | "not_sure";
+};
+
+export type LearningTimeAssistantQuestion = {
+  id: "duration" | "activity_type" | "new_learning" | "standard_relevance" | "working_hours" | "compensation" | "productive_work" | "productive_work_detail";
+  prompt: string;
+  quickAnswers: Array<{
+    label: string;
+    value: string;
+  }>;
 };
 
 export type LearningTimeAssistantRequest = {
@@ -192,4 +218,9 @@ export type LearningTimeAssistantRequest = {
   mode: "eligibility_check" | "planning" | "capture_support";
   prompt: string;
   candidate?: Partial<LearningTimeActivityInput>;
+  conversationState?: LearningTimeAssistantConversationState;
+  answer?: {
+    questionId: LearningTimeAssistantQuestion["id"];
+    value: string;
+  };
 };

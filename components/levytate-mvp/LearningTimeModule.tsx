@@ -13,6 +13,10 @@ import { activityCategoryLabel, eligibleActivityCategories, excludedActivityCate
 
 type JsonRecord = Record<string, unknown>;
 type AssistantMode = LearningTimeAssistantResponse["mode"];
+type AssistantPreparedDraft = {
+  activity: Partial<LearningTimeActivityInput>;
+  durationMinutes: number | null;
+};
 
 const assistantModeChoices: ReadonlyArray<{
   mode: AssistantMode;
@@ -114,16 +118,18 @@ export function LearningTimeModule() {
 function EmployeeLearningTime({ learner, busy, act }: { learner: LearningTimeLearnerView; busy: boolean; act: (body: JsonRecord, success: string) => Promise<boolean> }) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<LearningTimeActivityView | null>(null);
+  const [assistantDraft, setAssistantDraft] = useState<AssistantPreparedDraft | null>(null);
   if (!learner.plan) return <MessageState title="Your learning-time plan is being prepared" copy="You can use the Off-the-Job Assistant for guidance once your agreed plan has been published. No historic learning time has been inferred." tone="neutral" />;
-  const edit = (activity: LearningTimeActivityView) => { setEditing(activity); setShowForm(true); };
+  const edit = (activity: LearningTimeActivityView) => { setAssistantDraft(null); setEditing(activity); setShowForm(true); };
+  const prepareDraft = (draft: AssistantPreparedDraft) => { setEditing(null); setAssistantDraft(draft); setShowForm(true); };
   return <div className="grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,.8fr)]">
     <div className="order-2 grid content-start gap-5 lg:order-1">
-      <Section title="My learning activity" action={<button type="button" onClick={() => { setEditing(null); setShowForm((value) => !value); }} className={primaryButton}><Plus size={15}/>{showForm ? "Close form" : "Add learning activity"}</button>}>
-        {showForm ? <ActivityForm learner={learner} existing={editing} busy={busy} onSaved={() => { setEditing(null); setShowForm(false); }} act={act} /> : null}
+      <Section title="My learning activity" action={<button type="button" onClick={() => { setEditing(null); setAssistantDraft(null); setShowForm((value) => !value); }} className={primaryButton}><Plus size={15}/>{showForm ? "Close form" : "Add learning activity"}</button>}>
+        {showForm ? <ActivityForm key={editing?.id ?? assistantDraft?.activity.title ?? "new-activity"} learner={learner} existing={editing} prepared={assistantDraft} busy={busy} onSaved={() => { setEditing(null); setAssistantDraft(null); setShowForm(false); }} act={act} /> : null}
         <ActivityList learner={learner} canEdit canReview={false} busy={busy} onEdit={edit} act={act} />
       </Section>
     </div>
-    <div className="order-1 grid min-w-0 content-start gap-5 lg:order-2"><Priorities learner={learner}/><OffTheJobAssistant learner={learner}/></div>
+    <div className="order-1 grid min-w-0 content-start gap-5 lg:order-2"><Priorities learner={learner}/><OffTheJobAssistant learner={learner} onCreateDraft={prepareDraft}/></div>
   </div>;
 }
 
@@ -146,12 +152,14 @@ function LearnerSummary({ learner }: { learner: LearningTimeLearnerView }) {
   </section>;
 }
 
-function ActivityForm({ learner, existing, busy, onSaved, act }: { learner: LearningTimeLearnerView; existing: LearningTimeActivityView | null; busy: boolean; onSaved: () => void; act: (body: JsonRecord, success: string) => Promise<boolean> }) {
+function ActivityForm({ learner, existing, prepared, busy, onSaved, act }: { learner: LearningTimeLearnerView; existing: LearningTimeActivityView | null; prepared: AssistantPreparedDraft | null; busy: boolean; onSaved: () => void; act: (body: JsonRecord, success: string) => Promise<boolean> }) {
   const today = new Date().toISOString().slice(0, 10);
-  const [form, setForm] = useState<LearningTimeActivityInput>(() => ({ learnerRecordId: learner.learnerRecordId, activityId: existing?.id, activityDate: existing?.activityDate ?? today, startedAt: existing?.startedAt ?? "09:00", endedAt: existing?.endedAt ?? "10:00", breakMinutes: existing?.breakMinutes ?? 0, category: existing?.category ?? "provider_workshop", title: existing?.title ?? "", description: existing?.description ?? "", whatWasNew: existing?.whatWasNew ?? "", standardRelevance: existing?.standardRelevance ?? "", reflection: existing?.reflection ?? "", workingHoursBasis: existing?.workingHoursBasis ?? "not_confirmed", compensationNote: existing?.compensationNote ?? "", separateFromProductiveWork: existing?.separateFromProductiveWork ?? null, ksbReferences: existing?.ksbReferences ?? [], evidenceReference: existing?.evidenceReference ?? "" }));
+  const suggestion = prepared?.activity;
+  const [form, setForm] = useState<LearningTimeActivityInput>(() => ({ learnerRecordId: learner.learnerRecordId, activityId: existing?.id, activityDate: existing?.activityDate ?? (prepared ? "" : today), startedAt: existing?.startedAt ?? (prepared ? "" : "09:00"), endedAt: existing?.endedAt ?? (prepared ? "" : "10:00"), breakMinutes: existing?.breakMinutes ?? 0, category: existing?.category ?? suggestion?.category ?? "provider_workshop", title: existing?.title ?? suggestion?.title ?? "", description: existing?.description ?? suggestion?.description ?? "", whatWasNew: existing?.whatWasNew ?? suggestion?.whatWasNew ?? "", standardRelevance: existing?.standardRelevance ?? suggestion?.standardRelevance ?? "", reflection: existing?.reflection ?? suggestion?.reflection ?? "", workingHoursBasis: existing?.workingHoursBasis ?? suggestion?.workingHoursBasis ?? "not_confirmed", compensationNote: existing?.compensationNote ?? suggestion?.compensationNote ?? "", separateFromProductiveWork: existing?.separateFromProductiveWork ?? suggestion?.separateFromProductiveWork ?? null, ksbReferences: existing?.ksbReferences ?? [], evidenceReference: existing?.evidenceReference ?? "" }));
   const update = <K extends keyof LearningTimeActivityInput>(key: K, value: LearningTimeActivityInput[K]) => setForm((current) => ({ ...current, [key]: value }));
   const submit = async (event: FormEvent) => { event.preventDefault(); if (await act({ action: "save_activity", activity: form }, existing ? "Draft updated." : "Private draft saved.")) onSaved(); };
   return <form onSubmit={submit} className="mb-5 grid gap-4 rounded-2xl border border-[#0b8075]/15 bg-[#f2f8f6] p-4 sm:grid-cols-2">
+    {prepared ? <p className="rounded-xl bg-white px-3 py-2 text-xs leading-5 text-[#102c3d]/65 sm:col-span-2"><span className="font-semibold text-[#102c3d]">Assistant-prepared draft:</span> {prepared.durationMinutes ? `${formatMinutes(prepared.durationMinutes)} was recognised.` : "Add the actual duration."} Add the actual date and start/end times before saving; LevyTate has not invented them.</p> : null}
     <Field label="Activity date"><input required type="date" value={form.activityDate} onChange={(event) => update("activityDate", event.target.value)} className={inputClass}/></Field>
     <Field label="Activity type"><select value={form.category} onChange={(event) => update("category", event.target.value as OtjActivityCategory)} className={inputClass}>{eligibleActivityCategories.map((value) => <option key={value} value={value}>{activityCategoryLabel(value)}</option>)}<optgroup label="Usually not countable">{excludedActivityCategories.map((value) => <option key={value} value={value}>{activityCategoryLabel(value)}</option>)}</optgroup></select></Field>
     <Field label="Start"><input required type="time" value={form.startedAt} onChange={(event) => update("startedAt", event.target.value)} className={inputClass}/></Field>
@@ -214,13 +222,73 @@ function PlanForm({ learner, busy, act }: { learner: LearningTimeLearnerView; bu
   return <form onSubmit={submit} className="grid gap-3"><Field label="Original apprenticeship start"><input required type="date" value={form.originalStartDate} onChange={(event) => update("originalStartDate", event.target.value)} className={inputClass}/></Field><Field label="Practical period"><div className="grid grid-cols-2 gap-2"><input aria-label="Practical period start" required type="date" value={form.practicalStartDate} onChange={(event) => update("practicalStartDate", event.target.value)} className={inputClass}/><input aria-label="Practical period end" required type="date" value={form.practicalEndDate} onChange={(event) => update("practicalEndDate", event.target.value)} className={inputClass}/></div></Field><Field label="Standard and version"><div className="grid grid-cols-2 gap-2"><input required value={form.standardId} onChange={(event) => update("standardId", event.target.value)} placeholder="ST1512" className={inputClass}/><input required value={form.standardVersion} onChange={(event) => update("standardVersion", event.target.value)} placeholder="2.1" className={inputClass}/></div></Field><Field label="Individual minimum hours"><input required min={0} step="0.5" type="number" value={form.individualHours} onChange={(event) => update("individualHours", event.target.value)} className={inputClass}/></Field><Field label="Planned delivery hours"><input required min={0} step="0.5" type="number" value={form.plannedHours} onChange={(event) => update("plannedHours", event.target.value)} className={inputClass}/></Field><Field label="Prior-learning reduction hours"><input required min={0} step="0.5" type="number" value={form.priorLearningHours} onChange={(event) => update("priorLearningHours", event.target.value)} className={inputClass}/></Field><Field label="Legacy indicative minimum hours (required only for starts before 1 August 2025)"><input min={0} step="0.5" type="number" value={form.legacyHours} onChange={(event) => update("legacyHours", event.target.value)} className={inputClass}/></Field><Field label="Training-plan reference"><input required value={form.trainingPlanReference} onChange={(event) => update("trainingPlanReference", event.target.value)} className={inputClass}/></Field><Field label="Source date"><input required type="date" value={form.sourceDate} onChange={(event) => update("sourceDate", event.target.value)} className={inputClass}/></Field><button disabled={busy} className={primaryButton}>Create versioned draft</button><p className="text-[11px] leading-5 text-[#102c3d]/50">Publishing is a separate governed action. A future version never silently rewrites an earlier plan.</p></form>;
 }
 
-function OffTheJobAssistant({ learner }: { learner: LearningTimeLearnerView }) {
+function OffTheJobAssistant({ learner, onCreateDraft }: { learner: LearningTimeLearnerView; onCreateDraft?: (draft: AssistantPreparedDraft) => void }) {
   const [mode, setMode] = useState<AssistantMode>("eligibility_check");
-  const [prompt, setPrompt] = useState(""); const [result, setResult] = useState<LearningTimeAssistantResponse | null>(null); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
+  const [prompt, setPrompt] = useState("");
+  const [result, setResult] = useState<LearningTimeAssistantResponse | null>(null);
+  const [draft, setDraft] = useState<LearningTimeAssistantResponse["suggestedActivity"] | null>(null);
+  const [draftDuration, setDraftDuration] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
   const selectedChoice = assistantModeChoices.find((choice) => choice.mode === mode) ?? assistantModeChoices[0];
-  const chooseMode = (nextMode: AssistantMode) => { setMode(nextMode); setResult(null); setError(""); };
-  const ask = async (event: FormEvent) => { event.preventDefault(); setBusy(true); setError(""); try { const response = await fetch("/api/levytate-learning-time/assistant", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ learnerRecordId: learner.learnerRecordId, mode, prompt }) }); const body = await response.json() as LearningTimeAssistantResponse & { message?: string }; if (!response.ok) throw new Error(body.message || "The assistant is unavailable."); setResult(body); } catch (askError) { setError(askError instanceof Error ? askError.message : "The assistant is unavailable."); } finally { setBusy(false); } };
-  return <Section title="Off-the-Job Assistant"><form onSubmit={ask} className="grid gap-4">
+  const chooseMode = (nextMode: AssistantMode) => { setMode(nextMode); setResult(null); setDraft(null); setDraftDuration(null); setPrompt(""); setError(""); };
+
+  const send = async (message: string, answer?: { questionId: NonNullable<LearningTimeAssistantResponse["currentQuestion"]>["id"]; value: string }) => {
+    const clean = message.trim();
+    if (!clean) return;
+    setBusy(true); setError("");
+    try {
+      const response = await fetch("/api/levytate-learning-time/assistant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ learnerRecordId: learner.learnerRecordId, mode, prompt: clean, conversationState: result?.conversationState, answer }),
+      });
+      const body = await response.json() as LearningTimeAssistantResponse & { message?: string };
+      if (!response.ok) throw new Error(body.message || "The assistant is unavailable.");
+      setResult(body);
+      setPrompt("");
+      if (body.assessment === "likely_eligible") {
+        setDraft(body.suggestedActivity);
+        setDraftDuration(body.suggestedDurationMinutes);
+      } else {
+        setDraft(null);
+        setDraftDuration(null);
+      }
+    } catch (askError) {
+      setError(askError instanceof Error ? askError.message : "The assistant is unavailable.");
+    } finally { setBusy(false); }
+  };
+  const ask = (event: FormEvent) => { event.preventDefault(); void send(prompt); };
+  const answerQuestion = (label: string, value: string) => {
+    if (!result?.currentQuestion) return;
+    void send(label, { questionId: result.currentQuestion.id, value });
+  };
+  const prepareActivity = () => {
+    if (!draft || !onCreateDraft) return;
+    onCreateDraft({
+      durationMinutes: draftDuration,
+      activity: {
+        category: draft.category || "other_eligible_learning",
+        title: draft.title,
+        description: draft.description,
+        whatWasNew: draft.whatWasNew,
+        standardRelevance: draft.standardRelevance,
+        reflection: draft.reflection,
+        workingHoursBasis: result?.conversationState.workingHoursBasis,
+        compensationNote: result?.conversationState.compensationNote,
+        separateFromProductiveWork: result?.conversationState.separateFromProductiveWork,
+      },
+    });
+  };
+  const updateDraft = (key: keyof LearningTimeAssistantResponse["suggestedActivity"], value: string) => setDraft((current) => current ? { ...current, [key]: value } : current);
+  const resolvedChecks = result ? [
+    Boolean(result.conversationState.newLearningEvidence),
+    Boolean(result.conversationState.standardRelevanceEvidence),
+    result.conversationState.workingHoursBasis !== "not_confirmed",
+    result.conversationState.separateFromProductiveWork !== null,
+  ].filter(Boolean).length : 0;
+
+  return <Section title="Off-the-Job Assistant"><div className="grid gap-4">
     <fieldset className="min-w-0">
       <legend className="text-xs font-semibold text-[#102c3d]/65">How can LevyTate help?</legend>
       <div className="mt-2 grid min-w-0 gap-2 sm:grid-cols-3 lg:grid-cols-1 2xl:grid-cols-3">
@@ -233,12 +301,35 @@ function OffTheJobAssistant({ learner }: { learner: LearningTimeLearnerView }) {
         })}
       </div>
     </fieldset>
-    <div className="grid gap-2">
-      <label htmlFor="otj-assistant-prompt" className="text-xs font-semibold text-[#102c3d]/65">Tell LevyTate about your learning</label>
-      <textarea id="otj-assistant-prompt" required rows={4} maxLength={3000} value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder={selectedChoice.placeholder} className={inputClass}/>
-    </div>
-    <button disabled={busy} className={primaryButton}>{busy ? <LoaderCircle size={15} className="animate-spin"/> : <Sparkles size={15}/>}Prepare guidance</button>
-  </form>{error ? <p role="alert" className="mt-3 text-xs text-[#ad344e]">{error}</p> : null}{result ? <div className="mt-4 rounded-xl bg-[#f2f8f6] p-4"><p className="text-sm font-semibold">{result.headline}</p><p className="mt-2 text-xs leading-5 text-[#102c3d]/60">{result.explanation}</p>{result.clarificationQuestions.length ? <ul className="mt-3 list-disc space-y-1 pl-5 text-xs text-[#102c3d]/60">{result.clarificationQuestions.map((question) => <li key={question}>{question}</li>)}</ul> : null}<p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#0b8075]">{result.source === "openai" ? "AI-assisted draft" : "Deterministic guidance"}</p></div> : null}</Section>;
+
+    {result ? <div aria-live="polite" className={`rounded-xl border p-4 ${result.assessment === "likely_ineligible" ? "border-[#ad344e]/15 bg-[#fff5f6]" : "border-[#0b8075]/12 bg-[#f2f8f6]"}`}>
+      <div className="flex items-start justify-between gap-3"><p className="text-sm font-semibold">{result.headline}</p>{result.assessment === "needs_clarification" ? <span aria-label={`${resolvedChecks} eligibility checks evidenced`} className="shrink-0 rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-[#0b6f63]">{resolvedChecks}/4 evidenced</span> : null}</div>
+      <p className="mt-2 text-xs leading-5 text-[#102c3d]/65">{result.explanation}</p>
+      {result.candidateFacts.length ? <div className="mt-3 flex flex-wrap gap-1.5" aria-label="Information already recognised">{result.candidateFacts.map((fact) => <span key={fact} className="rounded-full border border-[#0b8075]/10 bg-white px-2.5 py-1 text-[10px] font-semibold text-[#0b6f63]">{fact}</span>)}</div> : null}
+      {result.currentQuestion ? <div className="mt-4 border-t border-[#102c3d]/[0.07] pt-4"><p className="text-sm font-semibold text-[#102c3d]">{result.currentQuestion.prompt}</p>{result.currentQuestion.quickAnswers.length ? <div className="mt-3 flex flex-wrap gap-2">{result.currentQuestion.quickAnswers.map((answer) => <button key={answer.value} type="button" disabled={busy} onClick={() => answerQuestion(answer.label, answer.value)} className={secondaryButton}>{answer.label}</button>)}</div> : null}</div> : null}
+      <p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#0b8075]">{result.source === "openai" ? "AI-assisted · deterministic rules checked" : "Deterministic guidance"}</p>
+    </div> : null}
+
+    <form onSubmit={ask} className="grid gap-3">
+      <label htmlFor="otj-assistant-prompt" className="text-xs font-semibold text-[#102c3d]/65">{result?.currentQuestion ? "Your answer" : "Tell LevyTate about your learning"}</label>
+      <textarea id="otj-assistant-prompt" required rows={result?.currentQuestion ? 3 : 4} maxLength={3000} value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder={result?.currentQuestion ? "Type your answer…" : selectedChoice.placeholder} className={inputClass}/>
+      <button disabled={busy} className={primaryButton}>{busy ? <LoaderCircle size={15} className="animate-spin"/> : <Sparkles size={15}/>} {result?.currentQuestion ? "Continue" : "Prepare guidance"}</button>
+    </form>
+    {error ? <p role="alert" className="text-xs text-[#ad344e]">{error}</p> : null}
+
+    {draft && result?.assessment === "likely_eligible" ? <div className="rounded-xl border border-[#0b8075]/15 bg-white p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#0b8075]">Editable activity draft</p><p className="mt-1 text-xs text-[#102c3d]/55">Nothing is submitted automatically.</p></div>{draftDuration ? <span className="rounded-full bg-[#edf8f4] px-3 py-1.5 text-xs font-semibold text-[#0b6f63]">{formatMinutes(draftDuration)}</span> : null}</div>
+      <div className="mt-4 grid gap-3">
+        <Field label="Title"><input value={draft.title} maxLength={180} onChange={(event) => updateDraft("title", event.target.value)} className={inputClass}/></Field>
+        <Field label="Activity"><textarea rows={2} value={draft.description} maxLength={1000} onChange={(event) => updateDraft("description", event.target.value)} className={inputClass}/></Field>
+        <Field label="What was new"><textarea rows={2} value={draft.whatWasNew} maxLength={1000} onChange={(event) => updateDraft("whatWasNew", event.target.value)} className={inputClass}/></Field>
+        <Field label="Programme relevance"><textarea rows={2} value={draft.standardRelevance} maxLength={1000} onChange={(event) => updateDraft("standardRelevance", event.target.value)} className={inputClass}/></Field>
+        <Field label="Reflection"><textarea rows={2} value={draft.reflection} maxLength={1000} onChange={(event) => updateDraft("reflection", event.target.value)} placeholder="Add your own reflection; LevyTate will not invent it." className={inputClass}/></Field>
+      </div>
+      {draft.evidenceToCapture.length ? <div className="mt-4"><p className="text-xs font-semibold text-[#102c3d]/65">Evidence to retain</p><ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-[#102c3d]/60">{draft.evidenceToCapture.map((item) => <li key={item}>{item}</li>)}</ul></div> : null}
+      {onCreateDraft ? <button type="button" onClick={prepareActivity} className={`${primaryButton} mt-4`}>Create draft activity</button> : null}
+    </div> : null}
+  </div></Section>;
 }
 
 function Priorities({ learner }: { learner: LearningTimeLearnerView }) { return <Section title="Learning priorities">{learner.priorities.length ? <div className="grid gap-2">{learner.priorities.map((priority) => <div key={priority.id} className="rounded-xl bg-[#f6f9f7] p-3"><p className="text-sm font-semibold">{priority.label}</p><p className="mt-1 text-xs leading-5 text-[#102c3d]/55">{priority.description}</p>{priority.ksbReferences.length ? <p className="mt-2 text-[10px] font-semibold text-[#0b8075]">{priority.ksbReferences.join(" · ")}</p> : null}</div>)}</div> : <p className="text-sm text-[#102c3d]/55">No current learning priorities have been recorded.</p>}</Section>; }

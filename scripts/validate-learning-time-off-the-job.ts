@@ -3,9 +3,16 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   assessCandidateOffTheJobActivity,
+  assessConversationalOffTheJobEvidence,
   calculateLearningTimeTotals,
   policyRegimeForOriginalStartDate,
 } from "../lib/levytate/off-the-job/domain";
+import {
+  assessConversationState,
+  conversationCandidateFacts,
+  extractConversationState,
+  nextConversationQuestion,
+} from "../lib/levytate/off-the-job/conversation";
 import { analyseLearningTimeAutopilot } from "../lib/levytate/autopilot/operations-autopilot";
 import { resolveContextualCopilotIntent } from "../lib/levytate/contextual-copilot-intent";
 import { getCoreEarlyAccessPolicy } from "../lib/levytate/core-early-access-policy";
@@ -39,6 +46,32 @@ const compensated = assessCandidateOffTheJobActivity({ lifecycleStatus: "enrolle
 check("compensated exceptions require an attributable arrangement", compensated.outcome === "needs_clarification");
 const outsidePeriod = assessCandidateOffTheJobActivity({ lifecycleStatus: "enrolled", activityDate: "2025-12-31", startedAt: "09:00", endedAt: "10:00", breakMinutes: 0, category: "provider_workshop", whatWasNew: "New learning", standardRelevance: "Standard", workingHoursBasis: "within_normal_working_hours", separateFromProductiveWork: true, evidenceReference: "ref", practicalPeriodStartDate: "2026-01-01", practicalPeriodEndDate: "2027-01-01" });
 check("activity outside the practical period is rejected", outsidePeriod.outcome === "likely_ineligible");
+
+const programme = { programmeName: "Data Analyst", standardId: "ST0118" };
+const examplePrompt = "I spent three hours with the data team learning how they build Power BI dashboards and then built my first report. Does this count?";
+const firstTurn = extractConversationState({ learnerRecordId: "learner-1", mode: "eligibility_check", prompt: examplePrompt }, programme);
+const firstAssessment = assessConversationState(firstTurn);
+const firstQuestion = nextConversationQuestion(firstTurn, firstAssessment);
+const firstFacts = conversationCandidateFacts(firstTurn, programme);
+check("deterministic conversation extracts the exact example duration", firstTurn.durationMinutes === 180);
+check("deterministic conversation recognises structured learning with the data team", firstTurn.categoryCandidate === "structured_shadowing");
+check("deterministic conversation recognises new Power BI learning without inventing KSBs", firstTurn.newLearningEvidence.includes("first report") && firstTurn.standardRelevanceEvidence.includes("Data Analyst") && !firstTurn.standardRelevanceEvidence.includes("KSB"));
+check("first example response asks only the working-hours clarification", firstAssessment.outcome === "needs_clarification" && firstQuestion?.id === "working_hours" && firstFacts.includes("Built a first report"));
+
+const secondTurn = extractConversationState({ learnerRecordId: "learner-1", mode: "eligibility_check", prompt: "Yes — normal paid hours.", conversationState: firstTurn }, programme);
+const secondAssessment = assessConversationState(secondTurn);
+const secondQuestion = nextConversationQuestion(secondTurn, secondAssessment);
+check("second turn retains extracted evidence and asks only about productive work", secondTurn.durationMinutes === 180 && secondTurn.workingHoursBasis === "within_normal_working_hours" && secondQuestion?.id === "productive_work");
+
+const thirdTurn = extractConversationState({ learnerRecordId: "learner-1", mode: "eligibility_check", prompt: "Yes — this was new structured learning, not my normal weekly reporting.", conversationState: secondTurn }, programme);
+const thirdAssessment = assessConversationState(thirdTurn);
+check("exact three-turn Power BI journey becomes likely eligible", thirdAssessment.outcome === "likely_eligible" && thirdTurn.separateFromProductiveWork === true && nextConversationQuestion(thirdTurn, thirdAssessment) === null);
+
+const progressReviewTurn = extractConversationState({ learnerRecordId: "learner-1", mode: "eligibility_check", prompt: "My provider progress review lasted one hour." }, programme);
+const progressReviewAssessment = assessConversationState(progressReviewTurn);
+check("excluded progress review short-circuits without irrelevant questions", progressReviewAssessment.outcome === "likely_ineligible" && nextConversationQuestion(progressReviewTurn, progressReviewAssessment) === null);
+const unresolved = assessConversationalOffTheJobEvidence({ durationMinutes: 60, category: "structured_shadowing", newLearningEvidence: "Learned a new reporting technique", standardRelevance: "Relevant to ST0118", workingHoursBasis: "not_confirmed", separateFromProductiveWork: null });
+check("conversational pre-check never assumes required confirmations", unresolved.outcome === "needs_clarification" && unresolved.clarificationItems.length === 2);
 
 const totals = calculateLearningTimeTotals({ individualMinimumMinutes: 12_000, activities: [{ id: "a", durationMinutes: 120, status: "submitted" }, { id: "b", durationMinutes: 90, status: "employer_checked" }, { id: "c", durationMinutes: 45, status: "draft" }], confirmations: [{ activityId: "b", outcome: "partially_confirmed", confirmedMinutes: 60, recordedAt: "2026-09-12T12:00:00Z" }] });
 check("candidate, employer and provider totals remain separate", totals.learnerRecordedMinutes === 210 && totals.employerCheckedMinutes === 90 && totals.providerConfirmedMinutes === 60 && totals.remainingMinutes === 11_940);
@@ -78,7 +111,7 @@ check("official requirements never default unknown to zero", !/minimum_minutes[^
 const st1512Seed = migration.split("\n").find((line) => line.includes("('ST1512', '2.1'")) ?? "";
 check("ST1512 remains fail-closed pending reliable official-source parsing", st1512Seed.includes("'needs_review'") && !st1512Seed.includes("'verified'"));
 check("writes resolve organisation and employee scope server-side", server.includes("organisation_id") && server.includes("manager_id") && server.includes("created_by_user_id"));
-check("assistant cannot override deterministic ineligibility", assistant.includes('fallback.assessment === "likely_ineligible"'));
+check("assistant cannot override deterministic ineligibility", assistant.includes('authoritative.assessment === "likely_ineligible"') && assistant.includes("return authoritative"));
 check("AI planning may reference only existing bounded priority IDs", assistant.includes("allowedPriorityIds.has(id)"));
 check("assistant planning returns no more than three suggestions", assistant.includes("slice(0, 3)"));
 check("private learner drafts stay out of employer and manager workspaces", server.includes('role === "Employee" || activity.status !== "draft"'));
@@ -90,5 +123,10 @@ check("assistant choices expose their selected state", learningTimeUi.includes("
 check("assistant prompt has an explicit accessible label", learningTimeUi.includes('htmlFor="otj-assistant-prompt"') && learningTimeUi.includes('id="otj-assistant-prompt"'));
 check("learner selector has an explicit accessible label", learningTimeUi.includes('htmlFor="learning-time-learner"') && learningTimeUi.includes('id="learning-time-learner"'));
 check("employee assistant precedes activity history on mobile without changing desktop columns", learningTimeUi.includes("order-2 grid content-start gap-5 lg:order-1") && learningTimeUi.includes("order-1 grid min-w-0 content-start gap-5 lg:order-2"));
+check("assistant asks one clarification at a time", assistant.includes("currentQuestion ? [currentQuestion.prompt] : []") && learningTimeUi.includes("result.currentQuestion.quickAnswers.map"));
+check("assistant preserves bounded structured conversation state without message history", assistant.includes("boundedConversationState") && !assistant.includes("conversationHistory"));
+check("AI candidate extraction remains deterministic and non-authoritative", assistant.includes("mergeAiCandidateState") && assistant.includes("const authoritative = buildResponse"));
+check("eligible guidance prepares an editable draft without automatic submission", learningTimeUi.includes("Editable activity draft") && learningTimeUi.includes("Nothing is submitted automatically") && learningTimeUi.includes("Create draft activity"));
+check("assistant-prepared activity requires actual dates and times", learningTimeUi.includes("LevyTate has not invented them"));
 
 console.log(JSON.stringify({ verdict: "PASS", checks: checks.length, labels: checks }, null, 2));

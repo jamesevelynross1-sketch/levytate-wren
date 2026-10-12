@@ -63,6 +63,16 @@ export type CandidateActivityAssessmentInput = {
   overlappingActivity?: boolean;
 };
 
+export type ConversationalActivityAssessmentInput = {
+  durationMinutes: number | null;
+  category: OtjActivityCategory | "";
+  newLearningEvidence: string;
+  standardRelevance: string;
+  workingHoursBasis: OtjWorkingHoursBasis;
+  compensationNote?: string;
+  separateFromProductiveWork: boolean | null;
+};
+
 export type CandidateActivityAssessment = {
   outcome: OtjEligibilityOutcome;
   durationMinutes: number;
@@ -175,6 +185,57 @@ export function assessCandidateOffTheJobActivity(input: CandidateActivityAssessm
   ]));
   warnings.push("This is a preparation check, not a compliance decision. The training provider remains responsible for confirming the evidence used for off-the-job training.");
 
+  return { outcome, durationMinutes, passedTests, failedTests, clarificationItems, reasons, warnings };
+}
+
+export function assessConversationalOffTheJobEvidence(input: ConversationalActivityAssessmentInput): CandidateActivityAssessment {
+  const failedTests: string[] = [];
+  const clarificationItems: string[] = [];
+  const passedTests: string[] = [];
+  const warnings: string[] = [];
+  const durationMinutes = input.durationMinutes ?? 0;
+  const excluded = input.category && (excludedActivityCategories as readonly string[]).includes(input.category);
+
+  if (input.durationMinutes === null) clarificationItems.push("How long did the learning activity take?");
+  else if (input.durationMinutes <= 0) failedTests.push("The learning activity must have a positive duration.");
+
+  if (!input.category) clarificationItems.push("What type of learning activity was this?");
+  else if (excluded) failedTests.push("The selected activity category is excluded from off-the-job training.");
+  else passedTests.push("The activity is not in an excluded category.");
+
+  if (!input.newLearningEvidence.trim()) clarificationItems.push("What knowledge, skill or behaviour was genuinely new?");
+  else passedTests.push("The learner supplied evidence of new learning.");
+
+  if (!input.standardRelevance.trim()) clarificationItems.push("How did this relate to the apprenticeship standard or an agreed learning priority?");
+  else passedTests.push("The learning has a grounded programme or priority link.");
+
+  if (input.workingHoursBasis === "outside_working_hours_uncompensated") {
+    failedTests.push("Uncompensated learning outside normal working hours cannot be counted.");
+  } else if (input.workingHoursBasis === "not_confirmed") {
+    clarificationItems.push("Confirm whether the activity took place during normal paid working hours.");
+  } else if (input.workingHoursBasis === "paid_exception" || input.workingHoursBasis === "time_off_in_lieu_exception") {
+    if (!input.compensationNote?.trim()) clarificationItems.push("Record the paid exception or time-off-in-lieu arrangement.");
+    else passedTests.push("A compensated working-hours exception was supplied for later employer review.");
+    warnings.push("Repeated out-of-hours exceptions require employer and provider review; most training must not be delivered this way.");
+  } else {
+    passedTests.push("The learner confirmed normal paid working hours.");
+  }
+
+  if (input.separateFromProductiveWork === false) failedTests.push("Routine productive work is not off-the-job training.");
+  else if (input.separateFromProductiveWork === null) clarificationItems.push("Confirm whether the learning was separate from routine productive work.");
+  else passedTests.push("The learner confirmed the activity was separate from routine productive work.");
+
+  const outcome: OtjEligibilityOutcome = failedTests.length
+    ? "likely_ineligible"
+    : clarificationItems.length
+      ? "needs_clarification"
+      : "likely_eligible";
+  const reasons = failedTests.length
+    ? failedTests
+    : clarificationItems.length
+      ? clarificationItems
+      : ["The supplied evidence passes the four deterministic eligibility pre-checks."];
+  warnings.push("This is a preparation check, not a compliance decision. The training provider remains responsible for confirming the evidence used for off-the-job training.");
   return { outcome, durationMinutes, passedTests, failedTests, clarificationItems, reasons, warnings };
 }
 
