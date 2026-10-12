@@ -16,6 +16,7 @@ const migration = readFileSync(join(root, "supabase/migrations/033_create_off_th
 const server = readFileSync(join(root, "lib/server/levytate-off-the-job.ts"), "utf8");
 const assistant = readFileSync(join(root, "lib/server/levytate-off-the-job-assistant.ts"), "utf8");
 const capability = readFileSync(join(root, "lib/server/levytate-off-the-job-capability.ts"), "utf8");
+const learningTimeUi = readFileSync(join(root, "components/levytate-mvp/LearningTimeModule.tsx"), "utf8");
 const checks: string[] = [];
 const check = (label: string, condition: unknown) => { assert.ok(condition, label); checks.push(label); };
 
@@ -83,5 +84,11 @@ check("assistant planning returns no more than three suggestions", assistant.inc
 check("private learner drafts stay out of employer and manager workspaces", server.includes('role === "Employee" || activity.status !== "draft"'));
 check("inactivity attention is suppressed during a break", server.includes("if (!activeBreak && plan)"));
 check("Production capability is fail-closed", capability.includes('process.env.VERCEL_ENV === "production"'));
+check("assistant exposes the three apprentice-facing entry choices", ["Does this count?", "Plan my learning time", "Help me write it up"].every((label) => learningTimeUi.includes(label)));
+check("assistant entry choices preserve the three existing API modes", ["eligibility_check", "planning", "capture_support"].every((mode) => learningTimeUi.includes(`mode: "${mode}"`)));
+check("assistant choices expose their selected state", learningTimeUi.includes("aria-pressed={selected}") && learningTimeUi.includes("Selected</span>"));
+check("assistant prompt has an explicit accessible label", learningTimeUi.includes('htmlFor="otj-assistant-prompt"') && learningTimeUi.includes('id="otj-assistant-prompt"'));
+check("learner selector has an explicit accessible label", learningTimeUi.includes('htmlFor="learning-time-learner"') && learningTimeUi.includes('id="learning-time-learner"'));
+check("employee assistant precedes activity history on mobile without changing desktop columns", learningTimeUi.includes("order-2 grid content-start gap-5 lg:order-1") && learningTimeUi.includes("order-1 grid min-w-0 content-start gap-5 lg:order-2"));
 
 console.log(JSON.stringify({ verdict: "PASS", checks: checks.length, labels: checks }, null, 2));

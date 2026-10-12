@@ -12,6 +12,33 @@ import type {
 import { activityCategoryLabel, eligibleActivityCategories, excludedActivityCategories, type OtjActivityCategory } from "@/lib/levytate/off-the-job/domain";
 
 type JsonRecord = Record<string, unknown>;
+type AssistantMode = LearningTimeAssistantResponse["mode"];
+
+const assistantModeChoices: ReadonlyArray<{
+  mode: AssistantMode;
+  title: string;
+  copy: string;
+  placeholder: string;
+}> = [
+  {
+    mode: "eligibility_check",
+    title: "Does this count?",
+    copy: "Describe something you've done and LevyTate will help you work out whether it may count as off-the-job learning.",
+    placeholder: "e.g. I spent three hours shadowing the data team and built my first Power BI report.",
+  },
+  {
+    mode: "planning",
+    title: "Plan my learning time",
+    copy: "Tell LevyTate how much protected learning time you have and get ideas grounded in your programme and current learning priorities.",
+    placeholder: "e.g. I have three hours of protected learning time on Thursday.",
+  },
+  {
+    mode: "capture_support",
+    title: "Help me write it up",
+    copy: "Turn your rough notes into a clearer learning record. LevyTate will not invent activities, hours or evidence.",
+    placeholder: "e.g. Today I learned how to clean a data set and remove duplicate values.",
+  },
+];
 
 export function LearningTimeModule() {
   const [workspace, setWorkspace] = useState<LearningTimeWorkspace | null>(null);
@@ -72,8 +99,8 @@ export function LearningTimeModule() {
     {error ? <MessageState title="Action not completed" copy={error} tone="error" /> : null}
     {notice ? <MessageState title="Learning Time updated" copy={notice} tone="success" /> : null}
     {!workspace.learners.length ? <EmptyState role={workspace.role} /> : <>
-      {workspace.learners.length > 1 ? <label className="grid max-w-xl gap-2 text-xs font-semibold text-[#102c3d]/65">Learner
-        <select value={selectedLearner?.learnerRecordId ?? ""} onChange={(event) => setSelectedLearnerId(event.target.value)} className={inputClass}><option value="">Choose learner</option>{workspace.learners.map((learner) => <option key={learner.learnerRecordId} value={learner.learnerRecordId}>{learner.learnerName} · {learner.programmeName}</option>)}</select>
+      {workspace.learners.length > 1 ? <label htmlFor="learning-time-learner" className="grid max-w-xl gap-2 text-xs font-semibold text-[#102c3d]/65">Learner
+        <select id="learning-time-learner" value={selectedLearner?.learnerRecordId ?? ""} onChange={(event) => setSelectedLearnerId(event.target.value)} className={inputClass}><option value="">Choose learner</option>{workspace.learners.map((learner) => <option key={learner.learnerRecordId} value={learner.learnerRecordId}>{learner.learnerName} · {learner.programmeName}</option>)}</select>
       </label> : null}
       {selectedLearner ? <LearnerSummary learner={selectedLearner} /> : null}
       {selectedLearner && workspace.canCreateActivities ? <EmployeeLearningTime learner={selectedLearner} busy={busy} act={act} /> : null}
@@ -90,13 +117,13 @@ function EmployeeLearningTime({ learner, busy, act }: { learner: LearningTimeLea
   if (!learner.plan) return <MessageState title="Your learning-time plan is being prepared" copy="You can use the Off-the-Job Assistant for guidance once your agreed plan has been published. No historic learning time has been inferred." tone="neutral" />;
   const edit = (activity: LearningTimeActivityView) => { setEditing(activity); setShowForm(true); };
   return <div className="grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,.8fr)]">
-    <div className="grid content-start gap-5">
+    <div className="order-2 grid content-start gap-5 lg:order-1">
       <Section title="My learning activity" action={<button type="button" onClick={() => { setEditing(null); setShowForm((value) => !value); }} className={primaryButton}><Plus size={15}/>{showForm ? "Close form" : "Add learning activity"}</button>}>
         {showForm ? <ActivityForm learner={learner} existing={editing} busy={busy} onSaved={() => { setEditing(null); setShowForm(false); }} act={act} /> : null}
         <ActivityList learner={learner} canEdit canReview={false} busy={busy} onEdit={edit} act={act} />
       </Section>
     </div>
-    <div className="grid content-start gap-5"><Priorities learner={learner}/><OffTheJobAssistant learner={learner}/></div>
+    <div className="order-1 grid min-w-0 content-start gap-5 lg:order-2"><Priorities learner={learner}/><OffTheJobAssistant learner={learner}/></div>
   </div>;
 }
 
@@ -188,10 +215,30 @@ function PlanForm({ learner, busy, act }: { learner: LearningTimeLearnerView; bu
 }
 
 function OffTheJobAssistant({ learner }: { learner: LearningTimeLearnerView }) {
-  const [mode, setMode] = useState<"eligibility_check" | "planning" | "capture_support">("eligibility_check");
+  const [mode, setMode] = useState<AssistantMode>("eligibility_check");
   const [prompt, setPrompt] = useState(""); const [result, setResult] = useState<LearningTimeAssistantResponse | null>(null); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
+  const selectedChoice = assistantModeChoices.find((choice) => choice.mode === mode) ?? assistantModeChoices[0];
+  const chooseMode = (nextMode: AssistantMode) => { setMode(nextMode); setResult(null); setError(""); };
   const ask = async (event: FormEvent) => { event.preventDefault(); setBusy(true); setError(""); try { const response = await fetch("/api/levytate-learning-time/assistant", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ learnerRecordId: learner.learnerRecordId, mode, prompt }) }); const body = await response.json() as LearningTimeAssistantResponse & { message?: string }; if (!response.ok) throw new Error(body.message || "The assistant is unavailable."); setResult(body); } catch (askError) { setError(askError instanceof Error ? askError.message : "The assistant is unavailable."); } finally { setBusy(false); } };
-  return <Section title="Off-the-Job Assistant"><form onSubmit={ask} className="grid gap-3"><label className="sr-only" htmlFor="otj-assistant-mode">Assistant mode</label><select id="otj-assistant-mode" value={mode} onChange={(event) => setMode(event.target.value as typeof mode)} className={inputClass}><option value="eligibility_check">Eligibility check</option><option value="planning">Plan future learning</option><option value="capture_support">Prepare a learning record</option></select><textarea required rows={4} maxLength={3000} value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder="Describe the activity or learning need. Do not include sensitive personal information." className={inputClass}/><button disabled={busy} className={primaryButton}>{busy ? <LoaderCircle size={15} className="animate-spin"/> : <Sparkles size={15}/>}Prepare guidance</button></form>{error ? <p role="alert" className="mt-3 text-xs text-[#ad344e]">{error}</p> : null}{result ? <div className="mt-4 rounded-xl bg-[#f2f8f6] p-4"><p className="text-sm font-semibold">{result.headline}</p><p className="mt-2 text-xs leading-5 text-[#102c3d]/60">{result.explanation}</p>{result.clarificationQuestions.length ? <ul className="mt-3 list-disc space-y-1 pl-5 text-xs text-[#102c3d]/60">{result.clarificationQuestions.map((question) => <li key={question}>{question}</li>)}</ul> : null}<p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#0b8075]">{result.source === "openai" ? "AI-assisted draft" : "Deterministic guidance"}</p></div> : null}</Section>;
+  return <Section title="Off-the-Job Assistant"><form onSubmit={ask} className="grid gap-4">
+    <fieldset className="min-w-0">
+      <legend className="text-xs font-semibold text-[#102c3d]/65">How can LevyTate help?</legend>
+      <div className="mt-2 grid min-w-0 gap-2 sm:grid-cols-3 lg:grid-cols-1 2xl:grid-cols-3">
+        {assistantModeChoices.map((choice) => {
+          const selected = choice.mode === mode;
+          return <button key={choice.mode} type="button" aria-pressed={selected} onClick={() => chooseMode(choice.mode)} className={`min-w-0 rounded-xl border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0b8075] focus-visible:ring-offset-2 ${selected ? "border-[#0b8075]/45 bg-[#edf8f4] shadow-[0_5px_16px_rgba(11,128,117,0.08)]" : "border-[#102c3d]/[0.09] bg-white hover:border-[#0b8075]/30 hover:bg-[#f7fbf9]"}`}>
+            <span className="flex items-start justify-between gap-2"><span className="text-sm font-semibold text-[#102c3d]">{choice.title}</span>{selected ? <span className="inline-flex shrink-0 items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#0b6f63]"><CheckCircle2 size={13} aria-hidden="true"/>Selected</span> : null}</span>
+            <span className="mt-2 block text-xs leading-5 text-[#102c3d]/58">{choice.copy}</span>
+          </button>;
+        })}
+      </div>
+    </fieldset>
+    <div className="grid gap-2">
+      <label htmlFor="otj-assistant-prompt" className="text-xs font-semibold text-[#102c3d]/65">Tell LevyTate about your learning</label>
+      <textarea id="otj-assistant-prompt" required rows={4} maxLength={3000} value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder={selectedChoice.placeholder} className={inputClass}/>
+    </div>
+    <button disabled={busy} className={primaryButton}>{busy ? <LoaderCircle size={15} className="animate-spin"/> : <Sparkles size={15}/>}Prepare guidance</button>
+  </form>{error ? <p role="alert" className="mt-3 text-xs text-[#ad344e]">{error}</p> : null}{result ? <div className="mt-4 rounded-xl bg-[#f2f8f6] p-4"><p className="text-sm font-semibold">{result.headline}</p><p className="mt-2 text-xs leading-5 text-[#102c3d]/60">{result.explanation}</p>{result.clarificationQuestions.length ? <ul className="mt-3 list-disc space-y-1 pl-5 text-xs text-[#102c3d]/60">{result.clarificationQuestions.map((question) => <li key={question}>{question}</li>)}</ul> : null}<p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#0b8075]">{result.source === "openai" ? "AI-assisted draft" : "Deterministic guidance"}</p></div> : null}</Section>;
 }
 
 function Priorities({ learner }: { learner: LearningTimeLearnerView }) { return <Section title="Learning priorities">{learner.priorities.length ? <div className="grid gap-2">{learner.priorities.map((priority) => <div key={priority.id} className="rounded-xl bg-[#f6f9f7] p-3"><p className="text-sm font-semibold">{priority.label}</p><p className="mt-1 text-xs leading-5 text-[#102c3d]/55">{priority.description}</p>{priority.ksbReferences.length ? <p className="mt-2 text-[10px] font-semibold text-[#0b8075]">{priority.ksbReferences.join(" · ")}</p> : null}</div>)}</div> : <p className="text-sm text-[#102c3d]/55">No current learning priorities have been recorded.</p>}</Section>; }
