@@ -14,6 +14,7 @@ import {
   type AssessmentAnswerMap,
   type WorkforceAssessmentResult,
 } from "@/lib/levytate/assessments/domain";
+import { canManagerAccessAssessment } from "@/lib/levytate/assessments/behaviour";
 import {
   assessmentFrameworkDisclosure,
   workforceAssessmentFrameworkKey,
@@ -38,7 +39,7 @@ type CampaignRow = {
   questionnaire_version: string; interpretation_version: string; owner_user_id: string; closing_date: string | null;
   sharing_policy: AssessmentCampaignView["sharingPolicy"]; created_at: string;
 };
-type ParticipantRow = { id: string; campaign_id: string; employee_id: string; employee_name_snapshot: string; department_snapshot: string; role_title_snapshot: string; audience_change_type: string };
+type ParticipantRow = { id: string; campaign_id: string; employee_id: string; employee_name_snapshot: string; department_snapshot: string; role_title_snapshot: string; audience_change_type: string; created_at: string };
 type AssessmentRow = {
   id: string; employee_id: string; campaign_id: string | null; status: AssessmentView["status"]; visibility: AssessmentView["visibility"];
   questionnaire_version: string; interpretation_version: string; questionnaire_snapshot: unknown; role_context: string;
@@ -108,10 +109,13 @@ export async function getAssessmentWorkspaceForSession(session: LevyTateBetaSess
   const visibleAssessments = allAssessments.filter((assessment) => {
     if (role === "Employee") return assessment.employee_id === currentEmployee?.id;
     if (role === "Line Manager") {
-      if (!directReportIds.has(assessment.employee_id)) return false;
-      if (assessment.visibility === "manager_shared") return allShares.some((share) => share.assessment_id === assessment.id && share.shared_with_employee_id === currentEmployee?.id && share.active);
       const campaign = assessment.campaign_id ? allCampaigns.find((item) => item.id === assessment.campaign_id) : null;
-      return assessment.visibility === "campaign_shared" && campaign?.sharing_policy === "manager_and_campaign_owner";
+      return canManagerAccessAssessment({
+        currentDirectReport: directReportIds.has(assessment.employee_id),
+        visibility: assessment.visibility,
+        activeShareAddressedToManager: allShares.some((share) => share.assessment_id === assessment.id && share.shared_with_employee_id === currentEmployee?.id && share.active),
+        campaignSharingPolicy: campaign?.sharing_policy ?? null,
+      });
     }
     return assessment.visibility === "campaign_shared";
   });
@@ -146,7 +150,7 @@ export async function getAssessmentWorkspaceForSession(session: LevyTateBetaSess
       activeSubmittedRevision: assessment.active_submission_revision,
       answers: object<AssessmentAnswerMap>(revision?.answers),
       result: result ? object<WorkforceAssessmentResult>(result.result_snapshot) : null,
-      sharedWithManager: shares.some((share) => share.assessment_id === assessment.id && share.shared_with === "line_manager" && share.active),
+      sharedWithManager: Boolean(currentEmployee?.manager_id) && shares.some((share) => share.assessment_id === assessment.id && share.shared_with === "line_manager" && share.shared_with_employee_id === currentEmployee?.manager_id && share.active),
       review: review ? reviewView(review) : null,
       applicationId: links.find((link) => link.assessment_id === assessment.id)?.application_id ?? null,
       updatedAt: assessment.updated_at,
@@ -154,10 +158,14 @@ export async function getAssessmentWorkspaceForSession(session: LevyTateBetaSess
   });
 
   const ownerById = new Map(ownerRows.map((owner) => [owner.id, owner.display_name || owner.email]));
-  const campaignViews = campaigns.map<AssessmentCampaignView>((campaign) => {
-    const participants = allParticipants.filter((participant) => participant.campaign_id === campaign.id && participant.audience_change_type !== "removed" && (
+  const participantSnapshotsByCampaign = new Map(campaigns.map((campaign) => [
+    campaign.id,
+    activeCampaignParticipants(allParticipants, campaign.id).filter((participant) => (
       role === "Employee" ? participant.employee_id === currentEmployee?.id : role === "Line Manager" ? directReportIds.has(participant.employee_id) : true
-    ));
+    )),
+  ]));
+  const campaignViews = campaigns.map<AssessmentCampaignView>((campaign) => {
+    const participants = participantSnapshotsByCampaign.get(campaign.id) ?? [];
     const submitted = visibleAssessments.filter((assessment) => assessment.campaign_id === campaign.id && assessment.active_submission_revision !== null).length;
     return {
       id: campaign.id,
@@ -180,7 +188,11 @@ export async function getAssessmentWorkspaceForSession(session: LevyTateBetaSess
     ? campaignViews.map((campaign) => ({
         campaignId: campaign.id,
         ...aggregateAssessmentResults({
-          invited: campaign.participantEmployeeIds,
+          audience: (participantSnapshotsByCampaign.get(campaign.id) ?? []).map((participant) => ({
+            employeeId: participant.employee_id,
+            department: participant.department_snapshot,
+            roleTitle: participant.role_title_snapshot,
+          })),
           submissions: assessments.filter((assessment) => assessment.campaignId === campaign.id && assessment.result).map((assessment) => ({
             employeeId: assessment.employeeId,
             department: assessment.department,
@@ -225,7 +237,12 @@ export async function applyAssessmentActionForSession(session: LevyTateBetaSessi
       if (!employee) throw new LevyTateAssessmentError("Your active employee record could not be found.", 403);
       const campaignId = action.campaignId || null;
       if (campaignId) await assertCampaignAssignment(context.organisation.id, campaignId, employee.id, true);
-      const query: Record<string, string> = { employee_id: `eq.${employee.id}`, campaign_id: campaignId ? `eq.${campaignId}` : "is.null", limit: "1" };
+      const query: Record<string, string> = {
+        employee_id: `eq.${employee.id}`,
+        campaign_id: campaignId ? `eq.${campaignId}` : "is.null",
+        ...(campaignId ? {} : { baseline_assessment_id: "is.null" }),
+        limit: "1",
+      };
       const existing = await selectRows<AssessmentRow>(tables.assessments, context.organisation.id, query);
       if (!existing.length) {
         const assessmentId = randomUUID();
@@ -321,7 +338,10 @@ export async function applyAssessmentActionForSession(session: LevyTateBetaSessi
       if (!assessment.active_submission_revision) throw new LevyTateAssessmentError("Submit the assessment before sharing findings.", 409);
       if (!employee?.manager_id) throw new LevyTateAssessmentError("No active line manager is linked to this employee.", 409);
       await supabaseInsert(config, tables.shares, [{ id: randomUUID(), organisation_id: context.organisation.id, assessment_id: assessment.id, shared_with: "line_manager", shared_with_employee_id: employee.manager_id, active: true, shared_by: context.user.id }], { prefer: "resolution=merge-duplicates,return=representation", query: "on_conflict=organisation_id,assessment_id,shared_with" });
-      await supabaseUpdate(config, tables.assessments, scope(context.organisation.id, { id: assessment.id }), { visibility: "manager_shared", updated_at: new Date().toISOString() });
+      await supabaseUpdate(config, tables.assessments, scope(context.organisation.id, { id: assessment.id }), {
+        visibility: assessment.campaign_id ? "campaign_shared" : "manager_shared",
+        updated_at: new Date().toISOString(),
+      });
       await recordEvent(context, action, assessment.id, assessment.campaign_id, "assessment.shared_with_manager");
       break;
     }
@@ -431,15 +451,26 @@ async function reviewableAssessment(organisationId: string, assessmentId: string
   if (!assessment) throw new LevyTateAssessmentError("Assessment was not found.", 404);
   if (role === "Line Manager") {
     if (!manager) throw new LevyTateAssessmentError("Your active manager record could not be found.", 403);
-    const report = (await selectRows<EmployeeRow>("levytate_employees", organisationId, { id: `eq.${assessment.employee_id}`, manager_id: `eq.${manager.id}`, status: "eq.Active", limit: "1" }))[0];
-    if (!report) throw new LevyTateAssessmentError("You cannot review this employee's assessment.", 403);
-    if (assessment.visibility === "private") throw new LevyTateAssessmentError("This assessment has not been shared for manager review.", 403);
-    if (assessment.visibility === "campaign_shared") {
-      const campaign = assessment.campaign_id ? await campaignRecord(organisationId, assessment.campaign_id) : null;
-      if (campaign?.sharing_policy !== "manager_and_campaign_owner") throw new LevyTateAssessmentError("This campaign does not disclose individual findings to managers.", 403);
-    }
+    const [report, shares, campaign] = await Promise.all([
+      selectRows<EmployeeRow>("levytate_employees", organisationId, { id: `eq.${assessment.employee_id}`, manager_id: `eq.${manager.id}`, status: "eq.Active", limit: "1" }).then((rows) => rows[0] ?? null),
+      selectRows<ShareRow>(tables.shares, organisationId, { assessment_id: `eq.${assessment.id}`, shared_with_employee_id: `eq.${manager.id}`, active: "eq.true" }),
+      assessment.campaign_id ? campaignRecord(organisationId, assessment.campaign_id) : Promise.resolve(null),
+    ]);
+    if (!canManagerAccessAssessment({
+      currentDirectReport: Boolean(report),
+      visibility: assessment.visibility,
+      activeShareAddressedToManager: shares.length > 0,
+      campaignSharingPolicy: campaign?.sharing_policy ?? null,
+    })) throw new LevyTateAssessmentError("This assessment has not been disclosed to you for manager review.", 403);
   } else if (assessment.visibility !== "campaign_shared") throw new LevyTateAssessmentError("Private personal assessments are not visible to employer reporting roles.", 403);
   return assessment;
+}
+
+function activeCampaignParticipants(participants: ParticipantRow[], campaignId: string) {
+  const campaignParticipants = participants.filter((participant) => participant.campaign_id === campaignId);
+  const removed = new Set(campaignParticipants.filter((participant) => participant.audience_change_type === "removed").map((participant) => participant.employee_id));
+  const active = campaignParticipants.filter((participant) => participant.audience_change_type !== "removed" && !removed.has(participant.employee_id));
+  return [...new Map(active.map((participant) => [participant.employee_id, participant])).values()];
 }
 
 async function assertCampaignAssignment(organisationId: string, campaignId: string, employeeId: string, mustBeOpen: boolean) {

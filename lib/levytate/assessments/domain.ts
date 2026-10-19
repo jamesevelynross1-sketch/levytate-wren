@@ -90,29 +90,33 @@ export function interpretWorkforceAssessment(answers: AssessmentAnswerMap): Work
 }
 
 export function aggregateAssessmentResults(input: {
-  invited: string[];
+  audience: Array<{ employeeId: string; department: string; roleTitle: string }>;
   submissions: Array<{ employeeId: string; department: string; roleTitle: string; result: WorkforceAssessmentResult }>;
   suppressionThreshold?: number;
 }) {
   const submittedByEmployee = new Map(input.submissions.map((submission) => [submission.employeeId, submission]));
   const submissions = [...submittedByEmployee.values()];
-  const invited = new Set(input.invited);
+  const audience = [...new Map(input.audience.map((participant) => [participant.employeeId, participant])).values()];
   const threshold = input.suppressionThreshold ?? 5;
-  const groups = [...new Set(submissions.map((submission) => submission.department).filter(Boolean))].map((department) => {
-    const departmentSubmissions = submissions.filter((submission) => submission.department === department);
+  const groups = [...new Set(audience.map((participant) => participant.department || "Unspecified"))].sort().map((department) => {
+    const departmentAudience = audience.filter((participant) => (participant.department || "Unspecified") === department);
+    const departmentEmployeeIds = new Set(departmentAudience.map((participant) => participant.employeeId));
+    const departmentSubmissions = submissions.filter((submission) => departmentEmployeeIds.has(submission.employeeId));
     return {
       department,
+      invited: departmentAudience.length,
       submitted: departmentSubmissions.length,
+      participationPercent: departmentAudience.length ? Math.round((departmentSubmissions.length / departmentAudience.length) * 100) : 0,
       suppressed: departmentSubmissions.length < threshold,
       recurringNeeds: departmentSubmissions.length < threshold ? [] : frequencies(departmentSubmissions.flatMap((submission) => submission.result.developmentNeeds)),
       blockers: departmentSubmissions.length < threshold ? [] : frequencies(departmentSubmissions.flatMap((submission) => submission.result.workplaceConstraints)),
     };
   });
   return {
-    invited: invited.size,
+    invited: audience.length,
     submitted: submissions.length,
-    participationPercent: invited.size ? Math.round((submissions.length / invited.size) * 100) : 0,
-    definition: `${submissions.length} distinct submitted response${submissions.length === 1 ? "" : "s"} from ${invited.size} recorded invitee${invited.size === 1 ? "" : "s"}. Unsubmitted invitees are not treated as capability evidence.`,
+    participationPercent: audience.length ? Math.round((submissions.length / audience.length) * 100) : 0,
+    definition: `${submissions.length} distinct submitted response${submissions.length === 1 ? "" : "s"} from ${audience.length} recorded invitee${audience.length === 1 ? "" : "s"}. Unsubmitted invitees are reported as non-response and are not treated as capability evidence.`,
     suppressionThreshold: threshold,
     groups,
   };

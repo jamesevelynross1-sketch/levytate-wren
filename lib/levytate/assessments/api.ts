@@ -70,7 +70,7 @@ export type AssessmentWorkspace = {
     submitted: number;
     participationPercent: number;
     suppressionThreshold: number;
-    groups: Array<{ department: string; submitted: number; suppressed: boolean; recurringNeeds: Array<{ label: string; count: number }>; blockers: Array<{ label: string; count: number }> }>;
+    groups: Array<{ department: string; invited: number; submitted: number; participationPercent: number; suppressed: boolean; recurringNeeds: Array<{ label: string; count: number }>; blockers: Array<{ label: string; count: number }> }>;
   }>;
 };
 

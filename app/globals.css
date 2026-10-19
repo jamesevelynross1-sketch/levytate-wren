@@ -399,12 +399,20 @@ a {
     visibility: hidden !important;
   }
 
+  body.assessment-report-printing > *:not(.assessment-campaign-report) {
+    display: none !important;
+  }
+
   .opportunity-review-report,
-  .opportunity-review-report * {
+  .opportunity-review-report *,
+  .assessment-campaign-report,
+  .assessment-campaign-report * {
     visibility: visible !important;
   }
 
-  .opportunity-review-report {
+  .opportunity-review-report,
+  .assessment-campaign-report {
+    display: block !important;
     position: absolute !important;
     inset: 0 auto auto 0 !important;
     width: 100% !important;
@@ -414,7 +422,9 @@ a {
   }
 
   .opportunity-review-report section,
-  .opportunity-review-report > div > div {
+  .opportunity-review-report > div > div,
+  .assessment-campaign-report section,
+  .assessment-campaign-report section > div {
     break-inside: avoid;
     page-break-inside: avoid;
     background: #ffffff !important;
@@ -427,18 +437,26 @@ a {
   .opportunity-review-report h3,
   .opportunity-review-report h4,
   .opportunity-review-report h5,
-  .opportunity-review-report p {
+  .opportunity-review-report p,
+  .assessment-campaign-report h1,
+  .assessment-campaign-report h2,
+  .assessment-campaign-report h3,
+  .assessment-campaign-report p {
     color: #0f2527 !important;
   }
 
-  .opportunity-review-report p {
+  .opportunity-review-report p,
+  .assessment-campaign-report p {
     font-size: 11pt !important;
     line-height: 1.6 !important;
   }
 
   .opportunity-review-report a,
   .opportunity-review-report button,
-  .opportunity-review-report .print-hidden {
+  .opportunity-review-report .print-hidden,
+  .assessment-campaign-report a,
+  .assessment-campaign-report button,
+  .assessment-campaign-report .print-hidden {
     display: none !important;
   }
 }

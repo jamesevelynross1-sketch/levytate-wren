@@ -35,7 +35,9 @@ Limited tool access, practice opportunity, time or manager support is treated as
 - **Invited**: distinct employees in the recorded campaign audience, excluding explicit removal records.
 - **Submitted**: distinct employees with an active submitted revision for the campaign.
 - **Participation**: submitted divided by invited.
+- **Department basis**: the department recorded in the immutable campaign audience snapshot, so later employee-profile changes do not rewrite campaign participation history.
 - Non-response is never interpreted as low capability.
+- Every recorded audience department remains in the report, including departments with zero submissions; invited, submitted and participation are shown separately from findings.
 - Department needs and blocker detail is suppressed below five submitted responses.
 - Employee names are not included in aggregate reporting exports.
 
