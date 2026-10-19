@@ -6,7 +6,7 @@ export type AssessmentAnswerValue = string | string[] | null;
 
 export type AssessmentQuestion = {
   id: string;
-  section: "role" | "capability" | "opportunity" | "responsible_use" | "readiness";
+  section: string;
   prompt: string;
   helpText: string;
   purpose: string;
@@ -14,6 +14,27 @@ export type AssessmentQuestion = {
   type: "single_choice" | "multi_choice" | "long_text";
   required: boolean;
   options?: Array<{ value: string; label: string }>;
+};
+
+export type AssessmentFrameworkSection = {
+  id: string;
+  label: string;
+  introduction: string;
+};
+
+export type AssessmentFrameworkDefinition = {
+  frameworkKey: string;
+  questionnaireVersion: string;
+  interpretationVersion: string;
+  title: string;
+  shortTitle: string;
+  purpose: string;
+  audience: string;
+  limitations: string[];
+  estimatedMinutes: number;
+  dimensions: Array<{ id: string; label: string; description: string }>;
+  sections: AssessmentFrameworkSection[];
+  questions: readonly AssessmentQuestion[];
 };
 
 const confidenceOptions = [

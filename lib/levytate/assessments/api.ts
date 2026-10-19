@@ -12,6 +12,9 @@ export type AssessmentView = {
   roleTitle: string;
   campaignId: string | null;
   campaignTitle: string | null;
+  questionnaireVersion: string;
+  interpretationVersion: string;
+  questions: AssessmentQuestion[];
   status: AssessmentStatus;
   visibility: "private" | "manager_shared" | "campaign_shared";
   currentRevision: number;
@@ -39,6 +42,8 @@ export type AssessmentCampaignView = {
   id: string;
   title: string;
   purpose: string;
+  frameworkTitle: string;
+  questionnaireVersion: string;
   businessObjectives: string[];
   departments: string[];
   status: "draft" | "open" | "closed";
@@ -57,6 +62,20 @@ export type AssessmentWorkspace = {
   role: MvpUserRole;
   currentEmployeeId: string | null;
   questions: AssessmentQuestion[];
+  frameworks: Array<{
+    frameworkKey: string;
+    questionnaireVersion: string;
+    interpretationVersion: string;
+    title: string;
+    shortTitle: string;
+    purpose: string;
+    audience: string;
+    limitations: string[];
+    estimatedMinutes: number;
+    questionCount: number;
+    sections: Array<{ id: string; label: string; introduction: string }>;
+    dimensions: Array<{ id: string; label: string; description: string }>;
+  }>;
   questionnaireVersion: string;
   interpretationVersion: string;
   disclosure: { private: string; campaign: string; guidance: string };
@@ -70,6 +89,10 @@ export type AssessmentWorkspace = {
     submitted: number;
     participationPercent: number;
     suppressionThreshold: number;
+    profiles: Array<{ label: string; count: number }>;
+    dimensions: Array<{ id: string; label: string; value: number }>;
+    barriers: Array<{ label: string; count: number }>;
+    cohorts: Array<{ label: string; count: number }>;
     groups: Array<{ department: string; invited: number; submitted: number; participationPercent: number; suppressed: boolean; recurringNeeds: Array<{ label: string; count: number }>; blockers: Array<{ label: string; count: number }> }>;
   }>;
 };
@@ -77,12 +100,12 @@ export type AssessmentWorkspace = {
 type Idempotent = { idempotencyKey: string };
 
 export type AssessmentAction = Idempotent & (
-  | { action: "start_assessment"; campaignId?: string }
+  | { action: "start_assessment"; campaignId?: string; questionnaireVersion?: string }
   | { action: "start_reassessment"; baselineAssessmentId: string }
   | { action: "save_answers"; assessmentId: string; answers: AssessmentAnswerMap; roleContext?: string }
   | { action: "submit"; assessmentId: string }
   | { action: "share_with_manager"; assessmentId: string }
-  | { action: "create_campaign"; title: string; purpose: string; businessObjectives: string[]; departments: string[]; employeeIds: string[]; closingDate?: string; sharingPolicy: AssessmentCampaignView["sharingPolicy"] }
+  | { action: "create_campaign"; questionnaireVersion: string; title: string; purpose: string; businessObjectives: string[]; departments: string[]; employeeIds: string[]; closingDate?: string; sharingPolicy: AssessmentCampaignView["sharingPolicy"] }
   | { action: "open_campaign"; campaignId: string }
   | { action: "close_campaign"; campaignId: string }
   | { action: "reopen_campaign"; campaignId: string }

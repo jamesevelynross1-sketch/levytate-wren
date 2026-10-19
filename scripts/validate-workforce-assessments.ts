@@ -8,6 +8,8 @@ import {
 } from "../lib/levytate/assessments/behaviour";
 import { aggregateAssessmentResults, interpretWorkforceAssessment, validateAssessmentAnswers, type AssessmentAnswerMap } from "../lib/levytate/assessments/domain";
 import { workforceAssessmentQuestions } from "../lib/levytate/assessments/framework";
+import { assessmentFrameworks, comprehensiveAssessmentQuestions } from "../lib/levytate/assessments/framework-registry";
+import { interpretComprehensiveAssessment, validateComprehensiveAnswers } from "../lib/server/levytate-assessment-scoring";
 import { getCoreEarlyAccessPolicy } from "../lib/levytate/core-early-access-policy";
 import { permissionsForMvpRole } from "../lib/levytate/mvp/rbac";
 
@@ -75,13 +77,41 @@ assert.ok(permissionsForMvpRole("Apprenticeship Lead").includes("assessments:man
 assert.ok(!permissionsForMvpRole("Platform Admin").includes("assessments:read"));
 assert.equal(getCoreEarlyAccessPolicy("Platform Admin").modules.find((item) => item.moduleKey === "Assessments")?.availability, "hidden");
 
+assert.equal(assessmentFrameworks.length, 2, "Quick and comprehensive templates must both remain published.");
+assert.equal(comprehensiveAssessmentQuestions.length, 40, "The approved active comprehensive framework contains 40 questions.");
+assert.equal(new Set(comprehensiveAssessmentQuestions.map((question) => question.id)).size, 40, "Comprehensive question identifiers must be unique.");
+const comprehensiveAnswers: AssessmentAnswerMap = Object.fromEntries(comprehensiveAssessmentQuestions.map((question) => [question.id,
+  question.type === "multi_choice" ? [question.options?.[0]?.value ?? ""]
+    : question.type === "long_text" ? "A fictional, non-sensitive workplace example"
+      : "5",
+]));
+Object.assign(comprehensiveAnswers, { pv1: "B", pv2: "C", pv3: "B", pv4: "C", ex2: "4", ex3: "5", personalUseCases: ["Researching and comparing information", "Drafting or improving writing", "Learning a new skill or topic"], workplaceUseCases: ["Research and comparison", "Drafting or improving writing", "Summarising documents"] });
+assert.equal(validateComprehensiveAnswers(comprehensiveAnswers).valid, true);
+assert.equal(validateComprehensiveAnswers({ ...comprehensiveAnswers, pv2: null }).valid, false, "Missing practical evidence must remain missing.");
+const comprehensive = interpretComprehensiveAssessment(comprehensiveAnswers);
+assert.equal(comprehensive.capabilityIntelligence?.practicalJudgement, 100);
+assert.equal(comprehensive.capabilityIntelligence?.dimensionScores.aiUnderstanding, 100);
+assert.equal(comprehensive.capabilityIntelligence?.developmentProfile, "Technical");
+assert.ok(comprehensive.capabilityIntelligence?.developmentCohorts.includes("Technical development"));
+const missingEvidence = interpretComprehensiveAssessment({ ...comprehensiveAnswers, un1: null });
+assert.equal(missingEvidence.capabilityIntelligence?.dimensionScores.aiUnderstanding, 100, "Missing evidence must be excluded rather than scored as poor capability.");
+assert.equal(missingEvidence.capabilityIntelligence?.evidenceCoverage.answeredScored, comprehensive.capabilityIntelligence!.evidenceCoverage.answeredScored - 1);
+const partialScenario = interpretComprehensiveAssessment({ ...comprehensiveAnswers, pv4: null });
+assert.equal(partialScenario.capabilityIntelligence?.practicalJudgement, null, "Incomplete scenarios must not create a misleading practical score.");
+
+const publicFrameworkSource = `${readFileSync(new URL("../lib/levytate/assessments/framework-registry.ts", import.meta.url), "utf8")}\n${readFileSync(new URL("../components/levytate-mvp/AssessmentsModule.tsx", import.meta.url), "utf8")}`;
+assert.ok(!publicFrameworkSource.includes('pv1: "B"') && !publicFrameworkSource.includes('pv2: "C"'), "The practical answer key must not enter client-reachable modules.");
+
 const migration = readFileSync(new URL("../supabase/migrations/034_create_workforce_assessments.sql", import.meta.url), "utf8");
 assert.ok(migration.includes("enable row level security"));
 assert.ok(migration.includes("revoke all on table"));
 assert.ok(migration.includes("baseline_assessment_id"));
 assert.ok(migration.includes("levytate_assessment_actions"));
+const v2Migration = readFileSync(new URL("../supabase/migrations/035_register_comprehensive_ai_capability_assessment.sql", import.meta.url), "utf8");
+assert.ok(v2Migration.includes("ai-capability-v2"));
+assert.ok(v2Migration.includes("on conflict") && !/\b(delete|drop table|truncate)\b/i.test(v2Migration), "V2 framework registration must remain additive and idempotent.");
 
-console.log("Workforce Assessments validation passed: behavioural coverage for save/submit sequencing, review scoping, manager disclosure, campaign visibility wording, reporting suppression and zero-response departments.");
+console.log("Workforce Assessments validation passed: V1/V2 versioning, 40-question framework, confidential scenario scoring, missing-evidence handling, profiles, cohorts, manager disclosure, suppression and historical compatibility.");
 }
 
 void main();

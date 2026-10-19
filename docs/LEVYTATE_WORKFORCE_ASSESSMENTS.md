@@ -1,4 +1,4 @@
-# LevyTate Workforce Assessments V1
+# LevyTate Workforce Assessments
 
 ## Purpose
 
@@ -30,6 +30,16 @@ Questionnaire version `ai-workforce-v1` and interpretation version `ai-workforce
 
 Limited tool access, practice opportunity, time or manager support is treated as a workplace condition, not a personal capability deficit. Possible routes are explained guidance and never automatic decisions.
 
+### Comprehensive AI Capability Assessment
+
+Questionnaire version `ai-capability-v2` and interpretation version `ai-capability-rules-v2` adapt the approved Ground Control Current AI Capability Assessment into LevyTate's connected, tenant-scoped architecture. The active framework contains 40 questions across experience, understanding, responsible use, practical application, verification, contribution, four workplace scenarios, barriers and opportunities. The earlier reference landing-page description of 28 questions is not used because it did not match the active question bank.
+
+The six internal evidence dimensions are AI understanding (15%), personal and workplace usage (20%), responsible use (20%), practical application (20%), verification and judgement (20%), and wider contribution (5%). Each self-report response uses a 1–5 scale normalised to 0–100. Only available, relevant evidence contributes to a dimension or weighted indicator: unanswered, unknown and not-applicable responses are excluded rather than scored as poor capability. Four practical scenarios are scored separately on the server, with a practical indicator produced only when all four are answered.
+
+Internal development bands (Foundation, Developing, Applied and Advanced), profiles (User, Enabler, Technical and Leader), confidence alignment, transferable experience and recommended cohorts support an authorised development conversation. They are working interpretation rules, not externally validated thresholds or certified competence measures. The Advanced band is conservatively capped when responsible-use, verification or practical evidence is weak. Employees receive constructive narrative findings and possible next steps, not numerical scores, grades or pass/fail outcomes.
+
+The scenario answer key is held only in a server module. It is not included in the questionnaire registry, employee JavaScript, workspace API or browser bundle. The framework captures categories of personal use only and explicitly tells employees not to disclose personal prompts, private topics, account details or confidential workplace information.
+
 ## Reporting definitions
 
 - **Invited**: distinct employees in the recorded campaign audience, excluding explicit removal records.
@@ -39,6 +49,7 @@ Limited tool access, practice opportunity, time or manager support is treated as
 - Non-response is never interpreted as low capability.
 - Every recorded audience department remains in the report, including departments with zero submissions; invited, submitted and participation are shown separately from findings.
 - Department needs and blocker detail is suppressed below five submitted responses.
+- Comprehensive organisation intelligence (profiles, dimensions, barriers and cohorts) is also withheld below five submissions. The current UI does not expose complement groups or intersecting aggregate filters, preventing subtraction attacks through overlapping views.
 - Employee names are not included in aggregate reporting exports.
 
 ## Application handoff
@@ -49,10 +60,11 @@ An employee may choose a mapped apprenticeship standard and prepare a draft appl
 
 All operational tables are organisation-scoped, RLS-enabled and unavailable to browser roles. The server-only service role is used behind session, role and tenant checks. Event writes are retry-safe, submitted results and events are immutable, and no service key reaches the client.
 
-## First-release limits
+## Current limits
 
-- One built-in workforce framework is available.
+- Two published templates are available: the historical/current 12-question Quick Assessment and the 40-question Comprehensive AI Capability Assessment. Campaigns and submissions remain pinned to their selected published version.
 - Campaign audiences are fixed after creation in V1.
-- Reports are printable through the browser; scheduled exports are not included.
+- Reports are printable through the browser and aggregate CSV is authorised server-side. Scheduled exports are not included.
 - Proposed actions are recorded, but general operational-action completion remains a separate workflow.
 - Provider initial assessments and apprenticeship eligibility evidence are outside this module.
+- Four scenarios provide limited practical evidence and must be interpreted with role context, manager discussion and workplace evidence.

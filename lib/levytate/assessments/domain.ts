@@ -15,6 +15,26 @@ export type WorkforceAssessmentResult = {
   discussionPoints: string[];
   evidenceDomains: Array<{ domain: "technical" | "non_technical" | "responsible_ethical"; answered: number; relevant: number }>;
   disclaimer: string;
+  capabilityIntelligence?: CapabilityIntelligence;
+};
+
+export type CapabilityDimension = "aiUnderstanding" | "generalUsage" | "responsibleUse" | "practicalApplication" | "verificationJudgement" | "contribution";
+export type DevelopmentProfile = "User" | "Enabler" | "Technical" | "Leader";
+export type CapabilityIntelligence = {
+  frameworkVersion: string;
+  internalBand: "Foundation" | "Developing" | "Applied" | "Advanced" | "Further review required";
+  developmentProfile: DevelopmentProfile;
+  dimensionScores: Partial<Record<CapabilityDimension, number>>;
+  overallIndicator: number | null;
+  practicalJudgement: number | null;
+  confidenceAlignment: "Aligned" | "Confidence ahead of evidence" | "Capability may be understated" | "Further review recommended";
+  transferableExperience: "Not currently evidenced" | "Personal experience not yet applied at work" | "Emerging workplace application" | "Established workplace application";
+  workplaceUsePattern: string;
+  barrier: string | null;
+  opportunity: string | null;
+  developmentCohorts: string[];
+  evidenceCoverage: { answeredScored: number; availableScored: number; practicalScenariosAnswered: number };
+  methodology: string;
 };
 
 const independent = new Set(["independent"]);

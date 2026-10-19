@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import type { LevyTateBetaSession } from "../lib/levytate/config/beta-access";
-import { workforceAssessmentQuestions } from "../lib/levytate/assessments/framework";
+import { comprehensiveAssessmentQuestions } from "../lib/levytate/assessments/framework-registry";
 import type { AssessmentAnswerMap } from "../lib/levytate/assessments/domain";
 import {
   applyAssessmentActionForSession,
@@ -106,11 +106,12 @@ function employee(identityRecord: { email: string; role: string }, id: string, j
 }
 
 function completeAnswers(employeeNumber: number): AssessmentAnswerMap {
-  return Object.fromEntries(workforceAssessmentQuestions.map((question) => [question.id,
+  const answers = Object.fromEntries(comprehensiveAssessmentQuestions.map((question) => [question.id,
     question.type === "multi_choice" ? [question.options?.[0]?.value ?? "not_sure"]
       : question.type === "long_text" ? `Fictional evidence for employee ${employeeNumber}`
-        : question.options?.[0]?.value ?? "not_sure",
+        : question.options?.at(-1)?.value ?? "",
   ]));
+  return { ...answers, pv1: "B", pv2: "C", pv3: "B", pv4: "C", ex2: "4", ex3: "5", workplaceUseCases: ["Research and comparison", "Drafting or improving writing", "Summarising documents"], personalUseCases: ["Researching and comparing information", "Drafting or improving writing", "Learning a new skill or topic"] };
 }
 
 function key(label: string) { return `${label}:${randomUUID()}`; }
@@ -139,7 +140,7 @@ async function main() {
   const employeeSessions = [identities.employee1, identities.employee2, identities.employee3, identities.employee4, identities.employee5, identities.employee6].map(session);
 
   let leadWorkspace = await applyAssessmentActionForSession(leadSession, {
-    action: "create_campaign", idempotencyKey: key("campaign-create"), title: `Connected acceptance ${runKey}`,
+    action: "create_campaign", idempotencyKey: key("campaign-create"), questionnaireVersion: "ai-capability-v2", title: `Connected acceptance ${runKey}`,
     purpose: "Understand fictional AI, automation and data development needs for the isolated acceptance workspace.",
     businessObjectives: ["Validate connected assessment controls"], departments: ["Digital", "Operations"],
     employeeIds: ["employee-1", "employee-2", "employee-3", "employee-4", "employee-5", "employee-6"],
@@ -157,7 +158,7 @@ async function main() {
   const answers1 = completeAnswers(1);
   await applyAssessmentActionForSession(employeeSessions[0], { action: "save_answers", idempotencyKey: key("save-1"), assessmentId: employeeAssessment.id, answers: answers1 });
   employeeWorkspace = await getAssessmentWorkspaceForSession(employeeSessions[0]);
-  check("saved answers resume from durable draft state", employeeWorkspace.assessments.find((item) => item.id === employeeAssessment.id)?.answers.automation_opportunity === answers1.automation_opportunity);
+  check("saved answers resume from durable draft state", employeeWorkspace.assessments.find((item) => item.id === employeeAssessment.id)?.answers.opportunity === answers1.opportunity);
   check("draft remains private from the manager before submission", !(await getAssessmentWorkspaceForSession(managerASession)).assessments.some((item) => item.id === employeeAssessment.id));
   await applyAssessmentActionForSession(employeeSessions[0], { action: "submit", idempotencyKey: key("submit-1"), assessmentId: employeeAssessment.id });
 
@@ -176,6 +177,8 @@ async function main() {
   check("five submissions preserve 83 percent organisation participation", campaignView?.submitted === 5 && campaignView.participationPercent === 83);
   check("recorded audience includes zero-response departments", campaignReport?.groups.some((group) => group.department === "Operations" && group.invited === 1 && group.submitted === 0 && group.participationPercent === 0));
   check("five Digital submissions make only Digital aggregate findings visible", campaignReport?.groups.some((group) => group.department === "Digital" && !group.suppressed) && campaignReport.groups.some((group) => group.department === "Operations" && group.suppressed));
+  check("comprehensive intelligence is available only to the authorised employer view", Boolean(leadWorkspace.assessments.find((item) => item.id === employeeAssessment.id)?.result?.capabilityIntelligence) && !(await getAssessmentWorkspaceForSession(employeeSessions[0])).assessments.find((item) => item.id === employeeAssessment.id)?.result?.capabilityIntelligence);
+  check("campaign intelligence uses the five-submission suppression boundary", Boolean(campaignReport?.profiles.length && campaignReport.dimensions.length && campaignReport.cohorts.length));
 
   await applyAssessmentActionForSession(employeeSessions[0], { action: "share_with_manager", idempotencyKey: key("campaign-share"), assessmentId: employeeAssessment.id });
   leadWorkspace = await getAssessmentWorkspaceForSession(leadSession);
@@ -201,7 +204,7 @@ async function main() {
   check("linked reassessment starts as a distinct private draft", Boolean(reassessment && reassessment.status === "draft" && reassessment.visibility === "private"));
   check("reassessment preserves its submitted baseline", baselineAfter?.activeSubmittedRevision === baselineBefore?.activeSubmittedRevision && baselineAfter?.result?.practicalOpportunity === baselineBefore?.result?.practicalOpportunity);
 
-  const personalStarted = await applyAssessmentActionForSession(employeeSessions[0], { action: "start_assessment", idempotencyKey: key("personal-start") });
+  const personalStarted = await applyAssessmentActionForSession(employeeSessions[0], { action: "start_assessment", idempotencyKey: key("personal-start"), questionnaireVersion: "ai-capability-v2" });
   const personal = personalStarted.assessments.find((item) => item.campaignId === null && item.id !== reassessment?.id);
   assert.ok(personal);
   await applyAssessmentActionForSession(employeeSessions[0], { action: "save_answers", idempotencyKey: key("personal-save"), assessmentId: personal.id, answers: completeAnswers(7) });
