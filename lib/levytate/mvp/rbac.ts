@@ -42,6 +42,10 @@ export type MvpPermission =
   | "learningTime:read"
   | "learningTime:write"
   | "learningTime:manage"
+  | "assessments:read"
+  | "assessments:write"
+  | "assessments:review"
+  | "assessments:manage"
   | "operationalActions:read"
   | "operationalActions:write"
   | "copilot:use"
@@ -124,6 +128,10 @@ const allPermissions = [
   "learningTime:read",
   "learningTime:write",
   "learningTime:manage",
+  "assessments:read",
+  "assessments:write",
+  "assessments:review",
+  "assessments:manage",
   "operationalActions:read",
   "operationalActions:write",
   "copilot:use",
@@ -183,6 +191,9 @@ export const mvpRolePermissions = {
     "learningTime:read",
     "learningTime:write",
     "learningTime:manage",
+    "assessments:read",
+    "assessments:review",
+    "assessments:manage",
     "operationalActions:read",
     "operationalActions:write",
     "copilot:use",
@@ -199,6 +210,8 @@ export const mvpRolePermissions = {
     "applications:status",
     "learnerLifecycle:read",
     "learningTime:read",
+    "assessments:read",
+    "assessments:review",
     "providers:read",
     "copilot:use",
     "knowledge:read",
@@ -208,6 +221,8 @@ export const mvpRolePermissions = {
     "employeeDevelopment:write",
     "applications:read",
     "applications:write",
+    "assessments:read",
+    "assessments:write",
     "learnerLifecycle:read",
     "learningTime:read",
     "learningTime:write",

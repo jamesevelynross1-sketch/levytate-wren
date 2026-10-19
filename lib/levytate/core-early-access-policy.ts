@@ -5,6 +5,7 @@ export type CoreEarlyAccessModuleKey =
   | "My Programme"
   | "My Application"
   | "Learning Time"
+  | "Assessments"
   | "My Team"
   | "Approvals"
   | "Operations"
@@ -85,6 +86,7 @@ export const coreEarlyAccessPolicy: Readonly<Record<MvpUserRole, CoreEarlyAccess
       item("My Application", "My Application", "enabled", "operate", "core"),
       item("My Programme", "My Apprenticeship", "enabled", "operate", "core"),
       item("Learning Time", "Learning Time", "hidden", undefined, "not-ready"),
+      item("Assessments", "Assessments", "enabled", "operate", "core"),
       item("Copilot", "Copilot", "secondary", "support", "supporting"),
       item("Knowledge", "Guidance Centre", "secondary", "support", "supporting"),
       item("Providers", "Programmes & Providers", "hidden", undefined, "non-core"),
@@ -102,6 +104,7 @@ export const coreEarlyAccessPolicy: Readonly<Record<MvpUserRole, CoreEarlyAccess
       item("Approvals", "Approvals", "enabled", "operate", "core"),
       item("My Team", "My Team", "enabled", "operate", "core"),
       item("Learning Time", "Learning Time", "hidden", undefined, "not-ready"),
+      item("Assessments", "Assessments", "enabled", "operate", "core"),
       item("Copilot", "Copilot", "secondary", "support", "supporting"),
       item("Knowledge", "Guidance Centre", "secondary", "support", "supporting"),
       item("Providers", "Programmes & Providers", "hidden", undefined, "non-core"),
@@ -119,6 +122,7 @@ export const coreEarlyAccessPolicy: Readonly<Record<MvpUserRole, CoreEarlyAccess
       item("Applications", "Applications", "enabled", "operate", "core"),
       item("Learners", "Learners", "enabled", "operate", "core"),
       item("Learning Time", "Learning Time", "hidden", undefined, "not-ready"),
+      item("Assessments", "Assessments", "enabled", "manage", "core"),
       item("Operations", "Operations Centre", "enabled", "operate", "core"),
       item("People", "People", "enabled", "manage", "core"),
       item("My Providers", "My Providers", "enabled", "manage", "core"),
@@ -149,6 +153,7 @@ export const coreEarlyAccessPolicy: Readonly<Record<MvpUserRole, CoreEarlyAccess
       item("Applications", "Applications", "hidden", undefined, "role-denied"),
       item("Learners", "Learners", "hidden", undefined, "role-denied"),
       item("Learning Time", "Learning Time", "hidden", undefined, "role-denied"),
+      item("Assessments", "Assessments", "hidden", undefined, "role-denied"),
       item("Reports", "Reports", "hidden", undefined, "role-denied"),
       item("Copilot", "Copilot", "hidden", undefined, "role-denied"),
     ],
@@ -162,6 +167,7 @@ export const coreEarlyAccessPolicy: Readonly<Record<MvpUserRole, CoreEarlyAccess
       item("Applications", "Applications", "enabled", "operate", "core"),
       item("Learners", "Learners", "enabled", "operate", "core"),
       item("Learning Time", "Learning Time", "hidden", undefined, "not-ready"),
+      item("Assessments", "Assessments", "enabled", "manage", "core"),
       item("Operations", "Operations Centre", "enabled", "operate", "core"),
       item("People", "People", "enabled", "manage", "core"),
       item("My Providers", "My Providers", "enabled", "manage", "core"),

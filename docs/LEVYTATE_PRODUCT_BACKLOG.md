@@ -75,6 +75,14 @@ Creates future apprenticeship demand, opens school engagement opportunities and 
 
 ## Priority 2 - Workforce Planning
 
+### Workforce Assessments — Initial Release
+
+- Private employee assessments and versioned reassessments.
+- Direct-report manager review with explicit sharing and workplace context.
+- Employer campaigns, recorded audiences, participation definitions and small-group suppression.
+- AI, automation and data framework with deterministic, explainable guidance.
+- Employee-approved handoff into the existing apprenticeship application workflow.
+
 ### Skills Gap Analysis
 
 Purpose:
