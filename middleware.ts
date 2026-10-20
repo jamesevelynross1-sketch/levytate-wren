@@ -4,6 +4,12 @@ import { levytateBetaSessionCookie, readLevyTateBetaSession } from "@/lib/levyta
 const levytateHosts = new Set(["levytate.co.uk", "www.levytate.co.uk"]);
 const publicTrustPaths = new Set(["/privacy", "/early-access-terms", "/data-processing", "/support", "/account-help", "/data-rights"]);
 const legacyDemoPathPrefixes = ["/portakabin-apprenticeship-hub", "/future-talent-portal", "/levytate-mvp", "/levytate/ground-control"];
+const publicStoryPages: Record<string, string> = {
+  "/": "/mission-v3/index.html",
+  "/apprenticeships": "/mission-v3/apprenticeships.html",
+  "/funding": "/mission-v3/funding.html",
+  "/manage-apprenticeships": "/mission-v3/manage-apprenticeships.html",
+};
 
 function isLevyTateHost(request: NextRequest) {
   const host = request.headers.get("host")?.split(":")[0]?.toLowerCase() ?? "";
@@ -31,9 +37,10 @@ export async function middleware(request: NextRequest) {
     return new NextResponse("Not Found", { status: 404 });
   }
 
-  if (pathname === "/") {
+  const publicPage = publicStoryPages[pathname];
+  if (publicPage) {
     const destination = request.nextUrl.clone();
-    destination.pathname = "/levytate-mission-v2.html";
+    destination.pathname = publicPage;
     return NextResponse.rewrite(destination);
   }
 
