@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { strict as assert } from 'node:assert';
+import { refinePageContent, contentStyles, contentInteractionOverrides } from './levytate-buyer-content.mjs';
 
 // Build independent public pages from the approved story. No changes to the app,
 // account records, enquiry endpoints, funding arithmetic or approved artwork.
@@ -57,7 +58,7 @@ function document({ title, description, path, body, page }) {
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400..700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/mission-v2/site.css"><link rel="stylesheet" href="/mission-v3/pages.css">
-${page === 'home' ? `<style>${explanationStyles}</style>` : ''}
+${page === 'home' ? `<style>${explanationStyles}</style>` : `<style>${contentStyles}</style>`}
 <script src="/mission-v3/navigation.js" defer></script><script src="/mission-v3/interactions.js" defer></script>
 </head><body class="${page === 'home' ? 'home-page' : 'detail-page'}" data-page="${page}">
 <a class="skip" href="#main-content">Skip to content</a>
@@ -107,7 +108,8 @@ for (const page of pages) {
   assert.equal(content.split(`<p>${page.oldIntro}</p>`).length, 2, `${page.id}: expected one introduction to update`);
   content = content.replace(`<p>${page.oldIntro}</p>`, `<p>${page.intro}</p>`);
   content = content.replace('href="/funding#roi"', page.id === 'funding' ? 'href="#roi"' : 'href="/funding#roi"');
-  const extra = page.extra ? section(page.extra) : '';
+  content = refinePageContent(page.id, content);
+  const extra = page.extra ? refinePageContent(page.extra, section(page.extra)) : '';
   const body = `${pageNavigation(page.id)}<main id="main-content" class="detail-main wrap"><div class="detail-surface">${content}${extra}</div><div class="page-close"><p>${page.id === 'journey' ? 'Less chasing. A clearer picture.' : 'See how this could work for your organisation.'}</p><a class="button" href="/early-access">Request a walkthrough <span aria-hidden="true">↗</span></a></div></main>`;
   writeFileSync(`${directory}/${page.file}.html`, document({ ...page, body, page: page.id }));
 }
@@ -123,7 +125,7 @@ const interactions = originalJs.slice(eventsStart, calculatorStart).replace("$('
 let calculator = originalJs.slice(calculatorStart, routerEnd);
 calculator = calculator.replace("if (!$('#roi').hidden)", "if ($('#roi') && !$('#roi').hidden)");
 calculator = calculator.replace("lines.join('\\\\n')", "lines.join('\\n')");
-writeFileSync(`${directory}/interactions.js`, globals + interactions + "\n  if ($('#roi-form')) {\n" + calculator + "\n  }\n})();\n");
+writeFileSync(`${directory}/interactions.js`, globals + contentInteractionOverrides + interactions + "\n  if ($('#roi-form')) {\n" + calculator + "\n  }\n})();\n");
 for (const file of ['index', ...pages.map(p => p.file)]) {
   const html = readFileSync(`${directory}/${file}.html`, 'utf8');
   assert.equal((html.match(/<h1\b/g) || []).length, 1, `${file}: one page heading required`);
@@ -134,4 +136,4 @@ const home = readFileSync(`${directory}/index.html`, 'utf8');
 assert(home.includes('<strong>LevyTate is an apprenticeship platform for employers.</strong>'), 'The product must be defined before interaction.');
 assert(home.includes('<summary>What is LevyTate?</summary>'), 'The accessible product explanation is required.');
 assert(!/<details[^>]*class="product-explainer"[^>]*\bopen(?:\s|>)/.test(home), 'The optional explanation must start closed.');
-console.log('Built centred LevyTate homepage and three independent benefit pages. Product definition clarified; original artwork and ROI calculations preserved.');
+console.log('Built centred LevyTate homepage and three independent benefit pages. Product content strengthened; original artwork and ROI calculations preserved.');
