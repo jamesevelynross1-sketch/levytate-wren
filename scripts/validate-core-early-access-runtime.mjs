@@ -2,9 +2,9 @@ const baseUrl = (process.argv[2] ?? process.env.LEVYTATE_VALIDATION_BASE_URL ?? 
 const betaCode = process.env.LEVYTATE_BETA_CODE?.trim() || "LEVYTATE-BETA";
 const checks = [];
 const scenarios = [
-  { email: "employee.demo@levytate.test", role: "Employee", labels: ["Home", "My Application", "My Apprenticeship", "Copilot", "Guidance Centre"], hidden: "Providers" },
-  { email: "manager.demo@levytate.test", role: "Line Manager", labels: ["Home", "Approvals", "My Team", "Copilot", "Guidance Centre"], hidden: "Reports" },
-  { email: "apprenticeshiplead.demo@levytate.test", role: "Apprenticeship Lead", labels: ["Home", "Applications", "Learners", "Operations Centre", "People", "My Providers", "My Programmes", "Finance", "Marketplace", "Intelligence", "Copilot", "Guidance Centre", "Settings"], hidden: "Reports" },
+  { email: "employee.demo@levytate.test", role: "Employee", labels: ["Home", "My Application", "My Apprenticeship", "Assessments", "Copilot", "Guidance Centre"], hidden: "Providers" },
+  { email: "manager.demo@levytate.test", role: "Line Manager", labels: ["Home", "Approvals", "My Team", "Assessments", "Copilot", "Guidance Centre"], hidden: "Reports" },
+  { email: "apprenticeshiplead.demo@levytate.test", role: "Apprenticeship Lead", labels: ["Home", "Applications", "Learners", "Assessments", "Operations Centre", "People", "My Providers", "My Programmes", "Overview", "Workforce Development", "Finance", "Marketplace", "Intelligence", "Copilot", "Guidance Centre", "Settings"], hidden: "Reports" },
   { email: "hello@levytate.co.uk", role: "Platform Admin", labels: ["Employer Workspaces", "Provider Catalogue", "Access & Tenant Support", "Guidance Administration", "Support / Audit Context"], hidden: "Learners" },
 ];
 
