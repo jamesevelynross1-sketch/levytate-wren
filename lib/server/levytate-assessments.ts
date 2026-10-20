@@ -15,6 +15,8 @@ import {
   type WorkforceAssessmentResult,
 } from "@/lib/levytate/assessments/domain";
 import { canManagerAccessAssessment } from "@/lib/levytate/assessments/behaviour";
+import { applyAssessmentAggregateDisclosure } from "@/lib/levytate/assessments/disclosure";
+import { buildAssessmentCampaignCsv } from "@/lib/levytate/assessments/export";
 import {
   assessmentFrameworkDisclosure,
   workforceAssessmentInterpretationVersion,
@@ -202,7 +204,7 @@ export async function getAssessmentWorkspaceForSession(session: LevyTateBetaSess
   });
   const reportingAssessments = visibleAssessments.filter((assessment) => role !== "Line Manager" || directReportIds.has(assessment.employee_id));
   const reporting = role === "Apprenticeship Lead" || role === "Employer Admin" || role === "Line Manager"
-    ? campaignViews.map((campaign) => ({
+    ? campaignViews.map((campaign) => applyAssessmentAggregateDisclosure({
         campaignId: campaign.id,
         ...aggregateAssessmentResults({
           audience: (participantSnapshotsByCampaign.get(campaign.id) ?? []).map((participant) => ({
@@ -490,27 +492,7 @@ export async function getAssessmentCampaignExportForSession(session: LevyTateBet
   const campaign = workspace.campaigns.find((item) => item.id === campaignId);
   const report = workspace.reporting.find((item) => item.campaignId === campaignId);
   if (!campaign || !report) throw new LevyTateAssessmentError("Campaign reporting was not found in your scope.", 404);
-  const rows: Array<Array<string | number>> = [
-    ["LevyTate aggregate assessment report"],
-    ["Campaign", campaign.title],
-    ["Framework", campaign.frameworkTitle],
-    ["Invited", report.invited],
-    ["Submitted", report.submitted],
-    ["Outstanding", Math.max(0, report.invited - report.submitted)],
-    ["Participation", `${report.participationPercent}%`],
-    [],
-    ["Department", "Invited", "Submitted", "Participation", "Aggregate findings"],
-    ...report.groups.map((group) => [group.department, group.invited, group.submitted, `${group.participationPercent}%`, group.suppressed ? `Suppressed below ${report.suppressionThreshold}` : "Available"]),
-  ];
-  if (report.submitted >= report.suppressionThreshold) {
-    rows.push([], ["Dimension", "Organisation value"], ...report.dimensions.map((item) => [item.label, item.value]));
-    rows.push([], ["Development profile", "Count"], ...report.profiles.map((item) => [item.label, item.count]));
-    rows.push([], ["Barrier", "Count"], ...report.barriers.map((item) => [item.label, item.count]));
-    rows.push([], ["Workplace use pattern", "Count"], ...report.useCases.map((item) => [item.label, item.count]));
-    rows.push([], ["Development cohort", "Count"], ...report.cohorts.map((item) => [item.label, item.count]));
-  }
-  rows.push([], ["Methodology", report.definition], ["Privacy", `No named employee records are included. Findings below ${report.suppressionThreshold} submissions are suppressed.`]);
-  return rows.map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(",")).join("\n");
+  return buildAssessmentCampaignCsv(campaign, report);
 }
 
 async function ownAssessment(organisationId: string, assessmentId: string, employeeId?: string) {

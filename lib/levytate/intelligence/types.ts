@@ -16,6 +16,7 @@ export type IntelligencePriority = {
   why: string;
   subject: string;
   owner: string;
+  ownerRole: string;
   nextStep: string;
   href: string;
 };
@@ -36,6 +37,13 @@ export type WorkforceIntelligenceReport = {
   participationPercent: number;
   suppressionThreshold: number;
   suppressed: boolean;
+  disclosure: {
+    mode: "available" | "campaign_suppressed" | "complementary_suppressed";
+    organisationFindingsAvailable: boolean;
+    departmentFindingsAvailable: boolean;
+    reason: string;
+    residualRisk: string;
+  };
   profiles: Array<{ label: string; count: number }>;
   dimensions: Array<{ id: string; label: string; value: number }>;
   barriers: Array<{ label: string; count: number }>;
@@ -47,6 +55,7 @@ export type WorkforceIntelligenceReport = {
     submitted: number;
     participationPercent: number;
     suppressed: boolean;
+    suppressionReason: "threshold" | "complementary" | null;
     recurringNeeds: Array<{ label: string; count: number }>;
     blockers: Array<{ label: string; count: number }>;
   }>;

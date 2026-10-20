@@ -16,6 +16,7 @@ type SourceResult<T> = { ok: true; value: T } | { ok: false; message: string };
 const activeLearnerStates = new Set(["enrolled", "assessment_preparation", "in_assessment", "break_in_learning"]);
 const upcomingEnrolmentStates = new Set(["Ready for provider", "Submitted to provider", "Enrolment in progress"]);
 const decisionOwners = new Set(["Line Manager", "Apprenticeship Lead", "Employer Admin"]);
+const closedApplicationStates = new Set(["Declined by Line Manager", "Declined by Apprenticeship Lead", "Withdrawn", "Cancelled", "Completed"]);
 
 export function buildEmployerIntelligence(input: {
   generatedAt?: string;
@@ -31,13 +32,14 @@ export function buildEmployerIntelligence(input: {
     throw new Error("Employer intelligence is restricted to employer reporting roles.");
   }
 
-  const decisions = data.applications.filter((application) => decisionOwners.has(application.currentOwner));
-  const activeLearners = data.learnerRecords.filter((record) => record.recordStatus === "Active" && activeLearnerStates.has(record.lifecycleStatus));
-  const upcomingEnrolments = data.enrolments.filter((enrolment) => upcomingEnrolmentStates.has(enrolment.status));
+  const decisions = distinctById(data.applications.filter((application) => decisionOwners.has(application.currentOwner) && !closedApplicationStates.has(application.status)));
+  const activeLearners = distinctById(data.learnerRecords.filter((record) => record.recordStatus === "Active" && activeLearnerStates.has(record.lifecycleStatus)));
+  const upcomingEnrolments = distinctById(data.enrolments.filter((enrolment) => upcomingEnrolmentStates.has(enrolment.status)));
   const assessmentReports = input.assessments.ok ? buildWorkforceReports(input.assessments.value) : [];
   const latestAssessment = assessmentReports[0] ?? null;
   const priorities = buildPriorities(input.workspace.value, input.operations);
   const operationsAt = input.operations.ok ? input.operations.value.generatedAt : null;
+  const attentionItems = input.operations.ok ? distinctOperations(input.operations.value) : [];
 
   return {
     generatedAt,
@@ -64,7 +66,7 @@ export function buildEmployerIntelligence(input: {
         {
           metricId: "operational-attention",
           label: "Items requiring attention",
-          value: input.operations.ok ? input.operations.value.totalAttentionItems : null,
+          value: input.operations.ok ? attentionItems.length : null,
           detail: input.operations.ok ? "Current Operations Centre conditions and actions." : input.operations.message,
           availability: input.operations.ok ? "available" : "unavailable",
           evidenceAt: operationsAt,
@@ -117,8 +119,8 @@ export function buildEmployerIntelligence(input: {
 
 function buildPriorities(workspace: LevyTateWorkspaceBootstrap, operations: SourceResult<OperationsResponse>): IntelligencePriority[] {
   const employeeById = new Map(workspace.data.employees.map((employee) => [employee.id, employee]));
-  const applicationPriorities = workspace.data.applications
-    .filter((application) => decisionOwners.has(application.currentOwner))
+  const applicationPriorities = distinctById(workspace.data.applications
+    .filter((application) => decisionOwners.has(application.currentOwner) && !closedApplicationStates.has(application.status)))
     .sort((left, right) => left.updatedAt.localeCompare(right.updatedAt))
     .map<IntelligencePriority>((application) => {
       const employee = employeeById.get(application.employeeId);
@@ -129,6 +131,7 @@ function buildPriorities(workspace: LevyTateWorkspaceBootstrap, operations: Sour
         why: `${application.status}. The application cannot progress until the recorded decision owner acts.`,
         subject: employee?.name ?? "Authorised application",
         owner: application.currentOwner,
+        ownerRole: application.currentOwner,
         nextStep: "Open the application and record the appropriate decision.",
         href: `/levytate/app?module=Applications&application=${encodeURIComponent(application.id)}`,
       };
@@ -145,6 +148,7 @@ function buildPriorities(workspace: LevyTateWorkspaceBootstrap, operations: Sour
         why: `${item.programmeName}${item.timingLabel ? ` · ${item.timingLabel}` : ""}`,
         subject: item.learnerName,
         owner: item.persistentOwnerDisplayName || item.ownerType,
+        ownerRole: item.ownerType,
         nextStep: item.actionLabel,
         href: item.actionUrl,
       }))
@@ -156,7 +160,7 @@ function buildWorkforceReports(workspace: AssessmentWorkspace): WorkforceIntelli
   return workspace.reporting.flatMap((report) => {
     const campaign = workspace.campaigns.find((item) => item.id === report.campaignId);
     if (!campaign) return [];
-    const suppressed = report.submitted < report.suppressionThreshold;
+    const suppressed = !report.disclosure.organisationFindingsAvailable;
     const review = campaign.closingDate ? `Review after ${formatDate(campaign.closingDate)} or when the campaign closes.` : "Review when the campaign closes or evidence materially changes.";
     const priorities: WorkforceIntelligenceReport["priorities"] = [];
     if (!suppressed) {
@@ -213,6 +217,7 @@ function buildWorkforceReports(workspace: AssessmentWorkspace): WorkforceIntelli
       participationPercent: report.participationPercent,
       suppressionThreshold: report.suppressionThreshold,
       suppressed,
+      disclosure: report.disclosure,
       profiles: report.profiles,
       dimensions: report.dimensions,
       barriers: report.barriers,
@@ -221,7 +226,7 @@ function buildWorkforceReports(workspace: AssessmentWorkspace): WorkforceIntelli
       groups: report.groups,
       priorities: priorities.slice(0, 3),
       limitation: suppressed
-        ? `Aggregate capability findings are withheld until at least ${report.suppressionThreshold} employees have submitted.`
+        ? report.disclosure.reason
         : "Self-reported development evidence only. Competence, apprenticeship suitability, funding and prior learning require separate decisions.",
     }];
   }).sort((left, right) => right.createdAt.localeCompare(left.createdAt));
@@ -271,6 +276,16 @@ function aggregateSpend(rows: Array<{ label: string; amountPence: number }>) {
   const values = new Map<string, number>();
   rows.forEach((row) => values.set(row.label, (values.get(row.label) ?? 0) + row.amountPence));
   return [...values.entries()].map(([label, amountPence]) => ({ label, amountPence })).sort((left, right) => right.amountPence - left.amountPence || left.label.localeCompare(right.label)).slice(0, 8);
+}
+
+function distinctById<T extends { id: string }>(rows: T[]) {
+  return [...new Map(rows.map((row) => [row.id, row] as const)).values()];
+}
+
+function distinctOperations(operations: OperationsResponse) {
+  return [...new Map(Object.values(operations.queues).flat()
+    .filter((item) => item.persistentActionStatus !== "completed" && item.persistentActionStatus !== "cancelled")
+    .map((item) => [item.sourceKey, item] as const)).values()];
 }
 
 function latestDate(values: string[]) { return [...values].filter(Boolean).sort().at(-1) ?? null; }

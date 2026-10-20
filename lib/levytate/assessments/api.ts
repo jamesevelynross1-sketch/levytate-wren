@@ -97,7 +97,14 @@ export type AssessmentWorkspace = {
     barriers: Array<{ label: string; count: number }>;
     useCases: Array<{ label: string; count: number }>;
     cohorts: Array<{ label: string; count: number }>;
-    groups: Array<{ department: string; invited: number; submitted: number; participationPercent: number; suppressed: boolean; recurringNeeds: Array<{ label: string; count: number }>; blockers: Array<{ label: string; count: number }> }>;
+    disclosure: {
+      mode: "available" | "campaign_suppressed" | "complementary_suppressed";
+      organisationFindingsAvailable: boolean;
+      departmentFindingsAvailable: boolean;
+      reason: string;
+      residualRisk: string;
+    };
+    groups: Array<{ department: string; invited: number; submitted: number; participationPercent: number; suppressed: boolean; suppressionReason: "threshold" | "complementary" | null; recurringNeeds: Array<{ label: string; count: number }>; blockers: Array<{ label: string; count: number }> }>;
   }>;
 };
 

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildEmployerIntelligence } from "../lib/levytate/intelligence/build";
+import { applyAssessmentAggregateDisclosure } from "../lib/levytate/assessments/disclosure";
 import { createEmptyMvpWorkspace } from "../lib/levytate/mvp/workspace";
 import { getCoreEarlyAccessPolicy, resolveCoreEarlyAccessRouteAccess } from "../lib/levytate/core-early-access-policy";
 import type { AssessmentWorkspace } from "../lib/levytate/assessments/api";
@@ -16,7 +17,13 @@ const workspace: LevyTateWorkspaceBootstrap = {
   meta: { organisationId: "org-release-3", organisationName: "Fictional Employer", userEmail: "lead@levytate.test", userRole: "Apprenticeship Lead", storageMode: "supabase", warnings: [] },
 };
 workspace.data.applications.push({ id: "app-1", employeeId: "employee-1", apprenticeshipStandardId: "ST0001", status: "Awaiting Final Approval", currentOwner: "Apprenticeship Lead", reason: "", careerGoal: "", supportRequired: "", managerNote: "", submittedAt: now, updatedAt: now, history: [] });
+workspace.data.applications.push({ id: "app-1", employeeId: "employee-1", apprenticeshipStandardId: "ST0001", status: "Awaiting Final Approval", currentOwner: "Apprenticeship Lead", reason: "", careerGoal: "", supportRequired: "", managerNote: "", submittedAt: now, updatedAt: now, history: [] });
+workspace.data.applications.push({ id: "app-closed", employeeId: "employee-1", apprenticeshipStandardId: "ST0001", status: "Completed", currentOwner: "Apprenticeship Lead", reason: "", careerGoal: "", supportRequired: "", managerNote: "", submittedAt: now, updatedAt: now, history: [] });
 workspace.data.employees.push({ id: "employee-1", employeeNumber: "F-001", name: "Fictional Employee", email: "employee@levytate.test", jobTitle: "Analyst", roleId: "", managerId: "", department: "Operations", site: "HQ", platformRole: "Employee", status: "Active", startDate: "2026-01-01", createdAt: now, updatedAt: now });
+const learner = { id: "learner-1", organisationId: "org-release-3", employeeId: "employee-1", applicationId: "app-1", programmeId: "programme-1", providerId: "provider-1", enrolmentId: "enrolment-1", lifecycleStatus: "enrolled" as const, employmentRoute: "existing_employee_upskill" as const, expectedStartDate: "2026-01-01", actualStartDate: "2026-01-01", expectedEndDate: "2027-01-01", actualEndDate: "", createdAt: now, updatedAt: now, createdBy: "lead@levytate.test", updatedBy: "lead@levytate.test", recordStatus: "Active" as const };
+workspace.data.learnerRecords.push(learner, { ...learner });
+const enrolment = { id: "enrolment-1", applicationId: "app-1", employeeId: "employee-1", providerId: "provider-1", apprenticeshipStandardId: "ST0001", status: "Enrolment in progress" as const, startDate: "2026-11-01", notes: "", createdAt: now, updatedAt: now };
+workspace.data.enrolments.push(enrolment, { ...enrolment });
 
 const operations: OperationsResponse = {
   source: "supabase", generatedAt: now,
@@ -24,9 +31,10 @@ const operations: OperationsResponse = {
   queues: { urgent: [{ id: "urgent-1", queueType: "urgent", learnerRecordId: "learner-1", learnerName: "Fictional Learner", programmeName: "Data Analyst", providerName: "Fictional Provider", department: "Operations", site: "HQ", lifecycleStatus: "Enrolled", priorityLevel: "High", priorityRank: 1, reason: "Provider review is overdue.", dueDate: "2026-10-10", dueStatus: "Overdue", daysOverdue: 10, timingLabel: "10 days overdue", ownerType: "Shared", actionType: "record_review", actionLabel: "Record review", actionUrl: "/levytate/app?module=Learners&learner=learner-1&action=record_review", secondaryActionUrl: "/levytate/app?module=Learners&learner=learner-1", sourceType: "review_due", sourceCondition: "provider-review-overdue", sourceKey: "learner-1:provider-review-overdue", persistentActionType: "record_provider_review" }], ready_to_enrol: [], reviews: [], progress: [], breaks: [], pre_enrolment: [], assessment: [] },
   recentActivity: [], filterOptions: { priorities: [], queues: [], learners: [], programmes: [], providers: [], sites: [], departments: [], owners: [], actionTypes: [] }, totalAttentionItems: 1,
 };
+operations.queues.reviews.push({ ...operations.queues.urgent[0], id: "duplicate-view", queueType: "reviews" });
 
 function assessmentWorkspace(submitted: number): AssessmentWorkspace {
-  const report = (id: string) => ({ campaignId: id, definition: `${submitted} submitted`, invited: 8, submitted, participationPercent: Math.round(submitted / 8 * 100), suppressionThreshold: 5, profiles: submitted < 5 ? [] : [{ label: "Enabler", count: 3 }], dimensions: submitted < 5 ? [] : [{ id: "responsibleUse", label: "Responsible use", value: 62 }], barriers: submitted < 5 ? [] : [{ label: "Unclear company guidance", count: 3 }], useCases: submitted < 5 ? [] : [{ label: "Analysis and reporting", count: 4 }], cohorts: submitted < 5 ? [] : [{ label: "Guided practice", count: 3 }], groups: [{ department: "Small team", invited: 3, submitted: 3, participationPercent: 100, suppressed: true, recurringNeeds: [], blockers: [] }, { department: "Operations", invited: 5, submitted: Math.min(5, submitted), participationPercent: Math.min(100, submitted * 20), suppressed: submitted < 5, recurringNeeds: submitted < 5 ? [] : [{ label: "Responsible use", count: 3 }], blockers: submitted < 5 ? [] : [{ label: "Guidance", count: 3 }] }] });
+  const report = (id: string) => applyAssessmentAggregateDisclosure({ campaignId: id, definition: `${submitted} submitted`, invited: 8, submitted, participationPercent: Math.round(submitted / 8 * 100), suppressionThreshold: 5, profiles: submitted < 5 ? [] : [{ label: "Enabler", count: 3 }], dimensions: submitted < 5 ? [] : [{ id: "responsibleUse", label: "Responsible use", value: 62 }], barriers: submitted < 5 ? [] : [{ label: "Unclear company guidance", count: 3 }], useCases: submitted < 5 ? [] : [{ label: "Analysis and reporting", count: 4 }], cohorts: submitted < 5 ? [] : [{ label: "Guided practice", count: 3 }], groups: [{ department: "Small team", invited: 3, submitted: 0, participationPercent: 0, suppressed: true, recurringNeeds: [], blockers: [] }, { department: "Operations", invited: 5, submitted: Math.min(5, submitted), participationPercent: Math.min(100, submitted * 20), suppressed: submitted < 5, recurringNeeds: submitted < 5 ? [] : [{ label: "Responsible use", count: 3 }], blockers: submitted < 5 ? [] : [{ label: "Guidance", count: 3 }] }] });
   return {
     generatedAt: now, role: "Apprenticeship Lead", currentEmployeeId: null, canCompleteOwnAssessments: false, questions: [], frameworks: [], questionnaireVersion: "v3", interpretationVersion: "v3", disclosure: { private: "", campaign: "", guidance: "" }, assessments: [], availableEmployees: [],
     campaigns: [
@@ -47,6 +55,9 @@ const finance = { version: 1 as const, mode: "persistent" as const, imports: [{ 
 const populated = buildEmployerIntelligence({ generatedAt: now, workspace: { ok: true, value: workspace }, operations: { ok: true, value: operations }, assessments: { ok: true, value: assessmentWorkspace(5) }, finance: { ok: true, value: finance } });
 check(populated.overview.signals.find((item) => item.metricId === "applications-awaiting-decision")?.value === 1, "Application decision count reconciles to source records");
 check(populated.overview.signals.find((item) => item.metricId === "operational-attention")?.value === 1, "Operational attention count reconciles to Operations Centre");
+check(populated.overview.signals.find((item) => item.metricId === "active-learners")?.value === 1, "Active learner count de-duplicates repeated source rows");
+check(populated.overview.signals.find((item) => item.metricId === "upcoming-enrolments")?.value === 1, "Upcoming enrolment count de-duplicates repeated source rows");
+check(populated.overview.priorities.filter((item) => item.id === "application:app-1").length === 1 && !populated.overview.priorities.some((item) => item.id === "application:app-closed"), "Priorities de-duplicate current applications and exclude closed applications");
 check(populated.overview.priorities[0]?.href.includes("learner-1"), "Priority opens the exact authorised learner action");
 check(populated.workforce.reports.length === 2 && populated.workforce.reports[0].questionnaireVersion === "v3" && populated.workforce.reports[1].questionnaireVersion === "v2", "Mixed framework versions remain separate campaign reports");
 check(populated.workforce.reports[0].groups[0].suppressed && populated.workforce.reports[0].groups[0].recurringNeeds.length === 0, "Under-five department stays suppressed without a complement aggregate");
@@ -73,11 +84,10 @@ for (const role of ["Employee", "Line Manager", "Platform Admin"] as const) {
 }
 
 const component = readFileSync(new URL("../components/levytate-mvp/EmployerInsightsModule.tsx", import.meta.url), "utf8");
+const executiveReport = readFileSync(new URL("../components/levytate-mvp/EmployerExecutiveReport.tsx", import.meta.url), "utf8");
 const builder = readFileSync(new URL("../lib/levytate/intelligence/build.ts", import.meta.url), "utf8");
 check(!`${component}\n${builder}`.includes("Levy utilisation"), "Legacy synthetic levy-utilisation KPI is absent");
-const printComponent = component.slice(component.indexOf("function ExecutivePrintReport"));
-check(!printComponent.includes("priority.subject"), "Executive print report does not render named priority subjects");
-check(component.includes("employer-intelligence-report"), "Executive print output is implemented");
+check(component.includes("EmployerExecutiveReport") && executiveReport.includes("employer-intelligence-report"), "Executive print output is implemented through the dedicated safe report contract");
 check(populated.metricCatalogue.every((item) => item.source && item.population && item.calculation && item.reportingPeriod && item.timestamp && item.roleAuthorisation && item.missingData && item.privacy), "Every metric has a complete source-of-truth definition");
 
 console.log(`Launch Release 3 validation passed (${assertions} assertions).`);

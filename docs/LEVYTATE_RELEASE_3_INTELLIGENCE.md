@@ -45,7 +45,7 @@ The executable catalogue lives in `lib/levytate/intelligence/metric-catalogue.ts
 | `active-learners` | Active learners | `levytate_learner_records` | Active records in enrolled, assessment preparation, in assessment or Break in Learning | Count of distinct active learner records in an active learning state | Current position; latest record update and report generation time | Apprenticeship Lead, Employer Admin | Zero only after a successful source read | Organisation aggregate in executive output |
 | `operational-attention` | Items requiring attention | Server-derived Operations Centre queues and persistent actions | Current organisation learner records and active operational conditions | Count of current, deduplicated operational queue items | Current position; Operations service generation time | Apprenticeship Lead, Employer Admin | Unavailable if the Operations service fails | Named subjects may appear in authorised screen actions but are excluded from aggregate print output |
 | `upcoming-enrolments` | Upcoming enrolments | Authorised LevyTate enrolment records | Ready for provider, submitted to provider or enrolment in progress | Count of distinct records not live, completed or cancelled | Current pipeline; enrolment update and report generation time | Apprenticeship Lead, Employer Admin | Zero only after a successful workspace read | Organisation aggregate |
-| `assessment-participation` | Assessment participation | Immutable campaign audience and submitted assessment revisions | Recorded invitees for one campaign and questionnaire version | Distinct submitted responses divided by distinct recorded invitees | Selected campaign; campaign dates and report generation time | Apprenticeship Lead, Employer Admin | Unavailable without an eligible campaign; zero-response campaign reported explicitly | Five-submission finding threshold; no private drafts; no overlapping or complement filters |
+| `assessment-participation` | Assessment participation | Immutable campaign audience and submitted assessment revisions | Recorded invitees for one campaign and questionnaire version | Distinct submitted responses divided by distinct recorded invitees | Selected campaign; campaign dates and report generation time | Apprenticeship Lead, Employer Admin | Unavailable without an eligible campaign; zero-response campaign reported explicitly | Five-submission threshold plus complementary suppression; no private drafts |
 | `workforce-dimensions` | Six-dimension capability evidence | Submitted comprehensive assessment result snapshots | Distinct submitted responses for one immutable campaign/framework version | Mean of available scored evidence by dimension, rounded to whole-number 0–100 indicators | Selected campaign; submitted revision and report generation time | Apprenticeship Lead, Employer Admin | Suppressed below five submissions; unavailable dimensions omitted | Aggregate evidence only; self-report is not competence; non-response is not low capability |
 | `levy-financial-position` | Levy financial position | Persisted DAS transactions, import audit records and confirmed balance evidence | Classified transactions in the latest imported date range | Absolute classified contributions, apprenticeship spend and expiry amounts | Latest imported period; import timestamp and balance evidence date | Apprenticeship Lead and Employer Admin with `finance:read` | Missing values labelled; unclassified rows remain visible | Organisation-scoped provider/programme aggregates; no learner names |
 
@@ -101,9 +101,13 @@ The threshold is five distinct submitted responses.
 
 - Organisation capability findings are hidden below five submissions.
 - Each department must independently meet five submissions before its findings appear.
-- A suppressed department is not merged into a visible `Other` or complement group.
-- The UI exposes no overlapping filters that would allow subtraction of one group from another.
+- If any department has one to four submitted responses, organisation category totals and every department's qualitative findings are withheld. This prevents the small department being reconstructed by subtracting visible departments from the organisation total.
+- A zero-response department remains suppressed but does not by itself trigger complementary suppression because it contributes no private category values.
+- A suppressed department is never merged into a visible `Other` or complement group.
+- The same disclosure contract is applied before screen, campaign print, executive print and CSV presentation.
 - Participation counts remain visible because they describe response coverage, not private response content.
+
+This policy reduces straightforward subtraction attacks; it does not guarantee anonymity against external datasets, repeated releases or colluding recipients. Campaigns and framework versions remain separate evidence populations and must not be combined for disclosure decisions.
 
 ### Interpretation
 
@@ -156,7 +160,7 @@ The Overview can be printed or saved as PDF using a professional multipage layou
 - priority actions;
 - definitions and material limitations.
 
-The aggregate executive output excludes employee and learner names, private assessment records and individual finance data. It is never emailed or automatically distributed.
+The aggregate executive output is built from a purpose-specific export contract. It excludes employee and learner names, named action owners, free-text operational reasons and notes, private assessment records and individual finance data. Operational priorities use a canonical role owner and controlled evidence/next-action wording. It is never emailed or automatically distributed.
 
 ## Empty and unavailable states
 
@@ -176,7 +180,7 @@ The aggregate executive output excludes employee and learner names, private asse
 - empty workspace behaviour;
 - source failure behaviour without stale values;
 - zero/under-five assessment suppression;
-- department suppression without complement disclosure;
+- complementary suppression and attempted reconstruction across screen, print and CSV;
 - mixed framework versions remaining separate;
 - three evidence-led priorities only above threshold;
 - finance contribution, spend, expiry and unclassified reconciliation;
