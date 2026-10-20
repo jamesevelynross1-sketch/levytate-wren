@@ -109,6 +109,14 @@ for (const page of pages) {
   content = content.replace(`<p>${page.oldIntro}</p>`, `<p>${page.intro}</p>`);
   content = content.replace('href="/funding#roi"', page.id === 'funding' ? 'href="#roi"' : 'href="/funding#roi"');
   content = refinePageContent(page.id, content);
+  // Replace only the integration's text tile. Reuse the existing responsive logo
+  // sizing so the Copilot and approved LevyTate marks remain balanced.
+  if (page.id === 'journey') {
+    const copilotTile = '<span class="ps-integration-label">Microsoft 365<br><strong>Copilot</strong></span>';
+    assert.equal(content.split(copilotTile).length, 2, 'Expected exactly one Copilot integration text tile.');
+    assert(readFileSync('public/brand/microsoft-copilot.svg', 'utf8').includes('<svg'), 'Microsoft Copilot logo asset is required.');
+    content = content.replace(copilotTile, '<img src="/brand/microsoft-copilot.svg" width="256" height="256" alt="Microsoft Copilot" class="ps-mark" decoding="async">');
+  }
   const extra = page.extra ? refinePageContent(page.extra, section(page.extra)) : '';
   const body = `${pageNavigation(page.id)}<main id="main-content" class="detail-main wrap"><div class="detail-surface">${content}${extra}</div><div class="page-close"><p>${page.id === 'journey' ? 'Less chasing. A clearer picture.' : 'See how this could work for your organisation.'}</p><a class="button" href="/early-access">Request a walkthrough <span aria-hidden="true">↗</span></a></div></main>`;
   writeFileSync(`${directory}/${page.file}.html`, document({ ...page, body, page: page.id }));
