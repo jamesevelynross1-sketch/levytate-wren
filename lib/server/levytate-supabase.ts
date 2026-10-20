@@ -34,6 +34,40 @@ export async function supabaseSelect<T>(
   );
 }
 
+export async function collectPaginatedRows<T>(
+  fetchPage: (offset: number, limit: number) => Promise<T[]>,
+  options: { pageSize?: number; maxRows?: number } = {},
+) {
+  const pageSize = options.pageSize ?? 1000;
+  const maxRows = options.maxRows ?? 100_000;
+  const rows: T[] = [];
+
+  for (let offset = 0; offset < maxRows; offset += pageSize) {
+    const page = await fetchPage(offset, pageSize);
+    rows.push(...page);
+    if (page.length < pageSize) return rows;
+  }
+
+  throw new LevyTateSupabaseError(`Supabase pagination exceeded the ${maxRows} row safety limit.`);
+}
+
+export async function supabaseSelectAll<T>(
+  config: SupabaseServiceConfig,
+  table: string,
+  query: URLSearchParams,
+  options: { pageSize?: number; maxRows?: number } = {},
+) {
+  const base = new URLSearchParams(query);
+  base.delete("limit");
+  base.delete("offset");
+  return collectPaginatedRows<T>(async (offset, limit) => {
+    const page = new URLSearchParams(base);
+    page.set("limit", String(limit));
+    page.set("offset", String(offset));
+    return supabaseSelect<T>(config, table, page);
+  }, options);
+}
+
 export async function supabaseInsert<T>(
   config: SupabaseServiceConfig,
   table: string,

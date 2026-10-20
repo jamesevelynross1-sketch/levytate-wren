@@ -146,7 +146,17 @@ async function main() {
     assert(
       "manager direct report decision already advanced safely",
       managerWorkspace.workspace.meta.permissions.includes("applications:status")
-        && ["Approved by Line Manager", "Submitted to Apprenticeship Lead", "Awaiting Final Approval", "Approved for Enrolment"].includes(managerDecisionApplication?.status),
+        && [
+          "Approved by Line Manager",
+          "Submitted to Apprenticeship Lead",
+          "Awaiting Final Approval",
+          "Approved for Enrolment",
+          "Declined by Line Manager",
+          "Declined by Apprenticeship Lead",
+          "Withdrawn",
+          "Completed",
+          "Cancelled",
+        ].includes(managerDecisionApplication?.status),
       { status: managerDecisionApplication?.status ?? null },
     );
   }

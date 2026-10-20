@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown, FileUp, Sparkles, UserPlus } from "lucide-react";
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   EmptyState,
   FormActions,
@@ -33,9 +33,10 @@ import {
   type MvpEmployee,
 } from "@/lib/levytate/mvp/workspace";
 
-export function EmployeesModule({ onStartDiscovery, onOpenDirectReport }: {
+export function EmployeesModule({ onStartDiscovery, onOpenDirectReport, initialEmployeeId = null }: {
   onStartDiscovery?: (employeeId: string) => void;
   onOpenDirectReport?: (employeeId: string) => void;
+  initialEmployeeId?: string | null;
 }) {
   const { data, saveEmployee, archiveEmployee, can, meta } = useMvpWorkspace();
   const [search, setSearch] = useState("");
@@ -49,6 +50,10 @@ export function EmployeesModule({ onStartDiscovery, onOpenDirectReport }: {
   const [error, setError] = useState("");
   const [peopleImport, setPeopleImport] = useState<{ fileName: string; result: PeopleImportResult } | null>(null);
   const [importComplete, setImportComplete] = useState(0);
+
+  useEffect(() => {
+    if (initialEmployeeId) setSelectedEmployeeId(initialEmployeeId);
+  }, [initialEmployeeId]);
 
   const departments = useMemo(
     () => [...new Set(data.employees.map((employee) => employee.department).filter(Boolean))].sort(),

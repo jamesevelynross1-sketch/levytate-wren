@@ -19,7 +19,7 @@ import {
   TableShell,
 } from "@/components/levytate-mvp/MvpUi";
 import { OperationalMetricRail, StageTracker } from "@/components/levytate-mvp/OperationalVisuals";
-import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
+import { useMvpWorkspace, type WorkspaceMutationResult } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { displayEmployee, includesSearch, statusTone } from "@/components/levytate-mvp/module-utils";
 import { managerName } from "@/lib/levytate/mvp/workspace-insights";
 
@@ -70,6 +70,7 @@ export function ApplicationsModule({
   const [draft, setDraft] = useState<MvpApplication | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(initialApplicationId ?? null);
   const [error, setError] = useState("");
+  const [savingDraft, setSavingDraft] = useState(false);
 
   useEffect(() => {
     setSelectedId(initialApplicationId ?? null);
@@ -135,7 +136,7 @@ export function ApplicationsModule({
     };
   }
 
-  function saveDraft(event: FormEvent) {
+  async function saveDraft(event: FormEvent) {
     event.preventDefault();
     if (!draft) return;
     if (!draft.employeeId || !draft.apprenticeshipStandardId) {
@@ -156,14 +157,20 @@ export function ApplicationsModule({
       setError("This employee already has an active application.");
       return;
     }
-    saveApplication({
+    setSavingDraft(true);
+    setError("");
+    const result = await saveApplication({
       ...draft,
       status: draftUsesConfigurableWorkflow ? "Draft" : draft.status,
       currentOwner: draftUsesConfigurableWorkflow ? "Employee" : applicationOwnerForStatus(draft.status),
       updatedAt: nowIso(),
     });
+    setSavingDraft(false);
+    if (!result.ok) {
+      setError(result.message);
+      return;
+    }
     setDraft(null);
-    setError("");
   }
 
   function submitToManager(application: MvpApplication) {
@@ -326,7 +333,7 @@ export function ApplicationsModule({
               <FormTextArea label="Decision note" value={draft.managerNote} onChange={(value) => setDraft({ ...draft, managerNote: value })} wide />
             </FormGrid>
             {draftUsesConfigurableWorkflow ? <p className="mt-4 rounded-xl bg-[#eef7f5] px-4 py-3 text-xs font-semibold leading-5 text-[#0b6f63]">Application draft created for the employee. The employee needs to review and submit it before the approval workflow begins.</p> : null}
-            <FormActions onCancel={() => setDraft(null)} label={draftUsesConfigurableWorkflow ? "Save draft" : "Save application"} error={error} />
+            <FormActions onCancel={() => setDraft(null)} label={savingDraft ? "Saving…" : draftUsesConfigurableWorkflow ? "Save draft" : "Save application"} error={error} disabled={savingDraft} />
           </form>
         </MvpModal>
       ) : null}
@@ -437,7 +444,7 @@ function ManagerReviewModal({ application, managerName: reviewerName, onClose, o
   application: MvpApplication;
   managerName: string;
   onClose: () => void;
-  onDecision: (status: RequestStatus, note: string) => void;
+  onDecision: (status: RequestStatus, note: string) => Promise<WorkspaceMutationResult>;
 }) {
   const { data } = useMvpWorkspace();
   const [decision, setDecision] = useState<"approve" | "info" | "decline" | null>(null);
@@ -449,6 +456,7 @@ function ManagerReviewModal({ application, managerName: reviewerName, onClose, o
   const [nextStep, setNextStep] = useState("");
   const [error, setError] = useState("");
   const [confirmation, setConfirmation] = useState("");
+  const [busy, setBusy] = useState(false);
 
   const employee = data.employees.find((item) => item.id === application.employeeId);
   const role = data.roles.find((item) => item.id === employee?.roleId);
@@ -461,7 +469,7 @@ function ManagerReviewModal({ application, managerName: reviewerName, onClose, o
   const latestHistory = application.history.at(-1);
   const canDecide = reviewableManagerStatuses.includes(application.status);
 
-  function submitDecision(event: FormEvent) {
+  async function submitDecision(event: FormEvent) {
     event.preventDefault();
     setError("");
 
@@ -470,12 +478,15 @@ function ManagerReviewModal({ application, managerName: reviewerName, onClose, o
         setError("Please confirm why you support the application and what workplace support the team can provide.");
         return;
       }
-      onDecision("Approved by Line Manager", [
+      setBusy(true);
+      const result = await onDecision("Approved by Line Manager", [
         `Manager decision by ${reviewerName}: approved for Apprenticeship Lead review.`,
         `Why supported: ${supportReason.trim()}`,
         `Workplace opportunity or support: ${workplaceSupport.trim()}`,
         leadNote.trim() ? `Notes for Apprenticeship Lead: ${leadNote.trim()}` : "",
       ].filter(Boolean).join("\n"));
+      setBusy(false);
+      if (!result.ok) { setError(result.message); return; }
       setConfirmation("Application approved and sent to the Apprenticeship Lead for final review.");
       return;
     }
@@ -485,10 +496,13 @@ function ManagerReviewModal({ application, managerName: reviewerName, onClose, o
         setError("Please write the information you need from the employee.");
         return;
       }
-      onDecision("More information requested", [
+      setBusy(true);
+      const result = await onDecision("More information requested", [
         `Manager decision by ${reviewerName}: more information requested.`,
         `Request: ${informationRequest.trim()}`,
       ].join("\n"));
+      setBusy(false);
+      if (!result.ok) { setError(result.message); return; }
       setConfirmation("The application has been returned to the employee for more information.");
       return;
     }
@@ -498,12 +512,15 @@ function ManagerReviewModal({ application, managerName: reviewerName, onClose, o
         setError("Please provide a clear reason for declining the application.");
         return;
       }
-      onDecision("Declined by Line Manager", [
+      setBusy(true);
+      const result = await onDecision("Declined by Line Manager", [
         `Manager decision by ${reviewerName}: declined.`,
         `Reason: ${declineReason.trim()}`,
         nextStep.trim() ? `Suggested next step: ${nextStep.trim()}` : "",
         leadNote.trim() ? `Note for Apprenticeship Lead: ${leadNote.trim()}` : "",
       ].filter(Boolean).join("\n"));
+      setBusy(false);
+      if (!result.ok) { setError(result.message); return; }
       setConfirmation("The application has been declined and the employee will be able to review your feedback.");
       return;
     }
@@ -622,7 +639,7 @@ function ManagerReviewModal({ application, managerName: reviewerName, onClose, o
 
                 <div className="mt-4 flex flex-col gap-3 border-t border-[#102c3d]/[0.07] pt-4 sm:flex-row sm:items-center sm:justify-between">
                   {error ? <p className="text-xs font-semibold text-[#b53c52]">{error}</p> : <p className="text-xs leading-5 text-[#102c3d]/[0.48]">Your decision will be recorded in the application history.</p>}
-                  <button className="h-10 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white">Confirm decision</button>
+                  <button disabled={busy} className="h-10 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white disabled:opacity-50">{busy ? "Saving decision…" : "Confirm decision"}</button>
                 </div>
               </form>
             ) : null}
@@ -729,12 +746,13 @@ function AnswerBlock({ question, answer }: { question: string; answer: string })
   );
 }
 
-function DecisionButton({ active, onClick, danger = false, children }: { active: boolean; onClick: () => void; danger?: boolean; children: ReactNode }) {
+function DecisionButton({ active, onClick, danger = false, disabled = false, children }: { active: boolean; onClick: () => void; danger?: boolean; disabled?: boolean; children: ReactNode }) {
   return (
     <button
       type="button"
+      disabled={disabled}
       onClick={onClick}
-      className={`min-h-10 rounded-xl px-3 py-2 text-xs font-semibold ring-1 transition ${active
+      className={`min-h-10 rounded-xl px-3 py-2 text-xs font-semibold ring-1 transition disabled:opacity-50 ${active
         ? danger
           ? "bg-[#fff0f2] text-[#b13b51] ring-[#b13b51]/[0.20]"
           : "bg-[#102c3d] text-white ring-[#102c3d]"

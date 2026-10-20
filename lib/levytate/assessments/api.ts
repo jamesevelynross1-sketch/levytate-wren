@@ -25,6 +25,7 @@ export type AssessmentView = {
   review: AssessmentReviewView | null;
   applicationId: string | null;
   updatedAt: string;
+  isOwn: boolean;
 };
 
 export type AssessmentReviewView = {
@@ -61,6 +62,7 @@ export type AssessmentWorkspace = {
   generatedAt: string;
   role: MvpUserRole;
   currentEmployeeId: string | null;
+  canCompleteOwnAssessments: boolean;
   questions: AssessmentQuestion[];
   frameworks: Array<{
     frameworkKey: string;
@@ -73,6 +75,7 @@ export type AssessmentWorkspace = {
     limitations: string[];
     estimatedMinutes: number;
     questionCount: number;
+    availableForNew: boolean;
     sections: Array<{ id: string; label: string; introduction: string }>;
     dimensions: Array<{ id: string; label: string; description: string }>;
   }>;

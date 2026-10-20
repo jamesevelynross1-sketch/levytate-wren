@@ -1,12 +1,17 @@
 import type { AssessmentAnswerMap, CapabilityDimension, CapabilityIntelligence, WorkforceAssessmentResult } from "@/lib/levytate/assessments/domain";
-import { comprehensiveAssessmentQuestions, comprehensiveQuestionnaireVersion } from "@/lib/levytate/assessments/framework-registry";
+import {
+  comprehensiveAssessmentQuestions,
+  comprehensiveAssessmentQuestionsV2,
+  comprehensiveQuestionnaireVersion,
+  comprehensiveQuestionnaireVersionV2,
+} from "@/lib/levytate/assessments/framework-registry";
 
 // Deliberately server-only. Never import this module from a client component.
 const practicalAnswerKey: Readonly<Record<string, string>> = { pv1: "B", pv2: "C", pv3: "B", pv4: "C" };
 const practicalIds = Object.keys(practicalAnswerKey);
 const dimensions: CapabilityDimension[] = ["aiUnderstanding", "generalUsage", "responsibleUse", "practicalApplication", "verificationJudgement", "contribution"];
 const weights: Record<CapabilityDimension, number> = { aiUnderstanding: .15, generalUsage: .20, responsibleUse: .20, practicalApplication: .20, verificationJudgement: .20, contribution: .05 };
-const idsByDimension: Record<CapabilityDimension, string[]> = {
+const idsByDimensionV2: Record<CapabilityDimension, string[]> = {
   aiUnderstanding: ["un1", "un2", "un3", "un4", "un5"],
   generalUsage: ["ex1", "ex2", "ex3", "ex4", "ex5", "ex6", "ex7"],
   responsibleUse: ["re1", "re2", "re3", "re4", "re5"],
@@ -15,17 +20,42 @@ const idsByDimension: Record<CapabilityDimension, string[]> = {
   contribution: ["co1", "co2", "co3", "co4", "co5"],
 };
 
+const idsByDimension: Record<CapabilityDimension, string[]> = {
+  ...idsByDimensionV2,
+  generalUsage: ["ex1", "ex2", "ex4", "ex5", "ex6", "ex7"],
+};
+
 export function interpretComprehensiveAssessment(answers: AssessmentAnswerMap): WorkforceAssessmentResult {
+  return interpretComprehensiveAssessmentVersion(answers, {
+    questionnaireVersion: comprehensiveQuestionnaireVersion,
+    ids: idsByDimension,
+    directConfidenceEvidence: true,
+  });
+}
+
+export function interpretComprehensiveAssessmentV2(answers: AssessmentAnswerMap): WorkforceAssessmentResult {
+  return interpretComprehensiveAssessmentVersion(answers, {
+    questionnaireVersion: comprehensiveQuestionnaireVersionV2,
+    ids: idsByDimensionV2,
+    directConfidenceEvidence: false,
+  });
+}
+
+function interpretComprehensiveAssessmentVersion(answers: AssessmentAnswerMap, config: {
+  questionnaireVersion: string;
+  ids: Record<CapabilityDimension, string[]>;
+  directConfidenceEvidence: boolean;
+}): WorkforceAssessmentResult {
   const dimensionScores = Object.fromEntries(dimensions.flatMap((dimension) => {
-    const values = idsByDimension[dimension].map((id) => scoreValue(answers[id])).filter((value): value is number => value !== null);
+    const values = config.ids[dimension].map((id) => scoreValue(answers[id])).filter((value): value is number => value !== null);
     return values.length ? [[dimension, Math.round(values.reduce((sum, value) => sum + value, 0) / values.length)]] : [];
   })) as Partial<Record<CapabilityDimension, number>>;
   const weighted = dimensions.flatMap((dimension) => dimensionScores[dimension] === undefined ? [] : [{ value: dimensionScores[dimension]!, weight: weights[dimension] }]);
   const overallIndicator = weighted.length ? Math.round(weighted.reduce((sum, item) => sum + item.value * item.weight, 0) / weighted.reduce((sum, item) => sum + item.weight, 0)) : null;
   const scenarioAnswers = practicalIds.filter((id) => typeof answers[id] === "string" && answers[id] !== "");
   const practicalJudgement = scenarioAnswers.length === practicalIds.length ? practicalIds.filter((id) => answers[id] === practicalAnswerKey[id]).length * 25 : null;
-  const generalUsage = dimensionScores.generalUsage;
-  const confidenceAlignment = generalUsage === undefined || practicalJudgement === null ? "Further review recommended" : generalUsage - practicalJudgement > 15 ? "Confidence ahead of evidence" : generalUsage - practicalJudgement < -15 ? "Capability may be understated" : "Aligned";
+  const confidenceEvidence = config.directConfidenceEvidence ? scoreValue(answers.ex6) : dimensionScores.generalUsage;
+  const confidenceAlignment = confidenceEvidence === null || confidenceEvidence === undefined || practicalJudgement === null ? "Further review recommended" : confidenceEvidence - practicalJudgement > 15 ? "Confidence ahead of evidence" : confidenceEvidence - practicalJudgement < -15 ? "Capability may be understated" : "Aligned";
   const personalFrequency = scoreValue(answers.ex1) ?? 0;
   const workplaceFrequency = scoreValue(answers.ex2) ?? 0;
   const personalCases = array(answers.personalUseCases);
@@ -43,10 +73,11 @@ export function interpretComprehensiveAssessment(answers: AssessmentAnswerMap): 
   const cohorts = cohortsFor({ profile, internalBand, overallIndicator, dimensions: dimensionScores, practicalJudgement, confidenceAlignment, transferableExperience, workplaceFrequency, workplaceCases });
   const strengths = dimensions.filter((dimension) => (dimensionScores[dimension] ?? -1) >= 70).map(dimensionLabel);
   const developmentNeeds = dimensions.filter((dimension) => (dimensionScores[dimension] ?? 101) < 55).map((dimension) => `${dimensionLabel(dimension)} development`);
-  const barrier = text(answers.barrier) || null;
+  const barrierAnswer = text(answers.barrier);
+  const barrier = !barrierAnswer || barrierAnswer === "no_current_barrier" || barrierAnswer === "not_applicable" ? null : barrierAnswer;
   const opportunity = text(answers.opportunity) || null;
   const intelligence: CapabilityIntelligence = {
-    frameworkVersion: comprehensiveQuestionnaireVersion,
+    frameworkVersion: config.questionnaireVersion,
     internalBand,
     developmentProfile: profile,
     dimensionScores,
@@ -54,12 +85,14 @@ export function interpretComprehensiveAssessment(answers: AssessmentAnswerMap): 
     practicalJudgement,
     confidenceAlignment,
     transferableExperience,
-    workplaceUsePattern: workplaceFrequency >= 75 ? "Frequent workplace use" : workplaceFrequency >= 50 ? "Developing workplace use" : "Limited current workplace use",
+    workplaceUsePattern: workplaceUsePattern(answers.ex3, workplaceFrequency),
     barrier,
     opportunity,
     developmentCohorts: cohorts,
-    evidenceCoverage: { answeredScored: dimensions.reduce((count, dimension) => count + idsByDimension[dimension].filter((id) => scoreValue(answers[id]) !== null).length, 0), availableScored: dimensions.reduce((count, dimension) => count + idsByDimension[dimension].length, 0), practicalScenariosAnswered: scenarioAnswers.length },
-    methodology: "Internal development indicators use available relevant responses only. Missing, unknown and not-applicable responses are excluded. Six self-report dimensions are weighted 15/20/20/20/20/5 and interpreted alongside four confidential workplace scenarios. These are not validated competency thresholds.",
+    evidenceCoverage: { answeredScored: dimensions.reduce((count, dimension) => count + config.ids[dimension].filter((id) => scoreValue(answers[id]) !== null).length, 0), availableScored: dimensions.reduce((count, dimension) => count + config.ids[dimension].length, 0), practicalScenariosAnswered: scenarioAnswers.length },
+    methodology: config.directConfidenceEvidence
+      ? "Internal development indicators use relevant scored responses only. Usage context is categorical, and the confidence item is compared separately with four indicative workplace scenarios. The scenarios are limited judgement evidence, not certification or validated competency thresholds."
+      : "Internal development indicators use available relevant responses only. Missing, unknown and not-applicable responses are excluded. Six self-report dimensions are weighted 15/20/20/20/20/5 and interpreted alongside four confidential workplace scenarios. These are not validated competency thresholds.",
   };
   return {
     strengths: strengths.length ? strengths : ["Further evidence is needed before identifying a reliable strength pattern"],
@@ -71,7 +104,7 @@ export function interpretComprehensiveAssessment(answers: AssessmentAnswerMap): 
     evidenceDomains: [
       { domain: "technical", answered: intelligence.evidenceCoverage.answeredScored, relevant: intelligence.evidenceCoverage.availableScored },
       { domain: "non_technical", answered: opportunity ? 1 : 0, relevant: 1 },
-      { domain: "responsible_ethical", answered: idsByDimension.responsibleUse.filter((id) => scoreValue(answers[id]) !== null).length, relevant: idsByDimension.responsibleUse.length },
+      { domain: "responsible_ethical", answered: config.ids.responsibleUse.filter((id) => scoreValue(answers[id]) !== null).length, relevant: config.ids.responsibleUse.length },
     ],
     disclaimer: "Internal, indicative development intelligence only. It is not a certified competence score, employment decision, apprenticeship eligibility decision, programme approval or provider recommendation.",
     capabilityIntelligence: intelligence,
@@ -81,6 +114,19 @@ export function interpretComprehensiveAssessment(answers: AssessmentAnswerMap): 
 export function validateComprehensiveAnswers(answers: AssessmentAnswerMap) {
   const missing = comprehensiveAssessmentQuestions.filter((question) => question.required && unanswered(answers[question.id]));
   return missing.length ? { valid: false as const, message: `Please answer ${missing.length} remaining question${missing.length === 1 ? "" : "s"}.`, missing: missing.map((question) => question.id) } : { valid: true as const, missing: [] as string[] };
+}
+
+export function validateComprehensiveAnswersV2(answers: AssessmentAnswerMap) {
+  const missing = comprehensiveAssessmentQuestionsV2.filter((question) => question.required && unanswered(answers[question.id]));
+  return missing.length ? { valid: false as const, message: `Please answer ${missing.length} remaining question${missing.length === 1 ? "" : "s"}.`, missing: missing.map((question) => question.id) } : { valid: true as const, missing: [] as string[] };
+}
+
+function workplaceUsePattern(context: unknown, workplaceFrequency: number) {
+  if (context === "personal") return "Personal use only";
+  if (context === "workplace") return "Workplace use only";
+  if (context === "both") return "Personal and workplace use";
+  if (context === "never") return "No current use reported";
+  return workplaceFrequency >= 75 ? "Frequent workplace use" : workplaceFrequency >= 50 ? "Developing workplace use" : "Limited current workplace use";
 }
 
 function profileFor(answers: AssessmentAnswerMap, scores: Partial<Record<CapabilityDimension, number>>, practical: number | null): CapabilityIntelligence["developmentProfile"] {

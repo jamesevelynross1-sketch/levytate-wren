@@ -31,31 +31,35 @@ import {
   type MvpWorkspaceProfile,
 } from "@/lib/levytate/mvp/workspace";
 
+export type WorkspaceMutationResult =
+  | { ok: true; workspace?: LevyTateWorkspaceBootstrap }
+  | { ok: false; message: string };
+
 type MvpWorkspaceStore = {
   data: MvpWorkspaceData;
   meta: LevyTateWorkspaceMeta | null;
   hydrated: boolean;
   can: (permission: MvpPermission) => boolean;
-  saveProfile: (profile: MvpWorkspaceProfile) => void;
-  saveEmployee: (employee: MvpEmployee) => void;
-  archiveEmployee: (id: string) => void;
-  saveEmployeeDevelopmentProfile: (profile: MvpEmployeeDevelopmentProfile) => void;
-  saveRole: (role: MvpRole) => void;
-  archiveRole: (id: string) => void;
-  saveApplication: (application: MvpApplication) => void;
-  updateApplicationStatus: (id: string, status: RequestStatus, note?: string) => void;
-  saveProvider: (provider: ProviderCatalogueRecord) => void;
-  archiveProvider: (id: string) => void;
-  saveProviderProgramme: (programme: ProviderProgramme) => void;
-  archiveProviderProgramme: (id: string) => void;
-  removeProviderProgramme: (id: string) => void;
-  saveProviderRelationship: (relationship: MvpProviderRelationship) => void;
-  saveOrganisationProvider: (selection: MvpOrganisationProvider) => void;
-  saveOrganisationProgramme: (selection: MvpOrganisationProgramme) => void;
-  saveMatchingRequest: (request: MvpMatchingRequest) => void;
-  updateMatchingStatus: (id: string, status: MvpMatchingStatus) => void;
-  saveEnrolment: (enrolment: MvpEnrolment) => void;
-  updateEnrolmentStatus: (id: string, status: MvpEnrolmentStatus) => void;
+  saveProfile: (profile: MvpWorkspaceProfile) => Promise<WorkspaceMutationResult>;
+  saveEmployee: (employee: MvpEmployee) => Promise<WorkspaceMutationResult>;
+  archiveEmployee: (id: string) => Promise<WorkspaceMutationResult>;
+  saveEmployeeDevelopmentProfile: (profile: MvpEmployeeDevelopmentProfile) => Promise<WorkspaceMutationResult>;
+  saveRole: (role: MvpRole) => Promise<WorkspaceMutationResult>;
+  archiveRole: (id: string) => Promise<WorkspaceMutationResult>;
+  saveApplication: (application: MvpApplication) => Promise<WorkspaceMutationResult>;
+  updateApplicationStatus: (id: string, status: RequestStatus, note?: string) => Promise<WorkspaceMutationResult>;
+  saveProvider: (provider: ProviderCatalogueRecord) => Promise<WorkspaceMutationResult>;
+  archiveProvider: (id: string) => Promise<WorkspaceMutationResult>;
+  saveProviderProgramme: (programme: ProviderProgramme) => Promise<WorkspaceMutationResult>;
+  archiveProviderProgramme: (id: string) => Promise<WorkspaceMutationResult>;
+  removeProviderProgramme: (id: string) => Promise<WorkspaceMutationResult>;
+  saveProviderRelationship: (relationship: MvpProviderRelationship) => Promise<WorkspaceMutationResult>;
+  saveOrganisationProvider: (selection: MvpOrganisationProvider) => Promise<WorkspaceMutationResult>;
+  saveOrganisationProgramme: (selection: MvpOrganisationProgramme) => Promise<WorkspaceMutationResult>;
+  saveMatchingRequest: (request: MvpMatchingRequest) => Promise<WorkspaceMutationResult>;
+  updateMatchingStatus: (id: string, status: MvpMatchingStatus) => Promise<WorkspaceMutationResult>;
+  saveEnrolment: (enrolment: MvpEnrolment) => Promise<WorkspaceMutationResult>;
+  updateEnrolmentStatus: (id: string, status: MvpEnrolmentStatus) => Promise<WorkspaceMutationResult>;
 };
 
 type WorkspaceResponse = {
@@ -231,13 +235,12 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
   }, [data, hydrated, meta?.storageMode, persistLocal]);
 
 
-  const syncMutation = useCallback((mutation: LevyTateWorkspaceMutation) => {
-    mutationQueue.current = mutationQueue.current
-      .then(async () => {
-        if (meta?.storageMode !== "supabase") return;
+  const syncMutation = useCallback((mutation: LevyTateWorkspaceMutation): Promise<WorkspaceMutationResult> => {
+    const run = mutationQueue.current.then(async (): Promise<WorkspaceMutationResult> => {
+      if (meta?.storageMode !== "supabase") return { ok: true };
 
-        try {
-          const response = await fetch("/api/levytate-workspace", {
+      try {
+        const response = await fetch("/api/levytate-workspace", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -245,28 +248,33 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
             body: JSON.stringify(mutation),
           });
 
-          const payload = (await response.json()) as WorkspaceResponse;
-          if (!response.ok || !payload.workspace) {
-            setMeta((current) => appendWarning(current, payload.message ?? "LevyTate could not confirm the latest save. No client-side copy was written."));
-            return;
-          }
-
-          setData(payload.workspace.data);
-          setMeta(payload.workspace.meta);
-        } catch {
-          setMeta((current) => appendWarning(current, "LevyTate could not confirm the latest save. No client-side copy was written."));
+        const payload = (await response.json()) as WorkspaceResponse;
+        if (!response.ok || !payload.workspace) {
+          const message = payload.message ?? "LevyTate could not confirm the latest save. Your information is still in this form; please retry.";
+          setMeta((current) => appendWarning(current, message));
+          return { ok: false, message };
         }
-      })
-      .catch(() => undefined);
+
+        setData(payload.workspace.data);
+        setMeta(payload.workspace.meta);
+        return { ok: true, workspace: payload.workspace };
+      } catch {
+        const message = "LevyTate could not confirm the latest save. Your information is still in this form; please retry.";
+        setMeta((current) => appendWarning(current, message));
+        return { ok: false, message };
+      }
+    });
+    mutationQueue.current = run.then(() => undefined, () => undefined);
+    return run;
   }, [meta?.storageMode]);
 
-  const commitMutation = useCallback((mutation: LevyTateWorkspaceMutation, alreadyOptimistic = false) => {
+  const commitMutation = useCallback(async (mutation: LevyTateWorkspaceMutation, alreadyOptimistic = false): Promise<WorkspaceMutationResult> => {
     const permission = mvpMutationPermission[mutation.type];
     const permissions = meta?.permissions ?? permissionsForMvpRole(meta?.userRole);
 
     if (!hasMvpPermission(permissions, permission)) {
       setMeta((current) => appendWarning(current, `Your role cannot perform ${mutation.type}.`));
-      return;
+      return { ok: false, message: `Your role cannot perform ${mutation.type}.` };
     }
 
     if (mutation.type === "saveApplication") {
@@ -280,7 +288,7 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
 
       if (anotherActiveApplication) {
         setMeta((current) => appendWarning(current, "This employee already has an active apprenticeship application."));
-        return;
+        return { ok: false, message: "This employee already has an active apprenticeship application." };
       }
 
       if (meta?.userRole === "Employee") {
@@ -290,12 +298,12 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
 
         if (!employeeSaveStatuses.includes(mutation.application.status)) {
           setMeta((current) => appendWarning(current, "Employees can save drafts or submit applications to their line manager only."));
-          return;
+          return { ok: false, message: "Employees can save drafts or submit applications to their line manager only." };
         }
 
         if (existing && !employeeEditableStatuses.includes(existing.status)) {
           setMeta((current) => appendWarning(current, "Submitted applications cannot be edited unless more information has been requested."));
-          return;
+          return { ok: false, message: "Submitted applications cannot be edited unless more information has been requested." };
         }
       }
     }
@@ -306,9 +314,10 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
         if (persistLocal) persistLocalWorkspace(next);
         return next;
       });
+      return { ok: true };
     }
 
-    syncMutation(mutation);
+    return syncMutation(mutation);
   }, [data.applications, syncMutation, meta, persistLocal]);
 
   const value = useMemo<MvpWorkspaceStore>(() => ({

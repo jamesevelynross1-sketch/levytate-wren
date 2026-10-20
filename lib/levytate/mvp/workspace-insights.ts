@@ -12,6 +12,7 @@ export type WorkspaceNotification = {
   title: string;
   copy: string;
   module: "Home" | "Employees" | "Applications" | "Provider Relationships" | "Reports" | "Enrolments" | "Ask LevyTate AI";
+  target?: string;
   tone: "green" | "yellow" | "blue" | "red";
 };
 
@@ -82,6 +83,7 @@ export function buildNotifications(data: MvpWorkspaceData): WorkspaceNotificatio
       title: `${lineManagerQueue.length} applications awaiting manager review`,
       copy: "Managers need to decide whether these requests should progress into formal approval.",
       module: "Applications",
+      target: `Applications:${lineManagerQueue[0].id}`,
       tone: "yellow",
     });
   }
@@ -91,6 +93,7 @@ export function buildNotifications(data: MvpWorkspaceData): WorkspaceNotificatio
       title: `${leadQueue.length} applications awaiting apprenticeship lead review`,
       copy: "Final approval is required before provider allocation and enrolment can begin.",
       module: "Applications",
+      target: `Applications:${leadQueue[0].id}`,
       tone: "yellow",
     });
   }

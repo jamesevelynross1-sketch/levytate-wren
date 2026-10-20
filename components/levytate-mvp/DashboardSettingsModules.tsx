@@ -41,11 +41,11 @@ export function DashboardModule({ onNavigate }: { onNavigate: (module: string) =
   const providerCoverage = providerCoverageSummary(data);
   const providerIssues = providerCoverage.missing.slice(0, 3);
   const primaryAction = notifications[0]
-    ? { label: "Review urgent work", target: notifications[0].module }
+    ? { label: "Review urgent work", target: notifications[0].target ?? notifications[0].module }
     : support[0]
       ? { label: "Continue employee discovery", target: "Employees" }
       : providerIssues[0]
-        ? { label: "Improve provider coverage", target: "Provider Relationships" }
+        ? { label: "Improve provider coverage", target: "Marketplace" }
         : { label: "Open LevyTate Copilot", target: "LevyTate Copilot" };
 
   const setupSteps = [
@@ -95,7 +95,7 @@ export function DashboardModule({ onNavigate }: { onNavigate: (module: string) =
           {notifications.length ? (
             <div className="grid gap-3">
               {notifications.slice(0, 4).map((notification) => (
-                <button key={notification.id} type="button" onClick={() => onNavigate(notification.module)} className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] px-4 py-3 text-left transition hover:border-[#159b8f]/18 hover:bg-white">
+                <button key={notification.id} type="button" onClick={() => onNavigate(notification.target ?? notification.module)} className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] px-4 py-3 text-left transition hover:border-[#159b8f]/18 hover:bg-white">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-[#102c3d]">{notification.title}</p>
@@ -116,7 +116,7 @@ export function DashboardModule({ onNavigate }: { onNavigate: (module: string) =
           <MvpPanel title="Employees requiring attention" eyebrow="People">
           <div className="grid gap-3">
             {support.length ? support.slice(0, 4).map((employee) => (
-              <button key={employee.id} type="button" onClick={() => onNavigate("Employees")} className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] px-4 py-3 text-left transition hover:border-[#159b8f]/18 hover:bg-white">
+              <button key={employee.id} type="button" onClick={() => onNavigate(`Employees:${employee.id}`)} className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] px-4 py-3 text-left transition hover:border-[#159b8f]/18 hover:bg-white">
                 <p className="text-sm font-semibold text-[#102c3d]">{employee.name}</p>
                 <p className="mt-1 text-xs leading-5 text-[#102c3d]/54">{employee.jobTitle || "Role to confirm"} needs discovery context.</p>
               </button>
@@ -129,7 +129,7 @@ export function DashboardModule({ onNavigate }: { onNavigate: (module: string) =
           <MvpPanel title="Provider issues" eyebrow="Coverage">
           <div className="grid gap-3">
             {providerIssues.length ? providerIssues.map((issue) => (
-              <ActionCard key={issue} title={issue} copy="Preferred provider coverage is not complete for this category." cta="Resolve" onClick={() => onNavigate("Provider Relationships")} />
+              <ActionCard key={issue} title={issue} copy="Preferred provider coverage is not complete for this category." cta="Explore providers" onClick={() => onNavigate("Marketplace")} />
             )) : <p className="text-sm leading-6 text-[#102c3d]/56">Provider coverage is in place for the current priority areas.</p>}
             {enrolments.length ? <ActionCard title="Approved learners need handoff" copy={`${enrolments.length} enrolment record${enrolments.length === 1 ? "" : "s"} need dates, provider or learner readiness checked.`} cta="Open enrolments" onClick={() => onNavigate("Enrolments")} /> : null}
           </div>

@@ -47,5 +47,16 @@ export function monthLabel(month: string) {
   return new Intl.DateTimeFormat("en-GB", { month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(year, value - 1, 1)));
 }
 
+export function financeReportingPeriod(summary: LevyFinanceSummary, now = new Date()) {
+  if (!summary.latestMonth) return { label: "No reporting period", status: "missing" as const, copy: "No DAS transaction period has been imported." };
+  const currentMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+  const current = summary.latestMonth === currentMonth;
+  return {
+    label: monthLabel(summary.latestMonth),
+    status: current ? "current" as const : "historical" as const,
+    copy: current ? "Current imported reporting period." : "Historical imported information — not a live current-month balance.",
+  };
+}
+
 function sum(items: DasFinanceTransaction[]) { return items.reduce((total, item) => total + item.amountPence, 0); }
 function totalAbsolute(items: DasFinanceTransaction[]) { return items.reduce((total, item) => total + Math.abs(item.amountPence), 0); }

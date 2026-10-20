@@ -194,6 +194,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
   const [learnerTarget, setLearnerTarget] = useState<{ learnerRecordId: string; actionType: OperationalActionType } | null>(null);
   const [managerDirectReportDetail, setManagerDirectReportDetail] = useState(initialManagerDirectReportDetail);
   const [managerReviewApplicationId, setManagerReviewApplicationId] = useState<string | null>(null);
+  const [peopleEmployeeId, setPeopleEmployeeId] = useState<string | null>(null);
   const [copilotEntity, setCopilotEntity] = useState<{ type: LevyTateCopilotEntityType; id: string; label: string } | null>(null);
   const deepLinkHandled = useRef(false);
 
@@ -239,6 +240,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
           ? searchParams.get("application")
           : null,
       );
+      setPeopleEmployeeId(access.permitted && resolved === "People" ? searchParams.get("employee") : null);
       if (!access.permitted) window.history.replaceState(null, "", access.safeRedirect);
     }
     deepLinkHandled.current = true;
@@ -263,6 +265,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
     if (!availableModules.some((item) => item.name === module)) return;
     setManagerDirectReportDetail(null);
     setManagerReviewApplicationId(null);
+    setPeopleEmployeeId(null);
     setCopilotEntity(null);
     window.history.replaceState(null, "", `/levytate/app?module=${encodeURIComponent(module)}`);
     setActiveModule(module);
@@ -321,6 +324,24 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
   }
 
   function navigateTo(target: string) {
+    if (target.startsWith("Applications:")) {
+      const applicationId = target.slice("Applications:".length);
+      const destinationModule = meta?.userRole === "Line Manager" ? "Approvals" : "Applications";
+      if (!availableModules.some((item) => item.name === destinationModule)) return;
+      setManagerReviewApplicationId(applicationId);
+      setActiveModule(destinationModule);
+      window.history.replaceState(null, "", `/levytate/app?module=${destinationModule}&application=${encodeURIComponent(applicationId)}`);
+      return;
+    }
+    if (target.startsWith("Employees:")) {
+      const employeeId = target.slice("Employees:".length);
+      if (!peopleItems.includes("Employees") || !availableModules.some((item) => item.name === "People")) return;
+      setPeopleView("Employees");
+      setPeopleEmployeeId(employeeId);
+      setActiveModule("People");
+      window.history.replaceState(null, "", `/levytate/app?module=People&employee=${encodeURIComponent(employeeId)}`);
+      return;
+    }
     if (target === "Programmes & Providers" || target.startsWith("Programmes & Providers:")) {
       openModule("Marketplace");
       const [, kind, id] = target.split(":");
@@ -534,7 +555,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
                   : <DashboardModule onNavigate={navigateTo} />
             ) : null}
             {activeModule === "My Programme" ? <EmployeeProgrammeModule onNavigate={(target) => navigateTo(target)} /> : null}
-            {activeModule === "My Application" ? <EmployeeApplicationModule /> : null}
+            {activeModule === "My Application" ? <EmployeeApplicationModule onNavigate={navigateTo} /> : null}
             {activeModule === "Copilot" ? <AskLevyTateAiWorkspace initialEmployeeId={aiEmployeeId} onNavigate={navigateTo} /> : null}
             {activeModule === "Knowledge" ? <GuidanceCentreModule /> : null}
             {activeModule === "My Team" ? (
@@ -551,7 +572,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
             {activeModule === "Assessments" ? <AssessmentsModule /> : null}
             {activeModule === "People" ? (
               <ModuleStackNav items={peopleItems} active={peopleView} onSelect={(item) => setPeopleView(item as PeopleView)}>
-                {peopleView === "Employees" ? <EmployeesModule onStartDiscovery={(employeeId) => { setAiEmployeeId(employeeId); openModule("Copilot"); }} /> : null}
+                {peopleView === "Employees" ? <EmployeesModule initialEmployeeId={peopleEmployeeId} onStartDiscovery={(employeeId) => { setAiEmployeeId(employeeId); openModule("Copilot"); }} /> : null}
                 {peopleView === "Roles" ? <RolesModule /> : null}
               </ModuleStackNav>
             ) : null}

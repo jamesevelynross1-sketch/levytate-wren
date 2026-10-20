@@ -21,8 +21,8 @@ import {
   workforceAssessmentQuestionnaireVersion,
   workforceAssessmentQuestions,
 } from "@/lib/levytate/assessments/framework";
-import { assessmentFrameworks, frameworkByVersion } from "@/lib/levytate/assessments/framework-registry";
-import { interpretComprehensiveAssessment, validateComprehensiveAnswers } from "@/lib/server/levytate-assessment-scoring";
+import { assessmentFrameworks, comprehensiveQuestionnaireVersion, comprehensiveQuestionnaireVersionV2, frameworkByVersion } from "@/lib/levytate/assessments/framework-registry";
+import { interpretComprehensiveAssessment, interpretComprehensiveAssessmentV2, validateComprehensiveAnswers, validateComprehensiveAnswersV2 } from "@/lib/server/levytate-assessment-scoring";
 import { normaliseMvpUserRole, type MvpUserRole } from "@/lib/levytate/mvp/rbac";
 import type { MvpApplication } from "@/lib/levytate/mvp/workspace";
 import { getLearnerLifecycleServerContext } from "@/lib/server/levytate-learner-lifecycle";
@@ -30,6 +30,7 @@ import {
   getLevyTateSupabaseConfig,
   supabaseInsert,
   supabaseSelect,
+  supabaseSelectAll,
   supabaseUpdate,
 } from "@/lib/server/levytate-supabase";
 import { applyWorkspaceMutationForSession } from "@/lib/server/levytate-workspace";
@@ -81,33 +82,33 @@ export async function getAssessmentWorkspaceForSession(session: LevyTateBetaSess
   const role = normaliseMvpUserRole(context.user.role);
   if (role === "Platform Admin") throw new LevyTateAssessmentError("Platform Admin cannot access employer assessment records.", 403);
   const config = requireConfig();
-  const employees = await supabaseSelect<EmployeeRow>(config, "levytate_employees", new URLSearchParams({
+  const employees = await supabaseSelectAll<EmployeeRow>(config, "levytate_employees", new URLSearchParams({
     select: "id,name,email,job_title,department,manager_id,status",
     organisation_id: `eq.${context.organisation.id}`,
     status: "eq.Active",
     order: "name.asc",
-    limit: "1000",
   }));
   const currentEmployee = employees.find((employee) => employee.email.trim().toLowerCase() === context.user.email.trim().toLowerCase()) ?? null;
   if ((role === "Employee" || role === "Line Manager") && !currentEmployee) {
     throw new LevyTateAssessmentError("Your user account is not linked to an active employee record.", 403);
   }
 
-  const allCampaigns = await selectRows<CampaignRow>(tables.campaigns, context.organisation.id, { order: "created_at.desc" });
-  const allParticipants = await selectRows<ParticipantRow>(tables.participants, context.organisation.id, { order: "created_at.asc" });
+  const allCampaigns = await selectAllRows<CampaignRow>(tables.campaigns, context.organisation.id, { order: "created_at.desc" });
+  const allParticipants = await selectAllRows<ParticipantRow>(tables.participants, context.organisation.id, { order: "created_at.asc" });
   const directReportIds = new Set(role === "Line Manager" && currentEmployee ? employees.filter((employee) => employee.manager_id === currentEmployee.id).map((employee) => employee.id) : []);
   const visibleCampaignIds = role === "Employee" && currentEmployee
     ? new Set(allParticipants.filter((participant) => participant.employee_id === currentEmployee.id).map((participant) => participant.campaign_id))
     : role === "Line Manager"
-      ? new Set(allParticipants.filter((participant) => directReportIds.has(participant.employee_id)).map((participant) => participant.campaign_id))
+      ? new Set(allParticipants.filter((participant) => directReportIds.has(participant.employee_id) || participant.employee_id === currentEmployee?.id).map((participant) => participant.campaign_id))
       : new Set(allCampaigns.map((campaign) => campaign.id));
   const campaigns = allCampaigns.filter((campaign) => visibleCampaignIds.has(campaign.id) || role === "Apprenticeship Lead" || role === "Employer Admin");
 
-  const allAssessments = await selectRows<AssessmentRow>(tables.assessments, context.organisation.id, { order: "updated_at.desc" });
+  const allAssessments = await selectAllRows<AssessmentRow>(tables.assessments, context.organisation.id, { order: "updated_at.desc" });
   const allShares = role === "Line Manager"
     ? await selectByIds<ShareRow>(tables.shares, context.organisation.id, "assessment_id", allAssessments.map((assessment) => assessment.id))
     : [];
   const visibleAssessments = allAssessments.filter((assessment) => {
+    if (currentEmployee && assessment.employee_id === currentEmployee.id) return true;
     if (role === "Employee") return assessment.employee_id === currentEmployee?.id;
     if (role === "Line Manager") {
       const campaign = assessment.campaign_id ? allCampaigns.find((item) => item.id === assessment.campaign_id) : null;
@@ -131,9 +132,16 @@ export async function getAssessmentWorkspaceForSession(session: LevyTateBetaSess
   ]);
   const employeeById = new Map(employees.map((employee) => [employee.id, employee]));
   const campaignById = new Map(allCampaigns.map((campaign) => [campaign.id, campaign]));
+  const storedResultByAssessmentId = new Map(results.flatMap((result) => {
+    const assessment = visibleAssessments.find((item) => item.id === result.assessment_id);
+    return assessment?.active_submission_revision === result.revision_number
+      ? [[result.assessment_id, object<WorkforceAssessmentResult>(result.result_snapshot)] as const]
+      : [];
+  }));
   const assessments = visibleAssessments.map<AssessmentView>((assessment) => {
     const employee = employeeById.get(assessment.employee_id);
-    const visibleRevisionNumber = role === "Employee" ? assessment.current_revision : assessment.active_submission_revision;
+    const isOwn = assessment.employee_id === currentEmployee?.id;
+    const visibleRevisionNumber = isOwn ? assessment.current_revision : assessment.active_submission_revision;
     const revision = revisions.find((item) => item.assessment_id === assessment.id && item.revision_number === visibleRevisionNumber);
     const result = results.find((item) => item.assessment_id === assessment.id && item.revision_number === assessment.active_submission_revision);
     const storedResult = result ? object<WorkforceAssessmentResult>(result.result_snapshot) : null;
@@ -154,11 +162,12 @@ export async function getAssessmentWorkspaceForSession(session: LevyTateBetaSess
       currentRevision: assessment.current_revision,
       activeSubmittedRevision: assessment.active_submission_revision,
       answers: object<AssessmentAnswerMap>(revision?.answers),
-      result: storedResult ? (role === "Employee" && storedResult.capabilityIntelligence ? { ...storedResult, capabilityIntelligence: undefined } : storedResult) : null,
+      result: storedResult ? (isOwn && storedResult.capabilityIntelligence ? { ...storedResult, capabilityIntelligence: undefined } : storedResult) : null,
       sharedWithManager: Boolean(currentEmployee?.manager_id) && shares.some((share) => share.assessment_id === assessment.id && share.shared_with === "line_manager" && share.shared_with_employee_id === currentEmployee?.manager_id && share.active),
       review: review ? reviewView(review) : null,
       applicationId: links.find((link) => link.assessment_id === assessment.id)?.application_id ?? null,
       updatedAt: assessment.updated_at,
+      isOwn,
     };
   });
 
@@ -191,6 +200,7 @@ export async function getAssessmentWorkspaceForSession(session: LevyTateBetaSess
       createdAt: campaign.created_at,
     };
   });
+  const reportingAssessments = visibleAssessments.filter((assessment) => role !== "Line Manager" || directReportIds.has(assessment.employee_id));
   const reporting = role === "Apprenticeship Lead" || role === "Employer Admin" || role === "Line Manager"
     ? campaignViews.map((campaign) => ({
         campaignId: campaign.id,
@@ -200,14 +210,14 @@ export async function getAssessmentWorkspaceForSession(session: LevyTateBetaSess
             department: participant.department_snapshot,
             roleTitle: participant.role_title_snapshot,
           })),
-          submissions: assessments.filter((assessment) => assessment.campaignId === campaign.id && assessment.result).map((assessment) => ({
-            employeeId: assessment.employeeId,
-            department: assessment.department,
-            roleTitle: assessment.roleTitle,
-            result: assessment.result!,
+          submissions: reportingAssessments.filter((assessment) => assessment.campaign_id === campaign.id && storedResultByAssessmentId.has(assessment.id)).map((assessment) => ({
+            employeeId: assessment.employee_id,
+            department: employeeById.get(assessment.employee_id)?.department ?? "",
+            roleTitle: employeeById.get(assessment.employee_id)?.job_title ?? assessment.role_context,
+            result: storedResultByAssessmentId.get(assessment.id)!,
           })),
         }),
-        ...aggregateCapabilityIntelligence(assessments.filter((assessment) => assessment.campaignId === campaign.id && assessment.result).map((assessment) => assessment.result!), participantSnapshotsByCampaign.get(campaign.id) ?? []),
+        ...aggregateCapabilityIntelligence(reportingAssessments.filter((assessment) => assessment.campaign_id === campaign.id).flatMap((assessment) => storedResultByAssessmentId.get(assessment.id) ? [storedResultByAssessmentId.get(assessment.id)!] : []), participantSnapshotsByCampaign.get(campaign.id) ?? []),
       }))
     : [];
 
@@ -215,6 +225,7 @@ export async function getAssessmentWorkspaceForSession(session: LevyTateBetaSess
     generatedAt: new Date().toISOString(),
     role,
     currentEmployeeId: currentEmployee?.id ?? null,
+    canCompleteOwnAssessments: Boolean(currentEmployee),
     questions: [...workforceAssessmentQuestions],
     frameworks: assessmentFrameworks.map((framework) => ({
       frameworkKey: framework.frameworkKey,
@@ -227,6 +238,7 @@ export async function getAssessmentWorkspaceForSession(session: LevyTateBetaSess
       limitations: framework.limitations,
       estimatedMinutes: framework.estimatedMinutes,
       questionCount: framework.questions.length,
+      availableForNew: framework.questionnaireVersion !== comprehensiveQuestionnaireVersionV2,
       sections: framework.sections.map((section) => ({ ...section })),
       dimensions: framework.dimensions.map((dimension) => ({ ...dimension })),
     })),
@@ -255,7 +267,7 @@ export async function applyAssessmentActionForSession(session: LevyTateBetaSessi
   const employee = await currentEmployee(context.organisation.id, context.user.email);
   switch (action.action) {
     case "start_assessment": {
-      assertRole(role, ["Employee"]);
+      assertPersonalAssessmentRole(role);
       if (!employee) throw new LevyTateAssessmentError("Your active employee record could not be found.", 403);
       const campaignId = action.campaignId || null;
       const campaign = campaignId ? await assertCampaignAssignment(context.organisation.id, campaignId, employee.id, true) : null;
@@ -263,7 +275,7 @@ export async function applyAssessmentActionForSession(session: LevyTateBetaSessi
       const query: Record<string, string> = {
         employee_id: `eq.${employee.id}`,
         campaign_id: campaignId ? `eq.${campaignId}` : "is.null",
-        ...(campaignId ? {} : { baseline_assessment_id: "is.null" }),
+        ...(campaignId ? {} : { baseline_assessment_id: "is.null", questionnaire_version: `eq.${framework.questionnaireVersion}` }),
         limit: "1",
       };
       const existing = await selectRows<AssessmentRow>(tables.assessments, context.organisation.id, query);
@@ -285,7 +297,7 @@ export async function applyAssessmentActionForSession(session: LevyTateBetaSessi
       break;
     }
     case "start_reassessment": {
-      assertRole(role, ["Employee"]);
+      assertPersonalAssessmentRole(role);
       if (!employee) throw new LevyTateAssessmentError("Your active employee record could not be found.", 403);
       const baseline = await ownAssessment(context.organisation.id, action.baselineAssessmentId, employee.id);
       if (!baseline.active_submission_revision) throw new LevyTateAssessmentError("Only a submitted assessment can be used as a baseline.", 409);
@@ -308,7 +320,7 @@ export async function applyAssessmentActionForSession(session: LevyTateBetaSessi
       break;
     }
     case "save_answers": {
-      assertRole(role, ["Employee"]);
+      assertPersonalAssessmentRole(role);
       const assessment = await ownAssessment(context.organisation.id, action.assessmentId, employee?.id);
       const current = await revision(context.organisation.id, assessment.id, assessment.current_revision);
       let revisionNumber = assessment.current_revision;
@@ -330,7 +342,7 @@ export async function applyAssessmentActionForSession(session: LevyTateBetaSessi
       break;
     }
     case "submit": {
-      assertRole(role, ["Employee"]);
+      assertPersonalAssessmentRole(role);
       const assessment = await ownAssessment(context.organisation.id, action.assessmentId, employee?.id);
       if (assessment.campaign_id) await assertCampaignAssignment(context.organisation.id, assessment.campaign_id, assessment.employee_id, true);
       const current = await revision(context.organisation.id, assessment.id, assessment.current_revision);
@@ -339,9 +351,17 @@ export async function applyAssessmentActionForSession(session: LevyTateBetaSessi
         break;
       }
       const answers = object<AssessmentAnswerMap>(current.answers);
-      const validation = assessment.questionnaire_version === "ai-capability-v2" ? validateComprehensiveAnswers(answers) : validateAssessmentAnswers(answers);
+      const validation = assessment.questionnaire_version === comprehensiveQuestionnaireVersion
+        ? validateComprehensiveAnswers(answers)
+        : assessment.questionnaire_version === comprehensiveQuestionnaireVersionV2
+          ? validateComprehensiveAnswersV2(answers)
+          : validateAssessmentAnswers(answers);
       if (!validation.valid) throw new LevyTateAssessmentError(validation.message, 400);
-      const result = assessment.questionnaire_version === "ai-capability-v2" ? interpretComprehensiveAssessment(answers) : interpretWorkforceAssessment(answers);
+      const result = assessment.questionnaire_version === comprehensiveQuestionnaireVersion
+        ? interpretComprehensiveAssessment(answers)
+        : assessment.questionnaire_version === comprehensiveQuestionnaireVersionV2
+          ? interpretComprehensiveAssessmentV2(answers)
+          : interpretWorkforceAssessment(answers);
       const submittedAt = new Date().toISOString();
       await supabaseUpdate(config, tables.revisions, scope(context.organisation.id, { assessment_id: assessment.id, revision_number: current.revision_number }), { status: "submitted", submitted_at: submittedAt, updated_at: submittedAt });
       await supabaseInsert(config, tables.results, [{ id: randomUUID(), organisation_id: context.organisation.id, assessment_id: assessment.id, revision_number: current.revision_number, result_snapshot: result, interpretation_version: assessment.interpretation_version, created_by: context.user.id }], { prefer: "resolution=ignore-duplicates,return=representation", query: "on_conflict=organisation_id,assessment_id,revision_number" });
@@ -356,7 +376,7 @@ export async function applyAssessmentActionForSession(session: LevyTateBetaSessi
       break;
     }
     case "share_with_manager": {
-      assertRole(role, ["Employee"]);
+      assertPersonalAssessmentRole(role);
       const assessment = await ownAssessment(context.organisation.id, action.assessmentId, employee?.id);
       if (!assessment.active_submission_revision) throw new LevyTateAssessmentError("Submit the assessment before sharing findings.", 409);
       if (!employee?.manager_id) throw new LevyTateAssessmentError("No active line manager is linked to this employee.", 409);
@@ -427,7 +447,7 @@ export async function applyAssessmentActionForSession(session: LevyTateBetaSessi
       break;
     }
     case "create_application_draft": {
-      assertRole(role, ["Employee"]);
+      assertPersonalAssessmentRole(role);
       const assessment = await ownAssessment(context.organisation.id, action.assessmentId, employee?.id);
       if (!assessment.active_submission_revision) throw new LevyTateAssessmentError("Submit the assessment before preparing an application.", 409);
       const existing = await selectRows<LinkRow>(tables.links, context.organisation.id, { assessment_id: `eq.${assessment.id}`, limit: "1" });
@@ -552,7 +572,7 @@ async function currentEmployee(organisationId: string, email: string) {
 }
 
 async function activeEmployees(organisationId: string) {
-  return selectRows<EmployeeRow>("levytate_employees", organisationId, { status: "eq.Active", order: "name.asc", limit: "1000" }, "id,name,email,job_title,department,manager_id,status");
+  return selectAllRows<EmployeeRow>("levytate_employees", organisationId, { status: "eq.Active", order: "name.asc" }, "id,name,email,job_title,department,manager_id,status");
 }
 
 async function recordEvent(context: Awaited<ReturnType<typeof getLearnerLifecycleServerContext>>, action: AssessmentAction, assessmentId: string | null, campaignId: string | null, eventType: string) {
@@ -567,9 +587,18 @@ async function selectRows<T>(table: string, organisationId: string, params: Reco
   return supabaseSelect<T>(requireConfig(), table, new URLSearchParams({ select, organisation_id: `eq.${organisationId}`, ...params }));
 }
 
+async function selectAllRows<T>(table: string, organisationId: string, params: Record<string, string>, select = "*") {
+  return supabaseSelectAll<T>(requireConfig(), table, new URLSearchParams({ select, organisation_id: `eq.${organisationId}`, ...params }));
+}
+
 async function selectByIds<T>(table: string, organisationId: string, key: string, ids: string[], select = "*") {
   if (!ids.length) return [];
-  return selectRows<T>(table, organisationId, { [key]: `in.(${ids.map(encodeURIComponent).join(",")})`, limit: "5000" }, select);
+  const rows: T[] = [];
+  for (let index = 0; index < ids.length; index += 200) {
+    const chunk = ids.slice(index, index + 200);
+    rows.push(...await selectAllRows<T>(table, organisationId, { [key]: `in.(${chunk.map(encodeURIComponent).join(",")})` }, select));
+  }
+  return rows;
 }
 
 function requireConfig() {
@@ -621,7 +650,7 @@ function questions(value: unknown) {
 function aggregateCapabilityIntelligence(results: WorkforceAssessmentResult[], participants: ParticipantRow[]) {
   const intelligence = results.flatMap((result) => result.capabilityIntelligence ? [result.capabilityIntelligence] : []);
   const thresholdMet = intelligence.length >= 5;
-  const dimensions = thresholdMet ? assessmentFrameworks[1].dimensions.flatMap((dimension) => {
+  const dimensions = thresholdMet ? (assessmentFrameworks.at(-1)?.dimensions ?? []).flatMap((dimension) => {
     const values = intelligence.flatMap((item) => item.dimensionScores[dimension.id as keyof typeof item.dimensionScores] === undefined ? [] : [item.dimensionScores[dimension.id as keyof typeof item.dimensionScores]!]);
     return values.length ? [{ id: dimension.id, label: dimension.label, value: Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) }] : [];
   }) : [];
@@ -640,6 +669,10 @@ function aggregateCapabilityIntelligence(results: WorkforceAssessmentResult[], p
 
 function assertRole(role: MvpUserRole, allowed: MvpUserRole[]) {
   if (!allowed.includes(role)) throw new LevyTateAssessmentError(`${role} cannot perform this assessment action.`, 403);
+}
+
+function assertPersonalAssessmentRole(role: MvpUserRole) {
+  assertRole(role, ["Employee", "Line Manager", "Apprenticeship Lead", "Employer Admin"]);
 }
 
 function bounded(value: string, length: number) { return value.trim().slice(0, length); }

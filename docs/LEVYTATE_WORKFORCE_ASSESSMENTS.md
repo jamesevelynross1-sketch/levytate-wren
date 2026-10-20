@@ -8,7 +8,7 @@ The original LevyTate question set is informed by the UK Government's [AI Skills
 
 ## Roles and privacy
 
-- Employees own private drafts, submit assigned campaigns, explicitly share a personal submission with their line manager, start linked reassessments and may prepare an application draft.
+- Any authorised employer user with an active employee record owns their private drafts, can submit their assigned campaigns, explicitly share a personal submission with their line manager, start linked reassessments and may prepare an application draft. Their personal activity remains separate from any manager or employer-review access granted by their runtime role.
 - Line Managers see only active direct-report submissions that were explicitly shared with that manager or disclosed by campaign policy. They can record context, support, constraints and proposed action.
 - Apprenticeship Leads and Employer Admins create and operate campaigns, see campaign submissions and access organisation reporting. They do not see private personal assessments.
 - Platform Admin has no access to employer assessment data.
@@ -34,7 +34,9 @@ Limited tool access, practice opportunity, time or manager support is treated as
 
 Questionnaire version `ai-capability-v2` and interpretation version `ai-capability-rules-v2` adapt the approved Ground Control Current AI Capability Assessment into LevyTate's connected, tenant-scoped architecture. The active framework contains 40 questions across experience, understanding, responsible use, practical application, verification, contribution, four workplace scenarios, barriers and opportunities. The earlier reference landing-page description of 28 questions is not used because it did not match the active question bank.
 
-The six internal evidence dimensions are AI understanding (15%), personal and workplace usage (20%), responsible use (20%), practical application (20%), verification and judgement (20%), and wider contribution (5%). Each self-report response uses a 1–5 scale normalised to 0–100. Only available, relevant evidence contributes to a dimension or weighted indicator: unanswered, unknown and not-applicable responses are excluded rather than scored as poor capability. Four practical scenarios are scored separately on the server, with a practical indicator produced only when all four are answered.
+Launch Release 1 publishes questionnaire version `ai-capability-v3` and interpretation version `ai-capability-rules-v3`. V2 remains immutable for historical drafts, submissions, results and campaign snapshots. V3 treats `ex3` as categorical usage-context evidence rather than silently attempting to score its text values, compares the explicit `ex6` confidence response with the four indicative scenarios, and offers truthful `No current barrier` and `Not applicable` responses. Those responses are excluded from barrier reporting rather than scored as capability gaps.
+
+The six internal evidence dimensions are AI understanding (15%), personal and workplace usage (20%), responsible use (20%), practical application (20%), verification and judgement (20%), and wider contribution (5%). Scored self-report responses use a 1–5 scale normalised to 0–100; categorical context questions are not converted into numbers. Only available, relevant evidence contributes to a dimension or weighted indicator: unanswered, unknown and not-applicable responses are excluded rather than scored as poor capability. Four practical scenarios are scored separately on the server, with a practical indicator produced only when all four are answered. They provide indicative judgement evidence only and are not certification or a validated competence test.
 
 Internal development bands (Foundation, Developing, Applied and Advanced), profiles (User, Enabler, Technical and Leader), confidence alignment, transferable experience and recommended cohorts support an authorised development conversation. They are working interpretation rules, not externally validated thresholds or certified competence measures. The Advanced band is conservatively capped when responsible-use, verification or practical evidence is weak. Employees receive constructive narrative findings and possible next steps, not numerical scores, grades or pass/fail outcomes.
 
@@ -62,7 +64,7 @@ All operational tables are organisation-scoped, RLS-enabled and unavailable to b
 
 ## Current limits
 
-- Two published templates are available: the historical/current 12-question Quick Assessment and the 40-question Comprehensive AI Capability Assessment. Campaigns and submissions remain pinned to their selected published version.
+- The 12-question Quick Assessment and versioned 40-question Comprehensive AI Capability Assessment are published. Campaigns and submissions remain pinned to their selected published version; V2 is historical and V3 is the corrected current comprehensive version.
 - Campaign audiences are fixed after creation in V1.
 - Reports are printable through the browser and aggregate CSV is authorised server-side. Scheduled exports are not included.
 - Proposed actions are recorded, but general operational-action completion remains a separate workflow.

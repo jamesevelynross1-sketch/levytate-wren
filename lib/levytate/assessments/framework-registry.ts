@@ -20,8 +20,10 @@ const personalUseCases = ["Researching and comparing information", "Drafting or 
 const workplaceUseCases = ["Research and comparison", "Drafting or improving writing", "Summarising documents", "Creating presentations or documents", "Analysing data or spreadsheets", "Planning and scheduling", "Creating training content", "Writing or troubleshooting code", "Building assistants or workflows", "Automating repetitive administration", "Comparing and checking outputs", "I do not currently use AI at work"].map((label) => ({ value: label, label }));
 const scale = (id: string, section: string, prompt: string, options = agreement, dimension = ""): AssessmentQuestion => ({ id, section, prompt, helpText: "Choose the response that best reflects your current experience.", purpose: dimension, interpretation: "Self-reported evidence; interpreted with practical evidence and role context.", type: "single_choice", required: true, options });
 
-export const comprehensiveQuestionnaireVersion = "ai-capability-v2";
-export const comprehensiveInterpretationVersion = "ai-capability-rules-v2";
+export const comprehensiveQuestionnaireVersionV2 = "ai-capability-v2";
+export const comprehensiveInterpretationVersionV2 = "ai-capability-rules-v2";
+export const comprehensiveQuestionnaireVersion = "ai-capability-v3";
+export const comprehensiveInterpretationVersion = "ai-capability-rules-v3";
 
 export const comprehensiveSections = [
   { id: "experience", label: "Your experience with AI", introduction: "People build useful AI skills through personal use as well as work. Do not share private prompts, topics or account information." },
@@ -34,7 +36,7 @@ export const comprehensiveSections = [
   { id: "opportunities", label: "Barriers and opportunities", introduction: "Identify the conditions and opportunities that would make development useful." },
 ] as const;
 
-export const comprehensiveAssessmentQuestions: readonly AssessmentQuestion[] = [
+export const comprehensiveAssessmentQuestionsV2: readonly AssessmentQuestion[] = [
   scale("ex1", "experience", "How often do you use AI tools for personal tasks or interests?", frequency, "generalUsage"),
   scale("ex2", "experience", "How often do you use AI tools as part of your work?", frequency, "generalUsage"),
   scale("ex3", "experience", "Which statement best reflects where you currently use AI?", context, "generalUsage"),
@@ -87,6 +89,33 @@ export const comprehensiveAssessmentQuestions: readonly AssessmentQuestion[] = [
   { id: "opportunity", section: "opportunities", prompt: "Which repetitive work task would you most like AI to improve?", helpText: "A short example is helpful. Do not include personal or confidential information.", purpose: "workplace opportunity", interpretation: "Narrative evidence only.", type: "long_text", required: false },
 ] as const;
 
+export const comprehensiveAssessmentQuestions: readonly AssessmentQuestion[] = comprehensiveAssessmentQuestionsV2.map((question) => {
+  if (question.id === "ex3") {
+    return {
+      ...question,
+      purpose: "usage context",
+      interpretation: "Categorical context evidence only; this answer is never converted into a numeric score.",
+      options: [
+        { value: "never", label: "I do not currently use AI" },
+        { value: "personal", label: "Personal use only" },
+        { value: "workplace", label: "Workplace use only" },
+        { value: "both", label: "Both personal and workplace use" },
+      ],
+    };
+  }
+  if (question.id === "barrier") {
+    return {
+      ...question,
+      options: [
+        ...(question.options ?? []),
+        { value: "no_current_barrier", label: "No current barrier" },
+        { value: "not_applicable", label: "Not applicable to my current role or work" },
+      ],
+    };
+  }
+  return { ...question, options: question.options?.map((option) => ({ ...option })) };
+});
+
 export const assessmentFrameworks: readonly AssessmentFrameworkDefinition[] = [
   {
     frameworkKey: workforceAssessmentFrameworkKey,
@@ -110,13 +139,34 @@ export const assessmentFrameworks: readonly AssessmentFrameworkDefinition[] = [
   },
   {
     frameworkKey: workforceAssessmentFrameworkKey,
+    questionnaireVersion: comprehensiveQuestionnaireVersionV2,
+    interpretationVersion: comprehensiveInterpretationVersionV2,
+    title: "Comprehensive AI Capability Assessment",
+    shortTitle: "Comprehensive Assessment",
+    purpose: "Build a fuller evidence base for safe AI adoption, capability development and workforce planning.",
+    audience: "Employees in an explicitly scoped employer campaign or a private personal assessment.",
+    limitations: ["Internal development bands are not certification", "Four scenarios provide limited practical evidence", "Self-report requires contextual review", "Non-response and not-applicable answers are never low scores"],
+    estimatedMinutes: 15,
+    dimensions: [
+      { id: "aiUnderstanding", label: "AI understanding", description: "Capabilities, limitations, uncertainty and oversight." },
+      { id: "generalUsage", label: "Personal and workplace usage", description: "Relevant experience and transfer into work." },
+      { id: "responsibleUse", label: "Responsible use", description: "Approved tools, information handling, fairness and accountability." },
+      { id: "practicalApplication", label: "Practical application", description: "Task definition, iteration and human review." },
+      { id: "verificationJudgement", label: "Verification and judgement", description: "Checking facts, omissions, sources and suitability." },
+      { id: "contribution", label: "Wider contribution", description: "Enablement, technical activity, governance and leadership." },
+    ],
+    sections: [...comprehensiveSections],
+    questions: comprehensiveAssessmentQuestionsV2,
+  },
+  {
+    frameworkKey: workforceAssessmentFrameworkKey,
     questionnaireVersion: comprehensiveQuestionnaireVersion,
     interpretationVersion: comprehensiveInterpretationVersion,
     title: "Comprehensive AI Capability Assessment",
     shortTitle: "Comprehensive Assessment",
     purpose: "Build a fuller evidence base for safe AI adoption, capability development and workforce planning.",
     audience: "Employees in an explicitly scoped employer campaign or a private personal assessment.",
-    limitations: ["Internal development bands are not certification", "Four scenarios provide limited practical evidence", "Self-report requires contextual review", "Non-response and not-applicable answers are never low scores"],
+    limitations: ["Internal development bands are not certification", "Four scenarios provide indicative judgement only", "Self-report requires contextual review", "Non-response and not-applicable answers are never low scores"],
     estimatedMinutes: 15,
     dimensions: [
       { id: "aiUnderstanding", label: "AI understanding", description: "Capabilities, limitations, uncertainty and oversight." },

@@ -201,7 +201,7 @@ export function EmployeeProgrammeModule({ onNavigate }: { onNavigate: (target: E
   );
 }
 
-export function EmployeeApplicationModule() {
+export function EmployeeApplicationModule({ onNavigate }: { onNavigate: (target: string) => void }) {
   const { data, saveApplication, meta } = useMvpWorkspace();
   const context = useEmployeeContext(data);
   const existing = context.application;
@@ -213,6 +213,7 @@ export function EmployeeApplicationModule() {
   const [formOpen, setFormOpen] = useState(() => state === "draft" || state === "more-info");
   const [error, setError] = useState("");
   const [savedMessage, setSavedMessage] = useState("");
+  const [saving, setSaving] = useState(false);
 
   if (!context.employee) return <EmployeeSetupNotice />;
 
@@ -233,7 +234,7 @@ export function EmployeeApplicationModule() {
   const showForm = editable && (formOpen || state === "draft" || state === "more-info");
   const manager = managerName(data, context.employee);
 
-  function save(status: MvpApplication["status"], note: string) {
+  async function save(status: MvpApplication["status"], note: string) {
     if (!context.employee || !context.mapping) return;
     if (!editable) {
       setError("Your submitted answers are locked. You can edit them only if your manager requests more information.");
@@ -267,19 +268,26 @@ export function EmployeeApplicationModule() {
         buildApplicationHistoryEntry(status, note, now),
       ],
     };
-    saveApplication(next);
+    setSaving(true);
     setError("");
+    setSavedMessage("");
+    const result = await saveApplication(next);
+    setSaving(false);
+    if (!result.ok) {
+      setError(result.message);
+      return;
+    }
     setSavedMessage(status === "Draft" ? "Draft saved." : configurableWorkflow ? "Application submitted to your organisation's approval workflow." : "Application submitted to your line manager.");
     if (status !== "Draft") setFormOpen(false);
   }
 
   function onSaveDraft(event: FormEvent) {
     event.preventDefault();
-    save("Draft", "Employee saved an application draft.");
+    void save("Draft", "Employee saved an application draft.");
   }
 
   function submitCurrent() {
-    save("Submitted to Line Manager", existing?.status === "More information requested" ? "Employee responded to the information request and resubmitted." : configurableWorkflow ? "Employee submitted the application." : "Employee submitted the application to line manager.");
+    void save("Submitted to Line Manager", existing?.status === "More information requested" ? "Employee responded to the information request and resubmitted." : configurableWorkflow ? "Employee submitted the application." : "Employee submitted the application to line manager.");
   }
 
   return (
@@ -323,7 +331,7 @@ export function EmployeeApplicationModule() {
               primaryLabel={primaryAction}
               onPrimary={() => setFormOpen(true)}
               secondaryLabel="View programme"
-              onSecondary={() => undefined}
+              onSecondary={() => onNavigate("My Programme")}
             />
           ) : null}
 
@@ -358,9 +366,9 @@ export function EmployeeApplicationModule() {
               <div className="mt-4 flex flex-col gap-3 rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4 sm:flex-row sm:items-center sm:justify-between">
                 <p className={`text-xs font-semibold ${error ? "text-[#b53c52]" : "text-[#102c3d]/52"}`}>{error || savedMessage || "Save a draft or submit when the first three answers are complete."}</p>
                 <div className="flex flex-wrap justify-end gap-2">
-                  <button type="submit" className="h-10 rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.1]">Save draft</button>
-                  <button type="button" onClick={submitCurrent} className="h-10 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white">
-                    {state === "more-info" ? "Respond and resubmit" : configurableWorkflow ? "Submit application" : "Submit to line manager"}
+                  <button type="submit" disabled={saving} className="h-10 rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.1] disabled:opacity-50">{saving ? "Saving…" : "Save draft"}</button>
+                  <button type="button" disabled={saving} onClick={submitCurrent} className="h-10 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white disabled:opacity-50">
+                    {saving ? "Submitting…" : state === "more-info" ? "Respond and resubmit" : configurableWorkflow ? "Submit application" : "Submit to line manager"}
                   </button>
                 </div>
               </div>
