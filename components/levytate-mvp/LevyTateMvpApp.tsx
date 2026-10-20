@@ -36,6 +36,7 @@ import { ApplicationWorkflowSettings } from "@/components/levytate-mvp/Applicati
 import { EarlyAccessModule } from "@/components/levytate-mvp/EarlyAccessModule";
 import { EmployeeApplicationModule, EmployeeHomeModule, EmployeeProgrammeModule } from "@/components/levytate-mvp/EmployeeExperienceModule";
 import { EmployeesModule } from "@/components/levytate-mvp/EmployeesModule";
+import { EmployerInsightsModule } from "@/components/levytate-mvp/EmployerInsightsModule";
 import { MyProgrammesModule, MyProvidersModule } from "@/components/levytate-mvp/EmployerPortfolioModules";
 import { GuidanceCentreModule } from "@/components/levytate-mvp/GuidanceCentreModule";
 import { LearnersModule } from "@/components/levytate-mvp/LearnersModule";
@@ -97,6 +98,8 @@ const modules = [
   { name: "My Programmes", icon: GraduationCap },
   { name: "Requests", icon: Handshake },
   { name: "Marketplace", icon: Store },
+  { name: "Insights", icon: ChartNoAxesCombined },
+  { name: "Workforce Development", icon: Users },
   { name: "Finance", icon: Landmark },
   { name: "Programmes", icon: BookOpenCheck },
   { name: "Copilot", icon: Sparkles },
@@ -129,6 +132,8 @@ const modulePermissions = {
   "My Programmes": "providerRelationships:read",
   Requests: "serviceRequests:read",
   Marketplace: "providers:read",
+  Insights: "reports:read",
+  "Workforce Development": "reports:read",
   Finance: "finance:read",
   Programmes: "providers:read",
   Copilot: "copilot:use",
@@ -173,6 +178,8 @@ const moduleCopy: Record<ModuleName, string> = {
   "My Programmes": "Manage the programmes your organisation has published for employees.",
   Requests: "Create one approved brief, compare provider proposals and hand over only the option your organisation confirms.",
   Marketplace: "Explore the global factual provider and programme catalogue.",
+  Insights: "A concise employer operating brief showing current position, priorities and authoritative evidence coverage.",
+  "Workforce Development": "Privacy-safe campaign evidence showing capability patterns, workplace barriers and proportionate next actions.",
   Finance: "Understand levy funding, apprenticeship spend, balances and expired funds from DAS transaction data.",
   Programmes: "Review the factual programme catalogue available to your organisation.",
   Copilot: "Use LevyTate Copilot to explain, find, guide and create work inside the platform.",
@@ -516,7 +523,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
       return;
     }
     if (target === "Reports") {
-      openModule("Reports");
+      openModule("Insights");
       return;
     }
     openModule("Home");
@@ -641,6 +648,8 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
             {activeModule === "My Programmes" ? <MyProgrammesModule onOpenMarketplace={() => openModule("Marketplace")} onRequest={meta?.requestsEnabled ? (programmeId, providerId) => openRequest({ programmeId, providerId }) : undefined} /> : null}
             {activeModule === "Requests" ? <EmployerRequestsContainer onOpenMarketplace={() => openModule("Marketplace")} onOpenMyProviders={() => openModule("My Providers")} onOpenMyProgrammes={() => openModule("My Programmes")} /> : null}
             {activeModule === "Marketplace" ? <ProvidersModule onRequest={openRequest} /> : null}
+            {activeModule === "Insights" ? <EmployerInsightsModule view="overview" /> : null}
+            {activeModule === "Workforce Development" ? <EmployerInsightsModule view="workforce" /> : null}
             {activeModule === "Finance" ? <LevyFinanceModule organisationId={meta?.organisationId ?? "local-demo"} demoMode={meta?.storageMode !== "supabase"} /> : null}
             {activeModule === "Programmes" ? <ProvidersModule /> : null}
             {activeModule === "Reports" ? <ReportsModule /> : null}

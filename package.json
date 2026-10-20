@@ -21,6 +21,8 @@
     "validate:assessments": "tsx scripts/validate-workforce-assessments.ts",
     "validate:launch-release-1": "tsx scripts/validate-launch-release-1.ts",
     "validate:launch-release-2": "node --import tsx scripts/validate-launch-release-2.ts",
+    "validate:launch-release-3": "node --import tsx scripts/validate-launch-release-3.ts",
+    "validate:launch-release-3:live": "node --env-file=.env.local --import tsx scripts/validate-launch-release-3-live.ts",
     "validate:assessments:live": "node --env-file=.env.local --import tsx scripts/validate-workforce-assessments-live.ts",
     "lint": "node --max-old-space-size=4096 node_modules/eslint/bin/eslint.js app/layout.tsx app/page.tsx app/stocks app/api/stocks components/stocks components/layout/SiteChrome.tsx components/ui/SectionEyebrow.tsx components/brand/Logo.tsx components/sections/TrustBandLocal.tsx lib/stocks next.config.ts tailwind.config.ts"
   },

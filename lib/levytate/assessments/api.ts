@@ -95,6 +95,7 @@ export type AssessmentWorkspace = {
     profiles: Array<{ label: string; count: number }>;
     dimensions: Array<{ id: string; label: string; value: number }>;
     barriers: Array<{ label: string; count: number }>;
+    useCases: Array<{ label: string; count: number }>;
     cohorts: Array<{ label: string; count: number }>;
     groups: Array<{ department: string; invited: number; submitted: number; participationPercent: number; suppressed: boolean; recurringNeeds: Array<{ label: string; count: number }>; blockers: Array<{ label: string; count: number }> }>;
   }>;

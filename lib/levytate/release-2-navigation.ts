@@ -15,7 +15,7 @@ const employerAreas: readonly Release2NavigationArea[] = [
   { key: "applications", label: "Applications", description: "Reviews, approvals and history", modules: ["Applications"], priority: "primary" },
   { key: "assessments", label: "Assessments", description: "Campaigns, submissions and findings", modules: ["Assessments"], priority: "primary" },
   { key: "programmes", label: "Programmes", description: "Programmes, providers and requests", modules: ["My Programmes", "My Providers", "Marketplace", "Intelligence", "Requests"], priority: "primary" },
-  { key: "insights", label: "Insights", description: "Trusted reporting and finance evidence", modules: ["Finance", "Reports"], priority: "primary" },
+  { key: "insights", label: "Insights", description: "Trusted operating, workforce and finance evidence", modules: ["Insights", "Workforce Development", "Finance"], priority: "primary" },
   { key: "copilot", label: "Copilot", description: "Grounded help in your current context", modules: ["Copilot"], priority: "secondary" },
   { key: "guidance", label: "Guidance", description: "Practical apprenticeship guidance", modules: ["Knowledge"], priority: "secondary" },
   { key: "settings", label: "Settings", description: "Workspace configuration", modules: ["Settings"], priority: "secondary" },

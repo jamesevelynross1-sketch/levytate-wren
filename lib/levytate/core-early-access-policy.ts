@@ -18,6 +18,8 @@ export type CoreEarlyAccessModuleKey =
   | "My Programmes"
   | "Requests"
   | "Marketplace"
+  | "Insights"
+  | "Workforce Development"
   | "Finance"
   | "Programmes"
   | "Copilot"
@@ -90,6 +92,8 @@ export const coreEarlyAccessPolicy: Readonly<Record<MvpUserRole, CoreEarlyAccess
       item("Copilot", "Copilot", "secondary", "support", "supporting"),
       item("Knowledge", "Guidance Centre", "secondary", "support", "supporting"),
       item("Providers", "Programmes & Providers", "hidden", undefined, "non-core"),
+      item("Insights", "Insights", "hidden", undefined, "role-denied"),
+      item("Workforce Development", "Workforce Development", "hidden", undefined, "role-denied"),
       item("Finance", "Finance", "hidden", undefined, "role-denied"),
       item("Programmes", "Programmes", "hidden", undefined, "non-core"),
       item("Reports", "Reports", "deferred", undefined, "not-ready"),
@@ -108,6 +112,8 @@ export const coreEarlyAccessPolicy: Readonly<Record<MvpUserRole, CoreEarlyAccess
       item("Copilot", "Copilot", "secondary", "support", "supporting"),
       item("Knowledge", "Guidance Centre", "secondary", "support", "supporting"),
       item("Providers", "Programmes & Providers", "hidden", undefined, "non-core"),
+      item("Insights", "Insights", "hidden", undefined, "role-denied"),
+      item("Workforce Development", "Workforce Development", "hidden", undefined, "role-denied"),
       item("Finance", "Finance", "hidden", undefined, "role-denied"),
       item("Programmes", "Programmes", "hidden", undefined, "non-core"),
       item("Reports", "Team Reporting", "deferred", undefined, "not-ready"),
@@ -128,6 +134,8 @@ export const coreEarlyAccessPolicy: Readonly<Record<MvpUserRole, CoreEarlyAccess
       item("My Providers", "My Providers", "enabled", "manage", "core"),
       item("My Programmes", "My Programmes", "enabled", "manage", "core"),
       item("Requests", "Requests", "hidden", undefined, "non-core"),
+      item("Insights", "Overview", "enabled", "manage", "core"),
+      item("Workforce Development", "Workforce Development", "enabled", "manage", "core"),
       item("Finance", "Finance", "enabled", "manage", "core"),
       item("Marketplace", "Marketplace", "enabled", "discover", "core"),
       item("Intelligence", "Intelligence", "enabled", "discover", "core"),
@@ -136,14 +144,16 @@ export const coreEarlyAccessPolicy: Readonly<Record<MvpUserRole, CoreEarlyAccess
       item("Settings", "Settings", "secondary", "support", "supporting"),
       item("Reports", "Reports", "deferred", undefined, "not-ready"),
     ],
-    permittedCapabilities: ["employer-organisation-operations"],
-    deniedCapabilities: ["employee-own-journey", "manager-direct-report-operations", "employer-operational-reporting", "platform-workspace-administration", "platform-provider-catalogue", "platform-access-support", "platform-guidance-administration", "platform-audit-context", ...commonDeferred],
+    permittedCapabilities: ["employer-organisation-operations", "employer-operational-reporting"],
+    deniedCapabilities: ["employee-own-journey", "manager-direct-report-operations", "platform-workspace-administration", "platform-provider-catalogue", "platform-access-support", "platform-guidance-administration", "platform-audit-context", ...commonDeferred],
   },
   "Platform Admin": {
     role: "Platform Admin",
     modules: [
       item("Home", "Employer Workspaces", "enabled", "manage", "core"),
       item("Intelligence", "Intelligence", "hidden", undefined, "role-denied"),
+      item("Insights", "Insights", "hidden", undefined, "role-denied"),
+      item("Workforce Development", "Workforce Development", "hidden", undefined, "role-denied"),
       item("Providers", "Provider Catalogue", "enabled", "manage", "core"),
       item("Finance", "Finance", "hidden", undefined, "role-denied"),
       item("Programmes", "Programmes", "hidden", undefined, "role-denied"),
@@ -173,6 +183,8 @@ export const coreEarlyAccessPolicy: Readonly<Record<MvpUserRole, CoreEarlyAccess
       item("My Providers", "My Providers", "enabled", "manage", "core"),
       item("My Programmes", "My Programmes", "enabled", "manage", "core"),
       item("Requests", "Requests", "hidden", undefined, "non-core"),
+      item("Insights", "Overview", "enabled", "manage", "core"),
+      item("Workforce Development", "Workforce Development", "enabled", "manage", "core"),
       item("Finance", "Finance", "enabled", "manage", "core"),
       item("Marketplace", "Marketplace", "enabled", "discover", "core"),
       item("Intelligence", "Intelligence", "enabled", "discover", "core"),
@@ -181,8 +193,8 @@ export const coreEarlyAccessPolicy: Readonly<Record<MvpUserRole, CoreEarlyAccess
       item("Settings", "Settings", "secondary", "support", "supporting"),
       item("Reports", "Reports", "deferred", undefined, "not-ready"),
     ],
-    permittedCapabilities: ["employer-organisation-operations"],
-    deniedCapabilities: ["employee-own-journey", "manager-direct-report-operations", "employer-operational-reporting", "platform-workspace-administration", "platform-provider-catalogue", "platform-access-support", "platform-guidance-administration", "platform-audit-context", ...commonDeferred],
+    permittedCapabilities: ["employer-organisation-operations", "employer-operational-reporting"],
+    deniedCapabilities: ["employee-own-journey", "manager-direct-report-operations", "platform-workspace-administration", "platform-provider-catalogue", "platform-access-support", "platform-guidance-administration", "platform-audit-context", ...commonDeferred],
   },
 };
 

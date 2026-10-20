@@ -506,6 +506,7 @@ export async function getAssessmentCampaignExportForSession(session: LevyTateBet
     rows.push([], ["Dimension", "Organisation value"], ...report.dimensions.map((item) => [item.label, item.value]));
     rows.push([], ["Development profile", "Count"], ...report.profiles.map((item) => [item.label, item.count]));
     rows.push([], ["Barrier", "Count"], ...report.barriers.map((item) => [item.label, item.count]));
+    rows.push([], ["Workplace use pattern", "Count"], ...report.useCases.map((item) => [item.label, item.count]));
     rows.push([], ["Development cohort", "Count"], ...report.cohorts.map((item) => [item.label, item.count]));
   }
   rows.push([], ["Methodology", report.definition], ["Privacy", `No named employee records are included. Findings below ${report.suppressionThreshold} submissions are suppressed.`]);
@@ -660,6 +661,7 @@ function aggregateCapabilityIntelligence(results: WorkforceAssessmentResult[], p
     profiles: counts(intelligence.map((item) => item.developmentProfile)),
     dimensions,
     barriers: counts(intelligence.flatMap((item) => item.barrier ? [item.barrier] : [])),
+    useCases: counts(intelligence.flatMap((item) => item.workplaceUsePattern ? [item.workplaceUsePattern] : [])),
     cohorts: counts(intelligence.flatMap((item) => item.developmentCohorts)),
     // Department intelligence is added to the existing audience groups below by the UI from the
     // same suppressed campaign result; no complement or overlapping aggregate is emitted here.
