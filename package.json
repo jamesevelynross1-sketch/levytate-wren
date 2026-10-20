@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "node scripts/build-levytate-home.mjs && node --check public/mission-v2/site.js && next build",
     "start": "next start",
     "prospect:sandbox": "node scripts/prospect-sandbox.mjs",
     "validate:prospect-sandbox": "node scripts/validate-prospect-sandbox.mjs",
