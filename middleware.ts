@@ -32,7 +32,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if (pathname === "/") {
-    return NextResponse.rewrite(new URL("/levytate", request.url));
+    return NextResponse.rewrite(new URL("/levytate-interactive-2026.html", request.url));
   }
 
   if (pathname === "/early-access") {
