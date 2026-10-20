@@ -7,6 +7,8 @@ import {
   BookOpenCheck,
   Building2,
   ChartNoAxesCombined,
+  ChevronRight,
+  CircleHelp,
   ClipboardCheck,
   ClipboardList,
   GraduationCap,
@@ -15,6 +17,7 @@ import {
   LayoutDashboard,
   Landmark,
   LogOut,
+  Menu,
   Network,
   Newspaper,
   Settings,
@@ -22,6 +25,7 @@ import {
   Store,
   UserRound,
   Users,
+  X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { LevyTateLogo } from "@/components/levytate-demo/PlatformShell";
@@ -41,6 +45,7 @@ import { OperationsCentreModule } from "@/components/levytate-mvp/OperationsCent
 import { PlatformAdminSupportContextModule, PlatformAdminWorkspacesModule } from "@/components/levytate-mvp/PlatformAdminModules";
 import { LevyTateStandardsProvider } from "@/components/levytate-mvp/LevyTateStandardsProvider";
 import { MvpWorkspaceProvider, useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
+import { MvpLoadingState } from "@/components/levytate-mvp/MvpUi";
 import { ProviderMatchingModule } from "@/components/levytate-mvp/ProviderMatchingModule";
 import { ProspectGettingStarted } from "@/components/levytate-mvp/ProspectGettingStarted";
 import { PersistentCopilot } from "@/components/levytate-mvp/PersistentCopilot";
@@ -51,7 +56,8 @@ import { ReportsModule } from "@/components/levytate-mvp/ReportsModule";
 import { RolesModule } from "@/components/levytate-mvp/RolesModule";
 import { LevyTateDesktopAppPanel } from "@/components/levytate-pwa/LevyTatePwa";
 import type { LevyTateWorkspaceBootstrap } from "@/lib/levytate/mvp/api";
-import { getCoreEarlyAccessPolicy, resolveCoreEarlyAccessRouteAccess, type CoreEarlyAccessNavigationGroup } from "@/lib/levytate/core-early-access-policy";
+import { getCoreEarlyAccessPolicy, resolveCoreEarlyAccessRouteAccess } from "@/lib/levytate/core-early-access-policy";
+import { findRelease2NavigationArea, getRelease2Navigation, type Release2NavigationArea } from "@/lib/levytate/release-2-navigation";
 import type { ManagerDirectReportLearnerDetail } from "@/lib/levytate/mvp/manager-learner-detail";
 import type { OperationalActionType } from "@/lib/levytate/mvp/operations-centre";
 import { hasMvpPermission, permissionsForMvpRole, type MvpPermission } from "@/lib/levytate/mvp/rbac";
@@ -60,17 +66,17 @@ import type { LevyTateCopilotContext, LevyTateCopilotEntityType } from "@/lib/le
 
 const EmployerRequestsContainer = dynamic(
   () => import("@/components/levytate-mvp/EmployerRequestsContainer").then((module) => module.EmployerRequestsContainer),
-  { loading: () => <div role="status" className="rounded-2xl border border-[#27456a]/[0.09] bg-white p-6 text-sm text-[#52677d]">Loading Requests…</div> },
+  { loading: () => <MvpLoadingState label="Loading Requests…" /> },
 );
 
 const LearningTimeModule = dynamic(
   () => import("@/components/levytate-mvp/LearningTimeModule").then((module) => module.LearningTimeModule),
-  { loading: () => <div role="status" className="rounded-2xl border border-[#27456a]/[0.09] bg-white p-6 text-sm text-[#52677d]">Loading Learning Time…</div> },
+  { loading: () => <MvpLoadingState label="Loading Learning Time…" /> },
 );
 
 const AssessmentsModule = dynamic(
   () => import("@/components/levytate-mvp/AssessmentsModule").then((module) => module.AssessmentsModule),
-  { loading: () => <div role="status" className="rounded-2xl border border-[#27456a]/[0.09] bg-white p-6 text-sm text-[#52677d]">Loading Assessments…</div> },
+  { loading: () => <MvpLoadingState label="Loading Assessments…" /> },
 );
 
 const modules = [
@@ -196,7 +202,13 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
   const [managerReviewApplicationId, setManagerReviewApplicationId] = useState<string | null>(null);
   const [peopleEmployeeId, setPeopleEmployeeId] = useState<string | null>(null);
   const [copilotEntity, setCopilotEntity] = useState<{ type: LevyTateCopilotEntityType; id: string; label: string } | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const deepLinkHandled = useRef(false);
+  const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
+  const mobileDrawerRef = useRef<HTMLElement>(null);
+  const accountButtonRef = useRef<HTMLButtonElement>(null);
+  const accountMenuRef = useRef<HTMLDivElement>(null);
 
   const notifications = useMemo(() => buildNotifications(data), [data]);
   const permissions = meta?.permissions ?? permissionsForMvpRole(meta?.userRole);
@@ -207,19 +219,19 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
     .map((status) => modules.find((module) => module.name === status.moduleKey))
     .filter((module): module is (typeof modules)[number] => Boolean(module))
     .filter((module) => can(modulePermissions[module.name]));
-  const navigationGroups = (["operate", "manage", "discover", "support"] as const)
-    .map((group) => ({
-      group,
-      modules: availableModules.filter((module) => earlyAccessPolicy.modules.find((entry) => entry.moduleKey === module.name)?.group === group),
-    }))
-    .filter((entry) => entry.modules.length);
+  const release2Navigation = getRelease2Navigation(meta?.userRole ?? "Employee", availableModules.map((module) => module.name));
+  const primaryNavigation = release2Navigation.filter((area) => area.priority === "primary");
+  const secondaryNavigation = release2Navigation.filter((area) => area.priority === "secondary");
+  const activeArea = findRelease2NavigationArea(release2Navigation, activeModule);
   const peopleItems = (["Employees", "Roles"] as PeopleView[]).filter((item) => can(peopleViewPermissions[item]));
   const providerItems = (["Programmes", "Relationships"] as ProviderView[]).filter((item) => can(providerViewPermissions[item]));
   const settingsItems = (["Workspace", "Workflows", "Desktop App", "Early Access"] as SettingsView[]).filter((item) => can(settingsViewPermissions[item]) && (item !== "Workflows" || meta?.applicationWorkflowsEnabled === true));
-  const moduleBadges = useMemo(() => ({
-    People: notifications.filter((item) => item.module === "Applications" || item.module === "Enrolments").length,
-    Providers: notifications.filter((item) => item.module === "Provider Relationships").length,
-    Reports: notifications.length,
+  const moduleBadges = useMemo<Partial<Record<ModuleName, number>>>(() => ({
+    Home: notifications.length,
+    Applications: notifications.filter((item) => item.module === "Applications" || item.module === "Enrolments").length,
+    Approvals: notifications.filter((item) => item.module === "Applications").length,
+    People: notifications.filter((item) => item.module === "Enrolments").length,
+    "My Providers": notifications.filter((item) => item.module === "Provider Relationships").length,
   }), [notifications]);
 
   useEffect(() => {
@@ -228,23 +240,89 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
   }, [activeModule, availableModules]);
 
   useEffect(() => {
-    if (!hydrated || deepLinkHandled.current) return;
-    const searchParams = new URLSearchParams(window.location.search);
-    const requested = searchParams.get("module") as ModuleName | null;
-    if (requested) {
-      const access = resolveCoreEarlyAccessRouteAccess(meta?.userRole ?? "Employee", requested, earlyAccessPolicy);
-      const resolved = access.module as ModuleName;
-      setActiveModule(resolved);
-      setManagerReviewApplicationId(
-        access.permitted && (resolved === "Approvals" || resolved === "Applications")
-          ? searchParams.get("application")
-          : null,
-      );
-      setPeopleEmployeeId(access.permitted && resolved === "People" ? searchParams.get("employee") : null);
-      if (!access.permitted) window.history.replaceState(null, "", access.safeRedirect);
+    if (!hydrated) return;
+    function syncFromLocation() {
+      const searchParams = new URLSearchParams(window.location.search);
+      const requested = searchParams.get("module") as ModuleName | null;
+      if (requested) {
+        const access = resolveCoreEarlyAccessRouteAccess(meta?.userRole ?? "Employee", requested, earlyAccessPolicy);
+        const resolved = access.module as ModuleName;
+        setActiveModule(resolved);
+        setManagerReviewApplicationId(
+          access.permitted && (resolved === "Approvals" || resolved === "Applications")
+            ? searchParams.get("application")
+            : null,
+        );
+        setPeopleEmployeeId(access.permitted && resolved === "People" ? searchParams.get("employee") : null);
+        if (!access.permitted) window.history.replaceState(null, "", access.safeRedirect);
+      } else {
+        setActiveModule("Home");
+        setManagerReviewApplicationId(null);
+        setPeopleEmployeeId(null);
+      }
     }
-    deepLinkHandled.current = true;
+    if (!deepLinkHandled.current) {
+      syncFromLocation();
+      deepLinkHandled.current = true;
+    }
+    window.addEventListener("popstate", syncFromLocation);
+    return () => window.removeEventListener("popstate", syncFromLocation);
   }, [availableModules, earlyAccessPolicy, hydrated, meta?.userRole]);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const drawer = mobileDrawerRef.current;
+    const trigger = mobileMenuButtonRef.current;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const focusable = () => drawer ? Array.from(drawer.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), [tabindex]:not([tabindex="-1"])')) : [];
+    focusable()[0]?.focus();
+    function onKeyDown(event: globalThis.KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setMobileMenuOpen(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const elements = focusable();
+      if (!elements.length) return;
+      const first = elements[0];
+      const last = elements[elements.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      trigger?.focus();
+    };
+  }, [mobileMenuOpen]);
+
+  useEffect(() => {
+    if (!accountMenuOpen) return;
+    function closeOnOutside(event: MouseEvent) {
+      const target = event.target as Node;
+      if (accountMenuRef.current?.contains(target) || accountButtonRef.current?.contains(target)) return;
+      setAccountMenuOpen(false);
+    }
+    function closeOnEscape(event: globalThis.KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      setAccountMenuOpen(false);
+      accountButtonRef.current?.focus();
+    }
+    document.addEventListener("mousedown", closeOnOutside);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [accountMenuOpen]);
 
   useEffect(() => {
     if (peopleItems.includes(peopleView)) return;
@@ -261,14 +339,25 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
     setSettingsView(settingsItems[0] ?? "Workspace");
   }, [settingsItems, settingsView]);
 
-  function openModule(module: ModuleName) {
+  function openModule(module: ModuleName, options: { replace?: boolean } = {}) {
     if (!availableModules.some((item) => item.name === module)) return;
     setManagerDirectReportDetail(null);
     setManagerReviewApplicationId(null);
     setPeopleEmployeeId(null);
     setCopilotEntity(null);
-    window.history.replaceState(null, "", `/levytate/app?module=${encodeURIComponent(module)}`);
+    window.history[options.replace ? "replaceState" : "pushState"](null, "", module === "Home" ? "/levytate/app" : `/levytate/app?module=${encodeURIComponent(module)}`);
     setActiveModule(module);
+    setMobileMenuOpen(false);
+    setAccountMenuOpen(false);
+  }
+
+  function openArea(area: Release2NavigationArea) {
+    if (area.modules.includes(activeModule)) {
+      setMobileMenuOpen(false);
+      return;
+    }
+    const destination = area.modules[0] as ModuleName;
+    openModule(destination);
   }
 
   function openRequest(context: { programmeId?: string; providerId?: string }) {
@@ -280,7 +369,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
     const params = new URLSearchParams({ module: "Requests" });
     if (context.programmeId) params.set("programme", context.programmeId);
     if (context.providerId) params.set("provider", context.providerId);
-    window.history.replaceState(null, "", `/levytate/app?${params.toString()}`);
+    window.history.pushState(null, "", `/levytate/app?${params.toString()}`);
   }
 
   function moduleLabel(module: ModuleName) {
@@ -292,7 +381,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
     setManagerDirectReportDetail(null);
     setManagerReviewApplicationId(applicationId);
     setActiveModule("Approvals");
-    window.history.replaceState(null, "", `/levytate/app?module=Approvals&application=${encodeURIComponent(applicationId)}`);
+    window.history.pushState(null, "", `/levytate/app?module=Approvals&application=${encodeURIComponent(applicationId)}`);
   }
 
   const updateApplicationReviewSelection = useCallback((applicationId: string | null) => {
@@ -330,7 +419,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
       if (!availableModules.some((item) => item.name === destinationModule)) return;
       setManagerReviewApplicationId(applicationId);
       setActiveModule(destinationModule);
-      window.history.replaceState(null, "", `/levytate/app?module=${destinationModule}&application=${encodeURIComponent(applicationId)}`);
+      window.history.pushState(null, "", `/levytate/app?module=${destinationModule}&application=${encodeURIComponent(applicationId)}`);
       return;
     }
     if (target.startsWith("Employees:")) {
@@ -339,7 +428,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
       setPeopleView("Employees");
       setPeopleEmployeeId(employeeId);
       setActiveModule("People");
-      window.history.replaceState(null, "", `/levytate/app?module=People&employee=${encodeURIComponent(employeeId)}`);
+      window.history.pushState(null, "", `/levytate/app?module=People&employee=${encodeURIComponent(employeeId)}`);
       return;
     }
     if (target === "Programmes & Providers" || target.startsWith("Programmes & Providers:")) {
@@ -448,102 +537,66 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
   }, [activeModule, copilotEntity, earlyAccessPolicy.modules]);
 
   return (
-    <main data-testid="levytate-app-shell" className="min-h-screen w-full min-w-0 bg-[#f4f7f5] text-[#102c3d]">
-      <header className="sticky top-0 z-40 border-b border-[#102c3d]/[0.08] bg-white/[0.94] backdrop-blur-xl">
-        <div className="mx-auto flex min-h-20 max-w-[1540px] flex-wrap items-center justify-between gap-x-4 gap-y-3 px-4 py-3 sm:px-6 lg:px-8 lg:py-0">
-          <div className="flex min-w-0 flex-1 items-center gap-3 lg:flex-none">
-            <LevyTateLogo className="[--levytate-logo-size:2.2rem] lg:[--levytate-logo-size:2.45rem]" />
-            <div className="hidden h-9 w-px bg-[#102c3d]/[0.08] lg:block" />
+    <main data-testid="levytate-app-shell" className="levytate-workspace min-h-screen w-full min-w-0 bg-[#f7f6f2] text-[#102c3d]">
+      <header className="sticky top-0 z-40 border-b border-[#102c3d]/[0.08] bg-white/[0.96] backdrop-blur-xl">
+        <div className="mx-auto flex h-[4.5rem] max-w-[1580px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-7">
+          <div className="flex min-w-0 items-center gap-3">
+            <button ref={mobileMenuButtonRef} type="button" onClick={() => setMobileMenuOpen(true)} aria-expanded={mobileMenuOpen} aria-controls="levytate-mobile-navigation" aria-label="Open navigation" className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-[#102c3d]/[0.09] bg-white text-[#102c3d] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 lg:hidden">
+              <Menu size={19} aria-hidden="true" />
+            </button>
+            <LevyTateLogo className="shrink-0 [--levytate-logo-size:2.05rem] sm:[--levytate-logo-size:2.25rem]" />
+            <div className="hidden h-8 w-px bg-[#102c3d]/[0.09] sm:block" />
             <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">Active workspace</p>
               <p className="truncate text-sm font-semibold text-[#102c3d]">{workspaceName}</p>
-              <p className="hidden truncate text-xs text-[#102c3d]/[0.46] sm:block">{workspaceLabel}</p>
+              <p className="hidden truncate text-[11px] text-[#102c3d]/55 sm:block">{workspaceLabel}</p>
             </div>
           </div>
 
-          <div className="flex w-full min-w-0 items-center gap-2 sm:gap-3 lg:w-auto">
-            <div className="min-w-0 flex-1 lg:hidden">
-              <select value={activeModule} onChange={(event) => openModule(event.target.value as ModuleName)} className="h-11 w-full rounded-xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 text-sm font-semibold text-[#102c3d] shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
-                {availableModules.map((module) => <option key={module.name} value={module.name}>{moduleLabel(module.name)}</option>)}
-              </select>
-            </div>
-            <span className="hidden rounded-full border border-[#159b8f]/[0.10] bg-[#edf7f3] px-3.5 py-2 text-xs font-semibold text-[#0b6f63] sm:inline-flex">
-              {hydrated ? `${notifications.length} alerts` : "Loading"}
-            </span>
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+            {availableModules.some((module) => module.name === "Copilot") ? <button type="button" onClick={() => openModule("Copilot")} className="hidden h-10 items-center gap-2 rounded-xl px-3 text-xs font-semibold text-[#102c3d]/65 transition hover:bg-[#f3f7f4] hover:text-[#102c3d] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 sm:inline-flex"><Sparkles size={15} aria-hidden="true" />Copilot</button> : null}
+            {notifications.length > 0 && availableModules.some((module) => module.name === "Home") ? <button type="button" onClick={() => openModule("Home")} aria-label={`${notifications.length} items need attention`} className="relative grid h-10 w-10 place-items-center rounded-xl text-[#102c3d]/60 transition hover:bg-[#f3f7f4] hover:text-[#102c3d] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20"><BellRing size={17} aria-hidden="true" /><span className="absolute right-1 top-1 min-w-4 rounded-full bg-[#c95568] px-1 text-center text-[9px] font-bold leading-4 text-white">{notifications.length}</span></button> : null}
             {meta?.prospectAccess?.status === "active" && meta.userRole === "Apprenticeship Lead" ? <ProspectGettingStarted access={meta.prospectAccess} onNavigate={navigateTo} /> : null}
-            <form action="/api/levytate-beta-logout" method="post">
-              <button type="submit" title="Logout" className="inline-flex h-11 shrink-0 items-center gap-2 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white shadow-[0_10px_22px_rgba(16,44,61,0.12)] transition hover:bg-[#17394d]">
-                <LogOut size={15} aria-hidden="true" />
-                <span className="hidden sm:inline">Logout</span>
+            <div className="relative">
+              <button ref={accountButtonRef} type="button" onClick={() => setAccountMenuOpen((open) => !open)} aria-expanded={accountMenuOpen} aria-haspopup="menu" aria-label="Open account menu" className="flex h-11 items-center gap-2 rounded-xl border border-[#102c3d]/[0.09] bg-white px-2.5 text-left shadow-[0_7px_20px_rgba(16,44,61,0.05)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 sm:px-3">
+                <span className="grid h-7 w-7 place-items-center rounded-lg bg-[#102c3d] text-white"><UserRound size={14} aria-hidden="true" /></span>
+                <span className="hidden max-w-36 sm:block"><span data-testid="current-role" className="block truncate text-xs font-semibold text-[#102c3d]">{meta?.userRole ?? "Workspace user"}</span><span className="block text-[10px] text-[#102c3d]/45">{storageStatus}</span></span>
               </button>
-            </form>
+              {accountMenuOpen ? <div ref={accountMenuRef} role="menu" className="absolute right-0 top-[calc(100%+0.55rem)] z-50 w-64 rounded-2xl border border-[#102c3d]/[0.09] bg-white p-3 shadow-[0_24px_70px_rgba(16,44,61,0.17)]">
+                <div className="rounded-xl bg-[#f4f8f5] px-3 py-3"><p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#0b6f63]">Signed in as</p><p className="mt-1 text-sm font-semibold">{meta?.userRole ?? "Workspace user"}</p><p className="mt-1 text-xs text-[#102c3d]/52">{workspaceName} · {storageStatus}</p></div>
+                {availableModules.some((module) => module.name === "Knowledge") ? <button role="menuitem" type="button" onClick={() => openModule("Knowledge")} className="mt-2 flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-xs font-semibold text-[#102c3d]/65 hover:bg-[#f4f8f5]"><CircleHelp size={15} aria-hidden="true" />Help and guidance</button> : null}
+                <form action="/api/levytate-beta-logout" method="post"><button role="menuitem" type="submit" className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-xs font-semibold text-[#b13b51] hover:bg-[#fff2f3]"><LogOut size={15} aria-hidden="true" />Sign out</button></form>
+              </div> : null}
+            </div>
           </div>
         </div>
       </header>
 
-      <div className="grid min-h-[calc(100vh-5rem)] w-full min-w-0 grid-cols-[minmax(0,1fr)] lg:grid-cols-[244px_minmax(0,1fr)]">
-        <aside data-testid="levytate-sidebar" className="hidden min-w-0 border-r border-[#102c3d]/[0.08] bg-white lg:sticky lg:top-20 lg:flex lg:h-[calc(100vh-5rem)] lg:flex-col">
-          <div className="flex min-h-0 flex-1 flex-col px-4 py-4">
-            <div className="px-2 pb-3">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/[0.36]">Navigation</p>
-              <p className="mt-1 text-sm font-semibold text-[#102c3d]">Decision areas</p>
-            </div>
+      {mobileMenuOpen ? <div className="fixed inset-0 z-50 lg:hidden"><button type="button" onClick={() => setMobileMenuOpen(false)} aria-label="Close navigation" className="absolute inset-0 bg-[#102c3d]/40 backdrop-blur-sm" /><aside ref={mobileDrawerRef} id="levytate-mobile-navigation" role="dialog" aria-modal="true" aria-labelledby="levytate-mobile-navigation-title" className="absolute inset-y-0 left-0 flex w-[min(88vw,22rem)] flex-col overflow-hidden bg-white shadow-[24px_0_80px_rgba(16,44,61,0.24)]">
+        <div className="flex h-[4.5rem] items-center justify-between border-b border-[#102c3d]/[0.08] px-4"><div><p id="levytate-mobile-navigation-title" className="text-sm font-semibold">{workspaceName}</p><p className="text-xs text-[#102c3d]/50">Navigation</p></div><button type="button" onClick={() => setMobileMenuOpen(false)} aria-label="Close navigation" className="grid h-11 w-11 place-items-center rounded-xl text-[#102c3d]/60 hover:bg-[#f4f8f5] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20"><X size={19} aria-hidden="true" /></button></div>
+        <nav aria-label="Mobile workspace navigation" className="min-h-0 flex-1 overflow-y-auto px-3 py-4"><p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/40">Your workspace</p><div className="grid gap-1">{primaryNavigation.map((area) => <MobileNavigationArea key={area.key} area={area} activeModule={activeModule} moduleLabel={moduleLabel} onOpenArea={openArea} onOpenModule={openModule} />)}</div>{secondaryNavigation.length ? <div className="mt-5 border-t border-[#102c3d]/[0.07] pt-4"><p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/40">Tools & support</p><div className="grid gap-1">{secondaryNavigation.map((area) => <MobileNavigationArea key={area.key} area={area} activeModule={activeModule} moduleLabel={moduleLabel} onOpenArea={openArea} onOpenModule={openModule} />)}</div></div> : null}</nav>
+        <div className="border-t border-[#102c3d]/[0.08] p-4"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-semibold">{meta?.userRole ?? "Workspace user"}</p><p className="mt-0.5 text-[11px] text-[#102c3d]/50">{storageStatus}</p></div><form action="/api/levytate-beta-logout" method="post"><button type="submit" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#b13b51]/15 px-3 text-xs font-semibold text-[#b13b51]"><LogOut size={14} aria-hidden="true" />Sign out</button></form></div></div>
+      </aside></div> : null}
 
-            <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-              <nav className="grid gap-4" aria-label="Core Early Access navigation">
-                {navigationGroups.map(({ group, modules: groupModules }) => <div key={group} className="grid gap-1">
-                  <p className="px-3 pb-1 pt-2 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/[0.34]">{navigationGroupLabel(group)}</p>
-                  {groupModules.map(({ name, icon: Icon }) => {
-                    const active = activeModule === name;
-                    const badge = moduleBadges[name as keyof typeof moduleBadges];
-                    return (
-                      <button key={name} onClick={() => openModule(name)} className={`group flex min-h-[44px] items-center justify-between gap-3 rounded-xl px-3 text-left text-sm font-semibold transition ${active ? "bg-[#eaf5f1] text-[#102c3d] shadow-[inset_3px_0_0_#159b8f,0_10px_18px_rgba(21,155,143,0.06)]" : "text-[#102c3d]/[0.58] hover:bg-[#f6f9f7] hover:text-[#102c3d]"}`}>
-                        <span className="flex min-w-0 items-center gap-3"><span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg transition ${active ? "bg-white text-[#0b8e82] ring-1 ring-[#159b8f]/[0.12]" : "bg-[#f7faf8] text-[#102c3d]/[0.42] group-hover:bg-white group-hover:text-[#0b8e82] group-hover:ring-1 group-hover:ring-[#102c3d]/[0.06]"}`}><Icon size={16} strokeWidth={active ? 2 : 1.8} aria-hidden="true" /></span><span className="truncate">{moduleLabel(name)}</span></span>
-                        {badge ? <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-[#0b6f63] ring-1 ring-[#159b8f]/[0.12]">{badge}</span> : null}
-                      </button>
-                    );
-                  })}
-                </div>)}
-              </nav>
-            </div>
-
-            <div className="mt-3 shrink-0 border-t border-[#102c3d]/[0.07] pt-3">
-              <div className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-3.5 shadow-[0_12px_26px_rgba(16,44,61,0.04)]">
-                <div className="flex items-start gap-3">
-                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#102c3d] text-white shadow-[0_8px_18px_rgba(16,44,61,0.12)]">
-                    <UserRound size={17} strokeWidth={1.8} aria-hidden="true" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">Current role</p>
-                    <p data-testid="current-role" className="mt-1 break-words text-sm font-semibold leading-5 text-[#102c3d]">{meta?.userRole ?? "Workspace user"}</p>
-                    <p className="mt-1 text-xs leading-5 text-[#102c3d]/[0.52]">People, providers and workspace setup.</p>
-                  </div>
-                </div>
-
-                <div className="mt-3 rounded-xl border border-[#102c3d]/[0.06] bg-white px-3 py-2.5">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/[0.34]">Status</p>
-                      <p className="mt-1 text-[11px] font-semibold leading-4 text-[#102c3d]/[0.68]">{storageStatus}</p>
-                    </div>
-                    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[#edf7f3] px-2 py-1 text-[10px] font-semibold text-[#0b6f63]">
-                      <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                      Live
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+      <div className="grid min-h-[calc(100vh-4.5rem)] w-full min-w-0 grid-cols-[minmax(0,1fr)] lg:grid-cols-[232px_minmax(0,1fr)]">
+        <aside data-testid="levytate-sidebar" className="hidden min-w-0 border-r border-[#102c3d]/[0.07] bg-white lg:sticky lg:top-[4.5rem] lg:flex lg:h-[calc(100vh-4.5rem)] lg:flex-col">
+          <nav className="flex min-h-0 flex-1 flex-col px-3 py-5" aria-label="Workspace areas">
+            <div className="px-3 pb-3"><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/38">Workspace</p><p className="mt-1 text-xs leading-5 text-[#102c3d]/55">Choose an area, then work in context.</p></div>
+            <div className="min-h-0 flex-1 space-y-1 overflow-y-auto">{primaryNavigation.map((area) => {
+              const Icon = navigationAreaIcon(area);
+              const active = activeArea?.key === area.key;
+              const badge = area.modules.reduce((total, module) => total + (moduleBadges[module as ModuleName] ?? 0), 0);
+              return <button key={area.key} type="button" onClick={() => openArea(area)} aria-current={active ? "page" : undefined} className={`group flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-left transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 ${active ? "bg-[#eaf5f1] text-[#102c3d] shadow-[inset_3px_0_0_#159b8f]" : "text-[#102c3d]/62 hover:bg-[#f5f8f5] hover:text-[#102c3d]"}`}><span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${active ? "bg-white text-[#087c73]" : "bg-[#f5f8f5] text-[#102c3d]/45 group-hover:bg-white"}`}><Icon size={16} strokeWidth={1.8} aria-hidden="true" /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{area.label}</span></span>{badge ? <span className="min-w-5 rounded-full bg-white px-1.5 text-center text-[10px] font-bold leading-5 text-[#0b6f63] ring-1 ring-[#159b8f]/15">{badge}</span> : null}</button>;
+            })}</div>
+            {secondaryNavigation.length ? <div className="mt-4 border-t border-[#102c3d]/[0.07] pt-3"><p className="px-3 pb-2 text-[9px] font-semibold uppercase tracking-[0.13em] text-[#102c3d]/35">Tools & support</p><div className="grid gap-0.5">{secondaryNavigation.map((area) => { const Icon = navigationAreaIcon(area); const active = activeArea?.key === area.key; return <button key={area.key} type="button" onClick={() => openArea(area)} aria-current={active ? "page" : undefined} className={`flex min-h-10 items-center gap-3 rounded-lg px-3 text-left text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 ${active ? "bg-[#f1f7f4] text-[#087c73]" : "text-[#102c3d]/54 hover:bg-[#f5f8f5] hover:text-[#102c3d]"}`}><Icon size={15} aria-hidden="true" />{area.label}</button>; })}</div></div> : null}
+          </nav>
         </aside>
 
         <section className="w-full min-w-0 max-w-full">
-          <div className="mx-auto w-full min-w-0 max-w-[1540px] px-4 py-4 sm:px-6 lg:px-8">
-            <section className="mb-4 border-b border-[#102c3d]/[0.07] pb-3">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">Protected workspace</p>
-              <h1 className="mt-1 text-2xl font-semibold tracking-[-0.025em]">{moduleLabel(activeModule)}</h1>
-              <p className="mt-1 max-w-3xl text-sm leading-5 text-[#102c3d]/[0.56] max-sm:hidden">{moduleCopy[activeModule]}</p>
-            </section>
+          <div className="mx-auto w-full min-w-0 max-w-[1580px] px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
+            <header className="mb-5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">{activeArea?.label ?? "Protected workspace"}</p><h1 className="mt-1 text-[1.7rem] font-semibold tracking-[-0.035em] text-[#102c3d] sm:text-[2rem]">{moduleLabel(activeModule)}</h1><p className="mt-1.5 max-w-3xl text-sm leading-6 text-[#102c3d]/60">{moduleCopy[activeModule]}</p></div></div>
+              {activeArea && activeArea.modules.length > 1 ? <nav aria-label={`${activeArea.label} views`} className="mt-4 flex max-w-full gap-1 overflow-x-auto rounded-xl border border-[#102c3d]/[0.07] bg-white p-1.5 shadow-[0_8px_24px_rgba(16,44,61,0.035)]">{activeArea.modules.map((module) => <button key={module} type="button" onClick={() => openModule(module as ModuleName)} aria-current={activeModule === module ? "page" : undefined} className={`min-h-10 shrink-0 rounded-lg px-3.5 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 ${activeModule === module ? "bg-[#102c3d] text-white shadow-[0_6px_14px_rgba(16,44,61,0.14)]" : "text-[#102c3d]/58 hover:bg-[#f3f7f4] hover:text-[#102c3d]"}`}>{moduleLabel(module as ModuleName)}</button>)}</nav> : null}
+            </header>
 
             {activeModule === "Home" ? (
               meta?.userRole === "Employee"
@@ -627,13 +680,15 @@ function ModuleStackNav({
 }) {
   return (
     <div className="grid gap-4">
-      <div className="flex flex-wrap gap-2 rounded-2xl border border-[#102c3d]/[0.07] bg-white p-2 shadow-[0_12px_30px_rgba(16,44,61,0.035)]">
+      <div className="flex max-w-full gap-1 overflow-x-auto rounded-xl border border-[#102c3d]/[0.07] bg-white p-1.5 shadow-[0_8px_24px_rgba(16,44,61,0.035)]" role="tablist">
         {items.map((item) => (
           <button
             key={item}
             type="button"
             onClick={() => onSelect(item)}
-            className={`rounded-full px-4 py-2 text-xs font-semibold transition ${active === item ? "bg-[#102c3d] text-white shadow-[0_8px_18px_rgba(16,44,61,0.12)]" : "text-[#102c3d]/[0.58] hover:bg-[#f6f9f7] hover:text-[#102c3d]"}`}
+            role="tab"
+            aria-selected={active === item}
+            className={`min-h-10 shrink-0 rounded-lg px-4 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 ${active === item ? "bg-[#102c3d] text-white shadow-[0_6px_14px_rgba(16,44,61,0.14)]" : "text-[#102c3d]/[0.58] hover:bg-[#f4f8f5] hover:text-[#102c3d]"}`}
           >
             {item}
           </button>
@@ -644,9 +699,35 @@ function ModuleStackNav({
   );
 }
 
-function navigationGroupLabel(group: CoreEarlyAccessNavigationGroup) {
-  if (group === "operate") return "Operate";
-  if (group === "manage") return "Manage";
-  if (group === "discover") return "Discover";
-  return "Support";
+function MobileNavigationArea({ area, activeModule, moduleLabel, onOpenArea, onOpenModule }: {
+  area: Release2NavigationArea;
+  activeModule: ModuleName;
+  moduleLabel: (module: ModuleName) => string;
+  onOpenArea: (area: Release2NavigationArea) => void;
+  onOpenModule: (module: ModuleName) => void;
+}) {
+  const active = area.modules.includes(activeModule);
+  const Icon = navigationAreaIcon(area);
+  return <div>
+    <button type="button" onClick={() => onOpenArea(area)} aria-current={active ? "page" : undefined} className={`flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-left transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 ${active ? "bg-[#eaf5f1] text-[#102c3d]" : "text-[#102c3d]/65 hover:bg-[#f4f8f5]"}`}>
+      <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${active ? "bg-white text-[#087c73]" : "bg-[#f4f8f5] text-[#102c3d]/45"}`}><Icon size={16} aria-hidden="true" /></span>
+      <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{area.label}</span><span className="mt-0.5 block truncate text-[11px] font-medium text-[#102c3d]/45">{area.description}</span></span>
+      <ChevronRight size={15} className="text-[#102c3d]/35" aria-hidden="true" />
+    </button>
+    {active && area.modules.length > 1 ? <div className="ml-11 mt-1 grid gap-0.5 border-l border-[#159b8f]/20 pl-3">{area.modules.map((module) => <button key={module} type="button" onClick={() => onOpenModule(module as ModuleName)} aria-current={activeModule === module ? "page" : undefined} className={`min-h-10 rounded-lg px-3 text-left text-xs font-semibold focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 ${activeModule === module ? "bg-[#102c3d] text-white" : "text-[#102c3d]/55 hover:bg-[#f4f8f5] hover:text-[#102c3d]"}`}>{moduleLabel(module as ModuleName)}</button>)}</div> : null}
+  </div>;
+}
+
+function navigationAreaIcon(area: Release2NavigationArea): LucideIcon {
+  if (area.key === "home" || area.key === "workspaces") return LayoutDashboard;
+  if (area.key === "people" || area.key === "team") return Users;
+  if (area.key === "applications" || area.key === "approvals" || area.key === "application") return ClipboardCheck;
+  if (area.key === "assessments" || area.key === "development") return ClipboardList;
+  if (area.key === "programmes") return GraduationCap;
+  if (area.key === "catalogue") return Building2;
+  if (area.key === "insights") return ChartNoAxesCombined;
+  if (area.key === "copilot") return Sparkles;
+  if (area.key === "guidance") return CircleHelp;
+  if (area.key === "settings" || area.key === "access") return Settings;
+  return BellRing;
 }

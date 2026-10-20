@@ -1,19 +1,19 @@
 "use client";
 
 import { Plus, Search, X } from "lucide-react";
-import { useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type KeyboardEvent, type ReactNode } from "react";
 
 export function MvpPanel({ title, eyebrow, actions, children }: { title: string; eyebrow?: string; actions?: ReactNode; children: ReactNode }) {
   return (
-    <section className="min-w-0 rounded-xl border border-[#102c3d]/[0.075] bg-white shadow-[0_14px_36px_rgba(16,44,61,0.045)]">
-      <div className="flex flex-col gap-3 border-b border-[#102c3d]/[0.06] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+    <section className="min-w-0 rounded-2xl border border-[#102c3d]/[0.075] bg-white shadow-[0_14px_36px_rgba(16,44,61,0.04)]">
+      <div className="flex flex-col gap-3 border-b border-[#102c3d]/[0.06] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <div>
           {eyebrow ? <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">{eyebrow}</p> : null}
           <h2 className="mt-0.5 text-lg font-semibold text-[#102c3d]">{title}</h2>
         </div>
         {actions}
       </div>
-      <div className="min-w-0 p-5">{children}</div>
+      <div className="min-w-0 p-5 sm:p-6">{children}</div>
     </section>
   );
 }
@@ -23,7 +23,7 @@ export function MvpToolbar({ search, onSearch, placeholder, actionLabel, onActio
     <div className={`mb-4 grid gap-3 ${filters ? "xl:grid-cols-[minmax(260px,0.8fr)_minmax(480px,1.4fr)_auto] xl:items-end" : "lg:grid-cols-[minmax(260px,1fr)_auto] lg:items-end"}`}>
       <label className="flex h-10 min-w-0 items-center gap-2 rounded-lg border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 focus-within:border-[#159b8f] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#159b8f]/[0.10]">
         <Search size={16} strokeWidth={1.8} className="shrink-0 text-[#102c3d]/[0.38]" aria-hidden="true" />
-        <input value={search} onChange={(event) => onSearch(event.target.value)} className="min-w-0 flex-1 bg-transparent text-sm text-[#102c3d] outline-none placeholder:text-[#102c3d]/[0.34]" placeholder={placeholder} />
+        <input aria-label={placeholder} value={search} onChange={(event) => onSearch(event.target.value)} className="min-w-0 flex-1 bg-transparent text-sm text-[#102c3d] outline-none placeholder:text-[#102c3d]/[0.34]" placeholder={placeholder} />
       </label>
       {filters ? <div className="min-w-0">{filters}</div> : null}
       {actionLabel && onAction ? (
@@ -51,12 +51,54 @@ export function EmptyState({ title, copy, actionLabel, onAction }: { title: stri
 }
 
 export function MvpModal({ title, eyebrow, children, onClose, wide = false }: { title: string; eyebrow?: string; children: ReactNode; onClose: () => void; wide?: boolean }) {
+  const titleId = useId();
+  const modalRef = useRef<HTMLElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const modal = modalRef.current;
+    function focusableElements() {
+      return modal ? Array.from(modal.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')) : [];
+    }
+    closeRef.current?.focus();
+    function onKeyDown(event: globalThis.KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const elements = focusableElements();
+      if (!elements.length) return;
+      const first = elements[0];
+      const last = elements[elements.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      previousFocus?.focus();
+    };
+  }, []);
+
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-[#102c3d]/[0.35] px-4 py-6 backdrop-blur-sm">
-      <section role="dialog" aria-modal="true" aria-label={title} className={`mx-auto rounded-xl bg-white shadow-[0_30px_90px_rgba(16,44,61,0.24)] ${wide ? "max-w-6xl" : "max-w-2xl"}`}>
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-[#102c3d]/[0.38] px-4 py-6 backdrop-blur-sm" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      <section ref={modalRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className={`mx-auto rounded-2xl bg-white shadow-[0_30px_90px_rgba(16,44,61,0.24)] ${wide ? "max-w-6xl" : "max-w-2xl"}`}>
         <div className="flex items-start justify-between gap-4 border-b border-[#102c3d]/[0.07] px-5 py-4">
-          <div>{eyebrow ? <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">{eyebrow}</p> : null}<h2 className="mt-0.5 text-xl font-semibold text-[#102c3d]">{title}</h2></div>
-          <button type="button" onClick={onClose} title="Close" aria-label="Close" className="grid h-9 w-9 place-items-center rounded-lg text-[#102c3d]/[0.52] transition hover:bg-[#f5f8f6] hover:text-[#102c3d]"><X size={18} /></button>
+          <div>{eyebrow ? <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">{eyebrow}</p> : null}<h2 id={titleId} className="mt-0.5 text-xl font-semibold text-[#102c3d]">{title}</h2></div>
+          <button ref={closeRef} type="button" onClick={onClose} title="Close" aria-label="Close dialog" className="grid h-11 w-11 place-items-center rounded-xl text-[#102c3d]/[0.52] transition hover:bg-[#f5f8f6] hover:text-[#102c3d] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20"><X size={18} /></button>
         </div>
         <div className="p-5">{children}</div>
       </section>
@@ -171,6 +213,24 @@ export function FormActions({ onCancel, label = "Save changes", error, disabled 
 export function StatusBadge({ children, tone = "neutral", testId }: { children: ReactNode; tone?: "neutral" | "green" | "yellow" | "red" | "blue"; testId?: string }) {
   const tones = { neutral: "bg-[#f5f7f3] text-[#102c3d]/[0.62]", green: "bg-[#e9f7f2] text-[#0b6f63]", yellow: "bg-[#fff7cf] text-[#756000]", red: "bg-[#fff0f2] text-[#b13b51]", blue: "bg-[#eef4f8] text-[#315e78]" };
   return <span data-testid={testId} className={`inline-flex max-w-full items-center rounded-lg px-2.5 py-1 text-[11px] font-semibold leading-4 ${tones[tone]}`}>{children}</span>;
+}
+
+export function MvpButton({ variant = "primary", className = "", children, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "destructive" }) {
+  const variants = {
+    primary: "bg-[#102c3d] text-white shadow-[0_8px_18px_rgba(16,44,61,0.12)] hover:bg-[#17394d]",
+    secondary: "border border-[#102c3d]/10 bg-white text-[#102c3d] hover:bg-[#f4f8f5]",
+    destructive: "border border-[#b13b51]/15 bg-[#fff2f3] text-[#a33149] hover:bg-[#ffe9ec]",
+  };
+  return <button {...props} className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 disabled:cursor-not-allowed disabled:opacity-45 ${variants[variant]} ${className}`}>{children}</button>;
+}
+
+export function MvpNotice({ tone = "info", children }: { tone?: "info" | "success" | "error"; children: ReactNode }) {
+  const tones = { info: "border-[#315e78]/15 bg-[#eef4f8] text-[#315e78]", success: "border-[#0b6f63]/15 bg-[#e9f7f2] text-[#0b6f63]", error: "border-[#b13b51]/15 bg-[#fff0f2] text-[#a33149]" };
+  return <div role={tone === "error" ? "alert" : "status"} className={`rounded-xl border px-4 py-3 text-sm font-semibold leading-6 ${tones[tone]}`}>{children}</div>;
+}
+
+export function MvpLoadingState({ label = "Loading workspace…" }: { label?: string }) {
+  return <div role="status" aria-live="polite" className="rounded-2xl border border-[#102c3d]/[0.07] bg-white p-6"><span className="sr-only">{label}</span><div aria-hidden="true" className="grid animate-pulse gap-3"><div className="h-3 w-24 rounded-full bg-[#102c3d]/10" /><div className="h-7 w-2/5 rounded-lg bg-[#102c3d]/10" /><div className="h-16 rounded-xl bg-[#f1f5f2]" /></div></div>;
 }
 
 export function TableShell({ children, minimumWidthClass = "min-w-[900px]", tableClassName = "", testId }: { children: ReactNode; minimumWidthClass?: string; tableClassName?: string; testId?: string }) { return <div data-testid={testId} className="min-w-0 max-w-full overflow-x-auto rounded-xl border border-[#102c3d]/[0.07]"><table className={`w-full ${minimumWidthClass} border-collapse text-left text-sm ${tableClassName}`}>{children}</table></div>; }

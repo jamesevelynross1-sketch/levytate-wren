@@ -86,50 +86,18 @@ export function EmployeeHomeModule({ onNavigate }: { onNavigate: (target: Employ
   if (!context.employee) return <EmployeeSetupNotice />;
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
-      <section className="rounded-2xl border border-[#102c3d]/[0.07] bg-white p-6 shadow-[0_18px_44px_rgba(16,44,61,0.055)]">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">Employee workspace</p>
-        <h2 className="mt-2 text-2xl font-semibold tracking-[-0.025em] text-[#102c3d]">Good to see you, {firstName(context.employee.name)}.</h2>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-[#102c3d]/58">
-          Your LevyTate workspace is focused on one thing: knowing where you are now and what you should do next.
-        </p>
-
-        <div className="mt-5 grid gap-3 md:grid-cols-3">
-          <EmployeeSummaryTile label="Recommended programme" value={context.programmeName} />
-          <EmployeeSummaryTile label="Current application" value={employeeStatusLabel(context.application)} />
-          <EmployeeSummaryTile label="Line manager" value={managerName(data, context.employee)} />
-        </div>
-
-        <div className="mt-6 flex flex-wrap gap-3">
-          <button type="button" onClick={() => onNavigate(nextAction.target)} className="inline-flex h-11 items-center justify-center rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white shadow-[0_12px_24px_rgba(16,44,61,0.14)] transition hover:-translate-y-0.5 hover:bg-[#17394d]">
-            {nextAction.primaryLabel}
-          </button>
-          <button type="button" onClick={() => onNavigate("Copilot")} className="inline-flex h-11 items-center justify-center rounded-full bg-white px-5 text-xs font-semibold text-[#102c3d] ring-1 ring-[#102c3d]/[0.1] transition hover:-translate-y-0.5 hover:ring-[#159b8f]/25">
-            Ask LevyTate Copilot
-          </button>
+    <div className="grid gap-5">
+      <section className="rounded-2xl bg-[#102c3d] p-5 text-white shadow-[0_20px_54px_rgba(16,44,61,0.14)] sm:p-6">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+          <div className="max-w-3xl"><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8fe0d2]">Your next step</p><h2 className="mt-2 text-2xl font-semibold tracking-[-0.025em]">{nextAction.heading}</h2><p className="mt-2 text-sm leading-6 text-white/68">{nextAction.copy}</p><p className="mt-3 text-xs font-semibold text-white/52">Next owner: {nextAction.owner}</p></div>
+          <button type="button" onClick={() => onNavigate(nextAction.target)} className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#ffde59] px-5 text-sm font-semibold text-[#102c3d] shadow-[0_9px_20px_rgba(0,0,0,0.1)] transition hover:bg-[#ffe780] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/30">{nextAction.primaryLabel}</button>
         </div>
       </section>
 
-      <section className="rounded-2xl border border-[#102c3d]/[0.07] bg-white p-6 shadow-[0_18px_44px_rgba(16,44,61,0.055)]">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">Needs attention</p>
-        <h2 className="mt-2 text-xl font-semibold text-[#102c3d]">What should I do next?</h2>
-        <div className="mt-4 rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4">
-          <div className="flex items-start gap-3">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#e9f7f2] text-[#0b6f63]">
-              <FileText size={17} strokeWidth={1.9} aria-hidden="true" />
-            </span>
-            <div>
-          <p className="text-sm font-semibold text-[#102c3d]">{nextAction.heading}</p>
-          <p className="mt-1 text-sm leading-6 text-[#102c3d]/56">{nextAction.copy}</p>
-          <p className="mt-2 text-xs font-semibold text-[#102c3d]/46">Next owner: {nextAction.owner}</p>
-            </div>
-          </div>
-        </div>
-        {context.application ? (
-          <div className="mt-4">
-            <ApplicationProgress application={context.application} compact />
-          </div>
-        ) : null}
+      <section className="rounded-2xl border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_14px_36px_rgba(16,44,61,0.04)] sm:p-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">Your journey</p><h2 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-[#102c3d]">Good to see you, {firstName(context.employee.name)}.</h2></div><button type="button" onClick={() => onNavigate("Copilot")} className="min-h-11 self-start rounded-xl border border-[#102c3d]/10 px-4 text-xs font-semibold text-[#102c3d] hover:bg-[#f4f8f5]">Ask LevyTate Copilot</button></div>
+        <div className="mt-5 grid gap-3 md:grid-cols-3"><EmployeeSummaryTile label="Recommended programme" value={context.programmeName} /><EmployeeSummaryTile label="Current application" value={employeeStatusLabel(context.application)} /><EmployeeSummaryTile label="Line manager" value={managerName(data, context.employee)} /></div>
+        {context.application ? <div className="mt-5 border-t border-[#102c3d]/[0.07] pt-5"><ApplicationProgress application={context.application} compact /></div> : null}
       </section>
     </div>
   );

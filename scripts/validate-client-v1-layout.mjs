@@ -11,11 +11,12 @@ const portfolio = read("components/levytate-mvp/EmployerPortfolioModules.tsx");
 const checks = [];
 
 check("application shell has an explicit shrinkable width boundary", shell.includes('data-testid="levytate-app-shell"') && shell.includes("min-h-screen w-full min-w-0"));
-check("shell grid gives main content a minmax zero track", shell.includes("grid-cols-[minmax(0,1fr)]") && shell.includes("lg:grid-cols-[244px_minmax(0,1fr)]"));
+check("shell grid gives main content a minmax zero track", shell.includes("grid-cols-[minmax(0,1fr)]") && shell.includes("lg:grid-cols-[232px_minmax(0,1fr)]"));
 check("main content is bounded without body-level overflow clipping", shell.includes('className="w-full min-w-0 max-w-full"') && !shell.includes("overflow-x-hidden"));
-check("sidebar is fixed to the compact desktop track", shell.includes('data-testid="levytate-sidebar"') && shell.includes("lg:grid-cols-[244px_minmax(0,1fr)]"));
-check("current role remains readable without truncation", shell.includes('data-testid="current-role"') && shell.includes("break-words") && !/data-testid="current-role"[^>]*truncate/.test(shell));
+check("sidebar is fixed to the compact desktop track", shell.includes('data-testid="levytate-sidebar"') && shell.includes("lg:grid-cols-[232px_minmax(0,1fr)]"));
+check("current role remains available in the compact account control", shell.includes('data-testid="current-role"') && shell.includes('aria-label="Open account menu"') && shell.includes("Signed in as"));
 check("connection status uses a concise label", shell.includes('? "Connected" : "Limited mode"'));
+check("mobile navigation uses an accessible drawer instead of a technical select", shell.includes('id="levytate-mobile-navigation"') && shell.includes('aria-modal="true"') && !shell.includes('<select value={activeModule}'));
 check("Home columns opt out of equal-height stretching", dashboard.includes('data-testid="home-attention-grid"') && dashboard.includes("grid items-start gap-4"));
 check("Home cards have independent shrinkable wrappers", ["home-urgent-card", "home-employee-card", "home-provider-card"].every((id) => dashboard.includes(`data-testid="${id}"`) && dashboard.includes("min-w-0 self-start")));
 check("Home hero retains the compact operating brief", dashboard.includes('data-testid="home-attention-hero"') && dashboard.includes("p-4") && dashboard.includes("sm:p-5"));

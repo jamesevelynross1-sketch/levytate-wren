@@ -53,6 +53,25 @@ a {
   text-decoration: none;
 }
 
+.levytate-workspace {
+  --levytate-navy: #102c3d;
+  --levytate-mint: #159b8f;
+  --levytate-coral: #c95568;
+  --levytate-canvas: #f7f6f2;
+  --levytate-border: rgb(16 44 61 / 0.08);
+  background: var(--levytate-canvas);
+  color: var(--levytate-navy);
+}
+
+.levytate-workspace :where(a, button, input, select, textarea, summary):focus-visible {
+  outline: 3px solid rgb(21 155 143 / 0.28);
+  outline-offset: 2px;
+}
+
+.levytate-workspace :where(h1, h2, h3, p, td, th) {
+  overflow-wrap: anywhere;
+}
+
 .text-balance {
   text-wrap: balance;
 }
