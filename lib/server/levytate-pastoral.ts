@@ -2,12 +2,15 @@ import { randomUUID } from "node:crypto";
 import type { LevyTateBetaSession } from "@/lib/levytate/config/beta-access";
 import {
   isPastoralTopicCategory,
+  pastoralRecipientIsSafeForConcern,
   pastoralPolicyVersion,
   pastoralSharedFieldNames,
+  type PastoralAssistantResponse,
   type PastoralConversationMessage,
   type PastoralConversationSummary,
   type PastoralLearnerContext,
   type PastoralSharedRequestPayload,
+  type PastoralSupportActionView,
   type PastoralSupportMutation,
   type PastoralSupportRecipient,
   type PastoralSupportRequestView,
@@ -94,11 +97,45 @@ type SupportRequestRow = {
   submitted_at: string;
   acknowledged_at: string | null;
   resolved_at: string | null;
+  agreed_follow_up_at: string | null;
+  administratively_closed_at: string | null;
+  employee_resolution_status: PastoralSupportRequestView["employeeResolutionStatus"];
+  employee_responded_at: string | null;
+  employee_confirmed_resolved_at: string | null;
 };
 type SupportEventRow = {
   id: string;
   support_request_id: string;
   event_type: PastoralSupportRequestView["events"][number]["eventType"];
+  previous_state: string | null;
+  new_state: string;
+  note_ciphertext: string | null;
+  note_nonce: string | null;
+  note_authentication_tag: string | null;
+  encryption_key_version: string | null;
+  idempotency_key: string;
+  created_at: string;
+};
+type SupportActionRow = {
+  id: string;
+  support_request_id: string;
+  responsible_recipient_id: string;
+  status: PastoralSupportActionView["status"];
+  due_at: string | null;
+  payload_ciphertext: string;
+  payload_nonce: string;
+  payload_authentication_tag: string;
+  encryption_key_version: string;
+  idempotency_key: string;
+  lock_version: number;
+  completed_at: string | null;
+  created_at: string;
+};
+type SupportActionEventRow = {
+  id: string;
+  support_request_id: string;
+  support_action_id: string;
+  event_type: PastoralSupportActionView["events"][number]["eventType"];
   previous_state: string | null;
   new_state: string;
   note_ciphertext: string | null;
@@ -133,7 +170,11 @@ export async function applyPastoralMutationForSession(session: LevyTateBetaSessi
   if (mutation.action === "set_history_preference") await updateHistoryPreference(context, mutation.saveHistory, mutation.retentionDays);
   else if (mutation.action === "delete_conversation") await deleteConversation(context, mutation.conversationId);
   else if (mutation.action === "submit_support_request") await submitSupportRequest(context, mutation);
-  else await transitionSupportRequest(context, mutation);
+  else if (mutation.action === "transition_support_request") await transitionSupportRequest(context, mutation);
+  else if (mutation.action === "record_follow_up") await recordFollowUp(context, mutation);
+  else if (mutation.action === "create_support_action") await createSupportAction(context, mutation);
+  else if (mutation.action === "transition_support_action") await transitionSupportAction(context, mutation);
+  else await recordEmployeeOutcome(context, mutation);
   return getPastoralWorkspaceForSession(session);
 }
 
@@ -156,19 +197,28 @@ export async function getEmployeePastoralAssistantContext(session: LevyTateBetaS
 
 export async function findPersistedAssistantReply(
   context: PastoralServerContext,
-  conversationId: string,
+  conversationId: string | null | undefined,
   clientMessageId: string,
 ) {
-  const conversation = await getOwnedConversation(context, conversationId);
-  const rows = await supabaseSelect<MessageRow>(requireConfig(), "levytate_pastoral_messages", new URLSearchParams({
+  assertEmployeeContext(context);
+  const query = new URLSearchParams({
     select: messageSelect,
     organisation_id: `eq.${context.organisation.id}`,
-    conversation_id: `eq.${conversation.id}`,
+    employee_id: `eq.${context.employee.id}`,
+    owner_user_id: `eq.${context.user.id}`,
     client_message_id: `eq.${clientMessageId}:assistant`,
+    order: "created_at.desc",
     limit: "1",
-  }));
+  });
+  if (conversationId) {
+    const conversation = await getOwnedConversation(context, conversationId);
+    query.set("conversation_id", `eq.${conversation.id}`);
+  }
+  const rows = await supabaseSelect<MessageRow>(requireConfig(), "levytate_pastoral_messages", query);
   const row = rows[0];
-  return row ? decryptMessage(context, row) : null;
+  if (!row) return null;
+  const envelope = decryptMessageEnvelope(context, row);
+  return { message: decryptMessage(context, row), response: envelope.assistantResponse ?? null, conversationId: row.conversation_id };
 }
 
 export async function persistPastoralExchange(input: {
@@ -178,6 +228,7 @@ export async function persistPastoralExchange(input: {
   clientMessageId: string;
   employeeMessage: string;
   assistantMessage: string;
+  assistantResponse?: Omit<PastoralAssistantResponse, "conversationId">;
 }) {
   if (!input.preference?.save_history || !input.context.employee) return null;
   const config = requireConfig();
@@ -204,7 +255,7 @@ export async function persistPastoralExchange(input: {
   );
   const assistantClientId = `${input.clientMessageId}:assistant`;
   const assistantCipher = encryptPastoralJson(
-    { content: input.assistantMessage },
+    { content: input.assistantMessage, assistantResponse: input.assistantResponse },
     messageAssociatedData(input.context.organisation.id, input.context.employee.id, conversation.id, sequence + 1, assistantClientId),
   );
   await supabaseInsert(config, "levytate_pastoral_messages", [
@@ -255,7 +306,7 @@ async function supportRecipientWorkspace(context: PastoralServerContext): Promis
     capabilityEnabled: true,
     accessMode: "support_recipient",
     employee: null,
-    recipients: context.recipientRows.map(recipientView),
+    recipients: (await listRecipients(context.organisation.id)).map(recipientView),
     conversations: [],
     requests: await listSupportRequests(context),
     privacyNotice,
@@ -394,13 +445,17 @@ async function loadConversationMessages(context: PastoralServerContext, conversa
 }
 
 function decryptMessage(context: PastoralServerContext, row: MessageRow): PastoralConversationMessage {
-  const value = decryptPastoralJson<{ content: string }>({
+  const value = decryptMessageEnvelope(context, row);
+  return { id: row.id, author: row.author_type, content: bounded(value.content, 3000), createdAt: row.created_at };
+}
+
+function decryptMessageEnvelope(context: PastoralServerContext, row: MessageRow) {
+  return decryptPastoralJson<{ content: string; assistantResponse?: Omit<PastoralAssistantResponse, "conversationId"> }>({
     ciphertext: row.ciphertext,
     nonce: row.nonce,
     authenticationTag: row.authentication_tag,
     keyVersion: row.encryption_key_version,
   }, messageAssociatedData(context.organisation.id, row.employee_id, row.conversation_id, row.sequence_number, row.client_message_id));
-  return { id: row.id, author: row.author_type, content: bounded(value.content, 3000), createdAt: row.created_at };
 }
 
 async function deleteConversation(context: PastoralServerContext, conversationId: string) {
@@ -413,14 +468,14 @@ async function deleteConversation(context: PastoralServerContext, conversationId
   await audit(context, "conversation", conversation.id, "conversation.deleted", "completed");
 }
 
-async function listRecipients(organisationId: string, employerUserId?: string) {
+async function listRecipients(organisationId: string, employerUserId?: string, activeOnly = true) {
   const query = new URLSearchParams({
     select: "id,recipient_kind,employer_user_id,provider_membership_id,display_label,contact_method,active",
     organisation_id: `eq.${organisationId}`,
-    active: "eq.true",
     order: "display_label.asc",
     limit: "100",
   });
+  if (activeOnly) query.set("active", "eq.true");
   if (employerUserId) query.set("employer_user_id", `eq.${employerUserId}`);
   return supabaseSelect<RecipientRow>(requireConfig(), "levytate_pastoral_support_recipients", query);
 }
@@ -510,6 +565,96 @@ async function transitionSupportRequest(context: PastoralServerContext, mutation
   });
 }
 
+async function recordFollowUp(context: PastoralServerContext, mutation: Extract<PastoralSupportMutation, { action: "record_follow_up" }>) {
+  if (context.accessMode !== "support_recipient") throw new LevyTatePastoralError("Only the assigned support contact may agree follow-up.", 403);
+  const requestId = boundedId(mutation.requestId);
+  const idempotencyKey = validIdempotencyKey(mutation.idempotencyKey);
+  const agreedFollowUpAt = validDate(mutation.agreedFollowUpAt, "Choose an agreed follow-up date.");
+  const note = bounded(mutation.note, 2000);
+  const encrypted = note ? encryptPastoralJson({ content: note }, supportEventAssociatedData(context.organisation.id, requestId, idempotencyKey)) : null;
+  await rpc<SupportRequestRow>("levytate_record_pastoral_follow_up", {
+    p_organisation_id: context.organisation.id,
+    p_support_request_id: requestId,
+    p_actor_user_id: context.user.id,
+    p_actor_provider_membership_id: null,
+    p_expected_lock_version: mutation.expectedLockVersion,
+    p_agreed_follow_up_at: agreedFollowUpAt,
+    p_idempotency_key: idempotencyKey,
+    p_note_ciphertext: encrypted?.ciphertext ?? null,
+    p_note_nonce: encrypted?.nonce ?? null,
+    p_note_authentication_tag: encrypted?.authenticationTag ?? null,
+    p_encryption_key_version: encrypted?.keyVersion ?? null,
+  });
+}
+
+async function createSupportAction(context: PastoralServerContext, mutation: Extract<PastoralSupportMutation, { action: "create_support_action" }>) {
+  if (context.accessMode !== "support_recipient") throw new LevyTatePastoralError("Only the assigned support contact may agree an action.", 403);
+  const requestId = boundedId(mutation.requestId);
+  const responsibleRecipientId = boundedId(mutation.responsibleRecipientId);
+  const idempotencyKey = validIdempotencyKey(mutation.idempotencyKey);
+  const payload = { summary: boundedRequired(mutation.summary, 1800, "Agreed action") };
+  const encrypted = encryptPastoralJson(payload, supportActionAssociatedData(context.organisation.id, requestId, idempotencyKey));
+  await rpc<SupportActionRow>("levytate_create_pastoral_support_action", {
+    p_organisation_id: context.organisation.id,
+    p_support_request_id: requestId,
+    p_responsible_recipient_id: responsibleRecipientId,
+    p_actor_user_id: context.user.id,
+    p_actor_provider_membership_id: null,
+    p_due_at: mutation.dueAt ? validDate(mutation.dueAt, "Choose a valid action due date.") : null,
+    p_payload_ciphertext: encrypted.ciphertext,
+    p_payload_nonce: encrypted.nonce,
+    p_payload_authentication_tag: encrypted.authenticationTag,
+    p_encryption_key_version: encrypted.keyVersion,
+    p_payload_digest: digestPastoralPayload(payload),
+    p_idempotency_key: idempotencyKey,
+  });
+}
+
+async function transitionSupportAction(context: PastoralServerContext, mutation: Extract<PastoralSupportMutation, { action: "transition_support_action" }>) {
+  if (context.accessMode !== "support_recipient") throw new LevyTatePastoralError("Only an authorised support contact may update an action.", 403);
+  const actionId = boundedId(mutation.supportActionId);
+  const idempotencyKey = validIdempotencyKey(mutation.idempotencyKey);
+  if (!Number.isInteger(mutation.expectedLockVersion) || mutation.expectedLockVersion < 0) throw new LevyTatePastoralError("Refresh the action before trying again.", 409);
+  if (!["start", "progress", "complete", "cancel", "reassign"].includes(mutation.transition)) throw new LevyTatePastoralError("That support-action update is not available.");
+  const note = bounded(mutation.note, 2000);
+  const encrypted = note ? encryptPastoralJson({ content: note }, supportActionEventAssociatedData(context.organisation.id, actionId, idempotencyKey)) : null;
+  await rpc<SupportActionRow>("levytate_transition_pastoral_support_action", {
+    p_organisation_id: context.organisation.id,
+    p_support_action_id: actionId,
+    p_actor_user_id: context.user.id,
+    p_actor_provider_membership_id: null,
+    p_action: mutation.transition,
+    p_expected_lock_version: mutation.expectedLockVersion,
+    p_idempotency_key: idempotencyKey,
+    p_new_responsible_recipient_id: mutation.newResponsibleRecipientId ? boundedId(mutation.newResponsibleRecipientId) : null,
+    p_note_ciphertext: encrypted?.ciphertext ?? null,
+    p_note_nonce: encrypted?.nonce ?? null,
+    p_note_authentication_tag: encrypted?.authenticationTag ?? null,
+    p_encryption_key_version: encrypted?.keyVersion ?? null,
+  });
+}
+
+async function recordEmployeeOutcome(context: PastoralServerContext, mutation: Extract<PastoralSupportMutation, { action: "record_employee_outcome" }>) {
+  assertEmployeeContext(context);
+  const requestId = boundedId(mutation.requestId);
+  const idempotencyKey = validIdempotencyKey(mutation.idempotencyKey);
+  if (!["helped", "further_support_requested"].includes(mutation.outcome)) throw new LevyTatePastoralError("Choose whether the support helped or whether you need more support.");
+  const note = bounded(mutation.note, 2000);
+  const encrypted = note ? encryptPastoralJson({ content: note }, supportEventAssociatedData(context.organisation.id, requestId, idempotencyKey)) : null;
+  await rpc<SupportRequestRow>("levytate_record_pastoral_employee_outcome", {
+    p_organisation_id: context.organisation.id,
+    p_support_request_id: requestId,
+    p_owner_user_id: context.user.id,
+    p_outcome: mutation.outcome,
+    p_expected_lock_version: mutation.expectedLockVersion,
+    p_idempotency_key: idempotencyKey,
+    p_note_ciphertext: encrypted?.ciphertext ?? null,
+    p_note_nonce: encrypted?.nonce ?? null,
+    p_note_authentication_tag: encrypted?.authenticationTag ?? null,
+    p_encryption_key_version: encrypted?.keyVersion ?? null,
+  });
+}
+
 async function listSupportRequests(context: PastoralServerContext) {
   const query = new URLSearchParams({
     select: supportRequestSelect,
@@ -521,7 +666,7 @@ async function listSupportRequests(context: PastoralServerContext) {
   else query.set("assigned_recipient_id", `in.(${context.recipientRows.map((row) => row.id).join(",")})`);
   const rows = await supabaseSelect<SupportRequestRow>(requireConfig(), "levytate_pastoral_support_requests", query);
   if (!rows.length) return [];
-  const recipients = await listRecipients(context.organisation.id);
+  const recipients = await listRecipients(context.organisation.id, undefined, false);
   const recipientById = new Map(recipients.map((entry) => [entry.id, entry]));
   const employeeIds = [...new Set(rows.map((row) => row.employee_id))];
   const employees = await supabaseSelect<EmployeeRow>(requireConfig(), "levytate_employees", new URLSearchParams({
@@ -531,13 +676,29 @@ async function listSupportRequests(context: PastoralServerContext) {
     limit: "100",
   }));
   const employeeById = new Map(employees.map((employee) => [employee.id, employee]));
-  const events = await supabaseSelect<SupportEventRow>(requireConfig(), "levytate_pastoral_support_request_events", new URLSearchParams({
+  const [events, actions] = await Promise.all([
+    supabaseSelect<SupportEventRow>(requireConfig(), "levytate_pastoral_support_request_events", new URLSearchParams({
     select: eventSelect,
     organisation_id: `eq.${context.organisation.id}`,
     support_request_id: `in.(${rows.map((row) => row.id).join(",")})`,
     order: "created_at.asc",
     limit: "1000",
-  }));
+    })),
+    supabaseSelect<SupportActionRow>(requireConfig(), "levytate_pastoral_support_actions", new URLSearchParams({
+      select: supportActionSelect,
+      organisation_id: `eq.${context.organisation.id}`,
+      support_request_id: `in.(${rows.map((row) => row.id).join(",")})`,
+      order: "created_at.asc",
+      limit: "1000",
+    })),
+  ]);
+  const actionEvents = actions.length ? await supabaseSelect<SupportActionEventRow>(requireConfig(), "levytate_pastoral_support_action_events", new URLSearchParams({
+    select: supportActionEventSelect,
+    organisation_id: `eq.${context.organisation.id}`,
+    support_action_id: `in.(${actions.map((action) => action.id).join(",")})`,
+    order: "created_at.asc",
+    limit: "2000",
+  })) : [];
   return rows.map((row): PastoralSupportRequestView => {
     const payload = decryptPastoralJson<PastoralSharedRequestPayload>({
       ciphertext: row.payload_ciphertext,
@@ -557,6 +718,11 @@ async function listSupportRequests(context: PastoralServerContext) {
       submittedAt: row.submitted_at,
       acknowledgedAt: row.acknowledged_at,
       resolvedAt: row.resolved_at,
+      agreedFollowUpAt: row.agreed_follow_up_at,
+      administrativelyClosedAt: row.administratively_closed_at,
+      employeeResolutionStatus: row.employee_resolution_status,
+      employeeRespondedAt: row.employee_responded_at,
+      employeeConfirmedResolvedAt: row.employee_confirmed_resolved_at,
       payload,
       events: events.filter((event) => event.support_request_id === row.id).map((event) => ({
         id: event.id,
@@ -566,8 +732,45 @@ async function listSupportRequests(context: PastoralServerContext) {
         note: decryptEventNote(context.organisation.id, row.id, event),
         createdAt: event.created_at,
       })),
+      actions: actions.filter((action) => action.support_request_id === row.id).map((action) => {
+        const payload = decryptPastoralJson<{ summary: string }>({
+          ciphertext: action.payload_ciphertext,
+          nonce: action.payload_nonce,
+          authenticationTag: action.payload_authentication_tag,
+          keyVersion: action.encryption_key_version,
+        }, supportActionAssociatedData(context.organisation.id, row.id, action.idempotency_key));
+        return {
+          id: action.id,
+          responsibleRecipientId: action.responsible_recipient_id,
+          responsibleRecipientLabel: recipientById.get(action.responsible_recipient_id)?.display_label ?? "Inactive support contact",
+          status: action.status,
+          dueAt: action.due_at,
+          summary: bounded(payload.summary, 1800),
+          lockVersion: action.lock_version,
+          completedAt: action.completed_at,
+          events: actionEvents.filter((event) => event.support_action_id === action.id).map((event) => ({
+            id: event.id,
+            eventType: event.event_type,
+            previousState: event.previous_state,
+            newState: event.new_state,
+            note: decryptActionEventNote(context.organisation.id, action.id, event),
+            createdAt: event.created_at,
+          })),
+        };
+      }),
     };
   });
+}
+
+function decryptActionEventNote(organisationId: string, actionId: string, row: SupportActionEventRow) {
+  if (!row.note_ciphertext || !row.note_nonce || !row.note_authentication_tag || !row.encryption_key_version) return "";
+  const value = decryptPastoralJson<{ content: string }>({
+    ciphertext: row.note_ciphertext,
+    nonce: row.note_nonce,
+    authenticationTag: row.note_authentication_tag,
+    keyVersion: row.encryption_key_version,
+  }, supportActionEventAssociatedData(organisationId, actionId, row.idempotency_key));
+  return bounded(value.content, 2000);
 }
 
 function decryptEventNote(organisationId: string, requestId: string, row: SupportEventRow) {
@@ -641,6 +844,39 @@ function parseMutation(value: unknown): PastoralSupportMutation {
     idempotencyKey: String(mutation.idempotencyKey ?? ""),
     note: typeof mutation.note === "string" ? mutation.note : undefined,
   };
+  if (mutation.action === "record_follow_up") return {
+    action: mutation.action,
+    requestId: String(mutation.requestId ?? ""),
+    expectedLockVersion: Number(mutation.expectedLockVersion),
+    agreedFollowUpAt: String(mutation.agreedFollowUpAt ?? ""),
+    idempotencyKey: String(mutation.idempotencyKey ?? ""),
+    note: typeof mutation.note === "string" ? mutation.note : undefined,
+  };
+  if (mutation.action === "create_support_action") return {
+    action: mutation.action,
+    requestId: String(mutation.requestId ?? ""),
+    responsibleRecipientId: String(mutation.responsibleRecipientId ?? ""),
+    dueAt: mutation.dueAt == null ? null : String(mutation.dueAt),
+    summary: String(mutation.summary ?? ""),
+    idempotencyKey: String(mutation.idempotencyKey ?? ""),
+  };
+  if (mutation.action === "transition_support_action") return {
+    action: mutation.action,
+    supportActionId: String(mutation.supportActionId ?? ""),
+    transition: mutation.transition as never,
+    expectedLockVersion: Number(mutation.expectedLockVersion),
+    idempotencyKey: String(mutation.idempotencyKey ?? ""),
+    newResponsibleRecipientId: typeof mutation.newResponsibleRecipientId === "string" ? mutation.newResponsibleRecipientId : undefined,
+    note: typeof mutation.note === "string" ? mutation.note : undefined,
+  };
+  if (mutation.action === "record_employee_outcome") return {
+    action: mutation.action,
+    requestId: String(mutation.requestId ?? ""),
+    outcome: mutation.outcome as never,
+    expectedLockVersion: Number(mutation.expectedLockVersion),
+    idempotencyKey: String(mutation.idempotencyKey ?? ""),
+    note: typeof mutation.note === "string" ? mutation.note : undefined,
+  };
   throw new LevyTatePastoralError("That My Support action is not recognised.");
 }
 
@@ -687,20 +923,23 @@ async function rpc<T>(name: string, body: Record<string, unknown>) {
 function messageAssociatedData(organisationId: string, employeeId: string, conversationId: string, sequence: number, clientMessageId: string) { return `${organisationId}:${employeeId}:message:${conversationId}:${sequence}:${clientMessageId}`; }
 function supportRequestAssociatedData(organisationId: string, employeeId: string, idempotencyKey: string) { return `${organisationId}:${employeeId}:support-request:${idempotencyKey}`; }
 function supportEventAssociatedData(organisationId: string, requestId: string, idempotencyKey: string) { return `${organisationId}:${requestId}:event:${idempotencyKey}`; }
+function supportActionAssociatedData(organisationId: string, requestId: string, idempotencyKey: string) { return `${organisationId}:${requestId}:support-action:${idempotencyKey}`; }
+function supportActionEventAssociatedData(organisationId: string, actionId: string, idempotencyKey: string) { return `${organisationId}:${actionId}:action-event:${idempotencyKey}`; }
 function bounded(value: unknown, max: number) { return String(value ?? "").trim().slice(0, max); }
 function boundedRequired(value: unknown, max: number, label: string) { const clean = bounded(value, max); if (!clean) throw new LevyTatePastoralError(`${label} is required.`); return clean; }
 function boundedId(value: string) { const clean = String(value ?? "").trim(); if (!/^[0-9a-f-]{36}$/i.test(clean)) throw new LevyTatePastoralError("A valid record identifier is required."); return clean; }
 function validIdempotencyKey(value: string) { const clean = String(value ?? "").trim(); if (!/^[a-zA-Z0-9:_-]{8,128}$/.test(clean)) throw new LevyTatePastoralError("A valid idempotency key is required."); return clean; }
 function numberOrUndefined(value: unknown) { return value === undefined ? undefined : Number(value); }
 function contactMethod(value: unknown): PastoralSharedRequestPayload["preferredContactMethod"] { if (!["in_platform", "email", "phone", "meeting", "provider_route"].includes(String(value))) throw new LevyTatePastoralError("Choose a valid preferred contact method."); return value as PastoralSharedRequestPayload["preferredContactMethod"]; }
+function validDate(value: unknown, message: string) { const date = new Date(String(value ?? "")); if (Number.isNaN(date.getTime())) throw new LevyTatePastoralError(message); return date.toISOString(); }
 function recipientIsSafeForPayload(recipient: RecipientRow, payload: PastoralSharedRequestPayload) {
   const combined = `${payload.topic} ${payload.whatIWantYouToUnderstand} ${payload.howItIsAffectingMe} ${payload.supportIWant} ${payload.sharingRestrictions}`;
-  if (recipient.recipient_kind === "line_manager" && /\b(?:my\s+)?(?:line\s+)?manager\b/i.test(combined)) return false;
-  if (recipient.recipient_kind === "apprenticeship_lead" && /\bapprenticeship\s+lead\b/i.test(combined)) return false;
-  return true;
+  return pastoralRecipientIsSafeForConcern(recipientView(recipient), combined);
 }
 
 const conversationSelect = "id,employee_id,owner_user_id,status,retention_expires_at,created_at,updated_at";
 const messageSelect = "id,conversation_id,employee_id,owner_user_id,sequence_number,author_type,ciphertext,nonce,authentication_tag,encryption_key_version,client_message_id,created_at";
-const supportRequestSelect = "id,employee_id,owner_user_id,recipient_id,assigned_recipient_id,topic_category,preferred_contact_method,urgency_route,payload_ciphertext,payload_nonce,payload_authentication_tag,encryption_key_version,idempotency_key,status,lock_version,submitted_at,acknowledged_at,resolved_at";
+const supportRequestSelect = "id,employee_id,owner_user_id,recipient_id,assigned_recipient_id,topic_category,preferred_contact_method,urgency_route,payload_ciphertext,payload_nonce,payload_authentication_tag,encryption_key_version,idempotency_key,status,lock_version,submitted_at,acknowledged_at,resolved_at,agreed_follow_up_at,administratively_closed_at,employee_resolution_status,employee_responded_at,employee_confirmed_resolved_at";
 const eventSelect = "id,support_request_id,event_type,previous_state,new_state,note_ciphertext,note_nonce,note_authentication_tag,encryption_key_version,idempotency_key,created_at";
+const supportActionSelect = "id,support_request_id,responsible_recipient_id,status,due_at,payload_ciphertext,payload_nonce,payload_authentication_tag,encryption_key_version,idempotency_key,lock_version,completed_at,created_at";
+const supportActionEventSelect = "id,support_request_id,support_action_id,event_type,previous_state,new_state,note_ciphertext,note_nonce,note_authentication_tag,encryption_key_version,idempotency_key,created_at";

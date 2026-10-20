@@ -31,6 +31,7 @@ No Production use is permitted until the lawful basis, special-category conditio
 5. If history saving is on, LevyTate encrypts each message using authenticated encryption before inserting ciphertext into Supabase.
 6. A support request is a new, employee-reviewed object. It contains only approved fields, is encrypted before storage and is accessible only to the employee and active assigned recipient.
 7. Aggregate employer reporting uses predefined categories from shared requests only, subject to disclosure thresholds and complementary suppression.
+8. If migration 038 is later approved, an authorised recipient may record an agreed follow-up and separate encrypted action/progress evidence. The employee then records whether support helped or whether further support is needed. Administrative closure is not treated as employee-confirmed resolution.
 
 ## Data minimisation
 
@@ -47,6 +48,8 @@ The following are prohibited from the AI context and private store:
 
 Audit records contain action, outcome, timestamp, entity identifier and correlation identifier only. They do not contain prompts, responses, transcript text or support-request payloads.
 
+Support-action metadata is limited to tenant, request, approved owner, due date, state, concurrency version and timestamps. The action summary and any progress/completion evidence are application-encrypted. These records are not general operational actions and are excluded from ordinary Operations, Insights, Copilot and exports.
+
 ## Access controls
 
 - Private conversations: owning employee only.
@@ -59,6 +62,8 @@ Audit records contain action, outcome, timestamp, entity identifier and correlat
 - Copilot, Insights, general operations, data exports and demo role switching: no private conversation content.
 
 All database tables are service-role only and application-encrypted content remains unintelligible without the separate server-held key. The server must revalidate membership, organisation, ownership and recipient assignment on every request.
+
+If a recipient becomes inactive, their content access and mutation authority fail immediately. Reassignment must name another active, individually approved recipient and leave append-only evidence. No role-wide fallback or Platform Admin override is permitted.
 
 ## Retention and deletion proposal
 
@@ -109,6 +114,9 @@ The initial rule suppresses cells below five and uses complementary suppression 
 | Deletion misunderstood because of backups | In-product explanation and runbook-aligned erasure process | Final retention language |
 | Under-18 use | Explicit adult eligibility gate; missing/expired means disabled | Operational owner and evidence source |
 | AI/provider outage | Honest unavailable state; no fabricated response | Timeout and failure test |
+| AI-assisted draft is mistaken for employee testimony | Facts and AI suggestions are presented separately; all fields remain editable and require review/send | Draft usability and accuracy review |
+| Administrative closure is mistaken for successful support | Separate employee outcome state and explicit `helped` / `further support` response | Migration 038 approval and end-to-end acceptance |
+| Inactive action owner leaves unsafe access or stalled support | Per-request revalidation and controlled reassignment to another named active recipient | Revocation/reassignment test and operational owner |
 
 ## Required approvals before any Preview enablement
 

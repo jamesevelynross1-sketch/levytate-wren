@@ -1,6 +1,6 @@
 # LevyTate My Support / digital pastoral companion
 
-Status: migration foundation applied and verified; application capability remains disabled for every organisation.
+Status: migration 037 foundation applied and verified; migration 038 follow-up extension prepared and isolated-restore validated but not applied; application capability remains disabled for every organisation.
 
 ## Purpose and boundary
 
@@ -120,6 +120,26 @@ Only the active assigned recipient may progress it. The employee can reopen or d
 
 Notifications contain only a minimal alert that a support request is available; they must not contain the request body or private conversation text.
 
+When the employee explicitly asks the assistant to help prepare a request, the assistant may return a structured editable draft from the bounded active conversation even when history saving is off. The draft separates employee-reported facts from AI suggestions. Empty or uncertain fields stay editable and no recipient is selected automatically. The employee must still choose an eligible recipient, review the exact shared fields and press `Send support request`. The transcript, the facts checklist and AI suggestions are not included in the submitted payload.
+
+Assistant submission uses a stable client message identifier. Saved exchanges retain the structured assistant state inside the same authenticated ciphertext envelope, so retrying after a lost response returns the persisted exchange rather than creating another. With history off, the active browser conversation remains transient. Network failure, timeout, invalid model output and session expiry retain the employee's unsent text and restore the controls; errors never log message content.
+
+## Human follow-up extension — migration 038 prepared only
+
+Migration `038_create_pastoral_human_follow_up.sql` is not present on the shared Supabase project and requires fresh explicit approval before application. It adds:
+
+- an agreed follow-up timestamp on the shared request;
+- a separate administrative-closure timestamp and employee outcome state;
+- employee confirmation that support helped, or a request for further support;
+- individually encrypted support-action summaries, an approved responsible recipient, due date, state and concurrency version;
+- encrypted progress/completion evidence in append-only action events;
+- idempotent, optimistic-concurrency RPCs for follow-up, action creation/progress and employee outcome;
+- explicit non-null actor matching, tenant checks, forced RLS and no browser grants.
+
+The employee sees the action, owner, due date and approved progress. Ordinary Operations, Insights, Copilot and exports do not query the action tables. Administrative closure changes the request to `awaiting_employee_response`; it does not assert that the employee's concern has been resolved. Only the employee can confirm `helped` or request `further_support_requested`.
+
+If a support contact becomes inactive, they immediately fail revalidation and cannot update requests or actions. The current active assigned recipient must select another individually approved active recipient using the controlled reassignment path. The history retains the previous owner; it is not rewritten. If no safe replacement exists, action updates stop and the employer test owner must approve a new recipient before work resumes.
+
 ## Recipient routing
 
 Recipients are individually approved, active records. Role possession alone does not create access, and “all Employer Admins” is never an implicit recipient group.
@@ -205,6 +225,23 @@ The feature is available only when all of the following pass:
 
 Normal Client V1 workspaces and Production fail closed. No real employer or employee is enabled by migration.
 
+## Fictional protected-Preview activation procedure
+
+Activation is intentionally a separate change after migration 038 approval. For the existing fictional Ground Control validation workspace only:
+
+1. confirm the protected deployment is a Preview of `feature/operational-rbac`, not Production;
+2. apply migration 038 only after a current backup/restore gate and schema approval;
+3. configure branch-scoped Preview variables `LEVYTATE_PASTORAL_SUPPORT_ENABLED`, `LEVYTATE_PASTORAL_SUPPORT_ENCRYPTION_KEY_V1`, `LEVYTATE_PASTORAL_SUPPORT_ENCRYPTION_KEY_VERSION` and `LEVYTATE_PASTORAL_SUPPORT_RATE_LIMIT_SECRET`, entering secret values directly and never copying them into Git or chat;
+4. enable `pastoral_support_enabled` only for the fictional Ground Control organisation;
+5. add one explicit, non-expired adult eligibility row for the approved fictional employee and no real identity;
+6. approve named fictional recipients individually, including an independent alternative when the Line Manager or usual support contact is implicated;
+7. verify employee ownership, recipient revocation, role switching, cross-tenant denial, mobile/desktop accessibility and disabled Production behaviour;
+8. after the demonstration, disable the organisation capability and remove or expire the fictional eligibility/recipient records under the test-data plan.
+
+The server gate always returns false in Production, even if an environment value is accidentally present. Other Preview branches receive no access unless they independently have all branch-scoped secrets and their own authorised fictional records. Demo role switching never returns private conversations; a recipient sees only explicitly addressed/assigned requests.
+
+Named approvals required before fictional enablement: Product Owner (scope and identity), Data Protection lead (wording, retention and fictional-data flow), safeguarding lead/qualified adviser (response and emergency copy), Security owner (key handling, logging, revocation and incident path), and employer test owner (named recipients, responsibilities and alternative route). Fictional approval is not approval for real employee data.
+
 ## Approval and deployment checklist
 
 - [x] Fresh manual backup completed under `LEVYTATE_DATABASE_BACKUP_AND_RESTORE.md`.
@@ -220,7 +257,6 @@ Normal Client V1 workspaces and Production fail closed. No real employer or empl
 - [ ] TypeScript, lint and build pass.
 - [ ] Protected Preview tested at desktop, tablet and 390px mobile widths.
 - [ ] Production remains disabled.
-
-### Known pre-demonstration workflow gap
-
-Migration 037 records encrypted recipient notes and a controlled request state machine, but it does not provide dedicated durable fields/events for a structured follow-up date, discrete support-action completion, or an employee's positive confirmation that support helped. Administrative resolution is clearly distinct because the employee can reopen or dispute it, but positive employee confirmation cannot be recorded without an additional authorised additive migration. No follow-on migration is included or authorised here, so the capability must remain disabled until product, privacy and safeguarding owners decide whether that evidence is mandatory for the demonstration workflow.
+- [x] Migration 038 prepared and validated twice on an isolated restored database.
+- [ ] Migration 038 separately authorised and applied to the shared project.
+- [ ] Fictional Ground Control capability, adult eligibility and named recipients separately authorised.

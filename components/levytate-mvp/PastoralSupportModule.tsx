@@ -11,16 +11,18 @@ import {
   Trash2,
   UserRoundCheck,
 } from "lucide-react";
-import { useEffect, useId, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import type {
   PastoralAssistantResponse,
   PastoralContactMethod,
   PastoralConversationMessage,
   PastoralSupportRequestView,
+  PastoralSupportRequestDraft,
   PastoralTopicCategory,
   PastoralUrgencyRoute,
   PastoralWorkspace,
 } from "@/lib/levytate/pastoral/domain";
+import { pastoralRecipientIsSafeForConcern } from "@/lib/levytate/pastoral/domain";
 import { MvpLoadingState, MvpPanel, StatusBadge } from "@/components/levytate-mvp/MvpUi";
 
 type EmployeeView = "conversation" | "requests" | "privacy";
@@ -56,7 +58,27 @@ const emptyDraft = () => ({
   recipientId: "",
   urgencyRoute: "standard" as PastoralUrgencyRoute,
   idempotencyKey: crypto.randomUUID(),
+  employeeReportedFacts: [] as string[],
+  aiSuggestions: [] as string[],
 });
+
+type SupportRequestFormDraft = ReturnType<typeof emptyDraft>;
+
+function formDraftFromAssistant(draft: PastoralSupportRequestDraft): SupportRequestFormDraft {
+  return {
+    ...emptyDraft(),
+    topicCategory: draft.topicCategory,
+    topic: draft.topic,
+    whatIWantYouToUnderstand: draft.whatIWantYouToUnderstand,
+    howItIsAffectingMe: draft.howItIsAffectingMe,
+    supportIWant: draft.supportIWant,
+    preferredContactMethod: draft.preferredContactMethod,
+    sharingRestrictions: draft.sharingRestrictions,
+    urgencyRoute: draft.urgencyRoute,
+    employeeReportedFacts: draft.employeeReportedFacts,
+    aiSuggestions: draft.aiSuggestions,
+  };
+}
 
 export function PastoralSupportModule() {
   const [workspace, setWorkspace] = useState<PastoralWorkspace | null>(null);
@@ -92,10 +114,12 @@ function EmployeePastoralWorkspace({ workspace, onWorkspace }: { workspace: Past
   const [draftOpen, setDraftOpen] = useState(false);
   const [suggestedTopic, setSuggestedTopic] = useState<PastoralTopicCategory>("apprenticeship_support");
   const [suggestedUrgency, setSuggestedUrgency] = useState<PastoralUrgencyRoute>("standard");
+  const [assistantDraft, setAssistantDraft] = useState<PastoralSupportRequestDraft | null>(null);
 
-  function openRequest(topic = suggestedTopic, urgency = suggestedUrgency) {
+  function openRequest(topic = suggestedTopic, urgency = suggestedUrgency, draft?: PastoralSupportRequestDraft | null) {
     setSuggestedTopic(topic);
     setSuggestedUrgency(urgency);
+    setAssistantDraft(draft ?? null);
     setDraftOpen(true);
     setView("requests");
   }
@@ -124,7 +148,7 @@ function EmployeePastoralWorkspace({ workspace, onWorkspace }: { workspace: Past
     </section>
 
     {view === "conversation" ? <ConversationPanel workspace={workspace} messages={messages} conversationId={conversationId} onMessages={setMessages} onConversationId={setConversationId} onRequestSupport={openRequest} /> : null}
-    {view === "requests" ? <EmployeeRequests workspace={workspace} draftOpen={draftOpen} initialTopic={suggestedTopic} initialUrgency={suggestedUrgency} onDraftOpen={setDraftOpen} onWorkspace={onWorkspace} /> : null}
+    {view === "requests" ? <EmployeeRequests workspace={workspace} draftOpen={draftOpen} initialTopic={suggestedTopic} initialUrgency={suggestedUrgency} assistantDraft={assistantDraft} onBlankDraft={() => openRequest("apprenticeship_support", "standard", null)} onDraftOpen={setDraftOpen} onWorkspace={onWorkspace} /> : null}
     {view === "privacy" ? <PrivacyPanel workspace={workspace} onWorkspace={onWorkspace} onResume={resumeConversation} /> : null}
   </div>;
 }
@@ -135,46 +159,82 @@ function ConversationPanel({ workspace, messages, conversationId, onMessages, on
   conversationId: string | null;
   onMessages: (messages: PastoralConversationMessage[]) => void;
   onConversationId: (id: string | null) => void;
-  onRequestSupport: (topic?: PastoralTopicCategory, urgency?: PastoralUrgencyRoute) => void;
+  onRequestSupport: (topic?: PastoralTopicCategory, urgency?: PastoralUrgencyRoute, draft?: PastoralSupportRequestDraft | null) => void;
 }) {
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [latest, setLatest] = useState<PastoralAssistantResponse | null>(null);
+  const [failed, setFailed] = useState<{ message: string; clientMessageId: string; draftSupportRequest: boolean; prior: Array<{ author: "employee" | "assistant"; content: string }> } | null>(null);
+  const inFlight = useRef(false);
   const inputId = useId();
+
+  async function sendAttempt(clean: string, clientMessageId: string, draftSupportRequest: boolean, prior: Array<{ author: "employee" | "assistant"; content: string }>, appendEmployeeMessage: boolean) {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    const userMessage: PastoralConversationMessage = { id: clientMessageId, author: "employee", content: clean, createdAt: new Date().toISOString() };
+    const baseMessages = appendEmployeeMessage ? [...messages, userMessage] : messages;
+    if (appendEmployeeMessage) onMessages(baseMessages);
+    setMessage("");
+    setSending(true);
+    setError("");
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 25_000);
+    try {
+      const response = await fetch("/api/levytate-pastoral/assistant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: clean, conversationId, clientMessageId, recentMessages: prior, draftSupportRequest }),
+        signal: controller.signal,
+      });
+      const body = await safeJson(response);
+      if (!response.ok || !body?.response) {
+        setFailed({ message: clean, clientMessageId, draftSupportRequest, prior });
+        setMessage(clean);
+        setError(response.status === 401 ? "Your session has ended. Sign in again, then retry your message." : body?.message || "The AI conversation is temporarily unavailable. Your message has been kept so you can retry safely.");
+        return;
+      }
+      const result = body.response as PastoralAssistantResponse;
+      setLatest(result);
+      setFailed(null);
+      onConversationId(result.conversationId);
+      onMessages([...baseMessages, { id: `${clientMessageId}:assistant`, author: "assistant", content: result.reply, createdAt: new Date().toISOString() }]);
+      if (result.supportRequestDraft) onRequestSupport(result.suggestedTopicCategory, result.urgencyRoute, result.supportRequestDraft);
+    } catch (requestError) {
+      setFailed({ message: clean, clientMessageId, draftSupportRequest, prior });
+      setMessage(clean);
+      setError(requestError instanceof DOMException && requestError.name === "AbortError" ? "My Support took too long to respond. Your message has been kept; retry when you are ready." : "The connection was interrupted. Your message has been kept; retry when you are ready.");
+    } finally {
+      window.clearTimeout(timeout);
+      setSending(false);
+      inFlight.current = false;
+    }
+  }
 
   async function send(event: FormEvent) {
     event.preventDefault();
     const clean = message.trim().slice(0, 3000);
     if (!clean || sending) return;
-    const clientMessageId = crypto.randomUUID();
-    const userMessage: PastoralConversationMessage = { id: clientMessageId, author: "employee", content: clean, createdAt: new Date().toISOString() };
-    const prior = messages.slice(-8);
-    onMessages([...messages, userMessage]);
-    setMessage("");
-    setSending(true);
-    setError("");
-    const response = await fetch("/api/levytate-pastoral/assistant", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: clean, conversationId, clientMessageId, recentMessages: prior.map(({ author, content }) => ({ author, content })) }),
-    });
-    const body = await safeJson(response);
-    setSending(false);
-    if (!response.ok || !body?.response) {
-      setError(body?.message || "The AI conversation is temporarily unavailable. You can still request human support.");
-      return;
-    }
-    const result = body.response as PastoralAssistantResponse;
-    setLatest(result);
-    onConversationId(result.conversationId);
-    onMessages([...messages, userMessage, { id: `${clientMessageId}:assistant`, author: "assistant", content: result.reply, createdAt: new Date().toISOString() }]);
+    const prior = messages.slice(-8).map(({ author, content }) => ({ author, content }));
+    await sendAttempt(clean, crypto.randomUUID(), false, prior, true);
+  }
+
+  async function prepareDraft() {
+    const clean = "Please help me prepare a support request from what I have told you.";
+    const prior = messages.slice(-8).map(({ author, content }) => ({ author, content }));
+    await sendAttempt(clean, crypto.randomUUID(), true, prior, true);
+  }
+
+  async function retryFailed() {
+    if (!failed) return;
+    await sendAttempt(failed.message, failed.clientMessageId, failed.draftSupportRequest, failed.prior, false);
   }
 
   function startNew() {
     onConversationId(null);
     onMessages([]);
     setLatest(null);
+    setFailed(null);
     setError("");
   }
 
@@ -182,8 +242,8 @@ function ConversationPanel({ workspace, messages, conversationId, onMessages, on
     <MvpPanel title="Talk it through" eyebrow="Private AI conversation" actions={messages.length ? <button type="button" onClick={startNew} className="min-h-10 rounded-xl border border-[#102c3d]/10 px-3 text-xs font-semibold text-[#102c3d] hover:bg-[#f4f8f5]">Start a new conversation</button> : undefined}>
       <div className="grid gap-5">
         {!messages.length ? <div><h3 className="text-lg font-semibold text-[#102c3d]">You can start wherever feels easiest.</h3><p className="mt-1 text-sm leading-6 text-[#102c3d]/58">Choose a prompt or write in your own words. You can ask to talk without advice.</p><div className="mt-4 grid gap-2 sm:grid-cols-2">{starters.map((starter) => <button key={starter} type="button" onClick={() => setMessage(starter)} className="min-h-12 rounded-xl border border-[#102c3d]/[0.08] bg-[#f8fbfa] px-4 py-3 text-left text-sm font-semibold leading-5 text-[#102c3d] transition hover:border-[#159b8f]/35 hover:bg-[#eef8f4] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20">{starter}</button>)}</div></div> : <div aria-live="polite" className="grid max-h-[32rem] gap-3 overflow-y-auto pr-1">{messages.map((entry) => <article key={entry.id} className={`max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-6 ${entry.author === "employee" ? "ml-auto bg-[#102c3d] text-white" : "bg-[#edf7f3] text-[#102c3d]"}`}><p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] opacity-55">{entry.author === "employee" ? "You" : "My Support · AI"}</p><p className="whitespace-pre-wrap">{entry.content}</p></article>)}{sending ? <div className="max-w-[88%] rounded-2xl bg-[#edf7f3] px-4 py-3 text-sm text-[#102c3d]/60">My Support is preparing a response…</div> : null}</div>}
-        {error ? <div role="alert" className="rounded-xl border border-[#c95568]/20 bg-[#fff4f5] p-4 text-sm leading-6 text-[#8f3042]"><p>{error}</p>{workspace.recipients.length ? <button type="button" onClick={() => onRequestSupport()} className="mt-3 min-h-10 rounded-xl bg-[#102c3d] px-4 text-xs font-semibold text-white">Request human support</button> : null}</div> : null}
-        {latest?.supportOffer ? <div className="rounded-xl border border-[#159b8f]/20 bg-[#f0f8f5] p-4"><p className="text-sm font-semibold text-[#102c3d]">Would you like support from a person?</p><p className="mt-1 text-xs leading-5 text-[#102c3d]/58">You can prepare a separate request. Your private conversation will not be attached.</p><button type="button" onClick={() => onRequestSupport(latest.suggestedTopicCategory, latest.urgencyRoute)} className="mt-3 min-h-10 rounded-xl bg-[#102c3d] px-4 text-xs font-semibold text-white">Prepare a support request</button></div> : null}
+        {error ? <div role="alert" className="rounded-xl border border-[#c95568]/20 bg-[#fff4f5] p-4 text-sm leading-6 text-[#8f3042]"><p>{error}</p><div className="mt-3 flex flex-wrap gap-2">{failed ? <button type="button" disabled={sending} onClick={retryFailed} className="min-h-10 rounded-xl bg-[#102c3d] px-4 text-xs font-semibold text-white disabled:opacity-45">Retry this message</button> : null}{workspace.recipients.length ? <button type="button" onClick={() => onRequestSupport()} className="min-h-10 rounded-xl border border-[#102c3d]/15 px-4 text-xs font-semibold text-[#102c3d]">Request human support</button> : null}</div></div> : null}
+        {latest?.supportOffer ? <div className="rounded-xl border border-[#159b8f]/20 bg-[#f0f8f5] p-4"><p className="text-sm font-semibold text-[#102c3d]">Would you like support from a person?</p><p className="mt-1 text-xs leading-5 text-[#102c3d]/58">Ask the AI to prepare an editable draft from this active conversation. Nothing is sent and your transcript is never attached.</p><button type="button" disabled={sending} onClick={latest.supportRequestDraft ? () => onRequestSupport(latest.suggestedTopicCategory, latest.urgencyRoute, latest.supportRequestDraft) : prepareDraft} className="mt-3 min-h-10 rounded-xl bg-[#102c3d] px-4 text-xs font-semibold text-white disabled:opacity-45">{latest.supportRequestDraft ? "Review AI-assisted draft" : "Help me prepare a support request"}</button></div> : null}
         <form onSubmit={send} className="border-t border-[#102c3d]/[0.07] pt-4"><label htmlFor={inputId} className="text-xs font-semibold text-[#102c3d]">What would you like to talk through?</label><textarea id={inputId} value={message} onChange={(event) => setMessage(event.target.value.slice(0, 3000))} rows={4} maxLength={3000} placeholder="Write in your own words…" className="mt-2 w-full resize-y rounded-xl border border-[#102c3d]/10 bg-[#f8fbfa] px-4 py-3 text-sm leading-6 text-[#102c3d] outline-none focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10" /><div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><p className="text-[11px] leading-5 text-[#102c3d]/48">{workspace.employee?.historySavingEnabled ? "This conversation will be encrypted and saved so you can return to it." : "History saving is off. Routine chat content is not stored after this active session."}</p><button disabled={sending || !message.trim()} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#102c3d] px-5 text-sm font-semibold text-white disabled:opacity-45"><Send size={15} aria-hidden="true" />Send</button></div></form>
       </div>
     </MvpPanel>
@@ -197,11 +257,13 @@ function ContextCard({ workspace }: { workspace: PastoralWorkspace }) {
   return <section className="rounded-2xl border border-[#102c3d]/[0.07] bg-white p-5"><p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#0b6f63]">Your apprenticeship context</p><h3 className="mt-2 text-sm font-semibold text-[#102c3d]">{context.programmeName}</h3><dl className="mt-3 grid gap-2 text-xs"><div className="flex justify-between gap-3"><dt className="text-[#102c3d]/48">Provider</dt><dd className="text-right font-semibold">{context.providerName}</dd></div><div className="flex justify-between gap-3"><dt className="text-[#102c3d]/48">Stage</dt><dd className="text-right font-semibold">{humanise(context.lifecycleStage)}</dd></div></dl><p className="mt-3 text-[11px] leading-5 text-[#102c3d]/48">Only this minimal, learner-visible context is made available to the assistant.</p></section>;
 }
 
-function EmployeeRequests({ workspace, draftOpen, initialTopic, initialUrgency, onDraftOpen, onWorkspace }: {
+function EmployeeRequests({ workspace, draftOpen, initialTopic, initialUrgency, assistantDraft, onBlankDraft, onDraftOpen, onWorkspace }: {
   workspace: PastoralWorkspace;
   draftOpen: boolean;
   initialTopic: PastoralTopicCategory;
   initialUrgency: PastoralUrgencyRoute;
+  assistantDraft: PastoralSupportRequestDraft | null;
+  onBlankDraft: () => void;
   onDraftOpen: (open: boolean) => void;
   onWorkspace: (workspace: PastoralWorkspace) => void;
 }) {
@@ -211,16 +273,24 @@ function EmployeeRequests({ workspace, draftOpen, initialTopic, initialUrgency, 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  useEffect(() => { if (draftOpen) setDraft((current) => ({ ...current, topicCategory: initialTopic, urgencyRoute: initialUrgency })); }, [draftOpen, initialTopic, initialUrgency]);
+  useEffect(() => {
+    if (!draftOpen) return;
+    setDraft(assistantDraft ? formDraftFromAssistant(assistantDraft) : { ...emptyDraft(), topicCategory: initialTopic, urgencyRoute: initialUrgency });
+  }, [assistantDraft, draftOpen, initialTopic, initialUrgency]);
 
   async function mutate(body: unknown) {
+    if (working) return false;
     setWorking(true); setError(""); setSuccess("");
-    const response = await fetch("/api/levytate-pastoral", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    const result = await safeJson(response);
-    setWorking(false);
-    if (!response.ok || !result?.workspace) { setError(result?.message || "The support request could not be updated."); return false; }
-    onWorkspace(result.workspace as PastoralWorkspace);
-    return true;
+    try {
+      const response = await fetch("/api/levytate-pastoral", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const result = await safeJson(response);
+      if (!response.ok || !result?.workspace) { setError(response.status === 401 ? "Your session has ended. Sign in again before retrying." : result?.message || "The support request could not be updated. Your draft has been kept."); return false; }
+      onWorkspace(result.workspace as PastoralWorkspace);
+      return true;
+    } catch {
+      setError("The connection was interrupted. Your draft has been kept and the same submission can be retried safely.");
+      return false;
+    } finally { setWorking(false); }
   }
 
   async function send() {
@@ -253,12 +323,17 @@ function EmployeeRequests({ workspace, draftOpen, initialTopic, initialUrgency, 
     if (ok) setSuccess(transition === "reopen" ? "The support request has been reopened." : "Your request for further help has been recorded.");
   }
 
+  async function employeeOutcome(request: PastoralSupportRequestView, outcome: "helped" | "further_support_requested") {
+    const ok = await mutate({ action: "record_employee_outcome", requestId: request.id, outcome, expectedLockVersion: request.lockVersion, idempotencyKey: crypto.randomUUID(), note: outcome === "further_support_requested" ? "I need further support with this request." : undefined });
+    if (ok) setSuccess(outcome === "helped" ? "You confirmed that the support helped." : "Your request for further support has been recorded.");
+  }
+
   return <div className="grid gap-5">
-    <MvpPanel title="My support requests" eyebrow="Only what you choose to share" actions={<button type="button" onClick={() => { onDraftOpen(true); setReviewing(false); setError(""); }} disabled={!workspace.recipients.length} className="min-h-10 rounded-xl bg-[#102c3d] px-4 text-xs font-semibold text-white disabled:opacity-45">New support request</button>}>
+    <MvpPanel title="My support requests" eyebrow="Only what you choose to share" actions={<button type="button" onClick={() => { onBlankDraft(); setReviewing(false); setError(""); }} disabled={!workspace.recipients.length} className="min-h-10 rounded-xl bg-[#102c3d] px-4 text-xs font-semibold text-white disabled:opacity-45">New support request</button>}>
       <p className="text-sm leading-6 text-[#102c3d]/58">A support request is separate from your private AI conversation. Your transcript is never attached automatically and later messages are not shared.</p>
       {success ? <p role="status" className="mt-4 rounded-xl bg-[#eaf7f2] p-3 text-sm font-semibold text-[#0b6f63]">{success}</p> : null}
       {error ? <p role="alert" className="mt-4 rounded-xl bg-[#fff1f3] p-3 text-sm font-semibold text-[#a33a4d]">{error}</p> : null}
-      {!workspace.requests.length ? <div className="mt-5 rounded-xl border border-dashed border-[#102c3d]/15 bg-[#f8fbfa] p-6 text-center"><UserRoundCheck className="mx-auto text-[#0b776e]" size={23} aria-hidden="true" /><h3 className="mt-3 text-sm font-semibold text-[#102c3d]">No support requests sent</h3><p className="mt-1 text-xs leading-5 text-[#102c3d]/55">You stay in control of whether anything is shared.</p></div> : <div className="mt-5 grid gap-3">{workspace.requests.map((request) => <RequestCard key={request.id} request={request} employeeView onTransition={(transition) => employeeTransition(request, transition)} />)}</div>}
+      {!workspace.requests.length ? <div className="mt-5 rounded-xl border border-dashed border-[#102c3d]/15 bg-[#f8fbfa] p-6 text-center"><UserRoundCheck className="mx-auto text-[#0b776e]" size={23} aria-hidden="true" /><h3 className="mt-3 text-sm font-semibold text-[#102c3d]">No support requests sent</h3><p className="mt-1 text-xs leading-5 text-[#102c3d]/55">You stay in control of whether anything is shared.</p></div> : <div className="mt-5 grid gap-3">{workspace.requests.map((request) => <RequestCard key={request.id} request={request} employeeView onTransition={(transition) => employeeTransition(request, transition)} onOutcome={(outcome) => employeeOutcome(request, outcome)} />)}</div>}
     </MvpPanel>
     {draftOpen ? <SupportRequestDraft workspace={workspace} draft={draft} reviewing={reviewing} working={working} onDraft={setDraft} onReview={() => setReviewing(true)} onBack={() => setReviewing(false)} onCancel={() => { onDraftOpen(false); setReviewing(false); }} onSend={send} /> : null}
   </div>;
@@ -266,25 +341,21 @@ function EmployeeRequests({ workspace, draftOpen, initialTopic, initialUrgency, 
 
 function SupportRequestDraft({ workspace, draft, reviewing, working, onDraft, onReview, onBack, onCancel, onSend }: {
   workspace: PastoralWorkspace;
-  draft: ReturnType<typeof emptyDraft>;
+  draft: SupportRequestFormDraft;
   reviewing: boolean;
   working: boolean;
-  onDraft: (draft: ReturnType<typeof emptyDraft>) => void;
+  onDraft: (draft: SupportRequestFormDraft) => void;
   onReview: () => void;
   onBack: () => void;
   onCancel: () => void;
   onSend: () => void;
 }) {
   const concernText = `${draft.topic} ${draft.whatIWantYouToUnderstand} ${draft.howItIsAffectingMe} ${draft.supportIWant} ${draft.sharingRestrictions}`;
-  const safeRecipients = workspace.recipients.filter((entry) => {
-    if (entry.kind === "line_manager" && /\b(?:my\s+)?(?:line\s+)?manager\b/i.test(concernText)) return false;
-    if (entry.kind === "apprenticeship_lead" && /\bapprenticeship\s+lead\b/i.test(concernText)) return false;
-    return true;
-  });
+  const safeRecipients = workspace.recipients.filter((entry) => pastoralRecipientIsSafeForConcern(entry, concernText));
   const recipient = safeRecipients.find((entry) => entry.id === draft.recipientId);
   const canReview = Boolean(recipient && draft.topic.trim() && draft.whatIWantYouToUnderstand.trim() && draft.supportIWant.trim());
-  if (reviewing) return <MvpPanel title="Review before sending" eyebrow="Your choice"><div className="grid gap-4"><div className="rounded-xl border border-[#159b8f]/20 bg-[#f1f8f5] p-4"><p className="text-xs font-semibold text-[#0b6f63]">This is exactly what will be shared</p><dl className="mt-3 grid gap-3 text-sm"><ReviewRow label="Recipient" value={recipient?.label || "Not selected"} /><ReviewRow label="Topic" value={draft.topic} /><ReviewRow label="What to understand" value={draft.whatIWantYouToUnderstand} /><ReviewRow label="Effect on apprenticeship" value={draft.howItIsAffectingMe || "Not provided"} /><ReviewRow label="Support requested" value={draft.supportIWant} /><ReviewRow label="Preferred contact" value={humanise(draft.preferredContactMethod)} /><ReviewRow label="Sharing restrictions" value={draft.sharingRestrictions || "None provided"} /></dl></div><div className="flex items-start gap-3 rounded-xl bg-[#fff8df] p-4 text-xs leading-5 text-[#65550b]"><LockKeyhole className="mt-0.5 shrink-0" size={16} aria-hidden="true" />Your private conversation is not included. Sending this request does not authorise sharing later conversations.</div><div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><button type="button" onClick={onBack} disabled={working} className="min-h-11 rounded-xl border border-[#102c3d]/10 px-4 text-xs font-semibold">Edit request</button><button type="button" onClick={onSend} disabled={working} className="min-h-11 rounded-xl bg-[#102c3d] px-5 text-xs font-semibold text-white disabled:opacity-50">{working ? "Sending…" : "Send support request"}</button></div></div></MvpPanel>;
-  return <MvpPanel title="Prepare a support request" eyebrow="Editable draft"><form onSubmit={(event) => { event.preventDefault(); if (canReview) onReview(); }} className="grid gap-4"><div className="grid gap-4 md:grid-cols-2"><SelectField label="Topic category" value={draft.topicCategory} options={topicOptions} onChange={(value) => onDraft({ ...draft, topicCategory: value as PastoralTopicCategory })} /><SelectField label="Intended recipient" value={recipient ? draft.recipientId : ""} options={[{ value: "", label: safeRecipients.length ? "Choose an approved support contact" : "No independent approved contact is available" }, ...safeRecipients.map((entry) => ({ value: entry.id, label: entry.label }))]} onChange={(value) => onDraft({ ...draft, recipientId: value })} /></div>{safeRecipients.length < workspace.recipients.length ? <p className="rounded-xl bg-[#fff8df] p-3 text-xs leading-5 text-[#65550b]">A contact mentioned in the concern has been removed from the recipient choices. Choose an independent approved support route.</p> : null}<TextField label="Topic" value={draft.topic} maxLength={180} onChange={(value) => onDraft({ ...draft, topic: value })} placeholder="A short description of what you need help with" /><TextArea label="What would you like your support contact to understand?" value={draft.whatIWantYouToUnderstand} maxLength={2500} onChange={(value) => onDraft({ ...draft, whatIWantYouToUnderstand: value })} /><TextArea label="How is this affecting your apprenticeship?" value={draft.howItIsAffectingMe} maxLength={1800} onChange={(value) => onDraft({ ...draft, howItIsAffectingMe: value })} /><TextArea label="What support would you like?" value={draft.supportIWant} maxLength={1800} onChange={(value) => onDraft({ ...draft, supportIWant: value })} /><div className="grid gap-4 md:grid-cols-2"><SelectField label="Preferred contact method" value={draft.preferredContactMethod} options={[{ value: "in_platform", label: "In LevyTate" }, { value: "email", label: "Email" }, { value: "phone", label: "Phone" }, { value: "meeting", label: "Meeting" }, { value: "provider_route", label: "Provider support route" }]} onChange={(value) => onDraft({ ...draft, preferredContactMethod: value as PastoralContactMethod })} /><TextField label="Restrictions on who should be contacted" value={draft.sharingRestrictions} maxLength={1000} onChange={(value) => onDraft({ ...draft, sharingRestrictions: value })} placeholder="Optional" /></div><div className="flex flex-col-reverse gap-2 border-t border-[#102c3d]/[0.07] pt-4 sm:flex-row sm:justify-end"><button type="button" onClick={onCancel} className="min-h-11 rounded-xl border border-[#102c3d]/10 px-4 text-xs font-semibold">Cancel</button><button disabled={!canReview} className="min-h-11 rounded-xl bg-[#102c3d] px-5 text-xs font-semibold text-white disabled:opacity-45">Review support request</button></div></form></MvpPanel>;
+  if (reviewing) return <MvpPanel title="Review before sending" eyebrow="Your choice"><div className="grid gap-4"><div className="rounded-xl border border-[#159b8f]/20 bg-[#f1f8f5] p-4"><p className="text-xs font-semibold text-[#0b6f63]">This is exactly what will be shared</p><dl className="mt-3 grid gap-3 text-sm"><ReviewRow label="Recipient" value={recipient?.label || "Not selected"} /><ReviewRow label="Topic" value={draft.topic} /><ReviewRow label="What to understand" value={draft.whatIWantYouToUnderstand} /><ReviewRow label="Effect on apprenticeship" value={draft.howItIsAffectingMe || "Not provided"} /><ReviewRow label="Support requested" value={draft.supportIWant} /><ReviewRow label="Preferred contact" value={humanise(draft.preferredContactMethod)} /><ReviewRow label="Sharing restrictions" value={draft.sharingRestrictions || "None provided"} /></dl></div><div className="flex items-start gap-3 rounded-xl bg-[#fff8df] p-4 text-xs leading-5 text-[#65550b]"><LockKeyhole className="mt-0.5 shrink-0" size={16} aria-hidden="true" />Your private conversation, AI suggestions and reported-facts checklist are not included. Sending this request does not authorise sharing later conversations.</div><div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><button type="button" onClick={onBack} disabled={working} className="min-h-11 rounded-xl border border-[#102c3d]/10 px-4 text-xs font-semibold">Edit request</button><button type="button" onClick={onSend} disabled={working} className="min-h-11 rounded-xl bg-[#102c3d] px-5 text-xs font-semibold text-white disabled:opacity-50">{working ? "Sending…" : "Send support request"}</button></div></div></MvpPanel>;
+  return <MvpPanel title="Prepare a support request" eyebrow="Editable draft"><form onSubmit={(event) => { event.preventDefault(); if (canReview) onReview(); }} className="grid gap-4">{draft.employeeReportedFacts.length || draft.aiSuggestions.length ? <div className="grid gap-3 rounded-xl border border-[#102c3d]/[0.08] bg-[#f8fbfa] p-4 md:grid-cols-2"><DraftEvidenceList title="What you reported" items={draft.employeeReportedFacts} empty="No facts were extracted." /><DraftEvidenceList title="AI suggestions — not reported facts" items={draft.aiSuggestions} empty="No suggestions were added." /></div> : null}<p className="text-xs leading-5 text-[#102c3d]/55">Check every field. Delete, change or omit anything you do not want to share.</p><div className="grid gap-4 md:grid-cols-2"><SelectField label="Topic category" value={draft.topicCategory} options={topicOptions} onChange={(value) => onDraft({ ...draft, topicCategory: value as PastoralTopicCategory })} /><SelectField label="Intended recipient" value={recipient ? draft.recipientId : ""} options={[{ value: "", label: safeRecipients.length ? "Choose an approved support contact" : "No independent approved contact is available" }, ...safeRecipients.map((entry) => ({ value: entry.id, label: entry.label }))]} onChange={(value) => onDraft({ ...draft, recipientId: value })} /></div>{safeRecipients.length < workspace.recipients.length ? <p className="rounded-xl bg-[#fff8df] p-3 text-xs leading-5 text-[#65550b]">A contact mentioned in the concern has been removed from the recipient choices. Choose an independent approved support route.</p> : null}<TextField label="Topic" value={draft.topic} maxLength={180} onChange={(value) => onDraft({ ...draft, topic: value })} placeholder="A short description of what you need help with" /><TextArea label="What would you like your support contact to understand?" value={draft.whatIWantYouToUnderstand} maxLength={2500} onChange={(value) => onDraft({ ...draft, whatIWantYouToUnderstand: value })} /><TextArea label="How is this affecting your apprenticeship?" value={draft.howItIsAffectingMe} maxLength={1800} onChange={(value) => onDraft({ ...draft, howItIsAffectingMe: value })} /><TextArea label="What support would you like?" value={draft.supportIWant} maxLength={1800} onChange={(value) => onDraft({ ...draft, supportIWant: value })} /><div className="grid gap-4 md:grid-cols-2"><SelectField label="Preferred contact method" value={draft.preferredContactMethod} options={[{ value: "in_platform", label: "In LevyTate" }, { value: "email", label: "Email" }, { value: "phone", label: "Phone" }, { value: "meeting", label: "Meeting" }, { value: "provider_route", label: "Provider support route" }]} onChange={(value) => onDraft({ ...draft, preferredContactMethod: value as PastoralContactMethod })} /><TextField label="Restrictions on who should be contacted" value={draft.sharingRestrictions} maxLength={1000} onChange={(value) => onDraft({ ...draft, sharingRestrictions: value })} placeholder="Optional" /></div><div className="flex flex-col-reverse gap-2 border-t border-[#102c3d]/[0.07] pt-4 sm:flex-row sm:justify-end"><button type="button" onClick={onCancel} className="min-h-11 rounded-xl border border-[#102c3d]/10 px-4 text-xs font-semibold">Cancel</button><button disabled={!canReview} className="min-h-11 rounded-xl bg-[#102c3d] px-5 text-xs font-semibold text-white disabled:opacity-45">Review support request</button></div></form></MvpPanel>;
 }
 
 function PrivacyPanel({ workspace, onWorkspace, onResume }: { workspace: PastoralWorkspace; onWorkspace: (workspace: PastoralWorkspace) => void; onResume: (id: string) => void }) {
@@ -297,26 +368,58 @@ function PrivacyPanel({ workspace, onWorkspace, onResume }: { workspace: Pastora
 function SupportInbox({ workspace, onWorkspace }: { workspace: PastoralWorkspace; onWorkspace: (workspace: PastoralWorkspace) => void }) {
   const [selectedId, setSelectedId] = useState(workspace.requests[0]?.id ?? "");
   const [note, setNote] = useState("");
+  const [followUpAt, setFollowUpAt] = useState("");
+  const [actionSummary, setActionSummary] = useState("");
+  const [actionDueAt, setActionDueAt] = useState("");
+  const [actionOwnerId, setActionOwnerId] = useState("");
   const [working, setWorking] = useState(false);
   const [message, setMessage] = useState("");
   const noteId = useId();
   const selected = workspace.requests.find((request) => request.id === selectedId) ?? workspace.requests[0];
   const counts = useMemo(() => ({ open: workspace.requests.filter((request) => request.status !== "resolved").length, followUp: workspace.requests.filter((request) => request.status === "follow_up").length, resolved: workspace.requests.filter((request) => request.status === "resolved").length }), [workspace.requests]);
 
-  async function transition(action: "acknowledge" | "start_support" | "request_follow_up" | "resolve") {
-    if (!selected) return;
+  async function mutate(body: unknown, success: string) {
+    if (working) return false;
     setWorking(true); setMessage("");
-    const response = await fetch("/api/levytate-pastoral", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "transition_support_request", requestId: selected.id, transition: action, expectedLockVersion: selected.lockVersion, idempotencyKey: crypto.randomUUID(), note }) });
-    const result = await safeJson(response); setWorking(false);
-    if (!response.ok || !result?.workspace) { setMessage(result?.message || "The request could not be updated."); return; }
-    onWorkspace(result.workspace as PastoralWorkspace); setNote(""); setMessage("Support request updated.");
+    try {
+      const response = await fetch("/api/levytate-pastoral", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const result = await safeJson(response);
+      if (!response.ok || !result?.workspace) { setMessage(result?.message || "The request could not be updated."); return false; }
+      onWorkspace(result.workspace as PastoralWorkspace); setMessage(success); return true;
+    } catch {
+      setMessage("The connection was interrupted. Nothing was silently recorded; retry when ready."); return false;
+    } finally { setWorking(false); }
   }
 
-  return <div className="grid gap-5"><section className="rounded-2xl bg-[#102c3d] p-5 text-white sm:p-6"><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9de5d8]">Restricted support inbox</p><h2 className="mt-2 text-2xl font-semibold">Learner Support</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-white/68">Only requests addressed or explicitly assigned to your approved support identity appear here. Private employee conversations are never included.</p><div className="mt-5 grid gap-3 sm:grid-cols-3"><SummaryMetric label="Open requests" value={counts.open} /><SummaryMetric label="Follow-up" value={counts.followUp} /><SummaryMetric label="Resolved" value={counts.resolved} /></div></section>{!workspace.requests.length ? <MvpPanel title="Support inbox" eyebrow="Restricted"><div className="rounded-xl border border-dashed border-[#102c3d]/15 bg-[#f8fbfa] p-7 text-center"><CheckCircle2 className="mx-auto text-[#0b776e]" size={24} aria-hidden="true" /><h3 className="mt-3 text-sm font-semibold">No requests are assigned to you</h3><p className="mt-1 text-xs leading-5 text-[#102c3d]/55">Requests assigned to another support contact remain inaccessible.</p></div></MvpPanel> : <div className="grid gap-5 xl:grid-cols-[340px_minmax(0,1fr)]"><MvpPanel title="Assigned requests" eyebrow="Your support queue"><div className="grid gap-2">{workspace.requests.map((request) => <button key={request.id} type="button" onClick={() => setSelectedId(request.id)} aria-current={selected?.id === request.id ? "true" : undefined} className={`rounded-xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 ${selected?.id === request.id ? "border-[#159b8f]/35 bg-[#edf7f3]" : "border-[#102c3d]/[0.08] hover:bg-[#f8fbfa]"}`}><div className="flex items-start justify-between gap-2"><p className="text-sm font-semibold text-[#102c3d]">{request.payload.topic}</p><StatusBadge tone={statusTone(request.status)}>{humanise(request.status)}</StatusBadge></div><p className="mt-2 text-xs text-[#102c3d]/52">{request.employeeLabel} · {formatDate(request.submittedAt)}</p></button>)}</div></MvpPanel>{selected ? <MvpPanel title={selected.payload.topic} eyebrow="Employee-approved support request"><RequestDetail request={selected} /><div className="mt-5 border-t border-[#102c3d]/[0.07] pt-5"><label htmlFor={noteId} className="text-xs font-semibold text-[#102c3d]">Response or agreed action</label><textarea id={noteId} value={note} onChange={(event) => setNote(event.target.value.slice(0, 2000))} rows={3} maxLength={2000} placeholder="Record only the support response or agreed next action." className="mt-2 w-full rounded-xl border border-[#102c3d]/10 bg-[#f8fbfa] px-4 py-3 text-sm leading-6 outline-none focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10" /><div className="mt-3 flex flex-wrap gap-2">{selected.status === "submitted" ? <ActionButton label="Acknowledge receipt" onClick={() => transition("acknowledge")} disabled={working} /> : null}{["acknowledged", "follow_up"].includes(selected.status) ? <ActionButton label="Start support" onClick={() => transition("start_support")} disabled={working} /> : null}{["acknowledged", "support_in_progress"].includes(selected.status) ? <ActionButton label="Set follow-up" onClick={() => transition("request_follow_up")} disabled={working} /> : null}{["support_in_progress", "follow_up"].includes(selected.status) ? <ActionButton label="Mark resolved" onClick={() => transition("resolve")} disabled={working} /> : null}</div>{message ? <p role="status" className="mt-3 text-xs font-semibold text-[#0b6f63]">{message}</p> : null}</div></MvpPanel> : null}</div>}<SafetyCard notice={workspace.emergencyNotice} /></div>;
+  async function transition(action: "acknowledge" | "start_support" | "request_follow_up" | "resolve") {
+    if (!selected) return;
+    const ok = await mutate({ action: "transition_support_request", requestId: selected.id, transition: action, expectedLockVersion: selected.lockVersion, idempotencyKey: crypto.randomUUID(), note }, "Support request updated.");
+    if (ok) setNote("");
+  }
+
+  async function recordFollowUp() {
+    if (!selected || !followUpAt) return;
+    const ok = await mutate({ action: "record_follow_up", requestId: selected.id, expectedLockVersion: selected.lockVersion, agreedFollowUpAt: followUpAt, idempotencyKey: crypto.randomUUID(), note }, "The agreed follow-up date was recorded.");
+    if (ok) { setFollowUpAt(""); setNote(""); }
+  }
+
+  async function createAction() {
+    if (!selected || !actionSummary.trim()) return;
+    const ownerId = actionOwnerId || selected.recipientId;
+    const ok = await mutate({ action: "create_support_action", requestId: selected.id, responsibleRecipientId: ownerId, dueAt: actionDueAt || null, summary: actionSummary, idempotencyKey: crypto.randomUUID() }, "The agreed support action was recorded.");
+    if (ok) { setActionSummary(""); setActionDueAt(""); setActionOwnerId(""); }
+  }
+
+  async function transitionAction(actionId: string, expectedLockVersion: number, transition: "start" | "progress" | "complete" | "cancel") {
+    const ok = await mutate({ action: "transition_support_action", supportActionId: actionId, transition, expectedLockVersion, idempotencyKey: crypto.randomUUID(), note }, "Support-action progress was recorded.");
+    if (ok) setNote("");
+  }
+
+  return <div className="grid gap-5"><section className="rounded-2xl bg-[#102c3d] p-5 text-white sm:p-6"><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9de5d8]">Restricted support inbox</p><h2 className="mt-2 text-2xl font-semibold">Learner Support</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-white/68">Only requests addressed or explicitly assigned to your approved support identity appear here. Private employee conversations are never included.</p><div className="mt-5 grid gap-3 sm:grid-cols-3"><SummaryMetric label="Open requests" value={counts.open} /><SummaryMetric label="Follow-up" value={counts.followUp} /><SummaryMetric label="Resolved" value={counts.resolved} /></div></section>{!workspace.requests.length ? <MvpPanel title="Support inbox" eyebrow="Restricted"><div className="rounded-xl border border-dashed border-[#102c3d]/15 bg-[#f8fbfa] p-7 text-center"><CheckCircle2 className="mx-auto text-[#0b776e]" size={24} aria-hidden="true" /><h3 className="mt-3 text-sm font-semibold">No requests are assigned to you</h3><p className="mt-1 text-xs leading-5 text-[#102c3d]/55">Requests assigned to another support contact remain inaccessible.</p></div></MvpPanel> : <div className="grid gap-5 xl:grid-cols-[340px_minmax(0,1fr)]"><MvpPanel title="Assigned requests" eyebrow="Your support queue"><div className="grid gap-2">{workspace.requests.map((request) => <button key={request.id} type="button" onClick={() => setSelectedId(request.id)} aria-current={selected?.id === request.id ? "true" : undefined} className={`rounded-xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 ${selected?.id === request.id ? "border-[#159b8f]/35 bg-[#edf7f3]" : "border-[#102c3d]/[0.08] hover:bg-[#f8fbfa]"}`}><div className="flex items-start justify-between gap-2"><p className="text-sm font-semibold text-[#102c3d]">{request.payload.topic}</p><StatusBadge tone={statusTone(request.status)}>{humanise(request.status)}</StatusBadge></div><p className="mt-2 text-xs text-[#102c3d]/52">{request.employeeLabel} · {formatDate(request.submittedAt)}</p></button>)}</div></MvpPanel>{selected ? <MvpPanel title={selected.payload.topic} eyebrow="Employee-approved support request"><RequestDetail request={selected} /><div className="mt-5 grid gap-5 border-t border-[#102c3d]/[0.07] pt-5"><div><label htmlFor={noteId} className="text-xs font-semibold text-[#102c3d]">Response or progress note</label><textarea id={noteId} value={note} onChange={(event) => setNote(event.target.value.slice(0, 2000))} rows={3} maxLength={2000} placeholder="Record only the support response, progress or completion evidence." className="mt-2 w-full rounded-xl border border-[#102c3d]/10 bg-[#f8fbfa] px-4 py-3 text-sm leading-6 outline-none focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10" /><div className="mt-3 flex flex-wrap gap-2">{selected.status === "submitted" ? <ActionButton label="Acknowledge receipt" onClick={() => transition("acknowledge")} disabled={working} /> : null}{["acknowledged", "follow_up"].includes(selected.status) ? <ActionButton label="Start support" onClick={() => transition("start_support")} disabled={working} /> : null}{["support_in_progress", "follow_up"].includes(selected.status) ? <ActionButton label="Administratively close" onClick={() => transition("resolve")} disabled={working} /> : null}</div></div><div className="rounded-xl border border-[#102c3d]/[0.08] bg-[#f8fbfa] p-4"><p className="text-xs font-semibold text-[#102c3d]">Agree follow-up</p><label className="mt-3 grid gap-1.5 text-xs font-semibold text-[#102c3d]/60">Follow-up date and time<input type="datetime-local" value={followUpAt} onChange={(event) => setFollowUpAt(event.target.value)} className="h-11 rounded-xl border border-[#102c3d]/10 bg-white px-3 text-sm" /></label><button type="button" onClick={recordFollowUp} disabled={working || !followUpAt} className="mt-3 min-h-10 rounded-xl bg-[#102c3d] px-4 text-xs font-semibold text-white disabled:opacity-45">Record agreed follow-up</button></div><div className="rounded-xl border border-[#102c3d]/[0.08] bg-[#f8fbfa] p-4"><p className="text-xs font-semibold text-[#102c3d]">Agreed support action</p><TextArea label="Action the employee will see" value={actionSummary} maxLength={1800} onChange={setActionSummary} /><div className="mt-3 grid gap-3 md:grid-cols-2"><SelectField label="Responsible approved contact" value={actionOwnerId || selected.recipientId} options={workspace.recipients.map((recipient) => ({ value: recipient.id, label: recipient.label }))} onChange={setActionOwnerId} /><label className="grid gap-1.5 text-xs font-semibold text-[#102c3d]/60">Due date<input type="date" value={actionDueAt} onChange={(event) => setActionDueAt(event.target.value)} className="h-11 rounded-xl border border-[#102c3d]/10 bg-white px-3 text-sm" /></label></div><button type="button" onClick={createAction} disabled={working || !actionSummary.trim()} className="mt-3 min-h-10 rounded-xl bg-[#102c3d] px-4 text-xs font-semibold text-white disabled:opacity-45">Add agreed action</button>{selected.actions.length ? <div className="mt-4 grid gap-2">{selected.actions.map((action) => <div key={action.id} className="rounded-lg border border-[#102c3d]/[0.07] bg-white p-3"><div className="flex items-start justify-between gap-3"><p className="text-xs font-semibold leading-5">{action.summary}</p><StatusBadge tone={statusTone(action.status)}>{humanise(action.status)}</StatusBadge></div><p className="mt-1 text-[11px] text-[#102c3d]/48">{action.responsibleRecipientLabel}{action.dueAt ? ` · ${formatDateTime(action.dueAt)}` : ""}</p>{["agreed", "in_progress"].includes(action.status) ? <div className="mt-2 flex flex-wrap gap-2">{action.status === "agreed" ? <ActionButton label="Start" onClick={() => transitionAction(action.id, action.lockVersion, "start")} disabled={working} /> : null}<ActionButton label="Record progress" onClick={() => transitionAction(action.id, action.lockVersion, "progress")} disabled={working} /><ActionButton label="Complete" onClick={() => transitionAction(action.id, action.lockVersion, "complete")} disabled={working} /><ActionButton label="Cancel" onClick={() => transitionAction(action.id, action.lockVersion, "cancel")} disabled={working} /></div> : null}</div>)}</div> : null}</div>{message ? <p role="status" className="text-xs font-semibold text-[#0b6f63]">{message}</p> : null}</div></MvpPanel> : null}</div>}<SafetyCard notice={workspace.emergencyNotice} /></div>;
 }
 
-function RequestCard({ request, employeeView, onTransition }: { request: PastoralSupportRequestView; employeeView?: boolean; onTransition?: (action: "reopen" | "dispute") => void }) {
-  return <article className="rounded-xl border border-[#102c3d]/[0.08] bg-[#fbfcfb] p-4"><div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-sm font-semibold text-[#102c3d]">{request.payload.topic}</p><p className="mt-1 text-xs text-[#102c3d]/50">Sent to {request.recipientLabel} · {formatDate(request.submittedAt)}</p></div><StatusBadge tone={statusTone(request.status)}>{humanise(request.status)}</StatusBadge></div><p className="mt-3 text-sm leading-6 text-[#102c3d]/62">{request.payload.supportIWant}</p>{request.events.length ? <div className="mt-4 border-t border-[#102c3d]/[0.06] pt-3"><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/40">Latest update</p><p className="mt-1 text-xs leading-5 text-[#102c3d]/58">{humanise(request.events.at(-1)!.eventType)} · {formatDate(request.events.at(-1)!.createdAt)}{request.events.at(-1)!.note ? ` — ${request.events.at(-1)!.note}` : ""}</p></div> : null}{employeeView && request.status === "resolved" && onTransition ? <div className="mt-4 flex flex-wrap gap-2"><button type="button" onClick={() => onTransition("reopen")} className="min-h-10 rounded-xl border border-[#102c3d]/10 px-4 text-xs font-semibold">I need more help</button><button type="button" onClick={() => onTransition("dispute")} className="min-h-10 rounded-xl border border-[#c95568]/20 px-4 text-xs font-semibold text-[#a33a4d]">I don&apos;t agree it&apos;s resolved</button></div> : null}</article>;
+function RequestCard({ request, employeeView, onTransition, onOutcome }: { request: PastoralSupportRequestView; employeeView?: boolean; onTransition?: (action: "reopen" | "dispute") => void; onOutcome?: (outcome: "helped" | "further_support_requested") => void }) {
+  return <article className="rounded-xl border border-[#102c3d]/[0.08] bg-[#fbfcfb] p-4"><div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-sm font-semibold text-[#102c3d]">{request.payload.topic}</p><p className="mt-1 text-xs text-[#102c3d]/50">Sent to {request.recipientLabel} · {formatDate(request.submittedAt)}</p></div><StatusBadge tone={statusTone(request.status)}>{humanise(request.status)}</StatusBadge></div><p className="mt-3 text-sm leading-6 text-[#102c3d]/62">{request.payload.supportIWant}</p>{request.agreedFollowUpAt ? <p className="mt-3 rounded-lg bg-[#edf7f3] px-3 py-2 text-xs font-semibold text-[#0b6f63]">Agreed follow-up: {formatDateTime(request.agreedFollowUpAt)}</p> : null}{request.actions.length ? <div className="mt-4 border-t border-[#102c3d]/[0.06] pt-3"><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/40">Agreed actions</p><div className="mt-2 grid gap-2">{request.actions.map((action) => <div key={action.id} className="rounded-lg border border-[#102c3d]/[0.07] bg-white p-3"><div className="flex items-start justify-between gap-3"><p className="text-xs font-semibold leading-5 text-[#102c3d]">{action.summary}</p><StatusBadge tone={statusTone(action.status)}>{humanise(action.status)}</StatusBadge></div><p className="mt-1 text-[11px] text-[#102c3d]/50">Owner: {action.responsibleRecipientLabel}{action.dueAt ? ` · Due ${formatDateTime(action.dueAt)}` : ""}</p>{action.events.at(-1)?.note ? <p className="mt-2 text-xs leading-5 text-[#102c3d]/58">{action.events.at(-1)!.note}</p> : null}</div>)}</div></div> : null}{request.events.length ? <div className="mt-4 border-t border-[#102c3d]/[0.06] pt-3"><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/40">Latest update</p><p className="mt-1 text-xs leading-5 text-[#102c3d]/58">{humanise(request.events.at(-1)!.eventType)} · {formatDate(request.events.at(-1)!.createdAt)}{request.events.at(-1)!.note ? ` — ${request.events.at(-1)!.note}` : ""}</p></div> : null}{employeeView && request.employeeResolutionStatus === "awaiting_employee_response" && onOutcome ? <div className="mt-4 rounded-xl border border-[#159b8f]/20 bg-[#f0f8f5] p-3"><p className="text-xs font-semibold text-[#102c3d]">Did this support help?</p><div className="mt-2 flex flex-wrap gap-2"><button type="button" onClick={() => onOutcome("helped")} className="min-h-10 rounded-xl bg-[#102c3d] px-4 text-xs font-semibold text-white">Yes, this helped</button><button type="button" onClick={() => onOutcome("further_support_requested")} className="min-h-10 rounded-xl border border-[#102c3d]/10 px-4 text-xs font-semibold">I need further support</button></div></div> : null}{employeeView && request.status === "resolved" && request.employeeResolutionStatus !== "awaiting_employee_response" && request.employeeResolutionStatus !== "helped" && onTransition ? <div className="mt-4 flex flex-wrap gap-2"><button type="button" onClick={() => onTransition("reopen")} className="min-h-10 rounded-xl border border-[#102c3d]/10 px-4 text-xs font-semibold">I need more help</button><button type="button" onClick={() => onTransition("dispute")} className="min-h-10 rounded-xl border border-[#c95568]/20 px-4 text-xs font-semibold text-[#a33a4d]">I don&apos;t agree it&apos;s resolved</button></div> : null}</article>;
 }
 
 function RequestDetail({ request }: { request: PastoralSupportRequestView }) { return <div className="grid gap-4"><div className="flex flex-wrap items-center gap-2"><StatusBadge tone={statusTone(request.status)}>{humanise(request.status)}</StatusBadge><StatusBadge tone={request.urgencyRoute === "standard" ? "neutral" : "yellow"}>{humanise(request.urgencyRoute)}</StatusBadge></div><dl className="grid gap-4 rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4"><ReviewRow label="Employee" value={request.employeeLabel} /><ReviewRow label="What they want you to understand" value={request.payload.whatIWantYouToUnderstand} /><ReviewRow label="Effect on apprenticeship" value={request.payload.howItIsAffectingMe || "Not provided"} /><ReviewRow label="Support requested" value={request.payload.supportIWant} /><ReviewRow label="Preferred contact" value={humanise(request.payload.preferredContactMethod)} /><ReviewRow label="Sharing restrictions" value={request.payload.sharingRestrictions || "None provided"} /></dl>{request.events.length ? <div><p className="text-xs font-semibold text-[#102c3d]">Support history</p><ol className="mt-3 grid gap-3">{request.events.map((event) => <li key={event.id} className="flex gap-3 text-xs leading-5 text-[#102c3d]/58"><span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[#159b8f]" /><span><strong className="text-[#102c3d]">{humanise(event.eventType)}</strong> · {formatDate(event.createdAt)}{event.note ? <span className="block">{event.note}</span> : null}</span></li>)}</ol></div> : null}</div>; }
@@ -324,6 +427,7 @@ function RequestDetail({ request }: { request: PastoralSupportRequestView }) { r
 function SafetyCard({ notice }: { notice: string }) { return <section className="rounded-2xl border border-[#d3a119]/20 bg-[#fff9e8] p-5"><div className="flex items-start gap-3"><AlertTriangle className="mt-0.5 shrink-0 text-[#8b6b08]" size={18} aria-hidden="true" /><div><h3 className="text-sm font-semibold text-[#594908]">Immediate safety</h3><p className="mt-1 text-xs leading-5 text-[#594908]/75">{notice}</p></div></div></section>; }
 function SummaryMetric({ label, value }: { label: string; value: number }) { return <div className="rounded-xl bg-white/[0.08] p-4"><p className="text-2xl font-semibold">{value}</p><p className="mt-1 text-xs text-white/55">{label}</p></div>; }
 function ReviewRow({ label, value }: { label: string; value: string }) { return <div><dt className="text-[10px] font-semibold uppercase tracking-[0.11em] text-[#102c3d]/42">{label}</dt><dd className="mt-1 whitespace-pre-wrap text-sm leading-6 text-[#102c3d]">{value}</dd></div>; }
+function DraftEvidenceList({ title, items, empty }: { title: string; items: string[]; empty: string }) { return <div><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/45">{title}</p>{items.length ? <ul className="mt-2 grid gap-1.5 text-xs leading-5 text-[#102c3d]/66">{items.map((item, index) => <li key={`${index}-${item}`} className="flex gap-2"><span aria-hidden="true">•</span><span>{item}</span></li>)}</ul> : <p className="mt-2 text-xs text-[#102c3d]/48">{empty}</p>}</div>; }
 function ActionButton({ label, onClick, disabled }: { label: string; onClick: () => void; disabled: boolean }) { return <button type="button" onClick={onClick} disabled={disabled} className="min-h-10 rounded-xl bg-[#102c3d] px-4 text-xs font-semibold text-white disabled:opacity-45">{label}</button>; }
 function TextField({ label, value, maxLength, onChange, placeholder }: { label: string; value: string; maxLength: number; onChange: (value: string) => void; placeholder?: string }) { return <label className="grid gap-1.5 text-xs font-semibold text-[#102c3d]/60">{label}<input value={value} maxLength={maxLength} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="h-11 rounded-xl border border-[#102c3d]/10 bg-[#f8fbfa] px-3 text-sm text-[#102c3d] outline-none focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10" /></label>; }
 function TextArea({ label, value, maxLength, onChange }: { label: string; value: string; maxLength: number; onChange: (value: string) => void }) { return <label className="grid gap-1.5 text-xs font-semibold text-[#102c3d]/60">{label}<textarea value={value} maxLength={maxLength} rows={4} onChange={(event) => onChange(event.target.value)} className="rounded-xl border border-[#102c3d]/10 bg-[#f8fbfa] px-3 py-2.5 text-sm leading-6 text-[#102c3d] outline-none focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10" /></label>; }
@@ -332,4 +436,5 @@ function UnavailableState({ message, onRetry }: { message: string; onRetry: () =
 function statusTone(status: string): "neutral" | "green" | "yellow" | "red" | "blue" { if (status === "resolved") return "green"; if (status === "follow_up") return "yellow"; if (status === "support_in_progress") return "blue"; return "neutral"; }
 function humanise(value: string) { return value.replaceAll("_", " ").replace(/\b\w/g, (character) => character.toUpperCase()); }
 function formatDate(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" }).format(date); }
+function formatDateTime(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(date); }
 async function safeJson(response: Response) { try { return await response.json() as { message?: string; workspace?: unknown; response?: unknown }; } catch { return null; } }

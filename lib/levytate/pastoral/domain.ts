@@ -18,6 +18,8 @@ export type PastoralSupportStatus = "submitted" | "acknowledged" | "support_in_p
 export type PastoralContactMethod = "in_platform" | "email" | "phone" | "meeting" | "provider_route";
 export type PastoralConversationAuthor = "employee" | "assistant";
 export type PastoralAssistantSource = "openai" | "safety_policy";
+export type PastoralEmployeeResolutionStatus = "not_requested" | "awaiting_employee_response" | "helped" | "further_support_requested";
+export type PastoralSupportActionStatus = "agreed" | "in_progress" | "completed" | "cancelled";
 
 export type PastoralLearnerContext = {
   programmeName: string;
@@ -60,9 +62,43 @@ export type PastoralSharedRequestPayload = {
   recipient: string;
 };
 
+export type PastoralSupportRequestDraft = {
+  topicCategory: PastoralTopicCategory;
+  topic: string;
+  whatIWantYouToUnderstand: string;
+  howItIsAffectingMe: string;
+  supportIWant: string;
+  preferredContactMethod: PastoralContactMethod;
+  sharingRestrictions: string;
+  urgencyRoute: PastoralUrgencyRoute;
+  employeeReportedFacts: string[];
+  aiSuggestions: string[];
+};
+
+export type PastoralSupportActionEvent = {
+  id: string;
+  eventType: "agreed" | "started" | "progress_recorded" | "completed" | "cancelled" | "reassigned";
+  previousState: string | null;
+  newState: string;
+  note: string;
+  createdAt: string;
+};
+
+export type PastoralSupportActionView = {
+  id: string;
+  responsibleRecipientId: string;
+  responsibleRecipientLabel: string;
+  status: PastoralSupportActionStatus;
+  dueAt: string | null;
+  summary: string;
+  lockVersion: number;
+  completedAt: string | null;
+  events: PastoralSupportActionEvent[];
+};
+
 export type PastoralSupportEvent = {
   id: string;
-  eventType: "submitted" | "acknowledged" | "support_started" | "follow_up_requested" | "resolved" | "reopened" | "disputed" | "reassigned";
+  eventType: "submitted" | "acknowledged" | "support_started" | "follow_up_requested" | "follow_up_agreed" | "resolved" | "reopened" | "disputed" | "reassigned" | "employee_confirmed_helped" | "employee_requested_further_support";
   previousState: string | null;
   newState: string;
   note: string;
@@ -81,8 +117,14 @@ export type PastoralSupportRequestView = {
   submittedAt: string;
   acknowledgedAt: string | null;
   resolvedAt: string | null;
+  agreedFollowUpAt: string | null;
+  administrativelyClosedAt: string | null;
+  employeeResolutionStatus: PastoralEmployeeResolutionStatus;
+  employeeRespondedAt: string | null;
+  employeeConfirmedResolvedAt: string | null;
   payload: PastoralSharedRequestPayload;
   events: PastoralSupportEvent[];
+  actions: PastoralSupportActionView[];
 };
 
 export type PastoralWorkspace = {
@@ -109,6 +151,7 @@ export type PastoralAssistantRequest = {
   conversationId?: string | null;
   clientMessageId: string;
   recentMessages?: Array<{ author: PastoralConversationAuthor; content: string }>;
+  draftSupportRequest?: boolean;
 };
 
 export type PastoralAssistantResponse = {
@@ -120,6 +163,7 @@ export type PastoralAssistantResponse = {
   suggestedTopicCategory: PastoralTopicCategory;
   humanSupportAvailable: boolean;
   policyVersion: string;
+  supportRequestDraft: PastoralSupportRequestDraft | null;
 };
 
 export type PastoralSupportMutation =
@@ -140,6 +184,39 @@ export type PastoralSupportMutation =
       expectedLockVersion: number;
       idempotencyKey: string;
       note?: string;
+    }
+  | {
+      action: "record_follow_up";
+      requestId: string;
+      expectedLockVersion: number;
+      agreedFollowUpAt: string;
+      idempotencyKey: string;
+      note?: string;
+    }
+  | {
+      action: "create_support_action";
+      requestId: string;
+      responsibleRecipientId: string;
+      dueAt?: string | null;
+      summary: string;
+      idempotencyKey: string;
+    }
+  | {
+      action: "transition_support_action";
+      supportActionId: string;
+      transition: "start" | "progress" | "complete" | "cancel" | "reassign";
+      expectedLockVersion: number;
+      idempotencyKey: string;
+      newResponsibleRecipientId?: string;
+      note?: string;
+    }
+  | {
+      action: "record_employee_outcome";
+      requestId: string;
+      outcome: "helped" | "further_support_requested";
+      expectedLockVersion: number;
+      idempotencyKey: string;
+      note?: string;
     };
 
 export const pastoralSharedFieldNames = [
@@ -154,4 +231,13 @@ export const pastoralSharedFieldNames = [
 
 export function isPastoralTopicCategory(value: unknown): value is PastoralTopicCategory {
   return pastoralTopicCategories.includes(value as PastoralTopicCategory);
+}
+
+export function pastoralRecipientIsSafeForConcern(recipient: PastoralSupportRecipient, concern: string) {
+  const text = concern.toLocaleLowerCase("en-GB");
+  const label = recipient.label.trim().toLocaleLowerCase("en-GB");
+  if (label.length >= 3 && text.includes(label)) return false;
+  if (recipient.kind === "line_manager" && /\b(?:my\s+)?(?:line\s+)?(?:manager|boss|supervisor)\b/i.test(concern)) return false;
+  if (recipient.kind === "apprenticeship_lead" && /\b(?:my\s+)?(?:apprenticeship|learning and development|l&d)\s+(?:lead|manager)\b/i.test(concern)) return false;
+  return true;
 }

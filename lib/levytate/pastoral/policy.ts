@@ -25,6 +25,9 @@ Conversation rules:
 
 Human handoff rules:
 - You may offer to help draft a support request, but you cannot send it.
+- Prepare a structured support-request draft only when draftSupportRequest is true or the apprentice explicitly asks you to prepare one.
+- In a draft, copy only facts the apprentice reported. Keep possible wording or next-step ideas in aiSuggestions and never present them as reported facts or agreed outcomes.
+- Leave a draft field empty when the apprentice has not supplied enough information; do not fill gaps with plausible detail.
 - Never state that a request has been shared, submitted or received.
 - A private conversation is not automatically shared and must never be attached to a support request.
 
@@ -42,6 +45,10 @@ const immediateRiskPatterns = [
   /\bimmediate danger\b/i,
   /\bnot safe (?:right )?now\b/i,
   /\bsomeone (?:will|is going to) hurt me\b/i,
+  /\b(?:do not|don't) want to (?:be here|wake up|carry on|go on)\b/i,
+  /\b(?:cannot|can't) (?:keep myself safe|go on|carry on)\b/i,
+  /\b(?:everyone|they|you) would be better off without me\b/i,
+  /\bno (?:reason|point) (?:to|in) (?:living|carry(?:ing)? on|going on)\b/i,
 ];
 
 const promptHumanPatterns = [
@@ -50,12 +57,25 @@ const promptHumanPatterns = [
   /\bharass(?:ment|ed|ing)\b/i,
   /\babus(?:e|ed|ive)\b/i,
   /\bsevere(?:ly)? distressed\b/i,
+  /\b(?:scared|afraid|frightened) (?:to|of) (?:go(?:ing)?|speak(?:ing)?|tell(?:ing)?|raise|raising)\b/i,
+  /\b(?:dread|dreading) (?:work|going in|seeing (?:my )?manager)\b/i,
+  /\b(?:humiliat(?:ed|ing)|threaten(?:ed|ing))\b/i,
+];
+
+const explicitDraftPatterns = [
+  /\b(?:help|can you help) (?:me )?(?:draft|prepare|write) (?:a |my )?(?:support )?request\b/i,
+  /\b(?:draft|prepare|write) (?:a |my )?(?:support )?request (?:for me|with me)?\b/i,
+  /\b(?:yes|please),? (?:help me )?(?:prepare|draft) (?:it|the request)\b/i,
 ];
 
 export function classifyPastoralSafety(message: string): PastoralUrgencyRoute {
   if (immediateRiskPatterns.some((pattern) => pattern.test(message))) return "emergency_guidance";
   if (promptHumanPatterns.some((pattern) => pattern.test(message))) return "prompt_human_support";
   return "standard";
+}
+
+export function isExplicitPastoralDraftRequest(message: string) {
+  return explicitDraftPatterns.some((pattern) => pattern.test(message));
 }
 
 export function classifyPastoralTopic(message: string): PastoralTopicCategory {

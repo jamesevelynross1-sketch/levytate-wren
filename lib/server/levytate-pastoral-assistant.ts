@@ -8,12 +8,14 @@ import {
   type PastoralAssistantRequest,
   type PastoralAssistantResponse,
   type PastoralConversationMessage,
+  type PastoralSupportRequestDraft,
 } from "@/lib/levytate/pastoral/domain";
 import {
   assertSafePastoralModelReply,
   classifyPastoralSafety,
   classifyPastoralTopic,
   immediateRiskResponse,
+  isExplicitPastoralDraftRequest,
   pastoralSystemPrompt,
 } from "@/lib/levytate/pastoral/policy";
 import {
@@ -24,20 +26,33 @@ import {
 } from "@/lib/server/levytate-pastoral";
 import { getLevyTateSupabaseConfig, readRuntimeEnv, supabaseFetchJson } from "@/lib/server/levytate-supabase";
 
+const pastoralDraftOutput = z.object({
+  topicCategory: z.enum(pastoralTopicCategories),
+  topic: z.string().max(180),
+  whatIWantYouToUnderstand: z.string().max(2500),
+  howItIsAffectingMe: z.string().max(1800),
+  supportIWant: z.string().max(1800),
+  preferredContactMethod: z.enum(["in_platform", "email", "phone", "meeting", "provider_route"]),
+  sharingRestrictions: z.string().max(1000),
+  employeeReportedFacts: z.array(z.string().min(1).max(300)).max(12),
+  aiSuggestions: z.array(z.string().min(1).max(300)).max(8),
+}).strict();
+
 const pastoralModelOutput = z.object({
   reply: z.string().min(20).max(2400),
   supportOffer: z.boolean(),
   urgencyRoute: z.enum(["standard", "prompt_human_support", "emergency_guidance"]),
   suggestedTopicCategory: z.enum(pastoralTopicCategories),
+  supportRequestDraft: pastoralDraftOutput.nullable(),
 }).strict();
 
 export async function runPastoralAssistant(session: LevyTateBetaSession, input: unknown): Promise<PastoralAssistantResponse> {
   const request = parseRequest(input);
   const prepared = await getEmployeePastoralAssistantContext(session, request.conversationId);
-  if (request.conversationId) {
-    const replay = await findPersistedAssistantReply(prepared.context, request.conversationId, request.clientMessageId);
-    if (replay) return responseView(replay.content, request.conversationId, request.message, prepared.recipients.length > 0);
-  }
+  const replay = await findPersistedAssistantReply(prepared.context, request.conversationId, request.clientMessageId);
+  if (replay) return replay.response
+    ? { ...replay.response, conversationId: replay.conversationId }
+    : responseView(replay.message.content, replay.conversationId, request.message, prepared.recipients.length > 0);
   await consumeRateLimit(prepared.context.organisation.id, prepared.context.user.id);
   const safety = classifyPastoralSafety(request.message);
   if (safety === "emergency_guidance") {
@@ -49,6 +64,16 @@ export async function runPastoralAssistant(session: LevyTateBetaSession, input: 
       clientMessageId: request.clientMessageId,
       employeeMessage: request.message,
       assistantMessage: reply,
+      assistantResponse: {
+        reply,
+        source: "safety_policy",
+        supportOffer: prepared.recipients.length > 0,
+        urgencyRoute: "emergency_guidance",
+        suggestedTopicCategory: classifyPastoralTopic(request.message),
+        humanSupportAvailable: prepared.recipients.length > 0,
+        policyVersion: pastoralPolicyVersion,
+        supportRequestDraft: null,
+      },
     });
     return {
       reply,
@@ -59,6 +84,7 @@ export async function runPastoralAssistant(session: LevyTateBetaSession, input: 
       suggestedTopicCategory: classifyPastoralTopic(request.message),
       humanSupportAvailable: prepared.recipients.length > 0,
       policyVersion: pastoralPolicyVersion,
+      supportRequestDraft: null,
     };
   }
   if (!levyTateAiEnabled() || !readRuntimeEnv("OPENAI_API_KEY")) {
@@ -68,18 +94,55 @@ export async function runPastoralAssistant(session: LevyTateBetaSession, input: 
   const history = prepared.conversation
     ? prepared.messages.slice(-8)
     : boundedClientHistory(request.recentMessages);
+  const draftRequested = request.draftSupportRequest === true || isExplicitPastoralDraftRequest(request.message);
   const modelOutput = await callPastoralModel({
     message: request.message,
     history,
     learnerContext: prepared.learnerContext,
     recipientAvailable: prepared.recipients.length > 0,
     safety,
+    draftRequested,
   });
   const parsed = pastoralModelOutput.safeParse(modelOutput);
   if (!parsed.success || !assertSafePastoralModelReply(parsed.data?.reply ?? "")) {
     throw new LevyTatePastoralError("My Support could not prepare a safe response. You can continue later or request support from an approved person.", 503);
   }
-  const urgencyRoute = safety === "prompt_human_support" ? "prompt_human_support" : parsed.data.urgencyRoute === "emergency_guidance" ? "prompt_human_support" : parsed.data.urgencyRoute;
+  if (draftRequested && !parsed.data.supportRequestDraft) {
+    throw new LevyTatePastoralError("My Support could not prepare a reliable draft. Your conversation is unchanged; you can try again or prepare the request yourself.", 503);
+  }
+  if (parsed.data.urgencyRoute === "emergency_guidance") {
+    const reply = immediateRiskResponse();
+    const assistantResponse: Omit<PastoralAssistantResponse, "conversationId"> = {
+      reply,
+      source: "safety_policy",
+      supportOffer: prepared.recipients.length > 0,
+      urgencyRoute: "emergency_guidance",
+      suggestedTopicCategory: parsed.data.suggestedTopicCategory,
+      humanSupportAvailable: prepared.recipients.length > 0,
+      policyVersion: pastoralPolicyVersion,
+      supportRequestDraft: null,
+    };
+    const conversationId = await persistPastoralExchange({
+      context: prepared.context, preference: prepared.preference, conversation: prepared.conversation,
+      clientMessageId: request.clientMessageId, employeeMessage: request.message,
+      assistantMessage: reply, assistantResponse,
+    });
+    return { ...assistantResponse, conversationId };
+  }
+  const urgencyRoute = safety === "prompt_human_support" ? "prompt_human_support" : parsed.data.urgencyRoute;
+  const supportRequestDraft = draftRequested && parsed.data.supportRequestDraft
+    ? normaliseSupportRequestDraft(parsed.data.supportRequestDraft, urgencyRoute)
+    : null;
+  const assistantResponse: Omit<PastoralAssistantResponse, "conversationId"> = {
+    reply: parsed.data.reply,
+    source: "openai",
+    supportOffer: prepared.recipients.length > 0 && (parsed.data.supportOffer || urgencyRoute !== "standard" || Boolean(supportRequestDraft)),
+    urgencyRoute,
+    suggestedTopicCategory: parsed.data.suggestedTopicCategory,
+    humanSupportAvailable: prepared.recipients.length > 0,
+    policyVersion: pastoralPolicyVersion,
+    supportRequestDraft,
+  };
   const conversationId = await persistPastoralExchange({
     context: prepared.context,
     preference: prepared.preference,
@@ -87,17 +150,9 @@ export async function runPastoralAssistant(session: LevyTateBetaSession, input: 
     clientMessageId: request.clientMessageId,
     employeeMessage: request.message,
     assistantMessage: parsed.data.reply,
+    assistantResponse,
   });
-  return {
-    reply: parsed.data.reply,
-    source: "openai",
-    conversationId,
-    supportOffer: prepared.recipients.length > 0 && (parsed.data.supportOffer || urgencyRoute !== "standard"),
-    urgencyRoute,
-    suggestedTopicCategory: parsed.data.suggestedTopicCategory,
-    humanSupportAvailable: prepared.recipients.length > 0,
-    policyVersion: pastoralPolicyVersion,
-  };
+  return { ...assistantResponse, conversationId };
 }
 
 async function callPastoralModel(input: {
@@ -106,6 +161,7 @@ async function callPastoralModel(input: {
   learnerContext: unknown;
   recipientAvailable: boolean;
   safety: "standard" | "prompt_human_support";
+  draftRequested: boolean;
 }) {
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
@@ -126,11 +182,15 @@ async function callPastoralModel(input: {
             employeeVisibleApprenticeshipContext: input.learnerContext,
             approvedHumanSupportAvailable: input.recipientAvailable,
             deterministicSafetyRoute: input.safety,
+            draftSupportRequest: input.draftRequested,
+            draftInstruction: input.draftRequested
+              ? "Prepare the separate structured draft from employee-reported information only. Put non-factual ideas only in aiSuggestions."
+              : "Return supportRequestDraft as null.",
           }),
         },
       ],
       text: { format: { type: "json_schema", name: "levytate_pastoral_support", strict: true, schema: outputSchema() } },
-      max_output_tokens: 700,
+      max_output_tokens: 1200,
     }),
     signal: AbortSignal.timeout(20_000),
   });
@@ -178,6 +238,7 @@ function parseRequest(value: unknown): PastoralAssistantRequest {
     clientMessageId,
     conversationId,
     recentMessages: Array.isArray(item.recentMessages) ? item.recentMessages as PastoralAssistantRequest["recentMessages"] : [],
+    draftSupportRequest: item.draftSupportRequest === true,
   };
 }
 
@@ -201,6 +262,7 @@ function responseView(reply: string, conversationId: string, message: string, hu
     suggestedTopicCategory: classifyPastoralTopic(message),
     humanSupportAvailable,
     policyVersion: pastoralPolicyVersion,
+    supportRequestDraft: null,
   };
 }
 
@@ -213,8 +275,29 @@ function outputSchema() {
       supportOffer: { type: "boolean" },
       urgencyRoute: { type: "string", enum: ["standard", "prompt_human_support", "emergency_guidance"] },
       suggestedTopicCategory: { type: "string", enum: pastoralTopicCategories },
+      supportRequestDraft: {
+        anyOf: [
+          { type: "null" },
+          {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              topicCategory: { type: "string", enum: pastoralTopicCategories },
+              topic: { type: "string" },
+              whatIWantYouToUnderstand: { type: "string" },
+              howItIsAffectingMe: { type: "string" },
+              supportIWant: { type: "string" },
+              preferredContactMethod: { type: "string", enum: ["in_platform", "email", "phone", "meeting", "provider_route"] },
+              sharingRestrictions: { type: "string" },
+              employeeReportedFacts: { type: "array", items: { type: "string" }, maxItems: 12 },
+              aiSuggestions: { type: "array", items: { type: "string" }, maxItems: 8 },
+            },
+            required: ["topicCategory", "topic", "whatIWantYouToUnderstand", "howItIsAffectingMe", "supportIWant", "preferredContactMethod", "sharingRestrictions", "employeeReportedFacts", "aiSuggestions"],
+          },
+        ],
+      },
     },
-    required: ["reply", "supportOffer", "urgencyRoute", "suggestedTopicCategory"],
+    required: ["reply", "supportOffer", "urgencyRoute", "suggestedTopicCategory", "supportRequestDraft"],
   };
 }
 
@@ -226,3 +309,21 @@ function extractOutputText(payload: unknown) {
 }
 
 function bounded(value: unknown, max: number) { return String(value ?? "").trim().slice(0, max); }
+
+function normaliseSupportRequestDraft(
+  value: z.infer<typeof pastoralDraftOutput>,
+  urgencyRoute: PastoralAssistantResponse["urgencyRoute"],
+): PastoralSupportRequestDraft {
+  return {
+    topicCategory: value.topicCategory,
+    topic: bounded(value.topic, 180),
+    whatIWantYouToUnderstand: bounded(value.whatIWantYouToUnderstand, 2500),
+    howItIsAffectingMe: bounded(value.howItIsAffectingMe, 1800),
+    supportIWant: bounded(value.supportIWant, 1800),
+    preferredContactMethod: value.preferredContactMethod,
+    sharingRestrictions: bounded(value.sharingRestrictions, 1000),
+    urgencyRoute,
+    employeeReportedFacts: value.employeeReportedFacts.map((item) => bounded(item, 300)).filter(Boolean),
+    aiSuggestions: value.aiSuggestions.map((item) => bounded(item, 300)).filter(Boolean),
+  };
+}
