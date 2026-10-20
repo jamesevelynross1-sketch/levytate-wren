@@ -24,6 +24,8 @@
     "validate:launch-release-3": "node --import tsx scripts/validate-launch-release-3.ts",
     "validate:launch-release-3:live": "node --env-file=.env.local --import tsx scripts/validate-launch-release-3-live.ts",
     "validate:launch-release-4": "node --import tsx scripts/validate-launch-release-4.tsx",
+    "validate:demo-role-switcher": "node scripts/validate-demo-role-switcher.mjs",
+    "validate:demo-role-switcher-live": "node scripts/validate-demo-role-switcher-live.mjs",
     "validate:assessments:live": "node --env-file=.env.local --import tsx scripts/validate-workforce-assessments-live.ts",
     "lint": "node --max-old-space-size=4096 node_modules/eslint/bin/eslint.js app/layout.tsx app/page.tsx app/stocks app/api/stocks components/stocks components/layout/SiteChrome.tsx components/ui/SectionEyebrow.tsx components/brand/Logo.tsx components/sections/TrustBandLocal.tsx lib/stocks next.config.ts tailwind.config.ts"
   },

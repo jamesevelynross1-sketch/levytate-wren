@@ -2,8 +2,9 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie, readLevyTateBetaSession } from "@/lib/levytate/config/beta-access";
 import { invalidateEmployerAuthSession, levytateSupabaseAccessCookie, levytateSupabaseRefreshCookie, recordEmployerLogoutEvent } from "@/lib/server/levytate-auth";
+import { levytateDemoControllerCookie } from "@/lib/server/levytate-demo-role-switcher";
 
-const authenticationCookies = [levytateBetaSessionCookie, levytateSupabaseAccessCookie, levytateSupabaseRefreshCookie] as const;
+const authenticationCookies = [levytateBetaSessionCookie, levytateSupabaseAccessCookie, levytateSupabaseRefreshCookie, levytateDemoControllerCookie] as const;
 
 export async function POST(request: Request) {
   const store = await cookies();

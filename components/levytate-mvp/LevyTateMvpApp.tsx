@@ -32,6 +32,7 @@ import { LevyTateLogo } from "@/components/levytate-demo/PlatformShell";
 import { ApplicationsModule } from "@/components/levytate-mvp/ApplicationsModule";
 import { AskLevyTateAiWorkspace } from "@/components/levytate-mvp/AskLevyTateAiWorkspace";
 import { DashboardModule, LineManagerHomeModule, SettingsModule } from "@/components/levytate-mvp/DashboardSettingsModules";
+import { DemoModeIndicator, DemoPerspectiveMenu, useDemoPerspectiveSwitcher } from "@/components/levytate-mvp/DemoPerspectiveSwitcher";
 import { ApplicationWorkflowSettings } from "@/components/levytate-mvp/ApplicationWorkflowSettings";
 import { EarlyAccessModule } from "@/components/levytate-mvp/EarlyAccessModule";
 import { EmployeeApplicationModule, EmployeeHomeModule, EmployeeProgrammeModule } from "@/components/levytate-mvp/EmployeeExperienceModule";
@@ -211,6 +212,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
   const [copilotEntity, setCopilotEntity] = useState<{ type: LevyTateCopilotEntityType; id: string; label: string } | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const demoPerspective = useDemoPerspectiveSwitcher();
   const deepLinkHandled = useRef(false);
   const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
   const mobileDrawerRef = useRef<HTMLElement>(null);
@@ -563,13 +565,15 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
             {availableModules.some((module) => module.name === "Copilot") ? <button type="button" onClick={() => openModule("Copilot")} className="hidden h-10 items-center gap-2 rounded-xl px-3 text-xs font-semibold text-[#102c3d]/65 transition hover:bg-[#f3f7f4] hover:text-[#102c3d] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 sm:inline-flex"><Sparkles size={15} aria-hidden="true" />Copilot</button> : null}
             {notifications.length > 0 && availableModules.some((module) => module.name === "Home") ? <button type="button" onClick={() => openModule("Home")} aria-label={`${notifications.length} items need attention`} className="relative grid h-10 w-10 place-items-center rounded-xl text-[#102c3d]/60 transition hover:bg-[#f3f7f4] hover:text-[#102c3d] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20"><BellRing size={17} aria-hidden="true" /><span className="absolute right-1 top-1 min-w-4 rounded-full bg-[#c95568] px-1 text-center text-[9px] font-bold leading-4 text-white">{notifications.length}</span></button> : null}
             {meta?.prospectAccess?.status === "active" && meta.userRole === "Apprenticeship Lead" ? <ProspectGettingStarted access={meta.prospectAccess} onNavigate={navigateTo} /> : null}
+            {demoPerspective.state ? <DemoModeIndicator state={demoPerspective.state} /> : null}
             <div className="relative">
               <button ref={accountButtonRef} type="button" onClick={() => setAccountMenuOpen((open) => !open)} aria-expanded={accountMenuOpen} aria-haspopup="menu" aria-label="Open account menu" className="flex h-11 items-center gap-2 rounded-xl border border-[#102c3d]/[0.09] bg-white px-2.5 text-left shadow-[0_7px_20px_rgba(16,44,61,0.05)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 sm:px-3">
                 <span className="grid h-7 w-7 place-items-center rounded-lg bg-[#102c3d] text-white"><UserRound size={14} aria-hidden="true" /></span>
                 <span className="hidden max-w-36 sm:block"><span data-testid="current-role" className="block truncate text-xs font-semibold text-[#102c3d]">{meta?.userRole ?? "Workspace user"}</span><span className="block text-[10px] text-[#102c3d]/45">{storageStatus}</span></span>
               </button>
-              {accountMenuOpen ? <div ref={accountMenuRef} role="menu" className="absolute right-0 top-[calc(100%+0.55rem)] z-50 w-64 rounded-2xl border border-[#102c3d]/[0.09] bg-white p-3 shadow-[0_24px_70px_rgba(16,44,61,0.17)]">
+              {accountMenuOpen ? <div ref={accountMenuRef} role="menu" className="absolute right-0 top-[calc(100%+0.55rem)] z-50 w-80 max-w-[calc(100vw-2rem)] rounded-2xl border border-[#102c3d]/[0.09] bg-white p-3 shadow-[0_24px_70px_rgba(16,44,61,0.17)]">
                 <div className="rounded-xl bg-[#f4f8f5] px-3 py-3"><p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#0b6f63]">Signed in as</p><p className="mt-1 text-sm font-semibold">{meta?.userRole ?? "Workspace user"}</p><p className="mt-1 text-xs text-[#102c3d]/52">{workspaceName} · {storageStatus}</p></div>
+                <DemoPerspectiveMenu controller={demoPerspective} />
                 {availableModules.some((module) => module.name === "Knowledge") ? <button role="menuitem" type="button" onClick={() => openModule("Knowledge")} className="mt-2 flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-xs font-semibold text-[#102c3d]/65 hover:bg-[#f4f8f5]"><CircleHelp size={15} aria-hidden="true" />Help and guidance</button> : null}
                 <form action="/api/levytate-beta-logout" method="post"><button role="menuitem" type="submit" className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-xs font-semibold text-[#b13b51] hover:bg-[#fff2f3]"><LogOut size={15} aria-hidden="true" />Sign out</button></form>
               </div> : null}

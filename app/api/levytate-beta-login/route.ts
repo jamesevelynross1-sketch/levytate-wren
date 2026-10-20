@@ -16,6 +16,13 @@ import { getPersistentEarlyAccessState } from "@/lib/server/levytate-beta-access
 import { getEarlyAccessRequestByEmail } from "@/lib/server/levytate-early-access";
 import { ProspectAccessError, assertProspectLoginAccess, recordProspectFirstLogin } from "@/lib/server/levytate-prospect-access";
 import { checkBetaLoginLimits, LevyTateRateLimitStoreError } from "@/lib/server/levytate-auth-rate-limit";
+import {
+  createDemoControllerAuthorisation,
+  isDemoRoleSwitcherRuntimeEnabled,
+  levytateDemoControllerCookie,
+  levytateDemoControllerMaxAge,
+  LevyTateDemoRoleSwitcherError,
+} from "@/lib/server/levytate-demo-role-switcher";
 
 type LoginRequestBody = {
   email?: unknown;
@@ -67,6 +74,33 @@ export async function POST(request: Request) {
       maxAge: levytateBetaSessionMaxAge,
       path: "/",
     });
+
+    if (isDemoRoleSwitcherRuntimeEnabled()) {
+      try {
+        const controllerToken = await createDemoControllerAuthorisation({
+          email,
+          accessLevel,
+          authMode: "internal_beta",
+          issuedAt: Date.now(),
+          expiresAt: Date.now() + levytateBetaSessionMaxAge * 1000,
+        });
+        response.cookies.set(levytateDemoControllerCookie, controllerToken, {
+          httpOnly: true,
+          sameSite: "strict",
+          secure: process.env.NODE_ENV === "production",
+          maxAge: levytateDemoControllerMaxAge,
+          path: "/",
+        });
+      } catch (error) {
+        // Internal beta sign-in remains available when the optional Preview demo controller is ineligible.
+        if (!(error instanceof LevyTateDemoRoleSwitcherError && error.code === "unauthorised")) {
+          console.error("LevyTate demo controller authorisation unavailable", {
+            outcome: "not_issued",
+            code: error instanceof LevyTateDemoRoleSwitcherError ? error.code : "unexpected",
+          });
+        }
+      }
+    }
 
     return response;
   } catch (error) {
