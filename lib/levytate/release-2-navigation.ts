@@ -10,7 +10,7 @@ export type Release2NavigationArea = {
 };
 
 const employerAreas: readonly Release2NavigationArea[] = [
-  { key: "home", label: "Home", description: "Priorities and operational attention", modules: ["Home", "Operations"], priority: "primary" },
+  { key: "home", label: "Home", description: "Priorities and operational attention", modules: ["Home", "Operations", "Learner Support"], priority: "primary" },
   { key: "people", label: "People", description: "Employees, learners and roles", modules: ["People", "Learners", "Learning Time"], priority: "primary" },
   { key: "applications", label: "Applications", description: "Reviews, approvals and history", modules: ["Applications"], priority: "primary" },
   { key: "assessments", label: "Assessments", description: "Campaigns, submissions and findings", modules: ["Assessments"], priority: "primary" },
@@ -23,7 +23,7 @@ const employerAreas: readonly Release2NavigationArea[] = [
 
 const employeeAreas: readonly Release2NavigationArea[] = [
   { key: "home", label: "Home", description: "Your next important step", modules: ["Home"], priority: "primary" },
-  { key: "development", label: "My Development", description: "Assessment, apprenticeship and learning", modules: ["Assessments", "My Programme", "Learning Time"], priority: "primary" },
+  { key: "development", label: "My Development", description: "Assessment, apprenticeship, learning and support", modules: ["Assessments", "My Programme", "Learning Time", "My Support"], priority: "primary" },
   { key: "application", label: "My Application", description: "Prepare and track your application", modules: ["My Application"], priority: "primary" },
   { key: "copilot", label: "Copilot", description: "Help with your LevyTate journey", modules: ["Copilot"], priority: "secondary" },
   { key: "guidance", label: "Guidance", description: "Practical apprenticeship guidance", modules: ["Knowledge"], priority: "secondary" },
@@ -31,7 +31,7 @@ const employeeAreas: readonly Release2NavigationArea[] = [
 
 const managerAreas: readonly Release2NavigationArea[] = [
   { key: "home", label: "Home", description: "Decisions and team attention", modules: ["Home"], priority: "primary" },
-  { key: "team", label: "My Team", description: "Direct-report development", modules: ["My Team"], priority: "primary" },
+  { key: "team", label: "My Team", description: "Direct-report development", modules: ["My Team", "Learner Support"], priority: "primary" },
   { key: "approvals", label: "Approvals", description: "Applications awaiting your decision", modules: ["Approvals"], priority: "primary" },
   { key: "development", label: "My Development", description: "Your own assessment and learning", modules: ["Assessments", "Learning Time"], priority: "secondary" },
   { key: "copilot", label: "Copilot", description: "Grounded manager support", modules: ["Copilot"], priority: "secondary" },

@@ -13,6 +13,7 @@ import {
   ClipboardList,
   GraduationCap,
   Handshake,
+  HeartHandshake,
   Hourglass,
   LayoutDashboard,
   Landmark,
@@ -81,6 +82,11 @@ const AssessmentsModule = dynamic(
   { loading: () => <MvpLoadingState label="Loading Assessments…" /> },
 );
 
+const PastoralSupportModule = dynamic(
+  () => import("@/components/levytate-mvp/PastoralSupportModule").then((module) => module.PastoralSupportModule),
+  { loading: () => <MvpLoadingState label="Opening My Support…" /> },
+);
+
 const modules = [
   { name: "Home", icon: LayoutDashboard },
   { name: "My Programme", icon: BookOpenCheck },
@@ -93,6 +99,8 @@ const modules = [
   { name: "People", icon: Users },
   { name: "Learners", icon: GraduationCap },
   { name: "Learning Time", icon: Hourglass },
+  { name: "My Support", icon: HeartHandshake },
+  { name: "Learner Support", icon: HeartHandshake },
   { name: "Assessments", icon: ClipboardList },
   { name: "Providers", icon: Building2 },
   { name: "My Providers", icon: Network },
@@ -127,6 +135,8 @@ const modulePermissions = {
   People: "employees:read",
   Learners: "learnerLifecycle:read",
   "Learning Time": "learningTime:read",
+  "My Support": "workspace:read",
+  "Learner Support": "workspace:read",
   Assessments: "assessments:read",
   Providers: "providers:read",
   "My Providers": "providerRelationships:read",
@@ -173,6 +183,8 @@ const moduleCopy: Record<ModuleName, string> = {
   People: "Employee and role records that shape workforce development decisions.",
   Learners: "Read-only lifecycle records covering eligibility, enrolment, progress, reviews and completion.",
   "Learning Time": "Plan, prepare and review off-the-job learning activity with clear candidate, employer and provider evidence states.",
+  "My Support": "Talk through apprenticeship difficulties privately and choose whether to request support from an approved person.",
+  "Learner Support": "Respond to employee-approved support requests addressed or explicitly assigned to you.",
   Assessments: "Run private and employer-led workforce assessments, interpret evidence and agree practical development action.",
   Providers: "Explore factual apprenticeship programme and provider information in one clear directory.",
   "My Providers": "Manage the providers your organisation works with and review their current activity.",
@@ -633,6 +645,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
             {activeModule === "Applications" ? <ApplicationsModule initialApplicationId={managerReviewApplicationId} onApplicationSelectionChange={updateApplicationReviewSelection} /> : null}
             {activeModule === "Learners" ? <LearnersModule initialLearnerRecordId={learnerTarget?.learnerRecordId} initialAction={learnerTarget?.actionType} onDeepLinkConsumed={() => setLearnerTarget(null)} onLearnerSelectionChange={updateLearnerCopilotSelection} /> : null}
             {activeModule === "Learning Time" ? <LearningTimeModule /> : null}
+            {activeModule === "My Support" || activeModule === "Learner Support" ? <PastoralSupportModule /> : null}
             {activeModule === "Assessments" ? <AssessmentsModule /> : null}
             {activeModule === "People" ? (
               <ModuleStackNav items={peopleItems} active={peopleView} onSelect={(item) => setPeopleView(item as PeopleView)}>
@@ -736,6 +749,7 @@ function navigationAreaIcon(area: Release2NavigationArea): LucideIcon {
   if (area.key === "people" || area.key === "team") return Users;
   if (area.key === "applications" || area.key === "approvals" || area.key === "application") return ClipboardCheck;
   if (area.key === "assessments" || area.key === "development") return ClipboardList;
+  if (area.key === "support") return HeartHandshake;
   if (area.key === "programmes") return GraduationCap;
   if (area.key === "catalogue") return Building2;
   if (area.key === "insights") return ChartNoAxesCombined;

@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Clock3, FileText, GraduationCap, LockKeyhole, MessageCircle, ShieldCheck } from "lucide-react";
+import { CheckCircle2, Clock3, FileText, GraduationCap, HeartHandshake, LockKeyhole, MessageCircle, ShieldCheck } from "lucide-react";
 import { useMemo, useState, type FormEvent } from "react";
 import type { LucideIcon } from "lucide-react";
 import { getApprenticeshipStandard } from "@/lib/levytate/domain";
@@ -26,7 +26,7 @@ import {
 } from "@/components/levytate-mvp/MvpUi";
 import { statusTone } from "@/components/levytate-mvp/module-utils";
 
-type EmployeeModuleTarget = "Home" | "My Programme" | "My Application" | "Copilot" | "Knowledge";
+type EmployeeModuleTarget = "Home" | "My Programme" | "My Application" | "My Support" | "Copilot" | "Knowledge";
 
 type EmployeeContext = {
   employee: MvpEmployee | null;
@@ -79,7 +79,7 @@ type EmployeeActionSummary = {
 };
 
 export function EmployeeHomeModule({ onNavigate }: { onNavigate: (target: EmployeeModuleTarget) => void }) {
-  const { data } = useMvpWorkspace();
+  const { data, meta } = useMvpWorkspace();
   const context = useEmployeeContext(data);
   const nextAction = nextEmployeeAction(context, data);
 
@@ -99,8 +99,14 @@ export function EmployeeHomeModule({ onNavigate }: { onNavigate: (target: Employ
         <div className="mt-5 grid gap-3 md:grid-cols-3"><EmployeeSummaryTile label="Recommended programme" value={context.programmeName} /><EmployeeSummaryTile label="Current application" value={employeeStatusLabel(context.application)} /><EmployeeSummaryTile label="Line manager" value={managerName(data, context.employee)} /></div>
         {context.application ? <div className="mt-5 border-t border-[#102c3d]/[0.07] pt-5"><ApplicationProgress application={context.application} compact /></div> : null}
       </section>
+
+      {meta?.pastoralSupportEnabled ? <section className="rounded-2xl border border-[#159b8f]/15 bg-[#eef8f4] p-5 sm:p-6"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-[#087c73] shadow-sm"><HeartHandshake size={19} aria-hidden="true" /></span><div><h2 className="text-sm font-semibold text-[#102c3d]">Need some support with your apprenticeship?</h2><p className="mt-1 max-w-2xl text-xs leading-5 text-[#102c3d]/58">Talk something through privately with My Support, or go directly to an approved human support contact. Nothing is shared unless you choose to send a separate request.</p></div></div><button type="button" onClick={() => onNavigate("My Support")} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#102c3d] px-4 text-xs font-semibold text-white">Open My Support<ChevronRightIcon /></button></div></section> : null}
     </div>
   );
+}
+
+function ChevronRightIcon() {
+  return <span aria-hidden="true">→</span>;
 }
 
 export function EmployeeProgrammeModule({ onNavigate }: { onNavigate: (target: EmployeeModuleTarget) => void }) {

@@ -19,6 +19,7 @@
     "validate:copilot-pilot-demo": "tsx scripts/validate-copilot-pilot-demo.ts",
     "validate:learning-time": "node --import tsx scripts/validate-learning-time-off-the-job.ts",
     "validate:assessments": "node --import tsx scripts/validate-workforce-assessments.ts",
+    "validate:pastoral-support": "node --import tsx scripts/validate-pastoral-support.ts",
     "validate:launch-release-1": "node --import tsx scripts/validate-launch-release-1.ts",
     "validate:launch-release-2": "node --import tsx scripts/validate-launch-release-2.ts",
     "validate:launch-release-3": "node --import tsx scripts/validate-launch-release-3.ts",

@@ -5,6 +5,8 @@ export type CoreEarlyAccessModuleKey =
   | "My Programme"
   | "My Application"
   | "Learning Time"
+  | "My Support"
+  | "Learner Support"
   | "Assessments"
   | "My Team"
   | "Approvals"
@@ -88,6 +90,7 @@ export const coreEarlyAccessPolicy: Readonly<Record<MvpUserRole, CoreEarlyAccess
       item("My Application", "My Application", "enabled", "operate", "core"),
       item("My Programme", "My Apprenticeship", "enabled", "operate", "core"),
       item("Learning Time", "Learning Time", "hidden", undefined, "not-ready"),
+      item("My Support", "My Support", "hidden", undefined, "not-ready"),
       item("Assessments", "Assessments", "enabled", "operate", "core"),
       item("Copilot", "Copilot", "secondary", "support", "supporting"),
       item("Knowledge", "Guidance Centre", "secondary", "support", "supporting"),
@@ -108,6 +111,7 @@ export const coreEarlyAccessPolicy: Readonly<Record<MvpUserRole, CoreEarlyAccess
       item("Approvals", "Approvals", "enabled", "operate", "core"),
       item("My Team", "My Team", "enabled", "operate", "core"),
       item("Learning Time", "Learning Time", "hidden", undefined, "not-ready"),
+      item("Learner Support", "Learner Support", "hidden", undefined, "role-denied"),
       item("Assessments", "Assessments", "enabled", "operate", "core"),
       item("Copilot", "Copilot", "secondary", "support", "supporting"),
       item("Knowledge", "Guidance Centre", "secondary", "support", "supporting"),
@@ -128,6 +132,7 @@ export const coreEarlyAccessPolicy: Readonly<Record<MvpUserRole, CoreEarlyAccess
       item("Applications", "Applications", "enabled", "operate", "core"),
       item("Learners", "Learners", "enabled", "operate", "core"),
       item("Learning Time", "Learning Time", "hidden", undefined, "not-ready"),
+      item("Learner Support", "Learner Support", "hidden", undefined, "not-ready"),
       item("Assessments", "Assessments", "enabled", "manage", "core"),
       item("Operations", "Operations Centre", "enabled", "operate", "core"),
       item("People", "People", "enabled", "manage", "core"),
@@ -163,6 +168,7 @@ export const coreEarlyAccessPolicy: Readonly<Record<MvpUserRole, CoreEarlyAccess
       item("Applications", "Applications", "hidden", undefined, "role-denied"),
       item("Learners", "Learners", "hidden", undefined, "role-denied"),
       item("Learning Time", "Learning Time", "hidden", undefined, "role-denied"),
+      item("Learner Support", "Learner Support", "hidden", undefined, "role-denied"),
       item("Assessments", "Assessments", "hidden", undefined, "role-denied"),
       item("Reports", "Reports", "hidden", undefined, "role-denied"),
       item("Copilot", "Copilot", "hidden", undefined, "role-denied"),
@@ -177,6 +183,7 @@ export const coreEarlyAccessPolicy: Readonly<Record<MvpUserRole, CoreEarlyAccess
       item("Applications", "Applications", "enabled", "operate", "core"),
       item("Learners", "Learners", "enabled", "operate", "core"),
       item("Learning Time", "Learning Time", "hidden", undefined, "not-ready"),
+      item("Learner Support", "Learner Support", "hidden", undefined, "not-ready"),
       item("Assessments", "Assessments", "enabled", "manage", "core"),
       item("Operations", "Operations Centre", "enabled", "operate", "core"),
       item("People", "People", "enabled", "manage", "core"),
@@ -200,10 +207,10 @@ export const coreEarlyAccessPolicy: Readonly<Record<MvpUserRole, CoreEarlyAccess
 
 export function getCoreEarlyAccessPolicy(
   role: MvpUserRole,
-  options: { requestsEnabled?: boolean; offTheJobAssistantEnabled?: boolean } = {},
+  options: { requestsEnabled?: boolean; offTheJobAssistantEnabled?: boolean; pastoralSupportEnabled?: boolean; pastoralInboxEnabled?: boolean } = {},
 ): CoreEarlyAccessRolePolicy {
   const base = coreEarlyAccessPolicy[role];
-  const policy = options.offTheJobAssistantEnabled && role !== "Platform Admin"
+  let policy = options.offTheJobAssistantEnabled && role !== "Platform Admin"
     ? {
         ...base,
         modules: base.modules.map((module) => module.moduleKey === "Learning Time"
@@ -216,15 +223,33 @@ export function getCoreEarlyAccessPolicy(
           : module),
       }
     : base;
-  if (!options.requestsEnabled || (role !== "Employer Admin" && role !== "Apprenticeship Lead")) return policy;
-  return {
-    ...policy,
-    modules: policy.modules.map((module) => module.moduleKey === "Requests"
-      ? { ...module, availability: "enabled", group: "manage", reasonCode: "core" }
-      : module),
-    permittedCapabilities: [...policy.permittedCapabilities, "service-requests"],
-    deniedCapabilities: policy.deniedCapabilities.filter((capability) => capability !== "service-requests"),
-  };
+  if (options.requestsEnabled && (role === "Employer Admin" || role === "Apprenticeship Lead")) {
+    policy = {
+      ...policy,
+      modules: policy.modules.map((module) => module.moduleKey === "Requests"
+        ? { ...module, availability: "enabled", group: "manage", reasonCode: "core" }
+        : module),
+      permittedCapabilities: [...policy.permittedCapabilities, "service-requests"],
+      deniedCapabilities: policy.deniedCapabilities.filter((capability) => capability !== "service-requests"),
+    };
+  }
+  if (role === "Employee" && options.pastoralSupportEnabled) {
+    policy = {
+      ...policy,
+      modules: policy.modules.map((module) => module.moduleKey === "My Support"
+        ? { ...module, availability: "enabled", group: "support", reasonCode: "core" }
+        : module),
+    };
+  }
+  if (role !== "Employee" && role !== "Platform Admin" && options.pastoralInboxEnabled) {
+    policy = {
+      ...policy,
+      modules: policy.modules.map((module) => module.moduleKey === "Learner Support"
+        ? { ...module, availability: "enabled", group: "operate", reasonCode: "core" }
+        : module),
+    };
+  }
+  return policy;
 }
 
 export function resolveCoreEarlyAccessRouteAccess(

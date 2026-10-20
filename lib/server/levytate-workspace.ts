@@ -67,6 +67,7 @@ import { synchroniseApplicationReviewOperationalActions } from "@/lib/server/lev
 import { getOrganisationLearnerLifecycleCollectionsForWorkspace } from "@/lib/server/levytate-learner-lifecycle";
 import { isBetaApprovedEarlyAccessStatus } from "@/lib/levytate/early-access/domain";
 import { isRequestsEnabledForOrganisation } from "@/lib/server/levytate-request-capability";
+import { getPastoralNavigationAccess } from "@/lib/server/levytate-pastoral-capability";
 
 type OrganisationRow = {
   id: string;
@@ -429,11 +430,13 @@ export async function getWorkspaceBootstrapForSession(session: LevyTateBetaSessi
   try {
     const context = await ensureWorkspaceContext(session);
     await assertWorkspaceReadAllowed(context);
-    const [data, requestsEnabled, applicationWorkflowsEnabled, offTheJobAssistantEnabled] = await Promise.all([
+    const preliminaryRole = normaliseMvpUserRole(context.user.role);
+    const [data, requestsEnabled, applicationWorkflowsEnabled, offTheJobAssistantEnabled, pastoralAccess] = await Promise.all([
       loadWorkspaceData(context, session),
       isRequestsEnabledForOrganisation(context.organisation.id),
       isApplicationWorkflowsEnabledForOrganisation(context.organisation.id),
       isOffTheJobAssistantEnabledForOrganisation(context.organisation.id),
+      getPastoralNavigationAccess({ organisationId: context.organisation.id, userId: context.user.id, email: context.user.email, role: preliminaryRole }),
     ]);
     const userRole = normaliseMvpUserRole(context.user.role);
     const applicationWorkflowPublished = applicationWorkflowsEnabled
@@ -460,11 +463,13 @@ export async function getWorkspaceBootstrapForSession(session: LevyTateBetaSessi
         userEmail: session.email,
         userRole,
         permissions: permissionsForMvpRole(context.user.role),
-        coreEarlyAccess: getCoreEarlyAccessPolicy(userRole, { requestsEnabled, offTheJobAssistantEnabled }),
+        coreEarlyAccess: getCoreEarlyAccessPolicy(userRole, { requestsEnabled, offTheJobAssistantEnabled, pastoralSupportEnabled: pastoralAccess.employeeAccess, pastoralInboxEnabled: pastoralAccess.supportInboxAccess }),
         requestsEnabled,
         applicationWorkflowsEnabled,
         applicationWorkflowPublished,
         offTheJobAssistantEnabled,
+        pastoralSupportEnabled: pastoralAccess.employeeAccess,
+        pastoralInboxEnabled: pastoralAccess.supportInboxAccess,
         directReportOperationalSummaries,
         prospectAccess: prospectAccess ? {
           id: prospectAccess.id,
@@ -549,6 +554,8 @@ export async function getWorkspaceBootstrapForMicrosoftCopilotActor(
       applicationWorkflowsEnabled,
       applicationWorkflowPublished,
       offTheJobAssistantEnabled,
+      pastoralSupportEnabled: false,
+      pastoralInboxEnabled: false,
       directReportOperationalSummaries: undefined,
       prospectAccess: null,
       storageMode: "supabase",

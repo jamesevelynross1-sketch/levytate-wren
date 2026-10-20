@@ -42,6 +42,8 @@ export type LevyTateWorkspaceMeta = {
   applicationWorkflowsEnabled?: boolean;
   applicationWorkflowPublished?: boolean;
   offTheJobAssistantEnabled?: boolean;
+  pastoralSupportEnabled?: boolean;
+  pastoralInboxEnabled?: boolean;
   directReportOperationalSummaries?: EmployeeOperationalSummary[];
   prospectAccess?: ProspectAccessMeta | null;
   storageMode: MvpWorkspaceStorageMode;
