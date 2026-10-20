@@ -138,7 +138,7 @@ Migration `038_create_pastoral_human_follow_up.sql` is not present on the shared
 
 The employee sees the action, owner, due date and approved progress. Ordinary Operations, Insights, Copilot and exports do not query the action tables. Administrative closure changes the request to `awaiting_employee_response`; it does not assert that the employee's concern has been resolved. Only the employee can confirm `helped` or request `further_support_requested`.
 
-If a support contact becomes inactive, they immediately fail revalidation and cannot update requests or actions. The current active assigned recipient must select another individually approved active recipient using the controlled reassignment path. The history retains the previous owner; it is not rewritten. If no safe replacement exists, action updates stop and the employer test owner must approve a new recipient before work resumes.
+If a support contact becomes inactive, they immediately fail revalidation and cannot update requests or actions. Another individually approved active recipient may perform the controlled reassignment; when the inactive assignment is no longer visible in an ordinary inbox, the employer test owner must give an authorised service operator the request identifier rather than granting organisation-wide pastoral access. The history retains the previous owner; it is not rewritten. If no safe replacement exists, action updates stop and the employer test owner must approve a new recipient before work resumes.
 
 ## Recipient routing
 
