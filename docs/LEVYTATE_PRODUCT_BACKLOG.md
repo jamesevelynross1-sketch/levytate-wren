@@ -1,5 +1,25 @@
 # LevyTate Product Backlog
 
+## LevyTate Explore — Public employee-led acquisition
+
+Status: Isolated Preview development; **not approved for public release**.
+
+Purpose: Let employees already in work discover relevant apprenticeships using
+plain-English De-fluff explanations and initiate their own manager conversation.
+Allow separately consented MPR guidance requests, generating potential
+provider-funded enrolments or employer licence opportunities.
+
+Prerequisites for release:
+- Updated Skills England API source/version and full catalogue content review
+- Durable MPR lead/outbox, private triage and consent/retention controls
+- Legal/privacy review, approved rate limits and abuse protection
+- Isolated functional, accessibility, PWA, performance and security testing
+- Successful protected Preview build and deployment verification
+
+See docs/LEVYTATE_EXPLORE_V1.md for the delivery and quality gates.
+
+---
+
 ## Priority 1 - Core Commercial Features
 
 ### LevyTate Copilot
