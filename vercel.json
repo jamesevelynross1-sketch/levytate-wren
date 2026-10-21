@@ -11,6 +11,10 @@
     {
       "path": "/api/internal/provider-intelligence/refresh",
       "schedule": "15 6 * * *"
+    },
+    {
+      "path": "/api/cron/levytate-explore-notifications",
+      "schedule": "5 * * * *"
     }
   ]
 }
