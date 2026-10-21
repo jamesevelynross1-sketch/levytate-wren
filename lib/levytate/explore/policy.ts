@@ -5,7 +5,11 @@
 export const EXPLORE_GUIDANCE_CONSENT_VERSION = "explore-guidance-v1";
 export const EXPLORE_GUIDANCE_CONSENT_TEXT =
   "I agree that LevyTate, operated by MPR Consulting, can use my details to contact me about this development enquiry. I understand my employer will not be contacted without a separate agreed step.";
-export const EXPLORE_PRIVACY_URL = "/levytate/privacy";
+export const EXPLORE_MANAGER_CONSENT_VERSION = "explore-manager-v1";
+export const EXPLORE_MANAGER_CONSENT_TEXT =
+  "I agree that LevyTate, operated by MPR Consulting, can use my details to contact me about this employee development enquiry as a manager. I understand that no other employee or colleague will be contacted without a separate agreed step.";
+export type ExploreRequesterType = "employee" | "manager";
+export const EXPLORE_PRIVACY_URL = "/explore/privacy";
 
 export const EXPLORE_ENQUIRY_STATUSES = [
   "new",
