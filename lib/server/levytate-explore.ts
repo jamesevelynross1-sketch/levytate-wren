@@ -165,7 +165,7 @@ function emailBody(lead: ExploreEnquiryRow) {
     ["Role", lead.job_title || "Not provided"],
     ["Programme", lead.standard_title + " (" + lead.standard_code + ")"],
     ["Official source", lead.source_url],
-    ["Employee's note", lead.employee_note || "General apprenticeship guidance requested"],
+    ["Enquiry note", lead.employee_note || "General apprenticeship guidance requested"],
     ["Consent version", lead.consent_version],
     ["Consent time", lead.consent_given_at],
   ];
