@@ -35,6 +35,7 @@ Apprenticeship Lead → Enrolment workflow stays authoritative.
 - Opt-in employee/manager contact: POST /api/levytate-explore/interest
 - Private beta-admin pipeline: /explore/internal
 - Private pipeline API: /api/levytate-explore/admin/enquiries
+- Official evidence inspector (admin only): /api/levytate-explore/admin/evidence/ST1512
 - Secured retry worker: /api/cron/levytate-explore-notifications
 
 Public paths are rewritten to the existing standalone LevyTate application
@@ -90,7 +91,8 @@ Source: https://occupational-maps.skillsengland.education.gov.uk/public-api/
 - Separate consent copy and version history exists for employee and manager enquiries.
 - A public Explore privacy page is a Preview draft only and requires formal legal approval.
 - The catalogue uses Skills England source metadata. Eight editorial De-fluff guides are available; other standards show honest official-only content until verified.
-- Package builds run the automatic Explore catalogue validation script first.
+- Package builds run the automatic Explore catalogue validation and OCC-to-ST source-link tests first.
+- Server-only source evidence retrieval supports Skills England's SearchOccupations endpoint when SKILLS_ENGLAND_API_KEY is configured. It verifies an exact productCode association between ST apprenticeship and OCC occupation before returning summaries, duties or knowledge/skills/behaviours. It never automatically publishes AI copy.
 
 **Migration 040 remains unapplied.** The connected Supabase workspace exposed to this session is not confirmed to be the correct live LevyTate database. Consequently, Preview submission must fail closed rather than storing personal data in an unverified project.
 
@@ -100,7 +102,7 @@ Source: https://occupational-maps.skillsengland.education.gov.uk/public-api/
 2. Test public enquiry POSTs (employee and manager), forged origin, spam, duplicates, no DB, no email, user cancellation and accessibility with synthetic identities.
 3. Confirm verified Resend sender and notification destination plus CRON_SECRET in the correct environment; prove retry without duplicate email.
 4. Verify beta-admin-only list/update and deny employer-role access. Exercise simultaneous operator updates, audit events and privacy requests.
-5. Request Skills England API key, refresh the July 2026 fallback, join current occupational KSBs to approved standard versions and expand high-quality De-fluff coverage.
+5. Request Skills England API key, set SKILLS_ENGLAND_API_KEY only in protected server environments, validate the SearchOccupations productCode mapping, refresh the July 2026 fallback and expand human-reviewed De-fluff coverage. No automatic public AI writing is approved.
 6. Approve separate Explore controller privacy notice, lawful basis, company details, retention schedule, deleted-lead procedures, provider disclosure, employer outreach policy and any international processing safeguards.
 7. Test actual iOS/Android installation, keyboard/screen-reader accessibility, forms, focus, contrast and mobile performance.
 8. Rebuild, review and security-test the exact release commit. Obtain approval before merging or promoting Production.
