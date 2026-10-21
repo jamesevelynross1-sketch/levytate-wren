@@ -73,3 +73,29 @@ dpl_2zBgkadx1wXGQSkLhAmqgmdbYULr
 ```
 
 This record intentionally contains no secret value, credential fingerprint, authentication token or personal/customer data.
+
+## Fixed-list deletion action
+
+On 21 October 2026 the fixed 42-deployment allowlist above was revalidated against Vercel project `prj_NO1rAvQ8mrAeeeabgZGPVVUJTsB5`. All entries belonged to the `levytate-wren` project and were historical `feature/operational-rbac` Preview deployments. None was the remediated employer Preview, a Production deployment or a Production recovery candidate.
+
+Forty entries had no active alias and were deleted individually with Vercel's safe-deletion guard. Post-deletion API checks returned `not_found` for all 40 IDs. Direct requests to all 40 former hostnames returned `404` with `DEPLOYMENT_NOT_FOUND`; this confirms removal rather than merely encountering Vercel Authentication. These deployments are marked **DO NOT RESTORE**. The available Vercel interfaces did not provide a separate recoverability or permanent-erasure assertion, so no stronger erasure claim is made.
+
+Two allowlisted deployments remain because they still serve preserved internal sales aliases:
+
+- `dpl_2qM73xfgsXXMgGZgRAL8sJ1hFVwQ` — MPR Prospect OS at `mpr-sales-internal-jamesevelynross1-sketchs-projects.vercel.app`
+- `dpl_BE2Vvf6BV97hj76iJPPjqfS35Aiz` — LevyTate Prospect OS at `levytate-sales-internal-jamesevelynross1-sketchs-projects.vercel.app`
+
+Both applications were recovered as distinct source bundles and inspected without adding their source or prospect data to Git. MPR Prospect OS is a 15-file Next.js application using private Supabase Storage bucket `mpr-prospect-os`; LevyTate Prospect OS is a 16-file Next.js application using private bucket `levytate-prospect-os`. Neither application uses browser-local persistence or contains a beta-login route. Restricted read-only snapshots confirmed 50 records in each namespace and byte-for-byte unchanged state before and after the operation.
+
+Two protected candidate builds were created from the recovered sources:
+
+- MPR candidate `dpl_C17KTaBPXS2H2EW2StVKFZTYxdcw`
+- LevyTate candidate `dpl_BNGCnypYGQpH7v9iSFPuV9B3GL2F`
+
+Neither candidate received an alias. Their read-only state checks fell back to bundled seed state because manual deployments did not inherit the required branch-scoped storage credential. Attaching the broad shared Supabase service-role credential to reconstructed applications with state-mutation routes—and a LevyTate reset route—requires explicit risk approval or a narrower storage-access design. The original sales aliases and deployments therefore remain unchanged and protected.
+
+The remediated employer Preview `dpl_9ARQBWbBd528nsQGXvA1LSzE8RMR` remains `READY`, with the stable branch alias unchanged and Vercel Authentication enabled. Fresh internal authentication, all three approved demo perspectives, logout invalidation, and the populated Lift Opportunity, Decision and Proof records passed after the deletion batch. Lift remains enabled only for fictional Ground Control. Production remains `dpl_ASZjd1R4bktYdk8DdXHtQRG6zfLz`; no Production deployment, alias, variable, Supabase schema or product record changed.
+
+Containment is therefore partial: 40 of 42 affected immutable deployments are removed. The two sales deployments remain behind Vercel Authentication until safe replacements can be connected to their existing private storage namespaces. Historical login attribution remains not assessable; this record does not claim that no unauthorised access occurred.
+
+The non-secret per-deployment evidence is recorded in [the fixed-list deletion manifest](./LEVYTATE_PREVIEW_CREDENTIAL_INCIDENT_2026-10-21_MANIFEST.md).
