@@ -4,7 +4,7 @@ import { ExploreDetail } from "@/components/levytate-explore/ExploreDetail";
 import { createExploreCatalogue } from "@/lib/levytate/explore/catalogue";
 import { loadLevyTateStandards } from "@/lib/server/levytate-apprenticeship-standards";
 
-type Props = { params: Promise<{ code: string }> };
+type Props = { params: Promise<{ code: string }>; searchParams: Promise<{ audience?: string }> };
 
 async function getStandard(code: string) {
   if (!/^ST\d{4}$/i.test(code)) return null;
@@ -23,10 +23,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function ExploreStandardPage({ params }: Props) {
+export default async function ExploreStandardPage({ params, searchParams }: Props) {
   const { code } = await params;
   const standard = await getStandard(code);
   if (!standard) notFound();
 
-  return <ExploreDetail standard={standard} />;
+  const query = await searchParams;
+  return <ExploreDetail standard={standard} managerView={query.audience === "manager"} />;
 }
