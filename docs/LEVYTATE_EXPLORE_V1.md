@@ -6,11 +6,23 @@ Explore is public, employee-led career development **for people already employed
 It is not an apprenticeship vacancy finder, a recruitment agency, or a new
 provider marketplace. Users can browse freely without registration.
 
-A user may independently:
-1. Discover approved apprenticeship standards through their interests.
-2. Read a humanised, editorially reviewed "De-fluff" guide beside official facts.
-3. Choose to draft an email to their own manager (nothing automatically sent).
-4. Separately opt in to contact from MPR/LevyTate for advice.
+The simplified first-release journey is deliberate:
+1. See a searchable alphabetical list of approved apprenticeship **standard names**.
+2. Tap a name. The page automatically requests AI "De-fluff" rewriting of the
+   official Skills England occupational evidence for that standard.
+3. Read one grounded plain-English explanation, or an honest unavailable
+   state if generation or source verification cannot run. The official source
+   always remains available.
+4. Optionally prepare your own email to your line manager, or independently
+   consent to MPR/LevyTate guidance. Nothing is silently sent to employers.
+
+No quiz, interest-based category cards, provider marketplace or unnecessary
+second "Generate" click appears in this first-release journey.
+
+**True generation vs. caching:** first uncached, verified versions generate
+with AI on demand. Repeat views may show the previously generated explanation,
+with transparent labelling and no additional token charge. Cache freshness is
+checked at least weekly against the official source.
 
 The public request is **not** an employer's formal application or an approval.
 The authenticated platform's existing Employee → Line Manager →
@@ -52,12 +64,38 @@ The existing /app route remains employer-authenticated.
 - ST1512 (AI and automation practitioner, v2.1, L4, 18 months) is an
   editorially sourced addition confirmed via its official Skills England page
   on 2026-10-21. It does not mutate employer catalogue data.
-- Curated guides are reviewed editorial copy. They are not dynamic AI output
-  and must not promise eligibility, employer approval, funding, promotion,
-  or particular tools/outcomes.
-- Where editorial KSB grounding is incomplete, show official metadata and
-  say the humanised guide is being prepared. Do not fabricate learning outcomes.
+- The initial eight hand-written editorial examples remain in the repository as
+  prior examples but are **no longer presented as the generated experience**.
+  Real user-facing De-fluff output is requested on click, using the government
+  evidence and strict validation before publication.
+- If official KSB grounding, model access or budget is unavailable, show the
+  official source with a clear explanation, never a fabricated transformation.
 - The official standard and its verification date are always accessible.
+
+## AI transformation — feature-gated until approved
+
+- `POST /api/levytate-explore/de-fluff` accepts an ST reference only, never
+  an employee name, personalised prompt or employer-private material.
+- The source adapter requests Skills England occupational summary, duties and
+  KSBs, and rejects records without a matching ST-linked productCode.
+- The structured OpenAI Responses output is schema-checked before display;
+  it must not promise qualifications, promotions or funding.
+- `LEVYTATE_EXPLORE_AI_ENABLED=true`, a server-side `OPENAI_API_KEY`, a
+  `SKILLS_ENGLAND_API_KEY`, a correctly configured Supabase Preview store and
+  distributed abuse limits are all required. The flag is **off by default**.
+- Versioned cache and atomic claim RPCs are prepared as a SQL proposal at
+  `docs/database/LEVYTATE_EXPLORE_AI_NARRATIVE_CACHE_PROPOSAL.sql`.
+  It is **not applied** or Production-ready; convert it into a reviewed formal
+  migration and test first.
+- Generation is capped at 5 new programmes per network per day and 20 globally
+  per environment per day; repeat cached views don't incur model charges.
+  Public request limits also protect the official API.
+- A free-to-install PWA does **not** make live model usage free. We must set up
+  billing, a suitable small-model configuration and cost monitoring only with
+  explicit owner approval. No paid model calls have been made by this change.
+- In the current Preview, clicking a standard will show the automatic loading
+  experience followed by a clear disabled/unavailable state until activated.
+  We will never falsely label static copy as real-time AI output.
 
 ## Skills England licence
 
