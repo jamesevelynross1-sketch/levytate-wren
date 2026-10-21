@@ -31,10 +31,6 @@ export function ExploreHeader() {
   );
 }
 
-function standardTags(standard: ExploreStandard) {
-  return [standard.story?.theme || standard.route, "Level " + standard.level, standard.duration];
-}
-
 function StandardCard({ standard, index }: { standard: ExploreStandard; index: number }) {
   const accents = [
     "bg-[#e5f2eb] text-[#146c60]",
@@ -225,16 +221,16 @@ export function ExploreHome({ standards }: { standards: ExploreStandard[] }) {
         <section className="mx-auto grid max-w-[1330px] gap-6 px-5 py-16 sm:px-9 md:grid-cols-[1fr_1.2fr] md:items-center md:py-20">
           <div>
             <p className="text-xs font-bold uppercase tracking-[.2em] text-[#117f70]">A little different</p>
-            <h2 className="mt-4 text-[clamp(2rem,4vw,3rem)] font-semibold leading-[1.1] tracking-[-.055em]">You don't have to be looking for a new job.</h2>
+            <h2 className="mt-4 text-[clamp(2rem,4vw,3rem)] font-semibold leading-[1.1] tracking-[-.055em]">You don&apos;t have to be looking for a new job.</h2>
           </div>
           <div className="rounded-[22px] bg-white p-7 text-[15px] leading-8 text-[#102c3d]/70">
-            Apprenticeships aren't only for people entering the workforce. They can also help people already in a role develop new skills or take on new challenges. Your employer needs to support the programme, and it must be suitable for your work and previous experience — but exploring an option costs nothing and commits you to nothing.
+            Apprenticeships aren&apos;t only for people entering the workforce. They can also help people already in a role develop new skills or take on new challenges. Your employer needs to support the programme, and it must be suitable for your work and previous experience — but exploring an option costs nothing and commits you to nothing.
           </div>
         </section>
       </main>
       <footer className="bg-[#102c3d]">
         <div className="mx-auto flex max-w-[1330px] flex-wrap items-center justify-between gap-5 px-5 py-8 text-xs text-white/65 sm:px-9">
-          <div className="flex items-center gap-3"><span className="font-semibold tracking-[.19em] text-white">LEVYTATE / EXPLORE</span><span className="text-white/30">•</span><span>Discover what you're capable of.</span></div>
+          <div className="flex items-center gap-3"><span className="font-semibold tracking-[.19em] text-white">LEVYTATE / EXPLORE</span><span className="text-white/30">•</span><span>Discover what you&apos;re capable of.</span></div>
           <div className="flex gap-5">
             <a href="/levytate/privacy" className="hover:text-white">Privacy</a>
             <a href="https://skillsengland.education.gov.uk/apprenticeships" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-white">Skills England <ArrowUpRight size={13}/></a>
@@ -242,7 +238,7 @@ export function ExploreHome({ standards }: { standards: ExploreStandard[] }) {
         </div>
         <div className="mx-auto flex max-w-[1330px] flex-wrap items-center justify-between gap-5 border-t border-white/10 px-5 py-5 text-[11px] leading-5 text-white/55 sm:px-9">
           <a href="https://occupational-maps.skillsengland.education.gov.uk/public-api/" target="_blank" rel="noopener noreferrer" aria-label="Skills England official data source">
-            <img src="https://occupational-maps.skillsengland.education.gov.uk/media/xmehhrr0/skills-england_lesser_arms_stacked-dfe-blue-se-logo.svg?rmode=max&amp;width=500" alt="Skills England" loading="lazy" width="126" height="58" className="h-auto w-[126px] rounded-lg bg-white p-2" />
+            <Image unoptimized src="https://occupational-maps.skillsengland.education.gov.uk/media/xmehhrr0/skills-england_lesser_arms_stacked-dfe-blue-se-logo.svg?rmode=max&amp;width=500" alt="Skills England" loading="lazy" width="126" height="58" className="h-auto w-[126px] rounded-lg bg-white p-2" />
           </a>
           <p>© Skills England 2025 · Official source information licensed under the <a href="https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-white">Open Government Licence v3.0</a>. Plain-English guides are LevyTate interpretations.</p>
         </div>
