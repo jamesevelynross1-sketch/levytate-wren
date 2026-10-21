@@ -60,6 +60,11 @@ async function checkAbuseLimits(request: Request, email: string) {
 }
 
 export async function POST(request: Request) {
+  // Deliberate release switch. Public submissions remain unavailable until
+  // the isolated lead store and legal/privacy acceptance tests are approved.
+  if (process.env.LEVYTATE_EXPLORE_SUBMISSIONS_ENABLED !== "true") {
+    return reply("Explore guidance enquiries are not yet available.", 503);
+  }
   const origin = request.headers.get("origin");
   if (!origin || origin !== new URL(request.url).origin) {
     return reply("This request must come from LevyTate Explore.", 403);
