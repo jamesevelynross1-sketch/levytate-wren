@@ -93,37 +93,37 @@ export function ExploreAiExplanation({ standard }: { standard: ExploreStandard }
 
   return (
     <section aria-labelledby="unpacked-title" className="mt-8">
-      <div className="flex items-center justify-between gap-3">
-        <h2 id="unpacked-title" className="flex items-center gap-2 text-xl font-semibold tracking-[-.035em]">
-          <WandSparkles size={22} className="text-[#117f70]" aria-hidden="true" />
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#142f3a]/15 pb-4">
+        <h2 id="unpacked-title" className="explore-unpacked-heading flex items-center gap-2 text-[clamp(26px,3vw,33px)] font-extrabold">
+          <WandSparkles size={23} className="text-[#126955]" aria-hidden="true" />
           Unpacked
         </h2>
-        <span className="text-[11px] font-semibold text-[#102c3d]/50">AI explanation · not official advice</span>
+        <span className="explore-soft-stamp text-[#142f3a]/75">AI explanation · not official advice</span>
       </div>
 
       {status === "loading" ? (
-        <div role="status" aria-live="polite" className="mt-5 overflow-hidden rounded-[23px] border border-[#102c3d]/10 bg-[#e4f1e8] p-7 sm:p-9">
+        <div role="status" aria-live="polite" className="explore-unpacked-hero mt-5 overflow-hidden border border-[#142f3a]/10 p-7 sm:p-9">
           <div className="flex items-start gap-3">
-            <span className="grid h-10 w-10 shrink-0 animate-pulse place-items-center rounded-full bg-[#c6e5d7] text-[#0d7869] motion-reduce:animate-none">
+            <span className="grid h-11 w-11 shrink-0 animate-pulse place-items-center rounded-full bg-[#d9f3a1] text-[#142f3a] motion-reduce:animate-none">
               <Sparkles size={20} aria-hidden="true" />
             </span>
             <div>
-              <h3 className="text-[21px] font-semibold tracking-[-.04em]">Unpacking what this really means.</h3>
+              <h3 className="text-[23px] font-extrabold tracking-[-.045em]">Unpacking what this really means.</h3>
               <p className="mt-2 text-sm leading-7 text-[#102c3d]/65">
                 Checking the source, finding the useful details and translating them into everyday language.
               </p>
             </div>
           </div>
           <div aria-hidden="true" className="mt-8 space-y-3">
-            <div className="h-3 w-[88%] animate-pulse rounded-full bg-[#c4e0d4] motion-reduce:animate-none" />
-            <div className="h-3 w-[76%] animate-pulse rounded-full bg-[#c4e0d4] motion-reduce:animate-none" />
-            <div className="h-3 w-[63%] animate-pulse rounded-full bg-[#c4e0d4] motion-reduce:animate-none" />
+            <div className="h-3 w-[88%] animate-pulse rounded-full bg-[#cadfb0] motion-reduce:animate-none" />
+            <div className="h-3 w-[76%] animate-pulse rounded-full bg-[#cadfb0] motion-reduce:animate-none" />
+            <div className="h-3 w-[63%] animate-pulse rounded-full bg-[#cadfb0] motion-reduce:animate-none" />
           </div>
         </div>
       ) : null}
 
       {status === "error" ? (
-        <div role="status" className="mt-5 rounded-[23px] border border-[#102c3d]/10 bg-white p-7 sm:p-9">
+        <div role="status" className="mt-5 rounded-[23px] border border-[#142f3a]/10 bg-[#fff0e4] p-7 sm:p-9">
           <div className="flex items-start gap-3">
             <ShieldCheck size={23} className="mt-0.5 shrink-0 text-[#117f70]" aria-hidden="true" />
             <div>
@@ -148,20 +148,20 @@ export function ExploreAiExplanation({ standard }: { standard: ExploreStandard }
 
       {status === "ready" && narrative ? (
         <div aria-live="polite" className="mt-5">
-          <div className="rounded-[23px] bg-[#dff0e7] px-6 pb-7 pt-7 sm:px-9 sm:pb-10 sm:pt-9">
+          <div className="explore-unpacked-hero px-6 pb-7 pt-7 sm:px-9 sm:pb-10 sm:pt-9">
             <p className="text-[11px] font-bold uppercase tracking-[.16em] text-[#117f70]">
               {usedCache ? "Previously unpacked from the official source" : "Unpacked by AI from the official source"}
             </p>
-            <h3 className="mt-4 font-serif text-[clamp(1.8rem,4vw,3.1rem)] leading-[1.13] tracking-[-.042em] text-[#102c3d]">{narrative.headline}</h3>
-            <p className="mt-5 whitespace-pre-wrap text-[15px] leading-8 text-[#102c3d]/78 sm:text-[16px]">{narrative.introduction}</p>
+            <h3 className="mt-5 max-w-[700px] font-serif text-[clamp(2rem,4.4vw,3.35rem)] leading-[1.1] tracking-[-.055em] text-[#142f3a]">{narrative.headline}</h3>
+            <p className="mt-5 whitespace-pre-wrap text-[15px] leading-[1.85] text-[#142f3a]/82 sm:text-[16px]">{narrative.introduction}</p>
           </div>
 
           <div className="mt-9">
-            <h3 className="text-xl font-semibold tracking-[-.035em]">What would you actually learn?</h3>
+            <h3 className="text-[23px] font-extrabold tracking-[-.045em]">What would you actually learn?</h3>
             <ul className="mt-4 space-y-3">
               {narrative.whatYouWillLearn.map((point, index) => (
-                <li key={index} className="flex items-start gap-4 rounded-[16px] border border-[#102c3d]/10 bg-white p-5">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#f5e6e3] text-xs font-bold text-[#a54b61]">0{index + 1}</span>
+                <li key={index} className="flex items-start gap-4 rounded-[15px] border border-[#142f3a]/10 bg-white p-5">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#fdd2c2] text-xs font-extrabold text-[#142f3a]">0{index + 1}</span>
                   <span className="text-sm leading-7 text-[#102c3d]/78">{point}</span>
                 </li>
               ))}
@@ -172,7 +172,7 @@ export function ExploreAiExplanation({ standard }: { standard: ExploreStandard }
             <h3 className="text-xl font-semibold tracking-[-.035em]">What could that look like at work?</h3>
             <ul className="mt-4 grid gap-3">
               {narrative.whatThisCouldLookLikeAtWork.map((point, index) => (
-                <li key={index} className="flex gap-3 rounded-[16px] bg-[#f5eae8] p-5 text-sm leading-7 text-[#102c3d]/78">
+                <li key={index} className="flex gap-3 rounded-[16px] bg-[#ebe5ff] p-5 text-sm leading-7 text-[#142f3a]/80">
                   <Sparkles size={18} className="mt-1 shrink-0 text-[#a54b61]" aria-hidden="true" />
                   {point}
                 </li>
@@ -190,7 +190,7 @@ export function ExploreAiExplanation({ standard }: { standard: ExploreStandard }
               <p className="mt-3 text-sm leading-7 text-[#102c3d]/68">{narrative.whatToKnowBeforeYouStart}</p>
             </div>
           </div>
-          <div className="mt-6 rounded-[17px] border-l-4 border-[#117f70] bg-white p-5">
+          <div className="mt-6 rounded-[17px] border-l-[6px] border-[#276a58] bg-[#e4f1d0] p-5">
             <p className="text-xs font-bold uppercase tracking-[.12em] text-[#117f70]">A good question for your manager</p>
             <p className="mt-2 text-[15px] leading-7 text-[#102c3d]/85">{narrative.aConversationStarter}</p>
           </div>
@@ -200,8 +200,8 @@ export function ExploreAiExplanation({ standard }: { standard: ExploreStandard }
         </div>
       ) : null}
 
-      <details className="mt-7 rounded-[16px] border border-[#102c3d]/10 bg-white p-5">
-        <summary className="cursor-pointer text-sm font-semibold text-[#102c3d]">View original apprenticeship details</summary>
+      <details className="mt-7 rounded-[16px] border border-[#142f3a]/15 bg-white p-5 sm:p-6">
+        <summary className="cursor-pointer min-h-[35px] text-[14px] font-extrabold text-[#142f3a]">View original apprenticeship details</summary>
         <dl className="mt-4 divide-y divide-[#102c3d]/10 text-sm">
           {[
             ["Standard", standard.title],
