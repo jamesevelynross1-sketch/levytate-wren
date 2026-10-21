@@ -12,9 +12,11 @@ import { ExploreFooter, ExploreHeader } from "./ExploreHome";
 type Props = {
   route: ExploreRoute | null;
   standards: ExploreStandard[];
+  pathwayName?: string;
+  pathwaySource?: "live-official-api" | "historical-official-map" | "not-connected";
 };
 
-export function ExploreRouteStandards({ route, standards }: Props) {
+export function ExploreRouteStandards({ route, standards, pathwayName, pathwaySource }: Props) {
   const [search, setSearch] = useState("");
   const [level, setLevel] = useState(0);
   const [visibleCount, setVisibleCount] = useState(40);
@@ -35,8 +37,11 @@ export function ExploreRouteStandards({ route, standards }: Props) {
     setVisibleCount(40);
   }
 
-  const title = route?.name || "Standards awaiting classification";
-  const description = route?.description || "These standards have not yet been matched to one of the 15 official occupational routes in our catalogue.";
+  const title = pathwayName || route?.name || "Standards awaiting classification";
+  const description = pathwayName
+    ? "Explore the apprenticeships listed under this pathway in " + (route?.name || "the occupational map")
+    : route?.description || "These standards have not yet been matched to one of the 15 official occupational routes in our catalogue.";
+  const routeHref = route ? getExploreRouteHref(route) : "/explore";
 
   return (
     <>
@@ -46,19 +51,31 @@ export function ExploreRouteStandards({ route, standards }: Props) {
           <Link href="/explore" className="inline-flex min-h-9 items-center gap-2 font-semibold text-[#117f70] hover:underline">
             <ArrowLeft size={14} aria-hidden="true" /> All routes
           </Link>
-          <span aria-hidden="true" className="text-[#102c3d]/25">/</span>
-          <span aria-current="page">{title}</span>
+          {route ? (
+            <>
+              <span aria-hidden="true" className="text-[#102c3d]/25">/</span>
+              {pathwayName ? (
+                <Link href={routeHref} className="font-medium text-[#117f70] hover:underline">{route.name}</Link>
+              ) : <span aria-current="page">{route.name}</span>}
+            </>
+          ) : null}
+          {pathwayName || !route ? (
+            <>
+              <span aria-hidden="true" className="text-[#102c3d]/25">/</span>
+              <span aria-current="page">{title}</span>
+            </>
+          ) : null}
         </nav>
 
         <section className="mt-8 max-w-[830px]">
           <p className="text-[11px] font-bold uppercase tracking-[.18em] text-[#117f70]">
-            Apprenticeship routes
+            {pathwayName ? "Official occupational pathway" : "Apprenticeship routes"}
           </p>
           <h1 className="mt-4 text-[clamp(2.15rem,5.5vw,4rem)] font-semibold leading-[1.05] tracking-[-.06em] text-[#102c3d]">
             {title}
           </h1>
           <p className="mt-5 text-[15px] leading-8 text-[#102c3d]/65">
-            {description}. Choose an apprenticeship below to see what its official requirements could mean in everyday working life.
+            {description}. Choose a standard to see what it could mean for your working life with Unpacked.
           </p>
         </section>
 
@@ -68,7 +85,7 @@ export function ExploreRouteStandards({ route, standards }: Props) {
               Apprenticeship standards
             </h2>
             <p className="text-xs text-[#102c3d]/55">
-              {standards.length} {standards.length === 1 ? "standard" : "standards"} in this route
+              {standards.length} {standards.length === 1 ? "standard" : "standards"} {pathwayName ? "in this pathway" : "in this route"}
             </p>
           </div>
 
@@ -101,6 +118,11 @@ export function ExploreRouteStandards({ route, standards }: Props) {
             </label>
           </div>
 
+          {pathwaySource === "historical-official-map" ? (
+            <p className="mt-4 rounded-xl border border-[#bb9b69]/25 bg-[#fff9eb] px-4 py-3 text-xs leading-6 text-[#705e40]">
+              Preview mapping from a May 2019 official occupational map. A current government API check is required before public launch.
+            </p>
+          ) : null}
           <p role="status" aria-live="polite" className="mt-4 text-xs text-[#102c3d]/55">
             {filtered.length} {filtered.length === 1 ? "matching apprenticeship" : "matching apprenticeships"}
           </p>
@@ -150,8 +172,9 @@ export function ExploreRouteStandards({ route, standards }: Props) {
 
           <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-[#102c3d]/10 pt-6 text-xs text-[#102c3d]/55">
             <span>Standards are based on our Skills England catalogue. Status and eligibility must be confirmed against the current official record.</span>
-            {route ? <Link href={getExploreRouteHref(route)} className="sr-only">Current route: {title}</Link> : null}
-            <Link href="/explore" className="shrink-0 font-semibold text-[#117f70] underline underline-offset-2">Browse other routes</Link>
+            <Link href={routeHref} className="shrink-0 font-semibold text-[#117f70] underline underline-offset-2">
+              {pathwayName ? "All pathways" : "Browse other routes"}
+            </Link>
           </div>
         </section>
       </main>
