@@ -145,7 +145,14 @@ export function ExploreHome({ standards }: { standards: ExploreStandard[] }) {
             <a href="https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/" rel="noopener noreferrer" target="_blank" className="hover:text-white">Open Government Licence</a>
           </div>
         </div>
-        <p className="mx-auto mt-3 max-w-[960px] text-[11px]">© Skills England 2025. Source information licensed under Open Government Licence v3.0. Humanised AI explanations are produced by LevyTate.</p>
+        <div className="mx-auto mt-5 flex max-w-[960px] flex-wrap items-center gap-4 border-t border-white/10 pt-5">
+          <a href="https://occupational-maps.skillsengland.education.gov.uk/public-api/" target="_blank" rel="noopener noreferrer" aria-label="Skills England occupational standards data">
+            <Image unoptimized src="https://occupational-maps.skillsengland.education.gov.uk/media/xmehhrr0/skills-england_lesser_arms_stacked-dfe-blue-se-logo.svg?rmode=max&amp;width=500" alt="Skills England" loading="lazy" width={126} height={58} className="w-[126px] rounded-lg bg-white p-2" />
+          </a>
+          <p className="max-w-[730px] text-[11px] leading-6">
+            © Skills England 2025. Source information licensed under Open Government Licence v3.0. Humanised AI explanations are produced by LevyTate and are not official guidance.
+          </p>
+        </div>
       </footer>
     </>
   );
