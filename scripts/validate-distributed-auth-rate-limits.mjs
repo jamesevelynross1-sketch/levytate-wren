@@ -28,7 +28,7 @@ check("environment namespace is server-derived and local development stays isola
 check("email burst and hourly limits are central", /limit: 3, windowSeconds: 10 \* 60/.test(config) && /limit: 5, windowSeconds: 60 \* 60/.test(config));
 check("network and global email limits are central", /magicLinkNetworkHourly/.test(config) && /magicLinkGlobalHourly/.test(config));
 check("callback limiter runs before token verification", callback.indexOf("await checkCallbackAttemptLimit") < callback.indexOf("await verifyEmployerMagicLink"));
-check("beta limiter runs before access-code comparison", beta.indexOf("await checkBetaLoginLimits") < beta.indexOf("code !== getLevyTateBetaAccessCode"));
+check("beta limiter runs before access-code comparison", beta.indexOf("await checkBetaLoginLimits") < beta.indexOf("code !== configuredAccessCode"));
 check("session refresh has explicit fail-open store policy", session.includes("valid refresh token is still verified by Supabase") && session.includes("LevyTateRateLimitStoreError"));
 check("magic-link store outage returns safe 503", request.includes("LevyTateRateLimitStoreError") && request.includes("status: 503"));
 check("email throttling uses safe wording and 429", request.includes("Please wait before requesting another sign-in link.") && request.includes("status: 429"));

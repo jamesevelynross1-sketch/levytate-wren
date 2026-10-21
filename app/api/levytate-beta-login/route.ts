@@ -35,6 +35,10 @@ export async function POST(request: Request) {
     if (!isInternalBetaLoginEnabled()) {
       return NextResponse.json({ ok: false, message: "Internal demonstration sign-in is not available." }, { status: 404 });
     }
+    const configuredAccessCode = getLevyTateBetaAccessCode();
+    if (!configuredAccessCode) {
+      return NextResponse.json({ ok: false, message: "Internal demonstration sign-in is not available." }, { status: 404 });
+    }
     const body = await parseLoginRequestBody(request);
     const email = typeof body.email === "string" ? normaliseBetaEmail(body.email) : "";
     const code = typeof body.code === "string" ? body.code.trim() : "";
@@ -57,7 +61,7 @@ export async function POST(request: Request) {
       throw new BetaLoginError("Please enter your beta access code.", 400);
     }
 
-    if (code !== getLevyTateBetaAccessCode().trim()) {
+    if (code !== configuredAccessCode) {
       throw new BetaLoginError("Invalid beta access code.", 401);
     }
 

@@ -27,7 +27,7 @@ const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
 export function getLevyTateBetaAccessCode() {
-  return process.env.LEVYTATE_BETA_CODE ?? "LEVYTATE-BETA";
+  return process.env.LEVYTATE_BETA_CODE?.trim() ?? "";
 }
 
 export function isInternalBetaLoginEnabled() {
