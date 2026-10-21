@@ -127,7 +127,7 @@ export function ExploreAiExplanation({ standard }: { standard: ExploreStandard }
           <div className="flex items-start gap-3">
             <ShieldCheck size={23} className="mt-0.5 shrink-0 text-[#117f70]" aria-hidden="true" />
             <div>
-              <h3 className="text-[21px] font-semibold tracking-[-.04em]">The AI explanation isn't available yet.</h3>
+              <h3 className="text-[21px] font-semibold tracking-[-.04em]">The AI explanation isn&apos;t available yet.</h3>
               <p className="mt-3 text-sm leading-7 text-[#102c3d]/65">
                 {failure} We won&apos;t guess what an apprenticeship teaches when we cannot verify the official information.
               </p>
