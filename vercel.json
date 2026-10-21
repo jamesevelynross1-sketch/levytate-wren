@@ -14,7 +14,7 @@
     },
     {
       "path": "/api/cron/levytate-explore-notifications",
-      "schedule": "5 * * * *"
+      "schedule": "5 6 * * *"
     }
   ]
 }
