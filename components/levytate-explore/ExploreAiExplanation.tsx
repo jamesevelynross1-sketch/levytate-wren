@@ -92,11 +92,11 @@ export function ExploreAiExplanation({ standard }: { standard: ExploreStandard }
   }, [standard.code, attempt]);
 
   return (
-    <section aria-labelledby="de-fluff-title" className="mt-8">
+    <section aria-labelledby="unpacked-title" className="mt-8">
       <div className="flex items-center justify-between gap-3">
-        <h2 id="de-fluff-title" className="flex items-center gap-2 text-xl font-semibold tracking-[-.035em]">
+        <h2 id="unpacked-title" className="flex items-center gap-2 text-xl font-semibold tracking-[-.035em]">
           <WandSparkles size={22} className="text-[#117f70]" aria-hidden="true" />
-          De-fluff
+          Unpacked
         </h2>
         <span className="text-[11px] font-semibold text-[#102c3d]/50">AI explanation · not official advice</span>
       </div>
@@ -108,7 +108,7 @@ export function ExploreAiExplanation({ standard }: { standard: ExploreStandard }
               <Sparkles size={20} aria-hidden="true" />
             </span>
             <div>
-              <h3 className="text-[21px] font-semibold tracking-[-.04em]">Making the official standard make sense.</h3>
+              <h3 className="text-[21px] font-semibold tracking-[-.04em]">Unpacking what this really means.</h3>
               <p className="mt-2 text-sm leading-7 text-[#102c3d]/65">
                 Checking the source, finding the useful details and translating them into everyday language.
               </p>
@@ -127,7 +127,7 @@ export function ExploreAiExplanation({ standard }: { standard: ExploreStandard }
           <div className="flex items-start gap-3">
             <ShieldCheck size={23} className="mt-0.5 shrink-0 text-[#117f70]" aria-hidden="true" />
             <div>
-              <h3 className="text-[21px] font-semibold tracking-[-.04em]">The AI explanation isn&apos;t available yet.</h3>
+              <h3 className="text-[21px] font-semibold tracking-[-.04em]">Unpacked isn&apos;t available yet.</h3>
               <p className="mt-3 text-sm leading-7 text-[#102c3d]/65">
                 {failure} We won&apos;t guess what an apprenticeship teaches when we cannot verify the official information.
               </p>
@@ -150,7 +150,7 @@ export function ExploreAiExplanation({ standard }: { standard: ExploreStandard }
         <div aria-live="polite" className="mt-5">
           <div className="rounded-[23px] bg-[#dff0e7] px-6 pb-7 pt-7 sm:px-9 sm:pb-10 sm:pt-9">
             <p className="text-[11px] font-bold uppercase tracking-[.16em] text-[#117f70]">
-              {usedCache ? "Previously generated from the official source" : "AI-translated from the official source"}
+              {usedCache ? "Previously unpacked from the official source" : "Unpacked by AI from the official source"}
             </p>
             <h3 className="mt-4 font-serif text-[clamp(1.8rem,4vw,3.1rem)] leading-[1.13] tracking-[-.042em] text-[#102c3d]">{narrative.headline}</h3>
             <p className="mt-5 whitespace-pre-wrap text-[15px] leading-8 text-[#102c3d]/78 sm:text-[16px]">{narrative.introduction}</p>
