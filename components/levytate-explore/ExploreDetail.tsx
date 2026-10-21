@@ -1,13 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { FormEvent, useEffect, useState } from "react";
 import {
   ArrowLeft, ArrowUpRight, CheckCircle2,
   ChevronRight, Send, ShieldCheck,
 } from "lucide-react";
-import { ExploreHeader } from "./ExploreHome";
+import { ExploreHeader, ExploreFooter } from "./ExploreHome";
 import { ExploreAiExplanation } from "./ExploreAiExplanation";
 import { getExploreRouteByName, getExploreRouteHref } from "@/lib/levytate/explore/occupational-routes";
 import type { ExploreStandard } from "@/lib/levytate/explore/catalogue";
@@ -169,19 +168,21 @@ export function ExploreDetail({ standard, managerView = false, enquiriesEnabled 
   return (
     <>
       <ExploreHeader />
-      <main className="mx-auto max-w-[1330px] px-5 pb-20 pt-7 sm:px-9 sm:pt-11">
+      <main className="mx-auto max-w-[1200px] px-4 pb-20 pt-6 sm:px-8 sm:pt-9">
         <Link href={returnHref || (occupationalRoute ? getExploreRouteHref(occupationalRoute) : "/explore")} className="inline-flex items-center gap-2 rounded-full py-2 text-sm font-semibold text-[#102c3d]/65 transition hover:text-[#102c3d]"><ArrowLeft size={16} /> {returnHref ? "Back to standards" : occupationalRoute ? "Back to " + occupationalRoute.name : "All occupational routes"}</Link>
-        <div className="mt-8 grid items-start gap-9 lg:grid-cols-[minmax(0,1fr)_355px] lg:gap-12">
+        <div className="mt-5 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_355px] lg:gap-7">
           <article className="min-w-0">
+            <div className="explore-detail-hero">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-[#dcece4] px-3 py-1.5 text-[11px] font-bold text-[#117f70]">{standard.route}</span>
+              <span className="rounded-full border border-[#142f3a]/10 bg-white/70 px-3 py-1.5 text-[11px] font-extrabold text-[#245b53]">{standard.route}</span>
               <span className="rounded-full bg-white px-3 py-1.5 text-[11px] font-bold text-[#102c3d]/65">Level {standard.level}</span>
               <span className="rounded-full bg-white px-3 py-1.5 text-[11px] font-bold text-[#102c3d]/65">{standard.duration}</span>
             </div>
-            <h1 className="mt-5 max-w-[800px] text-[clamp(2.5rem,5.5vw,4.8rem)] font-semibold leading-[1.02] tracking-[-.068em]">{standard.title}</h1>
-            <p className="mt-5 text-sm text-[#102c3d]/60">Official apprenticeship reference: {standard.code} · Version {standard.version}</p>
+            <h1 className="explore-display mt-5 max-w-[800px] text-[clamp(2.3rem,5.3vw,4.7rem)]">{standard.title}</h1>
+            <p className="mt-5 text-[12px] font-semibold text-[#142f3a]/65">OFFICIAL STANDARD <span className="mx-2 opacity-40">/</span> {standard.code} <span className="mx-2 opacity-40">/</span> VERSION {standard.version}</p>
+            </div>
             {managerView ? (
-              <div className="mt-7 rounded-[18px] border border-[#159b8f]/20 bg-[#e9f2ee] p-5 sm:p-6">
+              <div className="mt-5 rounded-[18px] border border-[#142f3a]/10 bg-[#e3f1e0] p-5 sm:p-6">
                 <p className="text-[11px] font-bold uppercase tracking-[.18em] text-[#117f70]">For line managers</p>
                 <h2 className="mt-2 text-xl font-semibold tracking-[-.04em]">Someone on your team wants to grow.</h2>
                 <p className="mt-3 text-sm leading-7 text-[#102c3d]/70">This is a starting point for a development conversation, not a formal application. Explore how the skills might benefit your team, whether the employee has suitable work opportunities and what employer support would involve. LevyTate can help without charging you for an initial enquiry.</p>
@@ -192,16 +193,17 @@ export function ExploreDetail({ standard, managerView = false, enquiriesEnabled 
           </article>
 
           <aside className="lg:sticky lg:top-5">
-            <div className="overflow-hidden rounded-[25px] border border-[#102c3d]/10 bg-white shadow-[0_15px_40px_rgba(16,44,61,.055)]">
-              <div className="bg-[#102c3d] p-6 text-white">
+            <div className="explore-action-panel">
+              <div className="explore-action-panel-heading">
                 <p className="text-[11px] font-bold uppercase tracking-[.18em] text-[#bfeadd]">{managerView ? "Your team member" : "Your next step"}</p>
-                <h2 className="mt-3 text-[25px] font-semibold leading-[1.15] tracking-[-.045em]">{managerView ? "Could this benefit your team?" : "Interested? Start a conversation."}</h2>
+                <span className="explore-action-accent" aria-hidden="true" />
+                <h2 className="mt-3 text-[26px] font-extrabold leading-[1.13] tracking-[-.05em]">{managerView ? "Could this benefit your team?" : "Interested? Start a conversation."}</h2>
                 <p className="mt-4 text-sm leading-6 text-white/65">{managerView ? "A useful conversation starts with understanding what the employee wants to learn and what the business needs." : "No applications, no commitment. Just an opportunity to explore."}</p>
               </div>
               <div className="p-5 sm:p-6">
                 {!action ? (
                   <div className="grid gap-3">
-                    {!managerView ? <button type="button" onClick={() => setAction("manager")} className="group flex min-h-[75px] w-full items-center justify-between gap-3 rounded-[15px] border border-[#102c3d]/15 p-4 text-left transition hover:border-[#117f70] hover:bg-[#f3f7f3]">
+                    {!managerView ? <button type="button" onClick={() => setAction("manager")} className="explore-contact-choice group">
                       <span><span className="block text-sm font-semibold">Bring it to my manager</span><span className="mt-1 block text-xs text-[#102c3d]/55">Prepare an email to start the discussion</span></span>
                       <ChevronRight size={19} className="shrink-0 text-[#117f70]" />
                     </button> : null}
@@ -223,21 +225,13 @@ export function ExploreDetail({ standard, managerView = false, enquiriesEnabled 
                 </div>
               </div>
             </div>
-            <div className="mt-4 rounded-[17px] border border-[#102c3d]/10 px-5 py-4 text-xs leading-6 text-[#102c3d]/60">
+            <div className="mt-4 rounded-[17px] border border-[#142f3a]/10 bg-[#eff3e9] px-5 py-4 text-xs leading-6 text-[#142f3a]/70">
               Already a LevyTate employee user? <Link href="/levytate/app" className="font-semibold text-[#117f70] underline underline-offset-2">Sign in to your organisation&apos;s platform.</Link> Its application approvals are separate from this public exploration journey.
             </div>
           </aside>
         </div>
       </main>
-      <footer className="border-t border-[#102c3d]/10 px-5 py-7 text-center text-xs text-[#102c3d]/55">
-        <Link href="/explore" className="font-semibold hover:underline">LevyTate Explore</Link> · Independent apprenticeship discovery · <a href="https://skillsengland.education.gov.uk/apprenticeships" target="_blank" rel="noopener noreferrer" className="hover:underline">Official Skills England catalogue</a>
-      <div className="mx-auto flex max-w-[1330px] flex-wrap items-center justify-center gap-4 px-5 pb-8 text-[11px] text-[#102c3d]/55">
-        <a href="https://occupational-maps.skillsengland.education.gov.uk/public-api/" target="_blank" rel="noopener noreferrer">
-          <Image unoptimized src="https://occupational-maps.skillsengland.education.gov.uk/media/xmehhrr0/skills-england_lesser_arms_stacked-dfe-blue-se-logo.svg?rmode=max&amp;width=500" alt="Skills England" loading="lazy" width="126" height="58" className="w-[126px] rounded-lg bg-white p-2" />
-        </a>
-        <span>© Skills England 2025. Source information under the <a href="https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">Open Government Licence v3.0</a>.</span>
-      </div>
-      </footer>
+      <ExploreFooter />
     </>
   );
 }
