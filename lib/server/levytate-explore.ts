@@ -3,6 +3,8 @@ import { escapeHtml } from "@/lib/email/shared";
 import { type ExploreStandard } from "@/lib/levytate/explore/catalogue";
 import {
   EXPLORE_GUIDANCE_CONSENT_TEXT, EXPLORE_GUIDANCE_CONSENT_VERSION,
+  EXPLORE_MANAGER_CONSENT_TEXT, EXPLORE_MANAGER_CONSENT_VERSION,
+  type ExploreRequesterType,
   type ExploreEnquiryStatus, type ExploreRevenueRoute,
 } from "@/lib/levytate/explore/policy";
 import { getLevyTateRateLimitEnvironment } from "@/lib/server/levytate-auth-rate-limit-config";
@@ -19,6 +21,7 @@ type ExploreEnvironment = "local" | "preview" | "production";
 export type ExploreEnquiryRow = {
   id: string;
   environment_namespace: ExploreEnvironment;
+  requester_type: ExploreRequesterType;
   full_name: string;
   email: string;
   organisation: string;
@@ -48,6 +51,7 @@ type OutboxClaim = {
 };
 
 export type ExploreEnquiryInput = {
+  requesterType: ExploreRequesterType;
   fullName: string;
   email: string;
   organisation: string;
@@ -72,9 +76,9 @@ function environment(): ExploreEnvironment {
   return getLevyTateRateLimitEnvironment();
 }
 
-export function makeExploreDedupeKey(email: string, code: string, now = new Date(), namespace = environment()) {
+export function makeExploreDedupeKey(email: string, code: string, requesterType: ExploreRequesterType, now = new Date(), namespace = environment()) {
   return createHash("sha256")
-    .update(["explore-v1", namespace, email.trim().toLowerCase(), code.toUpperCase(), now.toISOString().slice(0, 10)].join("\u0000"))
+    .update(["explore-v1", namespace, requesterType, email.trim().toLowerCase(), code.toUpperCase(), now.toISOString().slice(0, 10)].join("\u0000"))
     .digest("hex");
 }
 
@@ -83,7 +87,8 @@ export async function saveExploreEnquiry(input: ExploreEnquiryInput, standard: E
   const namespace = environment();
   const record = {
     environment_namespace: namespace,
-    dedupe_key: makeExploreDedupeKey(input.email, standard.code),
+    dedupe_key: makeExploreDedupeKey(input.email, standard.code, input.requesterType),
+    requester_type: input.requesterType,
     full_name: input.fullName,
     email: input.email,
     organisation: input.organisation,
@@ -94,8 +99,8 @@ export async function saveExploreEnquiry(input: ExploreEnquiryInput, standard: E
     source_url: standard.officialUrl,
     source_version: standard.version,
     source_last_verified: /^\d{4}-\d{2}-\d{2}$/.test(standard.sourceVerified) ? standard.sourceVerified : null,
-    consent_version: EXPLORE_GUIDANCE_CONSENT_VERSION,
-    consent_text: EXPLORE_GUIDANCE_CONSENT_TEXT,
+    consent_version: input.requesterType === "manager" ? EXPLORE_MANAGER_CONSENT_VERSION : EXPLORE_GUIDANCE_CONSENT_VERSION,
+    consent_text: input.requesterType === "manager" ? EXPLORE_MANAGER_CONSENT_TEXT : EXPLORE_GUIDANCE_CONSENT_TEXT,
   };
 
   try {
@@ -117,7 +122,7 @@ export async function saveExploreEnquiry(input: ExploreEnquiryInput, standard: E
 export async function listExploreEnquiries(status?: ExploreEnquiryStatus, limit = 80) {
   const config = requireConfig();
   const query = new URLSearchParams({
-    select: "id,environment_namespace,full_name,email,organisation,job_title,employee_note,standard_code,standard_title,source_url,source_version,source_last_verified,consent_version,consent_text,consent_given_at,manager_contact_authorised,status,commercial_route,internal_notes,updated_by,created_at,updated_at",
+    select: "id,environment_namespace,requester_type,full_name,email,organisation,job_title,employee_note,standard_code,standard_title,source_url,source_version,source_last_verified,consent_version,consent_text,consent_given_at,manager_contact_authorised,status,commercial_route,internal_notes,updated_by,created_at,updated_at",
     environment_namespace: "eq." + environment(),
     order: "created_at.desc",
     limit: String(Math.max(1, Math.min(limit, 100))),
@@ -139,7 +144,7 @@ export async function updateExploreEnquiry(
     id: "eq." + id,
     environment_namespace: "eq." + environment(),
     updated_at: "eq." + expectedUpdatedAt,
-    select: "id,environment_namespace,full_name,email,organisation,job_title,employee_note,standard_code,standard_title,source_url,source_version,source_last_verified,consent_version,consent_text,consent_given_at,manager_contact_authorised,status,commercial_route,internal_notes,updated_by,created_at,updated_at",
+    select: "id,environment_namespace,requester_type,full_name,email,organisation,job_title,employee_note,standard_code,standard_title,source_url,source_version,source_last_verified,consent_version,consent_text,consent_given_at,manager_contact_authorised,status,commercial_route,internal_notes,updated_by,created_at,updated_at",
   });
   // Optimistic concurrency prevents one administrator silently overwriting another.
   const rows = await supabaseUpdate<ExploreEnquiryRow>(config, ENQUIRIES_TABLE, query.toString(), {
@@ -153,6 +158,7 @@ export async function updateExploreEnquiry(
 
 function emailBody(lead: ExploreEnquiryRow) {
   const facts: Array<[string, string]> = [
+    ["Enquiry initiated by", lead.requester_type === "manager" ? "Line manager" : "Employee"],
     ["Name", lead.full_name],
     ["Work email", lead.email],
     ["Organisation", lead.organisation],
@@ -172,10 +178,10 @@ function emailBody(lead: ExploreEnquiryRow) {
   ).join("");
   return {
     subject: "LevyTate Explore enquiry · " + lead.organisation,
-    text: "New employee-led Explore enquiry\n\n" + plain +
-      "\n\nEmployee requested MPR guidance only. Do not contact the employer or manager without a separate agreed step.",
-    html: "<!doctype html><html lang=\"en\"><body style=\"font-family:Arial,sans-serif;color:#102c3d;background:#f5f6f2;padding:22px\"><div style=\"margin:auto;max-width:680px;background:#fff;padding:25px;border-radius:18px\"><h1>New Explore enquiry</h1><p>Employee has requested LevyTate/MPR guidance. Employer outreach is not authorised.</p><table style=\"border-collapse:collapse;width:100%\">" +
-      table + "</table><p style=\"font-weight:bold\">Do not contact the manager or employer without separate permission.</p></div></body></html>",
+    text: "New " + lead.requester_type + "-initiated Explore enquiry\n\n" + plain +
+      "\n\nThe named requester chose to contact MPR. Do not contact any other employee or employer representative without a separate agreed step.",
+    html: "<!doctype html><html lang=\"en\"><body style=\"font-family:Arial,sans-serif;color:#102c3d;background:#f5f6f2;padding:22px\"><div style=\"margin:auto;max-width:680px;background:#fff;padding:25px;border-radius:18px\"><h1>New Explore enquiry</h1><p>The named requester has asked for LevyTate/MPR guidance. Unsolicited third-party outreach is not authorised.</p><table style=\"border-collapse:collapse;width:100%\">" +
+      table + "</table><p style=\"font-weight:bold\">Do not contact anyone other than the named requester without separate permission.</p></div></body></html>",
   };
 }
 
@@ -206,7 +212,7 @@ export async function dispatchExploreNotifications({
     let errorCode = "delivery_failed";
     try {
       const query = new URLSearchParams({
-        select: "id,environment_namespace,full_name,email,organisation,job_title,employee_note,standard_code,standard_title,source_url,source_version,source_last_verified,consent_version,consent_text,consent_given_at,manager_contact_authorised,status,commercial_route,internal_notes,updated_by,created_at,updated_at",
+        select: "id,environment_namespace,requester_type,full_name,email,organisation,job_title,employee_note,standard_code,standard_title,source_url,source_version,source_last_verified,consent_version,consent_text,consent_given_at,manager_contact_authorised,status,commercial_route,internal_notes,updated_by,created_at,updated_at",
         environment_namespace: "eq." + namespace,
         id: "eq." + claim.enquiry_id,
         limit: "1",
