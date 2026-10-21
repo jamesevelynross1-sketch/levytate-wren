@@ -186,7 +186,7 @@ assert.match(officialLoaderSource, /occupation\.products/, "Read explicit ST pro
 assert.match(officialLoaderSource, /SKILLS_ENGLAND_API_KEY/, "Official API is authenticated server-side only");
 assert.match(routeListSource, /standard\.title/, "Within a route, display the original standard names");
 assert.match(routeListSource, /setSearch|input/, "Route-specific list supports finding standards");
-assert.match(homeSource, /15 official routes/, "Explain route provenance to employees");
+assert.match(homeSource, /15 official occupational routes/, "Explain route provenance to employees");
 assert.match(explainSource, /Unpacked/, "The public-facing transformation is called Unpacked");
 assert.doesNotMatch(explainSource, />\s*De-fluff\s*</, "Old label must not appear in UI");
 assert.match(detailSource, /ExploreAiExplanation standard=/, "A programme click must open the AI panel automatically");
@@ -206,4 +206,27 @@ assert.equal(exploreNarrativeSchema.safeParse({
   whatToKnowBeforeYouStart: "Your employer needs to support the learning, and eligibility depends on the work available and your existing skills.",
   aConversationStarter: "Could we discuss whether this programme fits our team's needs?",
 }).success, true);
+
+const designSource = readFileSync("app/levytate/explore/explore-theme.css", "utf8");
+const exploreLayout = readFileSync("app/levytate/explore/layout.tsx", "utf8");
+assert.match(exploreLayout, /explore-theme\.css/, "Load the Explore-only theme within the public PWA layout");
+assert.match(designSource, /\.levytate-explore/, "Scope style rules away from the employer workspace");
+assert.match(designSource, /prefers-reduced-motion: reduce/, "Respect reduced motion preferences");
+assert.match(designSource, /focus-visible/, "Preserve prominent keyboard focus indicators");
+assert.match(designSource, /explore-route-card/, "Keep the government's route tiles");
+assert.match(designSource, /explore-pathway-card/, "Keep official pathway tiles");
+assert.match(designSource, /explore-directory-row/, "Keep accessible tappable programme rows");
+assert.match(designSource, /explore-unpacked-hero/, "Style the existing Unpacked panel");
+assert.match(homeSource, /getExploreRouteHref\(route\)/, "Route tile destinations must be unchanged");
+assert.match(homeSource, /getExploreRouteGroups\(standards\)/, "Route names and counts must remain source-derived");
+assert.match(pathwayTilesSource, /routeHref \+ "\/pathways\/" \+ group.slug/, "Pathway tile URLs remain unchanged");
+assert.match(routeListSource, /setLevel\(Number\(event.target.value\)\)/, "Level filters are still functional");
+assert.match(routeListSource, /setSearch\(event.target.value\)/, "Standards searches are still functional");
+assert.match(routeListSource, /getExploreRouteHref\(route\) \+ "\/pathways\/" \+ pathwaySlug/, "Back navigation retains pathway context");
+assert.match(detailSource, /setAction\("manager"\)/, "Keep employee-controlled manager email journey");
+assert.match(detailSource, /setAction\("mpr"\)/, "Keep voluntary adviser contact");
+assert.match(detailSource, /MprContact standard=\{standard\}/, "Retain the gated contact route");
+assert.match(explainSource, /fetch\("\/api\/levytate-explore\/de-fluff"/, "No changes to the existing AI API/activation flow");
+assert.match(homeSource, /levytate-logo-supplied\.png/, "Preserve the original supplied LevyTate artwork");
+
 console.log("Explore route → official pathway → standards, source mapping, Unpacked AI and PWA checks passed.");
