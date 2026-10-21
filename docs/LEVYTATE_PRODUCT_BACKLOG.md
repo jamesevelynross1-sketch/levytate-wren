@@ -4,11 +4,13 @@
 
 Status: Isolated Preview development; **not approved for public release**.
 
-Purpose: Give employees already in work a searchable list of approved
-apprenticeship **names**. Tapping a name automatically invokes a source-grounded
-AI De-fluff explanation (with honest fallback if unavailable). Employees can
-then initiate their own manager conversation. Separately consented MPR guidance
-requests generate potential provider-funded enrolments or employer licences.
+Purpose: Display the **15 government-defined Skills England occupational
+routes as tiles**. Selecting a tile displays an alphabetical, searchable list
+of approved standards in that official route. Selecting a standard automatically
+invokes source-grounded AI **Unpacked** (with honest fallback if unavailable).
+Employees can then initiate their own manager conversation. Separately consented
+MPR guidance requests generate potential provider-funded enrolments or employer
+licences.
 
 Engineering: version-aware narrative cache, exact official ST↔OCC product
 mapping, structured response validation, strict daily API budgets, and feature
