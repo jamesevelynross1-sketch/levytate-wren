@@ -36,6 +36,15 @@ function parseNarrative(value: unknown) {
   return exploreNarrativeSchema.safeParse(value);
 }
 
+/** Treat version 1, 1.0 and v1.0 as equivalent; never infer a match for "Current". */
+export function normaliseExploreVersion(raw: string): string | null {
+  const candidate = raw.trim().toLowerCase().replace(/^v/, "");
+  if (!/^\d+(?:[.-]\d+)*$/.test(candidate)) return null;
+  const parts = candidate.split(/[.-]/).map(value => Number(value));
+  while (parts.length > 1 && parts[parts.length - 1] === 0) parts.pop();
+  return parts.join(".");
+}
+
 /**
  * Persisted budget: max 5 new AI generations per network per day, 20 in total
  * per deployment environment. Cache hits do not consume this allowance.
@@ -157,14 +166,15 @@ export async function explainExploreStandard(
 
   let source: ExploreSourceEvidence;
   try {
-    source = await fetchExploreSourceEvidence(standard.code);
+    source = await fetchExploreSourceEvidence(standard.code, standard.title);
   } catch {
     throw new ExploreGenerationUnavailable("source_unavailable");
   }
   // Product/version linkage must be explicit; never match on title.
   if (source.standardCode !== standard.code) throw new ExploreGenerationUnavailable("source_unavailable");
-  if (source.apprenticeshipProductVersion && standard.version &&
-      source.apprenticeshipProductVersion.replace(/[^0-9]/g, "") !== standard.version.replace(/[^0-9]/g, "")) {
+  const sourceVersion = normaliseExploreVersion(source.apprenticeshipProductVersion);
+  const catalogueVersion = normaliseExploreVersion(standard.version);
+  if (sourceVersion && catalogueVersion && sourceVersion !== catalogueVersion) {
     throw new ExploreGenerationUnavailable("source_unavailable");
   }
 
