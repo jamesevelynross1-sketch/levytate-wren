@@ -111,10 +111,13 @@ whose employer has not purchased LevyTate. It is not a vacancy board, a
 recruitment product, or part of employer tenant records.
 
 - No account or employer licence is required for browsing.
-- The first-release UI is a **simple searchable alphabetical list of official
-  apprenticeship standard names**; not a card marketplace, quiz or pathway form.
-- When a user clicks a name the detail page automatically requests a **live,
-  source-grounded AI De-fluff transformation**, with no extra Generate step.
+- The first-release homepage is a grid of tiles for the **15 official
+  Skills England occupational routes**, with names and counts from the
+  underlying government route metadata, not AI-invented categories.
+- Selecting a tile opens a searchable alphabetical list containing only
+  approved apprenticeship standards belonging to that route.
+- Selecting an individual standard automatically requests the source-grounded
+  AI **Unpacked** transformation, with no extra Generate step.
 - Only currently approved apprenticeship standards should be discoverable.
 - An explanation is clearly labelled AI-generated; the original standard is
   always accessible. Missing verified source data, model access or safe usage
