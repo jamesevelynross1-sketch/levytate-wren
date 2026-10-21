@@ -10,6 +10,10 @@ import {
   getExploreRouteGroups, getExploreRouteHref, standardsForExploreRoute,
   countUncategorisedStandards,
 } from "../lib/levytate/explore/occupational-routes";
+import {
+  historicalExplorePathwayMap, mapPathwayGroups, standardsForPathway,
+  unavailableExplorePathwayMap, unmappedStandardsForPathways,
+} from "../lib/levytate/explore/official-pathways";
 
 function record(code: string, status: string, type = "Apprenticeship standard"): ApprenticeshipStandard {
   return {
@@ -77,6 +81,9 @@ for (const name of ["levytate-192.png", "levytate-512.png", "levytate-maskable-1
 const homeSource = readFileSync("components/levytate-explore/ExploreHome.tsx", "utf8");
 const routeListSource = readFileSync("components/levytate-explore/ExploreRouteStandards.tsx", "utf8");
 const routePageSource = readFileSync("app/levytate/explore/routes/[slug]/page.tsx", "utf8");
+const pathwayTilesSource = readFileSync("components/levytate-explore/ExploreRoutePathways.tsx", "utf8");
+const pathwayPageSource = readFileSync("app/levytate/explore/routes/[slug]/pathways/[pathway]/page.tsx", "utf8");
+const officialLoaderSource = readFileSync("lib/server/levytate-explore-pathways.ts", "utf8");
 const detailSource = readFileSync("components/levytate-explore/ExploreDetail.tsx", "utf8");
 const explainSource = readFileSync("components/levytate-explore/ExploreAiExplanation.tsx", "utf8");
 const routeSource = readFileSync("app/api/levytate-explore/de-fluff/route.ts", "utf8");
@@ -108,10 +115,75 @@ for (const item of officialGroups) {
   assert.deepEqual(standards.map(s => s.title), [...standards].map(s => s.title).sort((a,b)=>a.localeCompare(b)));
 }
 assert.equal(standardsForExploreRoute(realCatalogue,"unknown").length,0, "Unknown route has no accidental results");
+
+// The official map hierarchy is Route → Pathway → ClusterGroup → Cluster
+// → Occupation(OCC) → apprenticeship product(ST). Never classify by title.
+const salesRoute = getExploreRouteBySlug("sales-marketing-and-procurement");
+assert.ok(salesRoute);
+const salesStandards = standardsForExploreRoute(realCatalogue, salesRoute.slug);
+const archive = historicalExplorePathwayMap(salesRoute, salesStandards);
+assert.ok(archive && archive.source === "historical-official-map");
+assert.deepEqual(archive.groups.map(g => g.name), ["Customer Service", "Marketing", "Procurement", "Retail"]);
+assert.equal(standardsForPathway(salesStandards, archive, "retail").some(s => s.code === "ST0078"), true, "Butcher belongs in verified historical Retail");
+assert.equal(standardsForPathway(salesStandards, archive, "retail").some(s => s.code === "ST0194"), true, "Fishmonger belongs in verified historical Retail");
+assert.equal(standardsForPathway(salesStandards, archive, "customer-service").some(s => s.code === "ST0584"), true, "Funeral director belongs in verified historical Customer Service");
+const historicalMapped = new Set(archive.groups.flatMap(g => g.standardCodes));
+assert.equal(historicalMapped.size + archive.unmappedCodes.length, salesStandards.length, "Do not lose newly introduced/unverified standards");
+
+const apiFixture = {
+  name: "Sales, marketing and procurement",
+  routeId: 15,
+  pathways: [
+    {
+      id: 31, name: "Retail", sequence: 2,
+      clusterGroups: [{ clusters: [{ occupations: [
+        { stdCode: "OCC0078A", products: [{ productCode: "ST0078", typeName: "Apprenticeship standard" }] },
+        { stdCode: "OCC0078B", products: [{ productCode: "ST0078", typeName: "Apprenticeship standard" }] },
+        { stdCode: "OCC9999", products: [{ productCode: "ST0313" }] }, // retired should be omitted
+        { stdCode: "ST0194", products: [{ productCode: "ST0194" }] }, // not an occupation code
+      ] }] }],
+    },
+    {
+      id: 32, name: "Customer Service", sequence: 1,
+      clusterGroups: [{ clusters: [{ occupations: [
+        { stdCode: "OCC0584", products: [{ productCode: "ST0584" }] },
+      ] }] }],
+    },
+  ],
+};
+const fromApi = mapPathwayGroups(salesRoute, salesStandards, apiFixture, "2026-10-21T18:00:00Z");
+assert.ok(fromApi && fromApi.source === "live-official-api");
+assert.deepEqual(fromApi.groups.map(g => g.name), ["Customer Service", "Retail"], "Preserve government pathway sequencing");
+assert.deepEqual(fromApi.groups.find(g => g.slug === "retail")?.standardCodes, ["ST0078"], "Multiple options for one ST are deduplicated");
+assert.deepEqual(fromApi.groups.find(g => g.slug === "customer-service")?.standardCodes, ["ST0584"]);
+assert.equal(fromApi.groups.flatMap(g => g.standardCodes).includes("ST0313"), false, "Exclude withdrawn standards");
+assert.equal(fromApi.unmappedCodes.includes("ST0194"), true, "Do not infer a pathway from the name");
+assert.equal(
+  mapPathwayGroups(salesRoute, salesStandards, { ...apiFixture, name: "Engineering and manufacturing" }, "2026-10-21T18:00:00Z"),
+  null,
+  "Reject a mismatched official route payload",
+);
+assert.equal(
+  mapPathwayGroups(salesRoute, salesStandards, { ...apiFixture, pathways: [{ id: 1, name: "Retail" }, { id: 2, name: "Retail" }] }, "2026-10-21T18:00:00Z"),
+  null,
+  "Reject duplicate slugs rather than create ambiguous URLs",
+);
+const unmappedEngineering = unavailableExplorePathwayMap(getExploreRouteBySlug("engineering-and-manufacturing")!, realCatalogue);
+assert.equal(unmappedEngineering.groups.length, 0, "Do not invent unverified government pathways");
+const engineeringStandards = standardsForExploreRoute(realCatalogue, "engineering-and-manufacturing");
+assert.equal(unmappedStandardsForPathways(engineeringStandards, unmappedEngineering).length, engineeringStandards.length);
+
 assert.match(homeSource, /getExploreRouteGroups/, "Home must display government route tiles");
 assert.match(homeSource, /route\.name/, "Tiles use official route names");
 assert.doesNotMatch(homeSource, /visible\.map\(standard|EXPLORER_INTERESTS|interestScore/, "No long apprenticeship directory on the home screen");
-assert.match(routePageSource, /standardsForExploreRoute/, "Route pages must strictly filter the standard catalogue");
+assert.match(routePageSource, /ExploreRoutePathways/, "Clicking a route must first display pathway tiles");
+assert.match(pathwayTilesSource, /mapping\.groups\.map/, "Render pathways from the approved map, not name heuristics");
+assert.match(pathwayTilesSource, /historical-official-map/, "Label older government maps honestly");
+assert.match(pathwayPageSource, /standardsForPathway/, "A pathway displays only its mapped standards");
+assert.match(pathwayPageSource, /unmappedStandardsForPathways/, "Unverified mapping never hides a standard");
+assert.match(officialLoaderSource, /\/Routes\//, "Fetch official route structure by routeId");
+assert.match(officialLoaderSource, /occupation\.products/, "Read explicit ST products in the official hierarchy");
+assert.match(officialLoaderSource, /SKILLS_ENGLAND_API_KEY/, "Official API is authenticated server-side only");
 assert.match(routeListSource, /standard\.title/, "Within a route, display the original standard names");
 assert.match(routeListSource, /setSearch|input/, "Route-specific list supports finding standards");
 assert.match(homeSource, /15 official routes/, "Explain route provenance to employees");
@@ -134,4 +206,4 @@ assert.equal(exploreNarrativeSchema.safeParse({
   whatToKnowBeforeYouStart: "Your employer needs to support the learning, and eligibility depends on the work available and your existing skills.",
   aConversationStarter: "Could we discuss whether this programme fits our team's needs?",
 }).success, true);
-console.log("Explore occupational routes (15), catalogue filtering, Unpacked AI, official-source and PWA checks passed.");
+console.log("Explore route → official pathway → standards, source mapping, Unpacked AI and PWA checks passed.");
