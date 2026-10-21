@@ -4,10 +4,16 @@
 
 Status: Isolated Preview development; **not approved for public release**.
 
-Purpose: Let employees already in work discover relevant apprenticeships using
-plain-English De-fluff explanations and initiate their own manager conversation.
-Allow separately consented MPR guidance requests, generating potential
-provider-funded enrolments or employer licence opportunities.
+Purpose: Give employees already in work a searchable list of approved
+apprenticeship **names**. Tapping a name automatically invokes a source-grounded
+AI De-fluff explanation (with honest fallback if unavailable). Employees can
+then initiate their own manager conversation. Separately consented MPR guidance
+requests generate potential provider-funded enrolments or employer licences.
+
+Engineering: version-aware narrative cache, exact official ST↔OCC product
+mapping, structured response validation, strict daily API budgets, and feature
+gating. Source/cache SQL remains a proposal until reviewed migration and test
+evidence exist; **AI calls remain disabled in the current Preview**.
 
 Prerequisites for release:
 - Updated Skills England API source/version and full catalogue content review
