@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 
 const manifest: MetadataRoute.Manifest = {
   id: "/explore",
+  lang: "en-GB",
   name: "LevyTate Explore",
   short_name: "Explore",
   description: "Discover what you're capable of. Find apprenticeships in plain English.",
