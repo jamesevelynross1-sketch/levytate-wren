@@ -6,7 +6,7 @@ const manifest: MetadataRoute.Manifest = {
   short_name: "Explore",
   description: "Discover what you're capable of. Find apprenticeships in plain English.",
   start_url: "/explore",
-  scope: "/explore/",
+  scope: "/explore",
   display: "standalone",
   background_color: "#f5f6f2",
   theme_color: "#102c3d",
