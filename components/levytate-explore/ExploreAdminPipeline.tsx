@@ -60,7 +60,7 @@ export function ExploreAdminPipeline() {
     [enquiries, filter],
   );
   const newCount = enquiries.filter(item => item.status === "new").length;
-  const managerCount = enquiries.filter(item => item.status === "manager_conversation").length;
+  const managerCount = enquiries.filter(item => item.requester_type === "manager" || item.status === "manager_conversation").length;
   const providerCount = enquiries.filter(item => item.commercial_route === "provider_referral" || item.commercial_route === "both").length;
   const licenceCount = enquiries.filter(item => item.commercial_route === "levytate_licence" || item.commercial_route === "both").length;
 
@@ -136,8 +136,8 @@ export function ExploreAdminPipeline() {
             <p className="text-xs font-bold uppercase tracking-[.2em] text-[#117f70]">LEVYTATE / EXPLORE / INTERNAL</p>
             <h1 className="mt-3 text-[clamp(2.1rem,4vw,3.7rem)] font-semibold tracking-[-.06em]">Development pipeline</h1>
             <p className="mt-3 max-w-[730px] text-sm leading-7 text-[#102c3d]/65">
-              Employee-initiated enquiries across employers that do not necessarily use LevyTate.
-              The employee has requested MPR guidance, not authorised unsolicited manager or employer contact.
+              Development enquiries from employees and managers across employers that do not necessarily use LevyTate.
+              The named person has requested MPR guidance, not authorised contact with other people.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -153,7 +153,7 @@ export function ExploreAdminPipeline() {
         <div className="mt-7 grid grid-cols-2 gap-3 md:grid-cols-4">
           {[
             [newCount, "New enquiries"],
-            [managerCount, "Manager conversations"],
+            [managerCount, "Manager engagement"],
             [providerCount, "Provider referral routes"],
             [licenceCount, "LevyTate licence routes"],
           ].map(([value, label]) => (
@@ -210,7 +210,7 @@ export function ExploreAdminPipeline() {
             {selected && draft ? (
               <div className="overflow-hidden rounded-[22px] border border-[#102c3d]/10 bg-white">
                 <div className="bg-[#102c3d] px-6 py-6 text-white">
-                  <p className="text-[11px] font-semibold uppercase tracking-[.16em] text-[#c6ebdd]">Private employee enquiry</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[.16em] text-[#c6ebdd]">{selected.requester_type === "manager" ? "Manager-initiated enquiry" : "Employee-initiated enquiry"}</p>
                   <h2 className="mt-2 text-2xl font-semibold tracking-[-.04em]">{selected.full_name}</h2>
                   <p className="mt-2 text-xs text-white/65">{selected.organisation} · {shortDate(selected.created_at)}</p>
                 </div>
@@ -224,7 +224,7 @@ export function ExploreAdminPipeline() {
                   </dl>
                   <div className="flex items-start gap-3 rounded-xl bg-[#fff3e9] p-4 text-xs leading-6 text-[#825c30]">
                     <ShieldCheck size={19} className="mt-0.5 shrink-0" />
-                    Contact permission is for employee guidance only. Employer and manager outreach have not been authorised.
+                    {selected.requester_type === "manager" ? "This manager independently requested MPR contact. Do not contact the employee or other colleagues without a separate agreed step." : "This employee requested MPR guidance only. Manager or employer outreach requires a separate agreed step."}
                   </div>
                   <label className="block text-xs font-semibold text-[#102c3d]/75" htmlFor="explore-stage">Pipeline stage
                     <select id="explore-stage" value={draft.status} onChange={e => setDraft({ ...draft, status: e.target.value as ExploreEnquiryStatus })} className="mt-2 block min-h-11 w-full rounded-xl border border-[#102c3d]/15 bg-[#f5f6f2] px-3 text-sm font-semibold">
@@ -248,7 +248,7 @@ export function ExploreAdminPipeline() {
               <div className="rounded-[22px] border border-[#102c3d]/10 bg-white p-8 text-center">
                 <Inbox className="mx-auto mb-4 text-[#117f70]" size={29} />
                 <h2 className="text-lg font-semibold">Choose an enquiry</h2>
-                <p className="mt-2 text-sm leading-6 text-[#102c3d]/55">Review the employee&apos;s interest and qualify the provider referral or LevyTate licence opportunity.</p>
+                <p className="mt-2 text-sm leading-6 text-[#102c3d]/55">Review this person&apos;s interest and qualify the provider referral or LevyTate licence opportunity.</p>
               </div>
             )}
           </section>
