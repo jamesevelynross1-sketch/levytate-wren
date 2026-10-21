@@ -88,7 +88,8 @@ export function ExploreAdminPipeline() {
       });
       const payload = (await response.json()) as { enquiry?: ExploreEnquiryRow; message?: string };
       if (!response.ok || !payload.enquiry) throw new Error(payload.message || "Unable to save the change.");
-      setEnquiries(current => current.map(item => item.id === payload.enquiry?.id ? payload.enquiry : item));
+      const updated = payload.enquiry;
+      setEnquiries(current => current.map(item => item.id === updated.id ? updated : item));
       setDraft(currentForm(payload.enquiry));
       setNotice("Saved. The pipeline has been updated.");
     } catch (cause) {
