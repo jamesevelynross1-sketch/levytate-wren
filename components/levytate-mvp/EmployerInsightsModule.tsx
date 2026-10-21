@@ -4,6 +4,7 @@ import { ArrowRight, BarChart3, CalendarClock, CheckCircle2, Info, Printer, Refr
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { EmployerExecutiveReport } from "@/components/levytate-mvp/EmployerExecutiveReport";
+import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { formatGbp } from "@/lib/levytate/finance/calculations";
 import { buildEmployerExecutiveReportContract } from "@/lib/levytate/intelligence/executive-report";
 import type { EmployerIntelligenceResponse, IntelligencePriority, WorkforceIntelligenceReport } from "@/lib/levytate/intelligence/types";
@@ -15,6 +16,7 @@ const eyebrow = "text-[10px] font-semibold uppercase tracking-[0.14em] text-[#08
 const button = "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#102c3d]/10 bg-white px-4 text-xs font-semibold text-[#102c3d] transition hover:border-[#159b8f]/30 hover:bg-[#f3f8f5] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20";
 
 export function EmployerInsightsModule({ view }: { view: View }) {
+  const { meta } = useMvpWorkspace();
   const [data, setData] = useState<EmployerIntelligenceResponse | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -73,6 +75,8 @@ export function EmployerInsightsModule({ view }: { view: View }) {
         <a href="#metric-definitions" className="font-semibold text-[#087c73] hover:underline">View definitions</a>
       </div>
     </section>
+
+    {meta?.liftEnabled ? <section className={`${panel} flex flex-col gap-3 border-[#159b8f]/20 bg-[#f4faf7] p-5 sm:flex-row sm:items-center sm:justify-between`}><div><p className={eyebrow}>LevyTate Lift</p><h3 className="mt-1 text-base font-semibold text-[#102c3d]">Continue from evidence to opportunity and proof</h3><p className="mt-1 text-xs leading-5 text-[#102c3d]/55">Lift evidence remains separate from historical assessment scores and workforce aggregates.</p></div><a className={`${button} shrink-0`} href="/levytate/app?module=Assessments">Open Lift <ArrowRight size={14} aria-hidden="true"/></a></section> : null}
 
     {view === "overview"
       ? <Overview intelligence={data} selectedCampaign={selected} />

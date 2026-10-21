@@ -68,6 +68,7 @@ import { getOrganisationLearnerLifecycleCollectionsForWorkspace } from "@/lib/se
 import { isBetaApprovedEarlyAccessStatus } from "@/lib/levytate/early-access/domain";
 import { isRequestsEnabledForOrganisation } from "@/lib/server/levytate-request-capability";
 import { getPastoralNavigationAccess } from "@/lib/server/levytate-pastoral-capability";
+import { isLiftEnabledForOrganisation } from "@/lib/server/levytate-lift-capability";
 
 type OrganisationRow = {
   id: string;
@@ -431,12 +432,13 @@ export async function getWorkspaceBootstrapForSession(session: LevyTateBetaSessi
     const context = await ensureWorkspaceContext(session);
     await assertWorkspaceReadAllowed(context);
     const preliminaryRole = normaliseMvpUserRole(context.user.role);
-    const [data, requestsEnabled, applicationWorkflowsEnabled, offTheJobAssistantEnabled, pastoralAccess] = await Promise.all([
+    const [data, requestsEnabled, applicationWorkflowsEnabled, offTheJobAssistantEnabled, pastoralAccess, liftEnabled] = await Promise.all([
       loadWorkspaceData(context, session),
       isRequestsEnabledForOrganisation(context.organisation.id),
       isApplicationWorkflowsEnabledForOrganisation(context.organisation.id),
       isOffTheJobAssistantEnabledForOrganisation(context.organisation.id),
       getPastoralNavigationAccess({ organisationId: context.organisation.id, userId: context.user.id, email: context.user.email, role: preliminaryRole }),
+      isLiftEnabledForOrganisation(context.organisation.id),
     ]);
     const userRole = normaliseMvpUserRole(context.user.role);
     const applicationWorkflowPublished = applicationWorkflowsEnabled
@@ -470,6 +472,7 @@ export async function getWorkspaceBootstrapForSession(session: LevyTateBetaSessi
         offTheJobAssistantEnabled,
         pastoralSupportEnabled: pastoralAccess.employeeAccess,
         pastoralInboxEnabled: pastoralAccess.supportInboxAccess,
+        liftEnabled,
         directReportOperationalSummaries,
         prospectAccess: prospectAccess ? {
           id: prospectAccess.id,
@@ -530,11 +533,12 @@ export async function getWorkspaceBootstrapForMicrosoftCopilotActor(
   const context: WorkspaceContext = { organisation, user, warnings: [] };
   await assertWorkspaceReadAllowed(context);
   const session = microsoftCopilotActorSession(actor);
-  const [data, requestsEnabled, applicationWorkflowsEnabled, offTheJobAssistantEnabled] = await Promise.all([
+  const [data, requestsEnabled, applicationWorkflowsEnabled, offTheJobAssistantEnabled, liftEnabled] = await Promise.all([
     loadWorkspaceData(context, session),
     isRequestsEnabledForOrganisation(actor.organisationId),
     isApplicationWorkflowsEnabledForOrganisation(actor.organisationId),
     isOffTheJobAssistantEnabledForOrganisation(actor.organisationId),
+    isLiftEnabledForOrganisation(actor.organisationId),
   ]);
   const applicationWorkflowPublished = applicationWorkflowsEnabled
     ? await hasPublishedApplicationWorkflow(actor.organisationId)
@@ -555,6 +559,7 @@ export async function getWorkspaceBootstrapForMicrosoftCopilotActor(
       applicationWorkflowPublished,
       offTheJobAssistantEnabled,
       pastoralSupportEnabled: false,
+      liftEnabled,
       pastoralInboxEnabled: false,
       directReportOperationalSummaries: undefined,
       prospectAccess: null,
