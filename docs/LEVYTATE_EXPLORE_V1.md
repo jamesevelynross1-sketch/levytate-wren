@@ -84,7 +84,7 @@ Source: https://occupational-maps.skillsengland.education.gov.uk/public-api/
 
 - Staged migration 040 creates an isolated private enquiry register, audit trail, and retryable notification outbox with atomic leasing.
 - Public submissions are persisted before acknowledgement, deduplicated per requester/standard/day and environment, and protected by existing distributed rate-limit controls.
-- The server notifies MPR through Resend and retries failures from a protected hourly worker; there is no email-only fallback if durable storage is absent.
+- The server notifies MPR through Resend and retries failures from a protected daily worker; there is no email-only fallback if durable storage is absent.
 - Internal beta-admin only dashboard captures status, notes, and the provider-referral versus LevyTate-licence revenue route. No public lead is added to employer tenant records.
 - Employee-to-manager sharing is an email draft controlled by the employee. The recipient sees a manager-specific programme view and can independently consent to MPR contact.
 - Separate consent copy and version history exists for employee and manager enquiries.
