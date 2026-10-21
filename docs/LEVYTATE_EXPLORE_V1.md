@@ -94,6 +94,13 @@ Source: https://occupational-maps.skillsengland.education.gov.uk/public-api/
 - Package builds run the automatic Explore catalogue validation and OCC-to-ST source-link tests first.
 - Server-only source evidence retrieval supports Skills England's SearchOccupations endpoint when SKILLS_ENGLAND_API_KEY is configured. It verifies an exact productCode association between ST apprenticeship and OCC occupation before returning summaries, duties or knowledge/skills/behaviours. It never automatically publishes AI copy.
 
+**Public submission release switch:** `LEVYTATE_EXPLORE_SUBMISSIONS_ENABLED=true`
+is required in the specific approved environment before the contact form is
+visible and POST requests are accepted. It MUST stay absent/false on the
+current Preview and Production until the isolated lead store is migrated,
+verified and the separate public privacy notice is legally approved.
+The manager email draft and programme discovery remain available.
+
 **Migration 040 remains unapplied.** The connected Supabase workspace exposed to this session is not confirmed to be the correct live LevyTate database. Consequently, Preview submission must fail closed rather than storing personal data in an unverified project.
 
 ## Public-release acceptance gates
