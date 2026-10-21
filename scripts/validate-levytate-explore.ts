@@ -21,7 +21,7 @@ const input = [
   record("AU0010", "Approved for delivery", "Apprenticeship unit"),
 ];
 const catalogue = createExploreCatalogue(input);
-assert.deepEqual(catalogue.map(x => x.code), ["ST1512", "ST0118"].sort());
+assert.deepEqual(catalogue.map(x => x.code), ["ST1512", "ST0118"]);
 assert.equal(catalogue.find(x => x.code === "ST0118")?.duration, "24 months");
 assert.equal(catalogue.find(x => x.code === "ST0118")?.story?.outcomes.length, 3);
 assert.equal(catalogue.find(x => x.code === "ST1512")?.version, "2.1");
@@ -29,4 +29,6 @@ assert.equal(searchExploreCatalogue(catalogue, "data analyst").length, 1);
 assert.equal(searchExploreCatalogue(catalogue, "", "ai").some(x => x.code === "ST1512"), true);
 assert.equal(searchExploreCatalogue(catalogue, "", undefined, 3).length, 0);
 assert.equal(catalogue.some(x => x.code === "AU0010" || x.code === "ST0117"), false);
+assert.equal(searchExploreCatalogue(catalogue, "data analyst", "people").length, 0);
+assert.equal(catalogue.find(x => x.code === "ST0118")?.sourceVerified, "2026-07-02");
 console.log("Explore catalogue validation passed: approved-only, deduplicated, source-aware, searchable.");
