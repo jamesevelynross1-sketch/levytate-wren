@@ -29,5 +29,9 @@ export default async function ExploreStandardPage({ params, searchParams }: Prop
   if (!standard) notFound();
 
   const query = await searchParams;
-  return <ExploreDetail standard={standard} managerView={query.audience === "manager"} />;
+  return <ExploreDetail
+    standard={standard}
+    managerView={query.audience === "manager"}
+    enquiriesEnabled={process.env.LEVYTATE_EXPLORE_SUBMISSIONS_ENABLED === "true"}
+  />;
 }
