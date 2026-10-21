@@ -5,9 +5,11 @@
 Status: Isolated Preview development; **not approved for public release**.
 
 Purpose: Display the **15 government-defined Skills England occupational
-routes as tiles**. Selecting a tile displays an alphabetical, searchable list
-of approved standards in that official route. Selecting a standard automatically
-invokes source-grounded AI **Unpacked** (with honest fallback if unavailable).
+routes as tiles**, followed by the official occupational **pathways** within
+each route. Selecting a pathway displays only its verified, approved
+apprenticeship standards. Unknown mappings remain explicitly visible without
+inventing classifications. Selecting a standard automatically invokes
+source-grounded AI **Unpacked** (with honest fallback if unavailable).
 Employees can then initiate their own manager conversation. Separately consented
 MPR guidance requests generate potential provider-funded enrolments or employer
 licences.
