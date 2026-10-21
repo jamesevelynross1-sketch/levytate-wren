@@ -106,7 +106,7 @@ export function ExploreInstallAction() {
       <button
         type="button"
         onClick={() => dialog.current?.showModal()}
-        className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-full bg-[#102c3d] px-3.5 text-[12px] font-semibold text-white transition hover:bg-[#1c4856] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#159b8f] sm:px-5"
+        className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-[#142f3a] px-4 text-[12px] font-extrabold text-white transition hover:bg-[#245360] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#117f70] sm:px-5"
         aria-label={installed ? "LevyTate Explore is installed" : "Install LevyTate Explore for free"}
       >
         {installed ? <CheckCircle2 size={16} aria-hidden="true" /> : <Download size={16} aria-hidden="true" />}
@@ -117,7 +117,7 @@ export function ExploreInstallAction() {
         ref={dialog}
         aria-labelledby="explore-install-title"
         aria-describedby="explore-install-description"
-        className="w-[calc(100%-2rem)] max-w-[465px] overflow-hidden rounded-[25px] border border-[#102c3d]/10 bg-[#f5f6f2] p-0 text-[#102c3d] shadow-[0_28px_90px_rgba(16,44,61,.3)] backdrop:bg-[#102c3d]/65"
+        className="explore-install-dialog w-[calc(100%-2rem)] max-w-[465px] overflow-hidden rounded-[25px] border border-[#142f3a]/10 bg-[#faf9f5] p-0 text-[#142f3a] shadow-[0_28px_90px_rgba(16,44,61,.3)] backdrop:bg-[#142f3a]/75"
         onClick={event => {
           // Native dialog: clicking its backdrop closes it; inner card is inert.
           if (event.target === dialog.current) dialog.current?.close();
@@ -132,8 +132,8 @@ export function ExploreInstallAction() {
               <X size={19} aria-hidden="true" />
             </button>
           </div>
-          <p className="mt-7 text-[11px] font-bold uppercase tracking-[.2em] text-[#117f70]">Your development, one tap away</p>
-          <h2 id="explore-install-title" className="mt-3 text-[31px] font-semibold leading-[1.1] tracking-[-.055em]">
+          <p className="explore-eyebrow mt-7 text-[#117f70]">Your development, one tap away</p>
+          <h2 id="explore-install-title" className="explore-display mt-3 text-[clamp(1.9rem,5vw,2.4rem)]">
             Explore, right on your home screen.
           </h2>
           <p id="explore-install-description" className="mt-4 text-sm leading-7 text-[#102c3d]/65">
@@ -165,7 +165,7 @@ export function ExploreInstallAction() {
               </div>
               {canPrompt && platform !== "ios" ? (
                 <button type="button" onClick={() => void requestInstall()}
-                  className="mt-5 inline-flex min-h-[50px] w-full items-center justify-center gap-2 rounded-full bg-[#117f70] px-5 text-sm font-bold text-white transition hover:bg-[#0d655b]">
+                  className="mt-5 inline-flex min-h-[50px] w-full items-center justify-center gap-2 rounded-full bg-[#142f3a] px-5 text-sm font-extrabold text-white transition hover:bg-[#275566]">
                   <Download size={18} aria-hidden="true" /> Install Explore now
                 </button>
               ) : null}
