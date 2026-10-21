@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
-  ArrowDown, ArrowRight, ArrowUpRight, BookOpen, Check, ChevronRight,
+  ArrowDown, ArrowUpRight, BookOpen, Check, ChevronRight,
   Compass, Lightbulb, Search, Sparkles, Users, WandSparkles, X,
 } from "lucide-react";
 import {
@@ -236,9 +236,15 @@ export function ExploreHome({ standards }: { standards: ExploreStandard[] }) {
         <div className="mx-auto flex max-w-[1330px] flex-wrap items-center justify-between gap-5 px-5 py-8 text-xs text-white/65 sm:px-9">
           <div className="flex items-center gap-3"><span className="font-semibold tracking-[.19em] text-white">LEVYTATE / EXPLORE</span><span className="text-white/30">•</span><span>Discover what you're capable of.</span></div>
           <div className="flex gap-5">
-            <a href="/privacy" className="hover:text-white">Privacy</a>
+            <a href="/levytate/privacy" className="hover:text-white">Privacy</a>
             <a href="https://skillsengland.education.gov.uk/apprenticeships" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-white">Skills England <ArrowUpRight size={13}/></a>
           </div>
+        </div>
+        <div className="mx-auto flex max-w-[1330px] flex-wrap items-center justify-between gap-5 border-t border-white/10 px-5 py-5 text-[11px] leading-5 text-white/55 sm:px-9">
+          <a href="https://occupational-maps.skillsengland.education.gov.uk/public-api/" target="_blank" rel="noopener noreferrer" aria-label="Skills England official data source">
+            <img src="https://occupational-maps.skillsengland.education.gov.uk/media/xmehhrr0/skills-england_lesser_arms_stacked-dfe-blue-se-logo.svg?rmode=max&amp;width=500" alt="Skills England" loading="lazy" width="126" height="58" className="h-auto w-[126px] rounded-lg bg-white p-2" />
+          </a>
+          <p>© Skills England 2025 · Official source information licensed under the <a href="https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-white">Open Government Licence v3.0</a>. Plain-English guides are LevyTate interpretations.</p>
         </div>
       </footer>
     </>
