@@ -3,6 +3,9 @@ import { z } from "zod";
 import { createExploreCatalogue } from "@/lib/levytate/explore/catalogue";
 import { loadLevyTateStandards } from "@/lib/server/levytate-apprenticeship-standards";
 import { explainExploreStandard, ExploreGenerationUnavailable } from "@/lib/server/levytate-explore-explain";
+import { getLevyTateRateLimitEnvironment } from "@/lib/server/levytate-auth-rate-limit-config";
+import { networkRateLimitKey, rateLimitKey } from "@/lib/server/levytate-auth-rate-limit";
+import { getLevyTateSupabaseConfig, supabaseFetchJson } from "@/lib/server/levytate-supabase";
 
 export const runtime = "nodejs";
 export const maxDuration = 45;
@@ -16,6 +19,33 @@ const responseHeaders = {
 
 function reply(message: string, status: number, additional: Record<string, unknown> = {}) {
   return NextResponse.json({ message, ...additional }, { status, headers: responseHeaders });
+}
+
+async function enforcePublicRequestLimit(request: Request) {
+  const config = getLevyTateSupabaseConfig();
+  if (!config) throw new ExploreGenerationUnavailable("not_configured");
+
+  const rules = [
+    { action: "explore.ai.requests.network.hour", key: networkRateLimitKey(request), limit: 60 },
+    { action: "explore.ai.requests.global.hour", key: rateLimitKey("explore-ai-requests", "all"), limit: 1000 },
+  ];
+  for (const rule of rules) {
+    const rows = await supabaseFetchJson<Array<{ allowed: boolean }>>(
+      config, "rpc/levytate_consume_auth_rate_limit", {
+        method: "POST",
+        body: JSON.stringify({
+          p_environment_namespace: getLevyTateRateLimitEnvironment(),
+          p_action: rule.action,
+          p_key_hash: rule.key,
+          p_window_seconds: 3600,
+          p_limit: rule.limit,
+          p_route: "/api/levytate-explore/de-fluff",
+          p_event_type: "explore_ai_request_rate_limited",
+        }),
+      },
+    );
+    if (!rows[0]?.allowed) throw new ExploreGenerationUnavailable("rate_limited");
+  }
 }
 
 export async function POST(request: Request) {
@@ -44,6 +74,15 @@ export async function POST(request: Request) {
   }
   const parsed = inputSchema.safeParse(body);
   if (!parsed.success) return reply("Invalid apprenticeship reference.", 400);
+
+  try {
+    await enforcePublicRequestLimit(request);
+  } catch (error) {
+    if (error instanceof ExploreGenerationUnavailable && error.reason === "rate_limited") {
+      return reply("Please try again later.", 429, { code: "rate_limited" });
+    }
+    return reply("AI explanations are not configured for this environment.", 503, { code: "not_configured" });
+  }
 
   try {
     const payload = await loadLevyTateStandards({
