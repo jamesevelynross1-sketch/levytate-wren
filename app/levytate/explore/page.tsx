@@ -5,7 +5,7 @@ import { loadLevyTateStandards } from "@/lib/server/levytate-apprenticeship-stan
 
 export const metadata: Metadata = {
   title: "Explore | Discover what you're capable of | LevyTate",
-  description: "Already working? Discover apprenticeship pathways that could help you grow in your role. Understand your options in plain English and start a conversation with your manager.",
+  description: "Explore Skills England’s 15 occupational routes, find approved apprenticeships in each area and discover what they mean for your working life with LevyTate Unpacked.",
   alternates: { canonical: "/explore" },
   openGraph: { title: "LevyTate Explore — Your job isn't your limit", description: "Career development made human. Explore apprenticeships without the jargon or the job hunt.", url: "/explore", type: "website" },
 };
