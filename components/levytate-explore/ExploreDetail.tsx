@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import {
   ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, CheckCircle2,
   ChevronRight, ExternalLink, Send, ShieldCheck, Sparkles, WandSparkles,
@@ -22,6 +22,8 @@ const initialContact: ContactForm = { fullName: "", email: "", organisation: "",
 function ManagerEmail({ standard }: { standard: ExploreStandard }) {
   const [managerEmail, setManagerEmail] = useState("");
   const [personalNote, setPersonalNote] = useState("");
+  const [shareOrigin, setShareOrigin] = useState("https://www.levytate.co.uk");
+  useEffect(() => setShareOrigin(window.location.origin), []);
   const subject = "Could we discuss an apprenticeship opportunity?";
   const message = [
     "Hi,",
@@ -29,7 +31,7 @@ function ManagerEmail({ standard }: { standard: ExploreStandard }) {
     "I've been exploring how I could develop my skills while continuing in my current role, and found an apprenticeship that looks interesting:",
     "",
     standard.title + " (Level " + standard.level + ", " + standard.code + ")",
-    "A straightforward explanation: https://www.levytate.co.uk/explore/" + standard.code.toLowerCase() + "?audience=manager",
+    "A straightforward explanation: " + shareOrigin + "/explore/" + standard.code.toLowerCase() + "?audience=manager",
     "Official apprenticeship standard: " + standard.officialUrl,
     "",
     personalNote.trim() ? "Why it interests me: " + personalNote.trim() : "I think it could be worth discussing how the learning might apply to my work.",
