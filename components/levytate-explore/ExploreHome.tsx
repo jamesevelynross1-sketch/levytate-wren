@@ -232,7 +232,7 @@ export function ExploreHome({ standards }: { standards: ExploreStandard[] }) {
         <div className="mx-auto flex max-w-[1330px] flex-wrap items-center justify-between gap-5 px-5 py-8 text-xs text-white/65 sm:px-9">
           <div className="flex items-center gap-3"><span className="font-semibold tracking-[.19em] text-white">LEVYTATE / EXPLORE</span><span className="text-white/30">•</span><span>Discover what you&apos;re capable of.</span></div>
           <div className="flex gap-5">
-            <a href="/levytate/privacy" className="hover:text-white">Privacy</a>
+            <a href="/explore/privacy" className="hover:text-white">Privacy</a>
             <a href="https://skillsengland.education.gov.uk/apprenticeships" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-white">Skills England <ArrowUpRight size={13}/></a>
           </div>
         </div>
