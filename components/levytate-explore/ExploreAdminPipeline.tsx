@@ -223,7 +223,7 @@ export function ExploreAdminPipeline() {
               <div className="rounded-[22px] border border-[#102c3d]/10 bg-white p-8 text-center">
                 <Inbox className="mx-auto mb-4 text-[#117f70]" size={29} />
                 <h2 className="text-lg font-semibold">Choose an enquiry</h2>
-                <p className="mt-2 text-sm leading-6 text-[#102c3d]/55">Review the employee's interest and qualify the provider referral or LevyTate licence opportunity.</p>
+                <p className="mt-2 text-sm leading-6 text-[#102c3d]/55">Review the employee&apos;s interest and qualify the provider referral or LevyTate licence opportunity.</p>
               </div>
             )}
           </section>
