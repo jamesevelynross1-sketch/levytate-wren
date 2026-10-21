@@ -9,6 +9,10 @@ import {
 } from "lucide-react";
 import { ExploreHeader } from "./ExploreHome";
 import type { ExploreStandard } from "@/lib/levytate/explore/catalogue";
+import {
+  EXPLORE_GUIDANCE_CONSENT_TEXT, EXPLORE_MANAGER_CONSENT_TEXT,
+  EXPLORE_PRIVACY_URL, type ExploreRequesterType,
+} from "@/lib/levytate/explore/policy";
 
 type Tab = "human" | "official";
 type ContactForm = { fullName: string; email: string; organisation: string; jobTitle: string; note: string; website: string };
@@ -25,7 +29,8 @@ function ManagerEmail({ standard }: { standard: ExploreStandard }) {
     "I've been exploring how I could develop my skills while continuing in my current role, and found an apprenticeship that looks interesting:",
     "",
     standard.title + " (Level " + standard.level + ", " + standard.code + ")",
-    standard.officialUrl,
+    "A straightforward explanation: https://www.levytate.co.uk/explore/" + standard.code.toLowerCase() + "?audience=manager",
+    "Official apprenticeship standard: " + standard.officialUrl,
     "",
     personalNote.trim() ? "Why it interests me: " + personalNote.trim() : "I think it could be worth discussing how the learning might apply to my work.",
     "",
@@ -63,7 +68,7 @@ function ManagerEmail({ standard }: { standard: ExploreStandard }) {
   );
 }
 
-function MprContact({ standard }: { standard: ExploreStandard }) {
+function MprContact({ standard, requesterType }: { standard: ExploreStandard; requesterType: ExploreRequesterType }) {
   const [contact, setContact] = useState<ContactForm>(initialContact);
   const [consent, setConsent] = useState(false);
   const [status, setStatus] = useState<"idle" | "sending" | "success" | "error">("idle");
@@ -82,7 +87,7 @@ function MprContact({ standard }: { standard: ExploreStandard }) {
       const response = await fetch("/api/levytate-explore/interest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...contact, code: standard.code, consent }),
+        body: JSON.stringify({ ...contact, code: standard.code, consent, requesterType }),
       });
       const result = (await response.json()) as { message?: string };
       if (!response.ok) throw new Error(result.message || "We couldn't send your request just now.");
@@ -105,7 +110,9 @@ function MprContact({ standard }: { standard: ExploreStandard }) {
 
   return (
     <form onSubmit={submit} className="mt-5 space-y-3">
-      <p className="text-sm leading-6 text-[#102c3d]/65">Ask our team for practical guidance about this programme and how to start a conversation with your employer.</p>
+      <p className="text-sm leading-6 text-[#102c3d]/65">{requesterType === "manager"
+          ? "Explore the development request with an impartial apprenticeship adviser. We can help you understand suitability, commitment, funding considerations and next steps."
+          : "Ask our team for practical guidance about this programme and how to start a conversation with your employer."}</p>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
         <label className="text-xs font-semibold text-[#102c3d]/70">Your name
           <input required autoComplete="name" maxLength={100} value={contact.fullName} onChange={e => change("fullName", e.target.value)} className="mt-1.5 min-h-[45px] w-full rounded-xl border border-[#102c3d]/15 bg-white px-3 text-sm font-normal outline-none focus:border-[#159b8f]" />
@@ -128,10 +135,10 @@ function MprContact({ standard }: { standard: ExploreStandard }) {
       </label>
       <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-[#eff3ef] p-3 text-xs leading-5 text-[#102c3d]/75">
         <input type="checkbox" required checked={consent} onChange={e => setConsent(e.target.checked)} className="mt-1 h-4 w-4 shrink-0 accent-[#117f70]" />
-        <span>I agree that LevyTate, operated by MPR Consulting, can use these details to contact me about this development enquiry. I understand my employer will not be contacted without a separate agreed step.</span>
+        <span>{requesterType === "manager" ? EXPLORE_MANAGER_CONSENT_TEXT : EXPLORE_GUIDANCE_CONSENT_TEXT}</span>
       </label>
       <p className="text-[11px] leading-5 text-[#102c3d]/55">
-        There is no charge to you or your employer for using Explore. MPR may receive commercial fees from training providers for successful introductions. This does not determine which standards appear in the catalogue. <a className="underline underline-offset-2" href="/levytate/privacy">Privacy information</a>.
+        There is no charge to you or your employer for using Explore. MPR may receive commercial fees from training providers for successful introductions. This does not determine which standards appear in the catalogue. <a className="underline underline-offset-2" href={EXPLORE_PRIVACY_URL}>Privacy information</a>.
       </p>
       <button type="submit" disabled={!consent || status === "sending"} className="inline-flex min-h-[50px] w-full items-center justify-center gap-3 rounded-full bg-[#102c3d] px-5 text-sm font-semibold text-white transition hover:bg-[#1e4960] disabled:cursor-not-allowed disabled:opacity-50">
         {status === "sending" ? "Sending your request..." : "Ask LevyTate for guidance"} <Send size={16} aria-hidden="true" />
@@ -141,7 +148,7 @@ function MprContact({ standard }: { standard: ExploreStandard }) {
   );
 }
 
-export function ExploreDetail({ standard }: { standard: ExploreStandard }) {
+export function ExploreDetail({ standard, managerView = false }: { standard: ExploreStandard; managerView?: boolean }) {
   const [tab, setTab] = useState<Tab>("human");
   const [action, setAction] = useState<"manager" | "mpr" | null>(null);
   const info = standard.story;
@@ -160,6 +167,13 @@ export function ExploreDetail({ standard }: { standard: ExploreStandard }) {
             </div>
             <h1 className="mt-5 max-w-[800px] text-[clamp(2.5rem,5.5vw,4.8rem)] font-semibold leading-[1.02] tracking-[-.068em]">{standard.title}</h1>
             <p className="mt-5 text-sm text-[#102c3d]/60">Official apprenticeship reference: {standard.code} · Version {standard.version}</p>
+            {managerView ? (
+              <div className="mt-7 rounded-[18px] border border-[#159b8f]/20 bg-[#e9f2ee] p-5 sm:p-6">
+                <p className="text-[11px] font-bold uppercase tracking-[.18em] text-[#117f70]">For line managers</p>
+                <h2 className="mt-2 text-xl font-semibold tracking-[-.04em]">Someone on your team wants to grow.</h2>
+                <p className="mt-3 text-sm leading-7 text-[#102c3d]/70">This is a starting point for a development conversation, not a formal application. Explore how the skills might benefit your team, whether the employee has suitable work opportunities and what employer support would involve. LevyTate can help without charging you for an initial enquiry.</p>
+              </div>
+            ) : null}
 
             <div className="mt-9 flex items-center gap-2 rounded-[16px] border border-[#102c3d]/10 bg-white p-1.5" role="tablist" aria-label="Choose how to read the apprenticeship">
               <button role="tab" aria-selected={tab === "human"} type="button" onClick={() => setTab("human")}
@@ -245,19 +259,19 @@ export function ExploreDetail({ standard }: { standard: ExploreStandard }) {
           <aside className="lg:sticky lg:top-5">
             <div className="overflow-hidden rounded-[25px] border border-[#102c3d]/10 bg-white shadow-[0_15px_40px_rgba(16,44,61,.055)]">
               <div className="bg-[#102c3d] p-6 text-white">
-                <p className="text-[11px] font-bold uppercase tracking-[.18em] text-[#bfeadd]">Your next step</p>
-                <h2 className="mt-3 text-[25px] font-semibold leading-[1.15] tracking-[-.045em]">Interested? Start a conversation.</h2>
-                <p className="mt-4 text-sm leading-6 text-white/65">No applications, no commitment. Just an opportunity to explore.</p>
+                <p className="text-[11px] font-bold uppercase tracking-[.18em] text-[#bfeadd]">{managerView ? "Your team member" : "Your next step"}</p>
+                <h2 className="mt-3 text-[25px] font-semibold leading-[1.15] tracking-[-.045em]">{managerView ? "Could this benefit your team?" : "Interested? Start a conversation."}</h2>
+                <p className="mt-4 text-sm leading-6 text-white/65">{managerView ? "A useful conversation starts with understanding what the employee wants to learn and what the business needs." : "No applications, no commitment. Just an opportunity to explore."}</p>
               </div>
               <div className="p-5 sm:p-6">
                 {!action ? (
                   <div className="grid gap-3">
-                    <button type="button" onClick={() => setAction("manager")} className="group flex min-h-[75px] w-full items-center justify-between gap-3 rounded-[15px] border border-[#102c3d]/15 p-4 text-left transition hover:border-[#117f70] hover:bg-[#f3f7f3]">
+                    {!managerView ? <button type="button" onClick={() => setAction("manager")} className="group flex min-h-[75px] w-full items-center justify-between gap-3 rounded-[15px] border border-[#102c3d]/15 p-4 text-left transition hover:border-[#117f70] hover:bg-[#f3f7f3]">
                       <span><span className="block text-sm font-semibold">Bring it to my manager</span><span className="mt-1 block text-xs text-[#102c3d]/55">Prepare an email to start the discussion</span></span>
                       <ChevronRight size={19} className="shrink-0 text-[#117f70]" />
-                    </button>
+                    </button> : null}
                     <button type="button" onClick={() => setAction("mpr")} className="group flex min-h-[75px] w-full items-center justify-between gap-3 rounded-[15px] border border-[#102c3d]/15 p-4 text-left transition hover:border-[#117f70] hover:bg-[#f3f7f3]">
-                      <span><span className="block text-sm font-semibold">Ask LevyTate to help</span><span className="mt-1 block text-xs text-[#102c3d]/55">Talk to our apprenticeship advisory team</span></span>
+                      <span><span className="block text-sm font-semibold">{managerView ? "Discuss it with LevyTate" : "Ask LevyTate to help"}</span><span className="mt-1 block text-xs text-[#102c3d]/55">Talk to our apprenticeship advisory team</span></span>
                       <ChevronRight size={19} className="shrink-0 text-[#117f70]" />
                     </button>
                   </div>
@@ -265,12 +279,12 @@ export function ExploreDetail({ standard }: { standard: ExploreStandard }) {
                   <div>
                     <button type="button" onClick={() => setAction(null)} className="inline-flex items-center gap-2 text-xs font-semibold text-[#102c3d]/50 hover:text-[#102c3d]"><ArrowLeft size={14} /> Back to options</button>
                     <h3 className="mt-5 text-lg font-semibold tracking-[-.035em]">{action === "manager" ? "Make the first move." : "Let's explore it together."}</h3>
-                    {action === "manager" ? <ManagerEmail standard={standard} /> : <MprContact standard={standard} />}
+                    {action === "manager" ? <ManagerEmail standard={standard} /> : <MprContact standard={standard} requesterType={managerView ? "manager" : "employee"} />}
                   </div>
                 )}
                 <div className="mt-6 flex items-start gap-2 border-t border-[#102c3d]/10 pt-5 text-[11px] leading-5 text-[#102c3d]/50">
                   <ShieldCheck size={17} className="mt-0.5 shrink-0 text-[#117f70]" aria-hidden="true" />
-                  Your browsing is private. Nothing is shared until you deliberately choose to share it.
+                  Your browsing is private. Enquiries only go to MPR when you explicitly submit them.
                 </div>
               </div>
             </div>
