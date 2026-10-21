@@ -70,7 +70,7 @@ function ManagerEmail({ standard }: { standard: ExploreStandard }) {
   );
 }
 
-function MprContact({ standard, requesterType }: { standard: ExploreStandard; requesterType: ExploreRequesterType }) {
+function MprContact({ standard, requesterType, enabled }: { standard: ExploreStandard; requesterType: ExploreRequesterType; enabled: boolean }) {
   const [contact, setContact] = useState<ContactForm>(initialContact);
   const [consent, setConsent] = useState(false);
   const [status, setStatus] = useState<"idle" | "sending" | "success" | "error">("idle");
@@ -100,6 +100,17 @@ function MprContact({ standard, requesterType }: { standard: ExploreStandard; re
       setMessage(error instanceof Error ? error.message : "We couldn't send your request just now.");
     }
   }
+
+  if (!enabled) return (
+    <div role="status" className="mt-5 rounded-[18px] border border-[#102c3d]/10 bg-[#f2f6f1] p-5">
+      <ShieldCheck size={24} className="text-[#117f70]" aria-hidden="true" />
+      <h3 className="mt-3 text-lg font-semibold">Guidance enquiries are being prepared.</h3>
+      <p className="mt-2 text-sm leading-7 text-[#102c3d]/65">
+        This development Preview lets you explore apprenticeships and create a message for your manager, but we are not yet accepting personal enquiries through the app. The service will open when secure record-keeping and privacy checks are complete.
+      </p>
+      <p className="mt-3 text-xs leading-6 text-[#102c3d]/50">No personal details have been collected or submitted.</p>
+    </div>
+  );
 
   if (status === "success") return (
     <div role="status" className="mt-5 rounded-[18px] border border-[#138372]/20 bg-[#e1f4eb] p-5">
@@ -150,7 +161,7 @@ function MprContact({ standard, requesterType }: { standard: ExploreStandard; re
   );
 }
 
-export function ExploreDetail({ standard, managerView = false }: { standard: ExploreStandard; managerView?: boolean }) {
+export function ExploreDetail({ standard, managerView = false, enquiriesEnabled = false }: { standard: ExploreStandard; managerView?: boolean; enquiriesEnabled?: boolean }) {
   const [tab, setTab] = useState<Tab>("human");
   const [action, setAction] = useState<"manager" | "mpr" | null>(null);
   const info = standard.story;
@@ -281,7 +292,7 @@ export function ExploreDetail({ standard, managerView = false }: { standard: Exp
                   <div>
                     <button type="button" onClick={() => setAction(null)} className="inline-flex items-center gap-2 text-xs font-semibold text-[#102c3d]/50 hover:text-[#102c3d]"><ArrowLeft size={14} /> Back to options</button>
                     <h3 className="mt-5 text-lg font-semibold tracking-[-.035em]">{action === "manager" ? "Make the first move." : "Let's explore it together."}</h3>
-                    {action === "manager" ? <ManagerEmail standard={standard} /> : <MprContact standard={standard} requesterType={managerView ? "manager" : "employee"} />}
+                    {action === "manager" ? <ManagerEmail standard={standard} /> : <MprContact standard={standard} requesterType={managerView ? "manager" : "employee"} enabled={enquiriesEnabled} />}
                   </div>
                 )}
                 <div className="mt-6 flex items-start gap-2 border-t border-[#102c3d]/10 pt-5 text-[11px] leading-5 text-[#102c3d]/50">
