@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowClockwise, BookOpen, ExternalLink, ShieldCheck, Sparkles, WandSparkles } from "lucide-react";
+import { RefreshCw, BookOpen, ExternalLink, ShieldCheck, Sparkles, WandSparkles } from "lucide-react";
 import type { ExploreStandard } from "@/lib/levytate/explore/catalogue";
 import { exploreNarrativeSchema, type ExploreNarrative } from "@/lib/levytate/explore/narrative";
 
@@ -134,7 +134,7 @@ export function ExploreAiExplanation({ standard }: { standard: ExploreStandard }
               <div className="mt-5 flex flex-wrap gap-3">
                 <button type="button" onClick={() => setAttempt(value => value + 1)}
                   className="inline-flex min-h-[45px] items-center gap-2 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white transition hover:bg-[#214957]">
-                  <ArrowClockwise size={15} aria-hidden="true" /> Try again
+                  <RefreshCw size={15} aria-hidden="true" /> Try again
                 </button>
                 <a href={standard.officialUrl} target="_blank" rel="noopener noreferrer"
                   className="inline-flex min-h-[45px] items-center gap-2 rounded-full border border-[#102c3d]/20 px-5 text-xs font-semibold">
