@@ -1,6 +1,31 @@
 export const liftFrameworkKey = "lift-workforce-v1";
-export const liftQuestionnaireVersion = "lift-workforce-questionnaire-v1";
-export const liftInterpretationVersion = "lift-workforce-rules-v1";
+export const liftQuestionnaireVersion = "lift-workforce-questionnaire-v1.1";
+export const liftInterpretationVersion = "lift-workforce-rules-v1.1";
+export const liftOpportunityGroupingVersion = "lift-opportunity-grouping-v1";
+
+export const liftWorkflowGroups = [
+  "reporting_and_insight",
+  "process_and_handoffs",
+  "customer_and_service",
+  "quality_and_compliance",
+  "digital_and_automation",
+  "planning_and_delivery",
+  "people_and_knowledge",
+  "other_reviewed",
+] as const;
+
+export type LiftWorkflowGroup = (typeof liftWorkflowGroups)[number];
+
+export const liftWorkflowGroupLabels: Record<LiftWorkflowGroup, string> = {
+  reporting_and_insight: "Reporting and insight",
+  process_and_handoffs: "Processes and handoffs",
+  customer_and_service: "Customer and service delivery",
+  quality_and_compliance: "Quality and compliance",
+  digital_and_automation: "Digital work and automation",
+  planning_and_delivery: "Planning and delivery",
+  people_and_knowledge: "People and knowledge sharing",
+  other_reviewed: "Other reviewed workflow",
+};
 
 export const liftCapabilities = [
   "think_clearly",
@@ -74,6 +99,9 @@ export type LiftEvidenceReference = {
 
 export type LiftOpportunity = {
   id: string;
+  campaignId?: string;
+  workflowGroup?: LiftWorkflowGroup;
+  groupingVersion?: string;
   title: string;
   capabilityIds: LiftCapability[];
   capabilityEvidence: string;
@@ -174,6 +202,7 @@ export type LiftAction =
   | { action: "save_team_context"; purpose: string; workflows: string; friction: string; expectedChanges: string; availableSupport: string; expectedRevision: number; idempotencyKey: string }
   | { action: "save_manager_perspective"; employeeId: string; observations: Record<string, unknown>; expectedRevision: number; idempotencyKey: string }
   | { action: "submit_manager_perspective"; employeeId: string; expectedRevision: number; idempotencyKey: string }
+  | { action: "add_manager_perspective_addendum"; employeeId: string; clarification: string; idempotencyKey: string }
   | { action: "record_employee_context"; managerObservationId: string; context: string; disputed: boolean; idempotencyKey: string }
   | { action: "record_decision"; opportunityId: string; decision: Omit<LiftDecision, "id" | "recordedAt" | "opportunityId">; idempotencyKey: string }
   | { action: "record_proof"; opportunityId: string; proof: Omit<LiftProofRecord, "opportunityId" | "updatedAt">; expectedRevision: number; idempotencyKey: string };

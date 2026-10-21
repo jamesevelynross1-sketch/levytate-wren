@@ -11,6 +11,7 @@ import {
 } from "@/lib/levytate/lift/domain";
 import { liftQuestionnaire } from "@/lib/levytate/lift/framework";
 import { buildLiftOpportunities, interpretLiftAssessment } from "@/lib/server/levytate-lift-interpretation";
+import { rubricFor } from "@/lib/server/levytate-lift-rubric";
 
 const generatedAt = "2026-10-21T09:30:00.000Z";
 
@@ -128,7 +129,7 @@ function fixtureCase(input: {
 }) {
   const answers: LiftAnswerMap = Object.fromEntries(liftQuestionnaire.map((item) => [item.id,
     item.type === "long_text" ? `Fictional response for ${item.id} with evidence, uncertainty and a bounded next check.`
-      : item.evidenceType === "anchored_experience" ? "D" : "B",
+      : rubricFor(item.id)?.supportedValues[0] ?? rubricFor(item.id)?.contextValues[0] ?? null,
   ]));
   const interpreted = interpretLiftAssessment({ assessmentId: input.assessmentId, employeeId: input.employeeId, answers, submittedAt: "2026-09-01T09:00:00.000Z" });
   const opportunities = buildLiftOpportunities({
@@ -138,6 +139,9 @@ function fixtureCase(input: {
     employeeEvidence: interpreted.evidence,
     manager: {
       employeeId: input.employeeId,
+      observationId: `${input.assessmentId}-observation`,
+      observationRevision: 1,
+      workflowGroup: "reporting_and_insight",
       observedCapabilityIds: input.capabilities,
       workThatCouldImprove: input.work,
       intendedOutcome: input.outcome,

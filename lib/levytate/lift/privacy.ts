@@ -28,11 +28,17 @@ export function discloseLiftAggregates<T>(input: {
     cohorts.set(candidate.cohort, group);
   });
   const hasSmallPositiveCohort = [...cohorts.values()].some((ids) => ids.size > 0 && ids.size < threshold);
-  const available = normalised.filter((candidate) => candidate.contributorEmployeeIds.length >= threshold && !hasSmallPositiveCohort);
+  const reconstructsSmallComplement = normalised.some((candidate) => {
+    if (candidate.contributorEmployeeIds.length < threshold) return false;
+    const contributors = new Set(candidate.contributorEmployeeIds);
+    const complement = [...submitted].filter((id) => !contributors.has(id)).length;
+    return complement > 0 && complement < threshold;
+  });
+  const available = normalised.filter((candidate) => candidate.contributorEmployeeIds.length >= threshold && !hasSmallPositiveCohort && !reconstructsSmallComplement);
   return {
     available,
     suppressed: normalised.length - available.length,
-    reason: hasSmallPositiveCohort
+    reason: hasSmallPositiveCohort || reconstructsSmallComplement
       ? "All overlapping cohort routes are withheld because a positive group below the disclosure threshold could be reconstructed by subtraction."
       : available.length === normalised.length
         ? "Every displayed route meets the distinct-employee threshold."

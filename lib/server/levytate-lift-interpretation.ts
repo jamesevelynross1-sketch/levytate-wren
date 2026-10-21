@@ -3,17 +3,23 @@ import {
   liftCapabilities,
   liftCapabilityLabels,
   liftInterpretationVersion,
+  liftOpportunityGroupingVersion,
+  liftWorkflowGroupLabels,
   type LiftAnswerMap,
   type LiftCapability,
   type LiftCapabilityFinding,
   type LiftEvidenceReference,
   type LiftOpportunity,
+  type LiftWorkflowGroup,
 } from "@/lib/levytate/lift/domain";
 import { liftQuestionnaire } from "@/lib/levytate/lift/framework";
 import { rubricFor } from "@/lib/server/levytate-lift-rubric";
 
 type ManagerContext = {
   employeeId: string;
+  observationId: string;
+  observationRevision: number;
+  workflowGroup: LiftWorkflowGroup;
   observedCapabilityIds: readonly LiftCapability[];
   workThatCouldImprove: string;
   intendedOutcome: string;
@@ -67,7 +73,7 @@ export function buildLiftOpportunities(input: {
     (finding.state === "supported" || finding.state === "emerging") && input.manager!.observedCapabilityIds.includes(finding.capabilityId),
   );
   const constraintParts = Object.entries(input.manager.conditions).filter(([, value]) => value.trim() && !/^available|agreed|yes$/i.test(value.trim())).map(([key, value]) => `${humanise(key)}: ${value.trim()}`);
-  const managerEvidenceId = liftManagerEvidenceId(input.assessmentId, input.manager.employeeId, input.manager.recordedAt);
+  const managerEvidenceId = liftManagerEvidenceId(input.assessmentId, input.manager.observationId, input.manager.observationRevision);
   const managerEvidence = {
     id: managerEvidenceId,
     source: "manager_observation" as const,
@@ -82,11 +88,13 @@ export function buildLiftOpportunities(input: {
   if (!candidateCapabilities.length) return [];
   const primary = candidateCapabilities.slice(0, 3);
   const employeeIds = primary.flatMap((finding) => finding.evidenceIds).filter((id) => input.employeeEvidence.some((item) => item.id === id));
-  const relationship = primary.every((finding) => finding.state === "supported") && input.manager.concreteExamples.length > 0 ? "supported" : "hypothesis";
-  const opportunityId = stableEntityId("opportunity", input.assessmentId, primary.map((item) => item.capabilityId).join(":"), input.manager.workThatCouldImprove);
+  const relationship = primary.every((finding) => finding.state === "supported" && finding.contradictoryEvidenceIds.length === 0) && input.manager.concreteExamples.length > 0 ? "supported" : "hypothesis";
+  const opportunityId = stableEntityId("opportunity-candidate", input.assessmentId, input.manager.workflowGroup, primary.map((item) => item.capabilityId).sort().join(":"));
   return [{
     id: opportunityId,
-    title: constraintParts.length ? "Remove a workplace constraint before choosing development" : "Test a grounded improvement in current work",
+    workflowGroup: input.manager.workflowGroup,
+    groupingVersion: liftOpportunityGroupingVersion,
+    title: constraintParts.length ? `Review constraints in ${liftWorkflowGroupLabels[input.manager.workflowGroup].toLowerCase()}` : `Test an improvement in ${liftWorkflowGroupLabels[input.manager.workflowGroup].toLowerCase()}`,
     capabilityIds: primary.map((finding) => finding.capabilityId),
     capabilityEvidence: primary.map((finding) => `${finding.label}: ${finding.state}`).join(" · "),
     workThatCouldImprove: input.manager.workThatCouldImprove,
@@ -126,10 +134,12 @@ function findingFor(capabilityId: LiftCapability, assessmentId: string, answers:
   for (const item of relevant) {
     const value = scalar(answers[item.id]);
     const rubric = rubricFor(item.id);
-    if (!rubric || !value) continue;
+    if (!rubric || !rubric.automaticallyInterpreted || !value) continue;
     if (rubric.supportedValues.includes(value)) { supported += 2; episodes.add(item.episode); evidenceIds.push(stableEvidenceId(assessmentId, item.id)); }
     else if (rubric.emergingValues.includes(value)) { emerging += 1; episodes.add(item.episode); evidenceIds.push(stableEvidenceId(assessmentId, item.id)); }
     else if (rubric.contradictoryValues.includes(value)) { contradictory += 1; contradictoryIds.push(stableEvidenceId(assessmentId, item.id)); }
+    // Unknown and contextual responses are intentionally neutral. They may
+    // inform a human review but cannot lower a capability finding.
   }
   const distinctSituations = episodes.size;
   const state = contradictory >= 2 && supported === 0
@@ -159,4 +169,4 @@ function hashUuid(value: string) { const hash = createHash("sha256").update(valu
 function humanise(value: string) { return value.replace(/([A-Z])/g, " $1").replace(/^./, (letter) => letter.toUpperCase()); }
 
 export function newLiftId() { return randomUUID(); }
-export function liftManagerEvidenceId(assessmentId: string, employeeId: string, recordedAt: string) { return stableEvidenceId(assessmentId, `manager:${employeeId}:${recordedAt}`); }
+export function liftManagerEvidenceId(assessmentId: string, observationId: string, revisionNumber: number) { return stableEvidenceId(assessmentId, `manager:${observationId}:revision:${revisionNumber}`); }

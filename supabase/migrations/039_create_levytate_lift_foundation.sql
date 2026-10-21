@@ -24,7 +24,7 @@ create table if not exists public.levytate_lift_framework_versions (
 insert into public.levytate_lift_framework_versions (
   framework_key, questionnaire_version, interpretation_version, title, status, item_manifest, limitations
 ) values (
-  'lift-workforce-v1', 'lift-workforce-questionnaire-v1', 'lift-workforce-rules-v1',
+  'lift-workforce-v1', 'lift-workforce-questionnaire-v1.1', 'lift-workforce-rules-v1.1',
   'LevyTate Workforce Capability Assessment', 'pilot',
   '[
     {"episode":"check","items":["check_01","check_02","check_03","check_04","check_05"]},
@@ -43,8 +43,8 @@ create table if not exists public.levytate_lift_campaigns (
   title text not null check (char_length(btrim(title)) between 1 and 180),
   business_objective text not null check (char_length(btrim(business_objective)) between 1 and 2000),
   framework_key text not null default 'lift-workforce-v1',
-  questionnaire_version text not null default 'lift-workforce-questionnaire-v1',
-  interpretation_version text not null default 'lift-workforce-rules-v1',
+  questionnaire_version text not null default 'lift-workforce-questionnaire-v1.1',
+  interpretation_version text not null default 'lift-workforce-rules-v1.1',
   status text not null default 'draft' check (status in ('draft','open','closed')),
   created_by uuid not null references public.levytate_users(id) on delete restrict,
   opened_at timestamptz,
@@ -56,8 +56,8 @@ create table if not exists public.levytate_lift_campaigns (
   foreign key (framework_key, questionnaire_version, interpretation_version)
     references public.levytate_lift_framework_versions(framework_key, questionnaire_version, interpretation_version) on delete restrict,
   check (framework_key = 'lift-workforce-v1'),
-  check (questionnaire_version = 'lift-workforce-questionnaire-v1'),
-  check (interpretation_version = 'lift-workforce-rules-v1')
+  check (questionnaire_version = 'lift-workforce-questionnaire-v1.1'),
+  check (interpretation_version = 'lift-workforce-rules-v1.1')
 );
 
 create table if not exists public.levytate_lift_participants (
@@ -171,6 +171,7 @@ create table if not exists public.levytate_lift_manager_observation_revisions (
   support_degree text not null check (support_degree in ('independent','some_support','substantial_support','not_observed')),
   capability_observations jsonb not null default '[]'::jsonb check (jsonb_typeof(capability_observations) = 'array'),
   concrete_examples jsonb not null default '[]'::jsonb check (jsonb_typeof(concrete_examples) = 'array'),
+  workflow_group_key text not null default 'other_reviewed' check (workflow_group_key in ('reporting_and_insight','process_and_handoffs','customer_and_service','quality_and_compliance','digital_and_automation','planning_and_delivery','people_and_knowledge','other_reviewed')),
   suitable_opportunity text not null default '' check (char_length(suitable_opportunity) <= 3000),
   intended_outcome text not null default '' check (char_length(intended_outcome) <= 3000),
   condition_time text not null default '',
@@ -179,6 +180,8 @@ create table if not exists public.levytate_lift_manager_observation_revisions (
   condition_supervision text not null default '',
   condition_suitable_work text not null default '',
   status text not null default 'draft' check (status in ('draft','submitted','superseded')),
+  revision_kind text not null default 'initial' check (revision_kind in ('initial','addendum')),
+  clarifies_revision_number integer check (clarifies_revision_number is null or clarifies_revision_number > 0),
   created_by uuid not null references public.levytate_users(id) on delete restrict,
   submitted_at timestamptz,
   created_at timestamptz not null default timezone('utc', now()),
@@ -186,7 +189,8 @@ create table if not exists public.levytate_lift_manager_observation_revisions (
   unique (organisation_id, id),
   unique (organisation_id, observation_id, revision_number),
   foreign key (organisation_id, observation_id) references public.levytate_lift_manager_observations(organisation_id, id) on delete restrict,
-  check ((status = 'submitted' and submitted_at is not null) or status <> 'submitted')
+  check ((status = 'submitted' and submitted_at is not null) or status <> 'submitted'),
+  check ((revision_kind = 'initial' and clarifies_revision_number is null) or (revision_kind = 'addendum' and clarifies_revision_number is not null))
 );
 
 create table if not exists public.levytate_lift_employee_observation_contexts (
@@ -242,11 +246,52 @@ create table if not exists public.levytate_lift_interpretations (
   foreign key (organisation_id, participant_id) references public.levytate_lift_participants(organisation_id, id) on delete restrict
 );
 
-create table if not exists public.levytate_lift_opportunities (
+create table if not exists public.levytate_lift_opportunity_candidates (
   id uuid primary key default gen_random_uuid(),
   organisation_id uuid not null references public.levytate_organisations(id) on delete restrict,
   campaign_id uuid not null,
   interpretation_id uuid not null,
+  employee_id text not null,
+  framework_key text not null,
+  questionnaire_version text not null,
+  interpretation_version text not null,
+  grouping_version text not null default 'lift-opportunity-grouping-v1',
+  workflow_group_key text not null check (workflow_group_key in ('reporting_and_insight','process_and_handoffs','customer_and_service','quality_and_compliance','digital_and_automation','planning_and_delivery','people_and_knowledge','other_reviewed')),
+  title text not null check (char_length(btrim(title)) between 1 and 240),
+  capability_ids jsonb not null check (jsonb_typeof(capability_ids) = 'array'),
+  work_that_could_improve text not null,
+  named_constraint text not null,
+  outcome_worth_pursuing text not null,
+  relationship_type text not null check (relationship_type in ('supported','hypothesis')),
+  supporting_evidence_ids jsonb not null default '[]'::jsonb check (jsonb_typeof(supporting_evidence_ids) = 'array'),
+  contradictory_evidence_ids jsonb not null default '[]'::jsonb check (jsonb_typeof(contradictory_evidence_ids) = 'array'),
+  missing_inputs jsonb not null default '[]'::jsonb check (jsonb_typeof(missing_inputs) = 'array'),
+  decision_question text not null,
+  evidence_needed jsonb not null default '[]'::jsonb check (jsonb_typeof(evidence_needed) = 'array'),
+  state text not null default 'signal_identified' check (state in ('signal_identified','work_context_confirmed','change_tested','outcome_evidenced','paused','not_supported','no_improvement')),
+  revision integer not null default 1 check (revision > 0),
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now()),
+  unique (organisation_id, id),
+  unique (organisation_id, campaign_id, employee_id, workflow_group_key, interpretation_version, grouping_version),
+  foreign key (organisation_id, campaign_id) references public.levytate_lift_campaigns(organisation_id, id) on delete restrict,
+  foreign key (organisation_id, interpretation_id) references public.levytate_lift_interpretations(organisation_id, id) on delete restrict,
+  foreign key (framework_key, questionnaire_version, interpretation_version)
+    references public.levytate_lift_framework_versions(framework_key, questionnaire_version, interpretation_version) on delete restrict
+);
+
+create table if not exists public.levytate_lift_opportunities (
+  id uuid primary key default gen_random_uuid(),
+  organisation_id uuid not null references public.levytate_organisations(id) on delete restrict,
+  campaign_id uuid not null,
+  framework_key text not null,
+  questionnaire_version text not null,
+  interpretation_version text not null,
+  grouping_version text not null,
+  workflow_group_key text not null check (workflow_group_key in ('reporting_and_insight','process_and_handoffs','customer_and_service','quality_and_compliance','digital_and_automation','planning_and_delivery','people_and_knowledge','other_reviewed')),
+  grouping_key text not null,
+  grouping_criteria jsonb not null check (jsonb_typeof(grouping_criteria) = 'object'),
+  contributor_count integer not null check (contributor_count >= 5),
   title text not null check (char_length(btrim(title)) between 1 and 240),
   capability_ids jsonb not null check (jsonb_typeof(capability_ids) = 'array'),
   work_that_could_improve text not null,
@@ -261,8 +306,23 @@ create table if not exists public.levytate_lift_opportunities (
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now()),
   unique (organisation_id, id),
+  unique (organisation_id, grouping_key),
   foreign key (organisation_id, campaign_id) references public.levytate_lift_campaigns(organisation_id, id) on delete restrict,
-  foreign key (organisation_id, interpretation_id) references public.levytate_lift_interpretations(organisation_id, id) on delete restrict
+  foreign key (framework_key, questionnaire_version, interpretation_version)
+    references public.levytate_lift_framework_versions(framework_key, questionnaire_version, interpretation_version) on delete restrict
+);
+
+create table if not exists public.levytate_lift_opportunity_route_members (
+  organisation_id uuid not null references public.levytate_organisations(id) on delete restrict,
+  opportunity_id uuid not null,
+  candidate_id uuid not null,
+  contributor_employee_id text not null,
+  grouping_criteria jsonb not null check (jsonb_typeof(grouping_criteria) = 'object'),
+  created_at timestamptz not null default timezone('utc', now()),
+  primary key (organisation_id, opportunity_id, candidate_id),
+  unique (organisation_id, opportunity_id, contributor_employee_id),
+  foreign key (organisation_id, opportunity_id) references public.levytate_lift_opportunities(organisation_id, id) on delete restrict,
+  foreign key (organisation_id, candidate_id) references public.levytate_lift_opportunity_candidates(organisation_id, id) on delete restrict
 );
 
 create table if not exists public.levytate_lift_opportunity_evidence (
@@ -357,7 +417,9 @@ create index if not exists levytate_lift_participants_employee_idx on public.lev
 create index if not exists levytate_lift_assessments_employee_idx on public.levytate_lift_assessments(organisation_id, employee_id, updated_at desc);
 create index if not exists levytate_lift_manager_observations_manager_idx on public.levytate_lift_manager_observations(organisation_id, manager_employee_id, status);
 create index if not exists levytate_lift_evidence_campaign_idx on public.levytate_lift_evidence_records(organisation_id, campaign_id, source_type, recorded_at desc);
+create index if not exists levytate_lift_opportunity_candidates_group_idx on public.levytate_lift_opportunity_candidates(organisation_id, campaign_id, framework_key, questionnaire_version, interpretation_version, grouping_version, workflow_group_key);
 create index if not exists levytate_lift_opportunities_campaign_idx on public.levytate_lift_opportunities(organisation_id, campaign_id, state, updated_at desc);
+create index if not exists levytate_lift_opportunity_route_members_contributor_idx on public.levytate_lift_opportunity_route_members(organisation_id, contributor_employee_id, opportunity_id);
 create index if not exists levytate_lift_decisions_opportunity_idx on public.levytate_lift_decisions(organisation_id, opportunity_id, decision_version desc);
 create index if not exists levytate_lift_proof_events_record_idx on public.levytate_lift_proof_events(organisation_id, proof_record_id, created_at);
 
@@ -369,7 +431,7 @@ begin
     'levytate_lift_assessments','levytate_lift_assessment_revisions','levytate_lift_team_context_revisions',
     'levytate_lift_manager_observations','levytate_lift_manager_observation_revisions',
     'levytate_lift_employee_observation_contexts','levytate_lift_evidence_records','levytate_lift_interpretations',
-    'levytate_lift_opportunities','levytate_lift_opportunity_evidence','levytate_lift_decisions',
+    'levytate_lift_opportunity_candidates','levytate_lift_opportunities','levytate_lift_opportunity_route_members','levytate_lift_opportunity_evidence','levytate_lift_decisions',
     'levytate_lift_decision_assumptions','levytate_lift_proof_records','levytate_lift_proof_events'
   ] loop
     execute format('alter table public.%I enable row level security', table_name);
@@ -381,7 +443,7 @@ begin
         and policyname = table_name || '_service_role_all'
     ) then
       execute format(
-        'create policy %I on public.%I for all to service_role using (auth.role() = ''service_role'') with check (auth.role() = ''service_role'')',
+        'create policy %I on public.%I for all to service_role using (true) with check (true)',
         table_name || '_service_role_all', table_name
       );
     end if;
@@ -407,6 +469,30 @@ drop trigger if exists levytate_lift_proof_records_updated_at on public.levytate
 create trigger levytate_lift_proof_records_updated_at before update on public.levytate_lift_proof_records
   for each row execute function public.set_current_timestamp_updated_at();
 
+create or replace function public.levytate_guard_lift_manager_observation_revision()
+returns trigger language plpgsql set search_path = public, pg_temp as $$
+begin
+  if tg_op = 'DELETE' then
+    raise exception 'Submitted Lift manager observations are immutable';
+  end if;
+  if old.status <> 'draft' then
+    raise exception 'Submitted Lift manager observations are immutable';
+  end if;
+  if new.observation_id <> old.observation_id or new.revision_number <> old.revision_number
+     or new.revision_kind <> old.revision_kind or new.clarifies_revision_number is distinct from old.clarifies_revision_number then
+    raise exception 'Lift manager observation revision identity is immutable';
+  end if;
+  if new.status not in ('draft','submitted') then
+    raise exception 'Invalid Lift manager observation revision transition';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists levytate_lift_manager_observation_revision_guard on public.levytate_lift_manager_observation_revisions;
+create trigger levytate_lift_manager_observation_revision_guard before update or delete on public.levytate_lift_manager_observation_revisions
+  for each row execute function public.levytate_guard_lift_manager_observation_revision();
+
 create or replace function public.levytate_reject_lift_append_only_mutation()
 returns trigger language plpgsql set search_path = public, pg_temp as $$
 begin
@@ -416,6 +502,12 @@ $$;
 
 drop trigger if exists levytate_lift_evidence_immutable on public.levytate_lift_evidence_records;
 create trigger levytate_lift_evidence_immutable before update or delete on public.levytate_lift_evidence_records
+  for each row execute function public.levytate_reject_lift_append_only_mutation();
+drop trigger if exists levytate_lift_opportunity_candidates_immutable on public.levytate_lift_opportunity_candidates;
+create trigger levytate_lift_opportunity_candidates_immutable before update or delete on public.levytate_lift_opportunity_candidates
+  for each row execute function public.levytate_reject_lift_append_only_mutation();
+drop trigger if exists levytate_lift_opportunity_route_members_immutable on public.levytate_lift_opportunity_route_members;
+create trigger levytate_lift_opportunity_route_members_immutable before update or delete on public.levytate_lift_opportunity_route_members
   for each row execute function public.levytate_reject_lift_append_only_mutation();
 drop trigger if exists levytate_lift_decisions_immutable on public.levytate_lift_decisions;
 create trigger levytate_lift_decisions_immutable before update or delete on public.levytate_lift_decisions

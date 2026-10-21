@@ -3,11 +3,17 @@ import { getLevyTateSupabaseConfig, readRuntimeEnv, supabaseSelect } from "@/lib
 type CapabilityRow = { organisation_id: string; lift_enabled: boolean };
 
 export function isLiftEnvironmentEnabled() {
-  return readRuntimeEnv("LEVYTATE_LIFT_ENABLED") === "true" && process.env.VERCEL_ENV !== "production";
+  if (readRuntimeEnv("LEVYTATE_LIFT_ENABLED") !== "true") return false;
+  const scope = readRuntimeEnv("LEVYTATE_LIFT_RUNTIME_SCOPE");
+  if (scope === "local") return process.env.NODE_ENV === "development" && !process.env.VERCEL_ENV;
+  if (scope !== "preview" || process.env.VERCEL_ENV !== "preview") return false;
+  return readRuntimeEnv("LEVYTATE_LIFT_ALLOWED_BRANCH") === "feature/operational-rbac"
+    && process.env.VERCEL_GIT_COMMIT_REF === "feature/operational-rbac";
 }
 
 export async function isLiftEnabledForOrganisation(organisationId: string) {
   if (!isLiftEnvironmentEnabled()) return false;
+  if (readRuntimeEnv("LEVYTATE_LIFT_ALLOWED_ORGANISATION_ID") !== organisationId) return false;
   const config = getLevyTateSupabaseConfig();
   if (!config) return false;
   try {
