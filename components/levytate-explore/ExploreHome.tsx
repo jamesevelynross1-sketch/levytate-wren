@@ -168,7 +168,7 @@ export function ExploreHome({ standards }: { standards: ExploreStandard[] }) {
           <div className="explore-hero-body">
             <p className="explore-eyebrow text-[#d9f3a1]">A new direction can start right here</p>
             <h1 className="explore-display mt-6 max-w-[790px] text-[clamp(3.15rem,7.3vw,6.5rem)]">
-              You&apos;re not <span className="whitespace-nowrap">done <em>growing.</em></span>
+              You&apos;re not <span className="sm:whitespace-nowrap">done <em>growing.</em></span>
             </h1>
             <p className="mt-6 max-w-[500px] text-[15px] leading-[1.8] text-white/85 sm:text-[17px]">
               Already in work? Find an apprenticeship that could take your skills somewhere new.
