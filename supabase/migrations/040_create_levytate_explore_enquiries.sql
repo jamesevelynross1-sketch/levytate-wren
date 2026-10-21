@@ -8,6 +8,7 @@ create table if not exists public.levytate_explore_enquiries (
   environment_namespace text not null check (environment_namespace in ('local','preview','production')),
   dedupe_key text not null check (dedupe_key ~ '^[a-f0-9]{64}$'),
   origin text not null default 'public_explore' check (origin = 'public_explore'),
+  requester_type text not null default 'employee' check (requester_type in ('employee','manager')),
   full_name text not null check (char_length(btrim(full_name)) between 2 and 100),
   email text not null check (char_length(email) between 6 and 254),
   organisation text not null check (char_length(btrim(organisation)) between 2 and 140),
