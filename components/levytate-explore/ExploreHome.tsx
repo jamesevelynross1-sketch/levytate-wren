@@ -2,10 +2,11 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import type { CSSProperties } from "react";
 import {
-  ArrowRight, ArrowUpRight, BriefcaseBusiness, Factory, GraduationCap,
-  HardHat, HeartHandshake, HeartPulse, Leaf, Megaphone, Monitor, Palette,
-  Scale, Scissors, ShieldCheck, Truck, Utensils,
+  ArrowDownRight, ArrowRight, ArrowUpRight, BriefcaseBusiness, Factory,
+  GraduationCap, HardHat, HeartHandshake, HeartPulse, Leaf, Megaphone,
+  Monitor, Palette, Scale, Scissors, ShieldCheck, Sparkles, Truck, Utensils,
 } from "lucide-react";
 import { ExploreInstallAction } from "./ExploreInstallAction";
 import type { ExploreStandard } from "@/lib/levytate/explore/catalogue";
@@ -17,26 +18,27 @@ import {
 
 export function ExploreHeader() {
   return (
-    <header className="border-b border-[#102c3d]/10 bg-[#f8f8f5]">
-      <div className="mx-auto flex min-h-[76px] max-w-[1220px] items-center justify-between gap-3 px-5 sm:px-8">
+    <header className="explore-header">
+      <div className="explore-header-inner mx-auto flex max-w-[1220px] items-center justify-between gap-3 px-5 sm:px-8">
         <Link href="/explore" className="flex min-w-0 items-center gap-3" aria-label="LevyTate Explore home">
+          {/* Retain the supplied dimensional LevyTate wordmark exactly. */}
           <Image
             src="/brand/levytate-logo-supplied.png"
             alt="LevyTate"
             width={131}
             height={46}
-            className="h-[39px] w-auto max-w-[132px] object-contain"
+            className="h-[40px] w-auto max-w-[132px] object-contain"
             priority
           />
-          <span className="h-6 w-px bg-[#102c3d]/20" aria-hidden="true" />
-          <span className="text-[11px] font-bold uppercase tracking-[.18em] text-[#102c3d] sm:text-xs">Explore</span>
+          <span className="h-6 w-px bg-[#142f3a]/20" aria-hidden="true" />
+          <span className="explore-identifier">EXPLORE</span>
         </Link>
-        <div className="flex shrink-0 items-center gap-2 sm:gap-4">
+        <div className="flex shrink-0 items-center gap-3 sm:gap-6">
           <a
             href="https://www.levytate.co.uk/"
-            className="hidden min-h-[42px] items-center gap-2 text-xs font-semibold text-[#102c3d]/70 hover:text-[#102c3d] md:inline-flex"
+            className="hidden min-h-11 items-center gap-2 text-xs font-semibold text-[#142f3a]/70 transition hover:text-[#142f3a] md:inline-flex"
           >
-            For employers <ArrowUpRight size={14} aria-hidden="true" />
+            For employers <ArrowUpRight size={15} aria-hidden="true" />
           </a>
           <ExploreInstallAction />
         </div>
@@ -63,52 +65,46 @@ const routeIcons = {
   truck: Truck,
 } as const;
 
-const tileColours = {
-  mint: { background: "#ebf4ed", accent: "#156e63", iconBackground: "#d3e9db" },
-  cream: { background: "#f8f3e7", accent: "#87613f", iconBackground: "#eee4cf" },
-  rose: { background: "#f9eced", accent: "#ad5e6b", iconBackground: "#f0dce0" },
-  peach: { background: "#faf0e5", accent: "#a86640", iconBackground: "#f3dfc9" },
-  lavender: { background: "#f0eef8", accent: "#746298", iconBackground: "#e4def3" },
-  slate: { background: "#edf1f4", accent: "#4c6981", iconBackground: "#dce5eb" },
+const routePalette = {
+  mint: { background: "#bce8cf", accent: "#0d6456" },
+  cream: { background: "#f5e8bd", accent: "#795729" },
+  rose: { background: "#fad5d9", accent: "#904355" },
+  peach: { background: "#f8d2b2", accent: "#87482c" },
+  lavender: { background: "#d9d2fa", accent: "#5e4897" },
+  slate: { background: "#cae5f2", accent: "#345e7a" },
 } as const;
 
-function RouteTile({ route, count }: ExploreRouteGroup) {
-  const palette = tileColours[route.tone];
+function RouteTile({ route, count, index }: ExploreRouteGroup & { index: number }) {
+  const palette = routePalette[route.tone];
   const Icon = routeIcons[route.icon];
+  const tileStyle = {
+    "--tile-bg": palette.background,
+    "--tile-accent": palette.accent,
+  } as CSSProperties;
 
   return (
     <Link
       href={getExploreRouteHref(route)}
       prefetch={false}
-      className="group relative flex min-h-[205px] flex-col justify-between overflow-hidden rounded-[21px] border border-[#102c3d]/[.06] px-5 pb-5 pt-6 transition duration-200 hover:-translate-y-1 hover:border-[#102c3d]/20 hover:shadow-[0_17px_45px_rgba(16,44,61,.085)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[#117f70] sm:p-6"
-      style={{ backgroundColor: palette.background }}
+      className="explore-route-card group focus-visible:outline-offset-3"
+      style={tileStyle}
       aria-label={route.name + " — " + count + " apprenticeships"}
     >
       <div className="relative z-10 flex items-start justify-between gap-4">
-        <span
-          className="grid h-[47px] w-[47px] shrink-0 place-items-center rounded-[15px]"
-          style={{ backgroundColor: palette.iconBackground, color: palette.accent }}
-          aria-hidden="true"
-        >
-          <Icon size={23} strokeWidth={1.7} />
+        <span className="explore-route-number">{String(index + 1).padStart(2, "0")} / 15</span>
+        <span className="explore-route-icon">
+          <Icon size={23} strokeWidth={1.8} aria-hidden="true" />
         </span>
-        <ArrowUpRight
-          size={20}
-          className="text-[#102c3d]/30 transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-[#102c3d]"
-          aria-hidden="true"
-        />
       </div>
-      <div className="relative z-10 mt-8">
-        <h3 className="max-w-[290px] text-[20px] font-semibold leading-[1.16] tracking-[-.045em] text-[#102c3d] sm:text-[21px]">
-          {route.name}
-        </h3>
-        <p className="mt-2 text-[13px] leading-[1.5] text-[#102c3d]/55">{route.description}</p>
-        <div className="mt-5 flex items-center justify-between gap-3 border-t border-[#102c3d]/10 pt-4">
-          <span className="text-xs font-semibold text-[#102c3d]/65">
+      <div className="relative z-10 mt-6">
+        <h3 className="explore-route-title">{route.name}</h3>
+        <p className="explore-route-description mt-2">{route.description}</p>
+        <div className="explore-route-bottom">
+          <span className="font-semibold opacity-75">
             {count} {count === 1 ? "apprenticeship" : "apprenticeships"}
           </span>
-          <span className="inline-flex items-center gap-1 text-[12px] font-bold" style={{ color: palette.accent }}>
-            View standards <ArrowRight size={14} aria-hidden="true" />
+          <span className="flex items-center gap-2 font-extrabold">
+            Explore <span className="explore-route-arrow"><ArrowRight size={16} aria-hidden="true" /></span>
           </span>
         </div>
       </div>
@@ -118,31 +114,43 @@ function RouteTile({ route, count }: ExploreRouteGroup) {
 
 export function ExploreFooter() {
   return (
-    <footer className="border-t border-[#102c3d]/10 bg-[#102c3d] px-5 py-7 text-white/60">
-      <div className="mx-auto flex max-w-[1220px] flex-wrap items-center justify-between gap-3 text-xs">
-        <span>LevyTate Explore · Discover what you&apos;re capable of.</span>
-        <div className="flex flex-wrap items-center gap-4 sm:gap-5">
-          <Link href="/explore/privacy" className="hover:text-white">Privacy</Link>
-          <a href="https://occupational-maps.skillsengland.education.gov.uk/" rel="noopener noreferrer" target="_blank" className="hover:text-white">Skills England</a>
-          <a href="https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/" rel="noopener noreferrer" target="_blank" className="hover:text-white">Open Government Licence</a>
+    <footer className="bg-[#142f3a] px-5 pb-8 pt-9 text-white/70">
+      <div className="mx-auto max-w-[1220px]">
+        <div className="flex flex-wrap items-start justify-between gap-5">
+          <div>
+            <p className="text-[15px] font-extrabold tracking-[-.03em] text-white">LevyTate <span className="text-[#d9f3a1]">Explore</span></p>
+            <p className="mt-1 text-[12px]">Discover what you&apos;re capable of.</p>
+          </div>
+          <div className="flex flex-wrap gap-x-6 gap-y-3 text-xs font-semibold">
+            <Link href="/explore/privacy" className="min-h-9 py-2 hover:text-white">Privacy</Link>
+            <a href="https://occupational-maps.skillsengland.education.gov.uk/" rel="noopener noreferrer" target="_blank" className="min-h-9 py-2 hover:text-white">Skills England</a>
+            <a href="https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/" rel="noopener noreferrer" target="_blank" className="min-h-9 py-2 hover:text-white">Open Government Licence</a>
+          </div>
         </div>
-      </div>
-      <div className="mx-auto mt-5 flex max-w-[1220px] flex-wrap items-center gap-4 border-t border-white/10 pt-5">
-        <a href="https://occupational-maps.skillsengland.education.gov.uk/" target="_blank" rel="noopener noreferrer" aria-label="Skills England occupational standards data">
-          <Image
-            unoptimized
-            src="https://occupational-maps.skillsengland.education.gov.uk/media/xmehhrr0/skills-england_lesser_arms_stacked-dfe-blue-se-logo.svg?rmode=max&amp;width=500"
-            alt="Skills England"
-            loading="lazy"
-            width={126}
-            height={58}
-            className="w-[126px] rounded-lg bg-white p-2"
-          />
-        </a>
-        <p className="max-w-[750px] text-[11px] leading-6">
-          © Skills England 2025. Source information licensed under Open Government Licence v3.0.
-          LevyTate Unpacked provides AI explanations, not official apprenticeship or funding advice.
-        </p>
+        <div className="mt-7 flex flex-wrap items-center gap-4 border-t border-white/20 pt-5">
+          <a
+            href="https://occupational-maps.skillsengland.education.gov.uk/"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Skills England occupational standards data"
+            className="shrink-0"
+          >
+            <Image
+              unoptimized
+              src="https://occupational-maps.skillsengland.education.gov.uk/media/xmehhrr0/skills-england_lesser_arms_stacked-dfe-blue-se-logo.svg?rmode=max&amp;width=500"
+              alt="Skills England"
+              loading="lazy"
+              width={126}
+              height={58}
+              className="w-[126px] rounded-lg bg-white p-2"
+            />
+          </a>
+          <p className="max-w-[740px] text-[11px] leading-[1.9] text-white/65">
+            © Skills England 2025. Source information under Open Government Licence v3.0.
+            LevyTate Unpacked translates official information into plain language; it is not an official
+            eligibility assessment or funding guarantee.
+          </p>
+        </div>
       </div>
     </footer>
   );
@@ -155,50 +163,65 @@ export function ExploreHome({ standards }: { standards: ExploreStandard[] }) {
   return (
     <>
       <ExploreHeader />
-      <main className="mx-auto max-w-[1220px] px-5 pb-24 pt-12 sm:px-8 sm:pt-16">
-        <section className="max-w-[850px]">
-          <p className="text-[11px] font-bold uppercase tracking-[.18em] text-[#117f70]">
-            LevyTate Explore <span className="mx-2 text-[#102c3d]/25">/</span> Your next chapter
-          </p>
-          <h1 className="mt-5 max-w-[760px] text-[clamp(2.6rem,6vw,5rem)] font-semibold leading-[1.03] tracking-[-.066em] text-[#102c3d]">
-            Where could you <span className="font-serif font-normal italic text-[#117f70]">go next?</span>
-          </h1>
-          <p className="mt-5 max-w-[650px] text-[15px] leading-8 text-[#102c3d]/65 sm:text-[17px]">
-            Explore apprenticeships for people already in work. Choose a field,
-            find a programme, then discover what it could mean for you with <strong className="font-semibold text-[#102c3d]">Unpacked</strong>.
-          </p>
+      <main className="mx-auto max-w-[1220px] px-4 pb-20 pt-5 sm:px-8 sm:pt-7">
+        <section className="explore-hero">
+          <div className="explore-hero-body">
+            <p className="explore-eyebrow text-[#d9f3a1]">A new direction can start right here</p>
+            <h1 className="explore-display mt-6 max-w-[790px] text-[clamp(3.15rem,7.3vw,6.5rem)]">
+              You&apos;re not <span className="whitespace-nowrap">done <em>growing.</em></span>
+            </h1>
+            <p className="mt-6 max-w-[500px] text-[15px] leading-[1.8] text-white/85 sm:text-[17px]">
+              Already in work? Find an apprenticeship that could take your skills somewhere new.
+              No job hunt. Just possibilities.
+            </p>
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <a
+                href="#routes"
+                className="inline-flex min-h-[49px] items-center gap-2 rounded-full bg-[#d9f3a1] px-5 text-[13px] font-extrabold text-[#142f3a] transition hover:bg-white"
+              >
+                Find your field <ArrowDownRight size={19} aria-hidden="true" />
+              </a>
+              <span className="explore-hero-note">Free to explore <span aria-hidden="true">✦</span> No account required</span>
+            </div>
+          </div>
         </section>
 
-        <section aria-labelledby="route-list-heading" className="mt-12 sm:mt-16">
-          <div className="flex flex-wrap items-end justify-between gap-4 border-b border-[#102c3d]/10 pb-5">
+        <section id="routes" aria-labelledby="route-list-heading" className="mt-12 scroll-mt-8 sm:mt-16">
+          <div className="explore-section-lead">
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-[.15em] text-[#117f70]">Start with a field</p>
-              <h2 id="route-list-heading" className="mt-2 text-[clamp(1.55rem,3vw,2.2rem)] font-semibold tracking-[-.045em] text-[#102c3d]">
-                Explore apprenticeship routes
-              </h2>
+              <p className="explore-eyebrow mb-2 text-[#147362]">01 / Choose a field</p>
+              <h2 id="route-list-heading">Where do you want to go?</h2>
             </div>
-            <span className="pb-1 text-xs font-medium text-[#102c3d]/55">
-              15 official routes <span className="px-2 text-[#102c3d]/20">/</span> {standards.length} listed standards
-            </span>
+            <p className="text-[12px] font-semibold text-[#142f3a]/65">
+              15 official occupational routes <span className="mx-2 text-[#142f3a]/20">•</span> {standards.length} standards
+            </p>
           </div>
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 sm:gap-4">
-            {routeGroups.map(group => (
-              <RouteTile key={group.route.slug} route={group.route} count={group.count} />
+          <div className="explore-route-grid mt-5 grid sm:grid-cols-2 lg:grid-cols-3">
+            {routeGroups.map((group, index) => (
+              <RouteTile key={group.route.slug} route={group.route} count={group.count} index={index} />
             ))}
           </div>
+
           {uncategorised > 0 ? (
-            <div className="mt-6 rounded-[15px] border border-[#102c3d]/10 bg-white px-5 py-4 text-xs leading-6 text-[#102c3d]/65">
-              {uncategorised} {uncategorised === 1 ? "standard is" : "standards are"} not yet assigned to a recognised Skills England route in our current catalogue.{" "}
-              <Link href={"/explore/routes/" + UNCATEGORISED_ROUTE_SLUG} className="font-semibold text-[#117f70] underline underline-offset-2">
-                Browse unclassified standards
+            <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-[17px] border border-[#142f3a]/15 bg-white px-5 py-4 text-[13px] leading-6">
+              <span>{uncategorised} {uncategorised === 1 ? "standard is" : "standards are"} awaiting an official occupational route.</span>
+              <Link href={"/explore/routes/" + UNCATEGORISED_ROUTE_SLUG} className="inline-flex min-h-10 items-center gap-2 font-bold text-[#126b59] underline underline-offset-4">
+                View unclassified standards <ArrowUpRight size={16} aria-hidden="true" />
               </Link>
             </div>
           ) : null}
-          <p className="mt-6 text-xs leading-6 text-[#102c3d]/50">
-            These are Skills England&apos;s 15 occupational routes, not LevyTate-generated categories.
-            Counts reflect the approved standards currently recorded in our catalogue and may change.
-          </p>
+
+          <div className="mt-7 flex flex-wrap items-start justify-between gap-3">
+            <p className="explore-editorial-note max-w-[770px]">
+              These tiles use Skills England&apos;s official occupational routes. We&apos;re making the
+              information easier to explore, not changing the government classification.
+              Individual standards and funding status can change.
+            </p>
+            <span className="explore-soft-stamp">
+              <Sparkles size={14} className="text-[#127365]" aria-hidden="true" /> Powered by official standards
+            </span>
+          </div>
         </section>
       </main>
       <ExploreFooter />
