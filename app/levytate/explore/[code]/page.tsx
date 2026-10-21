@@ -4,7 +4,7 @@ import { ExploreDetail } from "@/components/levytate-explore/ExploreDetail";
 import { createExploreCatalogue } from "@/lib/levytate/explore/catalogue";
 import { loadLevyTateStandards } from "@/lib/server/levytate-apprenticeship-standards";
 
-type Props = { params: Promise<{ code: string }>; searchParams: Promise<{ audience?: string }> };
+type Props = { params: Promise<{ code: string }>; searchParams: Promise<{ audience?: string; from?: string }> };
 
 async function getStandard(code: string) {
   if (!/^ST\d{4}$/i.test(code)) return null;
@@ -29,9 +29,18 @@ export default async function ExploreStandardPage({ params, searchParams }: Prop
   if (!standard) notFound();
 
   const query = await searchParams;
+  const sourceRoute = standard.route.toLowerCase().replace(/\s*&\s*/g, " and ");
+  const { getExploreRouteByName, getExploreRouteHref } = await import("@/lib/levytate/explore/occupational-routes");
+  const route = getExploreRouteByName(sourceRoute);
+  const prefix = route ? getExploreRouteHref(route) + "/pathways/" : null;
+  const returnHref = prefix && query.from?.startsWith(prefix) &&
+    /^\/explore\/routes\/[a-z0-9-]{1,100}\/pathways\/[a-z0-9-]{1,100}$/.test(query.from)
+      ? query.from
+      : null;
   return <ExploreDetail
     standard={standard}
     managerView={query.audience === "manager"}
+    returnHref={returnHref}
     enquiriesEnabled={process.env.LEVYTATE_EXPLORE_SUBMISSIONS_ENABLED === "true"}
   />;
 }
