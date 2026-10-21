@@ -7,27 +7,51 @@ It is not an apprenticeship vacancy finder, a recruitment agency, or a new
 provider marketplace. Users can browse freely without registration.
 
 The simple first-release journey is deliberate:
-1. **Explore official occupational routes.** The landing page shows exactly
-   the 15 Skills England routes as navigable tiles, with their unchanged
-   official route names and a dynamic count of the approved apprenticeships
-   currently mapped to each route.
-2. **Find the standard.** Selecting a route opens only its apprenticeship
-   standards, in an alphabetical list with name search and optional level
-   filter. The URL is shareable and survives a refresh.
-3. **Unpacked.** Selecting a standard opens its own page and automatically
-   requests source-grounded AI **Unpacked** content from Skills England duties
-   and knowledge/skills/behaviours. Do not show an additional Generate button.
-   Repeat views can use the versioned cached explanation. The original
-   official record stays accessible, and unverifiable content fails closed.
-4. **Start a conversation.** The employee may draft an email to their manager,
+1. **Explore official occupational routes.** The homepage presents the
+   15 Skills England routes with counts of approved apprenticeship standards.
+2. **Choose a pathway.** A route opens its government **pathways** as tiles.
+   Pathway membership must come from Skills England's actual Route → Pathway →
+   ClusterGroup → Cluster → Occupation (OCC) → Apprenticeship (ST) product
+   hierarchy. Never infer an official pathway from a title or generic LLM.
+   When mapping is not yet connected, preserve access to the route's full
+   standard list and clearly distinguish unverified/unmapped programmes.
+3. **Find a standard.** A pathway opens its approved standards in an
+   alphabetical list with name search and optional level filter. Returning
+   from Unpacked preserves the pathway where possible.
+4. **Unpacked.** Selecting a standard automatically requests source-grounded
+   AI explanation from official Skills England duties and KSBs. The original
+   record remains accessible and unverifiable AI content fails closed.
+5. **Start a conversation.** The employee may draft an email to their manager
    or independently consent to MPR guidance. There is no invisible outreach
    or employer application.
 
-Tiles are the government's **15 occupational routes**, not invented interest
-categories. Occupations can also be grouped into pathways and clusters on
-the official occupational maps, but the existing LevyTate catalogue only
-contains authoritative **route** metadata. Do not invent the deeper
-pathway/cluster mapping until it is reliably imported and verified.
+The first 15 tiles are the government's **routes**, and the next set are its
+**pathways**, not AI-generated clusters or inferred categories. The original
+July 2026 LevyTate standards catalogue contains route metadata only.
+To bridge that gap safely:
+- `lib/server/levytate-explore-pathways.ts` uses the documented official
+  `GET /api/v1/Routes` to resolve the route ID, then
+  `GET /api/v1/Routes/{id}?expand=occupation.products` and a strict ST-code
+  join against the approved standard catalogue. Server-only key required.
+- The historical government **May 2019** Sales, marketing and procurement map
+  provides an explicitly labelled Preview-only four-pathway seed:
+  Customer Service, Marketing, Procurement and Retail. This was validated
+  against the archived official 2019 map; it is not represented as current.
+- Without verified data for another route, show "pathways not yet connected"
+  and keep its standards discoverable rather than inventing assignments.
+- Newly introduced or unverified standards remain available under a separate
+  "Awaiting pathway verification" link. No active standard is silently lost.
+- Cached live government route requests are refreshed at most every 12 hours
+  when the approved `SKILLS_ENGLAND_API_KEY` is configured, and the displayed
+  grouping replaces the historical subset.
+
+The official API key is **not configured** in the connected Preview environment.
+Therefore full pathway coverage is a **release blocker**, not a finished live
+feature, and no official API calls were made in this change.
+
+**The public name "Unpacked" is confirmed**, with the positioning
+"The apprenticeship, made human." Old `de-fluff` API/cache identifiers
+remain temporarily for backwards compatibility but are not UI labels.
 
 "De-fluff" is retained as an internal technical route/cache identifier where
 needed for backwards compatibility. **"Unpacked"** is the public-facing
@@ -58,6 +82,8 @@ Apprenticeship Lead → Enrolment workflow stays authoritative.
 
 - Public home: /explore
 - Official route tiles: /explore/routes/digital (and 14 other route pages)
+- Verified pathway pages: /explore/routes/sales-marketing-and-procurement/pathways/retail
+- Explicit unmapped fallback: /explore/routes/sales-marketing-and-procurement/pathways/unmapped
 - Unclassified fallback: /explore/routes/uncategorised (only if any standards lack an official route)
 - Approved programme profile: /explore/st1512 (and other approved standards)
 - Installer manifest: /explore/manifest.webmanifest
@@ -128,6 +154,11 @@ a separate, explicitly marked uncategorised fallback exists if needed.
 
 The July 2026 fallback snapshot contains representatives in every route,
 but it still needs a proper source refresh before a public commercial launch.
+
+The public Occupational Maps API is key-protected and licensed under the OGL.
+Relevant API schema: https://occupational-maps-api.skillsengland.education.gov.uk/swagger/v1.0/swagger.json
+Do not copy employee data into the government query. This work adds no database
+migrations and does not activate paid AI generation or public enquiries.
 
 ## Skills England licence
 
