@@ -47,8 +47,8 @@ export function ExploreRouteStandards({ route, standards, pathwayName, pathwaySo
   return (
     <>
       <ExploreHeader />
-      <main className="mx-auto max-w-[980px] px-5 pb-24 pt-8 sm:px-8 sm:pt-12">
-        <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-2 text-xs text-[#102c3d]/55">
+      <main className="mx-auto max-w-[1100px] px-4 pb-24 pt-6 sm:px-8 sm:pt-9">
+        <nav aria-label="Breadcrumb" className="flex min-h-11 flex-wrap items-center gap-2 text-xs text-[#142f3a]/65">
           <Link href="/explore" className="inline-flex min-h-9 items-center gap-2 font-semibold text-[#117f70] hover:underline">
             <ArrowLeft size={14} aria-hidden="true" /> All routes
           </Link>
@@ -68,21 +68,21 @@ export function ExploreRouteStandards({ route, standards, pathwayName, pathwaySo
           ) : null}
         </nav>
 
-        <section className="mt-8 max-w-[830px]">
-          <p className="text-[11px] font-bold uppercase tracking-[.18em] text-[#117f70]">
+        <section className="explore-directory-hero mt-5">
+          <p className="explore-eyebrow text-[#125f52]">
             {pathwayName ? "Official occupational pathway" : "Apprenticeship routes"}
           </p>
-          <h1 className="mt-4 text-[clamp(2.15rem,5.5vw,4rem)] font-semibold leading-[1.05] tracking-[-.06em] text-[#102c3d]">
+          <h1 className="explore-display mt-5 max-w-[820px] text-[clamp(2.4rem,6vw,4.7rem)]">
             {title}
           </h1>
-          <p className="mt-5 text-[15px] leading-8 text-[#102c3d]/65">
+          <p className="mt-5 max-w-[720px] text-[15px] leading-[1.85] text-[#142f3a]/80 sm:text-[17px]">
             {description}. Choose a standard to see what it could mean for your working life with Unpacked.
           </p>
         </section>
 
-        <section aria-labelledby="route-programme-list" className="mt-10 sm:mt-12">
-          <div className="flex flex-wrap items-end justify-between gap-3 border-b border-[#102c3d]/10 pb-5">
-            <h2 id="route-programme-list" className="text-xl font-semibold tracking-[-.035em]">
+        <section aria-labelledby="route-programme-list" className="mt-11 sm:mt-14">
+          <div className="explore-section-lead">
+            <h2 id="route-programme-list" className="text-[clamp(24px,3vw,33px)] font-extrabold tracking-[-.055em]">
               Apprenticeship standards
             </h2>
             <p className="text-xs text-[#102c3d]/55">
@@ -91,7 +91,7 @@ export function ExploreRouteStandards({ route, standards, pathwayName, pathwaySo
           </div>
 
           <div className="mt-5 flex flex-wrap items-stretch gap-3">
-            <label htmlFor="explore-route-search" className="relative flex h-[54px] min-w-[235px] flex-1 items-center gap-3 rounded-[14px] border border-[#102c3d]/15 bg-white px-4 focus-within:border-[#117f70] focus-within:ring-2 focus-within:ring-[#117f70]/10">
+            <label htmlFor="explore-route-search" className="explore-search-box relative flex min-w-[235px] flex-1 items-center gap-3 px-4">
               <Search size={19} className="shrink-0 text-[#102c3d]/40" aria-hidden="true" />
               <span className="sr-only">Find a standard in {title}</span>
               <input
@@ -105,7 +105,7 @@ export function ExploreRouteStandards({ route, standards, pathwayName, pathwaySo
               />
               {search ? <button type="button" onClick={() => { setSearch(""); setVisibleCount(40); }} className="grid h-8 w-8 place-items-center rounded-full hover:bg-[#e8f1eb]" aria-label="Clear standard search"><X size={16} aria-hidden="true" /></button> : null}
             </label>
-            <label htmlFor="explore-route-level" className="flex h-[54px] min-w-[165px] items-center justify-between gap-2 rounded-[14px] border border-[#102c3d]/15 bg-white px-4 text-sm font-medium text-[#102c3d]/65">
+            <label htmlFor="explore-route-level" className="explore-search-box flex min-w-[165px] items-center justify-between gap-2 px-4 text-sm font-semibold text-[#142f3a]/75">
               Level
               <select
                 id="explore-route-level"
@@ -124,28 +124,28 @@ export function ExploreRouteStandards({ route, standards, pathwayName, pathwaySo
               Preview mapping from a May 2019 official occupational map. A current government API check is required before public launch.
             </p>
           ) : null}
-          <p role="status" aria-live="polite" className="mt-4 text-xs text-[#102c3d]/55">
+          <p role="status" aria-live="polite" className="mt-4 text-xs font-medium text-[#142f3a]/60">
             {filtered.length} {filtered.length === 1 ? "matching apprenticeship" : "matching apprenticeships"}
           </p>
           {filtered.length ? (
-            <div className="mt-3 overflow-hidden rounded-[18px] border border-[#102c3d]/10 bg-white">
+            <div className="explore-directory-list mt-3">
               <ul className="divide-y divide-[#102c3d]/10">
                 {filtered.slice(0, visibleCount).map(standard => (
                   <li key={standard.code}>
                     <Link
                       prefetch={false}
                       href={"/explore/" + standard.code.toLowerCase() + (route && pathwaySlug ? "?from=" + encodeURIComponent(getExploreRouteHref(route) + "/pathways/" + pathwaySlug) : "")}
-                      className="group flex min-h-[71px] items-center justify-between gap-4 px-5 py-4 transition hover:bg-[#eff5f0] focus-visible:bg-[#eff5f0] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#117f70] sm:px-6"
+                      className="explore-directory-row group focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#117f70]"
                     >
                       <span className="min-w-0">
-                        <span className="block text-[15px] font-semibold leading-6 tracking-[-.015em] text-[#102c3d] sm:text-[16px]">
+                        <span className="block text-[16px] font-extrabold leading-[1.45] tracking-[-.025em] text-[#142f3a] sm:text-[17px]">
                           {standard.title}
                         </span>
-                        <span className="mt-1 block text-xs text-[#102c3d]/50">
+                        <span className="mt-1 block text-[12px] font-medium text-[#142f3a]/60">
                           Level {standard.level} <span className="px-1.5" aria-hidden="true">·</span> {standard.code}
                         </span>
                       </span>
-                      <ArrowRight size={19} aria-hidden="true" className="shrink-0 text-[#117f70] transition group-hover:translate-x-1" />
+                      <ArrowRight size={19} aria-hidden="true" className="shrink-0 text-[#13715d] transition group-hover:translate-x-1" />
                     </Link>
                   </li>
                 ))}
