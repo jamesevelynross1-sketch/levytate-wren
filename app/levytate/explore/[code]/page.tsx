@@ -18,7 +18,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!standard) return { title: "Apprenticeship not found | LevyTate Explore", robots: { index: false } };
   return {
     title: standard.title + " | LevyTate Explore",
-    description: "What could " + standard.title + " mean for your working life? Read the plain-English guide and bring the opportunity to your manager.",
+    description: "Discover " + standard.title + ", unpacked by LevyTate AI. Understand the real-world skills and bring the opportunity to your manager.",
     alternates: { canonical: "/explore/" + standard.code.toLowerCase() },
   };
 }
