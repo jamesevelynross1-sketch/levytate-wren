@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { ExploreInstallAction } from "./ExploreInstallAction";
 import { useMemo, useState } from "react";
 import {
   ArrowDown, ArrowUpRight, BookOpen, Check, ChevronRight,
@@ -17,14 +18,15 @@ export function ExploreHeader() {
       <div className="mx-auto flex min-h-[82px] max-w-[1330px] items-center justify-between gap-4 px-5 sm:px-9">
         <Link href="/explore" className="flex items-center gap-3" aria-label="LevyTate Explore home">
           <Image src="/brand/levytate-logo-supplied.png" alt="LevyTate" width={131} height={46} className="h-[42px] w-auto max-w-[135px] object-contain" priority />
-          <span className="h-6 w-px bg-[#102c3d]/20" aria-hidden="true" />
-          <span className="text-[12px] font-bold uppercase tracking-[0.21em] text-[#102c3d]">Explore</span>
+          <span className="hidden h-6 w-px bg-[#102c3d]/20 sm:block" aria-hidden="true" />
+          <span className="hidden text-[12px] font-bold uppercase tracking-[0.21em] text-[#102c3d] sm:inline">Explore</span>
         </Link>
         <div className="flex items-center gap-3 sm:gap-7">
-          <a href="/explore#how-it-works" className="hidden text-sm font-medium text-[#102c3d]/65 transition hover:text-[#102c3d] sm:inline">How it works</a>
-          <a href="https://www.levytate.co.uk/" className="inline-flex min-h-[42px] items-center gap-2 rounded-full border border-[#102c3d]/15 px-4 text-xs font-semibold transition hover:border-[#102c3d]/40 hover:bg-white sm:px-5">
+          <a href="/explore#how-it-works" className="hidden text-sm font-medium text-[#102c3d]/65 transition hover:text-[#102c3d] lg:inline">How it works</a>
+          <a href="https://www.levytate.co.uk/" className="hidden min-h-[42px] items-center gap-2 rounded-full border border-[#102c3d]/15 px-4 text-xs font-semibold transition hover:border-[#102c3d]/40 hover:bg-white sm:inline-flex sm:px-5">
             For employers <ArrowUpRight size={15} aria-hidden="true" />
           </a>
+          <ExploreInstallAction />
         </div>
       </div>
     </header>
@@ -109,6 +111,7 @@ export function ExploreHome({ standards }: { standards: ExploreStandard[] }) {
               <span className="flex items-center gap-2"><Check size={15} className="text-[#b9e7d5]" /> Free to explore</span>
               <span className="flex items-center gap-2"><Check size={15} className="text-[#b9e7d5]" /> No job search</span>
               <span className="flex items-center gap-2"><Check size={15} className="text-[#b9e7d5]" /> No account required</span>
+              <span className="flex items-center gap-2"><Check size={15} className="text-[#b9e7d5]" /> Installable on your phone</span>
             </div>
           </div>
         </section>
