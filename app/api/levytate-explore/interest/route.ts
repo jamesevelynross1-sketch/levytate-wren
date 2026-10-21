@@ -10,6 +10,7 @@ import { getLevyTateSupabaseConfig, supabaseFetchJson } from "@/lib/server/levyt
 export const runtime = "nodejs";
 
 const schema = z.object({
+  requesterType: z.enum(["employee", "manager"]).default("employee"),
   fullName: z.string().trim().min(2).max(100),
   email: z.string().trim().toLowerCase().email().max(254),
   organisation: z.string().trim().min(2).max(140),
@@ -127,7 +128,7 @@ export async function POST(request: Request) {
   }
 
   return reply(
-    "Your enquiry has been recorded securely. The LevyTate team can review it and follow up using the email you provided. Your manager and employer have not been contacted.",
+    "Your enquiry has been recorded securely. The LevyTate team can review it and follow up using the email you provided. No other person has been contacted.",
     200,
   );
 }
