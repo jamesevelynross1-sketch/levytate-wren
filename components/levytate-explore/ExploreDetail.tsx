@@ -4,7 +4,7 @@ import Link from "next/link";
 import { FormEvent, useState } from "react";
 import {
   ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, CheckCircle2,
-  ChevronRight, ExternalLink, Mail, Send, ShieldCheck, Sparkles, WandSparkles, X,
+  ChevronRight, ExternalLink, Send, ShieldCheck, Sparkles, WandSparkles,
 } from "lucide-react";
 import { ExploreHeader } from "./ExploreHome";
 import type { ExploreStandard } from "@/lib/levytate/explore/catalogue";
@@ -130,7 +130,7 @@ function MprContact({ standard }: { standard: ExploreStandard }) {
         <span>I agree that LevyTate, operated by MPR Consulting, can use these details to contact me about this development enquiry. I understand my employer will not be contacted without a separate agreed step.</span>
       </label>
       <p className="text-[11px] leading-5 text-[#102c3d]/55">
-        There is no charge to you or your employer for using Explore. MPR may receive commercial fees from training providers for successful introductions. This does not determine which standards appear in the catalogue. <a className="underline underline-offset-2" href="/privacy">Privacy information</a>.
+        There is no charge to you or your employer for using Explore. MPR may receive commercial fees from training providers for successful introductions. This does not determine which standards appear in the catalogue. <a className="underline underline-offset-2" href="/levytate/privacy">Privacy information</a>.
       </p>
       <button type="submit" disabled={!consent || status === "sending"} className="inline-flex min-h-[50px] w-full items-center justify-center gap-3 rounded-full bg-[#102c3d] px-5 text-sm font-semibold text-white transition hover:bg-[#1e4960] disabled:cursor-not-allowed disabled:opacity-50">
         {status === "sending" ? "Sending your request..." : "Ask LevyTate for guidance"} <Send size={16} aria-hidden="true" />
@@ -274,13 +274,19 @@ export function ExploreDetail({ standard }: { standard: ExploreStandard }) {
               </div>
             </div>
             <div className="mt-4 rounded-[17px] border border-[#102c3d]/10 px-5 py-4 text-xs leading-6 text-[#102c3d]/60">
-              Already a LevyTate employee user? <Link href="/app" className="font-semibold text-[#117f70] underline underline-offset-2">Sign in to your organisation&apos;s platform.</Link> Its application approvals are separate from this public exploration journey.
+              Already a LevyTate employee user? <Link href="/levytate/app" className="font-semibold text-[#117f70] underline underline-offset-2">Sign in to your organisation&apos;s platform.</Link> Its application approvals are separate from this public exploration journey.
             </div>
           </aside>
         </div>
       </main>
       <footer className="border-t border-[#102c3d]/10 px-5 py-7 text-center text-xs text-[#102c3d]/55">
         <Link href="/explore" className="font-semibold hover:underline">LevyTate Explore</Link> · Independent apprenticeship discovery · <a href="https://skillsengland.education.gov.uk/apprenticeships" target="_blank" rel="noopener noreferrer" className="hover:underline">Official Skills England catalogue</a>
+      <div className="mx-auto flex max-w-[1330px] flex-wrap items-center justify-center gap-4 px-5 pb-8 text-[11px] text-[#102c3d]/55">
+        <a href="https://occupational-maps.skillsengland.education.gov.uk/public-api/" target="_blank" rel="noopener noreferrer">
+          <img src="https://occupational-maps.skillsengland.education.gov.uk/media/xmehhrr0/skills-england_lesser_arms_stacked-dfe-blue-se-logo.svg?rmode=max&amp;width=500" alt="Skills England" loading="lazy" width="126" height="58" className="w-[126px] rounded-lg bg-white p-2" />
+        </a>
+        <span>© Skills England 2025. Source information under the <a href="https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">Open Government Licence v3.0</a>.</span>
+      </div>
       </footer>
     </>
   );
