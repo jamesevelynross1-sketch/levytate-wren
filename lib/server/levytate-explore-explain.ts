@@ -102,6 +102,32 @@ async function findRecentNarrative(standard: ExploreStandard) {
   return narrative.success ? { narrative: narrative.data, generatedAt: row.generated_at } : null;
 }
 
+async function findPendingNarrative(standard: ExploreStandard): Promise<"generating" | "cooldown" | null> {
+  const config = requireConfig();
+  const query = new URLSearchParams({
+    select: "status,claimed_at,updated_at",
+    standard_code: "eq." + standard.code,
+    standard_version: "eq." + standard.version,
+    prompt_version: "eq." + EXPLORE_NARRATIVE_VERSION,
+    status: "in.(generating,failed)",
+    order: "updated_at.desc",
+    limit: "1",
+  });
+  try {
+    const rows = await supabaseSelect<ArrayNever>(config, "levytate_explore_ai_narratives", query);
+    const row = rows[0];
+    if (!row) return null;
+    if (row.status === "generating" && row.claimed_at &&
+        Date.now() - Date.parse(row.claimed_at) < 75_000) return "generating";
+    if (row.status === "failed" && row.updated_at &&
+        Date.now() - Date.parse(row.updated_at) < 15 * 60_000) return "cooldown";
+    return null;
+  } catch {
+    throw new ExploreGenerationUnavailable("not_configured");
+  }
+}
+type ArrayNever = { status: "generating" | "failed"; claimed_at: string | null; updated_at: string };
+
 async function claimGeneration(
   standard: ExploreStandard,
   source: ExploreSourceEvidence,
@@ -163,6 +189,11 @@ export async function explainExploreStandard(
     sourceCheckedAt: ready.generatedAt,
     fromCache: true,
   };
+
+  // Polls and concurrent viewers should not repeatedly hit the government API.
+  const pending = await findPendingNarrative(standard);
+  if (pending === "generating") return { kind: "generating", retryAfterSeconds: 3 };
+  if (pending === "cooldown") return { kind: "cooldown" };
 
   let source: ExploreSourceEvidence;
   try {
