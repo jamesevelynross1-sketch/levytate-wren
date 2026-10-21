@@ -114,8 +114,13 @@ recruitment product, or part of employer tenant records.
 - The first-release homepage is a grid of tiles for the **15 official
   Skills England occupational routes**, with names and counts from the
   underlying government route metadata, not AI-invented categories.
-- Selecting a tile opens a searchable alphabetical list containing only
-  approved apprenticeship standards belonging to that route.
+- Selecting a route opens its source-backed **official occupational pathway
+  tiles**, not an unfiltered list mixing retail, marketing and other fields.
+- Selecting a pathway opens a searchable alphabetical list containing only
+  approved apprenticeship standards explicitly linked to that pathway by
+  the official occupation-to-apprenticeship product data.
+- Any standards without a verified pathway stay accessible in a clearly
+  marked uncategorised fallback; no AI-inferred mapping.
 - Selecting an individual standard automatically requests the source-grounded
   AI **Unpacked** transformation, with no extra Generate step.
 - Only currently approved apprenticeship standards should be discoverable.
