@@ -30,7 +30,12 @@ Apprenticeship Lead → Enrolment workflow stays authoritative.
 - Public home: /explore
 - Approved programme profile: /explore/st1512 (and other approved standards)
 - Installer manifest: /explore/manifest.webmanifest
-- Opt-in advisory request: POST /api/levytate-explore/interest
+- Manager share perspective: /explore/st1512?audience=manager
+- Public privacy preview: /explore/privacy
+- Opt-in employee/manager contact: POST /api/levytate-explore/interest
+- Private beta-admin pipeline: /explore/internal
+- Private pipeline API: /api/levytate-explore/admin/enquiries
+- Secured retry worker: /api/cron/levytate-explore-notifications
 
 Public paths are rewritten to the existing standalone LevyTate application
 shell on levytate.co.uk and isolated Preview hosts; do not inherit MPR SiteChrome.
@@ -67,8 +72,7 @@ Source: https://occupational-maps.skillsengland.education.gov.uk/public-api/
 - Browsing, search and opening programme pages require no identity.
 - Manager email is prepared as a mailto: draft client-side; manager address and
   text are not transmitted to LevyTate.
-- A separate employee action with mandatory consent posts name, work email,
-  employer and selected standard to MPR.
+- Independently consented employee or manager enquiries post only the named requester's details to MPR. A manager share link does not itself identify the employee.
 - Do not contact managers or employers just because an employee enquires.
 - No public browser access to Supabase service role. Server validates input,
   origin, length, active standard and persisted rate-limit quotas and fails
@@ -76,34 +80,30 @@ Source: https://occupational-maps.skillsengland.education.gov.uk/public-api/
 - There is no automatic conversion to a tenant employee application or
   bypass of manager/Apprenticeship Lead permissions.
 
-## Alpha transport and production-blocking tasks
+## Durable pipeline implemented on the branch — not activated
 
-The initial contact API uses server-side Resend to notify MPR, and its reply
-is successful only if email transmission is accepted. It does not yet record
-a durable lead/outbox transaction, manage re-delivery, or allow the user to
-track a reference. **This is not production-ready lead handling.**
+- Staged migration 040 creates an isolated private enquiry register, audit trail, and retryable notification outbox with atomic leasing.
+- Public submissions are persisted before acknowledgement, deduplicated per requester/standard/day and environment, and protected by existing distributed rate-limit controls.
+- The server notifies MPR through Resend and retries failures from a protected hourly worker; there is no email-only fallback if durable storage is absent.
+- Internal beta-admin only dashboard captures status, notes, and the provider-referral versus LevyTate-licence revenue route. No public lead is added to employer tenant records.
+- Employee-to-manager sharing is an email draft controlled by the employee. The recipient sees a manager-specific programme view and can independently consent to MPR contact.
+- Separate consent copy and version history exists for employee and manager enquiries.
+- A public Explore privacy page is a Preview draft only and requires formal legal approval.
+- The catalogue uses Skills England source metadata. Eight editorial De-fluff guides are available; other standards show honest official-only content until verified.
+- Package builds run the automatic Explore catalogue validation script first.
 
-Before opening public submissions:
-1. Add a durable isolated Explore lead store with private-only access,
-   per-record consent provenance, duplicate handling and an outbox/retry
-   process; adopt a migration in a verified Supabase environment, not against
-   a shared employer production database.
-2. Create admin-only MPR triage and employer qualification workflows that
-   don't expose public enquiries to employer tenant users.
-3. Test rate limits, origin restrictions, all validation states and failure
-   recovery with synthetic identities in isolated Preview.
-4. Obtain Skills England API key, sync and review official data (July
-   fallback requires refresh); validate version and funding language.
-5. Validate contact/email operator addresses and verified sending domain
-   (LEVYTATE_EXPLORE_NOTIFY_EMAIL + RESEND_API_KEY); confirm privacy notice,
-   retention and PECR review; introduce appropriate bot protection if traffic
-   warrants it.
-6. Test PWA installation and routes on real iOS Safari and Android Chrome,
-   keyboard navigation, reduced motion, Lighthouse and mobile performance.
-7. Run repository typecheck, lint, validation and build on the **exact**
-   release commit. Independently verify the protected Preview URL.
-8. Confirm the release owner, legal/privacy owner and code reviewer approve
-   public release. No automatic Production promotion.
+**Migration 040 remains unapplied.** The connected Supabase workspace exposed to this session is not confirmed to be the correct live LevyTate database. Consequently, Preview submission must fail closed rather than storing personal data in an unverified project.
+
+## Public-release acceptance gates
+
+1. Verify the exact isolated Preview Supabase project, complete backup/restore exercise, review then apply migration 040 there only. Confirm service-role RPCs, denied anon/authenticated access, no tenant leakage, deduplication, outbox concurrency and environment scoping.
+2. Test public enquiry POSTs (employee and manager), forged origin, spam, duplicates, no DB, no email, user cancellation and accessibility with synthetic identities.
+3. Confirm verified Resend sender and notification destination plus CRON_SECRET in the correct environment; prove retry without duplicate email.
+4. Verify beta-admin-only list/update and deny employer-role access. Exercise simultaneous operator updates, audit events and privacy requests.
+5. Request Skills England API key, refresh the July 2026 fallback, join current occupational KSBs to approved standard versions and expand high-quality De-fluff coverage.
+6. Approve separate Explore controller privacy notice, lawful basis, company details, retention schedule, deleted-lead procedures, provider disclosure, employer outreach policy and any international processing safeguards.
+7. Test actual iOS/Android installation, keyboard/screen-reader accessibility, forms, focus, contrast and mobile performance.
+8. Rebuild, review and security-test the exact release commit. Obtain approval before merging or promoting Production.
 
 ## Future iteration
 
