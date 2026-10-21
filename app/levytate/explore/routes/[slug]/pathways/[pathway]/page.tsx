@@ -53,6 +53,7 @@ export default async function ExplorePathwayPage({ params }: Params) {
         ? "All standards — pathways not yet connected"
         : "Standards awaiting pathway verification"}
       pathwaySource={mapping.source}
+      pathwaySlug={UNMAPPED}
     />;
   }
 
@@ -64,5 +65,6 @@ export default async function ExplorePathwayPage({ params }: Params) {
     standards={standards}
     pathwayName={group.name}
     pathwaySource={mapping.source}
+    pathwaySlug={group.slug}
   />;
 }
