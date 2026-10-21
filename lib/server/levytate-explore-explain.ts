@@ -183,9 +183,6 @@ export async function explainExploreStandard(
   // even if the last cache-verification timestamp is past the seven-day TTL.
   let claim: ClaimRow | null;
   try {
-    // Budget is checked before claiming work; repeated concurrent hits do
-    // count towards the abuse budget, but the DB claim ensures only one AI call.
-    await checkGenerationBudget(request);
     claim = await claimGeneration(standard, source, digest);
   } catch (error) {
     if (error instanceof ExploreGenerationUnavailable) throw error;
@@ -205,6 +202,17 @@ export async function explainExploreStandard(
   if (claim?.claim_state === "cooldown" || claim?.claim_state === "limit_reached") return { kind: "cooldown" };
   if (claim?.claim_state !== "claimed" || !claim.claim_token) {
     throw new ExploreGenerationUnavailable("not_configured");
+  }
+
+  // Spend the generation budget only for the single successfully claimed
+  // first-generation worker; cache hits and concurrent viewers are free.
+  try {
+    await checkGenerationBudget(request);
+  } catch (error) {
+    await finishGeneration(standard, digest, claim.claim_token, null, "generation_budget_denied")
+      .catch(() => undefined);
+    if (error instanceof ExploreGenerationUnavailable) throw error;
+    throw new ExploreGenerationUnavailable("generation_unavailable");
   }
 
   let narrative: ExploreNarrative | null = null;
