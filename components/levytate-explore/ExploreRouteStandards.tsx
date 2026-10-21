@@ -14,9 +14,10 @@ type Props = {
   standards: ExploreStandard[];
   pathwayName?: string;
   pathwaySource?: "live-official-api" | "historical-official-map" | "not-connected";
+  pathwaySlug?: string;
 };
 
-export function ExploreRouteStandards({ route, standards, pathwayName, pathwaySource }: Props) {
+export function ExploreRouteStandards({ route, standards, pathwayName, pathwaySource, pathwaySlug }: Props) {
   const [search, setSearch] = useState("");
   const [level, setLevel] = useState(0);
   const [visibleCount, setVisibleCount] = useState(40);
@@ -133,7 +134,7 @@ export function ExploreRouteStandards({ route, standards, pathwayName, pathwaySo
                   <li key={standard.code}>
                     <Link
                       prefetch={false}
-                      href={"/explore/" + standard.code.toLowerCase()}
+                      href={"/explore/" + standard.code.toLowerCase() + (route && pathwaySlug ? "?from=" + encodeURIComponent(getExploreRouteHref(route) + "/pathways/" + pathwaySlug) : "")}
                       className="group flex min-h-[71px] items-center justify-between gap-4 px-5 py-4 transition hover:bg-[#eff5f0] focus-visible:bg-[#eff5f0] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#117f70] sm:px-6"
                     >
                       <span className="min-w-0">
