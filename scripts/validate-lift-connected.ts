@@ -8,9 +8,10 @@ import { liftRubricMatrix } from "../lib/server/levytate-lift-rubric";
 
 const socket = process.env.LEVYTATE_LIFT_TEST_SOCKET;
 const databasePort = process.env.LEVYTATE_LIFT_TEST_PORT ?? "55439";
+const databaseUser = process.env.LEVYTATE_LIFT_TEST_USER ?? "postgres";
 if (!socket) throw new Error("LEVYTATE_LIFT_TEST_SOCKET is required.");
 
-const psql = (sql: string) => execFileSync("/opt/homebrew/bin/psql", ["-h", socket, "-p", databasePort, "-d", "lift039", "-v", "ON_ERROR_STOP=1", "-At", "-c", sql], { encoding: "utf8" }).trim();
+const psql = (sql: string) => execFileSync("/opt/homebrew/bin/psql", ["-h", socket, "-p", databasePort, "-U", databaseUser, "-d", "lift039", "-v", "ON_ERROR_STOP=1", "-At", "-c", sql], { encoding: "utf8" }).trim();
 const jsonQuery = <T>(sql: string): T => JSON.parse(psql(`select coalesce(json_agg(result),'[]'::json) from (${sql}) result;`) || "[]") as T;
 const jsonDml = <T>(sql: string): T => JSON.parse(psql(`with result as (${sql}) select coalesce(json_agg(result),'[]'::json) from result;`) || "[]") as T;
 const quote = (value: unknown) => value === null ? "null" : typeof value === "number" ? String(value) : typeof value === "boolean" ? String(value) : typeof value === "object" ? `${literal(JSON.stringify(value))}::jsonb` : literal(String(value));

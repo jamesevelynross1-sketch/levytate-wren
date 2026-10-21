@@ -41,7 +41,7 @@ Production and unrecognised runtimes always return disabled. The local fixture p
 
 ## Honest release status
 
-The implementation and migration can be validated in isolation. Shared end-to-end persistence remains unavailable until migration 039 and one fictional Preview workspace capability are separately authorised. The pilot instrument still requires subject-matter, accessibility, privacy and measurement review before live employee use.
+Migration 039 is applied to the shared Supabase project after a fresh restricted backup and successful isolated restore. Lift is enabled only for the existing Ground Control fictional validation workspace on the protected `feature/operational-rbac` Preview. Every other organisation and Production remain fail-closed. The pilot instrument still requires subject-matter, accessibility, privacy and measurement review before any live employee or employer use.
 
 ## Isolated fixture screenshots
 
