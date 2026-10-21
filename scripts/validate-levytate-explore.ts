@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { existsSync, readFileSync } from "node:fs";
 import { createExploreCatalogue, searchExploreCatalogue } from "../lib/levytate/explore/catalogue";
 import { normaliseExploreSource } from "../lib/levytate/explore/source-evidence";
 import type { ApprenticeshipStandard } from "../lib/levytate/domain/types";
@@ -54,4 +55,16 @@ const evidence = normaliseExploreSource("ST0118", officialRecord);
 assert.equal(evidence?.occupationCode, "OCC0123", "Must map ST apprenticeship to linked OCC record");
 assert.equal(evidence?.duties.length, 3);
 assert.ok(evidence?.summary.includes("workplace improvements"));
-console.log("Explore catalogue and official-source validation passed.");
+const installComponent = readFileSync("components/levytate-explore/ExploreInstallAction.tsx", "utf8");
+const bootstrap = readFileSync("components/levytate-explore/ExplorePwaBootstrap.tsx", "utf8");
+const manifestSource = readFileSync("app/levytate/explore/manifest.webmanifest/route.ts", "utf8");
+assert.match(installComponent, /beforeinstallprompt/, "Android needs native installation prompt support");
+assert.match(installComponent, /Add to Home Screen/, "iPhone needs manual installation guidance");
+assert.match(installComponent, /appinstalled/, "Install success must come from browser confirmation");
+assert.match(bootstrap, /explore-sw\\.js/, "Installable app should register its offline shell");
+assert.match(manifestSource, /display: "standalone"/);
+assert.match(manifestSource, /start_url: "\/explore"/);
+for (const name of ["levytate-192.png", "levytate-512.png", "levytate-maskable-192.png", "levytate-maskable-512.png"]) {
+  assert.ok(existsSync("public/brand/pwa/" + name), "Missing PWA installation icon: " + name);
+}
+console.log("Explore catalogue, official-source and install-shell checks passed.");
