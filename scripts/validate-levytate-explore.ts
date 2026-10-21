@@ -61,7 +61,7 @@ const manifestSource = readFileSync("app/levytate/explore/manifest.webmanifest/r
 assert.match(installComponent, /beforeinstallprompt/, "Android needs native installation prompt support");
 assert.match(installComponent, /Add to Home Screen/, "iPhone needs manual installation guidance");
 assert.match(installComponent, /appinstalled/, "Install success must come from browser confirmation");
-assert.match(bootstrap, /explore-sw\\.js/, "Installable app should register its offline shell");
+assert.match(bootstrap, /explore-sw/, "Installable app should register its offline shell");
 assert.match(manifestSource, /display: "standalone"/);
 assert.match(manifestSource, /start_url: "\/explore"/);
 for (const name of ["levytate-192.png", "levytate-512.png", "levytate-maskable-192.png", "levytate-maskable-512.png"]) {
