@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { FormEvent, useState } from "react";
 import {
   ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, CheckCircle2,
@@ -283,7 +284,7 @@ export function ExploreDetail({ standard }: { standard: ExploreStandard }) {
         <Link href="/explore" className="font-semibold hover:underline">LevyTate Explore</Link> · Independent apprenticeship discovery · <a href="https://skillsengland.education.gov.uk/apprenticeships" target="_blank" rel="noopener noreferrer" className="hover:underline">Official Skills England catalogue</a>
       <div className="mx-auto flex max-w-[1330px] flex-wrap items-center justify-center gap-4 px-5 pb-8 text-[11px] text-[#102c3d]/55">
         <a href="https://occupational-maps.skillsengland.education.gov.uk/public-api/" target="_blank" rel="noopener noreferrer">
-          <img src="https://occupational-maps.skillsengland.education.gov.uk/media/xmehhrr0/skills-england_lesser_arms_stacked-dfe-blue-se-logo.svg?rmode=max&amp;width=500" alt="Skills England" loading="lazy" width="126" height="58" className="w-[126px] rounded-lg bg-white p-2" />
+          <Image unoptimized src="https://occupational-maps.skillsengland.education.gov.uk/media/xmehhrr0/skills-england_lesser_arms_stacked-dfe-blue-se-logo.svg?rmode=max&amp;width=500" alt="Skills England" loading="lazy" width="126" height="58" className="w-[126px] rounded-lg bg-white p-2" />
         </a>
         <span>© Skills England 2025. Source information under the <a href="https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">Open Government Licence v3.0</a>.</span>
       </div>
