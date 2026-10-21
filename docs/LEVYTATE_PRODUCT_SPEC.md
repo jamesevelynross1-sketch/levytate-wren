@@ -111,8 +111,16 @@ whose employer has not purchased LevyTate. It is not a vacancy board, a
 recruitment product, or part of employer tenant records.
 
 - No account or employer licence is required for browsing.
+- The first-release UI is a **simple searchable alphabetical list of official
+  apprenticeship standard names**; not a card marketplace, quiz or pathway form.
+- When a user clicks a name the detail page automatically requests a **live,
+  source-grounded AI De-fluff transformation**, with no extra Generate step.
 - Only currently approved apprenticeship standards should be discoverable.
-- Plain-English De-fluff content must be accurate, sourced and reviewed;
+- An explanation is clearly labelled AI-generated; the original standard is
+  always accessible. Missing verified source data, model access or safe usage
+  allowance must produce an honest unavailable state, never invented content.
+- Plain-English De-fluff content must be constrained to linked official duties
+  and KSB evidence, schema-validated and version-cached to control costs;
   funding and suitability are never guaranteed.
 - Employees may prepare an email draft to a manager without transmitting the
   manager's identity to LevyTate.
