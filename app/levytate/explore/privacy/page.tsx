@@ -43,7 +43,7 @@ export default function ExplorePrivacyPage() {
         <p className="mt-12 text-xs font-bold uppercase tracking-[.2em] text-[#117f70]">LEVYTATE / EXPLORE / PRIVACY</p>
         <h1 className="mt-3 text-[clamp(2.6rem,6vw,4.5rem)] font-semibold leading-[1.05] tracking-[-.065em]">Your curiosity belongs to you.</h1>
         <p className="mt-6 max-w-[700px] text-base leading-8 text-[#102c3d]/65">
-          Explore is free to use, and browsing doesn't create a named employee profile.
+          Explore is free to use, and browsing doesn&apos;t create a named employee profile.
           We only receive the details you explicitly submit when asking our team for help.
         </p>
         <div className="mt-9 flex items-start gap-3 rounded-[18px] border border-[#d6d8ba] bg-[#fff8df] p-5 text-sm leading-7 text-[#6e632e]">
