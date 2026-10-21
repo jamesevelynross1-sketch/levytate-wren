@@ -4,6 +4,12 @@ import { createExploreCatalogue, searchExploreCatalogue } from "../lib/levytate/
 import { normaliseExploreSource } from "../lib/levytate/explore/source-evidence";
 import type { ApprenticeshipStandard } from "../lib/levytate/domain/types";
 import { exploreNarrativeSchema, EXPLORE_NARRATIVE_VERSION } from "../lib/levytate/explore/narrative";
+import { apprenticeshipStandards } from "../lib/levytate/data/mvp/apprenticeship-standards";
+import {
+  SKILLS_ENGLAND_ROUTES, getExploreRouteByName, getExploreRouteBySlug,
+  getExploreRouteGroups, getExploreRouteHref, standardsForExploreRoute,
+  countUncategorisedStandards,
+} from "../lib/levytate/explore/occupational-routes";
 
 function record(code: string, status: string, type = "Apprenticeship standard"): ApprenticeshipStandard {
   return {
@@ -69,15 +75,48 @@ for (const name of ["levytate-192.png", "levytate-512.png", "levytate-maskable-1
   assert.ok(existsSync("public/brand/pwa/" + name), "Missing PWA installation icon: " + name);
 }
 const homeSource = readFileSync("components/levytate-explore/ExploreHome.tsx", "utf8");
+const routeListSource = readFileSync("components/levytate-explore/ExploreRouteStandards.tsx", "utf8");
+const routePageSource = readFileSync("app/levytate/explore/routes/[slug]/page.tsx", "utf8");
 const detailSource = readFileSync("components/levytate-explore/ExploreDetail.tsx", "utf8");
 const explainSource = readFileSync("components/levytate-explore/ExploreAiExplanation.tsx", "utf8");
 const routeSource = readFileSync("app/api/levytate-explore/de-fluff/route.ts", "utf8");
 const generationSource = readFileSync("lib/server/levytate-explore-explain.ts", "utf8");
 const cacheSchema = readFileSync("docs/database/LEVYTATE_EXPLORE_AI_NARRATIVE_CACHE_PROPOSAL.sql", "utf8");
 
-assert.match(homeSource, /Apprenticeship standards/, "Home must be a simple apprenticeship-name list");
-assert.match(homeSource, /standard\.title/, "Each row must display the official programme name");
-assert.doesNotMatch(homeSource, /EXPLORER_INTERESTS|interestScore/, "No interest cards or recommendation funnel in the first version");
+assert.equal(SKILLS_ENGLAND_ROUTES.length, 15, "Use exactly the 15 Skills England occupational routes");
+assert.equal(new Set(SKILLS_ENGLAND_ROUTES.map(r => r.slug)).size, 15, "Routes have stable unique slugs");
+assert.equal(new Set(SKILLS_ENGLAND_ROUTES.map(r => r.name)).size, 15, "Route names are unique");
+for (const route of SKILLS_ENGLAND_ROUTES) {
+  assert.equal(getExploreRouteByName(route.name)?.slug, route.slug, "Every official name must resolve");
+  assert.equal(getExploreRouteBySlug(route.slug)?.name, route.name, "Each route link must resolve");
+  assert.equal(getExploreRouteHref(route), "/explore/routes/" + route.slug);
+}
+assert.equal(getExploreRouteByName("Business  and administration")?.slug, "business-and-administration");
+assert.equal(getExploreRouteByName("Nonexistent occupational route"), null, "Do not fabricate categorisation");
+assert.equal(getExploreRouteBySlug("made-up"), null, "Do not accept fictional route URLs");
+
+const realCatalogue = createExploreCatalogue(apprenticeshipStandards);
+const officialGroups = getExploreRouteGroups(realCatalogue);
+assert.equal(officialGroups.length, 15);
+assert.equal(officialGroups.every(item => item.count > 0), true, "Each official route has options in the source catalogue");
+const totalGrouped = officialGroups.reduce((total, group) => total + group.count, 0);
+assert.equal(totalGrouped + countUncategorisedStandards(realCatalogue), realCatalogue.length, "No active standard is silently lost");
+for (const item of officialGroups) {
+  const standards = standardsForExploreRoute(realCatalogue, item.route.slug);
+  assert.equal(standards.length, item.count, "Route counts equal filtered list length");
+  assert.equal(standards.every(s => getExploreRouteByName(s.route)?.slug === item.route.slug), true);
+  assert.deepEqual(standards.map(s => s.title), [...standards].map(s => s.title).sort((a,b)=>a.localeCompare(b)));
+}
+assert.equal(standardsForExploreRoute(realCatalogue,"unknown").length,0, "Unknown route has no accidental results");
+assert.match(homeSource, /getExploreRouteGroups/, "Home must display government route tiles");
+assert.match(homeSource, /route\.name/, "Tiles use official route names");
+assert.doesNotMatch(homeSource, /visible\.map\(standard|EXPLORER_INTERESTS|interestScore/, "No long apprenticeship directory on the home screen");
+assert.match(routePageSource, /standardsForExploreRoute/, "Route pages must strictly filter the standard catalogue");
+assert.match(routeListSource, /standard\.title/, "Within a route, display the original standard names");
+assert.match(routeListSource, /setSearch|input/, "Route-specific list supports finding standards");
+assert.match(homeSource, /15 official routes/, "Explain route provenance to employees");
+assert.match(explainSource, /Unpacked/, "The public-facing transformation is called Unpacked");
+assert.doesNotMatch(explainSource, />\s*De-fluff\s*</, "Old label must not appear in UI");
 assert.match(detailSource, /ExploreAiExplanation standard=/, "A programme click must open the AI panel automatically");
 assert.match(explainSource, /useEffect\(/, "AI loading must start on the programme detail page");
 assert.match(routeSource, /LEVYTATE_EXPLORE_AI_ENABLED/, "Paid requests must have an explicit server-side release flag");
@@ -95,4 +134,4 @@ assert.equal(exploreNarrativeSchema.safeParse({
   whatToKnowBeforeYouStart: "Your employer needs to support the learning, and eligibility depends on the work available and your existing skills.",
   aConversationStarter: "Could we discuss whether this programme fits our team's needs?",
 }).success, true);
-console.log("Explore catalogue, official-source, on-click AI and install-shell checks passed.");
+console.log("Explore occupational routes (15), catalogue filtering, Unpacked AI, official-source and PWA checks passed.");
