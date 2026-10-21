@@ -103,6 +103,30 @@ Commercial value:
 - Generates strategic workforce pipeline conversations
 - Extends LevyTate beyond current employees into pre-employment talent development
 
+## Public LevyTate Explore
+
+Explore is the public, standalone, employee-led apprenticeship development discovery
+experience. It serves people who are already employed, including individuals
+whose employer has not purchased LevyTate. It is not a vacancy board, a
+recruitment product, or part of employer tenant records.
+
+- No account or employer licence is required for browsing.
+- Only currently approved apprenticeship standards should be discoverable.
+- Plain-English De-fluff content must be accurate, sourced and reviewed;
+  funding and suitability are never guaranteed.
+- Employees may prepare an email draft to a manager without transmitting the
+  manager's identity to LevyTate.
+- An independent explicit opt-in action may send an employee enquiry to
+  MPR/LevyTate. Employer outreach requires a separate agreed step.
+- Public enquiries never bypass the existing authenticated employee application,
+  manager decision or Apprenticeship Lead final approval flow.
+- Commercial routes: provider-paid referral/enrolment fees (MPR) and optional
+  paid employer platform licences (LevyTate). Provider compensation must not
+  influence programme selection, ranking or guidance.
+- Development proceeds on an isolated feature branch, subject to the release
+  gates documented in /docs/LEVYTATE_EXPLORE_V1.md. Public release is not
+  approved simply because the user interface has been implemented.
+
 ## Core User Roles
 
 ### Employee
