@@ -33,6 +33,7 @@ export function ExploreAdminPipeline() {
   const [draft, setDraft] = useState<Editable | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
@@ -68,6 +69,25 @@ export function ExploreAdminPipeline() {
     setDraft(currentForm(item));
     setNotice("");
     setError("");
+  }
+
+  async function retryNotifications() {
+    if (retrying) return;
+    setRetrying(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/levytate-explore/admin/retry-notifications", {
+        method: "POST",
+      });
+      const result = (await response.json()) as { claimed?: number; sent?: number; deferred?: number; message?: string };
+      if (!response.ok) throw new Error(result.message || "Notification retry unavailable.");
+      setNotice("Notification check completed: " + (result.sent || 0) + " sent, " + (result.deferred || 0) + " still awaiting delivery.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Notification retry unavailable.");
+    } finally {
+      setRetrying(false);
+    }
   }
 
   async function save() {
@@ -120,9 +140,14 @@ export function ExploreAdminPipeline() {
               The employee has requested MPR guidance, not authorised unsolicited manager or employer contact.
             </p>
           </div>
+          <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={() => void retryNotifications()} disabled={retrying} className="inline-flex min-h-[44px] items-center gap-2 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white disabled:opacity-50">
+            <RefreshCw size={16} /> {retrying ? "Checking..." : "Retry notifications"}
+          </button>
           <button type="button" onClick={() => void load()} disabled={loading} className="inline-flex min-h-[44px] items-center gap-2 rounded-full border border-[#102c3d]/15 bg-white px-5 text-xs font-semibold disabled:opacity-50">
             <RefreshCw size={16} /> Refresh
           </button>
+          </div>
         </div>
 
         <div className="mt-7 grid grid-cols-2 gap-3 md:grid-cols-4">
