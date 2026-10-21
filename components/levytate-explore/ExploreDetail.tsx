@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { ExploreHeader } from "./ExploreHome";
 import { ExploreAiExplanation } from "./ExploreAiExplanation";
+import { getExploreRouteByName, getExploreRouteHref } from "@/lib/levytate/explore/occupational-routes";
 import type { ExploreStandard } from "@/lib/levytate/explore/catalogue";
 import {
   EXPLORE_GUIDANCE_CONSENT_TEXT, EXPLORE_MANAGER_CONSENT_TEXT,
@@ -163,12 +164,13 @@ function MprContact({ standard, requesterType, enabled }: { standard: ExploreSta
 
 export function ExploreDetail({ standard, managerView = false, enquiriesEnabled = false }: { standard: ExploreStandard; managerView?: boolean; enquiriesEnabled?: boolean }) {
   const [action, setAction] = useState<"manager" | "mpr" | null>(null);
+  const occupationalRoute = getExploreRouteByName(standard.route);
 
   return (
     <>
       <ExploreHeader />
       <main className="mx-auto max-w-[1330px] px-5 pb-20 pt-7 sm:px-9 sm:pt-11">
-        <Link href="/explore" className="inline-flex items-center gap-2 rounded-full py-2 text-sm font-semibold text-[#102c3d]/65 transition hover:text-[#102c3d]"><ArrowLeft size={16} /> All opportunities</Link>
+        <Link href={occupationalRoute ? getExploreRouteHref(occupationalRoute) : "/explore"} className="inline-flex items-center gap-2 rounded-full py-2 text-sm font-semibold text-[#102c3d]/65 transition hover:text-[#102c3d]"><ArrowLeft size={16} /> {occupationalRoute ? "Back to " + occupationalRoute.name : "All occupational routes"}</Link>
         <div className="mt-8 grid items-start gap-9 lg:grid-cols-[minmax(0,1fr)_355px] lg:gap-12">
           <article className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
