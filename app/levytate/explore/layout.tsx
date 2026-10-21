@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { ExplorePwaBootstrap } from "@/components/levytate-explore/ExplorePwaBootstrap";
 
 export const metadata: Metadata = {
   applicationName: "LevyTate Explore",
@@ -13,5 +14,5 @@ export const metadata: Metadata = {
 export const viewport: Viewport = { themeColor: "#102c3d" };
 
 export default function ExploreLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <div className="levytate-explore min-h-screen bg-[#f5f6f2] text-[#102c3d]">{children}</div>;
+  return <div className="levytate-explore min-h-screen bg-[#f5f6f2] text-[#102c3d]"><ExplorePwaBootstrap />{children}</div>;
 }
