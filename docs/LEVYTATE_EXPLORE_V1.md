@@ -6,18 +6,35 @@ Explore is public, employee-led career development **for people already employed
 It is not an apprenticeship vacancy finder, a recruitment agency, or a new
 provider marketplace. Users can browse freely without registration.
 
-The simplified first-release journey is deliberate:
-1. See a searchable alphabetical list of approved apprenticeship **standard names**.
-2. Tap a name. The page automatically requests AI "De-fluff" rewriting of the
-   official Skills England occupational evidence for that standard.
-3. Read one grounded plain-English explanation, or an honest unavailable
-   state if generation or source verification cannot run. The official source
-   always remains available.
-4. Optionally prepare your own email to your line manager, or independently
-   consent to MPR/LevyTate guidance. Nothing is silently sent to employers.
+The simple first-release journey is deliberate:
+1. **Explore official occupational routes.** The landing page shows exactly
+   the 15 Skills England routes as navigable tiles, with their unchanged
+   official route names and a dynamic count of the approved apprenticeships
+   currently mapped to each route.
+2. **Find the standard.** Selecting a route opens only its apprenticeship
+   standards, in an alphabetical list with name search and optional level
+   filter. The URL is shareable and survives a refresh.
+3. **Unpacked.** Selecting a standard opens its own page and automatically
+   requests source-grounded AI **Unpacked** content from Skills England duties
+   and knowledge/skills/behaviours. Do not show an additional Generate button.
+   Repeat views can use the versioned cached explanation. The original
+   official record stays accessible, and unverifiable content fails closed.
+4. **Start a conversation.** The employee may draft an email to their manager,
+   or independently consent to MPR guidance. There is no invisible outreach
+   or employer application.
 
-No quiz, interest-based category cards, provider marketplace or unnecessary
-second "Generate" click appears in this first-release journey.
+Tiles are the government's **15 occupational routes**, not invented interest
+categories. Occupations can also be grouped into pathways and clusters on
+the official occupational maps, but the existing LevyTate catalogue only
+contains authoritative **route** metadata. Do not invent the deeper
+pathway/cluster mapping until it is reliably imported and verified.
+
+"De-fluff" is retained as an internal technical route/cache identifier where
+needed for backwards compatibility. **"Unpacked"** is the public-facing
+feature label with the meaning "The apprenticeship, made human."
+
+No quiz, provider marketplace, AI chatbot or extra Generate click is included
+in this first-release experience.
 
 **True generation vs. caching:** first uncached, verified versions generate
 with AI on demand. Repeat views may show the previously generated explanation,
@@ -40,6 +57,8 @@ Apprenticeship Lead → Enrolment workflow stays authoritative.
 ## Entry points
 
 - Public home: /explore
+- Official route tiles: /explore/routes/digital (and 14 other route pages)
+- Unclassified fallback: /explore/routes/uncategorised (only if any standards lack an official route)
 - Approved programme profile: /explore/st1512 (and other approved standards)
 - Installer manifest: /explore/manifest.webmanifest
 - Manager share perspective: /explore/st1512?audience=manager
@@ -96,6 +115,19 @@ The existing /app route remains employer-authenticated.
 - In the current Preview, clicking a standard will show the automatic loading
   experience followed by a clear disabled/unavailable state until activated.
   We will never falsely label static copy as real-time AI output.
+
+## Government route classification
+
+Source: https://occupational-maps.skillsengland.education.gov.uk/
+Skills England publishes 15 occupational routes. The Explore catalogue uses
+each standard's actual `occupationalRoute` field to select its tile, not AI
+inference. Category names are exact official labels, URL slugs are stable,
+and the count on a tile is recomputed from the currently approved items.
+Unknown categories must never be silently placed in a made-up government route:
+a separate, explicitly marked uncategorised fallback exists if needed.
+
+The July 2026 fallback snapshot contains representatives in every route,
+but it still needs a proper source refresh before a public commercial launch.
 
 ## Skills England licence
 
