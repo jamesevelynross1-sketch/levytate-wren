@@ -12,7 +12,7 @@ import type { ExploreStandard } from "@/lib/levytate/explore/catalogue";
 import {
   UNCATEGORISED_ROUTE_SLUG,
   countUncategorisedStandards, getExploreRouteGroups, getExploreRouteHref,
-  type ExploreRoute, type ExploreRouteGroup,
+  type ExploreRouteGroup,
 } from "@/lib/levytate/explore/occupational-routes";
 
 export function ExploreHeader() {
