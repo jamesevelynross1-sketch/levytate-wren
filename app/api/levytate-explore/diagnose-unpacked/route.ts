@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createExploreCatalogue } from "@/lib/levytate/explore/catalogue";
 import { loadLevyTateStandards } from "@/lib/server/levytate-apprenticeship-standards";
 import { fetchExploreSourceEvidence } from "@/lib/server/levytate-explore-official";
+import { hasExploreGatewayAccess } from "@/lib/server/levytate-explore-generate";
+import { isUnpackedPreviewEnabled } from "@/lib/server/levytate-explore-preview";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,6 +25,8 @@ export async function GET(request: Request) {
     const evidence = await fetchExploreSourceEvidence(code, standard.title);
     return NextResponse.json({
       ok: true, code, occupation: evidence.occupationCode,
+      gatewayIdentityAvailable: hasExploreGatewayAccess(),
+      unpackedPreviewEnabled: isUnpackedPreviewEnabled(),
       productVersion: evidence.apprenticeshipProductVersion,
       summaryLength: evidence.summary.length, duties: evidence.duties.length,
       knowledge: evidence.knowledge.length, skills: evidence.skills.length,
