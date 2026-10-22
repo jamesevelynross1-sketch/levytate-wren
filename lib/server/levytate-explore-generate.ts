@@ -26,9 +26,10 @@ type ChatCompletionResponse = {
  * We use the OpenAI-compatible chat completions endpoint with a strict
  * structured JSON response; no additional SDK dependency is required.
  */
-export function hasExploreGatewayAccess() {
+export function hasExploreGatewayAccess(vercelRequestOidcToken?: string | null) {
   return Boolean(
     process.env.AI_GATEWAY_API_KEY?.trim() ||
+    vercelRequestOidcToken?.trim() ||
     process.env.VERCEL_OIDC_TOKEN?.trim(),
   );
 }
@@ -36,8 +37,12 @@ export function hasExploreGatewayAccess() {
 export async function generateExploreNarrative(
   standard: ExploreStandard,
   source: ExploreSourceEvidence,
+  vercelRequestOidcToken?: string | null,
 ): Promise<ExploreNarrative> {
+  // Vercel functions get fresh OIDC in x-vercel-oidc-token on the Request,
+  // not necessarily in process.env. This token must never be cached as data.
   const token = process.env.AI_GATEWAY_API_KEY?.trim() ||
+    vercelRequestOidcToken?.trim() ||
     process.env.VERCEL_OIDC_TOKEN?.trim();
   if (!token) throw new ExploreGenerationError("not_configured");
 
