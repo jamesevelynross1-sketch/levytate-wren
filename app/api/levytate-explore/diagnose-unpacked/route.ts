@@ -3,7 +3,7 @@ import { createExploreCatalogue } from "@/lib/levytate/explore/catalogue";
 import { loadLevyTateStandards } from "@/lib/server/levytate-apprenticeship-standards";
 import { fetchExploreSourceEvidence } from "@/lib/server/levytate-explore-official";
 import { hasExploreGatewayAccess } from "@/lib/server/levytate-explore-generate";
-import { isUnpackedPreviewEnabled } from "@/lib/server/levytate-explore-preview";
+import { isUnpackedPreviewEnabled, generateUnpackedPreview } from "@/lib/server/levytate-explore-preview";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,6 +22,21 @@ export async function GET(request: Request) {
     });
     const standard = createExploreCatalogue(source.standards).find(s => s.code === code);
     if (!standard) return NextResponse.json({ ok: false, code, reason: "not_in_catalogue" }, { status: 404 });
+    // Temporary single-standard smoke test for the protected Preview only.
+    // No personal information enters the model. Remove after successful QA.
+    if (code === "ST0118" && new URL(request.url).searchParams.get("smoke") === "1") {
+      if (!isUnpackedPreviewEnabled()) {
+        return NextResponse.json({ ok: false, reason: "preview_not_enabled" }, { status: 503 });
+      }
+      const output = await generateUnpackedPreview(standard, request);
+      return NextResponse.json({
+        ok: true, code, model: "openai/gpt-5.4-mini",
+        cached: output.fromCache,
+        occupation: output.occupationCode,
+        generatedAt: output.generatedAt,
+        narrative: output.narrative,
+      }, { headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex" } });
+    }
     const evidence = await fetchExploreSourceEvidence(code, standard.title);
     return NextResponse.json({
       ok: true, code, occupation: evidence.occupationCode,
