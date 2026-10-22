@@ -253,7 +253,7 @@ assert.match(previewSource, /createCachedGenerator\(requestToken\)/,
   "OIDC must be captured outside the cached function arguments");
 assert.doesNotMatch(previewSource, /cachedPreviewNarrative\(standard, evidence, requestToken\)/,
   "Never serialise OIDC in a cache key");
-assert.match(routeSource, /generateUnpackedPreview\(standard\)/, "Use gateway-backed output on isolated Preview");
+assert.match(routeSource, /generateUnpackedPreview\(standard, request\)/, "Use gateway-backed output on isolated Preview");
 assert.match(routeSource, /if \(!previewGeneration\) try/, "Preview cannot silently consume employer rate-limit credentials");
 assert.match(providerSource, /https:\/\/ai-gateway\.vercel\.sh\/v1\/chat\/completions/,
   "Model requests go through Vercel AI Gateway");
