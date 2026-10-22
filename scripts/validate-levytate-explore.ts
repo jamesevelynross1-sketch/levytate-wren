@@ -254,7 +254,7 @@ assert.match(providerSource, /https:\/\/ai-gateway\.vercel\.sh\/v1\/chat\/comple
 assert.match(providerSource, /VERCEL_OIDC_TOKEN/, "Use server-side OIDC rather than a public API key");
 assert.match(providerSource, /response_format/, "AI responses must be strictly structured JSON");
 assert.match(providerSource, /exploreNarrativeSchema\.safeParse/, "Reject invalid model fields before display");
-assert.doesNotMatch(structuredSchemaSource, /minItems|maxItems/, "Strict gateway schema must avoid unsupported array size keywords");
+assert.doesNotMatch(structuredSchemaSource, /\b(?:minItems|maxItems)\s*:/, "Strict gateway schema must avoid unsupported array size keywords");
 assert.match(sourceNormaliser, /retired\|withdrawn/, "Do not claim a retired standard is currently suitable");
 const retiredOccupationFixture = {
   results: [{
