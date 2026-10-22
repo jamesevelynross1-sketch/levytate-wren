@@ -3,7 +3,7 @@ import { unstable_cache } from "next/cache";
 import type { ExploreStandard } from "@/lib/levytate/explore/catalogue";
 import { EXPLORE_NARRATIVE_VERSION, type ExploreNarrative } from "@/lib/levytate/explore/narrative";
 import type { ExploreSourceEvidence } from "@/lib/levytate/explore/source-evidence";
-import { generateExploreNarrative, hasExploreGatewayAccess } from "@/lib/server/levytate-explore-generate";
+import { generateExploreNarrative, hasExploreGatewayAccess, ExploreGenerationError } from "@/lib/server/levytate-explore-generate";
 import { fetchExploreSourceEvidence } from "@/lib/server/levytate-explore-official";
 
 /**
@@ -71,7 +71,7 @@ function createCachedGenerator(vercelRequestOidcToken: string | null) {
 }
 
 export class PreviewUnpackedUnavailable extends Error {
-  constructor(public readonly reason: "not_configured" | "source_unavailable" | "model_unavailable") {
+  constructor(public readonly reason: "not_configured" | "source_unavailable" | "model_unavailable", public readonly diagnostic = "none") {
     super(reason);
     this.name = "PreviewUnpackedUnavailable";
   }
@@ -121,7 +121,10 @@ export async function generateUnpackedPreview(standard: ExploreStandard, request
       ...content,
       fromCache: Date.now() - Date.parse(content.generatedAt) > 10000,
     };
-  } catch {
-    throw new PreviewUnpackedUnavailable("model_unavailable");
+  } catch (error) {
+    const diagnostic = error instanceof ExploreGenerationError
+      ? error.code + (error.httpStatus ? "_http_" + error.httpStatus : "")
+      : error instanceof Error ? "runtime_" + error.name : "unknown_error";
+    throw new PreviewUnpackedUnavailable("model_unavailable", diagnostic);
   }
 }
