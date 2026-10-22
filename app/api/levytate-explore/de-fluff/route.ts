@@ -99,7 +99,7 @@ export async function POST(request: Request) {
 
     if (previewGeneration) {
       // No employee details and no tenant data are involved in generation.
-      const result = await generateUnpackedPreview(standard);
+      const result = await generateUnpackedPreview(standard, request);
       return NextResponse.json({
         state: "ready",
         narrative: result.narrative,
