@@ -184,6 +184,10 @@ assert.match(pathwayPageSource, /unmappedStandardsForPathways/, "Unverified mapp
 assert.match(officialLoaderSource, /\/Routes\//, "Fetch official route structure by routeId");
 assert.match(officialLoaderSource, /occupation\.products/, "Read explicit ST products in the official hierarchy");
 assert.match(officialLoaderSource, /SKILLS_ENGLAND_API_KEY/, "Official API is authenticated server-side only");
+assert.match(officialLoaderSource, /if \(key\) \{[\s\S]*return unavailableExplorePathwayMap\(route, approvedStandards\)/,
+  "Never fall back to 2019 content when a live official API key is configured");
+assert.match(officialLoaderSource, /VERCEL_ENV === "production"/,
+  "Production must never silently use historic 2019 classifications");
 assert.match(routeListSource, /standard\.title/, "Within a route, display the original standard names");
 assert.match(routeListSource, /setSearch|input/, "Route-specific list supports finding standards");
 assert.match(homeSource, /15 official occupational routes/, "Explain route provenance to employees");
