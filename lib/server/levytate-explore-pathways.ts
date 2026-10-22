@@ -63,8 +63,10 @@ async function querySkillsEnglandPathways(
 
 /**
  * Returns only source-backed groupings. No AI classification or fuzzy matching.
- * Existing public browsing remains available without an official API key;
- * Sales has explicitly labelled, historical government map examples only.
+ * If a current API key is configured, NEVER silently substitute a 2019 map
+ * after a transient government outage, a malformed response or a 403.
+ * The old, explicitly labelled 2019 map is retained only for isolated
+ * development previews where no key is configured.
  */
 export async function loadExplorePathways(
   route: ExploreRoute, approvedStandards: ExploreStandard[],
@@ -81,6 +83,16 @@ export async function loadExplorePathways(
         outcome: error instanceof Error ? error.message.slice(0, 50) : "lookup_failed",
       });
     }
+
+    // Fail closed on official mapping when live API access is configured:
+    // preserve the full standards list rather than reverting to 2019.
+    return unavailableExplorePathwayMap(route, approvedStandards);
+  }
+
+  // Historical fixtures exist only to keep isolated development previews
+  // inspectable before obtaining a government API key.
+  if (process.env.VERCEL_ENV === "production") {
+    return unavailableExplorePathwayMap(route, approvedStandards);
   }
   return historicalExplorePathwayMap(route, approvedStandards)
     || unavailableExplorePathwayMap(route, approvedStandards);
