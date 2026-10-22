@@ -233,4 +233,39 @@ assert.match(detailSource, /MprContact standard=\{standard\}/, "Retain the gated
 assert.match(explainSource, /fetch\("\/api\/levytate-explore\/de-fluff"/, "No changes to the existing AI API/activation flow");
 assert.match(homeSource, /levytate-logo-supplied\.png/, "Preserve the original supplied LevyTate artwork");
 
+
+const previewSource = readFileSync("lib/server/levytate-explore-preview.ts", "utf8");
+const providerSource = readFileSync("lib/server/levytate-explore-generate.ts", "utf8");
+const sourceNormaliser = readFileSync("lib/levytate/explore/source-evidence.ts", "utf8");
+const structuredSchemaSource = readFileSync("lib/levytate/explore/narrative.ts", "utf8");
+assert.match(previewSource, /VERCEL_ENV === "preview"/, "AI Gateway preview must never run on Production");
+assert.match(previewSource, /VERCEL_GIT_COMMIT_REF === "feature\/levytate-explore-public-pwa"/,
+  "Only the isolated Explore branch can use Preview generation");
+assert.match(previewSource, /LEVYTATE_EXPLORE_AI_ENABLED === "true"/,
+  "AI billing must remain opt-in via a server-only flag");
+assert.match(previewSource, /unstable_cache/, "Cache versioned model responses in Next/Vercel Data Cache");
+assert.match(previewSource, /createHash/, "Cache fingerprint includes source content");
+assert.match(previewSource, /MAX_NEW_GENERATIONS_PER_INSTANCE_DAY/, "Bound Preview model miss attempts");
+assert.match(previewSource, /hasExploreGatewayAccess/, "Avoid an unconfigured model request");
+assert.match(routeSource, /generateUnpackedPreview\(standard\)/, "Use gateway-backed output on isolated Preview");
+assert.match(routeSource, /if \(!previewGeneration\) try/, "Preview cannot silently consume employer rate-limit credentials");
+assert.match(providerSource, /https:\/\/ai-gateway\.vercel\.sh\/v1\/chat\/completions/,
+  "Model requests go through Vercel AI Gateway");
+assert.match(providerSource, /VERCEL_OIDC_TOKEN/, "Use server-side OIDC rather than a public API key");
+assert.match(providerSource, /response_format/, "AI responses must be strictly structured JSON");
+assert.match(providerSource, /exploreNarrativeSchema\.safeParse/, "Reject invalid model fields before display");
+assert.doesNotMatch(structuredSchemaSource, /minItems|maxItems/, "Strict gateway schema must avoid unsupported array size keywords");
+assert.match(sourceNormaliser, /retired\|withdrawn/, "Do not claim a retired standard is currently suitable");
+const retiredOccupationFixture = {
+  results: [{
+    stdCode: "OCC0118",
+    name: "Data analyst",
+    summary: "The data analyst works with varied data sources and people, discovers insights and explains evidence to business stakeholders and colleagues.",
+    products: [{ productCode: "ST0118", statusName: "Retired" }],
+    duties: [{ dutyDetail: "Explore data" }, { dutyDetail: "Analyse trends" }, { dutyDetail: "Report data" }],
+  }],
+};
+assert.equal(normaliseExploreSource("ST0118", retiredOccupationFixture), null,
+  "Do not generate an active career recommendation from a retired official product");
+
 console.log("Explore route → official pathway → standards, source mapping, Unpacked AI and PWA checks passed.");
