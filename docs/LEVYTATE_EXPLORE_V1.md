@@ -45,9 +45,35 @@ To bridge that gap safely:
   when the approved `SKILLS_ENGLAND_API_KEY` is configured, and the displayed
   grouping replaces the historical subset.
 
-The official API key is **not configured** in the connected Preview environment.
-Therefore full pathway coverage is a **release blocker**, not a finished live
-feature, and no official API calls were made in this change.
+### Live Skills England connection — verified 22 October 2026
+
+- The Skills England key is configured as a Sensitive Preview variable for
+  branch `feature/levytate-explore-public-pwa`. Values must not be logged,
+  exported or committed.
+- A fresh protected Vercel Preview deployment was tested via authenticated
+  page requests. All **15 of 15 occupational routes** rendered pathway
+  names sourced from the live Skills England Occupational Maps API.
+- Sales, marketing and procurement now reports: **Customer service,
+  Marketing, Procurement, Sales and retail**. The Retail-only 2019 archive
+  label has been superseded. Butcher and Fishmonger are in Sales and retail;
+  Funeral director and Funeral team member are in Customer service.
+- The existing July 2026 catalogue contains 575 approved standards. The
+  live map explicitly matched **572**. Three were intentionally retained
+  as pending pathway verification: Poultry worker (ST0389), Creative
+  industries production manager (ST0525) and Buying and merchandising
+  assistant (ST0683). Do not infer placements for these three.
+- Historical May 2019 pathway fixtures remain available only to isolated
+  non-production previews **without** an API key. When the key is present
+  but Skills England fails, the application keeps standards accessible as
+  unclassified rather than silently reverting to 2019. Production does
+  not use the historical fallback.
+- Official tree queries use a six-hour Next.js fetch revalidation period.
+  A live standard/curriculum approval status refresh remains a separate
+  launch task; the July catalogue snapshot is not automatically made current
+  by the Occupational Maps pathway API.
+
+All results above are confirmed in the protected Preview. No Production
+merge, Supabase schema migration or activation of paid Unpacked AI occurred.
 
 **The public name "Unpacked" is confirmed**, with the positioning
 "The apprenticeship, made human." Old `de-fluff` API/cache identifiers
