@@ -3,7 +3,7 @@ import type { ExploreStandard } from "@/lib/levytate/explore/catalogue";
 import type { ExploreSourceEvidence } from "@/lib/levytate/explore/source-evidence";
 
 export class ExploreGenerationError extends Error {
-  constructor(public readonly code: "not_configured" | "provider_unavailable" | "invalid_output") {
+  constructor(public readonly code: "not_configured" | "provider_unavailable" | "invalid_output", public readonly httpStatus?: number) {
     super(code);
     this.name = "ExploreGenerationError";
   }
@@ -124,7 +124,7 @@ export async function generateExploreNarrative(
     // Important for distinguishing malformed schema (400), auth (401),
     // exhausted free Gateway credits (402) and provider errors.
     console.warn("Unpacked Gateway request failed", { status: response.status });
-    throw new ExploreGenerationError("provider_unavailable");
+    throw new ExploreGenerationError("provider_unavailable", response.status);
   }
 
   let result: unknown;
