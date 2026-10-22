@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createExploreCatalogue } from "@/lib/levytate/explore/catalogue";
 import { loadLevyTateStandards } from "@/lib/server/levytate-apprenticeship-standards";
 import { explainExploreStandard, ExploreGenerationUnavailable } from "@/lib/server/levytate-explore-explain";
+import { generateUnpackedPreview, isUnpackedPreviewEnabled, PreviewUnpackedUnavailable } from "@/lib/server/levytate-explore-preview";
 import { getLevyTateRateLimitEnvironment } from "@/lib/server/levytate-auth-rate-limit-config";
 import { networkRateLimitKey, rateLimitKey } from "@/lib/server/levytate-auth-rate-limit";
 import { getLevyTateSupabaseConfig, supabaseFetchJson } from "@/lib/server/levytate-supabase";
@@ -75,7 +76,10 @@ export async function POST(request: Request) {
   const parsed = inputSchema.safeParse(body);
   if (!parsed.success) return reply("Invalid apprenticeship reference.", 400);
 
-  try {
+  const previewGeneration = isUnpackedPreviewEnabled();
+  // The protected, branch-scoped Preview has no employer database credentials.
+  // Public/production operation must use the existing durable rate limiter.
+  if (!previewGeneration) try {
     await enforcePublicRequestLimit(request);
   } catch (error) {
     if (error instanceof ExploreGenerationUnavailable && error.reason === "rate_limited") {
@@ -92,6 +96,24 @@ export async function POST(request: Request) {
     const standard = createExploreCatalogue(payload.standards)
       .find(item => item.code === parsed.data.code.toUpperCase());
     if (!standard) return reply("This apprenticeship is not available for a new application.", 404);
+
+    if (previewGeneration) {
+      // No employee details and no tenant data are involved in generation.
+      const result = await generateUnpackedPreview(standard);
+      return NextResponse.json({
+        state: "ready",
+        narrative: result.narrative,
+        source: {
+          title: standard.title,
+          code: standard.code,
+          version: standard.version,
+          officialUrl: standard.officialUrl,
+          sourceLastVerified: standard.sourceVerified,
+          generatedAt: result.generatedAt,
+          cached: result.fromCache,
+        },
+      }, { headers: responseHeaders });
+    }
 
     const result = await explainExploreStandard(request, standard);
     if (result.kind === "generating") {
@@ -118,6 +140,15 @@ export async function POST(request: Request) {
       },
     }, { headers: responseHeaders });
   } catch (error) {
+    if (error instanceof PreviewUnpackedUnavailable) {
+      if (error.reason === "not_configured") {
+        return reply("Unpacked is not configured for this Preview.", 503, { code: "not_configured" });
+      }
+      if (error.reason === "source_unavailable") {
+        return reply("The official apprenticeship evidence could not be verified. Please refer to the Skills England standard.", 503, { code: "source_unavailable" });
+      }
+      return reply("Unpacked couldn't finish the explanation just now. Please try again.", 503, { code: "generation_unavailable" });
+    }
     if (error instanceof ExploreGenerationUnavailable) {
       if (error.reason === "rate_limited") return reply("The daily AI allowance has been reached. Please try again tomorrow.", 429, { code: "rate_limited" });
       if (error.reason === "source_unavailable") return reply("We cannot verify the full official standard yet, so we won't invent an explanation.", 503, { code: "source_unavailable" });
