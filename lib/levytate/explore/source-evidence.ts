@@ -6,7 +6,7 @@
  *
  * Source: https://occupational-maps-api.skillsengland.education.gov.uk/swagger/
  */
-export type OccupationalProduct = { productCode?: string | null; versionNo?: string | null; name?: string | null };
+export type OccupationalProduct = { productCode?: string | null; versionNo?: string | null; name?: string | null; statusName?: string | null };
 export type OccupationalItem = { detail?: string | null; dutyDetail?: string | null };
 export type OccupationalRecord = {
   stdCode?: string | null;
@@ -77,6 +77,13 @@ export function normaliseExploreSource(code: string, input: OccupationalSearchPa
   if (!match?.stdCode) return null;
 
   const product = match.products?.find(p => p.productCode?.toUpperCase() === reference);
+  // The July 2026 local catalogue contains some records now retired. An
+  // occupation may still exist even when the associated apprenticeship does not.
+  // Never generate a current-development recommendation from a retired or
+  // withdrawn official product.
+  if (product?.statusName && /retired|withdrawn|closed|not approved|replaced/i.test(product.statusName)) {
+    return null;
+  }
   const duties = strings(match.duties, "dutyDetail", 32);
   const knowledge = strings(match.knowledges, "detail", 60);
   const skills = strings(match.skills, "detail", 60);
