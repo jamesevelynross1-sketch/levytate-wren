@@ -1,0 +1,398 @@
+/* LevyTate Explore — October 2026 visual system.
+   Scoped to the public Explore PWA; employer workspace and MPR are unaffected.
+   Editorial typography, uplifting brand accents, clear touch interactions.
+   No external font or image requests. */
+
+.levytate-explore {
+  --ex-ink: #142f3a;
+  --ex-paper: #faf9f5;
+  --ex-lime: #d9f3a1;
+  --ex-mint: #bce8cf;
+  --ex-coral: #fd9e8b;
+  --ex-lilac: #d9d2fa;
+  --ex-sky: #c9e9f9;
+  --ex-stroke: rgba(20, 47, 58, .12);
+  --ex-serif: "Iowan Old Style", "Baskerville", "Palatino Linotype", Georgia, serif;
+  background: var(--ex-paper);
+  color: var(--ex-ink);
+  font-feature-settings: "kern", "liga";
+  min-height: 100vh;
+}
+
+.levytate-explore * { -webkit-tap-highlight-color: transparent; }
+.levytate-explore :where(h1,h2,h3,p,span,a) { overflow-wrap: break-word; }
+.levytate-explore :where(a,button,input,select,textarea,summary):focus-visible {
+  outline: 3px solid #087c68;
+  outline-offset: 3px;
+}
+.levytate-explore ::selection { background: #d9f3a1; color: #142f3a; }
+
+.levytate-explore .explore-header {
+  background: var(--ex-paper);
+  border-bottom: 1px solid var(--ex-stroke);
+  position: relative;
+  z-index: 10;
+}
+.levytate-explore .explore-header-inner { min-height: 80px; }
+.levytate-explore .explore-identifier {
+  font-size: 11px;
+  letter-spacing: .22em;
+  font-weight: 800;
+  color: #1a7163;
+}
+
+.levytate-explore .explore-display {
+  font-weight: 800;
+  letter-spacing: -.068em;
+  line-height: 1.015;
+  text-wrap: balance;
+}
+.levytate-explore .explore-display em {
+  font-family: var(--ex-serif);
+  font-weight: 500;
+  font-style: italic;
+  letter-spacing: -.075em;
+}
+.levytate-explore .explore-eyebrow {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .19em;
+  line-height: 1.6;
+  text-transform: uppercase;
+}
+.levytate-explore .explore-small-marker {
+  display: inline-block;
+  background: #d9f3a1;
+  color: #142f3a;
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .08em;
+}
+
+/* A single memorable editorial anchor, not a second journey. */
+.levytate-explore .explore-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: #142f3a;
+  color: #fff;
+  border-radius: 29px;
+  min-height: 340px;
+  padding: clamp(28px, 5vw, 60px);
+}
+.levytate-explore .explore-hero::before {
+  content: "";
+  position: absolute;
+  right: -95px;
+  top: -140px;
+  width: min(58vw, 600px);
+  height: min(58vw, 600px);
+  min-width: 340px;
+  min-height: 340px;
+  border-radius: 50%;
+  border: clamp(46px, 7vw, 100px) solid rgba(217,243,161,.92);
+  transform: rotate(-24deg);
+  z-index: -1;
+  pointer-events: none;
+}
+.levytate-explore .explore-hero::after {
+  content: "";
+  position: absolute;
+  right: 8%;
+  bottom: -62px;
+  width: 215px;
+  height: 215px;
+  background: var(--ex-coral);
+  clip-path: polygon(0 16%, 90% 0, 100% 75%, 10% 100%);
+  transform: rotate(18deg);
+  opacity: .92;
+  z-index: -1;
+  pointer-events: none;
+}
+.levytate-explore .explore-hero-body { position: relative; z-index: 2; max-width: 720px; }
+.levytate-explore .explore-hero em { color: var(--ex-lime); }
+.levytate-explore .explore-hero-note {
+  display: flex; align-items: center; gap: 9px;
+  width: fit-content; max-width: 100%;
+  font-size: 12px; font-weight: 650;
+  letter-spacing: .01em;
+  border: 1px solid rgba(255,255,255,.27);
+  border-radius: 999px;
+  padding: 9px 14px;
+  background: rgba(255,255,255,.06);
+}
+
+/* Structural labels help scanning without adding an onboarding flow. */
+.levytate-explore .explore-section-lead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--ex-stroke);
+  padding-bottom: 20px;
+}
+.levytate-explore .explore-section-lead h2 {
+  font-size: clamp(25px, 3.3vw, 37px);
+  font-weight: 800;
+  letter-spacing: -.055em;
+  line-height: 1.08;
+}
+.levytate-explore .explore-route-grid { gap: 13px; }
+
+/* Keep every tile a single link, with strong visual individuality. */
+.levytate-explore .explore-route-card {
+  --tile-bg: #e8f0e9;
+  --tile-ink: #142f3a;
+  --tile-accent: #147765;
+  background: var(--tile-bg);
+  color: var(--tile-ink);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid rgba(20,47,58,.07);
+  border-radius: 23px;
+  padding: 24px;
+  min-height: 252px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: transform 220ms cubic-bezier(.18,.84,.24,1), box-shadow 220ms ease, border-color 220ms;
+}
+.levytate-explore .explore-route-card::after {
+  content: "";
+  position: absolute;
+  top: -84px;
+  right: -71px;
+  width: 215px; height: 215px;
+  border: 39px solid var(--tile-accent);
+  border-radius: 999px;
+  opacity: .09;
+  z-index: -1;
+  transition: transform 300ms cubic-bezier(.2,.8,.2,1);
+  pointer-events: none;
+}
+.levytate-explore .explore-route-card:hover,
+.levytate-explore .explore-route-card:focus-visible {
+  transform: translateY(-3px);
+  border-color: rgba(20,47,58,.24);
+  box-shadow: 0 18px 35px rgba(20,47,58,.11);
+}
+.levytate-explore .explore-route-card:hover::after,
+.levytate-explore .explore-route-card:focus-visible::after {
+  transform: scale(1.13) translateX(-9px) translateY(9px);
+}
+.levytate-explore .explore-route-number {
+  font-size: 12px;
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .14em;
+  color: var(--tile-accent);
+}
+.levytate-explore .explore-route-icon {
+  width: 49px; height: 49px; flex: 0 0 auto;
+  display: grid; place-items: center;
+  color: var(--tile-ink);
+  border: 1px solid rgba(20,47,58,.12);
+  border-radius: 14px;
+  background: rgba(255,255,255,.37);
+}
+.levytate-explore .explore-route-title {
+  max-width: 290px;
+  font-size: clamp(21px, 2.5vw, 27px);
+  letter-spacing: -.055em;
+  font-weight: 780;
+  line-height: 1.14;
+  text-wrap: balance;
+  color: var(--tile-ink);
+}
+.levytate-explore .explore-route-description {
+  color: rgba(20,47,58,.68);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.levytate-explore .explore-route-bottom {
+  border-top: 1px solid rgba(20,47,58,.13);
+  padding-top: 15px;
+  margin-top: 18px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; flex-wrap: wrap;
+  font-size: 12px;
+}
+.levytate-explore .explore-route-arrow {
+  background: var(--tile-ink);
+  color: white;
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  flex: 0 0 auto;
+  transition: transform 220ms ease;
+}
+.levytate-explore .explore-route-card:hover .explore-route-arrow { transform: rotate(-45deg); }
+
+/* Route and pathway pages use the same editorial language. */
+.levytate-explore .explore-interior-hero {
+  background: var(--ex-lilac);
+  border-radius: 25px;
+  padding: clamp(26px,4.2vw,48px);
+  position: relative; overflow: hidden; isolation: isolate;
+}
+.levytate-explore .explore-interior-hero::after {
+  content: ""; position: absolute; right: -73px; bottom: -145px;
+  width: 295px; height: 295px;
+  border: 55px solid rgba(20,47,58,.11);
+  border-radius: 50%; z-index: -1; pointer-events:none;
+}
+.levytate-explore .explore-pathway-grid { gap: 13px; }
+.levytate-explore .explore-pathway-card {
+  position: relative; isolation: isolate; overflow: hidden;
+  border-radius: 23px; padding: 25px;
+  min-height: 224px;
+  border: 1px solid rgba(20,47,58,.1);
+  transition: transform 220ms ease, box-shadow 220ms ease;
+}
+.levytate-explore .explore-pathway-card::after {
+  content: ""; position: absolute; width: 175px; height: 175px;
+  border: 30px solid rgba(20,47,58,.09); right: -53px; top: -87px;
+  transform: rotate(34deg); border-radius: 50%; pointer-events:none;
+}
+.levytate-explore .explore-pathway-card:hover,
+.levytate-explore .explore-pathway-card:focus-visible {
+  transform: translateY(-3px);
+  box-shadow: 0 17px 32px rgba(20,47,58,.1);
+}
+.levytate-explore .explore-pathway-title {
+  font-size: clamp(23px,3.3vw,30px);
+  letter-spacing: -.055em;
+  line-height: 1.14; font-weight: 800;
+}
+
+/* Standards pages are deliberately compact and easy to browse. */
+.levytate-explore .explore-directory-hero {
+  background: #ccead9;
+  border-radius: 24px; padding: clamp(25px,4.2vw,45px);
+  position: relative; isolation: isolate; overflow: hidden;
+}
+.levytate-explore .explore-directory-hero::before {
+  content:""; position:absolute; right:-42px; top:-115px;
+  width:280px; height:280px;
+  border:46px solid rgba(20,47,58,.09);
+  border-radius:50%; z-index:-1;
+}
+.levytate-explore .explore-directory-list {
+  border: 1px solid rgba(20,47,58,.12);
+  border-radius: 18px;
+  background: white;
+  overflow: hidden;
+}
+.levytate-explore .explore-directory-row {
+  min-height: 78px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 17px 20px;
+  transition: background 140ms, padding-left 180ms;
+}
+.levytate-explore .explore-directory-row:hover,
+.levytate-explore .explore-directory-row:focus-visible {
+  background: #f0f6ee;
+  padding-left: 25px;
+}
+.levytate-explore .explore-directory-row span:first-child > span:first-child {
+  font-size: 16px; font-weight: 750; letter-spacing: -.025em;
+}
+.levytate-explore .explore-search-box {
+  background: #fff; border: 1.5px solid rgba(20,47,58,.19);
+  border-radius: 14px; min-height: 55px;
+}
+.levytate-explore .explore-search-box:focus-within {
+  border-color: #116d5d;
+  box-shadow: 0 0 0 3px rgba(17,109,93,.13);
+}
+
+/* Unpacked detail view: vibrant on the page, conservative in the evidence. */
+.levytate-explore .explore-detail-hero {
+  background: #e5e0ff;
+  border-radius: 25px;
+  padding: clamp(23px,3.7vw,38px);
+  position: relative; isolation: isolate; overflow: hidden;
+}
+.levytate-explore .explore-detail-hero::before {
+  content:""; position:absolute; width:235px; height:235px;
+  border:46px solid rgba(126,89,189,.13); border-radius:50%;
+  right:-90px; top:-95px; pointer-events:none; z-index:-1;
+}
+.levytate-explore .explore-action-panel {
+  border: 1px solid rgba(20,47,58,.16);
+  border-radius: 23px; overflow:hidden;
+  background: #fff; box-shadow: 0 15px 40px rgba(20,47,58,.075);
+}
+.levytate-explore .explore-action-panel-heading {
+  background: #142f3a;
+  color: #fff;
+  padding: 25px;
+}
+.levytate-explore .explore-action-panel-heading h2 {
+  font-size: 26px; letter-spacing: -.05em; line-height: 1.13; font-weight: 800;
+}
+.levytate-explore .explore-action-panel-heading .explore-action-accent {
+  display: inline-block; width: 54px; height: 7px; border-radius:5px;
+  background: var(--ex-lime);
+  transform: rotate(-7deg); margin: 12px 0 8px;
+}
+.levytate-explore .explore-contact-choice {
+  min-height: 84px;
+  border: 1px solid rgba(20,47,58,.15);
+  border-radius: 15px; background: #fff;
+  text-align: left; padding: 17px; width:100%;
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  transition: background 160ms, border-color 160ms, transform 160ms;
+}
+.levytate-explore .explore-contact-choice:hover,
+.levytate-explore .explore-contact-choice:focus-visible {
+  border-color:#1b7e67; background: #eff9ec; transform:translateY(-1px);
+}
+.levytate-explore .explore-unpacked-heading { letter-spacing:-.045em; }
+.levytate-explore .explore-unpacked-hero {
+  background: #e4f1d0;
+  border-radius: 21px; position:relative; overflow:hidden;
+}
+.levytate-explore .explore-unpacked-hero::after {
+  content:""; position:absolute; width:140px; height:140px;
+  right:-46px; top:-62px; border:28px solid rgba(20,47,58,.075);
+  border-radius:50%; pointer-events:none;
+}
+
+.levytate-explore .explore-soft-stamp {
+  display:inline-flex; align-items:center; justify-content:center; gap:7px;
+  border: 1px solid var(--ex-stroke); border-radius:999px;
+  padding:8px 13px; font-size:11px; font-weight:720;
+  letter-spacing:.04em;
+}
+.levytate-explore .explore-editorial-note {
+  font-size:12px; line-height:1.7; color:rgba(20,47,58,.65);
+}
+
+@media (max-width: 700px) {
+  .levytate-explore .explore-hero { min-height: 365px; padding: 28px 24px 38px; }
+  .levytate-explore .explore-hero::before {
+    width: 280px; height: 280px; min-width:0; min-height:0;
+    right:-168px; top:-74px; border-width:57px; opacity:.55;
+  }
+  .levytate-explore .explore-hero::after { right:-35px; bottom:-90px; width:170px;height:170px;opacity:.65; }
+  .levytate-explore .explore-route-card { min-height: 224px; }
+  .levytate-explore .explore-pathway-card { min-height: 202px; }
+  .levytate-explore .explore-route-title { max-width: 310px; }
+  .levytate-explore .explore-interior-hero,
+  .levytate-explore .explore-directory-hero,
+  .levytate-explore .explore-detail-hero { border-radius: 21px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .levytate-explore :where(*, *::before, *::after) {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior:auto !important;
+    transition-duration: .01ms !important;
+    transform:none !important;
+  }
+}

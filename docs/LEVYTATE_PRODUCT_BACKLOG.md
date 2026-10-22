@@ -1,5 +1,35 @@
 # LevyTate Product Backlog
 
+## LevyTate Explore — Public employee-led acquisition
+
+Status: Isolated Preview development; **not approved for public release**.
+
+Purpose: Display the **15 government-defined Skills England occupational
+routes as tiles**, followed by the official occupational **pathways** within
+each route. Selecting a pathway displays only its verified, approved
+apprenticeship standards. Unknown mappings remain explicitly visible without
+inventing classifications. Selecting a standard automatically invokes
+source-grounded AI **Unpacked** (with honest fallback if unavailable).
+Employees can then initiate their own manager conversation. Separately consented
+MPR guidance requests generate potential provider-funded enrolments or employer
+licences.
+
+Engineering: version-aware narrative cache, exact official ST↔OCC product
+mapping, structured response validation, strict daily API budgets, and feature
+gating. Source/cache SQL remains a proposal until reviewed migration and test
+evidence exist; **AI calls remain disabled in the current Preview**.
+
+Prerequisites for release:
+- Updated Skills England API source/version and full catalogue content review
+- Durable MPR lead/outbox, private triage and consent/retention controls
+- Legal/privacy review, approved rate limits and abuse protection
+- Isolated functional, accessibility, PWA, performance and security testing
+- Successful protected Preview build and deployment verification
+
+See docs/LEVYTATE_EXPLORE_V1.md for the delivery and quality gates.
+
+---
+
 ## Priority 1 - Core Commercial Features
 
 ### LevyTate Copilot

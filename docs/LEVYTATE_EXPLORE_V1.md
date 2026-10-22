@@ -1,0 +1,250 @@
+# LevyTate Explore — public app: implementation and release gates
+
+## Product decision
+
+Explore is public, employee-led career development **for people already employed**.
+It is not an apprenticeship vacancy finder, a recruitment agency, or a new
+provider marketplace. Users can browse freely without registration.
+
+The simple first-release journey is deliberate:
+1. **Explore official occupational routes.** The homepage presents the
+   15 Skills England routes with counts of approved apprenticeship standards.
+2. **Choose a pathway.** A route opens its government **pathways** as tiles.
+   Pathway membership must come from Skills England's actual Route → Pathway →
+   ClusterGroup → Cluster → Occupation (OCC) → Apprenticeship (ST) product
+   hierarchy. Never infer an official pathway from a title or generic LLM.
+   When mapping is not yet connected, preserve access to the route's full
+   standard list and clearly distinguish unverified/unmapped programmes.
+3. **Find a standard.** A pathway opens its approved standards in an
+   alphabetical list with name search and optional level filter. Returning
+   from Unpacked preserves the pathway where possible.
+4. **Unpacked.** Selecting a standard automatically requests source-grounded
+   AI explanation from official Skills England duties and KSBs. The original
+   record remains accessible and unverifiable AI content fails closed.
+5. **Start a conversation.** The employee may draft an email to their manager
+   or independently consent to MPR guidance. There is no invisible outreach
+   or employer application.
+
+The first 15 tiles are the government's **routes**, and the next set are its
+**pathways**, not AI-generated clusters or inferred categories. The original
+July 2026 LevyTate standards catalogue contains route metadata only.
+To bridge that gap safely:
+- `lib/server/levytate-explore-pathways.ts` uses the documented official
+  `GET /api/v1/Routes` to resolve the route ID, then
+  `GET /api/v1/Routes/{id}?expand=occupation.products` and a strict ST-code
+  join against the approved standard catalogue. Server-only key required.
+- The historical government **May 2019** Sales, marketing and procurement map
+  provides an explicitly labelled Preview-only four-pathway seed:
+  Customer Service, Marketing, Procurement and Retail. This was validated
+  against the archived official 2019 map; it is not represented as current.
+- Without verified data for another route, show "pathways not yet connected"
+  and keep its standards discoverable rather than inventing assignments.
+- Newly introduced or unverified standards remain available under a separate
+  "Awaiting pathway verification" link. No active standard is silently lost.
+- Cached live government route requests are refreshed at most every 12 hours
+  when the approved `SKILLS_ENGLAND_API_KEY` is configured, and the displayed
+  grouping replaces the historical subset.
+
+### Live Skills England connection — verified 22 October 2026
+
+- The Skills England key is configured as a Sensitive Preview variable for
+  branch `feature/levytate-explore-public-pwa`. Values must not be logged,
+  exported or committed.
+- A fresh protected Vercel Preview deployment was tested via authenticated
+  page requests. All **15 of 15 occupational routes** rendered pathway
+  names sourced from the live Skills England Occupational Maps API.
+- Sales, marketing and procurement now reports: **Customer service,
+  Marketing, Procurement, Sales and retail**. The Retail-only 2019 archive
+  label has been superseded. Butcher and Fishmonger are in Sales and retail;
+  Funeral director and Funeral team member are in Customer service.
+- The existing July 2026 catalogue contains 575 approved standards. The
+  live map explicitly matched **572**. Three were intentionally retained
+  as pending pathway verification: Poultry worker (ST0389), Creative
+  industries production manager (ST0525) and Buying and merchandising
+  assistant (ST0683). Do not infer placements for these three.
+- Historical May 2019 pathway fixtures remain available only to isolated
+  non-production previews **without** an API key. When the key is present
+  but Skills England fails, the application keeps standards accessible as
+  unclassified rather than silently reverting to 2019. Production does
+  not use the historical fallback.
+- Official tree queries use a six-hour Next.js fetch revalidation period.
+  A live standard/curriculum approval status refresh remains a separate
+  launch task; the July catalogue snapshot is not automatically made current
+  by the Occupational Maps pathway API.
+
+All results above are confirmed in the protected Preview. No Production
+merge, Supabase schema migration or activation of paid Unpacked AI occurred.
+
+**The public name "Unpacked" is confirmed**, with the positioning
+"The apprenticeship, made human." Old `de-fluff` API/cache identifiers
+remain temporarily for backwards compatibility but are not UI labels.
+
+"De-fluff" is retained as an internal technical route/cache identifier where
+needed for backwards compatibility. **"Unpacked"** is the public-facing
+feature label with the meaning "The apprenticeship, made human."
+
+No quiz, provider marketplace, AI chatbot or extra Generate click is included
+in this first-release experience.
+
+**True generation vs. caching:** first uncached, verified versions generate
+with AI on demand. Repeat views may show the previously generated explanation,
+with transparent labelling and no additional token charge. Cache freshness is
+checked at least weekly against the official source.
+
+The public request is **not** an employer's formal application or an approval.
+The authenticated platform's existing Employee → Line Manager →
+Apprenticeship Lead → Enrolment workflow stays authoritative.
+
+## Two revenue routes
+
+- MPR earns separately negotiated provider-paid commercial introduction /
+  successful enrolment fees where an enrolment is achieved. Using Explore costs
+  neither employee nor employer. Commercial provider relationships must be
+  disclosed and never affect standards listing or content.
+- Qualified employers can separately choose a paid LevyTate employer licence.
+  Qualification and employer outreach must be permission-based.
+
+## Entry points
+
+- Public home: /explore
+- Official route tiles: /explore/routes/digital (and 14 other route pages)
+- Verified pathway pages: /explore/routes/sales-marketing-and-procurement/pathways/retail
+- Explicit unmapped fallback: /explore/routes/sales-marketing-and-procurement/pathways/unmapped
+- Unclassified fallback: /explore/routes/uncategorised (only if any standards lack an official route)
+- Approved programme profile: /explore/st1512 (and other approved standards)
+- Installer manifest: /explore/manifest.webmanifest
+- Manager share perspective: /explore/st1512?audience=manager
+- Public privacy preview: /explore/privacy
+- Opt-in employee/manager contact: POST /api/levytate-explore/interest
+- Private beta-admin pipeline: /explore/internal
+- Private pipeline API: /api/levytate-explore/admin/enquiries
+- Official evidence inspector (admin only): /api/levytate-explore/admin/evidence/ST1512
+- Secured retry worker: /api/cron/levytate-explore-notifications
+
+Public paths are rewritten to the existing standalone LevyTate application
+shell on levytate.co.uk and isolated Preview hosts; do not inherit MPR SiteChrome.
+The existing /app route remains employer-authenticated.
+
+## Data quality
+
+- Reuse read-only approved standards data from LevyTate's database, with fallback
+  to the generated Skills England catalogue.
+- The fallback was last verified on 2026-07-02 and may now be stale.
+- Explicitly exclude withdrawn, paused, retired, in-development, and
+  apprenticeship units from searchable approved apprenticeship standards.
+- ST1512 (AI and automation practitioner, v2.1, L4, 18 months) is an
+  editorially sourced addition confirmed via its official Skills England page
+  on 2026-10-21. It does not mutate employer catalogue data.
+- The initial eight hand-written editorial examples remain in the repository as
+  prior examples but are **no longer presented as the generated experience**.
+  Real user-facing De-fluff output is requested on click, using the government
+  evidence and strict validation before publication.
+- If official KSB grounding, model access or budget is unavailable, show the
+  official source with a clear explanation, never a fabricated transformation.
+- The official standard and its verification date are always accessible.
+
+## AI transformation — feature-gated until approved
+
+- `POST /api/levytate-explore/de-fluff` accepts an ST reference only, never
+  an employee name, personalised prompt or employer-private material.
+- The source adapter requests Skills England occupational summary, duties and
+  KSBs, and rejects records without a matching ST-linked productCode.
+- The structured OpenAI Responses output is schema-checked before display;
+  it must not promise qualifications, promotions or funding.
+- `LEVYTATE_EXPLORE_AI_ENABLED=true`, a server-side `OPENAI_API_KEY`, a
+  `SKILLS_ENGLAND_API_KEY`, a correctly configured Supabase Preview store and
+  distributed abuse limits are all required. The flag is **off by default**.
+- Versioned cache and atomic claim RPCs are prepared as a SQL proposal at
+  `docs/database/LEVYTATE_EXPLORE_AI_NARRATIVE_CACHE_PROPOSAL.sql`.
+  It is **not applied** or Production-ready; convert it into a reviewed formal
+  migration and test first.
+- Generation is capped at 5 new programmes per network per day and 20 globally
+  per environment per day; repeat cached views don't incur model charges.
+  Public request limits also protect the official API.
+- A free-to-install PWA does **not** make live model usage free. We must set up
+  billing, a suitable small-model configuration and cost monitoring only with
+  explicit owner approval. No paid model calls have been made by this change.
+- In the current Preview, clicking a standard will show the automatic loading
+  experience followed by a clear disabled/unavailable state until activated.
+  We will never falsely label static copy as real-time AI output.
+
+## Government route classification
+
+Source: https://occupational-maps.skillsengland.education.gov.uk/
+Skills England publishes 15 occupational routes. The Explore catalogue uses
+each standard's actual `occupationalRoute` field to select its tile, not AI
+inference. Category names are exact official labels, URL slugs are stable,
+and the count on a tile is recomputed from the currently approved items.
+Unknown categories must never be silently placed in a made-up government route:
+a separate, explicitly marked uncategorised fallback exists if needed.
+
+The July 2026 fallback snapshot contains representatives in every route,
+but it still needs a proper source refresh before a public commercial launch.
+
+The public Occupational Maps API is key-protected and licensed under the OGL.
+Relevant API schema: https://occupational-maps-api.skillsengland.education.gov.uk/swagger/v1.0/swagger.json
+Do not copy employee data into the government query. This work adds no database
+migrations and does not activate paid AI generation or public enquiries.
+
+## Skills England licence
+
+The public occupational API requires an API key, the Skills England logo,
+attribution, and OGL licence compliance. For a production automated ingestion
+pipeline request approved X-API-KEY access and sync occupation summary/duties/KSB
+with mapping to apprenticeship standard/reference/version. Refresh regularly;
+use source version, editorial approval state and a dated correction trail.
+Source: https://occupational-maps.skillsengland.education.gov.uk/public-api/
+
+## Consent, security, anti-abuse
+
+- Browsing, search and opening programme pages require no identity.
+- Manager email is prepared as a mailto: draft client-side; manager address and
+  text are not transmitted to LevyTate.
+- Independently consented employee or manager enquiries post only the named requester's details to MPR. A manager share link does not itself identify the employee.
+- Do not contact managers or employers just because an employee enquires.
+- No public browser access to Supabase service role. Server validates input,
+  origin, length, active standard and persisted rate-limit quotas and fails
+  closed when the backing security controls are unavailable.
+- There is no automatic conversion to a tenant employee application or
+  bypass of manager/Apprenticeship Lead permissions.
+
+## Durable pipeline implemented on the branch — not activated
+
+- Staged migration 040 creates an isolated private enquiry register, audit trail, and retryable notification outbox with atomic leasing.
+- Public submissions are persisted before acknowledgement, deduplicated per requester/standard/day and environment, and protected by existing distributed rate-limit controls.
+- The server notifies MPR through Resend and retries failures from a protected daily worker; there is no email-only fallback if durable storage is absent.
+- Internal beta-admin only dashboard captures status, notes, and the provider-referral versus LevyTate-licence revenue route. No public lead is added to employer tenant records.
+- Employee-to-manager sharing is an email draft controlled by the employee. The recipient sees a manager-specific programme view and can independently consent to MPR contact.
+- Separate consent copy and version history exists for employee and manager enquiries.
+- A public Explore privacy page is a Preview draft only and requires formal legal approval.
+- The catalogue uses Skills England source metadata. Eight editorial De-fluff guides are available; other standards show honest official-only content until verified.
+- Package builds run the automatic Explore catalogue validation and OCC-to-ST source-link tests first.
+- Server-only source evidence retrieval supports Skills England's SearchOccupations endpoint when SKILLS_ENGLAND_API_KEY is configured. It verifies an exact productCode association between ST apprenticeship and OCC occupation before returning summaries, duties or knowledge/skills/behaviours. It never automatically publishes AI copy.
+
+**Public submission release switch:** `LEVYTATE_EXPLORE_SUBMISSIONS_ENABLED=true`
+is required in the specific approved environment before the contact form is
+visible and POST requests are accepted. It MUST stay absent/false on the
+current Preview and Production until the isolated lead store is migrated,
+verified and the separate public privacy notice is legally approved.
+The manager email draft and programme discovery remain available.
+
+**Migration 040 remains unapplied.** The connected Supabase workspace exposed to this session is not confirmed to be the correct live LevyTate database. Consequently, Preview submission must fail closed rather than storing personal data in an unverified project.
+
+## Public-release acceptance gates
+
+1. Verify the exact isolated Preview Supabase project, complete backup/restore exercise, review then apply migration 040 there only. Confirm service-role RPCs, denied anon/authenticated access, no tenant leakage, deduplication, outbox concurrency and environment scoping.
+2. Test public enquiry POSTs (employee and manager), forged origin, spam, duplicates, no DB, no email, user cancellation and accessibility with synthetic identities.
+3. Confirm verified Resend sender and notification destination plus CRON_SECRET in the correct environment; prove retry without duplicate email.
+4. Verify beta-admin-only list/update and deny employer-role access. Exercise simultaneous operator updates, audit events and privacy requests.
+5. Request Skills England API key, set SKILLS_ENGLAND_API_KEY only in protected server environments, validate the SearchOccupations productCode mapping, refresh the July 2026 fallback and expand human-reviewed De-fluff coverage. No automatic public AI writing is approved.
+6. Approve separate Explore controller privacy notice, lawful basis, company details, retention schedule, deleted-lead procedures, provider disclosure, employer outreach policy and any international processing safeguards.
+7. Test actual iOS/Android installation, keyboard/screen-reader accessibility, forms, focus, contrast and mobile performance.
+8. Rebuild, review and security-test the exact release commit. Obtain approval before merging or promoting Production.
+
+## Future iteration
+
+Expand editorial coverage via a source-grounded content pipeline; add a secure
+saved-pathway account; optional employee-approved manager conversations; handle
+relationship management from first enquiry to provider-paid enrolment or
+LevyTate employer subscription. Validate pipeline economics using qualified
+manager conversations and conversion, not installs.

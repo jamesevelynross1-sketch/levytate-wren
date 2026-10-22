@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "npm run validate:explore && next build",
     "build:pwa-assets": "node scripts/build-levytate-pwa-assets.mjs",
     "package:microsoft-copilot": "node scripts/build-levytate-microsoft-copilot-package.mjs",
     "start": "next start",
@@ -31,7 +31,8 @@
     "validate:demo-role-switcher": "node scripts/validate-demo-role-switcher.mjs",
     "validate:demo-role-switcher-live": "node scripts/validate-demo-role-switcher-live.mjs",
     "validate:assessments:live": "node --env-file=.env.local --import tsx scripts/validate-workforce-assessments-live.ts",
-    "lint": "node --max-old-space-size=4096 node_modules/eslint/bin/eslint.js app/layout.tsx app/page.tsx app/stocks app/api/stocks components/stocks components/layout/SiteChrome.tsx components/ui/SectionEyebrow.tsx components/brand/Logo.tsx components/sections/TrustBandLocal.tsx lib/stocks next.config.ts tailwind.config.ts"
+    "lint": "node --max-old-space-size=4096 node_modules/eslint/bin/eslint.js app/layout.tsx app/page.tsx app/stocks app/api/stocks components/stocks components/layout/SiteChrome.tsx components/ui/SectionEyebrow.tsx components/brand/Logo.tsx components/sections/TrustBandLocal.tsx lib/stocks next.config.ts tailwind.config.ts",
+    "validate:explore": "node --import tsx scripts/validate-levytate-explore.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.3.1",

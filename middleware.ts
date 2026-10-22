@@ -27,6 +27,17 @@ export async function middleware(request: NextRequest) {
       : levyTateMcpStagingNotFound();
   }
 
+  // Public Explore lives at /explore on both LevyTate and isolated Preview hosts.
+  // Route it through the existing standalone LevyTate shell, never the MPR SiteChrome.
+  if (request.nextUrl.pathname === "/explore" || request.nextUrl.pathname.startsWith("/explore/")) {
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-levytate-route", "1");
+    return NextResponse.rewrite(
+      new URL("/levytate" + request.nextUrl.pathname, request.url),
+      { request: { headers: requestHeaders } },
+    );
+  }
+
   if (!isLevyTateHost(request)) {
     if (request.nextUrl.pathname === "/levytate" || request.nextUrl.pathname.startsWith("/levytate/")) {
       const requestHeaders = new Headers(request.headers);
