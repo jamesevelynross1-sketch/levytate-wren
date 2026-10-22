@@ -25,7 +25,7 @@ export async function GET(request: Request) {
     const evidence = await fetchExploreSourceEvidence(code, standard.title);
     return NextResponse.json({
       ok: true, code, occupation: evidence.occupationCode,
-      gatewayIdentityAvailable: hasExploreGatewayAccess(),
+      gatewayIdentityAvailable: hasExploreGatewayAccess(request.headers.get("x-vercel-oidc-token")),
       unpackedPreviewEnabled: isUnpackedPreviewEnabled(),
       productVersion: evidence.apprenticeshipProductVersion,
       summaryLength: evidence.summary.length, duties: evidence.duties.length,
