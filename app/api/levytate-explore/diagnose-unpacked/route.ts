@@ -51,7 +51,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       ok: false, code,
       reason: error instanceof Error ? error.name : "source_unavailable",
-      detail: error instanceof Error && "reason" in error ? String(error.reason) : "unavailable",
+      detail: error instanceof Error && "diagnostic" in error ? String(error.diagnostic) : (error instanceof Error && "reason" in error ? String(error.reason) : "unavailable"),
     }, { status: 502, headers: { "Cache-Control": "no-store" } });
   }
 }
