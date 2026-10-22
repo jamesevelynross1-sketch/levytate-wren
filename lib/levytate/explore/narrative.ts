@@ -18,14 +18,16 @@ export const exploreNarrativeSchema = z.object({
 
 export type ExploreNarrative = z.infer<typeof exploreNarrativeSchema>;
 
+// AI Gateway's strict structured-output subset does not accept minItems/maxItems.
+// Enforce the exact counts using the Zod schema before showing any content.
 export const EXPLORE_NARRATIVE_JSON_SCHEMA = {
   type: "object",
   additionalProperties: false,
   properties: {
     headline: { type: "string" },
     introduction: { type: "string" },
-    whatYouWillLearn: { type: "array", items: { type: "string" }, minItems: 4, maxItems: 4 },
-    whatThisCouldLookLikeAtWork: { type: "array", items: { type: "string" }, minItems: 3, maxItems: 3 },
+    whatYouWillLearn: { type: "array", items: { type: "string" } },
+    whatThisCouldLookLikeAtWork: { type: "array", items: { type: "string" } },
     whoItMightSuit: { type: "string" },
     whatToKnowBeforeYouStart: { type: "string" },
     aConversationStarter: { type: "string" },
