@@ -247,6 +247,12 @@ assert.match(previewSource, /unstable_cache/, "Cache versioned model responses i
 assert.match(previewSource, /createHash/, "Cache fingerprint includes source content");
 assert.match(previewSource, /MAX_NEW_GENERATIONS_PER_INSTANCE_DAY/, "Bound Preview model miss attempts");
 assert.match(previewSource, /hasExploreGatewayAccess/, "Avoid an unconfigured model request");
+assert.match(previewSource, /request\.headers\.get\("x-vercel-oidc-token"\)/,
+  "Vercel OIDC must be read from the function Request at runtime");
+assert.match(previewSource, /createCachedGenerator\(requestToken\)/,
+  "OIDC must be captured outside the cached function arguments");
+assert.doesNotMatch(previewSource, /cachedPreviewNarrative\(standard, evidence, requestToken\)/,
+  "Never serialise OIDC in a cache key");
 assert.match(routeSource, /generateUnpackedPreview\(standard\)/, "Use gateway-backed output on isolated Preview");
 assert.match(routeSource, /if \(!previewGeneration\) try/, "Preview cannot silently consume employer rate-limit credentials");
 assert.match(providerSource, /https:\/\/ai-gateway\.vercel\.sh\/v1\/chat\/completions/,
