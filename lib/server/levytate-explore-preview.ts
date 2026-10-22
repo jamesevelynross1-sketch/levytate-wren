@@ -52,19 +52,23 @@ function debitPreviewGeneration() {
  * evidence). No personal, employer or manager information is sent to AI.
  * Next.js/Vercel Data Cache avoids repeat bills on subsequent page opens.
  */
-const cachedPreviewNarrative = unstable_cache(
-  async (standard: ExploreStandard, evidence: ExploreSourceEvidence): Promise<StoredNarrative> => {
-    debitPreviewGeneration(); // runs only on an actual cache miss
-    const narrative = await generateExploreNarrative(standard, evidence);
-    return {
-      narrative,
-      generatedAt: new Date().toISOString(),
-      occupationCode: evidence.occupationCode,
-    };
-  },
-  ["levytate-unpacked-preview", EXPLORE_NARRATIVE_VERSION, "structured-v2"],
-  { revalidate: REVALIDATE },
-);
+function createCachedGenerator(vercelRequestOidcToken: string | null) {
+  // Capture the short-lived OIDC token in a per-request server-only closure.
+  // It is NEVER passed as an unstable_cache argument, key or returned value.
+  return unstable_cache(
+    async (standard: ExploreStandard, evidence: ExploreSourceEvidence): Promise<StoredNarrative> => {
+      debitPreviewGeneration(); // runs only on an actual cache miss
+      const narrative = await generateExploreNarrative(standard, evidence, vercelRequestOidcToken);
+      return {
+        narrative,
+        generatedAt: new Date().toISOString(),
+        occupationCode: evidence.occupationCode,
+      };
+    },
+    ["levytate-unpacked-preview", EXPLORE_NARRATIVE_VERSION, "structured-v3"],
+    { revalidate: REVALIDATE },
+  );
+}
 
 export class PreviewUnpackedUnavailable extends Error {
   constructor(public readonly reason: "not_configured" | "source_unavailable" | "model_unavailable") {
@@ -73,8 +77,9 @@ export class PreviewUnpackedUnavailable extends Error {
   }
 }
 
-export async function generateUnpackedPreview(standard: ExploreStandard): Promise<PreviewUnpackedResult> {
-  if (!isUnpackedPreviewEnabled() || !hasExploreGatewayAccess()) {
+export async function generateUnpackedPreview(standard: ExploreStandard, request: Request): Promise<PreviewUnpackedResult> {
+  const requestToken = request.headers.get("x-vercel-oidc-token");
+  if (!isUnpackedPreviewEnabled() || !hasExploreGatewayAccess(requestToken)) {
     throw new PreviewUnpackedUnavailable("not_configured");
   }
 
@@ -103,7 +108,7 @@ export async function generateUnpackedPreview(standard: ExploreStandard): Promis
 
   let job = inFlight.get(key);
   if (!job) {
-    job = cachedPreviewNarrative(standard, evidence);
+    job = createCachedGenerator(requestToken)(standard, evidence);
     inFlight.set(key, job);
     void job.finally(() => {
       if (inFlight.get(key) === job) inFlight.delete(key);
