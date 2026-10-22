@@ -120,8 +120,10 @@ export async function generateExploreNarrative(
     throw new ExploreGenerationError("provider_unavailable");
   }
   if (!response.ok) {
-    // A provider response may contain confidential request metadata.
-    // Never log raw bodies or an auth header, especially in public functions.
+    // Log only the numeric status; no headers or provider response bodies.
+    // Important for distinguishing malformed schema (400), auth (401),
+    // exhausted free Gateway credits (402) and provider errors.
+    console.warn("Unpacked Gateway request failed", { status: response.status });
     throw new ExploreGenerationError("provider_unavailable");
   }
 
@@ -130,6 +132,11 @@ export async function generateExploreNarrative(
     const json = await response.json() as ChatCompletionResponse;
     const first = json.choices?.[0];
     if (first?.message?.refusal || first?.finish_reason === "length" || !first?.message?.content) {
+      console.warn("Unpacked Gateway response incomplete", {
+        finishReason: first?.finish_reason || "none",
+        refused: Boolean(first?.message?.refusal),
+        contentPresent: Boolean(first?.message?.content),
+      });
       throw new Error("empty_or_incomplete");
     }
     result = JSON.parse(first.message.content);
