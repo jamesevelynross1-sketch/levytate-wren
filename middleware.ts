@@ -33,6 +33,12 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
+  if (pathname === "/favicon.ico") {
+    const destination = request.nextUrl.clone();
+    destination.pathname = "/brand/levytate-favicon.ico";
+    return NextResponse.rewrite(destination);
+  }
+
   if (legacyDemoPathPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) {
     return new NextResponse("Not Found", { status: 404 });
   }
@@ -72,5 +78,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|brand|fonts|api).*)"],
+  matcher: ["/((?!_next/static|_next/image|robots.txt|sitemap.xml|brand|fonts|api).*)"],
 };
