@@ -37,15 +37,7 @@
     const empty=one('[data-search-empty]');if(empty)empty.hidden=count!==0;say(count+' example programmes shown.');
   }
   one('[data-programme-search]')?.addEventListener('input',filterCourses);one('[data-programme-filter]')?.addEventListener('change',filterCourses);
-  const finance=[{label:'Jan–Mar 2026',received:18000,spend:12600,expired:0,balance:25400,months:['Jan','Feb','Mar'],values:[4200,3600,4800],breakdown:[6600,3600,2400]}, {label:'Apr–Jun 2026',received:18000,spend:16200,expired:1200,balance:26000,months:['Apr','May','Jun'],values:[4800,5400,6000],breakdown:[8400,4200,3600]}];
-  one('[data-finance-period-select]')?.addEventListener('change',e=>{
-    const q=finance[Number(e.target.value)]||finance[1];one('[data-finance-period]').textContent=q.label+' · illustrative import';
-    ['received','spend','expired','balance'].forEach(key=>{one('[data-metric="'+key+'"]').textContent=cash(q[key]);});
-    q.months.forEach((m,i)=>{one('[data-month="'+i+'"]').textContent=m;one('[data-month-spend="'+i+'"]').textContent=cash(q.values[i]);one('[data-spend-bar="'+i+'"]').style.height=(q.values[i]/6000*100)+'%';});
-    ['engineering','finance','people'].forEach((key,i)=>{one('[data-breakdown="'+key+'"]').textContent=cash(q.breakdown[i]);});
-    one('.ps-bars').setAttribute('aria-label','Example monthly contributions of £6,000 and spending of '+q.values.map(cash).join(', '));say('Example financial position updated to '+q.label+'.');
-  });
-  const departments={all:[42,7,16200,'All departments'],engineering:[24,3,8400,'Engineering'],finance:[8,2,4200,'Finance'],people:[10,2,3600,'People']};
+  const departments={all:[42,7,28500,'All departments'],engineering:[24,3,14700,'Engineering'],finance:[8,2,8100,'Finance'],people:[10,2,5700,'People']};
   one('[data-report-department]')?.addEventListener('change',e=>{
     const d=departments[e.target.value]||departments.all;['learners','decisions','report-spend'].forEach((key,i)=>{one('[data-metric="'+key+'"]').textContent=i===2?cash(d[i]):d[i];});
     all('.ps-department-rows>div').forEach((row,i)=>{row.hidden=e.target.value!=='all'&&['engineering','finance','people'][i]!==e.target.value;});say(d[3]+' report selected.');
@@ -53,7 +45,7 @@
   const dialog=one('#ps-report-dialog');let reportTrigger;
   one('[data-open-report]')?.addEventListener('click',e=>{
     if(!dialog)return;reportTrigger=e.currentTarget;const key=one('[data-report-department]').value;const d=departments[key]||departments.all;
-    one('[data-print-scope]',dialog).textContent=d[3]+' · Apr–Jun 2026';
+    one('[data-print-scope]',dialog).textContent=d[3]+' · Jul–Sep 2026';
     const copy=one('[data-report-copy]',dialog);copy.replaceChildren();
     [['Active learners',d[0]],['Awaiting decisions',d[1]],['Imported spending',cash(d[2])]].forEach(([label,value])=>{const div=document.createElement('div');div.className='ps-metric';const span=document.createElement('span'),strong=document.createElement('strong');span.textContent=label;strong.textContent=value;div.append(span,strong);copy.append(div);});
     dialog.showModal();one('[data-close-dialog]',dialog).focus();

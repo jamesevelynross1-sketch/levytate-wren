@@ -59,7 +59,9 @@ function document({ title, description, path, body, page }) {
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400..700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/mission-v2/site.css"><link rel="stylesheet" href="/mission-v3/pages.css">
 ${page === 'home' ? `<style>${explanationStyles}</style>` : `<style>${contentStyles}</style>`}
+${page === 'home' ? '' : '<link rel="stylesheet" href="/mission-v3/refinements.css">'}
 <script src="/mission-v3/navigation.js" defer></script><script src="/mission-v3/interactions.js" defer></script>
+${page === 'funding' ? '<script src="/mission-v3/forecast-model.js" defer></script><script src="/mission-v3/forecast.js" defer></script>' : ''}
 </head><body class="${page === 'home' ? 'home-page' : 'detail-page'}" data-page="${page}">
 <a class="skip" href="#main-content">Skip to content</a>
 ${header}
@@ -91,7 +93,7 @@ const pages = [
   { id: 'programmes', file: 'apprenticeships', path: '/apprenticeships', title: 'Find the right apprenticeships | LevyTate', description: 'Use LevyTate to connect roles and development needs with apprenticeship programmes, compare provider offers and help employees take the next step.', extra: 'providers',
     oldIntro: 'Someone wants to progress. Their team needs new skills. Start with the work they do—not a course catalogue.',
     intro: 'LevyTate starts with the employee’s role and what they need to learn. Programme information and provider support sit alongside that need, helping your team make a more informed choice.' },
-  { id: 'funding', file: 'funding', path: '/funding', title: 'Make your apprenticeship funding work harder | LevyTate', description: 'Review planned training spend, understand levy commitments and estimate the value of less administration with the LevyTate ROI calculator.', extra: 'roi',
+  { id: 'funding', file: 'funding', path: '/funding', title: 'Make your apprenticeship funding work harder | LevyTate', description: 'Explore an illustrative 12-month DAS balance forecast, upcoming commitments, fund expiry and the potential value of less administration.', extra: 'roi',
     oldIntro: 'Teams buy training separately while apprenticeship funding can go unused. Bring the plans together before committing the budget.',
     intro: 'Teams buy training separately while apprenticeship funding can go unused. LevyTate helps you review those plans together, check suitable apprenticeship options and build the case before spending.' },
   { id: 'journey', file: 'manage-apprenticeships', path: '/manage-apprenticeships', title: 'Manage apprenticeships in one place | LevyTate', description: 'Use LevyTate to keep employee requests, manager decisions, learner progress and provider actions together. See who needs to act next.',
@@ -121,7 +123,7 @@ for (const page of pages) {
   const body = `${pageNavigation(page.id)}<main id="main-content" class="detail-main wrap"><div class="detail-surface">${content}${extra}</div><div class="page-close"><p>${page.id === 'journey' ? 'Less chasing. A clearer picture.' : 'See how this could work for your organisation.'}</p><a class="button" href="/early-access">Request a walkthrough <span aria-hidden="true">↗</span></a></div></main>`;
   writeFileSync(`${directory}/${page.file}.html`, document({ ...page, body, page: page.id }));
 }
-// Preserve the approved examples and ROI maths. Remove the old single-screen router;
+// Preserve the approved examples and business-impact estimator. Remove the old single-screen router;
 // initialise the calculator only on its own page so other pages cannot go blank.
 const routerStart = originalJs.indexOf('  function currentDestination()');
 const eventsStart = originalJs.indexOf("  $$('[data-highlight]')");
@@ -144,4 +146,4 @@ const home = readFileSync(`${directory}/index.html`, 'utf8');
 assert(home.includes('<strong>LevyTate is an apprenticeship platform for employers.</strong>'), 'The product must be defined before interaction.');
 assert(home.includes('<summary>What is LevyTate?</summary>'), 'The accessible product explanation is required.');
 assert(!/<details[^>]*class="product-explainer"[^>]*\bopen(?:\s|>)/.test(home), 'The optional explanation must start closed.');
-console.log('Built centred LevyTate homepage and three independent benefit pages. Product content strengthened; original artwork and ROI calculations preserved.');
+console.log('Built LevyTate homepage and three benefit pages with illustrative DAS scenarios and a price-free business-impact estimator.');
