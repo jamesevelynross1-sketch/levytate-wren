@@ -42,7 +42,7 @@ http://localhost:3001/stocks
 
 ### 4. Debug A Live Quote
 
-Use the debug route to confirm key detection and provider output:
+Use the debug route on the local development server to confirm key detection and provider output. The route returns 404 when `NODE_ENV` is `production`, which covers `next start` and Vercel production and preview builds:
 
 ```text
 http://localhost:3001/api/stocks/debug-live?symbol=NVDA

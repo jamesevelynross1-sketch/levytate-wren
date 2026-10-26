@@ -165,6 +165,49 @@ Do not use markdown syntax, # headings, raw markdown bullets or empty placeholde
 `;
 }
 
+function clip(value: unknown, max: number) {
+  return typeof value === "string" ? value.trim().slice(0, max) : "";
+}
+
+function clipList(value: unknown, maxItems: number, maxLength: number) {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, maxItems).map((item) => clip(item, maxLength)).filter(Boolean);
+}
+
+export function clampGeneratePayload(payload: StrategyGeneratePayload): StrategyGeneratePayload {
+  const context = payload.context;
+  const scorecard = payload.scorecardContext;
+  return {
+    context: {
+      organisationName: clip(context?.organisationName, 160),
+      industry: clip(context?.industry, 160),
+      employeeNumbers: clip(context?.employeeNumbers, 40),
+      userRole: clip(context?.userRole, 120),
+      existingActivity: clip(context?.existingActivity, 2000),
+      strategicPriorities: clipList(context?.strategicPriorities, 12, 160),
+      fundingConfidence: clip(context?.fundingConfidence, 160),
+      providerConfidence: clip(context?.providerConfidence, 160),
+      strategicChallenge: clip(context?.strategicChallenge, 2000),
+    },
+    scorecardContext: scorecard
+      ? {
+          score: typeof scorecard.score === "number" && Number.isFinite(scorecard.score) ? scorecard.score : undefined,
+          position: clip(scorecard.position, 500),
+          blindSpots: clipList(scorecard.blindSpots, 12, 200),
+          selectedPriorities: clipList(scorecard.selectedPriorities, 12, 200),
+        }
+      : scorecard,
+  };
+}
+
+export function clampRefinePayload(payload: StrategyRefinePayload): StrategyRefinePayload {
+  return {
+    ...clampGeneratePayload(payload),
+    currentStrategy: clip(payload.currentStrategy, 20000),
+    instruction: clip(payload.instruction, 4000),
+  };
+}
+
 export function getStrategyModel() {
   return process.env.OPENAI_MODEL || "gpt-4.1-mini";
 }

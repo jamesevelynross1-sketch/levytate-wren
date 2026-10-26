@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { getLiveQuoteForValidation, validateMarketDataEnv } from "@/lib/stocks/market-data";
+import { stockDebugDisabledResponse } from "@/lib/stocks/debug-access";
 
 export const dynamic = "force-dynamic";
 
 const defaultSymbols = ["NVDA", "MSFT", "AMD", "PLTR", "COIN", "AAPL"];
 
 export async function GET(request: Request) {
+  const disabled = stockDebugDisabledResponse();
+  if (disabled) return disabled;
+
   const url = new URL(request.url);
   const symbols = (url.searchParams.get("symbols") ?? defaultSymbols.join(","))
     .split(",")
