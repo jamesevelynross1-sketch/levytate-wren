@@ -2,12 +2,10 @@
   "name": "mpr-consulting-site",
   "version": "0.1.0",
   "private": true,
-  "engines": {
-    "node": "22.x"
-  },
+  "engines": { "node": "22.x" },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "node scripts/build-levytate-home.mjs && node scripts/build-levytate-pages.mjs && node --check public/mission-v3/interactions.js && node --check public/mission-v3/navigation.js && node --check public/mission-v2/site.js && next build",
     "build:pwa-assets": "node scripts/build-levytate-pwa-assets.mjs",
     "package:microsoft-copilot": "node scripts/build-levytate-microsoft-copilot-package.mjs",
     "start": "next start",
@@ -59,7 +57,5 @@
     "typescript": "5.8.3",
     "vitest": "^5.0.5"
   },
-  "overrides": {
-    "postcss": "^8.5.10"
-  }
+  "overrides": { "postcss": "^8.5.10" }
 }

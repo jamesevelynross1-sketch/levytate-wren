@@ -66,6 +66,9 @@ describe("app.levytate.co.uk platform routing", () => {
     const solution = await middleware(requestFor("app.levytate.co.uk", "/solutions/employers"));
     const company = await middleware(requestFor("app.levytate.co.uk", "/company/about"));
     const internalHome = await middleware(requestFor("app.levytate.co.uk", "/levytate"));
+    const apprenticeships = await middleware(requestFor("app.levytate.co.uk", "/apprenticeships"));
+    const funding = await middleware(requestFor("app.levytate.co.uk", "/funding"));
+    const manage = await middleware(requestFor("app.levytate.co.uk", "/manage-apprenticeships"));
 
     expect(privacy.status).toBe(301);
     expect(privacy.headers.get("location")).toBe("https://marketing.example.test/privacy?from=app");
@@ -73,6 +76,9 @@ describe("app.levytate.co.uk platform routing", () => {
     expect(solution.headers.get("location")).toBe("https://marketing.example.test/solutions/employers");
     expect(company.headers.get("location")).toBe("https://marketing.example.test/company/about");
     expect(internalHome.headers.get("location")).toBe("https://marketing.example.test/levytate");
+    expect(apprenticeships.headers.get("location")).toBe("https://marketing.example.test/apprenticeships");
+    expect(funding.headers.get("location")).toBe("https://marketing.example.test/funding");
+    expect(manage.headers.get("location")).toBe("https://marketing.example.test/manage-apprenticeships");
   });
 
   it("leaves platform callbacks, provider routes and APIs on the app host", async () => {
@@ -102,16 +108,26 @@ describe("levytate.co.uk transition routing", () => {
     expect(login.headers.getSetCookie()).toEqual([]);
   });
 
-  it("keeps the current public site rewrites on the marketing hosts", async () => {
+  it("serves the release public site on the marketing hosts and keeps trust pages", async () => {
     vi.stubEnv("LEVYTATE_MCP_STAGING_ONLY", "");
     const home = await middleware(requestFor("www.levytate.co.uk", "/"));
+    const apprenticeships = await middleware(requestFor("levytate.co.uk", "/apprenticeships"));
+    const funding = await middleware(requestFor("www.levytate.co.uk", "/funding"));
+    const manage = await middleware(requestFor("levytate.co.uk", "/manage-apprenticeships"));
     const privacy = await middleware(requestFor("levytate.co.uk", "/privacy"));
     const earlyAccess = await middleware(requestFor("www.levytate.co.uk", "/early-access"));
     const solution = await middleware(requestFor("www.levytate.co.uk", "/solutions/employers"));
+    const favicon = await middleware(requestFor("www.levytate.co.uk", "/favicon.ico"));
+    const tabIcon = await middleware(requestFor("app.levytate.co.uk", "/levytate-tab-icon-20261027.png"));
 
-    expect(home.headers.get("x-middleware-rewrite")).toContain("/levytate");
+    expect(home.headers.get("x-middleware-rewrite")).toContain("/mission-v3/index.html");
+    expect(apprenticeships.headers.get("x-middleware-rewrite")).toContain("/mission-v3/apprenticeships.html");
+    expect(funding.headers.get("x-middleware-rewrite")).toContain("/mission-v3/funding.html");
+    expect(manage.headers.get("x-middleware-rewrite")).toContain("/mission-v3/manage-apprenticeships.html");
     expect(privacy.headers.get("x-middleware-rewrite")).toContain("/levytate/privacy");
     expect(earlyAccess.headers.get("x-middleware-rewrite")).toContain("/levytate/early-access");
+    expect(favicon.headers.get("x-middleware-rewrite")).toContain("/brand/levytate-favicon.ico");
+    expect(tabIcon.headers.get("x-middleware-rewrite")).toContain("/brand/levytate-favicon-32.png");
     expect(solution.status).toBe(200);
     expect(solution.headers.get("x-middleware-rewrite")).toBeNull();
     expect(solution.headers.get("location")).toBeNull();
@@ -168,6 +184,9 @@ describe("configurable platform URLs", () => {
 
   it("publishes marketing sitemap URLs from the website origin and none from the app host", () => {
     expect(levyTatePublicSitemap("www.levytate.co.uk")).toContain("https://www.levytate.co.uk/privacy");
+    expect(levyTatePublicSitemap("www.levytate.co.uk")).toContain("https://www.levytate.co.uk/apprenticeships");
+    expect(levyTatePublicSitemap("www.levytate.co.uk")).toContain("https://www.levytate.co.uk/funding");
+    expect(levyTatePublicSitemap("www.levytate.co.uk")).toContain("https://www.levytate.co.uk/manage-apprenticeships");
     expect(levyTatePublicSitemap("app.levytate.co.uk")).toEqual([]);
     expect(levyTatePublicSitemap("mprconsulting.co.uk")).toBeNull();
 

@@ -3,7 +3,17 @@ const DEFAULT_WEBSITE_ORIGIN = "https://www.levytate.co.uk";
 
 const marketingHosts = new Set(["levytate.co.uk", "www.levytate.co.uk"]);
 
+export const levyTatePublicStoryRewrites: Record<string, string> = {
+  "/": "/mission-v3/index.html",
+  "/apprenticeships": "/mission-v3/apprenticeships.html",
+  "/funding": "/mission-v3/funding.html",
+  "/manage-apprenticeships": "/mission-v3/manage-apprenticeships.html",
+};
+
+const levyTateStoryPaths = Object.keys(levyTatePublicStoryRewrites).filter((path) => path !== "/");
+
 const exactPublicPaths = new Set([
+  ...levyTateStoryPaths,
   "/early-access",
   "/privacy",
   "/early-access-terms",
@@ -27,6 +37,7 @@ const publicPathPrefixes = ["/solutions/", "/company/"];
 
 const publicSitemapPaths = [
   "/",
+  ...levyTateStoryPaths,
   "/early-access",
   "/privacy",
   "/early-access-terms",

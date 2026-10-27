@@ -7,6 +7,7 @@ import {
   isLevyTatePlatformEntryPath,
   isLevyTatePlatformHost,
   isLevyTatePublicPagePath,
+  levyTatePublicStoryRewrites,
   levytateAuthCookieOptions,
   requestHostname,
 } from "@/lib/levytate/hosts";
@@ -36,12 +37,32 @@ function rewriteLevyTate(request: NextRequest, pathname: string) {
   return NextResponse.rewrite(new URL(pathname, request.url));
 }
 
-async function handlePlatformHost(request: NextRequest) {
+function rewritePublicFavicon(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  if (pathname === "/favicon.ico" || pathname === "/levytate-tab-icon-20261027.png") {
+    const destination = request.nextUrl.clone();
+    destination.pathname = pathname === "/favicon.ico"
+      ? "/brand/levytate-favicon.ico"
+      : "/brand/levytate-favicon-32.png";
+    return NextResponse.rewrite(destination);
+  }
+  return null;
+}
 
+function rewriteLegacyDemo(pathname: string) {
   if (legacyDemoPathPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) {
     return new NextResponse("Not Found", { status: 404 });
   }
+  return null;
+}
+
+async function handlePlatformHost(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  const favicon = rewritePublicFavicon(request);
+  if (favicon) return favicon;
+
+  const legacy = rewriteLegacyDemo(pathname);
+  if (legacy) return legacy;
 
   if (isLevyTatePublicPagePath(pathname)) {
     return redirectToOrigin(request, getLevyTateWebsiteOrigin(), 301);
@@ -70,16 +91,18 @@ async function handlePlatformHost(request: NextRequest) {
 
 function handleMarketingHost(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const favicon = rewritePublicFavicon(request);
+  if (favicon) return favicon;
 
-  if (legacyDemoPathPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) {
-    return new NextResponse("Not Found", { status: 404 });
-  }
+  const legacy = rewriteLegacyDemo(pathname);
+  if (legacy) return legacy;
 
   if (isLevyTatePlatformEntryPath(pathname)) {
     return redirectToOrigin(request, getLevyTatePlatformOrigin(), 307);
   }
 
-  if (pathname === "/") return rewriteLevyTate(request, "/levytate");
+  const storyPage = levyTatePublicStoryRewrites[pathname];
+  if (storyPage) return rewriteLevyTate(request, storyPage);
   if (pathname === "/early-access") return rewriteLevyTate(request, "/levytate/early-access");
   if (marketingTrustPaths.has(pathname)) return rewriteLevyTate(request, `/levytate${pathname}`);
 
