@@ -5,7 +5,6 @@ const config: Config = {
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
     "./lib/**/*.{js,ts,jsx,tsx,mdx}",
-    "!./**/*-MPR.{js,ts,jsx,tsx,mdx}",
     "!./components/sections/TrustBand.tsx",
   ],
   theme: {

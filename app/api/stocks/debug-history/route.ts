@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 import { getDebugHistory } from "@/lib/stocks/market-data";
+import { stockDebugDisabledResponse } from "@/lib/stocks/debug-access";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
+  const disabled = stockDebugDisabledResponse();
+  if (disabled) return disabled;
+
   const url = new URL(request.url);
   const symbol = (url.searchParams.get("symbol") ?? "NVDA").trim().toUpperCase();
 

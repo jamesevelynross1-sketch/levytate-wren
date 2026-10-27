@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { escapeHtml } from "@/lib/email/shared";
+import { clipList, clipText, isHoneypotTripped, isReasonableEmail, publicSubmissionLimitResponse } from "@/lib/server/public-form-protection";
 import { sendEmail } from "@/lib/server/resend";
 
 type ReviewContext = {
@@ -32,6 +33,7 @@ type SubmissionPayload = {
     email?: string;
     telephone?: string;
     consent?: boolean;
+    hp_field?: string;
   };
   organisationDetails?: ReviewContext;
   review?: OpportunityReview;
@@ -47,40 +49,57 @@ const destinationEmail = "james@mprconsulting.co.uk";
 
 export async function POST(request: Request) {
   try {
-    const payload = (await request.json()) as SubmissionPayload;
-    const contact = payload.contact ?? {};
-    const organisation = contact.organisation?.trim() || payload.organisationDetails?.organisationName?.trim() || "Organisation not supplied";
-    const email = contact.email?.trim().toLowerCase() ?? "";
-
-    if (!contact.name?.trim() || !organisation || !isValidEmail(email) || !contact.consent || !payload.consent?.given) {
+    const payload = await readPayload(request);
+    if (!payload) {
       return NextResponse.json(
         { message: "Name, organisation, valid email address and consent are required." },
         { status: 400 },
       );
     }
 
+    if (isHoneypotTripped(payload.contact?.hp_field)) {
+      return NextResponse.json({ ok: true, message: "Review submitted." });
+    }
+
+    const contact = payload.contact ?? {};
+    const contactName = clipText(contact.name, 160);
+    const organisation = clipText(contact.organisation, 160) || clipText(payload.organisationDetails?.organisationName, 160);
+    const email = clipText(contact.email, 254).toLowerCase();
+    const telephone = clipText(contact.telephone, 40);
+    const boundedPayload = boundSubmission(payload, organisation);
+
+    if (!contactName || !organisation || !isReasonableEmail(email) || contact.consent !== true || payload.consent?.given !== true) {
+      return NextResponse.json(
+        { message: "Name, organisation, valid email address and consent are required." },
+        { status: 400 },
+      );
+    }
+
+    const limited = await publicSubmissionLimitResponse(request, email, "/api/opportunity-review/submit");
+    if (limited) return limited;
+
     const crmReadyPayload = {
       source: "apprenticeship_opportunity_review",
       contact: {
-        name: contact.name.trim(),
+        name: contactName,
         organisation,
         email,
-        telephone: contact.telephone?.trim() || null,
+        telephone: telephone || null,
       },
-      organisationDetails: payload.organisationDetails,
-      challenges: payload.organisationDetails?.challenges ?? [],
-      priorities: payload.organisationDetails?.priorities ?? [],
-      review: payload.review,
-      consent: payload.consent,
+      organisationDetails: boundedPayload.organisationDetails,
+      challenges: boundedPayload.organisationDetails?.challenges ?? [],
+      priorities: boundedPayload.organisationDetails?.priorities ?? [],
+      review: boundedPayload.review,
+      consent: boundedPayload.consent,
       submittedAt: new Date().toISOString(),
     };
 
     const emailContent = buildSubmissionEmail({
-      payload,
+      payload: boundedPayload,
       organisation,
-      contactName: contact.name.trim(),
+      contactName,
       contactEmail: email,
-      telephone: contact.telephone?.trim() || "",
+      telephone,
       crmReadyPayload,
     });
 
@@ -314,6 +333,47 @@ function renderSupportServices(services: OpportunityReview["supportServices"]) {
     </tr>`;
 }
 
-function isValidEmail(value: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+async function readPayload(request: Request) {
+  try {
+    return (await request.json()) as SubmissionPayload;
+  } catch {
+    return null;
+  }
+}
+
+function boundSubmission(payload: SubmissionPayload, organisation: string): SubmissionPayload {
+  const details = payload.organisationDetails ?? {};
+  const review = payload.review ?? {};
+  return {
+    ...payload,
+    organisationDetails: {
+      organisationName: organisation,
+      sector: clipText(details.sector, 160),
+      employeeNumbers: clipText(details.employeeNumbers, 40),
+      levyStatus: clipText(details.levyStatus, 40),
+      currentActivity: clipText(details.currentActivity, 160),
+      challenges: clipList(details.challenges, 12, 200),
+      priorities: clipList(details.priorities, 12, 200),
+    },
+    review: {
+      currentPosition: clipList(review.currentPosition, 12, 500),
+      immediateOpportunities: clipList(review.immediateOpportunities, 12, 500),
+      actions30: clipList(review.actions30, 12, 500),
+      actions60: clipList(review.actions60, 12, 500),
+      actions90: clipList(review.actions90, 12, 500),
+      supportServices: (review.supportServices ?? []).slice(0, 8).map((service) => ({
+        title: clipText(service.title, 160),
+        description: clipText(service.description, 500),
+      })).filter((service) => service.title),
+      nextConversation: clipText(review.nextConversation, 1000),
+    },
+    reviewText: clipText(payload.reviewText, 20000),
+    consent: payload.consent
+      ? {
+          given: payload.consent.given === true,
+          statement: clipText(payload.consent.statement, 1000),
+          capturedAt: clipText(payload.consent.capturedAt, 80),
+        }
+      : payload.consent,
+  };
 }

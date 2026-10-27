@@ -34,6 +34,7 @@ type SubmitForm = {
   email: string;
   telephone: string;
   consent: boolean;
+  hp_field: string;
 };
 
 const initialContext: ReviewContext = {
@@ -52,6 +53,7 @@ const initialSubmitForm: SubmitForm = {
   email: "",
   telephone: "",
   consent: false,
+  hp_field: "",
 };
 
 const employeeNumberOptions = ["1-49", "50-249", "250-999", "1000+"];
@@ -428,7 +430,11 @@ export default function StrategyBuilderClient() {
       setStatusMessage("Review submitted.");
     } catch (error) {
       console.error("Opportunity Review submission failed", error);
-      setErrorMessage("We couldn't submit your review at the moment. Please try again or contact us directly.");
+      setErrorMessage(
+        error instanceof Error && error.message
+          ? error.message
+          : "We couldn't submit your review at the moment. Please try again or contact us directly.",
+      );
     } finally {
       setIsSubmittingReview(false);
     }
@@ -1009,6 +1015,19 @@ function SubmitReviewForm({
       <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--muted)]">
         Share the completed review with MPR Consulting so we can understand the context before any follow-up conversation.
       </p>
+
+      <div className="h-0 overflow-hidden" aria-hidden="true">
+        <label>
+          Fax
+          <input
+            value={form.hp_field}
+            onChange={(event) => onChange("hp_field", event.target.value)}
+            tabIndex={-1}
+            autoComplete="off"
+            className="h-0 w-0 border-0 p-0"
+          />
+        </label>
+      </div>
 
       <div className="mt-6 grid gap-5 md:grid-cols-2">
         <Field label="Your Name *">

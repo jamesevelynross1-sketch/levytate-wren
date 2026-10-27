@@ -13,6 +13,11 @@ export const levyTateAuthRateLimits = {
   microsoftCopilotIdentityMinute: { limit: 120, windowSeconds: 60 },
   microsoftCopilotNetworkMinute: { limit: 300, windowSeconds: 60 },
   microsoftCopilotGlobalMinute: { limit: 1200, windowSeconds: 60 },
+  strategyBuilderIdentityBurst: { limit: 3, windowSeconds: 10 * 60 },
+  strategyBuilderIdentityHour: { limit: 8, windowSeconds: 60 * 60 },
+  strategyBuilderNetworkHour: { limit: 30, windowSeconds: 60 * 60 },
+  publicFormEmailHour: { limit: 5, windowSeconds: 60 * 60 },
+  publicFormNetworkHour: { limit: 30, windowSeconds: 60 * 60 },
 } as const;
 
 export type LevyTateRateLimitEnvironment = "local" | "preview" | "production";

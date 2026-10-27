@@ -1,4 +1,4 @@
-import { createHmac } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { levyTateAuthRateLimits, getLevyTateRateLimitEnvironment, getLevyTateRateLimitSecret } from "@/lib/server/levytate-auth-rate-limit-config";
 import { getLevyTateSupabaseConfig, supabaseFetchJson } from "@/lib/server/levytate-supabase";
 
@@ -132,4 +132,90 @@ async function consumeWithRetry(item: RateLimitCheck) {
 
 function check(action: string, actorKey: string, route: string, eventType: string, rule: RateLimitRule): RateLimitCheck {
   return { action, actorKey, route, eventType, rule };
+}
+
+const memoryBuckets = new Map<string, { count: number; windowStart: number }>();
+
+export async function checkStrategyBuilderLimits(
+  request: Request,
+  email: string,
+  route: "/api/strategy-builder/generate" | "/api/strategy-builder/refine",
+) {
+  return guardLimits(
+    () => consumeChecks([
+      check("strategy_builder.identity.burst", rateLimitKey("email", email), route, "strategy_builder_rate_limited", levyTateAuthRateLimits.strategyBuilderIdentityBurst),
+      check("strategy_builder.identity.hour", rateLimitKey("email", email), route, "strategy_builder_rate_limited", levyTateAuthRateLimits.strategyBuilderIdentityHour),
+      check("strategy_builder.network.hour", networkRateLimitKey(request), route, "strategy_builder_rate_limited", levyTateAuthRateLimits.strategyBuilderNetworkHour),
+    ]),
+    () => [
+      { key: memoryActorKey("strategy-email-burst", email), rule: levyTateAuthRateLimits.strategyBuilderIdentityBurst },
+      { key: memoryActorKey("strategy-email-hour", email), rule: levyTateAuthRateLimits.strategyBuilderIdentityHour },
+      { key: memoryActorKey("strategy-network", clientAddress(request)), rule: levyTateAuthRateLimits.strategyBuilderNetworkHour },
+    ],
+  );
+}
+
+export async function checkPublicSubmissionLimits(
+  request: Request,
+  email: string,
+  route: "/api/levy-transfer-enquiry" | "/api/opportunity-review/submit",
+) {
+  const action = route === "/api/levy-transfer-enquiry" ? "levy_transfer_enquiry" : "opportunity_review";
+  return guardLimits(
+    () => consumeChecks([
+      check(`${action}.email`, rateLimitKey("email", email), route, "public_form_rate_limited", levyTateAuthRateLimits.publicFormEmailHour),
+      check(`${action}.network`, networkRateLimitKey(request), route, "public_form_rate_limited", levyTateAuthRateLimits.publicFormNetworkHour),
+    ]),
+    () => [
+      { key: memoryActorKey(`${action}-email`, email), rule: levyTateAuthRateLimits.publicFormEmailHour },
+      { key: memoryActorKey(`${action}-network`, clientAddress(request)), rule: levyTateAuthRateLimits.publicFormNetworkHour },
+    ],
+  );
+}
+
+async function guardLimits(
+  consume: () => Promise<{ allowed: boolean; resetAt?: string }>,
+  memoryItems: () => Array<{ key: string; rule: RateLimitRule }>,
+) {
+  try {
+    return await consume();
+  } catch (error) {
+    if (process.env.NODE_ENV !== "production" && error instanceof LevyTateRateLimitStoreError) {
+      return allowMemoryChecks(memoryItems());
+    }
+    throw error instanceof LevyTateRateLimitStoreError ? error : new LevyTateRateLimitStoreError();
+  }
+}
+
+function allowMemoryChecks(items: Array<{ key: string; rule: RateLimitRule }>) {
+  for (const item of items) {
+    const result = allowInMemory(item.key, item.rule);
+    if (!result.allowed) return { allowed: false as const, resetAt: result.resetAt };
+  }
+  return { allowed: true as const };
+}
+
+function allowInMemory(key: string, rule: RateLimitRule) {
+  const now = Date.now();
+  const windowMs = rule.windowSeconds * 1000;
+  const windowStart = Math.floor(now / windowMs) * windowMs;
+  const bucketKey = `${key}:${windowStart}`;
+  const count = (memoryBuckets.get(bucketKey)?.count ?? 0) + 1;
+  memoryBuckets.set(bucketKey, { count, windowStart });
+  if (memoryBuckets.size > 500) {
+    for (const [storedKey, bucket] of memoryBuckets) {
+      if (now - bucket.windowStart > windowMs) memoryBuckets.delete(storedKey);
+    }
+  }
+  return { allowed: count <= rule.limit, resetAt: new Date(windowStart + windowMs).toISOString() };
+}
+
+function memoryActorKey(dimension: string, value: string) {
+  return createHash("sha256").update(`${dimension}:${value}`).digest("hex");
+}
+
+function clientAddress(request: Request) {
+  return request.headers.get("x-real-ip")?.trim()
+    || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+    || "unknown";
 }

@@ -29,6 +29,7 @@ export function LevyTransferEnquiryForm() {
       levyPayer: String(formData.get("levyPayer") ?? "").trim(),
       supportInterest: String(formData.get("supportInterest") ?? "").trim(),
       consent: formData.get("consent") === "on",
+      hp_field: String(formData.get("hp_field") ?? ""),
     };
 
     try {
@@ -86,6 +87,12 @@ export function LevyTransferEnquiryForm() {
 
   return (
     <form onSubmit={handleSubmit} className="grid gap-4" noValidate>
+      <div className="h-0 overflow-hidden" aria-hidden="true">
+        <label>
+          Fax
+          <input name="hp_field" type="text" tabIndex={-1} autoComplete="off" defaultValue="" className="h-0 w-0 border-0 p-0" />
+        </label>
+      </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Organisation Name *" name="organisationName" autoComplete="organization" />
         <Field label="Contact Name *" name="contactName" autoComplete="name" />

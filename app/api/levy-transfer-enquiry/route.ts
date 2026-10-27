@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { escapeHtml } from "@/lib/email/shared";
+import { clipText, isHoneypotTripped, isReasonableEmail, publicSubmissionLimitResponse } from "@/lib/server/public-form-protection";
 import { sendEmail } from "@/lib/server/resend";
 
 type LevyTransferEnquiryPayload = {
@@ -11,7 +12,11 @@ type LevyTransferEnquiryPayload = {
   levyPayer?: string;
   supportInterest?: string;
   consent?: boolean;
+  hp_field?: string;
 };
+
+const allowedEmployeeNumbers = new Set(["1-49", "50-249", "250-999", "1000+"]);
+const allowedLevyPayer = new Set(["Yes", "No", "Unsure"]);
 
 const destinationEmail = "james@mprconsulting.co.uk";
 const consentStatement =
@@ -19,15 +24,26 @@ const consentStatement =
 
 export async function POST(request: Request) {
   try {
-    const payload = (await request.json()) as LevyTransferEnquiryPayload;
+    const payload = await readPayload(request);
+    if (!payload) {
+      return NextResponse.json(
+        { message: "Please complete the required fields and provide consent." },
+        { status: 400 },
+      );
+    }
+
+    if (isHoneypotTripped(payload.hp_field)) {
+      return NextResponse.json({ ok: true, message: "Enquiry submitted." });
+    }
+
     const enquiry = normalisePayload(payload);
 
     if (
       !enquiry.organisationName ||
       !enquiry.contactName ||
-      !isValidEmail(enquiry.email) ||
-      !enquiry.employeeNumbers ||
-      !enquiry.levyPayer ||
+      !isReasonableEmail(enquiry.email) ||
+      !allowedEmployeeNumbers.has(enquiry.employeeNumbers) ||
+      !allowedLevyPayer.has(enquiry.levyPayer) ||
       !enquiry.supportInterest ||
       !enquiry.consent
     ) {
@@ -36,6 +52,9 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
+
+    const limited = await publicSubmissionLimitResponse(request, enquiry.email, "/api/levy-transfer-enquiry");
+    if (limited) return limited;
 
     const emailContent = buildLevyTransferEmail(enquiry);
 
@@ -59,15 +78,23 @@ export async function POST(request: Request) {
   }
 }
 
+async function readPayload(request: Request) {
+  try {
+    return (await request.json()) as LevyTransferEnquiryPayload;
+  } catch {
+    return null;
+  }
+}
+
 function normalisePayload(payload: LevyTransferEnquiryPayload) {
   return {
-    organisationName: payload.organisationName?.trim() ?? "",
-    contactName: payload.contactName?.trim() ?? "",
-    email: payload.email?.trim().toLowerCase() ?? "",
-    telephone: payload.telephone?.trim() ?? "",
-    employeeNumbers: payload.employeeNumbers?.trim() ?? "",
-    levyPayer: payload.levyPayer?.trim() ?? "",
-    supportInterest: payload.supportInterest?.trim() ?? "",
+    organisationName: clipText(payload.organisationName, 160),
+    contactName: clipText(payload.contactName, 160),
+    email: clipText(payload.email, 254).toLowerCase(),
+    telephone: clipText(payload.telephone, 40),
+    employeeNumbers: clipText(payload.employeeNumbers, 40),
+    levyPayer: clipText(payload.levyPayer, 40),
+    supportInterest: clipText(payload.supportInterest, 2000),
     consent: payload.consent === true,
     submittedAt: new Date().toISOString(),
   };
@@ -167,8 +194,4 @@ function renderSection(title: string, rows: Array<[string, string]>) {
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${renderedRows}</table>
       </td>
     </tr>`;
-}
-
-function isValidEmail(value: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
