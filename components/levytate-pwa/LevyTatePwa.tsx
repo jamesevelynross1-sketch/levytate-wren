@@ -64,7 +64,7 @@ function useInstallState() {
   return { ...state, install };
 }
 
-export function LevyTatePwaBootstrap() {
+export function LevyTatePwaBootstrap({ scope = "/levytate/" }: { scope?: "/" | "/levytate/" }) {
   const [online, setOnline] = useState(true);
 
   useEffect(() => {
@@ -91,7 +91,7 @@ export function LevyTatePwaBootstrap() {
     displayMode.addEventListener("change", handleDisplayMode);
 
     if ("serviceWorker" in navigator && window.isSecureContext) {
-      void navigator.serviceWorker.register("/levytate-sw.js", { scope: "/levytate/" }).catch(() => undefined);
+      void navigator.serviceWorker.register("/levytate-sw.js", { scope }).catch(() => undefined);
     }
 
     return () => {
@@ -101,7 +101,7 @@ export function LevyTatePwaBootstrap() {
       window.removeEventListener("offline", handleOffline);
       displayMode.removeEventListener("change", handleDisplayMode);
     };
-  }, []);
+  }, [scope]);
 
   if (online) return null;
 

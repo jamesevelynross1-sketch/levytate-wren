@@ -1,13 +1,11 @@
 import type { MetadataRoute } from "next";
+import { isLevyTatePlatformHost, requestHostname } from "@/lib/levytate/hosts";
 
-export const levytateManifest: MetadataRoute.Manifest = {
-  id: "/levytate/",
+const sharedManifest: Omit<MetadataRoute.Manifest, "id" | "start_url" | "scope"> = {
   name: "LevyTate",
   short_name: "LevyTate",
   description: "The apprenticeship operations platform for employers.",
-  start_url: "/levytate/login",
-  scope: "/levytate/",
-  display: "standalone",
+  display: "standalone" as const,
   background_color: "#FFFFFF",
   theme_color: "#17325C",
   categories: ["business", "productivity"],
@@ -38,3 +36,21 @@ export const levytateManifest: MetadataRoute.Manifest = {
     },
   ],
 };
+
+export const levytateManifest: MetadataRoute.Manifest = {
+  ...sharedManifest,
+  id: "/levytate/",
+  start_url: "/levytate/login",
+  scope: "/levytate/",
+};
+
+export const levytatePlatformManifest: MetadataRoute.Manifest = {
+  ...sharedManifest,
+  id: "/",
+  start_url: "/login",
+  scope: "/",
+};
+
+export function levytateManifestForHost(host: string | null | undefined) {
+  return isLevyTatePlatformHost(requestHostname(host)) ? levytatePlatformManifest : levytateManifest;
+}

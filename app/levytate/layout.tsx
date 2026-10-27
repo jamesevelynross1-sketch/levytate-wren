@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import { LevyTatePwaBootstrap } from "@/components/levytate-pwa/LevyTatePwa";
+import { isLevyTatePlatformHost, requestHostname } from "@/lib/levytate/hosts";
 
 export const metadata: Metadata = {
   applicationName: "LevyTate",
@@ -22,10 +24,13 @@ export const viewport: Viewport = {
   themeColor: "#17325C",
 };
 
-export default function LevyTateLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function LevyTateLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const host = requestHostname((await headers()).get("host"));
+  const scope = isLevyTatePlatformHost(host) ? "/" : "/levytate/";
+
   return (
     <>
-      <LevyTatePwaBootstrap />
+      <LevyTatePwaBootstrap scope={scope} />
       {children}
     </>
   );

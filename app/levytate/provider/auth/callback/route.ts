@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { levytateAuthCookieOptions } from "@/lib/levytate/hosts";
 import {
   completeLevyTateProviderMagicLinkCallback,
   levytateProviderAuthCookieMaxAge,
@@ -16,24 +17,9 @@ export async function GET(request: Request) {
     const result = await completeLevyTateProviderMagicLinkCallback(request);
     const response = NextResponse.redirect(new URL("/levytate/provider", url.origin));
 
-    setCookie(
-      response,
-      levytateProviderSessionCookie,
-      result.sessionToken,
-      levytateProviderAuthCookieMaxAge,
-    );
-    setCookie(
-      response,
-      levytateProviderSupabaseAccessCookie,
-      result.accessToken,
-      Math.min(result.expiresIn ?? 3600, levytateProviderAuthCookieMaxAge),
-    );
-    setCookie(
-      response,
-      levytateProviderSupabaseRefreshCookie,
-      result.refreshToken,
-      levytateProviderAuthCookieMaxAge,
-    );
+    setCookie(response, request, levytateProviderSessionCookie, result.sessionToken, levytateProviderAuthCookieMaxAge);
+    setCookie(response, request, levytateProviderSupabaseAccessCookie, result.accessToken, Math.min(result.expiresIn ?? 3600, levytateProviderAuthCookieMaxAge));
+    setCookie(response, request, levytateProviderSupabaseRefreshCookie, result.refreshToken, levytateProviderAuthCookieMaxAge);
     response.headers.set("Cache-Control", "private, no-store, max-age=0");
     return response;
   } catch {
@@ -41,14 +27,8 @@ export async function GET(request: Request) {
   }
 }
 
-function setCookie(response: NextResponse, name: string, value: string, maxAge: number) {
-  response.cookies.set(name, value, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge,
-  });
+function setCookie(response: NextResponse, request: Request, name: string, value: string, maxAge: number) {
+  response.cookies.set(name, value, levytateAuthCookieOptions(maxAge, request.headers.get("host")));
 }
 
 function failed(url: URL) {

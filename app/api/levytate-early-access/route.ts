@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
+import { applyLevyTatePublicCors } from "@/lib/levytate/hosts";
 import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
 import { syncPersistentEarlyAccessState } from "@/lib/server/levytate-beta-access-grants";
 import {
@@ -18,26 +19,23 @@ import {
   normaliseEarlyAccessEmail,
 } from "@/lib/server/levytate-early-access";
 
-export async function GET() {
+export function OPTIONS(request: Request) {
+  return applyLevyTatePublicCors(request, new NextResponse(null, { status: 204 }));
+}
+
+export async function GET(request: Request) {
   const cookieStore = await cookies();
   const session = await readAuthorisedLevyTateBetaSession(cookieStore.get(levytateBetaSessionCookie)?.value);
 
-  if (!session) {
-    return NextResponse.json({ message: "Unauthorised." }, { status: 401 });
-  }
+  if (!session) return json(request, { message: "Unauthorised." }, 401);
 
-  if (session.accessLevel !== "beta_admin") {
-    return NextResponse.json({ message: "Forbidden." }, { status: 403 });
-  }
+  if (session.accessLevel !== "beta_admin") return json(request, { message: "Forbidden." }, 403);
 
   try {
     const leads = await listEarlyAccessRequests();
-    return NextResponse.json({ ok: true, leads });
+    return json(request, { ok: true, leads });
   } catch (error) {
-    return NextResponse.json(
-      { message: getUserFacingError(error) },
-      { status: 500 },
-    );
+    return json(request, { message: getUserFacingError(error) }, 500);
   }
 }
 
@@ -47,10 +45,7 @@ export async function POST(request: Request) {
     const email = normaliseEarlyAccessEmail(body.email);
 
     if (!isValidEarlyAccessEmail(email)) {
-      return NextResponse.json(
-        { message: "Please enter a valid work email." },
-        { status: 400 },
-      );
+      return json(request, { message: "Please enter a valid work email." }, 400);
     }
 
     const created = await createEarlyAccessRequest({
@@ -70,7 +65,7 @@ export async function POST(request: Request) {
 
     await sendEarlyAccessEmails(created);
 
-    return NextResponse.json({
+    return json(request, {
       ok: true,
       lead: created,
       message:
@@ -78,10 +73,7 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     const status = error instanceof EarlyAccessStoreError ? 400 : 500;
-    return NextResponse.json(
-      { message: getUserFacingError(error) },
-      { status },
-    );
+    return json(request, { message: getUserFacingError(error) }, status);
   }
 }
 
@@ -110,6 +102,10 @@ async function sendEarlyAccessEmails(lead: Awaited<ReturnType<typeof createEarly
       });
     }
   });
+}
+
+function json(request: Request, body: unknown, status = 200) {
+  return applyLevyTatePublicCors(request, NextResponse.json(body, { status }));
 }
 
 function getUserFacingError(error: unknown) {

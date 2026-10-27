@@ -9,14 +9,14 @@ const content = read("lib/levytate/public-trust-content.ts");
 const governance = read("lib/server/levytate-public-trust-governance.ts");
 const login = read("components/levytate-mvp/LevyTateLoginClient.tsx");
 const app = read("components/levytate-mvp/LevyTateMvpApp.tsx");
-const middleware = read("middleware.ts");
 
 for (const slug of slugs) {
   const route = `app/levytate/${slug}/page.tsx`;
   assert.ok(fs.existsSync(path.join(root, route)), `${route} must exist`);
-  assert.match(read(route), new RegExp(`https://www\\.levytate\\.co\\.uk/${slug}`), `${slug} must have canonical metadata`);
+  assert.match(read(route), new RegExp(`levyTateWebsiteUrl\\("/${slug}"\\)`), `${slug} must have canonical metadata`);
+  assert.match(read("lib/levytate/hosts.ts"), new RegExp(`"/${slug}"`), `${slug} must stay on the public page list`);
   assert.match(content, new RegExp(`slug: "${slug}"`), `${slug} must use the structured content source`);
-  assert.match(middleware, new RegExp(`/${slug}`), `${slug} short path must be routed on the LevyTate domain`);
+  assert.match(read("lib/levytate/hosts.ts"), /https:\/\/www\.levytate\.co\.uk/, "website origin must default to www.levytate.co.uk");
 }
 
 for (const required of ["/levytate/privacy", "/levytate/early-access-terms", "/levytate/account-help", "/levytate/support"]) assert.match(login, new RegExp(required), `login must link ${required}`);

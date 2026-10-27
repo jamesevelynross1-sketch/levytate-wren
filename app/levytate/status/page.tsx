@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { levyTateWebsiteUrl } from "@/lib/levytate/hosts";
 import { PublicFooter, PublicHeader } from "@/components/levytate-public/PublicHeader";
 import { getPublicReadiness } from "@/lib/server/levytate-service-health";
 
@@ -7,7 +8,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: { absolute: "Service status | LevyTate" },
   description: "Current LevyTate service availability.",
-  alternates: { canonical: "https://www.levytate.co.uk/status" },
+  alternates: { canonical: levyTateWebsiteUrl("/status") },
 };
 
 export default async function Page() {

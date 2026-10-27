@@ -17,6 +17,13 @@ const OFFLINE_DOCUMENT = `<!doctype html>
   <body><main><p>Connection required</p><h1>LevyTate is temporarily offline</h1><p>LevyTate needs an internet connection to load live apprenticeship data. Reconnect, then reload this window.</p></main></body>
 </html>`;
 
+function isLevyTateNavigation(pathname) {
+  return pathname.startsWith("/levytate/")
+    || pathname === "/login"
+    || pathname === "/app"
+    || pathname.startsWith("/app/");
+}
+
 self.addEventListener("install", () => self.skipWaiting());
 
 self.addEventListener("activate", (event) => {
@@ -28,7 +35,7 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET" || request.mode !== "navigate") return;
 
   const url = new URL(request.url);
-  if (url.origin !== self.location.origin || !url.pathname.startsWith("/levytate/")) return;
+  if (url.origin !== self.location.origin || !isLevyTateNavigation(url.pathname)) return;
 
   event.respondWith(
     fetch(request).catch(() => new Response(OFFLINE_DOCUMENT, {
