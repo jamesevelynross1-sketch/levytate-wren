@@ -1,5 +1,7 @@
 # LevyTate MVP Architecture
 
+> **Superseded for current launch operations (27 October 2026).** This record describes an older single-domain and authentication foundation. Use `LEVYTATE_LAUNCH_SCOPE.md`, `LEVYTATE_CLIENT_LAUNCH_PLAN.md` and current runtime evidence.
+
 ## Domain and Project Setup
 
 The LevyTate MVP is designed to run as a standalone SaaS product on `https://www.levytate.co.uk/`.

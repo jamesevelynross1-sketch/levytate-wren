@@ -1,5 +1,7 @@
 # LevyTate Production readiness
 
+> **Superseded for current launch operations (27 October 2026).** This checklist contains useful unresolved gates but stale migration/domain state. Use `LEVYTATE_CLIENT_LAUNCH_PLAN.md` and `LEVYTATE_CLIENT_ACCEPTANCE.md` as the current control record.
+
 ## Service-health cutover gate
 
 Before the first employer:

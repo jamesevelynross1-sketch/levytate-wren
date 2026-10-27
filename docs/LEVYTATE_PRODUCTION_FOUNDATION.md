@@ -1,5 +1,7 @@
 # LevyTate Production Foundation
 
+> **Superseded for current launch operations (27 October 2026).** This historical sprint record predates current fail-closed server persistence and split-domain authentication. Use `LEVYTATE_CLIENT_LAUNCH_PLAN.md` and `LEVYTATE_CLIENT_ACCEPTANCE.md`.
+
 ## Objective
 
 Sprint 3 replaces the remaining browser-owned MVP persistence with a production-shaped tenant foundation that can support real employer workspaces, secure sessions, auditability and future integrations.

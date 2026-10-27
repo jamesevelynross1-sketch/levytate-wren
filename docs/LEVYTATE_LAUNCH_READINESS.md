@@ -1,5 +1,7 @@
 # LevyTate launch readiness — Release 4
 
+> **Superseded for current launch operations (27 October 2026).** Retained as Release 4 evidence for an older commit and Preview. Use `LEVYTATE_CLIENT_LAUNCH_PLAN.md` and `LEVYTATE_CLIENT_ACCEPTANCE.md` for the current first-employer decision.
+
 ## 1. Release candidate and deployment
 
 - Assurance implementation commit: `9e99a7764cfab33271aed37a1ff635fe3d7c8e14`.
