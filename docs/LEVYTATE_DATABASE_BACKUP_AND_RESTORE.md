@@ -23,6 +23,8 @@ The Release Owner authorises a backup or restore exercise. The Database Owner pe
 - A database password entered directly into a mode `0600` password file. Never put credentials in chat, command arguments, shell history, logs, documentation, or a connection URI copied into a ticket.
 - Enough local space for both the archive and an isolated restored cluster.
 
+The database archive includes highly sensitive Auth recovery material, which can include password hashes, refresh/session records and MFA state. Classify the entire archive and its restore logs as restricted secret material: keep it encrypted at rest, grant access only to named restore operators, never attach it to tickets/chat/Git, never extract Auth rows into evidence, and destroy it under the approved retention schedule.
+
 Use the dashboard's direct database connection where IPv6 is available. Where it is not, use the documented IPv4 **Session Pooler** on port 5432 with the project-scoped database user. Never use the Transaction Pooler for `pg_dump` or `pg_restore` validation.
 
 ## Create the archive
@@ -47,17 +49,16 @@ PGPASSFILE="$PASSFILE" pg_dump \
   --username="PROJECT_SCOPED_DATABASE_USER" \
   --dbname=postgres \
   --format=custom \
-  --no-owner \
-  --no-privileges \
   --verbose \
   --schema=public \
   --schema=auth \
   --schema=storage \
+  --schema=supabase_migrations \
   --file="$ARCHIVE" \
   2>"$ARCHIVE.pg_dump.log"
 ```
 
-Include `supabase_migrations` only when that schema exists. Absence of that schema must be recorded as a migration-baseline limitation, not silently treated as success.
+For the current linked project, `supabase_migrations` exists and is mandatory launch evidence. Confirm `supabase_migrations.schema_migrations` appears in the archive list. The recovery archive must retain object owners and grants; do not add `--no-owner` or `--no-privileges` to the authoritative archive. If a future environment genuinely lacks the ledger schema, stop and record the migration-baseline limitation rather than silently omitting it; use a separately reviewed ledger export only when the Database Owner approves the exact method.
 
 Restrict evidence files and validate the archive:
 
@@ -71,6 +72,19 @@ chmod 600 "$ARCHIVE.archive-list.txt"
 
 Review the dump log for warnings and errors. Record the client version, timestamp, duration, byte size, SHA-256 digest, included schemas, and archive object totals. Do not retain connection strings or credentials in evidence.
 
+Record only the distinct owner and grantee **role names** needed by the archive from fresh read-only catalogue queries. This separate role-name evidence must not extract Auth rows, password hashes, session/login material or service credentials. The isolated restore may create matching **NOLOGIN** placeholder roles solely so ownership and ACL statements can be replayed and compared.
+
+## Back up and test Storage object bytes
+
+`pg_dump` includes Storage metadata but not the object bytes held by the Storage service. For every in-scope private bucket:
+
+1. Export a key/version/size/content-type inventory and every object byte stream through an approved server-side Storage export using a short-lived credential that is never logged or committed.
+2. Store the export encrypted beside, but separately from, the database archive; record per-object SHA-256, total objects/bytes, export time and bucket policy/limit metadata.
+3. Restore into a non-Production isolated Storage target or approved local-compatible harness and verify object count, keys, byte sizes, content types and checksums.
+4. Prove tenant separation with one allowed and one cross-tenant-denied retrieval through the application path.
+
+If a reliable object backup/restore path is not approved, all file-upload/file-download workflows must remain disabled for the first employer and the Database Owner must confirm the in-scope buckets contain no client objects. Database restore evidence alone must never be described as complete file recovery.
+
 ## Restore into an isolated local database
 
 Use an ephemeral PostgreSQL cluster with network listening disabled. A disposable container is acceptable; a local cluster must use a temporary Unix socket and a non-default port.
@@ -78,15 +92,13 @@ Use an ephemeral PostgreSQL cluster with network listening disabled. A disposabl
 1. Initialise the temporary cluster in a restricted directory.
 2. Configure `listen_addresses=''` and a short, mode `0700` Unix-socket directory.
 3. Start the cluster and create a dedicated restore-validation database.
-4. Create non-login placeholder roles only when restored policies refer to managed Supabase roles, for example `service_role`.
+4. Create only the non-login placeholder roles recorded from the archive catalogue, including managed Supabase roles referenced by ownership, grants or policies.
 5. A newly created local database may already contain an empty `public` schema. Drop that empty schema in the isolated database before restore; never do this against the hosted project.
 6. Restore with fail-fast behaviour:
 
 ```sh
 pg_restore \
   --exit-on-error \
-  --no-owner \
-  --no-privileges \
   --dbname="ISOLATED_RESTORE_DATABASE" \
   "$ARCHIVE"
 ```
@@ -102,13 +114,18 @@ Compare fresh, read-only live queries with the isolated restore. At minimum reco
 - operational actions and operational-action events
 - authentication security and email-delivery events
 
-Also compare catalog totals for schemas, tables, functions, triggers, foreign keys, unique constraints, indexes, RLS-enabled tables, forced-RLS tables, and policies. Verify representative partial unique indexes and authentication subject-binding constraints. Confirm the learner-lifecycle timestamp trigger function and the current authentication rate-limit and delivery-monitoring functions exist.
+Also compare catalog totals for schemas, tables, functions, triggers, foreign keys, unique constraints, indexes, RLS-enabled tables, forced-RLS tables, policies, object owners and ACL/grant entries. Verify representative partial unique indexes and authentication subject-binding constraints. Confirm the learner-lifecycle timestamp trigger function and the current authentication rate-limit and delivery-monitoring functions exist.
+
+Compare the live and restored `supabase_migrations.schema_migrations` rows, including version, name and statement metadata where present. Reconcile the result to the dated canonical migration manifest; absence or mismatch is a failed restore-evidence gate, not a harmless warning.
 
 A restore is successful only when:
 
 - `pg_restore` exits zero without unexpected warnings;
 - every sampled live row count matches the restore;
 - catalog and security-policy totals match live;
+- object-owner and ACL/grant inventories match live;
+- the restored migration ledger matches the fresh live ledger and canonical manifest;
+- the separately restored Storage-object inventory and byte checksums match, or every file workflow is explicitly disabled with zero client objects;
 - the archive checksum is recorded; and
 - any limitation is explicit.
 

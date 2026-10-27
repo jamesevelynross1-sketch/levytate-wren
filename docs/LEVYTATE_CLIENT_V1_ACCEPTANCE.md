@@ -1,5 +1,7 @@
 # LevyTate Client V1 acceptance
 
+> **Superseded for current launch operations (27 October 2026).** Retained as historic Client V1 evidence; it is not current Production or first-employer approval. Use `LEVYTATE_CLIENT_LAUNCH_PLAN.md` and `LEVYTATE_CLIENT_ACCEPTANCE.md`.
+
 Status: release-candidate acceptance complete on 2 September 2026.
 
 This document defines and records the Client V1 boundary for the authenticated LevyTate product. It is not approval to promote a deployment to Production.

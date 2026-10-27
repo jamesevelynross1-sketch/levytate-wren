@@ -1,5 +1,7 @@
 # LevyTate Migration Baseline
 
+> **Superseded for current launch operations (27 October 2026).** Retained as a historical baseline through `022`. Use `LEVYTATE_CLIENT_LAUNCH_PLAN.md`, `LEVYTATE_CLIENT_ACCEPTANCE.md` and current read-only ledger evidence before any migration action.
+
 ## Canonical history
 
 The canonical LevyTate Production migration history starts at version `006_create_levytate_production_foundation.sql`.
