@@ -27,7 +27,7 @@ check("provider failure is audited without raw errors", auth.includes('"auth.ema
 check("verified identity and successful sign-in are distinct", auth.includes('"auth.email_identity_verified"') && auth.includes('"auth.sign_in_successful"'));
 check("callback consumes a token hash", callback.includes('searchParams.get("token_hash")'));
 check("callback never accepts role or organisation", !/searchParams\.get\(["'](?:role|organisation)/.test(callback));
-check("session cookies stay HTTP-only", /httpOnly: true/.test(callback));
+check("session cookies stay HTTP-only", callback.includes("levytateAuthCookieOptions") && /httpOnly: true/.test(readFileSync("lib/levytate/hosts.ts", "utf8")));
 check("invalid-link state is server-derived without hydration drift", loginPage.includes('auth === "invalid-link"') && !loginClient.includes('typeof window !== "undefined"'));
 check("runbook names the exact Supabase project", runbook.includes("lzwcahdgchrkeulmlfqv"));
 check("runbook preserves Microsoft 365 mail routing", runbook.includes("Do not remove or replace the root Microsoft 365 MX or SPF records"));

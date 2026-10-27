@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie, readLevyTateBetaSession } from "@/lib/levytate/config/beta-access";
+import { levyTateEmployerSignInPath, levytateAuthCookieOptions, requestHostname } from "@/lib/levytate/hosts";
 import { invalidateEmployerAuthSession, levytateSupabaseAccessCookie, levytateSupabaseRefreshCookie, recordEmployerLogoutEvent } from "@/lib/server/levytate-auth";
 import { levytateDemoControllerCookie } from "@/lib/server/levytate-demo-role-switcher";
 
@@ -29,10 +30,10 @@ export async function POST(request: Request) {
     }
   }
 
-  const destination = new URL("/levytate/login", request.url);
+  const destination = new URL(levyTateEmployerSignInPath(requestHostname(request.headers.get("host") || new URL(request.url).host)), request.url);
   if (providerFailure) destination.searchParams.set("logout", "local-only");
   const response = NextResponse.redirect(destination, 303);
-  for (const name of authenticationCookies) expireCookie(response, name);
+  for (const name of authenticationCookies) expireCookie(response, request, name);
   response.headers.set("Clear-Site-Data", '"cache", "storage"');
   response.headers.set("Cache-Control", "private, no-store, max-age=0");
   if (session) {
@@ -42,14 +43,10 @@ export async function POST(request: Request) {
   return response;
 }
 
-function expireCookie(response: NextResponse, name: string) {
+function expireCookie(response: NextResponse, request: Request, name: string) {
   response.cookies.set(name, "", {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    ...levytateAuthCookieOptions(0, request.headers.get("host")),
     expires: new Date(0),
-    maxAge: 0,
-    path: "/",
   });
 }
 

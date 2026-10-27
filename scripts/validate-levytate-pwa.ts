@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import sharp from "sharp";
-import { levytateManifest } from "../lib/levytate/pwa-manifest";
+import { levytateManifest, levytatePlatformManifest } from "../lib/levytate/pwa-manifest";
 
 const root = process.cwd();
 const checks: string[] = [];
@@ -30,7 +30,10 @@ check("manifest uses LevyTate theme", appManifest.theme_color === "#17325C");
 check("manifest uses white launch background", appManifest.background_color === "#FFFFFF");
 check("manifest includes four icon declarations", appManifest.icons?.length === 4);
 check("layout links only the LevyTate manifest", layout.includes('manifest: "/levytate/manifest.webmanifest"'));
-check("layout registers LevyTate PWA bootstrap", layout.includes("<LevyTatePwaBootstrap />"));
+check("layout registers LevyTate PWA bootstrap", layout.includes("<LevyTatePwaBootstrap"));
+check("platform manifest starts at the public login route", levytatePlatformManifest.start_url === "/login");
+check("platform manifest scope covers the app host", levytatePlatformManifest.scope === "/");
+check("platform manifest keeps the LevyTate identity", levytatePlatformManifest.name === "LevyTate" && levytatePlatformManifest.short_name === "LevyTate");
 
 for (const [filename, size] of [
   ["levytate-192.png", 192],
@@ -49,7 +52,8 @@ check("installed mode hides the install button", client.includes("installed ?") 
 check("manual browser installation is explained", client.includes("Install app or Add to Dock"));
 check("normal browser use remains available", client.includes("Browser access remains available"));
 check("offline state uses approved live-data wording", client.includes("LevyTate needs an internet connection to load live apprenticeship data."));
-check("service worker is LevyTate-scoped", client.includes('scope: "/levytate/"'));
+check("service worker is LevyTate-scoped", client.includes('scope = "/levytate/"') && client.includes("{ scope }"));
+check("service worker may cover the app host", nextConfig.includes('{ key: "Service-Worker-Allowed", value: "/" }'));
 check("service worker has no Cache API writes", !worker.includes("caches.open") && !worker.includes("cache.put") && !worker.includes("cache.add"));
 check("service worker only handles navigations", worker.includes('request.mode !== "navigate"'));
 check("service worker is same-origin and LevyTate-only", worker.includes("url.origin !== self.location.origin") && worker.includes('url.pathname.startsWith("/levytate/")'));

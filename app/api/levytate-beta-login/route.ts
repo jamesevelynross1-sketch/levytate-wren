@@ -16,6 +16,7 @@ import { getPersistentEarlyAccessState } from "@/lib/server/levytate-beta-access
 import { getEarlyAccessRequestByEmail } from "@/lib/server/levytate-early-access";
 import { ProspectAccessError, assertProspectLoginAccess, recordProspectFirstLogin } from "@/lib/server/levytate-prospect-access";
 import { checkBetaLoginLimits, LevyTateRateLimitStoreError } from "@/lib/server/levytate-auth-rate-limit";
+import { levytateAuthCookieOptions } from "@/lib/levytate/hosts";
 import {
   createDemoControllerAuthorisation,
   isDemoRoleSwitcherRuntimeEnabled,
@@ -71,13 +72,11 @@ export async function POST(request: Request) {
     const sessionToken = await createLevyTateBetaSession(email, accessLevel, { authMode: "internal_beta" });
     const response = NextResponse.json({ ok: true, user: { email, accessLevel }, prospectAccess });
 
-    response.cookies.set(levytateBetaSessionCookie, sessionToken, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      maxAge: levytateBetaSessionMaxAge,
-      path: "/",
-    });
+    response.cookies.set(
+      levytateBetaSessionCookie,
+      sessionToken,
+      levytateAuthCookieOptions(levytateBetaSessionMaxAge, request.headers.get("host")),
+    );
 
     if (isDemoRoleSwitcherRuntimeEnabled()) {
       try {
@@ -88,13 +87,11 @@ export async function POST(request: Request) {
           issuedAt: Date.now(),
           expiresAt: Date.now() + levytateBetaSessionMaxAge * 1000,
         });
-        response.cookies.set(levytateDemoControllerCookie, controllerToken, {
-          httpOnly: true,
-          sameSite: "strict",
-          secure: process.env.NODE_ENV === "production",
-          maxAge: levytateDemoControllerMaxAge,
-          path: "/",
-        });
+        response.cookies.set(
+          levytateDemoControllerCookie,
+          controllerToken,
+          levytateAuthCookieOptions(levytateDemoControllerMaxAge, request.headers.get("host"), "strict"),
+        );
       } catch (error) {
         // Internal beta sign-in remains available when the optional Preview demo controller is ineligible.
         if (!(error instanceof LevyTateDemoRoleSwitcherError && error.code === "unauthorised")) {

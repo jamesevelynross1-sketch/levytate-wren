@@ -1,25 +1,30 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { SiteChrome } from "@/components/layout/SiteChrome";
+import {
+  getLevyTatePlatformOrigin,
+  getLevyTateWebsiteOrigin,
+  isLevyTateMarketingHost,
+  isLevyTateProductHost,
+  requestHostname,
+} from "@/lib/levytate/hosts";
 import "./globals.css";
-
-const levytateHosts = new Set(["levytate.co.uk", "www.levytate.co.uk"]);
 
 async function getRequestHost() {
   const requestHeaders = await headers();
-  return requestHeaders.get("host")?.split(":")[0]?.toLowerCase() ?? "";
+  return requestHostname(requestHeaders.get("host"));
 }
 
 async function isLevyTateRequest() {
   const requestHeaders = await headers();
-  const host = requestHeaders.get("host")?.split(":")[0]?.toLowerCase() ?? "";
-  return levytateHosts.has(host) || requestHeaders.get("x-levytate-route") === "1";
+  return isLevyTateProductHost(requestHostname(requestHeaders.get("host"))) || requestHeaders.get("x-levytate-route") === "1";
 }
 
 export async function generateMetadata(): Promise<Metadata> {
   if (await isLevyTateRequest()) {
+    const host = await getRequestHost();
     return {
-      metadataBase: new URL("https://www.levytate.co.uk"),
+      metadataBase: new URL(isLevyTateMarketingHost(host) ? getLevyTateWebsiteOrigin() : getLevyTatePlatformOrigin()),
       title: {
         default: "LevyTate",
         template: "%s | LevyTate",
@@ -45,7 +50,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const host = await getRequestHost();
-  const isLevyTateHost = levytateHosts.has(host) || (await headers()).get("x-levytate-route") === "1";
+  const isLevyTateHost = isLevyTateProductHost(host) || (await headers()).get("x-levytate-route") === "1";
 
   return (
     <html lang="en-GB">

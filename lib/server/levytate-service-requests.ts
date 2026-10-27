@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { LevyTateBetaSession } from "@/lib/levytate/config/beta-access";
+import { levyTateEmployerSignInUrl, levyTateProviderSignInUrl } from "@/lib/levytate/hosts";
 import type {
   EmployerRequestsWorkspaceBootstrap,
   EmployerServiceRequestView,
@@ -650,13 +651,11 @@ function escapeHtml(value: string) {
 }
 
 function providerLoginUrl() {
-  const host = process.env.VERCEL_BRANCH_URL || process.env.VERCEL_URL;
-  return host ? `https://${host}/levytate/provider/login` : "http://localhost:3000/levytate/provider/login";
+  return levyTateProviderSignInUrl();
 }
 
 function employerLoginUrl() {
-  const host = process.env.VERCEL_BRANCH_URL || process.env.VERCEL_URL;
-  return host ? `https://${host}/levytate/login` : "http://localhost:3000/levytate/login";
+  return levyTateEmployerSignInUrl();
 }
 
 async function notifyEmployerOfResponse(store: ServiceRequestStore, invitation: ServiceRequestInvitation) {

@@ -10,9 +10,9 @@ afterEach(() => {
 });
 
 function levytateRequest(path: string, cookie?: string) {
-  const headers = new Headers({ host: "levytate.co.uk" });
+  const headers = new Headers({ host: "app.levytate.co.uk" });
   if (cookie) headers.set("cookie", cookie);
-  return new NextRequest(`https://levytate.co.uk${path}`, { headers });
+  return new NextRequest(`https://app.levytate.co.uk${path}`, { headers });
 }
 
 function clearedSessionCookie(response: Response) {
@@ -40,8 +40,9 @@ describe("LevyTate middleware session gate", () => {
     const response = await middleware(levytateRequest("/app"));
 
     expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toBe("https://levytate.co.uk/login");
+    expect(response.headers.get("location")).toBe("https://app.levytate.co.uk/login");
     expect(clearedSessionCookie(response).toLowerCase()).toContain(levytateBetaSessionCookie);
+    expect(clearedSessionCookie(response).toLowerCase()).toContain("domain=app.levytate.co.uk");
     expect(clearedSessionCookie(response).toLowerCase()).toMatch(/max-age=0|expires=thu, 01 jan 1970/);
   });
 
@@ -54,7 +55,7 @@ describe("LevyTate middleware session gate", () => {
     );
 
     expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toBe("https://levytate.co.uk/login");
+    expect(response.headers.get("location")).toBe("https://app.levytate.co.uk/login");
     expect(clearedSessionCookie(response).toLowerCase()).toMatch(/max-age=0|expires=thu, 01 jan 1970/);
   });
 });

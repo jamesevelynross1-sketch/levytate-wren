@@ -59,8 +59,8 @@ No public acknowledgement or resolution time is promised.
 Required configuration values, excluding secrets:
 
 - Service label: `LevyTate`
-- Liveness URL: `https://www.levytate.co.uk/api/levytate-health/live`
-- Readiness URL: `https://www.levytate.co.uk/api/levytate-health/ready`
+- Liveness URL: `https://app.levytate.co.uk/api/levytate-health/live`
+- Readiness URL: `https://app.levytate.co.uk/api/levytate-health/ready`
 - Method: `GET` (optional independent `HEAD` contract check)
 - Expected live: HTTP `200`, JSON `status=operational`, `service=LevyTate`, valid `checkedAt`
 - Expected ready: HTTP `200` for operational/degraded; `503` for unavailable; allowlisted JSON keys only

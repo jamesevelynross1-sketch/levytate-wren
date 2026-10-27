@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { levytateAuthCookieOptions } from "@/lib/levytate/hosts";
 import {
   invalidateProviderAuthSession,
   levytateProviderSessionCookie,
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
     303,
   );
   for (const name of [levytateProviderSessionCookie, levytateProviderSupabaseAccessCookie, levytateProviderSupabaseRefreshCookie]) {
-    response.cookies.set(name, "", { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 0 });
+    response.cookies.set(name, "", { ...levytateAuthCookieOptions(0, request.headers.get("host")), expires: new Date(0) });
   }
   response.headers.set("Clear-Site-Data", '"cache", "storage"');
   response.headers.set("Cache-Control", "private, no-store, max-age=0");

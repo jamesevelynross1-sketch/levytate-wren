@@ -26,12 +26,14 @@ Use the exact values shown by Resend when rebuilding or rotating this configurat
 
 ## Redirect configuration
 
-The Supabase Site URL remains `http://localhost:3000` until the production application domain is activated in Sprint 2C. The redirect allowlist contains only exact callback URLs for:
+The Supabase Site URL for Production is `https://app.levytate.co.uk`. The redirect allowlist contains only exact callback URLs for:
 
 - local development: `http://localhost:3000/levytate/auth/callback`
 - the protected feature Preview alias
 - the current protected validation deployment
-- eventual production: `https://www.levytate.co.uk/levytate/auth/callback`
+- production employer sign-in: `https://app.levytate.co.uk/levytate/auth/callback`
+- production provider sign-in: `https://app.levytate.co.uk/levytate/provider/auth/callback`
+- transition only, until in-flight links expire: `https://www.levytate.co.uk/levytate/auth/callback` and `https://levytate.co.uk/levytate/auth/callback`
 
 Do not add wildcard Vercel redirects. The production callback being allowlisted does not activate the production domain.
 
