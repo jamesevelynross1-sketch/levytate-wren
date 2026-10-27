@@ -69,6 +69,7 @@ describe("app.levytate.co.uk platform routing", () => {
     const apprenticeships = await middleware(requestFor("app.levytate.co.uk", "/apprenticeships"));
     const funding = await middleware(requestFor("app.levytate.co.uk", "/funding"));
     const manage = await middleware(requestFor("app.levytate.co.uk", "/manage-apprenticeships"));
+    const status = await middleware(requestFor("app.levytate.co.uk", "/status?source=app"));
 
     expect(privacy.status).toBe(301);
     expect(privacy.headers.get("location")).toBe("https://marketing.example.test/privacy?from=app");
@@ -79,6 +80,8 @@ describe("app.levytate.co.uk platform routing", () => {
     expect(apprenticeships.headers.get("location")).toBe("https://marketing.example.test/apprenticeships");
     expect(funding.headers.get("location")).toBe("https://marketing.example.test/funding");
     expect(manage.headers.get("location")).toBe("https://marketing.example.test/manage-apprenticeships");
+    expect(status.status).toBe(301);
+    expect(status.headers.get("location")).toBe("https://marketing.example.test/status?source=app");
   });
 
   it("leaves platform callbacks, provider routes and APIs on the app host", async () => {
@@ -131,6 +134,16 @@ describe("levytate.co.uk transition routing", () => {
     expect(solution.status).toBe(200);
     expect(solution.headers.get("x-middleware-rewrite")).toBeNull();
     expect(solution.headers.get("location")).toBeNull();
+  });
+
+  it.each(["levytate.co.uk", "www.levytate.co.uk"])("serves canonical /status content on %s", async (host) => {
+    vi.stubEnv("LEVYTATE_MCP_STAGING_ONLY", "");
+
+    const response = await middleware(requestFor(host, "/status"));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-middleware-rewrite")).toContain("/levytate/status");
+    expect(response.headers.get("location")).toBeNull();
   });
 
   it("follows LEVYTATE_APP_BASE_URL when the platform host is overridden", async () => {

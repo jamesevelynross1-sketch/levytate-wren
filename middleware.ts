@@ -18,7 +18,7 @@ import {
 } from "@/lib/server/levytate-mcp-staging";
 
 const legacyDemoPathPrefixes = ["/portakabin-apprenticeship-hub", "/future-talent-portal", "/levytate-mvp", "/levytate/ground-control"];
-const marketingTrustPaths = new Set(["/privacy", "/early-access-terms", "/data-processing", "/support", "/account-help", "/data-rights"]);
+const marketingTrustPaths = new Set(["/privacy", "/early-access-terms", "/data-processing", "/support", "/account-help", "/data-rights", "/status"]);
 
 function clearInvalidBetaSession(response: NextResponse, request: NextRequest) {
   response.cookies.set(levytateBetaSessionCookie, "", {
