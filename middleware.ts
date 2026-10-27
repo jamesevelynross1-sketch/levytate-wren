@@ -33,9 +33,11 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  if (pathname === "/favicon.ico") {
+  if (pathname === "/favicon.ico" || pathname === "/levytate-tab-icon-20261027.png") {
     const destination = request.nextUrl.clone();
-    destination.pathname = "/brand/levytate-favicon.ico";
+    destination.pathname = pathname === "/favicon.ico"
+      ? "/brand/levytate-favicon.ico"
+      : "/brand/levytate-favicon-32.png";
     return NextResponse.rewrite(destination);
   }
 

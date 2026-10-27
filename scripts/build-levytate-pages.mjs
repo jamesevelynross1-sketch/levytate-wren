@@ -54,9 +54,9 @@ function document({ title, description, path, body, page }) {
 <title>${escape(title)}</title><meta name="description" content="${escape(description)}">
 <meta name="theme-color" content="#f8f9f5"><link rel="canonical" href="https://www.levytate.co.uk${path}">
 <meta property="og:title" content="${escape(title)}"><meta property="og:description" content="${escape(description)}"><meta property="og:type" content="website"><meta property="og:url" content="https://www.levytate.co.uk${path}">
-<link rel="icon" href="/brand/levytate-favicon.ico?v=20261026" type="image/x-icon" sizes="16x16 32x32 48x48">
-<link rel="icon" href="/brand/levytate-favicon-32.png?v=20261026" type="image/png" sizes="32x32">
-<link rel="apple-touch-icon" href="/apple-touch-icon.png?v=20261026" sizes="180x180">
+<link rel="shortcut icon" href="/favicon.ico?v=20261027" type="image/x-icon">
+<link rel="icon" href="/levytate-tab-icon-20261027.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png?v=20261027" sizes="180x180">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400..700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/mission-v2/site.css"><link rel="stylesheet" href="/mission-v3/pages.css">

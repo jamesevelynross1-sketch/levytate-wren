@@ -27,13 +27,15 @@ test('every public page offers the approved icon in browser-sized favicon format
   assert.equal(touch.readUInt32BE(16), 180);
   assert.equal(touch.readUInt32BE(20), 180);
   for (const html of Object.values(pages)) {
-    assert.match(html, /rel="icon" href="\/brand\/levytate-favicon\.ico\?v=20261026"/);
-    assert.match(html, /rel="icon" href="\/brand\/levytate-favicon-32\.png\?v=20261026"/);
-    assert.match(html, /rel="apple-touch-icon" href="\/apple-touch-icon\.png\?v=20261026"/);
+    assert.match(html, /rel="shortcut icon" href="\/favicon\.ico\?v=20261027"/);
+    assert.match(html, /rel="icon" href="\/levytate-tab-icon-20261027\.png"/);
+    assert.match(html, /rel="apple-touch-icon" href="\/apple-touch-icon\.png\?v=20261027"/);
   }
   const middleware = readFileSync(join(__dirname, '..', 'middleware.ts'), 'utf8');
   assert.match(middleware, /pathname === "\/favicon\.ico"/);
-  assert.match(middleware, /destination\.pathname = "\/brand\/levytate-favicon\.ico"/);
+  assert.match(middleware, /pathname === "\/levytate-tab-icon-20261027\.png"/);
+  assert.match(middleware, /\? "\/brand\/levytate-favicon\.ico"/);
+  assert.match(middleware, /: "\/brand\/levytate-favicon-32\.png"/);
 });
 
 test('buyer pages have no product fee or dummy letter-avatar tiles', () => {
