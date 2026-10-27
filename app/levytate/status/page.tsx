@@ -16,7 +16,7 @@ export default async function Page() {
   try { readiness = await getPublicReadiness(); } catch { readiness = null; }
   const display = !readiness ? { title: "Status temporarily unavailable", copy: "The latest service check could not be displayed. Please try again shortly.", tone: "bg-[#fff7e8] text-[#71531c]", symbol: "?" }
     : readiness.status === "operational" ? { title: "Operational", copy: "LevyTate is available and its critical service checks are completing normally.", tone: "bg-[#e8f7f1] text-[#0b6f63]", symbol: "✓" }
-    : readiness.status === "degraded" ? { title: "Operational", copy: "Core LevyTate access is available, with limited internal diagnostic reporting.", tone: "bg-[#fff7e8] text-[#71531c]", symbol: "!" }
+    : readiness.status === "degraded" ? { title: "Degraded service", copy: "Core LevyTate access is available, but a supporting service check is temporarily limited.", tone: "bg-[#fff7e8] text-[#71531c]", symbol: "!" }
     : { title: "Service disruption", copy: "A critical service check is not completing. Protected LevyTate access may be unavailable.", tone: "bg-[#fff0f2] text-[#a8324a]", symbol: "!" };
   return <div className="min-h-screen overflow-x-hidden bg-[#f6fbf8] text-[#102c3d]">
     <PublicHeader />

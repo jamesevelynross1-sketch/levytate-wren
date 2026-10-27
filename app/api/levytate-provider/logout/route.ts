@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { levytateAuthCookieOptions } from "@/lib/levytate/hosts";
+import { expireLevyTateAuthCookies } from "@/lib/server/levytate-auth-cookies";
 import {
   invalidateProviderAuthSession,
   levytateProviderSessionCookie,
@@ -26,9 +26,11 @@ export async function POST(request: Request) {
     new URL(`/levytate/provider/login${fullyInvalidated ? "" : "?logout=local-only"}`, request.url),
     303,
   );
-  for (const name of [levytateProviderSessionCookie, levytateProviderSupabaseAccessCookie, levytateProviderSupabaseRefreshCookie]) {
-    response.cookies.set(name, "", { ...levytateAuthCookieOptions(0, request.headers.get("host")), expires: new Date(0) });
-  }
+  expireLevyTateAuthCookies(response, request.headers.get("host"), [
+    levytateProviderSessionCookie,
+    levytateProviderSupabaseAccessCookie,
+    levytateProviderSupabaseRefreshCookie,
+  ]);
   response.headers.set("Clear-Site-Data", '"cache", "storage"');
   response.headers.set("Cache-Control", "private, no-store, max-age=0");
   return response;

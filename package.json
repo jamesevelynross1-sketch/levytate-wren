@@ -20,6 +20,7 @@
     "validate:assessments": "node --import tsx scripts/validate-workforce-assessments.ts",
     "validate:pastoral-support": "node --import tsx scripts/validate-pastoral-support.ts",
     "validate:pastoral-support-038": "node scripts/validate-pastoral-support-038.mjs",
+    "validate:fresh-bootstrap": "node scripts/build-fresh-supabase-bootstrap.mjs --verify-only",
     "seed:lift-preview": "node --env-file=.env.local --import tsx scripts/seed-lift-ground-control-preview.ts",
     "validate:lift": "node --import tsx scripts/validate-lift.ts",
     "validate:launch-release-1": "node --import tsx scripts/validate-launch-release-1.ts",

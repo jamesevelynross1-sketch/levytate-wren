@@ -1,6 +1,6 @@
 # LevyTate Migration Baseline
 
-> **Superseded for current launch operations (27 October 2026).** Retained as a historical baseline through `022`. Use `LEVYTATE_CLIENT_LAUNCH_PLAN.md`, `LEVYTATE_CLIENT_ACCEPTANCE.md` and current read-only ledger evidence before any migration action.
+> **Superseded for current launch operations (27 October 2026).** Retained as a historical baseline through `022`. The LG-01A fresh-project strategy is documented in `LEVYTATE_FRESH_PROJECT_BOOTSTRAP.md`; use that document, `LEVYTATE_CLIENT_LAUNCH_PLAN.md`, `LEVYTATE_CLIENT_ACCEPTANCE.md` and current read-only ledger evidence before any migration action.
 
 ## Canonical history
 

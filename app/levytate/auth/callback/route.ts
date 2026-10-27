@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie, levytateBetaSessionMaxAge, readLevyTateBetaSession } from "@/lib/levytate/config/beta-access";
-import { levyTateAppHomePath, levyTateEmployerSignInPath, levytateAuthCookieOptions, requestHostname } from "@/lib/levytate/hosts";
+import { levyTateAppHomePath, levyTateEmployerSignInPath, requestHostname } from "@/lib/levytate/hosts";
 import { levytateAuthCookieMaxAge, levytateSupabaseAccessCookie, levytateSupabaseRefreshCookie, verifyEmployerMagicLink } from "@/lib/server/levytate-auth";
+import { setLevyTateAuthCookies } from "@/lib/server/levytate-auth-cookies";
 import { checkCallbackAttemptLimit } from "@/lib/server/levytate-auth-rate-limit";
 import { getCoreEarlyAccessPolicy } from "@/lib/levytate/core-early-access-policy";
 import { normaliseMvpUserRole } from "@/lib/levytate/mvp/rbac";
@@ -23,17 +24,15 @@ export async function GET(request: Request) {
     const termsGate = await getTermsGateState(session);
     if (!termsGate.bypass && !termsGate.accepted) destination.pathname = termsGate.authorisedAcceptor ? "/levytate/accept-terms" : homePath;
     const response = NextResponse.redirect(destination);
-    setCookie(response, request, levytateBetaSessionCookie, result.sessionToken, levytateBetaSessionMaxAge);
-    setCookie(response, request, levytateSupabaseAccessCookie, result.access_token, Math.min(result.expires_in ?? 3600, levytateAuthCookieMaxAge));
-    setCookie(response, request, levytateSupabaseRefreshCookie, result.refresh_token, levytateAuthCookieMaxAge);
+    setLevyTateAuthCookies(response, request.headers.get("host"), [
+      { name: levytateBetaSessionCookie, value: result.sessionToken, maxAge: levytateBetaSessionMaxAge },
+      { name: levytateSupabaseAccessCookie, value: result.access_token, maxAge: Math.min(result.expires_in ?? 3600, levytateAuthCookieMaxAge) },
+      { name: levytateSupabaseRefreshCookie, value: result.refresh_token, maxAge: levytateAuthCookieMaxAge },
+    ]);
     return response;
   } catch {
     return failed(url, request, "invalid-link");
   }
-}
-
-function setCookie(response: NextResponse, request: Request, name: string, value: string, maxAge: number) {
-  response.cookies.set(name, value, levytateAuthCookieOptions(maxAge, request.headers.get("host")));
 }
 function failed(url: URL, request: Request, reason: string) {
   const path = levyTateEmployerSignInPath(requestHostname(request.headers.get("host") || url.host));

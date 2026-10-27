@@ -4,8 +4,8 @@ import {
   levytateBetaSessionCookie,
   levytateBetaSessionMaxAge,
 } from "@/lib/levytate/config/beta-access";
-import { levytateAuthCookieOptions } from "@/lib/levytate/hosts";
 import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
+import { setLevyTateAuthCookies } from "@/lib/server/levytate-auth-cookies";
 import {
   getDemoRoleSwitcherState,
   isDemoRoleSwitcherRuntimeEnabled,
@@ -47,11 +47,9 @@ export async function POST(request: Request) {
       body.perspective,
     );
     const next = response({ ok: true, switcher: result.state });
-    next.cookies.set(
-      levytateBetaSessionCookie,
-      result.sessionToken,
-      levytateAuthCookieOptions(levytateBetaSessionMaxAge, request.headers.get("host")),
-    );
+    setLevyTateAuthCookies(next, request.headers.get("host"), [
+      { name: levytateBetaSessionCookie, value: result.sessionToken, maxAge: levytateBetaSessionMaxAge },
+    ]);
     return next;
   } catch (error) {
     return roleSwitcherError(error, false);

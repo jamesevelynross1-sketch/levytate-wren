@@ -4,10 +4,12 @@ import { OPTIONS, POST } from "@/app/api/levytate-early-access/route";
 import { middleware } from "@/middleware";
 import { createLevyTateBetaSession, levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
 import {
+  isLevyTateAuthCookieHost,
   levyTateAuthCallbackUrl,
   levyTateEmployerSignInUrl,
   levyTatePublicSitemap,
-  levytateSessionCookieDomain,
+  levytateAuthCookieOptions,
+  levytateLegacySessionCookieDomain,
 } from "@/lib/levytate/hosts";
 import { levytateManifestForHost } from "@/lib/levytate/pwa-manifest";
 
@@ -219,14 +221,23 @@ describe("configurable platform URLs", () => {
     });
   });
 
-  it("binds session cookies to the platform host and refuses a parent domain", async () => {
+  it("uses host-only session cookies and limits legacy cleanup to the exact platform host", async () => {
     vi.stubEnv("LEVYTATE_MCP_STAGING_ONLY", "");
-    expect(levytateSessionCookieDomain("app.levytate.co.uk")).toBe("app.levytate.co.uk");
-    expect(levytateSessionCookieDomain("www.levytate.co.uk")).toBeUndefined();
+    expect(levytateAuthCookieOptions(60, "app.levytate.co.uk")).not.toHaveProperty("domain");
+    expect(levytateAuthCookieOptions(60, "www.levytate.co.uk")).not.toHaveProperty("domain");
+    expect(isLevyTateAuthCookieHost("app.levytate.co.uk")).toBe(true);
+    expect(isLevyTateAuthCookieHost("www.levytate.co.uk")).toBe(false);
+    expect(isLevyTateAuthCookieHost("unintended.app.levytate.co.uk")).toBe(false);
+    expect(levytateLegacySessionCookieDomain("app.levytate.co.uk")).toBe("app.levytate.co.uk");
+    expect(levytateLegacySessionCookieDomain("www.levytate.co.uk")).toBeUndefined();
+    expect(levytateLegacySessionCookieDomain("unintended.app.levytate.co.uk")).toBeUndefined();
 
     vi.stubEnv("LEVYTATE_SESSION_COOKIE_DOMAIN", "levytate.co.uk");
     const response = await middleware(requestFor("app.levytate.co.uk", "/app"));
-    expect(response.headers.getSetCookie().join("\n").toLowerCase()).not.toContain("domain=");
+    const domainCookies = response.headers.getSetCookie().filter((cookie) => /domain=/i.test(cookie));
+    expect(domainCookies).toHaveLength(1);
+    expect(domainCookies[0]).toMatch(/Domain=app\.levytate\.co\.uk/i);
+    expect(domainCookies[0]).toMatch(/Max-Age=0/i);
   });
 });
 
