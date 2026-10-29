@@ -39,6 +39,11 @@ describe("Finance input contract", () => {
 });
 
 describe("workspace action envelope", () => {
+  it.each(["archiveEmployee", "archiveRole", "archiveProvider", "archiveProviderProgramme"])("%s requires an explicit retry-safe target state", (type) => {
+    expect(parseWorkspaceMutation({ type, id: "synthetic-record", status: "Archived" })).toEqual({ type, id: "synthetic-record", status: "Archived" });
+    expect(() => parseWorkspaceMutation({ type, id: "synthetic-record" })).toThrow();
+    expect(() => parseWorkspaceMutation({ type, id: "synthetic-record", status: "Deleted" })).toThrow();
+  });
   it("accepts a bounded People import with a stable receipt and rejects malformed envelopes", () => {
     const body = { type: "importEmployees", importId: "7b8aa254-57cb-4079-a4bd-9c462cb6bf5b", employees: [{ id: "synthetic-person" }] };
     expect(parseWorkspaceMutation(body)).toEqual(body);

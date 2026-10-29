@@ -75,8 +75,9 @@ export function parseWorkspaceMutation(body: Record<string, unknown>): LevyTateW
       validateBoundedValue(employee);
     }
   } else if (archiveActions.includes(type)) {
-    requireActionKeys(body, ["type", "id"]);
+    requireActionKeys(body, type === "removeProviderProgramme" ? ["type", "id"] : ["type", "id", "status"]);
     if (!identifier.safeParse(body.id).success) invalidAction();
+    if (type !== "removeProviderProgramme" && body.status !== "Active" && body.status !== "Archived") invalidAction();
   } else if (Object.hasOwn(statuses, type)) {
     requireActionKeys(body, type === "updateApplicationStatus" ? ["type", "id", "status", "note", "expectedRevision", "idempotencyKey"] : ["type", "id", "status"]);
     if (!identifier.safeParse(body.id).success || typeof body.status !== "string" || !(statuses[type as keyof typeof statuses] as readonly string[]).includes(body.status)) invalidAction();
