@@ -11,6 +11,18 @@ describe("Auth provider availability (transport unit tests)", () => {
     vi.stubGlobal("fetch", vi.fn(async () => Response.json({ code: "unexpected_failure" }, { status })));
     await expect(run()).rejects.toMatchObject({ status: 503 });
   });
+  it.each([400, 403, 422])("recognises GoTrue numeric status %s with an explicit expired-link code", async (status) => {
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ code: status, error_code: "otp_expired" }, { status })));
+    expect((await run()).status).toBe(status);
+  });
+  it("accepts the legacy string code format", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ code: "invalid_credentials" }, { status: 400 })));
+    expect((await run()).status).toBe(400);
+  });
+  it("does not ignore an unknown explicit error_code in favour of a legacy code", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ code: "otp_expired", error_code: "unexpected_failure" }, { status: 403 })));
+    await expect(run()).rejects.toMatchObject({ status: 503 });
+  });
   it("keeps provider rate limits distinct", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 429 })));
     await expect(run()).rejects.toMatchObject({ status: 429 });

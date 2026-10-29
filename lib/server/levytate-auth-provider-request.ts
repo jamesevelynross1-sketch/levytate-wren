@@ -26,7 +26,10 @@ export async function authProviderRequest(url: string, init: RequestInit): Promi
   let body: unknown;
   try { body = await readBoundedJson(response, 16 * 1024); }
   catch { throw new AuthenticationDependencyError(); }
-  const code = body && typeof body === "object" ? (body as { code?: unknown; error_code?: unknown }).code ?? (body as { error_code?: unknown }).error_code : undefined;
+  // GoTrue's wire format may carry a numeric HTTP `code` alongside the
+  // machine-readable `error_code`. Do not mistake that status for an Auth code.
+  const error = body && typeof body === "object" ? body as { code?: unknown; error_code?: unknown } : undefined;
+  const code = typeof error?.error_code === "string" ? error.error_code : error?.code;
   if (typeof code !== "string" || !invalidCredentialCodes.has(code)) throw new AuthenticationDependencyError();
   return response;
 }
