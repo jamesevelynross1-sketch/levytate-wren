@@ -1,10 +1,24 @@
 import { BoundedJsonBodyError, readBoundedJson } from "@/lib/server/bounded-json";
+import { checkAuthenticatedWriteLimit, LevyTateRateLimitStoreError } from "@/lib/server/levytate-auth-rate-limit";
 
 export class ClientRequestError extends Error {
-  constructor(message: string, readonly status: 400 | 403 | 413 | 415) {
+  constructor(message: string, readonly status: 400 | 403 | 413 | 415 | 429 | 503) {
     super(message);
     this.name = "ClientRequestError";
   }
+}
+
+export async function readAuthenticatedJson(request: Request, actorEmail: string, maximumBytes = 64 * 1024) {
+  const body = await readBrowserJson(request, maximumBytes);
+  try {
+    if (!(await checkAuthenticatedWriteLimit(request, actorEmail)).allowed) {
+      throw new ClientRequestError("Too many changes in a short time. Wait a minute before retrying.", 429);
+    }
+  } catch (error) {
+    if (error instanceof LevyTateRateLimitStoreError) throw new ClientRequestError("Security controls are temporarily unavailable. No change has been made.", 503);
+    throw error;
+  }
+  return body;
 }
 
 /** Cookie-authenticated writes require the browser's exact application origin.

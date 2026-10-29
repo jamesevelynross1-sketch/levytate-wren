@@ -4,7 +4,7 @@ import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
 import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
 import { confirmOrganisationFinanceBalance, getOrganisationFinanceState, importOrganisationFinance, LevyTateFinanceError } from "@/lib/server/levytate-finance";
 import { LevyTateLearnerLifecyclePermissionError } from "@/lib/server/levytate-learner-lifecycle";
-import { ClientRequestError, readBrowserJson } from "@/lib/server/levytate-request-boundary";
+import { ClientRequestError, readAuthenticatedJson } from "@/lib/server/levytate-request-boundary";
 import { parseFinanceAction } from "@/lib/server/levytate-mutation-input";
 
 async function sessionFromCookie(){const store=await cookies();return readAuthorisedLevyTateBetaSession(store.get(levytateBetaSessionCookie)?.value);}
@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   const session = await sessionFromCookie();
   if (!session) return response({ message: "Unauthorised." }, 401);
   try {
-    const body = parseFinanceAction(await readBrowserJson(request, 10 * 1024 * 1024));
+    const body = parseFinanceAction(await readAuthenticatedJson(request, session.email, 10 * 1024 * 1024));
     if (body.action === "import") return response({ ok: true, ...await importOrganisationFinance(session, body.fileName, body.result) });
     return response({ ok: true, state: await confirmOrganisationFinanceBalance(session, body.amountPence) });
   } catch (error) { return errorResponse(error); }

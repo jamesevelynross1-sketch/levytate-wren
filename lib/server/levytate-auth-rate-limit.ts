@@ -41,6 +41,24 @@ export async function checkSessionRefreshLimit(request: Request) {
   ]);
 }
 
+/** Shared, persistent budget for cookie-authenticated writes across endpoints.
+ * Keys are HMACs and a changed session cookie cannot reset the identity budget.
+ */
+export async function checkAuthenticatedWriteLimit(request: Request, email: string) {
+  return consumeChecks([
+    check("workspace_write.identity.minute", rateLimitKey("email", email.trim().toLowerCase()), "/api/levytate-workspace/*", "workspace_write_rate_limited", { limit: 120, windowSeconds: 60 }),
+    check("workspace_write.network.minute", networkRateLimitKey(request), "/api/levytate-workspace/*", "workspace_write_rate_limited", { limit: 600, windowSeconds: 60 }),
+  ]);
+}
+
+export async function checkLevyTateCopilotLimits(request: Request, email: string) {
+  return consumeChecks([
+    check("copilot.identity.minute", rateLimitKey("email", email.trim().toLowerCase()), "/api/levytate-ai", "copilot_rate_limited", { limit: 12, windowSeconds: 60 }),
+    check("copilot.identity.hour", rateLimitKey("email", email.trim().toLowerCase()), "/api/levytate-ai", "copilot_rate_limited", { limit: 120, windowSeconds: 3600 }),
+    check("copilot.network.hour", networkRateLimitKey(request), "/api/levytate-ai", "copilot_rate_limited", { limit: 1200, windowSeconds: 3600 }),
+  ]);
+}
+
 export async function checkMicrosoftCopilotPreAuthenticationLimit(request: Request) {
   return consumeChecks([
     check(
