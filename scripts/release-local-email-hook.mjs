@@ -12,6 +12,8 @@ const state = JSON.parse(readFileSync(`${root}/private-stack-state.json`, "utf8"
 const smtp = state.endpoints["mail.smtp"];
 if (smtp.address !== "127.0.0.1") throw new Error("SMTP must remain loopback capture only");
 const callback = "http://localhost:3107/levytate/auth/callback";
+const port=Number(process.env.RELEASE_EMAIL_HOOK_PORT??"3117");
+if(![3117,3118].includes(port))throw new Error("Dedicated local hook port required");
 
 async function deliver(to, token, type) {
   const socket = connect(smtp.port, "127.0.0.1");
@@ -54,4 +56,4 @@ createServer(async (request, response) => {
     response.writeHead(400, { "Content-Type": "application/json" }).end('{"error":{"http_code":400,"message":"Local acceptance email delivery failed"}}');
     console.error("FAIL local Auth capture; no token or recipient logged");
   }
-}).listen(3117, "127.0.0.1", () => console.log("Local signed email hook listening on loopback port 3117"));
+}).listen(port, "127.0.0.1", () => console.log(`Local signed email hook listening on loopback port ${port}`));

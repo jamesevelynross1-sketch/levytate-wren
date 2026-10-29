@@ -36,6 +36,11 @@ const env = {
   PGPASSWORD:database.password,RELEASE_PGHOST:database.hostname,RELEASE_PGPORT:database.port,RELEASE_PGUSER:database.username,
   RELEASE_PGDATABASE:process.env.RELEASE_TEST_DATABASE,RELEASE_PSQL:process.env.RELEASE_PSQL??"/opt/homebrew/opt/postgresql@17/bin/psql",
 };
+if(process.env.RELEASE_ENABLE_SYNTHETIC_LIFT==="true"){
+  const fixture=JSON.parse(readFileSync(env.RELEASE_FIXTURE_MANIFEST,"utf8"));
+  if(!fixture.synthetic||fixture.environment!=="local"||!fixture.tenants?.[0]?.id||process.env.VERCEL_ENV)throw new Error("Local synthetic Lift scope required");
+  Object.assign(env,{LEVYTATE_LIFT_ENABLED:"true",LEVYTATE_LIFT_RUNTIME_SCOPE:"local",LEVYTATE_LIFT_ALLOWED_ORGANISATION_ID:fixture.tenants[0].id});
+}
 const mode = process.argv[2];
 const commands = {
   hook: [process.execPath, [resolve(scriptDir, "release-local-email-hook.mjs")]],
@@ -49,6 +54,8 @@ const commands = {
   learner: [process.execPath,[resolve(scriptDir,"release-learner-integrity.mjs")]],
   suspension: [process.execPath,[resolve(scriptDir,"release-suspension-integrity.mjs")]],
   catalogue: [process.execPath,[resolve(scriptDir,"release-catalogue-concurrency.mjs")]],
+  lift: [process.execPath,[resolve(scriptDir,"release-lift-integrity.mjs")]],
+  "learning-time": [process.execPath,[resolve(scriptDir,"release-learning-time-integrity.mjs")]],
   start: [process.execPath, [resolve(scriptDir, "release-start-local-stack.mjs")]],
   stop: [`${root}/supabase`, ["stack", "stop", "--workdir", `${root}/project`, "--output-format", "json"]],
   "bootstrap-dry-run": [`${root}/supabase`, ["db", "push", "--local", "--dry-run", "--workdir", `${root}/project`]],

@@ -2,6 +2,7 @@
 import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { localUrl } from "./release-local-fixtures.mjs";
+import { lockAcceptanceRuntime } from "./release-runtime-lock.mjs";
 const root=process.env.RELEASE_LOCAL_RUNTIME;
 if(!root?.startsWith("/private/tmp/levytate-release-runtime."))throw new Error("Dedicated local runtime required");
 const state=JSON.parse(readFileSync(`${root}/private-stack-state.json`,"utf8")), db=new URL(state.env.DB_URL);
@@ -13,10 +14,12 @@ const signature=faultTarget==="consume"?"public.levytate_consume_auth_rate_limit
 const env={...process.env,PGHOST:db.hostname,PGPORT:db.port,PGUSER:db.username,PGPASSWORD:db.password,PGDATABASE:db.pathname.slice(1)};
 function sql(input){const r=spawnSync(process.env.RELEASE_PSQL??"/opt/homebrew/opt/postgresql@17/bin/psql",["-X","-A","-t","-q","-v","ON_ERROR_STOP=1"],{input,env,encoding:"utf8"});if(r.status)throw new Error("Local fault-injection SQL failed");return r.stdout.trim();}
 let injected=false,passed=0,failed=0;
+let releaseRuntime;
 function check(name,value){value?passed++:failed++;console.log(`${value?"PASS":"FAIL"} ${name}`);}
 const ready=()=>fetch(`${app}/api/levytate-health/ready`,{cache:"no-store"});
 const expiry=()=>new Promise(resolve=>setTimeout(resolve,11000));
 try{
+  releaseRuntime=lockAcceptanceRuntime("readiness-fault-injection");
   const baseline=await ready();check("genuinely available local backend yields readiness200",baseline.status===200&&(await baseline.json()).status==="operational");
   if(sql(`select has_function_privilege('service_role','${signature}','EXECUTE');`)!=="t")throw new Error("Expected original execute grant is absent; no mutation performed");
   sql(`revoke execute on function ${signature} from service_role;`);injected=true;
@@ -37,5 +40,6 @@ try{
 }catch(error){failed++;console.error(`FAIL readiness execution ${error.message}`);}
 finally{
   if(injected){try{sql(`grant execute on function ${signature} to service_role;`);console.log("Restored original LOCAL service-role execute grant");await expiry();check("dependency restoration recovers readiness200",(await ready()).status===200);}catch{failed++;console.error("FAIL LOCAL grant restoration; inspect restricted runtime before further tests");}}
+  releaseRuntime?.();
 }
 console.log(`Independent readiness integrity: ${passed} PASS, ${failed} FAIL`);if(failed)process.exitCode=1;

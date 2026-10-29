@@ -8,10 +8,22 @@ import { randomUUID, createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 import { localUrl, releaseBackend } from "./release-local-fixtures.mjs";
+import { lockAcceptanceRuntime } from "./release-runtime-lock.mjs";
 
 const results = [];
 let browser;
 let phase = "initialisation";
+let releaseRuntime;
+let restoreLift;
+function setLocalLiftFixture(manifest,enabled){
+  const root=process.env.RELEASE_LOCAL_RUNTIME,tenant=manifest.tenants[0];
+  if(!root?.startsWith("/private/tmp/levytate-release-runtime.")||!manifest.synthetic||manifest.environment!=="local"||!/^[-a-f0-9]{36}$/.test(manifest.run)||!/^[-a-f0-9]{36}$/.test(tenant.id))throw new Error("Synthetic local capability target required");
+  const state=JSON.parse(readFileSync(`${root}/private-stack-state.json`,"utf8")),db=new URL(state.env.DB_URL);
+  if(db.hostname!=="127.0.0.1")throw new Error("Loopback only");
+  const input=`insert into public.levytate_organisation_capabilities(organisation_id,lift_enabled) select id,${enabled} from public.levytate_organisations where id='${tenant.id}' and slug='release-${manifest.run}-a' on conflict(organisation_id)do update set lift_enabled=excluded.lift_enabled returning organisation_id;`;
+  const r=spawnSync(process.env.RELEASE_PSQL??"/opt/homebrew/opt/postgresql@17/bin/psql",["-XAtq","-v","ON_ERROR_STOP=1"],{input,env:{...process.env,PGHOST:db.hostname,PGPORT:db.port,PGUSER:db.username,PGPASSWORD:db.password,PGDATABASE:db.pathname.slice(1)},encoding:"utf8"});
+  if(r.status||r.stdout.trim()!==tenant.id)throw new Error("Synthetic capability update not confirmed");
+}
 function failureBudgetWritesSince(since) {
   const root=process.env.RELEASE_LOCAL_RUNTIME;
   if(!root?.startsWith("/private/tmp/levytate-release-runtime."))return null;
@@ -49,6 +61,7 @@ async function waitForCapturedLink(mailpit, email, appOrigin, after) {
 }
 
 try {
+  releaseRuntime=lockAcceptanceRuntime("genuine-browser-acceptance");
   const app = localUrl(process.env.RELEASE_APP_URL, "RELEASE_APP_URL");
   const mailpit = localUrl(process.env.RELEASE_MAILPIT_URL, "RELEASE_MAILPIT_URL");
   if (!process.env.RELEASE_FIXTURE_MANIFEST) throw new Error("BLOCKED: synthetic fixture manifest unavailable");
@@ -171,6 +184,47 @@ try {
       const gated=await actor.context.request.get(`${app}/api/${path}`);
       check(`${key}: unapproved ${path} remains tenant-gated`,gated.status()===404);
     }
+  }
+  if(process.env.RELEASE_LIFT_JOURNEY==="true"){
+    phase="genuine independent Lift perspectives";
+    setLocalLiftFixture(manifest,true);restoreLift=()=>setLocalLiftFixture(manifest,false);
+    const employee=contexts.get("a:employee"),manager=contexts.get("a:manager"),lead=contexts.get("a:lead"),other=contexts.get("b:employee");
+    const get=async actor=>{const response=await actor.context.request.get(`${app}/api/levytate-lift`);check(`${actor.user.role}: current synthetic Lift workspace loads`,response.status()===200);return(await response.json()).workspace;};
+    const post=(actor,input)=>actor.context.request.post(`${app}/api/levytate-lift`,{headers:{Origin:app},data:input});
+    let workspace=await get(lead);
+    const invite={action:"invite_people",idempotencyKey:randomUUID(),expectedWorkspaceRevision:workspace.mutationRevision,title:"Synthetic native acceptance",businessObjective:"Test persistence and independent perspectives only",employeeIds:[employee.user.personId],frameworkKey:workspace.framework.key,questionnaireVersion:workspace.framework.questionnaireVersion,interpretationVersion:workspace.framework.interpretationVersion};
+    check("Employee cannot issue Lift campaign invitations",(await post(employee,invite)).status()===403);
+    check("other tenant remains Lift-disabled",(await other.context.request.get(`${app}/api/levytate-lift`)).status()===404);
+    const invited=await post(lead,invite);check("Lead creates genuine persisted Lift invitation",invited.status()===200&&(await invited.json()).workspace.coverage.invited===1);
+    check("Lift invitation lost-response retry is idempotent",(await post(lead,invite)).status()===200);
+    workspace=await get(employee);
+    const assessmentId=workspace.assessment.id,answers=Object.fromEntries(workspace.framework.questions.map(question=>[question.id,question.type==="long_text"?"Fictional acceptance response: verify a bounded change using an owner, measure and review; no customer facts.":question.options[0].value]));
+    const save={action:"save_assessment",idempotencyKey:randomUUID(),expectedWorkspaceRevision:workspace.mutationRevision,assessmentId,answers,currentQuestionIndex:1,expectedRevision:1};
+    const privateWrite=await post(manager,save);
+    check("Manager cannot write Employee private Lift answers",[403,404].includes(privateWrite.status()));
+    check("denied Manager write leaves Employee answers unchanged",Object.values((await get(employee)).assessment.answers).every(value=>value===null||value===""));
+    const saved=await post(employee,save);check("Employee stores actual complete Lift draft",saved.status()===200&&(await saved.json()).workspace.assessment.answers.check_01===answers.check_01);
+    check("Lift draft exact retry does not duplicate writes",(await post(employee,save)).status()===200);
+    workspace=await get(manager);const direct=workspace.manager.directReports.find(row=>row.employeeId===employee.user.personId);
+    check("Manager cannot see draft Employee findings",direct.employeeFindingsReleased===false&&direct.employeeFindings.length===0);
+    const observe={action:"save_manager_perspective",idempotencyKey:randomUUID(),expectedWorkspaceRevision:workspace.mutationRevision,employeeId:employee.user.personId,expectedRevision:direct.currentRevision,observations:{workflowGroup:"other_reviewed",observedWork:"Fictional independent observed work",observationRecency:"Today in isolated acceptance",opportunityToObserve:"limited",supportDegree:"some_support",capabilityObservations:[],concreteExamples:["Fictional acceptance example"],suitableOpportunity:"Synthetic bounded improvement",intendedOutcome:"Verify integration without claiming real capability",conditionTime:"Synthetic test window",conditionTools:"Local test tool",conditionAccess:"Synthetic access",conditionSupervision:"Synthetic manager",conditionSuitableWork:"Synthetic workflow"}};
+    const observed=await post(manager,observe);check("Manager stores own independent perspective",observed.status()===200);
+    workspace=await get(manager);check("manager perspective survives fresh API reload",workspace.manager.directReports.find(row=>row.employeeId===employee.user.personId).draft.observedWork===observe.observations.observedWork);
+    const managerSubmit={action:"submit_manager_perspective",idempotencyKey:randomUUID(),expectedWorkspaceRevision:workspace.mutationRevision,employeeId:employee.user.personId,expectedRevision:direct.currentRevision};
+    check("Manager submits perspective independently",(await post(manager,managerSubmit)).status()===200);
+    workspace=await get(employee);check("independent manager submission does not leak before Employee submits",workspace.assessment.releasedManagerObservation===null);
+    const employeeSubmit={action:"submit_assessment",idempotencyKey:randomUUID(),expectedWorkspaceRevision:workspace.mutationRevision,assessmentId,expectedRevision:1};
+    const submitted=await post(employee,employeeSubmit),submittedBody=await submitted.json();
+    if(submitted.status()!==200)console.log("Lift submit diagnostic",JSON.stringify({status:submitted.status(),message:submittedBody.message}));
+    check("Employee submits and real service reconciles independent perspectives atomically",submitted.status()===200&&submittedBody.workspace.assessment.status==="submitted"&&submittedBody.workspace.assessment.managerPerspectiveStatus==="released");
+    check("Lift submitted retry returns durable result",(await post(employee,employeeSubmit)).status()===200);
+    workspace=await get(manager);check("Manager sees released findings only after both submissions",workspace.manager.directReports.find(row=>row.employeeId===employee.user.personId).employeeFindingsReleased===true);
+    workspace=await get(lead);check("single participant cannot create disclosable employer aggregate",workspace.opportunities.length===0&&workspace.proofs.length===0&&workspace.decisions.length===0);
+    check("submitted Lift answers cannot be overwritten",(await post(employee,{...save,idempotencyKey:randomUUID(),expectedWorkspaceRevision:workspace.mutationRevision})).status()===409);
+    const rows=await backend(`rest/v1/levytate_lift_assessments?organisation_id=eq.${employee.tenant.id}&id=eq.${assessmentId}&select=status,active_submission_revision`);
+    check("new database request confirms immutable submitted Lift record",rows.length===1&&rows[0].status==="submitted"&&rows[0].active_submission_revision===1);
+    restoreLift();restoreLift=undefined;
+    check("local synthetic Lift capability restored to disabled",(await lead.context.request.get(`${app}/api/levytate-lift`)).status()===404);
   }
   if (process.env.RELEASE_UI_RECOVERY === "true") {
     phase = "People form survives genuine session loss and reauthentication";
@@ -319,7 +373,9 @@ try {
   console.error(blocked ? error.message : `FAIL release browser acceptance at ${phase} (${error.name} ${networkCode}); authentication state and raw errors withheld`);
   process.exitCode = blocked ? 2 : 1;
 } finally {
+  try{restoreLift?.();}catch{results.push({name:"Restore local-only Lift capability to disabled",status:"FAIL"});console.error("FAIL local Lift capability restoration; inspect synthetic runtime before more acceptance");process.exitCode=1;}
   await browser?.close();
+  releaseRuntime?.();
   const evidence = { schemaVersion: 1, environment: "local", authenticationMethod: "requested-sign-in-link-through-local-smtp", authenticatedRolesVerified: results.filter((item) => item.name.endsWith("canonical role and tenant resolved") && item.status === "PASS").length, emailEvidence: "local-smtp-capture-only", results };
   if (process.env.RELEASE_EVIDENCE_PATH?.startsWith("/private/tmp/")) {
     const requested = process.env.RELEASE_EVIDENCE_PATH;
