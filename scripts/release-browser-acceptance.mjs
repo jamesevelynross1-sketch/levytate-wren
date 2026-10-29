@@ -188,7 +188,7 @@ try {
     check("reconnected form retains original typed values", await dialog.getByLabel("Employee name", { exact: true }).inputValue() === syntheticName && await dialog.getByLabel("Work email", { exact: true }).inputValue() === syntheticEmail);
     await dialog.getByRole("button", { name: "Save employee", exact: true }).click();
     try{await dialog.waitFor({ state: "detached" });}
-    catch(error){console.log("People inline error",(await dialog.getByRole("alert").allTextContents()).join(" | ").slice(0,1200));throw error;}
+    catch(error){console.log("People inline messages",(await dialog.locator("p").allTextContents()).join(" | ").slice(0,1600));throw error;}
     const stored = await backend(`rest/v1/levytate_employees?organisation_id=eq.${lead.tenant.id}&email=eq.${encodeURIComponent(syntheticEmail)}&select=id,name`);
     check("recovered People form durably saves exactly once", stored.length === 1 && stored[0].name === syntheticName);
   }
