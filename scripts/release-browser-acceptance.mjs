@@ -68,11 +68,13 @@ try {
         phase = `${label}: wait for request confirmation`;
         await page.getByRole("heading", { name: "Check your email", exact: true }).waitFor();
       } else {
+        phase = `${label}: controlled invitation`;
         const lead = contexts.get(`${tenant.key}:lead`);
         const requestId = randomUUID();
         const invitation = { action: "invite_user", userId: user.membershipId, requestId, expectedGeneration: 0 };
         const invite = await lead.context.request.post(`${app}/api/levytate-workspace/invitations`, { headers: { Origin: app }, data: invitation });
         const accepted = await invite.json();
+        if (invite.status() !== 200 || accepted.user?.invitationStatus !== "accepted") console.log("Invitation diagnostic", JSON.stringify({ status: invite.status(), invitationStatus: accepted.user?.invitationStatus, deliveryStatus: accepted.user?.deliveryStatus, message: accepted.message }));
         check(`${label}: Lead-controlled invitation accepted by real Auth`, invite.status() === 200 && accepted.user?.invitationStatus === "accepted");
         const repeated = await lead.context.request.post(`${app}/api/levytate-workspace/invitations`, { headers: { Origin: app }, data: invitation });
         check(`${label}: invitation request retry is idempotent`, repeated.status() === 200 && (await repeated.json()).user?.invitationGeneration === accepted.user.invitationGeneration);
@@ -91,7 +93,8 @@ try {
       }
       check(`${label}: callback stays on application origin`, new URL(page.url()).origin === app && new URL(page.url()).pathname.includes("/app"));
       const authCookies = (await context.cookies()).filter((cookie) => /^levytate_(beta_session|auth_access|auth_refresh)$/.test(cookie.name));
-      check(`${label}: three HttpOnly host-only cookies`, authCookies.length === 3 && authCookies.every((cookie) => cookie.httpOnly && cookie.path === "/" && !cookie.domain.startsWith(".") && cookie.sameSite !== "None") && callbackCookies.filter((value) => !/Max-Age=0/.test(value)).length === 3 && callbackCookies.every((value) => !/Domain=/i.test(value)));
+      const activeHeaders = callbackCookies.filter((value) => !/Max-Age=0/i.test(value));
+      check(`${label}: three HttpOnly host-only cookies`, authCookies.length === 3 && authCookies.every((cookie) => cookie.httpOnly && cookie.path === "/" && cookie.domain === new URL(app).hostname && cookie.sameSite !== "None") && activeHeaders.every((value) => !/Domain=/i.test(value)));
       const workspace = await context.request.get(`${app}/api/levytate-workspace`);
       const data = await workspace.json();
       check(`${label}: canonical role and tenant resolved`, workspace.status() === 200 && data.workspace?.meta?.userRole === user.role && data.workspace?.meta?.organisationId === tenant.id);

@@ -19,8 +19,8 @@ const env = {
   NEXT_PUBLIC_SUPABASE_URL: base, SUPABASE_SERVICE_ROLE_KEY: state.env.SERVICE_ROLE_KEY,
   LEVYTATE_BETA_SESSION_SECRET: secrets.sessionSecret, LEVYTATE_BETA_LOGIN_ENABLED: "false",
   RELEASE_SUPABASE_URL: base, RELEASE_SUPABASE_SERVICE_KEY: state.env.SERVICE_ROLE_KEY,
-  RELEASE_APP_URL: "http://localhost:3107", RELEASE_MAILPIT_URL: state.env.MAILPIT_URL,
-  RELEASE_FIXTURE_MANIFEST: `${root}/fixture-manifest.json`, RELEASE_EVIDENCE_PATH: `${root}/browser-evidence.json`,
+  RELEASE_APP_URL: process.env.RELEASE_APP_URL ?? "http://localhost:3107", RELEASE_MAILPIT_URL: state.env.MAILPIT_URL,
+  RELEASE_FIXTURE_MANIFEST: process.env.RELEASE_FIXTURE_MANIFEST ?? `${root}/fixture-manifest.json`, RELEASE_EVIDENCE_PATH: `${root}/browser-evidence.json`,
 };
 const mode = process.argv[2];
 const commands = {
