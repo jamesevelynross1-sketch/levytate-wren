@@ -25,9 +25,9 @@ import {
   type ManagerDirectReportContext,
 } from "@/lib/server/levytate-manager-scope";
 import { listManagerDirectReportLearnerLifecycleDetails } from "@/lib/server/levytate-learner-lifecycle";
+import { applyLearnerTransaction, learnerRevision, LearnerTransactionError } from "@/lib/server/levytate-learner-transaction";
 import {
   getLevyTateSupabaseConfig,
-  supabaseInsert,
   supabaseSelect,
 } from "@/lib/server/levytate-supabase";
 
@@ -80,21 +80,24 @@ export async function recordManagerDirectReportCheckIn(
 ) {
   const scope = await authorisedScope(session, employeeId);
   const details = await listManagerDirectReportLearnerLifecycleDetails(session, scope);
-  const learner = details.find((item) => item.learner.id === employeeId);
+  let learner = details.find((item) => item.learner.id === employeeId);
   if (!learner) {
     throw new LevyTateManagerCheckInValidationError("A learner record is required before a manager check-in can be recorded.");
   }
+  const idempotencyKey = validateIdempotencyKey(rawInput?.idempotencyKey);
+  const command = { organisationId: scope.organisation.id, actorId: scope.user.id, learnerId: learner.learnerRecordId, action: "manager_checkin", input: { employeeId, input: rawInput }, idempotencyKey };
+  const replay = await managerTransaction<{ record: ManagerReviewRow; learnerRecordId: string }>(command, { probe: true });
+  if (replay) return { created: false, record: reviewFromRow(replay.record), learnerRecordId: replay.learnerRecordId };
+  const expectedRevision = await learnerRevision(scope.organisation.id, learner.learnerRecordId);
+  learner = (await listManagerDirectReportLearnerLifecycleDetails(session, scope)).find((item) => item.learner.id === employeeId);
+  if (!learner) throw new LevyTateManagerCheckInAccessError();
   if (!managerCheckInEligibleLifecycleStatuses.includes(learner.lifecycleStatus as (typeof managerCheckInEligibleLifecycleStatuses)[number])) {
     throw new LevyTateManagerCheckInValidationError("A new manager check-in cannot be recorded for this learner's current journey state.");
   }
-
-  const idempotencyKey = validateIdempotencyKey(rawInput?.idempotencyKey);
   const reviewId = `learner-review-${learner.learnerRecordId}-${idempotencyKey}`;
   const existing = await selectReview(scope.organisation.id, reviewId);
   if (existing) {
-    await ensureLifecycleEvent(scope, employeeId, existing);
-    await synchroniseManagerConditions(session, employeeId, learner.learnerRecordId);
-    return { created: false, record: reviewFromRow(existing), learnerRecordId: learner.learnerRecordId };
+    throw new LevyTateManagerCheckInConflictError("This check-in ID already exists without a matching command receipt.");
   }
 
   if (rawInput.expectedActivityVersion && rawInput.expectedActivityVersion !== learner.activityVersion) {
@@ -147,16 +150,24 @@ export async function recordManagerDirectReportCheckIn(
     updated_at: timestamp,
   };
 
-  const inserted = await supabaseInsert<ManagerReviewRow>(requireConfig(), reviewsTable, [row], {
-    query: "on_conflict=organisation_id,id",
-    prefer: "resolution=ignore-duplicates,return=representation",
-  });
-  const persisted = inserted[0] ?? await selectReview(scope.organisation.id, reviewId);
-  if (!persisted) throw new Error("Manager check-in persistence did not return a record.");
-
-  await ensureLifecycleEvent(scope, employeeId, persisted);
+  const persisted = await managerTransaction(command, { expectedRevision, writes: [
+    { table: reviewsTable, row }, { table: lifecycleEventsTable, row: managerLifecycleEvent(scope, employeeId, row) },
+  ], result: { record: row, learnerRecordId: learner.learnerRecordId } });
+  if (!persisted) throw new Error("Manager check-in receipt was not returned.");
   await synchroniseManagerConditions(session, employeeId, learner.learnerRecordId);
-  return { created: Boolean(inserted[0]), record: reviewFromRow(persisted), learnerRecordId: learner.learnerRecordId };
+  return { created: true, record: reviewFromRow(persisted.record), learnerRecordId: learner.learnerRecordId };
+}
+
+async function managerTransaction<T>(command: Parameters<typeof applyLearnerTransaction>[0], options: Parameters<typeof applyLearnerTransaction<T>>[1]) {
+  try { return await applyLearnerTransaction<T>(command, options); }
+  catch (error) {
+    if (error instanceof LearnerTransactionError) {
+      if (error.status === 403) throw new LevyTateManagerCheckInAccessError();
+      if (error.status === 409) throw new LevyTateManagerCheckInConflictError(error.message);
+      if (error.status === 422) throw new LevyTateManagerCheckInValidationError(error.message);
+    }
+    throw error;
+  }
 }
 
 async function authorisedScope(session: LevyTateBetaSession, employeeId: string) {
@@ -294,9 +305,9 @@ async function selectReview(organisationId: string, id: string) {
   return rows[0] ?? null;
 }
 
-async function ensureLifecycleEvent(scope: ManagerDirectReportContext, employeeId: string, review: ManagerReviewRow) {
+function managerLifecycleEvent(scope: ManagerDirectReportContext, employeeId: string, review: ManagerReviewRow) {
   const details = parseManagerCheckInDetails(review.actions);
-  await supabaseInsert(requireConfig(), lifecycleEventsTable, [{
+  return {
     organisation_id: scope.organisation.id,
     id: `learner-event-${review.id}`,
     learner_record_id: review.learner_record_id,
@@ -317,10 +328,7 @@ async function ensureLifecycleEvent(scope: ManagerDirectReportContext, employeeI
       status: review.status,
     },
     created_at: review.created_at,
-  }], {
-    query: "on_conflict=organisation_id,id",
-    prefer: "resolution=ignore-duplicates,return=minimal",
-  });
+  };
 }
 
 async function synchroniseManagerConditions(session: LevyTateBetaSession, employeeId: string, learnerRecordId: string) {
