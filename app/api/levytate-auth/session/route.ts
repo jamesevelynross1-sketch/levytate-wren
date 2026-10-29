@@ -4,16 +4,13 @@ import { levytateBetaSessionCookie, levytateBetaSessionMaxAge } from "@/lib/levy
 import { levytateAuthCookieMaxAge, levytateSupabaseAccessCookie, levytateSupabaseRefreshCookie, refreshEmployerAuth } from "@/lib/server/levytate-auth";
 import { setLevyTateAuthCookies } from "@/lib/server/levytate-auth-cookies";
 import { checkSessionRefreshLimit, LevyTateRateLimitStoreError } from "@/lib/server/levytate-auth-rate-limit";
+import { assertBrowserOrigin, ClientRequestError } from "@/lib/server/levytate-request-boundary";
 
 export async function POST(request: Request) {
   try {
-    try {
-      const rateLimit = await checkSessionRefreshLimit(request);
-      if (!rateLimit.allowed) return response({ ok: false, message: "Please wait before refreshing your session again." }, 429);
-    } catch (error) {
-      if (!(error instanceof LevyTateRateLimitStoreError)) throw error;
-      // A valid refresh token is still verified by Supabase during a limiter outage.
-    }
+    assertBrowserOrigin(request);
+    const rateLimit = await checkSessionRefreshLimit(request);
+    if (!rateLimit.allowed) return response({ ok: false, message: "Please wait before refreshing your session again." }, 429);
     const store = await cookies();
     const refresh = store.get(levytateSupabaseRefreshCookie)?.value;
     if (!refresh) throw new Error("missing");
@@ -25,7 +22,9 @@ export async function POST(request: Request) {
       { name: levytateSupabaseRefreshCookie, value: result.refresh_token, maxAge: levytateAuthCookieMaxAge },
     ]);
     return refreshed;
-  } catch {
+  } catch (error) {
+    if (error instanceof ClientRequestError) return response({ ok: false, message: error.message }, error.status);
+    if (error instanceof LevyTateRateLimitStoreError) return response({ ok: false, message: "Secure sign-in is temporarily unavailable. Please try again shortly." }, 503);
     return response({ ok: false, message: "Your session has ended. Sign in again to continue." }, 401);
   }
 }

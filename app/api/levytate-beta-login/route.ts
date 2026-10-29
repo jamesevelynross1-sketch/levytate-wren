@@ -17,6 +17,7 @@ import { getEarlyAccessRequestByEmail } from "@/lib/server/levytate-early-access
 import { ProspectAccessError, assertProspectLoginAccess, recordProspectFirstLogin } from "@/lib/server/levytate-prospect-access";
 import { checkBetaLoginLimits, LevyTateRateLimitStoreError } from "@/lib/server/levytate-auth-rate-limit";
 import { setLevyTateAuthCookies, type LevyTateAuthCookie } from "@/lib/server/levytate-auth-cookies";
+import { ClientRequestError, readBrowserJson, requireActionKeys } from "@/lib/server/levytate-request-boundary";
 import {
   createDemoControllerAuthorisation,
   isDemoRoleSwitcherRuntimeEnabled,
@@ -104,6 +105,7 @@ export async function POST(request: Request) {
     setLevyTateAuthCookies(response, request.headers.get("host"), authCookies);
     return response;
   } catch (error) {
+    if (error instanceof ClientRequestError) return NextResponse.json({ ok: false, message: error.message }, { status: error.status });
     if (error instanceof LevyTateRateLimitStoreError) {
       return NextResponse.json({ ok: false, message: "Internal sign-in is temporarily unavailable." }, { status: 503 });
     }
@@ -119,11 +121,9 @@ export async function POST(request: Request) {
 }
 
 async function parseLoginRequestBody(request: Request): Promise<LoginRequestBody> {
-  try {
-    return (await request.json()) as LoginRequestBody;
-  } catch {
-    throw new BetaLoginError("We could not read your login request. Please try again.", 400);
-  }
+  const body = await readBrowserJson(request, 8192);
+  requireActionKeys(body, ["email", "code", "approvalToken"]);
+  return body;
 }
 
 async function resolveAccessLevel(email: string, approvalToken: string): Promise<LevyTateBetaAccessLevel> {

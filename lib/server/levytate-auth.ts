@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { createLevyTateBetaSession, normaliseBetaEmail, type LevyTateBetaAccessLevel, type LevyTateBetaSession } from "@/lib/levytate/config/beta-access";
-import { normaliseMvpUserRole } from "@/lib/levytate/mvp/rbac";
+import { parseMvpUserRole } from "@/lib/levytate/mvp/rbac";
+import { validateIdentityMembership } from "@/lib/server/levytate-identity-policy";
+import { invitationAllowsActivation, type ClientInvitationFields } from "@/lib/levytate/mvp/invitations";
 import { getLevyTateSupabaseConfig, supabaseInsert, supabaseSelect, supabaseUpdate } from "@/lib/server/levytate-supabase";
 import { checkProspectSessionAccess } from "@/lib/server/levytate-prospect-access";
 import { recordAuthenticationEmailAccepted, recordAuthenticationEmailRequest, shouldSuppressAuthenticationEmail } from "@/lib/server/levytate-auth-email-delivery";
@@ -10,7 +12,8 @@ export const levytateSupabaseRefreshCookie = "levytate_auth_refresh";
 export const levytateAuthCookieMaxAge = 60 * 60 * 8;
 export const genericSignInRequestMessage = "If this email is authorised for LevyTate, you’ll receive a secure sign-in link.";
 
-type MembershipRow = { id: string; organisation_id: string; email: string; role: string; access_level: string; active: boolean; auth_subject: string | null; auth_binding_status?: string; };
+type MembershipRow = Partial<ClientInvitationFields> & { id: string; organisation_id: string; email: string; role: string; access_level: string; active: boolean; auth_subject: string | null; auth_binding_status?: string; auth_bound_at?: string | null; };
+const membershipColumns = "id,organisation_id,email,role,access_level,active,auth_subject,auth_binding_status,auth_bound_at,invitation_status,invitation_expires_at,invitation_generation";
 type AuthUser = { id: string; email?: string };
 type AuthSessionResponse = { access_token: string; refresh_token: string; expires_in?: number; user: AuthUser };
 export type EmployerLogoutResult = { attempted: boolean; invalidated: boolean };
@@ -34,7 +37,7 @@ export async function requestEmployerSignIn(emailInput: string, redirectTo: stri
   const email = normaliseBetaEmail(emailInput);
   const membership = await findMembershipByEmail(email);
   await audit(membership, email, "auth.sign_in_requested", "requested");
-  if (!membership?.active || !(await checkProspectSessionAccess(email))) return;
+  if (!membership || !invitationAllowsActivation(membership) || !(await validateIdentityMembership(membership)) || !(await checkProspectSessionAccess(email))) return;
   if (await shouldSuppressAuthenticationEmail(email)) {
     await audit(membership, email, "auth.email_delivery_suppressed", "safe_suppression_active");
     return;
@@ -120,33 +123,59 @@ async function bindVerifiedIdentity(auth: AuthSessionResponse) {
   const membership = await findMembershipByEmail(email);
   if (!membership) throw new LevyTateAuthError("unauthorised", "This email is not currently authorised for LevyTate.");
   if (!membership.active) throw new LevyTateAuthError("inactive", "Your LevyTate account is not currently active.");
+  if (!invitationAllowsActivation(membership)) throw new LevyTateAuthError("unauthorised", "This invitation is not active. Ask your Apprenticeship Lead to send a new invitation.");
+  const identity = await validateIdentityMembership(membership);
+  if (!identity) throw new LevyTateAuthError("unauthorised", "This email is not currently authorised for LevyTate.");
   if (membership.auth_subject && membership.auth_subject !== auth.user.id) throw new LevyTateAuthError("conflict", "This email is not currently authorised for LevyTate.");
-  const subjectOwner = await findMembershipBySubject(auth.user.id);
-  if (subjectOwner && subjectOwner.id !== membership.id) throw new LevyTateAuthError("conflict", "This email is not currently authorised for LevyTate.");
+  const subjectOwners = await supabaseSelect<MembershipRow>(config(), "levytate_users", new URLSearchParams({ select: "id", auth_subject: `eq.${auth.user.id}`, limit: "2" }));
+  if (subjectOwners.length > 1 || subjectOwners.some((owner) => owner.id !== membership.id)) throw new LevyTateAuthError("conflict", "This email is not currently authorised for LevyTate.");
   const now = new Date().toISOString();
-  await supabaseUpdate(config(), "levytate_users", `id=eq.${encodeURIComponent(membership.id)}`, { auth_subject: auth.user.id, auth_binding_status: "bound", auth_bound_at: membership.auth_subject ? undefined : now, last_authentication_at: now, last_login_at: now, updated_at: now });
-  const accessLevel: LevyTateBetaAccessLevel = normaliseMvpUserRole(membership.role) === "Platform Admin" ? "beta_admin" : "beta_user";
+  const bindingQuery = new URLSearchParams({
+    id: `eq.${membership.id}`, organisation_id: `eq.${membership.organisation_id}`, email: `eq.${email}`,
+    active: "eq.true", role: `eq.${membership.role}`,
+    auth_subject: membership.auth_subject ? `eq.${membership.auth_subject}` : "is.null",
+  });
+  if (membership.auth_binding_status !== "bound") {
+    bindingQuery.set("invitation_status", "eq.accepted");
+    bindingQuery.set("invitation_generation", `eq.${membership.invitation_generation}`);
+    bindingQuery.set("invitation_expires_at", `gt.${now}`);
+  }
+  const saved = await supabaseUpdate<MembershipRow>(config(), "levytate_users", bindingQuery.toString(), { auth_subject: auth.user.id, auth_binding_status: "bound", auth_bound_at: membership.auth_subject ? membership.auth_bound_at ?? now : now, ...(membership.auth_binding_status !== "bound" ? { invitation_status: "consumed" } : {}), last_authentication_at: now, last_login_at: now, updated_at: now });
+  if (saved.length !== 1 || saved[0].auth_subject !== auth.user.id || !saved[0].active || !(await validateIdentityMembership(saved[0]))) {
+    throw new LevyTateAuthError("conflict", "This email is not currently authorised for LevyTate.");
+  }
+  const accessLevel: LevyTateBetaAccessLevel = identity.role === "Platform Admin" ? "beta_admin" : "beta_user";
   const sessionToken = await createLevyTateBetaSession(email, accessLevel, { authMode: "supabase_email", authSubject: auth.user.id });
-  await audit(membership, email, "auth.email_identity_verified", "verified");
-  if (!membership.auth_subject) await audit(membership, email, "auth.identity_bound", "successful");
-  await audit(membership, email, "auth.sign_in_successful", "successful");
+  try {
+    await audit(membership, email, "auth.email_identity_verified", "verified");
+    if (!membership.auth_subject) await audit(membership, email, "auth.identity_bound", "successful");
+    await audit(membership, email, "auth.sign_in_successful", "successful");
+  } catch {
+    // Binding is already confirmed. An audit outage must not consume the one-use
+    // link and then report a false invalid-link outcome to an authenticated user.
+    console.error("LevyTate authentication audit unavailable", { outcome: "identity_bound_audit_unavailable" });
+  }
   return { ...auth, sessionToken, membership };
 }
 
 export async function revalidateEmployerSession(session: LevyTateBetaSession): Promise<LevyTateBetaSession | null> {
   if (session.authMode !== "supabase_email") return session;
   const membership = await findMembershipBySubject(session.authSubject ?? "");
-  if (!membership || !membership.active || normaliseBetaEmail(membership.email) !== session.email) return null;
-  const accessLevel: LevyTateBetaAccessLevel = normaliseMvpUserRole(membership.role) === "Platform Admin" ? "beta_admin" : "beta_user";
+  if (!membership || !membership.active || membership.auth_binding_status !== "bound" || normaliseBetaEmail(membership.email) !== session.email) return null;
+  if (membership.auth_bound_at && Date.parse(membership.auth_bound_at) > session.issuedAt) return null;
+  if (!(await validateIdentityMembership(membership))) return null;
+  const accessLevel: LevyTateBetaAccessLevel = parseMvpUserRole(membership.role) === "Platform Admin" ? "beta_admin" : "beta_user";
   return { ...session, accessLevel };
 }
 
 async function findMembershipByEmail(email: string) {
-  return (await supabaseSelect<MembershipRow>(config(), "levytate_users", new URLSearchParams({ select: "id,organisation_id,email,role,access_level,active,auth_subject,auth_binding_status", email: `eq.${email}`, limit: "2" })))[0] ?? null;
+  const rows = await supabaseSelect<MembershipRow>(config(), "levytate_users", new URLSearchParams({ select: membershipColumns, email: `eq.${email}`, limit: "2" }));
+  return rows.length === 1 ? rows[0] : null;
 }
 async function findMembershipBySubject(subject: string) {
   if (!subject) return null;
-  return (await supabaseSelect<MembershipRow>(config(), "levytate_users", new URLSearchParams({ select: "id,organisation_id,email,role,access_level,active,auth_subject,auth_binding_status", auth_subject: `eq.${subject}`, limit: "2" })))[0] ?? null;
+  const rows = await supabaseSelect<MembershipRow>(config(), "levytate_users", new URLSearchParams({ select: membershipColumns, auth_subject: `eq.${subject}`, limit: "2" }));
+  return rows.length === 1 ? rows[0] : null;
 }
 async function audit(membership: MembershipRow | null, email: string, action: string, outcome: string) {
   if (!membership) return;

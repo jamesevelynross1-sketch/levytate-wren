@@ -267,7 +267,7 @@ export const mvpMutationPermission = {
   completeOperationalAction: "learnerLifecycle:write",
 } as const satisfies Record<MvpWorkspaceMutationType, MvpPermission>;
 
-export function normaliseMvpUserRole(role: string | null | undefined): MvpUserRole {
+export function parseMvpUserRole(role: unknown): MvpUserRole | null {
   if (
     role === "Platform Admin" ||
     role === "Employer Admin" ||
@@ -278,11 +278,18 @@ export function normaliseMvpUserRole(role: string | null | undefined): MvpUserRo
     return role;
   }
 
-  return "Employee";
+  return null;
+}
+
+export function normaliseMvpUserRole(role: string | null | undefined): MvpUserRole {
+  const parsed = parseMvpUserRole(role);
+  if (!parsed) throw new RangeError("Unsupported LevyTate role.");
+  return parsed;
 }
 
 export function permissionsForMvpRole(role: MvpUserRole | string | null | undefined): MvpPermission[] {
-  return [...mvpRolePermissions[normaliseMvpUserRole(role)]];
+  const parsed = parseMvpUserRole(role);
+  return parsed ? [...mvpRolePermissions[parsed]] : [];
 }
 
 export function hasMvpPermission(

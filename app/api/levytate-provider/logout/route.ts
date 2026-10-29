@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { expireLevyTateAuthCookies } from "@/lib/server/levytate-auth-cookies";
+import { assertBrowserOrigin } from "@/lib/server/levytate-request-boundary";
 import {
   invalidateProviderAuthSession,
   levytateProviderSessionCookie,
@@ -9,7 +10,7 @@ import {
 } from "@/lib/server/levytate-provider-auth";
 
 export async function POST(request: Request) {
-  if (!hasSameOrigin(request)) {
+  try { assertBrowserOrigin(request); } catch {
     return NextResponse.json({ message: "Forbidden." }, { status: 403, headers: { "Cache-Control": "private, no-store, max-age=0" } });
   }
   const cookieStore = await cookies();
@@ -34,9 +35,4 @@ export async function POST(request: Request) {
   response.headers.set("Clear-Site-Data", '"cache", "storage"');
   response.headers.set("Cache-Control", "private, no-store, max-age=0");
   return response;
-}
-
-function hasSameOrigin(request: Request) {
-  const origin = request.headers.get("origin");
-  return origin === new URL(request.url).origin;
 }

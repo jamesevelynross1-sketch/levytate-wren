@@ -5,10 +5,13 @@ import { levyTateEmployerSignInPath, requestHostname } from "@/lib/levytate/host
 import { invalidateEmployerAuthSession, levytateSupabaseAccessCookie, levytateSupabaseRefreshCookie, recordEmployerLogoutEvent } from "@/lib/server/levytate-auth";
 import { expireLevyTateAuthCookies } from "@/lib/server/levytate-auth-cookies";
 import { levytateDemoControllerCookie } from "@/lib/server/levytate-demo-role-switcher";
+import { assertBrowserOrigin, ClientRequestError } from "@/lib/server/levytate-request-boundary";
 
 const authenticationCookies = [levytateBetaSessionCookie, levytateSupabaseAccessCookie, levytateSupabaseRefreshCookie, levytateDemoControllerCookie] as const;
 
 export async function POST(request: Request) {
+  try { assertBrowserOrigin(request); }
+  catch (error) { return NextResponse.json({ message: "This request did not originate from this application." }, { status: error instanceof ClientRequestError ? error.status : 403 }); }
   const store = await cookies();
   const session = await readLevyTateBetaSession(store.get(levytateBetaSessionCookie)?.value);
   let providerFailure = false;
