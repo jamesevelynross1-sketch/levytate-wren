@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   EmployerRequestsModule,
   type EmployerRequestAgreementSnapshot,
@@ -30,6 +30,7 @@ export function EmployerRequestsContainer({
 }: Pick<EmployerRequestsModuleProps, "onOpenMarketplace" | "onOpenMyProviders" | "onOpenMyProgrammes">) {
   const [workspace, setWorkspace] = useState<EmployerRequestsWorkspaceBootstrap | null>(null);
   const [error, setError] = useState("");
+  const pendingCommands=useRef(new Map<string,string>());
   const initialContext = useMemo(() => {
     if (typeof window === "undefined") return undefined;
     const params = new URLSearchParams(window.location.search);
@@ -51,15 +52,19 @@ export function EmployerRequestsContainer({
   }, []);
 
   async function mutate(action: EmployerRequestAction) {
+    const fingerprint=JSON.stringify(Object.fromEntries(Object.entries(action).filter(([key])=>key!=="idempotencyKey")));
+    const idempotencyKey=pendingCommands.current.get(fingerprint)??action.idempotencyKey;
+    pendingCommands.current.set(fingerprint,idempotencyKey);
     const response = await fetch("/api/levytate-requests", {
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(action),
+      body: JSON.stringify({...action,idempotencyKey}),
     });
     const body = await response.json().catch(() => null) as { workspace?: EmployerRequestsWorkspaceBootstrap; message?: string } | null;
     if (!response.ok || !body?.workspace) throw new Error(body?.message ?? "We couldn’t save this Request. Please try again.");
     setWorkspace(body.workspace);
+    pendingCommands.current.delete(fingerprint);
     return body.workspace;
   }
 

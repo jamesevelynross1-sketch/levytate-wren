@@ -75,6 +75,7 @@ import {
   LevyTateSupabaseError,
   supabaseFetchJson,
   supabaseSelect,
+  supabaseSelectAll,
 } from "@/lib/server/levytate-supabase";
 import { getLearnerLifecycleServerContext } from "@/lib/server/levytate-learner-lifecycle";
 import { getWorkspaceBootstrapForSession } from "@/lib/server/levytate-workspace";
@@ -194,7 +195,8 @@ function eventFromRow(row: JsonRow): ServiceRequestEvent {
 }
 
 async function selectRows(table: string, params: Record<string, string>) {
-  return supabaseSelect<JsonRow>(config(), table, new URLSearchParams({ select: "*", ...params }));
+  const order=table===tables.versions?"organisation_id.asc,request_id.asc,version.asc":table===tables.responseVersions?"organisation_id.asc,response_id.asc,version.asc":"id.asc";
+  return supabaseSelectAll<JsonRow>(config(), table, new URLSearchParams({ select: "*", order, ...params }));
 }
 
 async function loadStoreForOrganisation(
@@ -205,7 +207,11 @@ async function loadStoreForOrganisation(
   },
   refreshDeadlines = true,
 ) {
-  const enabled = await isRequestsEnabledForOrganisation(organisationId);
+  const [capabilityEnabled,organisation]=await Promise.all([
+    isRequestsEnabledForOrganisation(organisationId),
+    supabaseSelect<{id:string}>(config(),"levytate_organisations",new URLSearchParams({select:"id",id:`eq.${organisationId}`,status:"eq.Active",limit:"1"})),
+  ]);
+  const enabled=capabilityEnabled && organisation.length===1;
   const scope = { organisation_id: `eq.${organisationId}` };
   const [requestRows, versionRows, invitationRows, responseRows, responseVersionRows, clarificationRows, decisionRows, agreementRows, handoverRows, eventRows] = enabled
     ? await Promise.all([
@@ -234,14 +240,10 @@ async function loadStoreForOrganisation(
   store.organisationProviderSelections = [...selections.organisationProviderSelections];
   store.organisationProgrammeSelections = [...selections.organisationProgrammeSelections];
   if (!refreshDeadlines) return store;
-  const beforeDeadlineRefresh = structuredClone(store);
+  const persistedEvents=store.events;
   markPastDeadlineInvitations(store, new Date().toISOString().slice(0, 10));
-  if (changed(beforeDeadlineRefresh, store)) {
-    await persistStore(beforeDeadlineRefresh, store);
-    // Database timestamp triggers own updated_at. Reload once so a follow-on
-    // action in this request uses the exact persisted optimistic-lock values.
-    return loadStoreForOrganisation(organisationId, selections, false);
-  }
+  // Expiry is a date-derived read state, never an implicit write or invented audit.
+  store.events=persistedEvents.filter(event=>event.eventType!=="request_expired" || eventRows.some(row=>text(row,"id")===event.id));
   return store;
 }
 
@@ -282,6 +284,10 @@ function changed(left: unknown, right: unknown) {
 }
 
 type PersistStoreOptions = {
+  organisationId: string;
+  actorKind: "employer" | "provider";
+  actorId: string;
+  command: JsonRow;
   selectionActorEmail?: string;
 };
 
@@ -308,7 +314,7 @@ function mutableRows<T extends { id: string; organisationId: string; updatedAt: 
 async function persistStore(
   before: ServiceRequestStore,
   after: ServiceRequestStore,
-  options: PersistStoreOptions = {},
+  options: PersistStoreOptions,
 ) {
   const organisations = new Set([
     ...after.requests.map((item) => item.organisationId),
@@ -318,11 +324,9 @@ async function persistStore(
     ...after.decisions.map((item) => item.organisationId),
     ...after.events.map((item) => item.organisationId),
   ]);
-  if (organisations.size !== 1) {
+  if ([...organisations].some(id=>id!==options.organisationId)) {
     throw new LevyTateServiceRequestError("Requests persistence scope is invalid.", 403);
   }
-  const organisationId = [...organisations][0];
-  if (!organisationId) return;
 
   const requests = mutableRows(before.requests, after.requests, requestRow);
   const invitations = mutableRows(before.invitations, after.invitations, invitationRow);
@@ -395,12 +399,16 @@ async function persistStore(
     organisation_programmes_upsert: organisationProgrammes,
     events_insert: newEvents.map(eventRow),
   };
-  if (!Object.values(changes).some((rows) => rows.length)) return;
 
   // Guard every Request touched directly or through a child row. Some valid
   // actions (notably a new invitation or an existing response draft update)
   // do not emit an event, so events alone are not a complete read set.
   const guardedRequestIds = new Set(newEvents.map((item) => item.requestId));
+  if (typeof options.command.requestId==="string") guardedRequestIds.add(options.command.requestId);
+  if (typeof options.command.invitationId==="string") {
+    const invitation=before.invitations.find(item=>item.id===options.command.invitationId);
+    if (invitation) guardedRequestIds.add(invitation.requestId);
+  }
   for (const item of [...requests.insert, ...requests.update] as Array<Record<string, unknown>>) {
     if (typeof item.id === "string") guardedRequestIds.add(item.id);
   }
@@ -413,20 +421,23 @@ async function persistStore(
     .filter((item) => guardedRequestIds.has(item.id))
     .map((item) => ({ id: item.id, updated_at: item.updatedAt }));
 
-  await supabaseFetchJson<unknown>(config(), "rpc/levytate_persist_service_request_action", {
-    method: "POST",
-    body: JSON.stringify({
-      p_organisation_id: organisationId,
-      p_changes: changes,
-      p_expected: {
+  await requestCommand(options,changes,{
         requests: expectedRequests,
         invitations: invitations.expected,
         responses: responses.expected,
         decisions: decisions.expected,
         clarifications: clarificationsExpected,
-      },
-    }),
-  });
+      });
+}
+
+export async function requestCommand(options: PersistStoreOptions,changes: JsonRow={},expected: JsonRow={},probe=false) {
+  try {
+    const result=await supabaseFetchJson<{committed:true;requestId:string}|null>(config(),"rpc/levytate_apply_request_command",{
+      method:"POST",body:JSON.stringify({p_organisation_id:options.organisationId,p_actor_kind:options.actorKind,p_actor_id:options.actorId,p_command:options.command,p_changes:changes,p_expected:expected,p_probe:probe}),
+    });
+    if (!probe && !result?.committed) throw new LevyTateServiceRequestError("The Request write could not be confirmed. Retry the same action.",503);
+    return result;
+  } catch(error) { throw normaliseWorkflowError(error); }
 }
 
 function employerActor(
@@ -618,12 +629,13 @@ async function deliverInvitation(
 ) {
   if (store.events.some((event) => event.organisationId === invitation.organisationId && event.requestId === invitation.requestId && event.idempotencyKey === `delivery:${idempotencyKey}`)) return;
   const before = structuredClone(store);
+  const persistence: PersistStoreOptions={organisationId:invitation.organisationId,actorKind:"employer",actorId:actor.userId,command:{action:"record_invitation_delivery",invitationId:invitation.id,idempotencyKey},selectionActorEmail:actor.email};
   const member = store.providerMemberships
     .filter((item) => item.providerId === invitation.providerId && item.active)
     .sort((left, right) => Number(right.role === "Provider Admin") - Number(left.role === "Provider Admin") || left.email.localeCompare(right.email))[0];
   if (!member) {
     recordInvitationDelivery(store, actor, invitation.id, { accepted: false, failureCode: "provider_access_not_configured", idempotencyKey });
-    await persistStore(before, store);
+    await persistStore(before, store,persistence);
     return;
   }
   invitation.invitedProviderMembershipId = member.id;
@@ -643,7 +655,7 @@ async function deliverInvitation(
   } catch {
     recordInvitationDelivery(store, actor, invitation.id, { accepted: false, failureCode: "delivery_provider_unavailable", idempotencyKey });
   }
-  await persistStore(before, store);
+  await persistStore(before, store,persistence);
 }
 
 function escapeHtml(value: string) {
@@ -658,7 +670,7 @@ function employerLoginUrl() {
   return levyTateEmployerSignInUrl();
 }
 
-async function notifyEmployerOfResponse(store: ServiceRequestStore, invitation: ServiceRequestInvitation) {
+async function notifyEmployerOfResponse(store: ServiceRequestStore, invitation: ServiceRequestInvitation, actor: ProviderRequestActor) {
   try {
     const recipients = await supabaseSelect<{ email: string }>(config(), "levytate_users", new URLSearchParams({
       select: "email",
@@ -693,7 +705,7 @@ async function notifyEmployerOfResponse(store: ServiceRequestStore, invitation: 
         recipientKey,
       );
     }));
-    if (store.events.length !== before.events.length) await persistStore(before, store);
+    if (store.events.length !== before.events.length) await persistStore(before, store,{organisationId:invitation.organisationId,actorKind:"provider",actorId:actor.membershipId,command:{action:"record_response_notification",invitationId:invitation.id,idempotencyKey:`notification:${response.id}:${response.currentVersion}:${createHash("sha256").update(JSON.stringify(store.events.filter(event=>!before.events.some(prior=>prior.id===event.id)).map(event=>event.id).sort())).digest("hex").slice(0,24)}`}});
     if (deliveries.some((delivery) => delivery.status === "rejected")) {
       console.error("LevyTate Request response notification was not accepted for every recipient.");
     }
@@ -713,15 +725,21 @@ export async function applyEmployerRequestActionForSession(
   if (!hasEmployerRequestPermission(actor.role, "serviceRequests:read")) {
     throw new LevyTateServiceRequestError("This role cannot access Requests.", 403);
   }
+  const persistence: PersistStoreOptions={organisationId:context.organisation.id,actorKind:"employer",actorId:actor.userId,command:structuredClone(action),selectionActorEmail:actor.email};
+  const receipt=await requestCommand(persistence,{}, {},true);
   const selections = {
     organisationProviderSelections: workspace.data.organisationProviders.filter((item) => item.status === "Active").map((item) => ({ organisationId: context.organisation.id, providerId: item.providerId })),
     organisationProgrammeSelections: workspace.data.organisationProgrammes.filter((item) => item.status === "Active").map((item) => ({ organisationId: context.organisation.id, programmeId: item.programmeId, providerId: item.providerId })),
   };
-  const store = await loadStoreForOrganisation(context.organisation.id, selections);
+  const store = await loadStoreForOrganisation(context.organisation.id, selections,false);
   store.providerMemberships = await allActiveProviderMemberships();
   const before = structuredClone(store);
   let invitationsToDeliver: ServiceRequestInvitation[] = [];
   try {
+    if (receipt) {
+      // Retrying a committed command may resume only its already-created pending notifications.
+      invitationsToDeliver=store.invitations.filter(item=>item.requestId===receipt.requestId && ["pending_delivery","delivery_failed"].includes(item.status));
+    } else {
     if ("content" in action) action.content = canonicalRequestContent(action.content, workspace);
     if ("privateContext" in action) action.privateContext = canonicalPrivateContext(action.privateContext);
     if ("providerIds" in action) assertCanonicalProviders(action.providerIds, workspace);
@@ -813,11 +831,12 @@ export async function applyEmployerRequestActionForSession(
       case "extend_deadline": extendServiceRequestDeadline(store, actor, action.requestId, action.deadline, { idempotencyKey: action.idempotencyKey }); break;
       default: throw new LevyTateServiceRequestError("Request action is not supported.");
     }
-    await persistStore(before, store, { selectionActorEmail: actor.email });
+    await persistStore(before, store, persistence);
+    }
     for (const pendingInvitation of invitationsToDeliver) {
       // Reload after the state transaction so trigger-generated timestamps and
       // any intervening terminal Request change are observed before email.
-      const deliveryStore = await loadStoreForOrganisation(context.organisation.id);
+      const deliveryStore = await loadStoreForOrganisation(context.organisation.id,undefined,false);
       const invitation = deliveryStore.invitations.find((item) => item.id === pendingInvitation.id);
       const request = invitation
         ? deliveryStore.requests.find((item) => item.id === invitation.requestId)
@@ -859,13 +878,13 @@ async function providerCatalogueName(providerId: string) {
 async function providerProgrammeOptions(providerId: string): Promise<RequestProgrammeOption[]> {
   const organisationId = await canonicalCatalogueOrganisationId();
   if (!organisationId) return [];
-  const rows = await supabaseSelect<JsonRow>(config(), "levytate_provider_programmes", new URLSearchParams({
+  const rows = await supabaseSelectAll<JsonRow>(config(), "levytate_provider_programmes", new URLSearchParams({
     select: "id,provider_id,programme_name,linked_standard_id,level,funding_band",
     organisation_id: `eq.${organisationId}`,
     provider_id: `eq.${providerId}`,
     status: "eq.Active",
     record_status: "eq.Active",
-    order: "programme_name.asc",
+    order: "programme_name.asc,id.asc",
   }));
   return rows.map((row) => ({
     programmeId: text(row, "id"), providerId: text(row, "provider_id"), programmeName: text(row, "programme_name"),
@@ -887,8 +906,8 @@ async function canonicalCatalogueOrganisationId() {
 
 async function organisationNames(ids: string[]) {
   if (!ids.length) return new Map<string, string>();
-  const rows = await supabaseSelect<JsonRow>(config(), "levytate_organisations", new URLSearchParams({
-    select: "id,name",
+  const rows = await supabaseSelectAll<JsonRow>(config(), "levytate_organisations", new URLSearchParams({
+    select: "id,name",order:"id.asc",
     id: `in.(${ids.map(encodeURIComponent).join(",")})`,
   }));
   return new Map(rows.map((row) => [text(row, "id"), text(row, "name")]));
@@ -959,10 +978,10 @@ function providerOpportunityView(
   };
 }
 
-async function loadProviderStores(session: LevyTateProviderSession) {
+async function loadProviderStores(session: LevyTateProviderSession,refreshDeadlines=true) {
   const invitationRows = await selectRows(tables.invitations, { provider_id: `eq.${session.providerId}` });
   const organisationIds = [...new Set(invitationRows.map((row) => text(row, "organisation_id")).filter(Boolean))];
-  const stores = (await Promise.all(organisationIds.map((id) => loadStoreForOrganisation(id))))
+  const stores = (await Promise.all(organisationIds.map((id) => loadStoreForOrganisation(id,undefined,refreshDeadlines))))
     .filter((store) => store.capabilities.some((item) => item.requestsEnabled));
   return stores;
 }
@@ -995,10 +1014,12 @@ export async function applyProviderRequestActionForSession(
   value: unknown,
 ): Promise<ProviderOpportunityView> {
   const action = validateProviderAction(value);
-  const stores = await loadProviderStores(session);
+  const stores = await loadProviderStores(session,false);
   const store = stores.find((item) => item.invitations.some((invitation) => invitation.id === action.invitationId));
   if (!store) throw new LevyTateServiceRequestError("Opportunity was not found.", 404);
   const actor = providerActor(session);
+  const persistence: PersistStoreOptions={organisationId:store.requests[0].organisationId,actorKind:"provider",actorId:actor.membershipId,command:structuredClone(action)};
+  const receipt=await requestCommand(persistence,{}, {},true);
   const before = structuredClone(store);
   const invitationForAction = store.invitations.find((item) => item.id === action.invitationId);
   const priorSubmitEvent = action.action === "submit_response" && invitationForAction
@@ -1010,6 +1031,8 @@ export async function applyProviderRequestActionForSession(
     : undefined;
   let shouldNotifyEmployer = false;
   try {
+    if (receipt) { shouldNotifyEmployer=action.action==="submit_response"; }
+    else {
     if ("content" in action && action.content.proposedProgramme.kind === "canonical_programme") {
       const programmes = await providerProgrammeOptions(session.providerId);
       const programmeId = action.content.proposedProgramme.programmeId;
@@ -1060,14 +1083,15 @@ export async function applyProviderRequestActionForSession(
       }
       default: throw new LevyTateServiceRequestError("Provider action is not supported.");
     }
-    await persistStore(before, store);
+    await persistStore(before, store,persistence);
+    }
     if (shouldNotifyEmployer) {
       // Reload trigger-authored timestamps before persisting notification
       // acknowledgements; the submitted response transaction updates its
       // parent Request and the database owns the resulting updated_at value.
-      const notificationStore = await loadStoreForOrganisation(store.requests[0].organisationId);
+      const notificationStore = await loadStoreForOrganisation(store.requests[0].organisationId,undefined,false);
       const submittedInvitation = notificationStore.invitations.find((item) => item.id === action.invitationId);
-      if (submittedInvitation) await notifyEmployerOfResponse(notificationStore, submittedInvitation);
+      if (submittedInvitation) await notifyEmployerOfResponse(notificationStore, submittedInvitation,actor);
     }
   } catch (error) {
     throw normaliseWorkflowError(error);
@@ -1081,10 +1105,13 @@ export async function applyProviderRequestActionForSession(
 function normaliseWorkflowError(error: unknown) {
   if (error instanceof LevyTateServiceRequestError) return error;
   if (error instanceof LevyTateSupabaseError) {
-    const conflict = /40001|23505|changed while|duplicate key/i.test(error.message);
+    const conflict = /PT409|40001|23505|changed while|duplicate key/i.test(error.message);
     if (conflict) {
       return new LevyTateServiceRequestError("This Request changed while the action was being saved. Reload and retry.", 409);
     }
+    if (/PT403|42501/.test(error.message)) return new LevyTateServiceRequestError("Your current membership cannot perform this Request action.",403);
+    if (/PT404/.test(error.message)) return new LevyTateServiceRequestError("Requests is unavailable in this workspace.",404);
+    if (/PT422|22[0-9A-Z]{3}|23[0-9A-Z]{3}/.test(error.message)) return new LevyTateServiceRequestError("Check the Request details and current workflow state.",400);
   }
   if (error instanceof ServiceRequestWorkflowError) {
     const denied = /denied|permission|inactive|feature_disabled/.test(error.code);
