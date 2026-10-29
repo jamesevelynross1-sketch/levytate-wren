@@ -87,7 +87,10 @@ export async function recordManagerDirectReportCheckIn(
   const idempotencyKey = validateIdempotencyKey(rawInput?.idempotencyKey);
   const command = { organisationId: scope.organisation.id, actorId: scope.user.id, learnerId: learner.learnerRecordId, action: "manager_checkin", input: { employeeId, input: rawInput }, idempotencyKey };
   const replay = await managerTransaction<{ record: ManagerReviewRow; learnerRecordId: string }>(command, { probe: true });
-  if (replay) return { created: false, record: reviewFromRow(replay.record), learnerRecordId: replay.learnerRecordId };
+  if (replay) {
+    await synchroniseManagerConditions(session, employeeId, replay.learnerRecordId);
+    return { created: false, record: reviewFromRow(replay.record), learnerRecordId: replay.learnerRecordId };
+  }
   const expectedRevision = await learnerRevision(scope.organisation.id, learner.learnerRecordId);
   learner = (await listManagerDirectReportLearnerLifecycleDetails(session, scope)).find((item) => item.learner.id === employeeId);
   if (!learner) throw new LevyTateManagerCheckInAccessError();
@@ -100,7 +103,7 @@ export async function recordManagerDirectReportCheckIn(
     throw new LevyTateManagerCheckInConflictError("This check-in ID already exists without a matching command receipt.");
   }
 
-  if (rawInput.expectedActivityVersion && rawInput.expectedActivityVersion !== learner.activityVersion) {
+  if (!rawInput.expectedActivityVersion || rawInput.expectedActivityVersion !== learner.activityVersion) {
     throw new LevyTateManagerCheckInConflictError("This learner record has changed since you opened it. Refresh the record before saving again.");
   }
 

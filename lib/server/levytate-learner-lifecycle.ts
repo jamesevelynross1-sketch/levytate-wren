@@ -583,6 +583,76 @@ export type EnrolmentConfirmationInput = {
   firstReviewerName: string;
 };
 export type EmployeeDeclarationInput = { idempotencyKey: string; expectedUpdatedAt: string; confirmed: true; expectedEnglandWorkingHoursPercentage: number };
+export type LearnerOutcomeInput = {
+  outcome: "withdrawal" | "achievement" | "completion_without_achievement";
+  idempotencyKey: string;
+  expectedActivityVersion: string;
+  effectiveDate: string;
+  notes: string;
+  reasonCategory?: string;
+  initiatedBy?: string;
+  providerNotified?: boolean;
+  providerNotifiedDate?: string;
+  employeeNotified?: boolean;
+  employeeNotifiedDate?: string;
+  grade?: string;
+  gradeType?: string;
+  certificateReceived?: boolean;
+  certificateReceivedDate?: string;
+};
+
+export async function recordLearnerOutcome(session: LevyTateBetaSession, learnerId: string, input: LearnerOutcomeInput) {
+  assertEnum(input.outcome, ["withdrawal", "achievement", "completion_without_achievement"], "learner outcome");
+  return atomicLifecycle(input.outcome, [session, learnerId, input], () => recordLearnerOutcomePlan(session, learnerId, input));
+}
+
+async function recordLearnerOutcomePlan(session: LevyTateBetaSession, learnerId: string, input: LearnerOutcomeInput) {
+  const context = await contextForSession(session);
+  assertPermission(context, "learnerLifecycle:status");
+  const learner = await getScopedLearnerRecord(context, learnerId, "write");
+  const status = input.outcome === "withdrawal" ? "withdrawn" : input.outcome === "achievement" ? "achieved" : "completed_without_achievement";
+  assertLearnerLifecycleTransition(learner.lifecycleStatus, status);
+  const collections = await loadLearnerLifecycleCollectionsForRecord(session, learnerId);
+  latestActivityVersionRequired(collections, learner, input.expectedActivityVersion);
+  const id = activityRecordId("learner-outcome", learnerId, input.idempotencyKey);
+  assertOperationalDate(input.effectiveDate, "Outcome effective date");
+  if (learner.actualStartDate) assertDateAfter(input.effectiveDate, learner.actualStartDate, "Outcome effective date", "actual start date", true);
+  const notes = requiredText(input.notes, "Outcome evidence and reason");
+  const timestamp = nowIso();
+  const activeBreak = collections.breaksInLearning.find((item) => item.status === "active");
+  if (activeBreak && input.outcome !== "withdrawal") throw new LevyTateLearnerLifecycleValidationError("An active break must be resolved before completion.");
+  if (input.outcome === "withdrawal") {
+    const next: LearnerWithdrawal = { id, organisationId: context.organisation.id, learnerRecordId: learnerId,
+      withdrawalDate: input.effectiveDate, effectiveDate: input.effectiveDate, reasonCategory: requiredText(input.reasonCategory, "Withdrawal reason"), reasonNotes: notes,
+      initiatedBy: requiredText(input.initiatedBy, "Withdrawal initiated by"), providerNotified: input.providerNotified === true,
+      providerNotifiedDate: notificationDate(input.providerNotified === true, input.providerNotifiedDate, "Provider notified date"),
+      employeeNotified: input.employeeNotified === true, employeeNotifiedDate: notificationDate(input.employeeNotified === true, input.employeeNotifiedDate, "Employee notified date"),
+      recordedBy: context.user.email, recordedAt: timestamp };
+    await supabaseInsert(assertSupabase(), withdrawalsTable, [withdrawalToRow(next)], { prefer: "return=minimal" });
+    if (activeBreak) {
+      assertDateAfter(input.effectiveDate, activeBreak.startDate, "Withdrawal date", "break start date", true);
+      await updateBreakRow(context.organisation.id, { ...activeBreak, status: "converted_to_withdrawal", updatedAt: timestamp });
+    }
+  } else {
+    const assessment = collections.assessmentReadiness[0];
+    if (!assessment || assessment.assessmentStatus !== "in_assessment") throw new LevyTateLearnerLifecycleValidationError("An active assessment record is required before recording a completion outcome.");
+    if (assessment.assessmentStartDate) assertDateAfter(input.effectiveDate, assessment.assessmentStartDate, "Outcome effective date", "assessment start date", true);
+    const achieved = input.outcome === "achievement";
+    const next: LearnerAchievement = { id, organisationId: context.organisation.id, learnerRecordId: learnerId,
+      expectedAchievementDate: learner.expectedEndDate, actualAchievementDate: input.effectiveDate,
+      grade: achieved ? requiredText(input.grade, "Confirmed grade") : "Not achieved", gradeType: achieved ? requiredText(input.gradeType, "Grade type") : "Outcome",
+      certificateReceived: achieved && input.certificateReceived === true,
+      certificateReceivedDate: notificationDate(achieved && input.certificateReceived === true, input.certificateReceivedDate, "Certificate received date"),
+      resultNotes: notes, recordedBy: context.user.email, recordedAt: timestamp };
+    if (next.certificateReceivedDate) assertDateAfter(next.certificateReceivedDate, input.effectiveDate, "Certificate received date", "achievement date", true);
+    await supabaseInsert(assertSupabase(), achievementsTable, [achievementToRow(next)], { prefer: "return=minimal" });
+    await persistAssessmentReadiness(context, assessment, { ...assessment, assessmentStatus: achieved ? "completed" : "unsuccessful", updatedBy: context.user.email, updatedAt: timestamp, version: assessment.version + 1 });
+  }
+  await persistLearnerStatus(context, { ...learner, actualEndDate: input.effectiveDate }, status);
+  await recordLifecycleEvent(context, learnerId, input.outcome === "withdrawal" ? "withdrawn" : input.outcome === "achievement" ? "achievement_recorded" : "lifecycle_status_changed", learner.lifecycleStatus, status,
+    input.outcome === "withdrawal" ? "Learner withdrawal recorded with evidence." : input.outcome === "achievement" ? "Confirmed achievement recorded." : "Completion without achievement recorded with evidence.", { outcome: input.outcome, effectiveDate: input.effectiveDate, evidenceId: id });
+  return getOrganisationLearnerLifecycleRecordDetail(session, learnerId);
+}
 
 export const addLearnerReview = (...args: Parameters<typeof addLearnerReviewPlan>) => atomicLifecycle("review", args, () => addLearnerReviewPlan(...args));
 export const addProgressUpdate = (...args: Parameters<typeof addProgressUpdatePlan>) => atomicLifecycle("progress", args, () => addProgressUpdatePlan(...args));
@@ -626,7 +696,7 @@ async function atomicLifecycle<T extends object>(action: string, args: [LevyTate
   const command = { organisationId: context.organisation.id, actorId: context.user.id, learnerId, action, input, idempotencyKey: keyInput?.idempotencyKey };
   try {
     const replay = await applyLearnerTransaction<{ kind: "detail" | "container" | "record"; value: unknown }>(command, { probe: true });
-    if (replay) return hydrate(replay);
+    if (replay) { await reconcile(); return hydrate(replay); }
     const expectedRevision = await learnerRevision(context.organisation.id, learnerId);
     const plan = { writes: [] as Array<{ table: string; row: Record<string, unknown> }>, synchronise: false };
     const value = await learnerWritePlan.run(plan, build);
@@ -637,7 +707,7 @@ async function atomicLifecycle<T extends object>(action: string, args: [LevyTate
     const saved = await applyLearnerTransaction(command, { expectedRevision, writes: plan.writes, result });
     if (!saved) throw new Error("No learner transaction receipt returned");
     // Derived operational queues refresh from committed lifecycle evidence.
-    if (plan.synchronise) await synchroniseLearnerOperationalActions(session, learnerId);
+    await reconcile();
     return hydrate(saved);
   } catch (error) {
     if (error instanceof LearnerTransactionError) {
@@ -651,6 +721,11 @@ async function atomicLifecycle<T extends object>(action: string, args: [LevyTate
     if (result.kind === "record") return result.value as T;
     const learner = await getOrganisationLearnerLifecycleRecordDetail(session, learnerId);
     return (result.kind === "detail" ? learner : { ...(result.value as object), learner }) as T;
+  }
+  async function reconcile() {
+    if (context.user.role === "Employee") return;
+    try { await synchroniseLearnerOperationalActions(session, learnerId); }
+    catch { throw new LearnerTransactionError("Learner evidence is saved, but its operational queue has not refreshed. Retry the same request to complete recovery without duplicating evidence.", 503); }
   }
 }
 
@@ -1165,6 +1240,8 @@ async function startLearnerAssessmentPlan(
   if (assessmentOrganisationRequired(current.assessmentModel) && !current.assessmentOrganisation) throw new LevyTateLearnerLifecycleValidationError("Record the assessment organisation before moving the learner into assessment.");
   const blockers = await criticalOperationalBlockers(context, learnerRecordId);
   if (blockers.length) throw new LevyTateLearnerLifecycleValidationError(`Assessment entry is blocked: ${blockers[0]}`);
+  const readiness = assessmentResultFor(learner, collections, current, blockers);
+  if (!readiness.readyForAssessment) throw new LevyTateLearnerLifecycleValidationError(readiness.blockingChecks[0]?.message ?? readiness.outstandingChecks[0]?.message ?? "Assessment readiness evidence is incomplete.");
   const timestamp = nowIso();
   const assessmentStartDate = cleanDate(input.assessmentStartDate, "assessment start date") || timestamp.slice(0, 10);
   const next: LearnerAssessmentReadiness = { ...current, assessmentStatus: "in_assessment", assessmentStartDate, updatedBy: context.user.email, updatedAt: timestamp, version: current.version + 1 };
@@ -1546,7 +1623,7 @@ function assessmentResultFor(
     providerId: record.providerId,
     readiness,
     latestProgress: latestLearnerProgressFromCollections(collections.progressUpdates, record.id),
-    latestProviderReview: latestProviderReviewFromCollections(collections.learnerReviews, record.id),
+    latestProviderReview: latestProviderReviewFromCollections(collections.learnerReviews.filter((review) => review.status === "completed" || review.status === "action_required"), record.id),
     criticalOperationalBlockers,
   });
 }

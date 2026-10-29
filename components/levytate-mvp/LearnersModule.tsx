@@ -6,6 +6,7 @@ import { EmptyState, FormField, FormGrid, FormSection, FormSelect, FormTagInput,
 import { OperationalMetricRail, ProgressTrack, StageTracker } from "@/components/levytate-mvp/OperationalVisuals";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { ApplicationPreEnrolmentModal } from "@/components/levytate-mvp/ApplicationPreEnrolmentModal";
+import { LearnerOutcomePanel } from "@/components/levytate-mvp/LearnerOutcomePanel";
 import { includesSearch, statusTone } from "@/components/levytate-mvp/module-utils";
 import {
   assessmentConfirmationStatusLabels,
@@ -627,6 +628,8 @@ function LearnerRecordView({ detail, loading, error, onBack, mayMutatePreEnrolme
 
       {assessmentOpen ? <AssessmentReadinessWorkflow detail={detail} onClose={() => setAssessmentOpen(false)} onSaved={(next, message) => { onDetailUpdated(next); setSuccess(message); setAssessmentOpen(false); }} /> : null}
 
+      {mayMutatePreEnrolment ? <LearnerOutcomePanel key={detail.learnerRecordId} detail={detail} onSaved={(next) => { onDetailUpdated(next); setSuccess("Final outcome and lifecycle evidence saved."); }} /> : null}
+
       <RecordSection title="Operational actions" eyebrow="Communications">
         {detail.operationalActions.length ? (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -1207,6 +1210,8 @@ function PreEnrolmentWorkflow({ detail, onCancel, onSaved, onEnrolled }: { detai
   }));
   const [saving, setSaving] = useState(false);
   const [enrolling, setEnrolling] = useState(false);
+  const [enrolmentKey] = useState(() => createEnrolmentRequestId());
+  const [initialEvidence, setInitialEvidence] = useState({ updateDate: "", target: "", actual: "", summary: "", firstReviewDate: "", firstReviewerName: "" });
   const [error, setError] = useState("");
   const readiness = detail.enrolmentReadiness;
 
@@ -1267,10 +1272,17 @@ function PreEnrolmentWorkflow({ detail, onCancel, onSaved, onEnrolled }: { detai
   }
 
   async function markEnrolled() {
+    if (!initialEvidence.updateDate || initialEvidence.target === "" || initialEvidence.actual === "" || !initialEvidence.summary.trim() || !initialEvidence.firstReviewDate || !initialEvidence.firstReviewerName.trim()) {
+      setError("Enter the initial progress evidence and first provider review plan before confirming enrolment."); return;
+    }
     setEnrolling(true);
     setError("");
     try {
-      const response = await fetch(`/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/enrol`, { method: "POST" });
+      const response = await fetch(`/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/enrol`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+        idempotencyKey: enrolmentKey, expectedActivityVersion: detail.activityVersion,
+        initialProgress: { updateDate: initialEvidence.updateDate, targetProgressPercentage: Number(initialEvidence.target), actualProgressPercentage: Number(initialEvidence.actual), summary: initialEvidence.summary },
+        firstReviewDate: initialEvidence.firstReviewDate, firstReviewerName: initialEvidence.firstReviewerName,
+      }) });
       const payload = (await response.json()) as LearnerMutationResponse;
       if (!response.ok || !payload.learner) throw new Error(payload.message ?? "Learner could not be marked as enrolled.");
       onEnrolled(payload.learner);
@@ -1402,6 +1414,14 @@ function PreEnrolmentWorkflow({ detail, onCancel, onSaved, onEnrolled }: { detai
           {error ? <p className="rounded-xl bg-[#fff0f2] px-4 py-3 text-sm font-semibold text-[#b13b51]">{error}</p> : null}
 
           <div className="rounded-xl border border-[#102c3d]/[0.075] bg-white p-4">
+            {readiness.readyForEnrolment ? <div className="mb-5 grid gap-3"><h4 className="font-semibold">Initial evidence and review plan</h4><p className="text-xs leading-5 text-[#102c3d]/60">Record the actual starting evidence. The provider review is scheduled, not marked complete.</p>
+              <FormField label="Initial progress date" type="date" value={initialEvidence.updateDate} onChange={(updateDate) => setInitialEvidence((value) => ({ ...value, updateDate }))} required />
+              <FormField label="Initial target progress (%)" type="number" value={initialEvidence.target} onChange={(target) => setInitialEvidence((value) => ({ ...value, target }))} required />
+              <FormField label="Initial actual progress (%)" type="number" value={initialEvidence.actual} onChange={(actual) => setInitialEvidence((value) => ({ ...value, actual }))} required />
+              <FormTextArea label="Initial progress evidence" value={initialEvidence.summary} onChange={(summary) => setInitialEvidence((value) => ({ ...value, summary }))} rows={3} required />
+              <FormField label="First provider review date" type="date" value={initialEvidence.firstReviewDate} onChange={(firstReviewDate) => setInitialEvidence((value) => ({ ...value, firstReviewDate }))} required />
+              <FormField label="Planned provider reviewer" value={initialEvidence.firstReviewerName} onChange={(firstReviewerName) => setInitialEvidence((value) => ({ ...value, firstReviewerName }))} required />
+            </div> : null}
             <button type="button" onClick={saveProgress} disabled={saving || enrolling} className="flex h-11 w-full items-center justify-center rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white transition hover:bg-[#17394d] disabled:cursor-not-allowed disabled:opacity-55">
               {saving ? "Saving progress" : "Save progress"}
             </button>
@@ -1415,6 +1435,8 @@ function PreEnrolmentWorkflow({ detail, onCancel, onSaved, onEnrolled }: { detai
     </section>
   );
 }
+
+function createEnrolmentRequestId() { return `enrol-${globalThis.crypto.randomUUID()}`; }
 
 function CompactSelect({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
   return (

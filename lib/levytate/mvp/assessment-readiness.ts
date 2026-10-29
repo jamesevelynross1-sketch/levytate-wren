@@ -6,6 +6,7 @@ import type {
   LearnerReview,
 } from "@/lib/levytate/mvp/learner-lifecycle";
 import { deriveProgressPosition } from "@/lib/levytate/mvp/learner-record-view";
+import { learnerProgressReviewPolicy } from "@/lib/levytate/mvp/learner-lifecycle";
 
 export const assessmentReadinessPolicy = {
   eligibleStatuses: ["enrolled", "assessment_preparation"] as LearnerLifecycleStatus[],
@@ -82,6 +83,7 @@ export type AssessmentReadinessResult = {
 };
 
 export type AssessmentReadinessDerivationInput = {
+  asOf?: string;
   lifecycleStatus: LearnerLifecycleStatus;
   activeBreak: boolean;
   programmeId: string;
@@ -135,6 +137,7 @@ export function assessmentOrganisationRequired(model: LearnerAssessmentModel) {
 
 export function deriveAssessmentReadiness(input: AssessmentReadinessDerivationInput): AssessmentReadinessResult {
   const checks: AssessmentReadinessCheck[] = [];
+  const today = input.asOf ?? new Date().toISOString().slice(0, 10);
   const readiness = input.readiness;
   const confirmations = readiness?.confirmations ?? emptyAssessmentReadinessConfirmations();
   const eligible = assessmentReadinessPolicy.eligibleStatuses.includes(input.lifecycleStatus);
@@ -152,12 +155,16 @@ export function deriveAssessmentReadiness(input: AssessmentReadinessDerivationIn
 
   checks.push(check("latest-progress-recorded", "Latest progress recorded", input.latestProgress ? "Complete" : "Blocking", input.latestProgress ? `Latest actual progress is ${input.latestProgress.actualProgressPercentage}% against ${input.latestProgress.targetProgressPercentage}% target.` : "Record a current progress update before readiness review."));
   if (input.latestProgress) {
+    const ageDays = (Date.parse(`${today}T00:00:00Z`) - Date.parse(`${input.latestProgress.updateDate}T00:00:00Z`)) / 86_400_000;
+    checks.push(check("current-progress-evidence", "Current progress evidence", ageDays > learnerProgressReviewPolicy.progressUpdateOverdueDays ? "Blocking" : "Complete", ageDays > learnerProgressReviewPolicy.progressUpdateOverdueDays ? "Refresh the overdue progress update before assessment readiness." : "Progress evidence is within the current review policy."));
     const position = deriveProgressPosition(input.latestProgress);
     const behind = position === "Slightly behind" || position === "Significantly behind";
     checks.push(check("progress-position-reviewed", "Progress position reviewed", behind ? "Warning" : "Complete", behind ? `${position}. Readiness must be supported by provider evidence and programme-specific judgement.` : `${position}. Progress alone does not confirm assessment readiness.`));
   }
 
-  checks.push(check("latest-provider-review-recorded", "Latest provider review recorded", input.latestProviderReview ? "Complete" : "Blocking", input.latestProviderReview ? `Provider review recorded on ${input.latestProviderReview.reviewDate}.` : "Record a current provider review."));
+  const providerEvidence = input.latestProviderReview && ["completed", "action_required"].includes(input.latestProviderReview.status) ? input.latestProviderReview : null;
+  checks.push(check("latest-provider-review-recorded", "Latest provider review recorded", providerEvidence ? "Complete" : "Blocking", providerEvidence ? `Provider review recorded on ${providerEvidence.reviewDate}.` : "Record a completed provider review; a scheduled review is not evidence."));
+  if (providerEvidence?.nextReviewDate && providerEvidence.nextReviewDate < today) checks.push(check("current-provider-review", "Current provider review", "Blocking", "The provider review is overdue; refresh the evidence before assessment readiness."));
 
   assessmentConfirmationTypes.forEach((type) => {
     const confirmation = confirmations[type];
