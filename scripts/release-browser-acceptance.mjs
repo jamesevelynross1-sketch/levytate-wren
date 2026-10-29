@@ -94,7 +94,9 @@ try {
       if (user.key === "lead" || memberships[0]?.auth_binding_status === "bound") {
         phase = `${label}: submit login form`;
         await page.getByLabel("Work email", { exact: true }).fill(user.email);
+        const requestOutcome=page.waitForResponse(response=>new URL(response.url()).pathname==="/api/levytate-auth/request"&&response.request().method()==="POST");
         await page.getByRole("button", { name: "Send secure sign-in link", exact: true }).click();
+        if((await requestOutcome).status()===429)throw new Error("BLOCKED: genuine local authentication rate budget reached; wait for expiry without resetting or weakening the limiter");
         phase = `${label}: wait for request confirmation`;
         await page.getByRole("heading", { name: "Check your email", exact: true }).waitFor();
       } else {
@@ -159,6 +161,18 @@ try {
   }
   const failureWrites=failureBudgetWritesSince(failureBudgetStartedAt);
   if(failureWrites!==null)check(`${contexts.size} genuine successful callbacks do not consume failed-link budget`,failureWrites===0);
+  if(process.env.RELEASE_OPERATIONS_JOURNEY==="true"){
+    phase="real operations read/write boundary";
+    const lead=contexts.get("a:lead"),path=`${app}/api/levytate-operations`;
+    const before=await backend(`rest/v1/levytate_operational_actions?organisation_id=eq.${lead.tenant.id}&select=id,updated_at&order=id`);
+    check("Operations GET reads real data",(await lead.context.request.get(path)).status()===200);
+    check("Operations GET cannot trigger legacy synchronization",(await lead.context.request.get(`${path}?synchronise=true`)).status()===400);
+    check("Operations GET leaves persisted actions unchanged",JSON.stringify(before)===JSON.stringify(await backend(`rest/v1/levytate_operational_actions?organisation_id=eq.${lead.tenant.id}&select=id,updated_at&order=id`)));
+    check("Operations POST without same origin is denied",(await lead.context.request.post(path,{data:{}})).status()===403);
+    check("Operations POST rejects untrusted actor fields",(await lead.context.request.post(path,{headers:{Origin:app},data:{organisationId:manifest.tenants[1].id}})).status()===400);
+    for(const key of["a:employee","a:manager"])check(`${key}: cannot synchronize employer Operations`,(await contexts.get(key).context.request.post(path,{headers:{Origin:app},data:{}})).status()===403);
+    check("Lead explicitly synchronizes Operations using guarded POST",(await lead.context.request.post(path,{headers:{Origin:app},data:{}})).status()===200);
+  }
   if(process.env.RELEASE_EVIDENCE_EXPORT==="true"||exportOnly){
     phase="real-role aggregate evidence export";
     for(const actor of contexts.values()){
@@ -267,8 +281,15 @@ try {
     catch(error){console.log("People inline messages",(await dialog.locator("p").allTextContents()).join(" | ").slice(0,1600));throw error;}
     const stored = await backend(`rest/v1/levytate_employees?organisation_id=eq.${lead.tenant.id}&email=eq.${encodeURIComponent(syntheticEmail)}&select=id,name`);
     check("recovered People form durably saves exactly once", stored.length === 1 && stored[0].name === syntheticName);
+    const storedAudit=await backend(`rest/v1/levytate_audit_events?organisation_id=eq.${lead.tenant.id}&entity_id=eq.${stored[0].id}&action=eq.employee.saved&select=id`);
+    check("recovered People row has exactly one confirmed append-only audit",storedAudit.length===1);
   }
   // Exercise replay only after all real identities have independently signed in.
+  if(process.env.RELEASE_STALE_PEOPLE_EDITOR==="true"){
+    phase="two genuine sessions and stale People reconnect";
+    const{verifyStalePeopleEditor}=await import("./release-people-stale-browser.mjs");
+    await verifyStalePeopleEditor({app,mailpit,manifest,lead:contexts.get("a:lead"),browser,backend,waitForCapturedLink,check});
+  }
   for (const key of peopleUiOnly?[]:["a:employee", "b:manager"]) {
     const item = contexts.get(key);
     const replay = await item.context.request.get(item.consumedLink, { maxRedirects: 0 });
@@ -336,6 +357,11 @@ try {
       check("Employee new page session reads durable enrolled journey",(await detail(employeeA)).lifecycleStatus==="enrolled");
       const finalWorkspace=await employeeA.context.request.get(`${app}/api/levytate-workspace`);
       check("Employee application and enrolment show connected completed handoff",(await finalWorkspace.json()).workspace?.data?.applications?.some(item=>item.id===applicationId&&item.status==="Completed"));
+      if(process.env.RELEASE_LEARNING_TIME_JOURNEY==="true"){
+        phase="genuine Learning Time UI and connected evidence";
+        const{verifyLearningTime}=await import("./release-learning-time-browser.mjs");
+        await verifyLearningTime({app,manifest,contexts,learnerId:row[0].id,backend,check});
+      }
       learner=await detail(leadA);
       const withdrawal={outcome:"withdrawal",idempotencyKey:randomUUID(),expectedActivityVersion:learner.activityVersion,effectiveDate:today,reasonCategory:"other",initiatedBy:"learner",notes:"Synthetic agreed withdrawal for end-to-end acceptance",providerNotified:false,employeeNotified:false};
       check("Employee cannot set official withdrawal outcome",(await mutation(employeeA,"outcome",withdrawal)).status()===403);

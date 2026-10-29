@@ -1,0 +1,60 @@
+/** Real signed-in browser/API journey, using only the synthetic local learner. */
+import{readFileSync}from"node:fs";
+import{spawnSync}from"node:child_process";
+import{randomUUID}from"node:crypto";
+export async function verifyLearningTime({app,manifest,contexts,learnerId,backend,check}){
+ const root=process.env.RELEASE_LOCAL_RUNTIME,tenant=manifest.tenants[0];
+ if(!root?.startsWith("/private/tmp/levytate-release-runtime.")||!manifest.synthetic||manifest.environment!=="local"||!/^[-a-f0-9]{36}$/.test(manifest.run)||!/^[-a-f0-9]{36}$/.test(tenant.id)||manifest.catalogue.standardId!=="ST0118")throw new Error("Synthetic local learner with committed standard requirement required");
+ const db=new URL(JSON.parse(readFileSync(`${root}/private-stack-state.json`,"utf8")).env.DB_URL);
+ if(db.hostname!=="127.0.0.1")throw new Error("Loopback only");
+ const capability=enabled=>{const r=spawnSync(process.env.RELEASE_PSQL??"/opt/homebrew/opt/postgresql@17/bin/psql",["-XAtq","-v","ON_ERROR_STOP=1"],{env:{...process.env,PGHOST:db.hostname,PGPORT:db.port,PGUSER:db.username,PGPASSWORD:db.password,PGDATABASE:db.pathname.slice(1)},input:`insert into public.levytate_organisation_capabilities(organisation_id,off_the_job_assistant_enabled) select id,${enabled} from public.levytate_organisations where id='${tenant.id}' and slug='release-${manifest.run}-a' on conflict(organisation_id)do update set off_the_job_assistant_enabled=excluded.off_the_job_assistant_enabled returning organisation_id;`,encoding:"utf8"});if(r.status||r.stdout.trim()!==tenant.id)throw new Error("Local Learning Time capability update failed");};
+ const employee=contexts.get("a:employee"),lead=contexts.get("a:lead"),manager=contexts.get("a:manager"),other=contexts.get("b:employee"),path=`${app}/api/levytate-learning-time`,today=new Date().toISOString().slice(0,10);
+ const post=(actor,body)=>actor.context.request.post(path,{headers:{Origin:app},data:body});
+ const workspace=async actor=>{const r=await actor.context.request.get(path);check(`${actor.user.role} reads enabled Learning Time`,r.status()===200);return r.json();};
+ capability(true);
+ try{
+  check("second tenant remains Learning Time disabled",(await other.context.request.get(path)).status()===404);
+  const plan={action:"create_plan_draft",idempotencyKey:randomUUID(),learnerRecordId:learnerId,originalStartDate:today,practicalStartDate:today,practicalEndDate:"2028-01-01",standardId:"ST0118",standardVersion:"1.1",priorLearningReductionMinutes:0,individualMinimumMinutes:22200,plannedDeliveryMinutes:22200,providerId:manifest.catalogue.providerId,trainingPlanReference:"Synthetic acceptance plan; no funding claim",sourceType:"provider_training_plan",sourceDate:today};
+  check("Employee cannot author the employer plan",(await post(employee,plan)).status()===403);
+  check("Manager cannot author the employer plan",(await post(manager,plan)).status()===403);
+  const drafted=await post(lead,plan),draft=await drafted.json();
+  if(drafted.status()!==201)console.log(`DIAGNOSTIC Learning Time plan status ${drafted.status()}`);
+  check("Lead creates exact standard-version plan",drafted.status()===201&&draft.version?.standard_version==="1.1");
+  check("plan retry returns same durable version",(await(await post(lead,plan)).json()).version?.id===draft.version.id);
+  const publish={action:"publish_plan",idempotencyKey:randomUUID(),versionId:draft.version.id};
+  check("Lead publishes plan explicitly",(await post(lead,publish)).status()===200);
+  const own=await workspace(employee);check("Employee sees only own connected learner",own.learners.length===1&&own.learners[0].learnerRecordId===learnerId&&own.learners[0].plan.versionId===draft.version.id);
+  await employee.page.goto(`${app}/levytate/app`);
+  await employee.page.getByRole("button",{name:"Learning Time",exact:true}).click();
+  await employee.page.getByRole("button",{name:"Add learning activity",exact:true}).click();
+  await employee.page.getByLabel("Activity date",{exact:true}).fill(today);
+  await employee.page.getByLabel("Start",{exact:true}).fill("09:00");await employee.page.getByLabel("End",{exact:true}).fill("10:00");
+  await employee.page.getByLabel("Working-hours basis",{exact:true}).selectOption("within_normal_working_hours");
+  const title=`Synthetic captured workshop ${manifest.run.slice(0,8)}`;
+  for(const[label,value]of[["Title",title],["What did you do?","Synthetic workshop practising analysis, separate from productive work."],["What was genuinely new?","New techniques for interpreting data in a fictional training exercise."],["How did this relate to your standard or agreed priority?","Data analysis methods aligned to the agreed synthetic programme."],["Reflection","A fictional learning reflection, not actual learner evidence."]])await employee.page.getByLabel(label,{exact:true}).fill(value);
+  await employee.page.getByLabel("This was separate from routine productive work.",{exact:true}).check();
+  const savedResponse=employee.page.waitForResponse(r=>new URL(r.url()).pathname==="/api/levytate-learning-time"&&r.request().method()==="POST");
+  await employee.page.getByRole("button",{name:"Save private draft",exact:true}).click();
+  const saved=await savedResponse,savedBody=await saved.json(),savedPayload=saved.request().postDataJSON();
+  check("real Employee UI saves a private draft",saved.status()===201&&savedBody.activity?.title===title&&savedBody.activity.status==="draft");
+  const activity=savedBody.activity;
+  check("lost-response UI payload replay preserves exact activity",(await(await post(employee,savedPayload)).json()).activity?.id===activity.id);
+  await employee.page.reload();
+  const fresh=await workspace(employee);check("draft survives browser reload",fresh.learners[0].activities.some(a=>a.id===activity.id&&a.title===title));
+  const submit={action:"submit_activity",activityId:activity.id,lockVersion:activity.lock_version,idempotencyKey:randomUUID()};
+  check("other tenant cannot submit this private draft",[403,404].includes((await post(other,submit)).status()));
+  check("Employee submits exact activity revision",(await post(employee,submit)).status()===200);
+  const submitted=(await workspace(employee)).learners[0].activities.find(a=>a.id===activity.id);
+  const review={action:"transition_activity",activityId:activity.id,lockVersion:submitted.lockVersion,transitionAction:"employer_check",note:"Synthetic employer check; not provider confirmation",idempotencyKey:randomUUID()};
+  check("Employee cannot employer-check own activity",(await post(employee,review)).status()===403);
+  check("Lead employer-checks submitted evidence",(await post(lead,review)).status()===200);
+  const confirm={action:"record_confirmation",activityId:activity.id,outcome:"confirmed",confirmedMinutes:60,sourceType:"provider_report",providerId:manifest.catalogue.providerId,sourceReference:"Synthetic attributable report; no actual provider delivery",sourceDate:today,note:"Fictional acceptance only",idempotencyKey:randomUUID()};
+  check("Employee cannot fabricate provider confirmation",(await post(employee,confirm)).status()===403);
+  check("Lead records attributable synthetic confirmation",(await post(lead,confirm)).status()===201);
+  check("confirmation retry remains successful",(await post(lead,confirm)).status()===201);
+  const rows=await backend(`rest/v1/levytate_otj_activity_confirmations?organisation_id=eq.${tenant.id}&activity_id=eq.${activity.id}&select=id`);
+  check("confirmation is exactly one database row",rows.length===1);
+  const end=(await workspace(employee)).learners[0];check("separate recorded, checked and confirmed totals reconcile",end.totals.learnerRecordedMinutes===60&&end.totals.employerCheckedMinutes===60&&end.totals.providerConfirmedMinutes===60);
+ }finally{capability(false);}
+ check("Learning Time capability restored disabled",(await employee.context.request.get(path)).status()===404);
+}

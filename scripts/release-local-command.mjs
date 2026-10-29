@@ -41,6 +41,11 @@ if(process.env.RELEASE_ENABLE_SYNTHETIC_LIFT==="true"){
   if(!fixture.synthetic||fixture.environment!=="local"||!fixture.tenants?.[0]?.id||process.env.VERCEL_ENV)throw new Error("Local synthetic Lift scope required");
   Object.assign(env,{LEVYTATE_LIFT_ENABLED:"true",LEVYTATE_LIFT_RUNTIME_SCOPE:"local",LEVYTATE_LIFT_ALLOWED_ORGANISATION_ID:fixture.tenants[0].id});
 }
+if(process.env.RELEASE_ENABLE_SYNTHETIC_LEARNING_TIME==="true"){
+  const fixture=JSON.parse(readFileSync(env.RELEASE_FIXTURE_MANIFEST,"utf8"));
+  if(!fixture.synthetic||fixture.environment!=="local"||!fixture.tenants?.[0]?.id||process.env.VERCEL_ENV)throw new Error("Local synthetic Learning Time scope required");
+  Object.assign(env,{LEVYTATE_OFF_THE_JOB_ASSISTANT_ENABLED:"true"});
+}
 const mode = process.argv[2];
 const commands = {
   hook: [process.execPath, [resolve(scriptDir, "release-local-email-hook.mjs")]],
@@ -56,6 +61,8 @@ const commands = {
   catalogue: [process.execPath,[resolve(scriptDir,"release-catalogue-concurrency.mjs")]],
   lift: [process.execPath,[resolve(scriptDir,"release-lift-integrity.mjs")]],
   "learning-time": [process.execPath,[resolve(scriptDir,"release-learning-time-integrity.mjs")]],
+  "workspace-atomic": [process.execPath,[resolve(scriptDir,"release-workspace-atomic-integrity.mjs")]],
+  requests: [process.execPath,[resolve(scriptDir,"release-requests-integrity.mjs")]],
   start: [process.execPath, [resolve(scriptDir, "release-start-local-stack.mjs")]],
   stop: [`${root}/supabase`, ["stack", "stop", "--workdir", `${root}/project`, "--output-format", "json"]],
   "bootstrap-dry-run": [`${root}/supabase`, ["db", "push", "--local", "--dry-run", "--workdir", `${root}/project`]],

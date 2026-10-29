@@ -7,10 +7,10 @@ function seedSyntheticStandard(standardId) {
   // Official standards are intentionally read-only to the application. Owner
   // fixture setup may insert a clearly synthetic row only in this local stack.
   const root=process.env.RELEASE_LOCAL_RUNTIME;
-  if(!root?.startsWith("/private/tmp/levytate-release-runtime.")||standardId!=="ST1490")throw new Error("Local synthetic standard setup only");
+  if(!root?.startsWith("/private/tmp/levytate-release-runtime.")||!["ST1490","ST0118"].includes(standardId))throw new Error("Local synthetic standard setup only");
   const state=JSON.parse(readFileSync(`${root}/private-stack-state.json`,"utf8")),db=new URL(state.env.DB_URL);
   if(db.hostname!=="127.0.0.1")throw new Error("Local standard database only");
-  const result=spawnSync(process.env.RELEASE_PSQL??"/opt/homebrew/opt/postgresql@17/bin/psql",["-XAtq","-v","ON_ERROR_STOP=1"],{env:{...process.env,PGHOST:db.hostname,PGPORT:db.port,PGUSER:db.username,PGPASSWORD:db.password,PGDATABASE:db.pathname.slice(1)},input:"insert into public.levytate_apprenticeship_standards(id,title,reference_code,status,level,occupational_route) values('ST1490','Synthetic acceptance standard record','ST1490','Approved for delivery',4,'Synthetic acceptance only');",encoding:"utf8"});
+  const result=spawnSync(process.env.RELEASE_PSQL??"/opt/homebrew/opt/postgresql@17/bin/psql",["-XAtq","-v","ON_ERROR_STOP=1"],{env:{...process.env,PGHOST:db.hostname,PGPORT:db.port,PGUSER:db.username,PGPASSWORD:db.password,PGDATABASE:db.pathname.slice(1)},input:`insert into public.levytate_apprenticeship_standards(id,title,reference_code,status,level,occupational_route) values('${standardId}','Synthetic acceptance standard record','${standardId}','Approved for delivery',4,'Synthetic acceptance only');`,encoding:"utf8"});
   if(result.status)throw new Error("Synthetic local standard setup failed; no grants changed");
 }
 
@@ -51,7 +51,8 @@ export async function createReleaseFixtures() {
   const catalogue = await backend("rest/v1/levytate_organisations?slug=eq.levytate-internal&select=id");
   const catalogueId = catalogue[0]?.id ?? randomUUID();
   if (!catalogue.length) await backend("rest/v1/levytate_organisations", "POST", { id: catalogueId, name: "Synthetic catalogue", slug: "levytate-internal", status: "Active" });
-  const providerId = `synthetic-${run}`, programmeId = `synthetic-programme-${run}`, standardId = "ST1490";
+  const providerId = `synthetic-${run}`, programmeId = `synthetic-programme-${run}`, standardId = process.env.RELEASE_TEST_STANDARD_ID??"ST1490";
+  if(!["ST1490","ST0118"].includes(standardId))throw new Error("Approved local fixture standard required");
   const standards=await backend(`rest/v1/levytate_apprenticeship_standards?id=eq.${standardId}&select=id`);
   if(!standards.length)seedSyntheticStandard(standardId);
   await backend("rest/v1/levytate_providers", "POST", { organisation_id: catalogueId, provider_id: providerId, provider_name: "Synthetic acceptance provider", provider_type: "Independent training provider", status: "Active", verification_status: "verified",last_verified:new Date().toISOString().slice(0,10),source_urls:["https://example.test/synthetic-provider-evidence"] });
