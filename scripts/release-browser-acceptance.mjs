@@ -3,7 +3,7 @@
  * login, injected sessions, demo switcher, traces or authentication screenshots.
  * Mailpit proves local SMTP capture, not delivery to a real external inbox.
  */
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { localUrl, releaseBackend } from "./release-local-fixtures.mjs";
@@ -184,6 +184,10 @@ try {
 } finally {
   await browser?.close();
   const evidence = { schemaVersion: 1, environment: "local", authenticationMethod: "requested-sign-in-link-through-local-smtp", authenticatedRolesVerified: results.filter((item) => item.name.endsWith("canonical role and tenant resolved") && item.status === "PASS").length, emailEvidence: "local-smtp-capture-only", results };
-  if (process.env.RELEASE_EVIDENCE_PATH?.startsWith("/private/tmp/")) writeFileSync(process.env.RELEASE_EVIDENCE_PATH, `${JSON.stringify(evidence, null, 2)}\n`, { mode: 0o600 });
+  if (process.env.RELEASE_EVIDENCE_PATH?.startsWith("/private/tmp/")) {
+    const requested = process.env.RELEASE_EVIDENCE_PATH;
+    const path = existsSync(requested) ? requested.replace(/\.json$/, `-${Date.now()}.json`) : requested;
+    writeFileSync(path, `${JSON.stringify(evidence, null, 2)}\n`, { mode: 0o600, flag: "wx" });
+  }
   console.log(`Release browser evidence: ${results.filter((item) => item.status === "PASS").length} PASS, ${results.filter((item) => item.status === "FAIL").length} FAIL, ${results.filter((item) => item.status === "BLOCKED").length} BLOCKED`);
 }
