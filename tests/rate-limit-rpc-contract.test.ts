@@ -21,6 +21,7 @@ describe("rate-limit client / reviewed SQL input contract", () => {
       return [field, new RegExp(match![1])];
     }));
     rpc.mockImplementation(async (_config, path, init) => {
+      if (path.startsWith("levytate_auth_rate_limits?")) return [];
       expect(path).toBe("rpc/levytate_consume_auth_rate_limit");
       const body = JSON.parse(init.body);
       for (const field of Object.keys(patterns)) expect(body[`p_${field}`]).toMatch(patterns[field]);
@@ -30,6 +31,7 @@ describe("rate-limit client / reviewed SQL input contract", () => {
     const request = new Request("http://localhost:3107/api/levytate-workspace");
     await limits.checkMagicLinkRequestLimits(request, "synthetic@example.invalid");
     await limits.checkCallbackAttemptLimit(request);
+    await limits.recordInvalidCallback(request);
     await limits.checkBetaLoginLimits(request, "synthetic@example.invalid");
     await limits.checkSessionRefreshLimit(request);
     await limits.checkAuthenticatedWriteLimit(request, "synthetic@example.invalid");
@@ -38,6 +40,6 @@ describe("rate-limit client / reviewed SQL input contract", () => {
     await limits.checkMicrosoftCopilotRequestLimits(request, "synthetic-tenant", "synthetic-object");
     await limits.checkStrategyBuilderLimits(request, "synthetic@example.invalid", "/api/strategy-builder/generate");
     await limits.checkPublicSubmissionLimits(request, "synthetic@example.invalid", "/api/opportunity-review/submit");
-    expect(rpc).toHaveBeenCalledTimes(22);
+    expect(rpc).toHaveBeenCalledTimes(25);
   });
 });

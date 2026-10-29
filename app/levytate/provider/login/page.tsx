@@ -38,6 +38,7 @@ export default async function LevyTateProviderLoginPage({
   return (
     <ProviderLoginClient
       invalidLink={auth === "invalid-link"}
+      authIssue={auth === "rate-limited" || auth === "unavailable" ? auth : undefined}
       providerLogoutWarning={logout === "local-only"}
     />
   );

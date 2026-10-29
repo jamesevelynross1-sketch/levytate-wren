@@ -1,7 +1,8 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie, levytateBetaSessionMaxAge, readLevyTateBetaSession } from "@/lib/levytate/config/beta-access";
-import { levytateAuthCookieMaxAge, levytateSupabaseAccessCookie, levytateSupabaseRefreshCookie, refreshEmployerAuth } from "@/lib/server/levytate-auth";
+import { levytateAuthCookieMaxAge, levytateSupabaseAccessCookie, levytateSupabaseRefreshCookie, refreshEmployerAuth, LevyTateAuthError } from "@/lib/server/levytate-auth";
+import { AuthenticationDependencyError } from "@/lib/server/levytate-auth-provider-request";
 import { setLevyTateAuthCookies } from "@/lib/server/levytate-auth-cookies";
 import { checkSessionRefreshLimit, LevyTateRateLimitStoreError } from "@/lib/server/levytate-auth-rate-limit";
 import { assertBrowserOrigin, ClientRequestError } from "@/lib/server/levytate-request-boundary";
@@ -14,7 +15,7 @@ export async function POST(request: Request) {
     const store = await cookies();
     const refresh = store.get(levytateSupabaseRefreshCookie)?.value;
     const session = await readLevyTateBetaSession(store.get(levytateBetaSessionCookie)?.value);
-    if (!refresh || !session) throw new Error("missing");
+    if (!refresh || !session) throw new LevyTateAuthError("unauthorised", "Your session has ended. Sign in again to continue.", 401);
     const result = await refreshEmployerAuth(refresh, session);
     const refreshed = response({ ok: true, identity: { email: result.membership.email, organisationId: result.membership.organisation_id } });
     setLevyTateAuthCookies(refreshed, request.headers.get("host"), [
@@ -25,8 +26,10 @@ export async function POST(request: Request) {
     return refreshed;
   } catch (error) {
     if (error instanceof ClientRequestError) return response({ ok: false, message: error.message }, error.status);
+    if (error instanceof AuthenticationDependencyError) return response({ ok: false, message: error.message }, error.status);
     if (error instanceof LevyTateRateLimitStoreError) return response({ ok: false, message: "Secure sign-in is temporarily unavailable. Please try again shortly." }, 503);
-    return response({ ok: false, message: "Your session has ended. Sign in again to continue." }, 401);
+    if (error instanceof LevyTateAuthError && error.code !== "configuration") return response({ ok: false, message: "Your session has ended. Sign in again to continue." }, 401);
+    return response({ ok: false, message: "Secure sign-in is temporarily unavailable. Please try again shortly." }, 503);
   }
 }
 function response(body: unknown, status = 200) { return NextResponse.json(body, { status, headers: { "Cache-Control": "private, no-store, max-age=0" } }); }

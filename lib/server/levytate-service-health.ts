@@ -28,7 +28,7 @@ const criticalChecks = [
   { key: "terms", kind: "table", table: "levytate_early_access_terms_acceptances", column: "id", label: "Terms acceptance schema" },
   { key: "security", kind: "table", table: "levytate_audit_events", column: "id", label: "Authentication security events" },
   { key: "rate-limit-operation", kind: "auth-rate-limit", label: "Authentication rate-limit operation" },
-  { key: "migration-baseline", kind: "table", table: "levytate_lift_framework_versions", column: "id", label: "Active migration baseline" },
+  { key: "migration-baseline", kind: "table", table: "levytate_lift_framework_versions", column: "framework_key", label: "Active migration baseline" },
 ] as const satisfies readonly HealthCheckDefinition[];
 const optionalChecks = [
   { key: "prospect", kind: "table", table: "levytate_prospect_access", column: "id", label: "Optional prospect access diagnostics" },

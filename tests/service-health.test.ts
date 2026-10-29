@@ -121,6 +121,12 @@ describe("LevyTate public readiness", () => {
 });
 
 describe("authentication rate-limit readiness probe", () => {
+  it("probes the actual composite-key Lift framework schema rather than an invented id", async () => {
+    stubRequiredEnvironment();
+    const observed: unknown[] = [];
+    await getPublicReadiness({ bypassCache: true, adapter: async (input) => { observed.push(input); } });
+    expect(observed).toContainEqual(expect.objectContaining({ key: "migration-baseline", table: "levytate_lift_framework_versions", column: "framework_key" }));
+  });
   it("is a critical check in the public readiness path", async () => {
     stubRequiredEnvironment();
     const observed: string[] = [];

@@ -6,7 +6,7 @@ export class BoundedJsonBodyError extends Error {
 }
 
 /** Read JSON without ever buffering more than the declared byte boundary. */
-export async function readBoundedJson(request: Request, maximumBytes: number): Promise<unknown> {
+export async function readBoundedJson(request: Pick<Request, "headers" | "body">, maximumBytes: number): Promise<unknown> {
   const declaredLength = Number(request.headers.get("content-length"));
   if (Number.isFinite(declaredLength) && declaredLength > maximumBytes) {
     throw new BoundedJsonBodyError(true);

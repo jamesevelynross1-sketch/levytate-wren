@@ -23,8 +23,31 @@ export async function checkMagicLinkRequestLimits(request: Request, email: strin
 }
 
 export async function checkCallbackAttemptLimit(request: Request) {
+  const transport = await consumeChecks([
+    check("magic_link.callback.transport", networkRateLimitKey(request), "/levytate/auth/callback", "callback_transport_rate_limited", levyTateAuthRateLimits.callbackTransportNetwork),
+    check("magic_link.callback.token", rateLimitKey("callback_token", (new URL(request.url).searchParams.get("token_hash") ?? "missing").slice(0, 2048)), "/levytate/auth/callback", "callback_replay_rate_limited", levyTateAuthRateLimits.callbackToken),
+  ]);
+  if (!transport.allowed) return transport;
+  // Successful callbacks must not consume the invalid-link budget for everyone
+  // behind an employer NAT. Check the existing failed-only bucket without a
+  // write; actual failures are consumed atomically after provider verification.
+  // Transport/token caps also bound concurrent attempts before failures settle.
+  try {
+    const config = getLevyTateSupabaseConfig();
+    if (!config) throw new LevyTateRateLimitStoreError();
+    const query = new URLSearchParams({ select: "request_count,expires_at", environment_namespace: `eq.${getLevyTateRateLimitEnvironment()}`,
+      action: "eq.magic_link.callback.failure", key_hash: `eq.${networkRateLimitKey(request)}`,
+      expires_at: `gt.${new Date().toISOString()}`, order: "expires_at.desc", limit: "1" });
+    const rows = await supabaseFetchJson<Array<{ request_count: number; expires_at: string }>>(config, `levytate_auth_rate_limits?${query}`);
+    if (!Array.isArray(rows) || rows.length > 1 || rows.some((row) => !Number.isSafeInteger(row.request_count) || row.request_count < 1 || !Number.isFinite(Date.parse(row.expires_at)))) throw new LevyTateRateLimitStoreError();
+    return rows[0]?.request_count >= levyTateAuthRateLimits.invalidCallbackNetwork.limit
+      ? { allowed: false, resetAt: rows[0].expires_at } : { allowed: true as const };
+  } catch { throw new LevyTateRateLimitStoreError(); }
+}
+
+export async function recordInvalidCallback(request: Request) {
   return consumeChecks([
-    check("magic_link.callback.invalid", networkRateLimitKey(request), "/levytate/auth/callback", "callback_abuse_threshold_reached", levyTateAuthRateLimits.invalidCallbackNetwork),
+    check("magic_link.callback.failure", networkRateLimitKey(request), "/levytate/auth/callback", "callback_abuse_threshold_reached", levyTateAuthRateLimits.invalidCallbackNetwork),
   ]);
 }
 

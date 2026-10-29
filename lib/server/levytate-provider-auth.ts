@@ -1,6 +1,7 @@
 import { normaliseBetaEmail } from "@/lib/levytate/config/beta-access";
 import { providerMembershipRoles, type ProviderMembershipRole } from "@/lib/levytate/requests/domain";
-import { checkCallbackAttemptLimit } from "@/lib/server/levytate-auth-rate-limit";
+import { checkCallbackAttemptLimit, recordInvalidCallback } from "@/lib/server/levytate-auth-rate-limit";
+import { authProviderRequest } from "@/lib/server/levytate-auth-provider-request";
 import { isRequestsEnabledForOrganisation, isRequestsEnvironmentEnabled } from "@/lib/server/levytate-request-capability";
 import {
   getLevyTateSupabaseConfig,
@@ -62,7 +63,7 @@ function config() {
 
 async function providerAuthFetch(path: string, init: RequestInit = {}) {
   const value = config();
-  return fetch(`${value.url}/auth/v1/${path}`, {
+  return authProviderRequest(`${value.url}/auth/v1/${path}`, {
     ...init,
     headers: {
       apikey: value.serviceRoleKey,
@@ -100,6 +101,7 @@ export async function completeLevyTateProviderMagicLinkCallback(request: Request
   const tokenHash = url.searchParams.get("token_hash") ?? "";
   const type = url.searchParams.get("type") ?? "email";
   if (!tokenHash || !["email", "magiclink"].includes(type)) {
+    await recordInvalidCallback(request);
     throw new LevyTateProviderAuthError("invalid_link", "This sign-in link is invalid or has expired.", 400);
   }
 
@@ -107,7 +109,10 @@ export async function completeLevyTateProviderMagicLinkCallback(request: Request
     method: "POST",
     body: JSON.stringify({ token_hash: tokenHash, type }),
   });
-  if (!response.ok) throw new LevyTateProviderAuthError("invalid_link", "This sign-in link is invalid or has expired.", 401);
+  if (!response.ok) {
+    await recordInvalidCallback(request);
+    throw new LevyTateProviderAuthError("invalid_link", "This sign-in link is invalid or has expired.", 401);
+  }
   const auth = await response.json() as SupabaseAuthResult;
   const email = normaliseBetaEmail(auth.user.email ?? "");
   const memberships = await findProviderMembershipsByEmail(email);

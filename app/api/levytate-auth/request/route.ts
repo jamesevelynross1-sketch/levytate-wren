@@ -4,6 +4,7 @@ import { genericSignInRequestMessage, requestEmployerSignIn } from "@/lib/server
 import { checkMagicLinkRequestLimits, LevyTateRateLimitStoreError } from "@/lib/server/levytate-auth-rate-limit";
 import { ClientRequestError, readBrowserJson, requireActionKeys } from "@/lib/server/levytate-request-boundary";
 import { applicationRequestUrl } from "@/lib/server/levytate-request-origin";
+import { AuthenticationDependencyError } from "@/lib/server/levytate-auth-provider-request";
 
 const waitMessage = "Please wait before requesting another sign-in link.";
 const unavailableMessage = "Secure sign-in is temporarily unavailable. Please try again shortly.";
@@ -19,10 +20,12 @@ export async function POST(request: Request) {
     await requestEmployerSignIn(body.email, levyTateAuthCallbackUrl(applicationRequestUrl(request).href, "/levytate/auth/callback"));
   } catch (error) {
     if (error instanceof ClientRequestError) return NextResponse.json({ ok: false, message: error.message }, { status: error.status });
+    if (error instanceof AuthenticationDependencyError) return NextResponse.json({ ok: false, message: error.message }, { status: error.status });
     if (error instanceof LevyTateRateLimitStoreError) {
       return NextResponse.json({ ok: false, message: unavailableMessage }, { status: 503 });
     }
-    console.error("LevyTate secure sign-in request failed", error instanceof Error ? error.name : "unknown");
+    console.error("LevyTate secure sign-in request failed", { outcome: "dependency_unavailable" });
+    return NextResponse.json({ ok: false, message: unavailableMessage }, { status: 503 });
   }
   return generic;
 }

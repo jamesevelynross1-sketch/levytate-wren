@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie, levytateBetaSessionMaxAge, readLevyTateBetaSession } from "@/lib/levytate/config/beta-access";
 import { levyTateAppHomePath, levyTateEmployerSignInPath, requestHostname } from "@/lib/levytate/hosts";
-import { levytateAuthCookieMaxAge, levytateSupabaseAccessCookie, levytateSupabaseRefreshCookie, verifyEmployerMagicLink } from "@/lib/server/levytate-auth";
+import { levytateAuthCookieMaxAge, levytateSupabaseAccessCookie, levytateSupabaseRefreshCookie, verifyEmployerMagicLink, LevyTateAuthError } from "@/lib/server/levytate-auth";
 import { setLevyTateAuthCookies } from "@/lib/server/levytate-auth-cookies";
-import { checkCallbackAttemptLimit } from "@/lib/server/levytate-auth-rate-limit";
+import { checkCallbackAttemptLimit, recordInvalidCallback } from "@/lib/server/levytate-auth-rate-limit";
+import { AuthenticationDependencyError } from "@/lib/server/levytate-auth-provider-request";
 import { getCoreEarlyAccessPolicy } from "@/lib/levytate/core-early-access-policy";
 import { normaliseMvpUserRole } from "@/lib/levytate/mvp/rbac";
 import { getTermsGateState } from "@/lib/server/levytate-early-access-terms";
@@ -15,7 +16,7 @@ export async function GET(request: Request) {
   catch { return NextResponse.json({ message: "Unrecognised application host." }, { status: 403 }); }
   try {
     const rateLimit = await checkCallbackAttemptLimit(request);
-    if (!rateLimit.allowed) return failed(url, request, "invalid-link");
+    if (!rateLimit.allowed) return failed(url, request, "rate-limited");
     const result = await verifyEmployerMagicLink(url.searchParams.get("token_hash") ?? "", url.searchParams.get("type") ?? "email");
     const role = normaliseMvpUserRole(result.membership.role);
     const first = getCoreEarlyAccessPolicy(role).modules.find((module) => module.availability === "enabled")?.moduleKey;
@@ -33,11 +34,20 @@ export async function GET(request: Request) {
       { name: levytateSupabaseRefreshCookie, value: result.refresh_token, maxAge: levytateAuthCookieMaxAge },
     ]);
     return response;
-  } catch {
-    return failed(url, request, "invalid-link");
+  } catch (error) {
+    if (error instanceof LevyTateAuthError && error.code !== "configuration") {
+      if (error.code === "invalid_link") {
+        try { if (!(await recordInvalidCallback(request)).allowed) return failed(url, request, "rate-limited"); }
+        catch { return failed(url, request, "unavailable"); }
+      }
+      return failed(url, request, "invalid-link");
+    }
+    return failed(url, request, error instanceof AuthenticationDependencyError && error.status === 429 ? "rate-limited" : "unavailable");
   }
 }
 function failed(url: URL, request: Request, reason: string) {
   const path = levyTateEmployerSignInPath(requestHostname(request.headers.get("host") || url.host));
-  return NextResponse.redirect(new URL(`${path}?auth=${reason}`, url.origin));
+  const response = NextResponse.redirect(new URL(`${path}?auth=${reason}`, url.origin));
+  response.headers.set("Cache-Control", "private, no-store, max-age=0");
+  return response;
 }

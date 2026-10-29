@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import { applicationRequestUrl } from "@/lib/server/levytate-request-origin";
 import { setLevyTateAuthCookies } from "@/lib/server/levytate-auth-cookies";
+import { AuthenticationDependencyError } from "@/lib/server/levytate-auth-provider-request";
 import {
   completeLevyTateProviderMagicLinkCallback,
   levytateProviderAuthCookieMaxAge,
   levytateProviderSessionCookie,
   levytateProviderSupabaseAccessCookie,
   levytateProviderSupabaseRefreshCookie,
+  LevyTateProviderAuthError,
 } from "@/lib/server/levytate-provider-auth";
 
 export async function GET(request: Request) {
@@ -27,14 +29,15 @@ export async function GET(request: Request) {
     ]);
     response.headers.set("Cache-Control", "private, no-store, max-age=0");
     return response;
-  } catch {
-    return failed(url);
+  } catch (error) {
+    const status = error instanceof AuthenticationDependencyError || error instanceof LevyTateProviderAuthError ? error.status : 503;
+    return failed(url, status === 429 ? "rate-limited" : status >= 500 ? "unavailable" : "invalid-link");
   }
 }
 
-function failed(url: URL) {
+function failed(url: URL, reason: string) {
   const response = NextResponse.redirect(
-    new URL("/levytate/provider/login?auth=invalid-link", url.origin),
+    new URL(`/levytate/provider/login?auth=${reason}`, url.origin),
   );
   response.headers.set("Cache-Control", "private, no-store, max-age=0");
   return response;

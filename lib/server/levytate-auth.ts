@@ -6,6 +6,7 @@ import { invitationAllowsActivation, type ClientInvitationFields } from "@/lib/l
 import { getLevyTateSupabaseConfig, supabaseInsert, supabaseSelect, supabaseUpdate } from "@/lib/server/levytate-supabase";
 import { checkProspectSessionAccess } from "@/lib/server/levytate-prospect-access";
 import { recordAuthenticationEmailAccepted, recordAuthenticationEmailRequest, shouldSuppressAuthenticationEmail } from "@/lib/server/levytate-auth-email-delivery";
+import { authProviderRequest } from "@/lib/server/levytate-auth-provider-request";
 
 export const levytateSupabaseAccessCookie = "levytate_auth_access";
 export const levytateSupabaseRefreshCookie = "levytate_auth_refresh";
@@ -30,7 +31,7 @@ function config() {
 
 async function authFetch(path: string, init: RequestInit = {}) {
   const value = config();
-  return fetch(`${value.url}/auth/v1/${path}`, { ...init, headers: { apikey: value.serviceRoleKey, Authorization: `Bearer ${value.serviceRoleKey}`, "Content-Type": "application/json", ...(init.headers ?? {}) }, cache: "no-store" });
+  return authProviderRequest(`${value.url}/auth/v1/${path}`, { ...init, headers: { apikey: value.serviceRoleKey, Authorization: `Bearer ${value.serviceRoleKey}`, "Content-Type": "application/json", ...(init.headers ?? {}) }, cache: "no-store" });
 }
 
 export async function requestEmployerSignIn(emailInput: string, redirectTo: string) {
