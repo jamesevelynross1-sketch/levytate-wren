@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { applicationRequestUrl } from "@/lib/server/levytate-request-origin";
 import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
 import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
 import { acceptCurrentEarlyAccessTerms, EarlyAccessTermsError } from "@/lib/server/levytate-early-access-terms";
@@ -7,7 +8,10 @@ import { ClientRequestError, readBrowserForm } from "@/lib/server/levytate-reque
 import { levyTateAppHomePath, levyTateEmployerSignInPath } from "@/lib/levytate/hosts";
 
 export async function POST(request: Request) {
-  const { origin, hostname } = new URL(request.url);
+  let url: URL;
+  try { url = applicationRequestUrl(request); }
+  catch { return NextResponse.json({ message: "Unrecognised application host." }, { status: 403 }); }
+  const { origin, hostname } = url;
   let body: URLSearchParams;
   try { body = await readBrowserForm(request, 1024); }
   catch (error) { return NextResponse.json({ message: "A valid same-origin terms submission is required." }, { status: error instanceof ClientRequestError ? error.status : 400 }); }

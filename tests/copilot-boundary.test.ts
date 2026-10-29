@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ session: vi.fn(), limits: vi.fn(), workspace: vi.fn(), operational: vi.fn(), guidance: vi.fn(), generate: vi.fn() }));
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => ({ value: "synthetic-cookie" }) }) }));
 vi.mock("@/lib/server/levytate-authorised-session", () => ({ readAuthorisedLevyTateBetaSession: mocks.session }));
@@ -15,10 +15,12 @@ function request(overrides: Record<string, unknown> = {}, origin = "https://cand
 }
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.stubEnv("VERCEL_ENV", "preview"); vi.stubEnv("VERCEL_URL", "candidate.vercel.app");
   mocks.session.mockResolvedValue({ email: "synthetic@example.invalid", accessLevel: "approved" });
   mocks.limits.mockResolvedValue({ allowed: true });
   mocks.workspace.mockRejectedValue(new Error("private provider diagnostic"));
 });
+afterEach(() => vi.unstubAllEnvs());
 describe("Copilot security and grounding failures", () => {
   it("rejects sibling-origin queries before loading platform data", async () => {
     expect((await POST(request({}, "https://sibling.vercel.app"))).status).toBe(403);

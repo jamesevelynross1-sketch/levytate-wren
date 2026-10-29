@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { applicationRequestOrigin } from "@/lib/server/levytate-request-origin";
 import { levytateBetaSessionCookie, readLevyTateBetaSession } from "@/lib/levytate/config/beta-access";
 import { levyTateEmployerSignInPath, requestHostname } from "@/lib/levytate/hosts";
 import { invalidateEmployerAuthSession, levytateSupabaseAccessCookie, levytateSupabaseRefreshCookie, recordEmployerLogoutEvent } from "@/lib/server/levytate-auth";
@@ -34,7 +35,7 @@ export async function POST(request: Request) {
     }
   }
 
-  const destination = new URL(levyTateEmployerSignInPath(requestHostname(request.headers.get("host") || new URL(request.url).host)), request.url);
+  const destination = new URL(levyTateEmployerSignInPath(requestHostname(request.headers.get("host") || new URL(request.url).host)), applicationRequestOrigin(request));
   if (providerFailure) destination.searchParams.set("logout", "local-only");
   const response = NextResponse.redirect(destination, 303);
   expireLevyTateAuthCookies(response, request.headers.get("host"), authenticationCookies);

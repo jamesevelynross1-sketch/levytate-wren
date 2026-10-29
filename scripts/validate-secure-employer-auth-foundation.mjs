@@ -56,7 +56,9 @@ check("verified Auth subject binds server-side", /auth_subject: auth\.user\.id/.
 check("browser cannot provide organisation or role", !/searchParams\.get\(["'](?:role|organisation)/.test(callback));
 check("protected requests revalidate current membership", authorised.includes("revalidateEmployerSession"));
 check("inactive membership is denied", /!membership\.active/.test(auth));
-check("role is re-read from membership", /normaliseMvpUserRole\(membership\.role\)/.test(auth));
+check("role is re-read from strictly validated membership", /parseMvpUserRole\(membership\.role\)/.test(auth) && auth.includes("validateIdentityMembership(membership)"));
+const { parseMvpUserRole } = await import(new URL("../lib/levytate/mvp/rbac.ts", import.meta.url));
+check("unsupported authenticated roles never become Employee", [null, undefined, "", "Department Head", "Administrator"].every((role) => parseMvpUserRole(role) === null));
 check("callback uses first central-policy module", callback.includes("getCoreEarlyAccessPolicy"));
 check("shared cookie policy is HTTP-only, SameSite and bounded", appCookie.httpOnly === true && appCookie.sameSite === "lax" && appCookie.maxAge === 60 && appCookie.path === "/");
 check("shared cookie policy honours the strict SameSite override", strictAppCookie.sameSite === "strict");

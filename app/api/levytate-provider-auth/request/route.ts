@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ClientRequestError, readBrowserJson, requireActionKeys } from "@/lib/server/levytate-request-boundary";
+import { applicationRequestUrl } from "@/lib/server/levytate-request-origin";
 import { levyTateAuthCallbackUrl } from "@/lib/levytate/hosts";
 import { checkMagicLinkRequestLimits, LevyTateRateLimitStoreError } from "@/lib/server/levytate-auth-rate-limit";
 import { genericProviderSignInMessage, requestProviderSignIn } from "@/lib/server/levytate-provider-auth";
@@ -15,7 +16,7 @@ export async function POST(request: Request) {
     if (typeof body.email !== "string" || !body.email.trim() || body.email.length > 254) return generic;
     const limit = await checkMagicLinkRequestLimits(request, body.email);
     if (!limit.allowed) return noStore({ ok: false, message: waitMessage }, 429);
-    await requestProviderSignIn(body.email, levyTateAuthCallbackUrl(request.url, "/levytate/provider/auth/callback"));
+    await requestProviderSignIn(body.email, levyTateAuthCallbackUrl(applicationRequestUrl(request).href, "/levytate/provider/auth/callback"));
   } catch (error) {
     if (error instanceof ClientRequestError) return noStore({ ok: false, message: error.message }, error.status);
     if (error instanceof LevyTateRateLimitStoreError) {

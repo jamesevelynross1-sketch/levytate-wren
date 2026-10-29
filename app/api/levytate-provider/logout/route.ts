@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { applicationRequestOrigin } from "@/lib/server/levytate-request-origin";
 import { expireLevyTateAuthCookies } from "@/lib/server/levytate-auth-cookies";
 import { assertBrowserOrigin } from "@/lib/server/levytate-request-boundary";
 import {
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
     fullyInvalidated = false;
   }
   const response = NextResponse.redirect(
-    new URL(`/levytate/provider/login${fullyInvalidated ? "" : "?logout=local-only"}`, request.url),
+    new URL(`/levytate/provider/login${fullyInvalidated ? "" : "?logout=local-only"}`, applicationRequestOrigin(request)),
     303,
   );
   expireLevyTateAuthCookies(response, request.headers.get("host"), [

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ session: vi.fn(), mutate: vi.fn(), bootstrap: vi.fn(), financeImport: vi.fn(), balance: vi.fn(), financeState: vi.fn(), writeLimit: vi.fn() }));
 vi.mock("@/lib/server/levytate-auth-rate-limit", () => ({ checkAuthenticatedWriteLimit: mocks.writeLimit, LevyTateRateLimitStoreError: class extends Error {} }));
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => ({ value: "synthetic-session" }) }) }));
@@ -16,7 +16,8 @@ import { ApplicationCommandError } from "@/lib/server/levytate-application-comma
 function request(body: unknown, origin = "https://candidate.vercel.app", contentType = "application/json") {
   return new Request("https://candidate.vercel.app/api/write", { method: "POST", headers: { origin, "content-type": contentType }, body: JSON.stringify(body) });
 }
-beforeEach(() => { vi.resetAllMocks(); mocks.session.mockResolvedValue({ email: "synthetic@example.invalid" }); mocks.mutate.mockResolvedValue({}); mocks.balance.mockResolvedValue({}); mocks.writeLimit.mockResolvedValue({ allowed: true }); });
+beforeEach(() => { vi.resetAllMocks(); vi.stubEnv("VERCEL_ENV", "preview"); vi.stubEnv("VERCEL_URL", "candidate.vercel.app"); mocks.session.mockResolvedValue({ email: "synthetic@example.invalid" }); mocks.mutate.mockResolvedValue({}); mocks.balance.mockResolvedValue({}); mocks.writeLimit.mockResolvedValue({ allowed: true }); });
+afterEach(() => vi.unstubAllEnvs());
 
 describe("actual cookie-authenticated mutation routes", () => {
   it.each([workspacePost, financePost])("denies sibling-origin writes without calling persistence", async (post) => {
@@ -26,6 +27,13 @@ describe("actual cookie-authenticated mutation routes", () => {
   it("rejects an unauthenticated mutation before parsing it", async () => {
     mocks.session.mockResolvedValue(null);
     expect((await workspacePost(request({ type: "archiveEmployee", id: "one" }))).status).toBe(401);
+    expect(mocks.mutate).not.toHaveBeenCalled();
+  });
+  it("does not replay an old account's draft under a new browser session", async () => {
+    const value = request({ type: "archiveEmployee", id: "one" });
+    value.headers.set("x-levytate-account", "previous@example.invalid");
+    const response = await workspacePost(value);
+    expect(response.status).toBe(409); expect(await response.json()).toMatchObject({ code: "account_changed" });
     expect(mocks.mutate).not.toHaveBeenCalled();
   });
   it("rejects malformed types and simple-request content types", async () => {

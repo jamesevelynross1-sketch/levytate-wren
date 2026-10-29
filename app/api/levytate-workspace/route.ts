@@ -39,6 +39,10 @@ export async function POST(request: Request) {
   if (!session) {
     return noStore({ message: "Unauthorised." }, 401);
   }
+  const expectedAccount = request.headers.get("x-levytate-account");
+  if (expectedAccount !== null && expectedAccount.trim().toLowerCase() !== session.email.trim().toLowerCase()) {
+    return noStore({ code: "account_changed", message: "A different account is signed in. Reload to switch accounts; this form was not submitted." }, 409);
+  }
 
   try {
     const mutation = parseWorkspaceMutation(await readAuthenticatedJson(request, session.email, 1024 * 1024));

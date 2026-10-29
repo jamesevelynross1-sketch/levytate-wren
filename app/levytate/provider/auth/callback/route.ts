@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { applicationRequestUrl } from "@/lib/server/levytate-request-origin";
 import { setLevyTateAuthCookies } from "@/lib/server/levytate-auth-cookies";
 import {
   completeLevyTateProviderMagicLinkCallback,
@@ -9,7 +10,9 @@ import {
 } from "@/lib/server/levytate-provider-auth";
 
 export async function GET(request: Request) {
-  const url = new URL(request.url);
+  let url: URL;
+  try { url = applicationRequestUrl(request); }
+  catch { return NextResponse.json({ message: "Unrecognised application host." }, { status: 403 }); }
 
   try {
     // This helper verifies the Supabase session, active provider membership,

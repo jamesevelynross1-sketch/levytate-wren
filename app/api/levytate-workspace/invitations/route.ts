@@ -5,6 +5,7 @@ import { levyTateAuthCallbackUrl } from "@/lib/levytate/hosts";
 import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
 import { ClientWorkspaceAdminError, inviteClientWorkspaceUser, listWorkspaceUsers, provisionClientWorkspaceUser, updateClientWorkspaceUser } from "@/lib/server/levytate-client-workspace-admin";
 import { ClientRequestError, readBrowserJson, requireActionKeys } from "@/lib/server/levytate-request-boundary";
+import { applicationRequestUrl } from "@/lib/server/levytate-request-origin";
 
 async function session() { const store = await cookies(); return readAuthorisedLevyTateBetaSession(store.get(levytateBetaSessionCookie)?.value); }
 export async function GET() {
@@ -23,7 +24,7 @@ export async function POST(request: Request) {
     }
     if (body.action === "invite_user") {
       requireActionKeys(body, ["action", "userId", "requestId", "expectedGeneration"]);
-      return reply({ ok: true, user: await inviteClientWorkspaceUser(current, body, levyTateAuthCallbackUrl(request.url, "/levytate/auth/callback"), request) });
+      return reply({ ok: true, user: await inviteClientWorkspaceUser(current, body, levyTateAuthCallbackUrl(applicationRequestUrl(request).href, "/levytate/auth/callback"), request) });
     }
     if (body.action === "revoke_user") {
       requireActionKeys(body, ["action", "userId"]);

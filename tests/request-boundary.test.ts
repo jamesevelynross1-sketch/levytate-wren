@@ -1,7 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { assertBrowserOrigin, readBrowserForm, readBrowserJson, requireActionKeys } from "@/lib/server/levytate-request-boundary";
 
 const url = "https://candidate.vercel.app/api/levytate-workspace";
+beforeEach(() => { vi.stubEnv("VERCEL_ENV", "preview"); vi.stubEnv("VERCEL_URL", "candidate.vercel.app"); });
+afterEach(() => vi.unstubAllEnvs());
 function request(body: string, headers: Record<string, string> = {}) {
   return new Request(url, { method: "POST", headers: { origin: "https://candidate.vercel.app", "content-type": "application/json", ...headers }, body });
 }
