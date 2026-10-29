@@ -4,11 +4,13 @@
  * Mailpit proves local SMTP capture, not delivery to a real external inbox.
  */
 import { readFileSync, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { localUrl, releaseBackend } from "./release-local-fixtures.mjs";
 
 const results = [];
 let browser;
+let phase = "initialisation";
 function check(name, condition) {
   results.push({ name, status: condition ? "PASS" : "FAIL" });
   console.log(`${condition ? "PASS" : "FAIL"} ${name}`);
@@ -51,22 +53,37 @@ try {
       const label = `${tenant.key} ${user.role}`;
       const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
       const page = await context.newPage();
+      page.on("response", (response) => {
+        const path = new URL(response.url()).pathname;
+        if (path.startsWith("/api/levytate-auth/") && response.status() >= 400) console.log(`DIAGNOSTIC auth API status ${response.status()} at ${path}`);
+      });
       contexts.set(`${tenant.key}:${user.key}`, { context, page, user, tenant });
       await page.goto(`${app}/levytate/login`);
       check(`${label}: no demo login required`, !(await page.getByText("Internal demonstration access", { exact: true }).count()));
       const after = Date.now();
-      await page.getByLabel("Work email", { exact: true }).fill(user.email);
-      await page.getByRole("button", { name: "Send secure sign-in link", exact: true }).click();
-      await page.getByRole("heading", { name: "Check your email", exact: true }).waitFor();
+      if (user.key === "lead") {
+        phase = `${label}: submit login form`;
+        await page.getByLabel("Work email", { exact: true }).fill(user.email);
+        await page.getByRole("button", { name: "Send secure sign-in link", exact: true }).click();
+        phase = `${label}: wait for request confirmation`;
+        await page.getByRole("heading", { name: "Check your email", exact: true }).waitFor();
+      } else {
+        const lead = contexts.get(`${tenant.key}:lead`);
+        const requestId = randomUUID();
+        const invitation = { action: "invite_user", userId: user.membershipId, requestId, expectedGeneration: 0 };
+        const invite = await lead.context.request.post(`${app}/api/levytate-workspace/invitations`, { headers: { Origin: app }, data: invitation });
+        const accepted = await invite.json();
+        check(`${label}: Lead-controlled invitation accepted by real Auth`, invite.status() === 200 && accepted.user?.invitationStatus === "accepted");
+        const repeated = await lead.context.request.post(`${app}/api/levytate-workspace/invitations`, { headers: { Origin: app }, data: invitation });
+        check(`${label}: invitation request retry is idempotent`, repeated.status() === 200 && (await repeated.json()).user?.invitationGeneration === accepted.user.invitationGeneration);
+      }
+      phase = `${label}: await local capture`;
       const link = await waitForCapturedLink(mailpit, user.email, app, after);
       check(`${label}: actual sign-in request reached local SMTP capture`, true);
-      let callbackCookies = [];
-      const listener = async (response) => {
-        if (new URL(response.url()).pathname === "/levytate/auth/callback") callbackCookies = (await response.headersArray()).filter((header) => header.name.toLowerCase() === "set-cookie").map((header) => header.value);
-      };
-      page.on("response", listener);
+      const callbackResponse = page.waitForResponse((response) => new URL(response.url()).pathname === "/levytate/auth/callback");
+      phase = `${label}: redeem app callback`;
       await page.goto(link);
-      page.off("response", listener);
+      const callbackCookies = (await (await callbackResponse).headersArray()).filter((header) => header.name.toLowerCase() === "set-cookie").map((header) => header.value);
       if (user.key === "lead" && new URL(page.url()).pathname === "/levytate/accept-terms") {
         await page.getByRole("checkbox").check();
         await page.getByRole("button", { name: "Accept Early Access Terms", exact: true }).click();
@@ -74,7 +91,7 @@ try {
       }
       check(`${label}: callback stays on application origin`, new URL(page.url()).origin === app && new URL(page.url()).pathname.includes("/app"));
       const authCookies = (await context.cookies()).filter((cookie) => /^levytate_(beta_session|auth_access|auth_refresh)$/.test(cookie.name));
-      check(`${label}: three HttpOnly host-only cookies`, authCookies.length === 3 && authCookies.every((cookie) => cookie.httpOnly && cookie.path === "/" && !cookie.domain.startsWith(".") && cookie.sameSite !== "None") && callbackCookies.filter((value) => !/Max-Age=0/.test(value)).every((value) => !/Domain=/i.test(value)));
+      check(`${label}: three HttpOnly host-only cookies`, authCookies.length === 3 && authCookies.every((cookie) => cookie.httpOnly && cookie.path === "/" && !cookie.domain.startsWith(".") && cookie.sameSite !== "None") && callbackCookies.filter((value) => !/Max-Age=0/.test(value)).length === 3 && callbackCookies.every((value) => !/Domain=/i.test(value)));
       const workspace = await context.request.get(`${app}/api/levytate-workspace`);
       const data = await workspace.json();
       check(`${label}: canonical role and tenant resolved`, workspace.status() === 200 && data.workspace?.meta?.userRole === user.role && data.workspace?.meta?.organisationId === tenant.id);
@@ -114,7 +131,7 @@ try {
 } catch (error) {
   const blocked = error.message?.startsWith("BLOCKED:");
   results.push({ name: "Acceptance execution", status: blocked ? "BLOCKED" : "FAIL", reason: blocked ? error.message : "A browser/API contract failed; authentication state omitted" });
-  console.error(blocked ? error.message : "FAIL release browser acceptance; authentication state and raw errors withheld");
+  console.error(blocked ? error.message : `FAIL release browser acceptance at ${phase} (${error.name}); authentication state and raw errors withheld`);
   process.exitCode = blocked ? 2 : 1;
 } finally {
   await browser?.close();

@@ -91,14 +91,32 @@ try {
     `);
     const app = `${prefix}-journey`;
     const fields = { employeeId: person, apprenticeshipStandardId: standard, reason: "Synthetic work need", careerGoal: "Synthetic development", supportRequired: "" };
+    deny("null action cannot evade command validation", command("employee", app, "save_draft", 0, "null-action-001", fields).replace("'save_draft'", "null"));
+    deny("null field object cannot evade command validation", command("employee", app, "save_draft", 0, "null-fields-001", null));
+    deny("numeric employee id is rejected", command("employee", app, "save_draft", 0, "numeric-id-001", { ...fields, employeeId: 42 }));
+    deny("array fields are rejected", command("employee", app, "save_draft", 0, "array-fields-001", []));
+    deny("fractional lock version is rejected", command("employee", app, "save_draft", 0, "fractional-lock-001", { ...fields, expectedLockVersion: 0.5 }));
     deny("browser status and owner cannot forge final approval", command("lead", app, "save_draft", 0, "forged-fields-001", { ...fields, status: "Approved for Enrolment", currentOwner: "Provider Partner" }));
     deny("cross-tenant actor rejected", command("otherLead", app, "save_draft", 0, "cross-tenant-001", fields));
     deny("Platform Admin cannot perform employer decisions", command("platform", app, "save_draft", 0, "platform-deny-001", fields));
     const saved = call("employee", app, "save_and_submit", 0, "employee-submit-001", fields);
     check("employee submission persists manager step with revision", saved.application.status === "Awaiting Manager Review" && saved.application.current_owner === "Line Manager" && saved.application.revision === 1);
     for (const actor of ["lead", "admin", "otherManager", "employee"]) deny(`${actor} cannot skip or impersonate current manager`, command(actor, app, "approve", 1, `manager-skip-${actor}`, { note: "Synthetic decision" }));
+    required(`update public.levytate_employees set manager_id=${literal(outsider)} where organisation_id=${literal(org)} and id=${literal(person)};`);
+    deny("manager reassignment removes old manager authority immediately", command("manager", app, "approve", 1, "reassigned-deny-001", { note: "Synthetic decision" }));
+    required(`update public.levytate_employees set manager_id=${literal(manager)} where organisation_id=${literal(org)} and id=${literal(person)}; update public.levytate_users set active=false where id=${literal(ids.manager)};`);
+    deny("revoked manager membership cannot decide", command("manager", app, "approve", 1, "revoked-deny-001", { note: "Synthetic decision" }));
+    required(`update public.levytate_users set active=true where id=${literal(ids.manager)};`);
+    required(`insert into public.levytate_applications(organisation_id,id,employee_id,apprenticeship_standard_id,status,current_owner) values(${literal(org)},${literal(`${prefix}-manager-own`)},${literal(manager)},${literal(standard)},'Awaiting Manager Review','Line Manager');`);
+    deny("manager cannot approve their own application", command("manager", `${prefix}-manager-own`, "approve", 0, "manager-self-001", { note: "Synthetic self review" }));
     deny("stale manager decision rejected", command("manager", app, "approve", 0, "stale-manager-001", { note: "Synthetic decision" }));
     const managerFields = { note: "Synthetic manager approval" };
+    const constraint = `release_fail_audit_${prefix}`;
+    required(`alter table public.levytate_audit_events add constraint ${constraint} check(organisation_id<>${literal(org)}::uuid or action<>'application.approve') not valid;`);
+    const failedAudit = sql(`begin; set local role service_role; ${command("manager", app, "approve", 1, "audit-failure-001", managerFields)} commit;`);
+    required(`alter table public.levytate_audit_events drop constraint ${constraint};`);
+    check("audit failure aborts the approval transaction", !failedAudit.ok && failedAudit.code === "23514");
+    check("audit failure preserves application and history atomically", required(`select status||':'||revision||':'||(select count(*) from public.levytate_application_history where organisation_id=${literal(org)} and application_id=${literal(app)}) from public.levytate_applications where organisation_id=${literal(org)} and id=${literal(app)};`) === "Awaiting Manager Review:1:1");
     const approved = call("manager", app, "approve", 1, "manager-approve-001", managerFields);
     const repeated = call("manager", app, "approve", 1, "manager-approve-001", managerFields);
     check("lost-response retry returns identical persisted result", JSON.stringify(approved) === JSON.stringify(repeated));
@@ -114,6 +132,20 @@ try {
       const result = sql(`begin; set local role ${roleName}; ${command("lead", app, "approve", 3, `browser-${roleName}`, {})} rollback;`);
       check(`${roleName} cannot execute privileged command`, !result.ok && result.code === "42501");
     }
+    const handoffFields = { employeeId: person, programmeId: programme, providerId: provider, employmentRoute: "existing_employee_upskill", expectedStartDate: "2027-01-01", expectedEndDate: "2028-01-01" };
+    const handoff = (actor, applicationId, key, fields = handoffFields) => `select public.levytate_start_pre_enrolment(${literal(org)}::uuid,${literal(ids[actor])}::uuid,${literal(applicationId)},3,${literal(key)},${json(fields)});`;
+    deny("employee cannot initiate employer pre-enrolment", handoff("employee", app, "employee-handoff-001"));
+    deny("cross-tenant lead cannot initiate handoff", handoff("otherLead", app, "cross-handoff-001"));
+    deny("blank application cannot start pre-enrolment", handoff("lead", "", "blank-handoff-001"));
+    deny("wrong-employee handoff cannot start pre-enrolment", handoff("lead", app, "wrong-handoff-001", { ...handoffFields, employeeId: manager }));
+    deny("direct enrolled lifecycle payload rejected", handoff("lead", app, "enrolled-handoff-001", { ...handoffFields, lifecycleStatus: "enrolled" }));
+    deny("unselected provider rejected", handoff("lead", app, "provider-handoff-001", { ...handoffFields, providerId: "unselected" }));
+    const handoffRaces = await Promise.all([1, 2].map(() => concurrent(`begin; set local role service_role; ${handoff("lead", app, "same-handoff-retry-001")} commit;`)));
+    check("concurrent handoff retry returns one durable identical result", handoffRaces.every((item) => item.ok) && handoffRaces[0].value === handoffRaces[1].value);
+    const learner = JSON.parse(handoffRaces[0].value || "null");
+    check("handoff starts pre-enrolment only", learner?.lifecycle_status === "pre_enrolment" && learner.employee_id === person && learner.application_id === app);
+    check("handoff persists exactly one learner and lifecycle event", required(`select (select count(*) from public.levytate_learner_records where organisation_id=${literal(org)} and application_id=${literal(app)})||':'||(select count(*) from public.levytate_learner_lifecycle_events where organisation_id=${literal(org)} and learner_record_id=${literal(learner?.id ?? "")});`) === "1:1");
+    deny("a different handoff key cannot duplicate the learner", handoff("lead", app, "different-handoff-001"));
   }
 } catch (error) {
   failed++; console.error(`FAIL independent database execution: ${error.message}`);

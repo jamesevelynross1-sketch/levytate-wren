@@ -38,27 +38,31 @@ export async function createReleaseFixtures() {
       workspace_name: `Synthetic release ${tenant.toUpperCase()}`, primary_contact: "Synthetic Lead",
       contact_email: `release.${run}.${tenant}.lead@example.test`, workspace_template: "levytate-client-v1", status: "Active",
     });
+    await backend("rest/v1/levytate_roles", "POST", { organisation_id: id, id: `${tenant}-role`, title: "Synthetic role", career_level: "Mixed", status: "Active" });
     const people = [];
     const users = [];
     for (const [key, role] of [["lead", "Apprenticeship Lead"], ["manager", "Line Manager"], ["employee", "Employee"]]) {
       const email = `release.${run}.${tenant}.${key}@example.test`;
       const membershipId = randomUUID();
       const personId = `${tenant}-${key}`;
-      const auth = await backend("auth/v1/admin/users", "POST", {
+      const auth = key === "lead" ? await backend("auth/v1/admin/users", "POST", {
         email, email_confirm: true, app_metadata: { release_fixture: run },
-      });
-      if (!auth.id) throw new Error("Local Auth did not create a synthetic identity");
-      // Auth account creation is fixture setup. Login below must still traverse
+      }) : null;
+      if (key === "lead" && !auth?.id) throw new Error("Local Auth did not create a synthetic identity");
+      // Only the two bootstrap Leads have Auth identities. All other users are
+      // invited by their Lead through the actual application endpoint.
+      // Auth account creation is fixture setup. Login must still traverse
       // the public request endpoint, SMTP capture, provider verify and callback.
       await backend("rest/v1/levytate_users", "POST", {
         id: membershipId, organisation_id: id, email, role, access_level: "beta_user", display_name: `Synthetic ${key}`,
-        active: true, auth_subject: null, auth_binding_status: "pending",
+        active: key === "lead", auth_subject: auth?.id ?? null, auth_binding_status: key === "lead" ? "bound" : "pending",
+        ...(key === "lead" ? { auth_bound_at: new Date().toISOString() } : {}),
       });
-      users.push({ key, role, email, membershipId, authId: auth.id, personId: key === "lead" ? null : personId });
+      users.push({ key, role, email, membershipId, personId: key === "lead" ? null : personId });
       if (key !== "lead") people.push({
         organisation_id: id, id: personId, employee_number: `${tenant}-${key}`, name: `Synthetic ${key}`, email,
         job_title: key, platform_role: role, manager_id: key === "employee" ? `${tenant}-manager` : "",
-        status: "Active", start_date: "2026-01-01",
+        role_id: `${tenant}-role`, status: "Active", start_date: "2026-01-01",
       });
     }
     await backend("rest/v1/levytate_employees", "POST", people);
@@ -72,7 +76,7 @@ if (process.argv[1]?.endsWith("release-local-fixtures.mjs")) {
     if (!process.env.RELEASE_FIXTURE_MANIFEST?.startsWith("/private/tmp/")) throw new Error("BLOCKED: manifest must be a restricted temporary path");
     const manifest = await createReleaseFixtures();
     writeFileSync(process.env.RELEASE_FIXTURE_MANIFEST, `${JSON.stringify(manifest, null, 2)}\n`, { mode: 0o600, flag: "wx" });
-    console.log("PASS local synthetic fixtures: two tenants, six distinct Auth identities, four People records; no email sent");
+    console.log("PASS local synthetic fixtures: two tenants, two bootstrap Lead Auth identities, four pending members and People records; no email sent");
   } catch (error) {
     console.error(error.message.startsWith("BLOCKED:") ? error.message : "FAIL local synthetic fixture preparation; inspect restricted local diagnostics");
     process.exitCode = error.message.startsWith("BLOCKED:") ? 2 : 1;
