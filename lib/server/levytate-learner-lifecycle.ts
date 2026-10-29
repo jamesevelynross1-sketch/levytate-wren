@@ -87,6 +87,7 @@ import {
   supabaseFetchJson,
   supabaseInsert,
   supabaseSelect,
+  supabaseSelectAll,
   supabaseUpdate,
 } from "@/lib/server/levytate-supabase";
 import {
@@ -2408,12 +2409,12 @@ async function selectMany<T>(table: string, organisationId: string, extraQuery: 
   const query = new URLSearchParams({
     select: "*",
     organisation_id: `eq.${organisationId}`,
-    order,
+    order: `${order},${table === "levytate_providers" ? "provider_id" : "id"}.asc`,
   });
   if (extraQuery) {
     for (const pair of new URLSearchParams(extraQuery)) query.set(pair[0], pair[1]);
   }
-  return supabaseSelect<T>(assertSupabase(), table, query);
+  return supabaseSelectAll<T>(assertSupabase(), table, query);
 }
 
 function organisationQuery(organisationId: string, extra: Record<string, string>) {
