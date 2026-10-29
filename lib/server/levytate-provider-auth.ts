@@ -1,6 +1,7 @@
 import { normaliseBetaEmail } from "@/lib/levytate/config/beta-access";
 import { providerMembershipRoles, type ProviderMembershipRole } from "@/lib/levytate/requests/domain";
-import { checkCallbackAttemptLimit } from "@/lib/server/levytate-auth-rate-limit";
+import { checkCallbackAttemptLimit, recordInvalidCallback } from "@/lib/server/levytate-auth-rate-limit";
+import { authProviderRequest } from "@/lib/server/levytate-auth-provider-request";
 import { isRequestsEnabledForOrganisation, isRequestsEnvironmentEnabled } from "@/lib/server/levytate-request-capability";
 import {
   getLevyTateSupabaseConfig,
@@ -62,7 +63,7 @@ function config() {
 
 async function providerAuthFetch(path: string, init: RequestInit = {}) {
   const value = config();
-  return fetch(`${value.url}/auth/v1/${path}`, {
+  return authProviderRequest(`${value.url}/auth/v1/${path}`, {
     ...init,
     headers: {
       apikey: value.serviceRoleKey,
@@ -78,7 +79,7 @@ export async function requestProviderSignIn(emailInput: string, redirectTo: stri
   if (!isRequestsEnvironmentEnabled()) return false;
   const email = normaliseBetaEmail(emailInput);
   const memberships = await findProviderMembershipsByEmail(email);
-  if (memberships.length !== 1 || !memberships[0].active) return false;
+  if (memberships.length !== 1 || !memberships[0].active || !providerMembershipRoles.includes(memberships[0].role as ProviderMembershipRole)) return false;
   if (!(await hasCapabilityEnabledInvitation(memberships[0]))) return false;
 
   const response = await providerAuthFetch(`otp?redirect_to=${encodeURIComponent(redirectTo)}`, {
@@ -100,6 +101,7 @@ export async function completeLevyTateProviderMagicLinkCallback(request: Request
   const tokenHash = url.searchParams.get("token_hash") ?? "";
   const type = url.searchParams.get("type") ?? "email";
   if (!tokenHash || !["email", "magiclink"].includes(type)) {
+    await recordInvalidCallback(request);
     throw new LevyTateProviderAuthError("invalid_link", "This sign-in link is invalid or has expired.", 400);
   }
 
@@ -107,7 +109,10 @@ export async function completeLevyTateProviderMagicLinkCallback(request: Request
     method: "POST",
     body: JSON.stringify({ token_hash: tokenHash, type }),
   });
-  if (!response.ok) throw new LevyTateProviderAuthError("invalid_link", "This sign-in link is invalid or has expired.", 401);
+  if (!response.ok) {
+    await recordInvalidCallback(request);
+    throw new LevyTateProviderAuthError("invalid_link", "This sign-in link is invalid or has expired.", 401);
+  }
   const auth = await response.json() as SupabaseAuthResult;
   const email = normaliseBetaEmail(auth.user.email ?? "");
   const memberships = await findProviderMembershipsByEmail(email);
@@ -115,6 +120,7 @@ export async function completeLevyTateProviderMagicLinkCallback(request: Request
     throw new LevyTateProviderAuthError("unauthorised", "This email is not authorised for LevyTate Opportunities.");
   }
   const membership = memberships[0];
+  normaliseProviderRole(membership.role);
   if (!membership.active) throw new LevyTateProviderAuthError("inactive", "This provider account is not active.");
   if (membership.auth_subject && membership.auth_subject !== auth.user.id) {
     throw new LevyTateProviderAuthError("conflict", "This email is not authorised for LevyTate Opportunities.");
@@ -128,10 +134,11 @@ export async function completeLevyTateProviderMagicLinkCallback(request: Request
   }
 
   const now = new Date().toISOString();
-  await supabaseUpdate(
+  const saved = await supabaseUpdate<ProviderMembershipRow>(
     config(),
     "levytate_provider_memberships",
-    `id=eq.${encodeURIComponent(membership.id)}`,
+    new URLSearchParams({ id: `eq.${membership.id}`, provider_id: `eq.${membership.provider_id}`, active: "eq.true",
+      role: `eq.${membership.role}`, auth_subject: membership.auth_subject ? `eq.${membership.auth_subject}` : "is.null" }).toString(),
     {
       auth_subject: auth.user.id,
       auth_binding_status: "bound",
@@ -139,8 +146,10 @@ export async function completeLevyTateProviderMagicLinkCallback(request: Request
       last_login_at: now,
       updated_at: now,
     },
-    { prefer: "return=minimal" },
   );
+  if (saved.length !== 1 || saved[0].auth_subject !== auth.user.id || !saved[0].active || !(await hasCapabilityEnabledInvitation(saved[0]))) {
+    throw new LevyTateProviderAuthError("conflict", "This email is not authorised for LevyTate Opportunities.");
+  }
 
   const session: LevyTateProviderSession = {
     membershipId: membership.id,
@@ -173,11 +182,13 @@ export async function readAuthorisedLevyTateProviderSession(token: string | unde
       auth_subject: `eq.${session.authSubject}`,
       auth_binding_status: "eq.bound",
       active: "eq.true",
-      limit: "1",
+      limit: "2",
     }),
   );
   const membership = rows[0];
-  if (!membership || normaliseBetaEmail(membership.email) !== session.email) return null;
+  if (rows.length !== 1 || !membership || normaliseBetaEmail(membership.email) !== session.email
+    || !providerMembershipRoles.includes(membership.role as ProviderMembershipRole)
+    || !(await hasCapabilityEnabledInvitation(membership))) return null;
   return { ...session, role: normaliseProviderRole(membership.role) };
 }
 
@@ -255,9 +266,10 @@ async function hasCapabilityEnabledInvitation(membership: ProviderMembershipRow)
 }
 
 function normaliseProviderRole(role: string): ProviderMembershipRole {
-  return providerMembershipRoles.includes(role as ProviderMembershipRole)
-    ? role as ProviderMembershipRole
-    : "Provider User";
+  if (!providerMembershipRoles.includes(role as ProviderMembershipRole)) {
+    throw new LevyTateProviderAuthError("unauthorised", "This email is not authorised for LevyTate Opportunities.");
+  }
+  return role as ProviderMembershipRole;
 }
 
 const encoder = new TextEncoder();

@@ -179,13 +179,15 @@ export type LiftProofRecord = {
 };
 
 export type LiftWorkspace = {
+  /** Present for the live persisted workspace; absent only in labelled design previews. */
+  mutationRevision?: number;
   enabled: boolean;
   generatedAt: string;
   role: "Employee" | "Line Manager" | "Apprenticeship Lead" | "Employer Admin";
   framework: { key: string; questionnaireVersion: string; interpretationVersion: string; questions: LiftQuestion[] };
   coverage: { invited: number; submitted: number; workplacePerspectives: number; applicablePopulation: number; evidenceFrom: string | null; evidenceTo: string | null };
   assessment: { id: string; status: "not_started" | "draft" | "submitted"; currentQuestionIndex: number; answers: LiftAnswerMap; findings: LiftCapabilityFinding[]; managerPerspectiveStatus: "not_added" | "submitted" | "released"; releasedManagerObservation: { id: string; observedWork: string; concreteExamples: string[]; suitableOpportunity: string; intendedOutcome: string; workplaceConditions: string[] } | null } | null;
-  manager: { teamContextSubmitted: boolean; directReports: Array<{ employeeId: string; employeeName: string; perspectiveStatus: "not_started" | "draft" | "submitted"; employeeFindingsReleased: boolean; employeeFindings: LiftCapabilityFinding[] }> } | null;
+  manager: { teamContextSubmitted: boolean; teamContextRevision?: number; directReports: Array<{ employeeId: string; employeeName: string; perspectiveStatus: "not_started" | "draft" | "submitted"; currentRevision?: number; draft?: Record<string, unknown>; employeeFindingsReleased: boolean; employeeFindings: LiftCapabilityFinding[] }> } | null;
   availableEmployees: Array<{ employeeId: string; employeeName: string; department: string; managerEmployeeId: string | null }>;
   opportunities: LiftOpportunity[];
   decisions: LiftDecision[];
@@ -195,7 +197,7 @@ export type LiftWorkspace = {
   privacyNotice: string;
 };
 
-export type LiftAction =
+export type LiftAction = { expectedWorkspaceRevision?: number } & (
   | { action: "invite_people"; title: string; businessObjective: string; employeeIds: string[]; frameworkKey: string; questionnaireVersion: string; interpretationVersion: string; idempotencyKey: string }
   | { action: "save_assessment"; assessmentId: string; answers: LiftAnswerMap; currentQuestionIndex: number; expectedRevision: number; idempotencyKey: string }
   | { action: "submit_assessment"; assessmentId: string; expectedRevision: number; idempotencyKey: string }
@@ -205,4 +207,4 @@ export type LiftAction =
   | { action: "add_manager_perspective_addendum"; employeeId: string; clarification: string; idempotencyKey: string }
   | { action: "record_employee_context"; managerObservationId: string; context: string; disputed: boolean; idempotencyKey: string }
   | { action: "record_decision"; opportunityId: string; decision: Omit<LiftDecision, "id" | "recordedAt" | "opportunityId">; idempotencyKey: string }
-  | { action: "record_proof"; opportunityId: string; proof: Omit<LiftProofRecord, "opportunityId" | "updatedAt">; expectedRevision: number; idempotencyKey: string };
+  | { action: "record_proof"; opportunityId: string; proof: Omit<LiftProofRecord, "opportunityId" | "updatedAt">; expectedRevision: number; idempotencyKey: string });

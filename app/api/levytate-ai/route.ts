@@ -33,34 +33,8 @@ import type { MvpApplication, MvpEmployee, MvpEmployeeDevelopmentProfile, MvpRol
 import { getWorkspaceBootstrapForSession } from "@/lib/server/levytate-workspace";
 import { getCopilotGuidanceItems } from "@/lib/server/levytate-guidance-sources";
 import { routeOperationalCopilotQuery } from "@/lib/server/levytate-copilot-tools";
-
-const requestWindowMs = 5 * 60 * 1000;
-const duplicateWindowMs = 1_500;
-const maxRequestsPerWindow = 24;
-const requestBuckets = new Map<string, { count: number; startedAt: number; lastMessage: string; lastRequestAt: number }>();
-
-function rateLimitKey(request: Request) {
-  return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "unknown";
-}
-
-function isRateLimited(key: string, message: string) {
-  const now = Date.now();
-  const normalisedMessage = message.trim().toLowerCase().slice(0, 240);
-  const existing = requestBuckets.get(key);
-
-  if (!existing || now - existing.startedAt >= requestWindowMs) {
-    requestBuckets.set(key, { count: 1, startedAt: now, lastMessage: normalisedMessage, lastRequestAt: now });
-    return false;
-  }
-
-  if (existing.lastMessage === normalisedMessage && now - existing.lastRequestAt < duplicateWindowMs) return true;
-
-  existing.count += 1;
-  existing.lastMessage = normalisedMessage;
-  existing.lastRequestAt = now;
-  requestBuckets.set(key, existing);
-  return existing.count > maxRequestsPerWindow;
-}
+import { ClientRequestError, readBrowserJson } from "@/lib/server/levytate-request-boundary";
+import { checkLevyTateCopilotLimits, LevyTateRateLimitStoreError } from "@/lib/server/levytate-auth-rate-limit";
 
 function mergeSafetyNotes(fallback: string[], generated: string[]) {
   const seen = new Set<string>();
@@ -155,6 +129,7 @@ function finaliseResponse(request: LevyTateAiRequest, response: LevyTateAiRespon
 
 export async function POST(request: Request) {
   let parsedRequest: LevyTateAiRequest | null = null;
+  let groundedFallback: LevyTateAiResponse | null = null;
 
   try {
     const session = await getSession();
@@ -165,20 +140,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Employer operational Copilot is not available to Platform Admin." }, { status: 403 });
     }
 
-    parsedRequest = parseLevyTateAiRequest(await request.json());
+    parsedRequest = parseLevyTateAiRequest(await readBrowserJson(request, 256 * 1024));
     if (!parsedRequest) {
       return NextResponse.json({ message: "Invalid LevyTate Copilot request payload." }, { status: 400 });
     }
 
-    if (isRateLimited(rateLimitKey(request), parsedRequest.userMessage)) {
+    if (!(await checkLevyTateCopilotLimits(request, session.email)).allowed) {
       return NextResponse.json({ message: "Please wait a moment before asking another question." }, { status: 429 });
     }
 
-    const operationalResponse = await routeOperationalCopilotQuery(session, parsedRequest);
-    if (operationalResponse) return NextResponse.json(operationalResponse);
-
     const workspace = await getWorkspaceBootstrapForSession(session);
     parsedRequest = sanitiseCopilotRequest(parsedRequest, workspace);
+
+    const operationalResponse = await routeOperationalCopilotQuery(session, parsedRequest);
+    if (operationalResponse) return NextResponse.json(operationalResponse);
 
     parsedRequest = withConversationMemory(parsedRequest);
 
@@ -194,6 +169,10 @@ export async function POST(request: Request) {
       asOf: new Date().toISOString().slice(0, 10),
     });
     const groundedContext = buildLevyTateAiContext(parsedRequest, guidanceItems);
+    // Only a provider-generation failure may fall back, after both workspace
+    // and approved guidance have loaded. Never use a client-supplied context
+    // after an authorisation, persistence or security-control failure.
+    groundedFallback = fallback;
     const generated = await requestLevyTateOpenAI({
       request: parsedRequest,
       systemPrompt: buildLevyTateAiSystemPrompt(parsedRequest),
@@ -202,13 +181,15 @@ export async function POST(request: Request) {
 
     return NextResponse.json(finaliseResponse(parsedRequest, mergeGeneratedGuidance(fallback, generated)));
   } catch (error) {
-    console.error("LevyTate Copilot request failed", { error });
+    if (error instanceof ClientRequestError) return NextResponse.json({ message: error.message }, { status: error.status });
+    if (error instanceof LevyTateRateLimitStoreError) return NextResponse.json({ message: "Copilot security controls are temporarily unavailable." }, { status: 503 });
+    console.error("LevyTate Copilot request failed", { outcome: groundedFallback ? "provider_generation_unavailable" : "grounding_unavailable" });
 
-    if (parsedRequest) {
-      return NextResponse.json(finaliseResponse(parsedRequest, buildGroundedFallback(parsedRequest)));
+    if (parsedRequest && groundedFallback) {
+      return NextResponse.json(finaliseResponse(parsedRequest, { ...groundedFallback, safetyNotes: [...groundedFallback.safetyNotes, "AI generation is temporarily unavailable. This response uses verified platform data only."] }));
     }
 
-    return NextResponse.json({ message: "LevyTate Copilot could not process this request." }, { status: 500 });
+    return NextResponse.json({ message: "LevyTate Copilot cannot verify the required platform data right now. Please try again." }, { status: 503 });
   }
 }
 

@@ -1,8 +1,7 @@
 import fs from "node:fs/promises";
 
 const read = async (path) => fs.readFile(new URL(`../${path}`, import.meta.url), "utf8");
-const [policy, rbac, shell, page, workspace, lifecycle, actions, operations, learners, applications, ai] = await Promise.all([
-  read("lib/levytate/core-early-access-policy.ts"),
+const [rbac, shell, page, workspace, lifecycle, actions, operations, learners, applications, ai] = await Promise.all([
   read("lib/levytate/mvp/rbac.ts"),
   read("components/levytate-mvp/LevyTateMvpApp.tsx"),
   read("app/levytate/app/page.tsx"),
@@ -14,45 +13,49 @@ const [policy, rbac, shell, page, workspace, lifecycle, actions, operations, lea
   read("components/levytate-mvp/ApplicationsModule.tsx"),
   read("app/api/levytate-ai/route.ts"),
 ]);
+const {
+  coreEarlyAccessPolicy,
+  getCoreEarlyAccessPolicy,
+  hasCoreEarlyAccessCapability,
+  resolveCoreEarlyAccessRouteAccess,
+} = await import(new URL("../lib/levytate/core-early-access-policy.ts", import.meta.url));
 
 const checks = [];
 const check = (label, condition) => { if (!condition) throw new Error(`FAILED: ${label}`); checks.push(label); };
-const roleBlock = (role) => {
-  const marker = role === "Employee" ? "  Employee: {" : `  "${role}": {`;
-  const start = policy.indexOf(marker);
-  const end = policy.indexOf("\n  },", start);
-  return start >= 0 && end > start ? policy.slice(start, end) : "";
-};
 
-check("one central policy contract exists", policy.includes("coreEarlyAccessPolicy") && policy.includes("resolveCoreEarlyAccessRouteAccess"));
-check("server returns the capability-resolved central policy", workspace.includes("coreEarlyAccess: getCoreEarlyAccessPolicy(userRole, { requestsEnabled, offTheJobAssistantEnabled })") && workspace.includes("requestsEnabled,") && workspace.includes("offTheJobAssistantEnabled,"));
+check("one central policy contract exists", Object.keys(coreEarlyAccessPolicy).length === 5 && typeof getCoreEarlyAccessPolicy === "function" && typeof resolveCoreEarlyAccessRouteAccess === "function" && typeof hasCoreEarlyAccessCapability === "function");
+const resolvedWorkspacePolicyCall = callArguments(workspace, "getCoreEarlyAccessPolicy", "userRole");
+check("server returns the capability-resolved central policy", ["requestsEnabled", "offTheJobAssistantEnabled", "pastoralSupportEnabled", "pastoralInboxEnabled"].every((option) => resolvedWorkspacePolicyCall.includes(option)));
 check("client consumes the server policy", shell.includes("meta?.coreEarlyAccess ?? getCoreEarlyAccessPolicy"));
 check("server route uses the shared resolver", page.includes("resolveCoreEarlyAccessRouteAccess") && page.includes("redirect(access.safeRedirect)"));
 check("client manipulated modules use the shared resolver", shell.includes("resolveCoreEarlyAccessRouteAccess(meta?.userRole"));
-check("Requests is enabled only by resolved server capability", policy.includes("requestsEnabled?: boolean") && policy.includes('availability: "enabled", group: "manage"'));
-check("Learning Time is enabled only by resolved server capability", policy.includes("offTheJobAssistantEnabled?: boolean") && policy.includes('module.moduleKey === "Learning Time"'));
+const defaultLead = getCoreEarlyAccessPolicy("Apprenticeship Lead");
+const requestsLead = getCoreEarlyAccessPolicy("Apprenticeship Lead", { requestsEnabled: true });
+check("Requests is enabled only by resolved server capability", moduleStatus(defaultLead, "Requests") === "hidden" && moduleStatus(requestsLead, "Requests") === "enabled" && requestsLead.permittedCapabilities.includes("service-requests"));
+check("Learning Time is enabled only by resolved server capability", moduleStatus(getCoreEarlyAccessPolicy("Employee"), "Learning Time") === "hidden" && moduleStatus(getCoreEarlyAccessPolicy("Employee", { offTheJobAssistantEnabled: true }), "Learning Time") === "enabled" && moduleStatus(getCoreEarlyAccessPolicy("Platform Admin", { offTheJobAssistantEnabled: true }), "Learning Time") === "hidden");
+check("pastoral navigation follows the resolved shared capability contract", moduleStatus(getCoreEarlyAccessPolicy("Employee"), "My Support") === "hidden" && moduleStatus(getCoreEarlyAccessPolicy("Employee", { pastoralSupportEnabled: true }), "My Support") === "enabled" && moduleStatus(getCoreEarlyAccessPolicy("Line Manager", { pastoralInboxEnabled: true }), "Learner Support") === "enabled");
 check("application review deep links preserve the role-specific module", shell.includes('const applicationModule = meta?.userRole === "Line Manager" ? "Approvals" : "Applications";') && shell.includes('resolved === "Approvals" || resolved === "Applications"') && shell.includes('<ApplicationsModule initialApplicationId={managerReviewApplicationId} onApplicationSelectionChange={updateApplicationReviewSelection} />') && applications.includes('useState<string | null>(initialApplicationId ?? null)'));
 
-const employee = roleBlock("Employee");
-check("Employee exact primary navigation", ordered(employee, ["Home", "My Application", "My Programme"]));
-check("Employee programme label is My Apprenticeship", employee.includes('item("My Programme", "My Apprenticeship"'));
-check("Employee provider directory is hidden", employee.includes('item("Providers", "Programmes & Providers", "hidden"'));
+const employee = getCoreEarlyAccessPolicy("Employee");
+check("Employee exact primary navigation", orderedModules(employee, ["Home", "My Application", "My Programme"]));
+check("Employee programme label is My Apprenticeship", moduleEntry(employee, "My Programme")?.label === "My Apprenticeship");
+check("Employee provider directory is hidden", moduleStatus(employee, "Providers") === "hidden");
 
-const manager = roleBlock("Line Manager");
-check("Line Manager exact primary navigation", ordered(manager, ["Home", "Approvals", "My Team"]));
-check("Team Reporting is deferred", manager.includes('item("Reports", "Team Reporting", "deferred"'));
+const manager = getCoreEarlyAccessPolicy("Line Manager");
+check("Line Manager exact primary navigation", orderedModules(manager, ["Home", "Approvals", "My Team"]));
+check("Team Reporting is deferred", moduleEntry(manager, "Reports")?.label === "Team Reporting" && moduleStatus(manager, "Reports") === "deferred");
 
-const lead = roleBlock("Apprenticeship Lead");
-check("Requests remains hidden in the accepted Client V1 policy", lead.includes('item("Requests", "Requests", "hidden"'));
-check("Lead exact Client V1 navigation", ordered(lead, ["Home", "Applications", "Learners", "Operations", "People", "My Providers", "My Programmes", "Finance", "Marketplace", "Intelligence", "Knowledge", "Settings"]));
-check("Lead employer catalogue navigation is distinct", lead.includes('item("My Providers", "My Providers", "enabled", "manage"') && lead.includes('item("My Programmes", "My Programmes", "enabled", "manage"') && lead.includes('item("Marketplace", "Marketplace", "enabled", "discover"'));
-check("Lead reports are deferred", lead.includes('item("Reports", "Reports", "deferred"'));
+const lead = getCoreEarlyAccessPolicy("Apprenticeship Lead");
+check("Requests remains hidden in the accepted Client V1 policy", moduleStatus(lead, "Requests") === "hidden");
+check("Lead exact Client V1 navigation", orderedModules(lead, ["Home", "Applications", "Learners", "Operations", "People", "My Providers", "My Programmes", "Finance", "Marketplace", "Intelligence", "Knowledge", "Settings"]));
+check("Lead employer catalogue navigation is distinct", moduleEntry(lead, "My Providers")?.group === "manage" && moduleEntry(lead, "My Programmes")?.group === "manage" && moduleEntry(lead, "Marketplace")?.group === "discover");
+check("Lead reports are deferred", moduleStatus(lead, "Reports") === "deferred");
 
-const admin = roleBlock("Platform Admin");
-check("Platform Admin exact primary navigation", ordered(admin, ["Home", "Providers", "Settings"]));
-check("Platform Admin primary labels are safe", ["Employer Workspaces", "Provider Catalogue", "Access & Tenant Support"].every((label) => admin.includes(`"${label}"`)));
-check("Platform Admin secondary navigation is safe", ["Guidance Administration", "Support / Audit Context"].every((label) => admin.includes(`"${label}"`)));
-check("Platform Admin employer modules are hidden", ["Applications", "Learners", "Reports", "Copilot"].every((key) => admin.includes(`item("${key}"`) && admin.includes('"role-denied"')));
+const admin = getCoreEarlyAccessPolicy("Platform Admin");
+check("Platform Admin exact primary navigation", orderedModules(admin, ["Home", "Providers", "Settings"]));
+check("Platform Admin primary labels are safe", ["Employer Workspaces", "Provider Catalogue", "Access & Tenant Support"].every((label) => admin.modules.some((module) => module.label === label)));
+check("Platform Admin secondary navigation is safe", ["Guidance Administration", "Support / Audit Context"].every((label) => admin.modules.some((module) => module.label === label && module.availability === "secondary")));
+check("Platform Admin employer modules are hidden", ["Applications", "Learners", "Reports", "Copilot"].every((key) => moduleEntry(admin, key)?.availability === "hidden" && moduleEntry(admin, key)?.reasonCode === "role-denied"));
 
 const platformPermissions = rbac.match(/"Platform Admin": \[([\s\S]*?)\n  \],/)?.[1] ?? "";
 check("Platform Admin no longer inherits allPermissions", !rbac.includes('"Platform Admin": allPermissions'));
@@ -70,10 +73,33 @@ check("no S2B migration is active", !(await exists("supabase/migrations/019_crea
 
 console.log(JSON.stringify({ ok: true, checksPassed: checks.length }, null, 2));
 
-function ordered(source, keys) {
+function callArguments(source, functionName, firstArgument) {
+  const marker = `${functionName}(${firstArgument}`;
+  const start = source.indexOf(marker);
+  if (start < 0) return "";
+  const opening = source.indexOf("(", start);
+  let depth = 0;
+  for (let index = opening; index < source.length; index += 1) {
+    if (source[index] === "(") depth += 1;
+    if (source[index] === ")") depth -= 1;
+    if (depth === 0) return source.slice(opening + 1, index);
+  }
+  return "";
+}
+
+function moduleEntry(resolvedPolicy, moduleKey) {
+  return resolvedPolicy.modules.find((module) => module.moduleKey === moduleKey);
+}
+
+function moduleStatus(resolvedPolicy, moduleKey) {
+  return moduleEntry(resolvedPolicy, moduleKey)?.availability;
+}
+
+function orderedModules(resolvedPolicy, keys) {
+  const order = resolvedPolicy.modules.map((module) => module.moduleKey);
   let cursor = -1;
   return keys.every((key) => {
-    const next = source.indexOf(`item("${key}"`, cursor + 1);
+    const next = order.indexOf(key, cursor + 1);
     if (next < 0) return false;
     cursor = next;
     return true;

@@ -1,5 +1,7 @@
 "use client";
 
+import { WorkspaceSessionRecovery } from "@/components/levytate-mvp/MvpWorkspaceStore";
+
 import { Plus, Search, X } from "lucide-react";
 import { useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type KeyboardEvent, type ReactNode } from "react";
 
@@ -100,7 +102,7 @@ export function MvpModal({ title, eyebrow, children, onClose, wide = false }: { 
           <div>{eyebrow ? <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">{eyebrow}</p> : null}<h2 id={titleId} className="mt-0.5 text-xl font-semibold text-[#102c3d]">{title}</h2></div>
           <button ref={closeRef} type="button" onClick={onClose} title="Close" aria-label="Close dialog" className="grid h-11 w-11 place-items-center rounded-xl text-[#102c3d]/[0.52] transition hover:bg-[#f5f8f6] hover:text-[#102c3d] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20"><X size={18} /></button>
         </div>
-        <div className="p-5">{children}</div>
+        <div className="p-5"><WorkspaceSessionRecovery />{children}</div>
       </section>
     </div>
   );
@@ -206,8 +208,8 @@ export function FormTagInput({ label, values, onChange, wide = false, placeholde
   );
 }
 
-export function FormActions({ onCancel, label = "Save changes", error, disabled = false }: { onCancel: () => void; label?: string; error?: string; disabled?: boolean }) {
-  return <div className="mt-5 flex flex-col gap-3 border-t border-[#102c3d]/[0.07] pt-4 sm:flex-row sm:items-center sm:justify-between">{error ? <p className="text-xs font-semibold text-[#b53c52]">{error}</p> : <span />}<div className="flex justify-end gap-2"><button type="button" disabled={disabled} onClick={onCancel} className="h-10 rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/[0.62] ring-1 ring-[#102c3d]/[0.1] disabled:opacity-50">Cancel</button><button disabled={disabled} className="h-10 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white disabled:opacity-50">{label}</button></div></div>;
+export function FormActions({ onCancel, label = "Save changes", error, disabled = false, submissionBlocked = false }: { onCancel: () => void; label?: string; error?: string; disabled?: boolean; submissionBlocked?: boolean }) {
+  return <div className="mt-5 flex flex-col gap-3 border-t border-[#102c3d]/[0.07] pt-4 sm:flex-row sm:items-center sm:justify-between">{error ? <p role="alert" className="text-xs font-semibold text-[#b53c52]">{error}</p> : <span />}<div className="flex justify-end gap-2"><button type="button" disabled={disabled} onClick={onCancel} className="h-10 rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/[0.62] ring-1 ring-[#102c3d]/[0.1] disabled:opacity-50">Cancel</button><button type="submit" disabled={disabled || submissionBlocked} className="h-10 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white disabled:opacity-50">{label}</button></div></div>;
 }
 
 export function StatusBadge({ children, tone = "neutral", testId }: { children: ReactNode; tone?: "neutral" | "green" | "yellow" | "red" | "blue"; testId?: string }) {

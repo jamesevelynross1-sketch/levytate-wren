@@ -9,5 +9,5 @@ export async function GET(request: NextRequest) {
     programmeType: searchParams.get("programmeType") ?? undefined,
   });
 
-  return NextResponse.json(payload, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json(payload, { status: payload.source === "unavailable" ? 503 : 200, headers: { "Cache-Control": "no-store" } });
 }

@@ -207,7 +207,7 @@ export function LevyTateMvpApp({ initialWorkspace, persistLocal = false, initial
   persistLocal?: boolean;
   initialManagerDirectReportDetail?: ManagerDirectReportLearnerDetail | null;
 }) {
-  return <LevyTateStandardsProvider><MvpWorkspaceProvider initialWorkspace={initialWorkspace} persistLocal={persistLocal}><MvpAppShell initialManagerDirectReportDetail={initialManagerDirectReportDetail} /></MvpWorkspaceProvider></LevyTateStandardsProvider>;
+  return <LevyTateStandardsProvider demoMode={persistLocal}><MvpWorkspaceProvider initialWorkspace={initialWorkspace} persistLocal={persistLocal}><MvpAppShell initialManagerDirectReportDetail={initialManagerDirectReportDetail} /></MvpWorkspaceProvider></LevyTateStandardsProvider>;
 }
 
 function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirectReportDetail: ManagerDirectReportLearnerDetail | null }) {

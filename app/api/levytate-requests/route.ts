@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
 import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
-import { BoundedJsonBodyError, readBoundedJson } from "@/lib/server/bounded-json";
+import { ClientRequestError, readAuthenticatedJson } from "@/lib/server/levytate-request-boundary";
 import {
   LevyTateServiceRequestError,
   applyEmployerRequestActionForSession,
@@ -22,29 +22,12 @@ export async function GET() {
 export async function POST(request: Request) {
   const session = await employerSession();
   if (!session) return noStore({ message: "Unauthorised." }, 401);
-  if (!hasSameOrigin(request)) return noStore({ message: "Forbidden." }, 403);
   try {
-    const action = await readJson(request);
+    const action = await readAuthenticatedJson(request, session.email);
     return noStore({ ok: true, workspace: await applyEmployerRequestActionForSession(session, action) });
   } catch (error) {
     return safeError(error);
   }
-}
-
-async function readJson(request: Request): Promise<unknown> {
-  try {
-    return await readBoundedJson(request, 64 * 1024);
-  } catch (error) {
-    if (error instanceof BoundedJsonBodyError && error.tooLarge) {
-      throw new LevyTateServiceRequestError("The Request action is too large.", 413);
-    }
-    throw new LevyTateServiceRequestError("A valid Request action is required.", 400);
-  }
-}
-
-function hasSameOrigin(request: Request) {
-  const origin = request.headers.get("origin");
-  return origin === new URL(request.url).origin;
 }
 
 async function employerSession() {
@@ -53,6 +36,7 @@ async function employerSession() {
 }
 
 function safeError(error: unknown) {
+  if (error instanceof ClientRequestError) return noStore({ message: error.message }, error.status);
   if (error instanceof LevyTateServiceRequestError) return noStore({ message: error.message }, error.status);
   console.error("LevyTate Requests route failed", error instanceof Error ? error.name : "unknown");
   return noStore({ message: "Requests are temporarily unavailable." }, 503);

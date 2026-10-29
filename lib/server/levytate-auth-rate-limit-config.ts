@@ -6,6 +6,8 @@ export const levyTateAuthRateLimits = {
   magicLinkNetworkHourly: { limit: 20, windowSeconds: 60 * 60 },
   magicLinkGlobalHourly: { limit: 200, windowSeconds: 60 * 60 },
   invalidCallbackNetwork: { limit: 10, windowSeconds: 15 * 60 },
+  callbackTransportNetwork: { limit: 30, windowSeconds: 5 * 60 },
+  callbackToken: { limit: 3, windowSeconds: 15 * 60 },
   betaLoginIdentity: { limit: 10, windowSeconds: 15 * 60 },
   betaLoginNetwork: { limit: 50, windowSeconds: 15 * 60 },
   sessionRefreshNetwork: { limit: 60, windowSeconds: 10 * 60 },

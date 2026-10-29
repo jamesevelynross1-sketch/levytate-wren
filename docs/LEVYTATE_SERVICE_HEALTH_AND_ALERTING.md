@@ -9,24 +9,24 @@ LevyTate has application-owned health contracts but **no external uptime monitor
 | Route | Purpose | Success / failure | Cache and limit |
 | --- | --- | --- | --- |
 | `GET/HEAD /api/levytate-health/live` | Dependency-free HTTP process liveness | `200`; GET body has only `status`, `service`, `checkedAt` | Edge cache 5 seconds; no DB or logs on success |
-| `GET/HEAD /api/levytate-health/ready` | Minimum safe authenticated-service dependencies | `200 operational/degraded`; `503 unavailable`; body has only `status`, `checkedAt`, optional generic `message` | In-process coalescing and edge cache 10 seconds; 2.5-second dependency timeout |
+| `GET/HEAD /api/levytate-health/ready` | Minimum safe authenticated-service dependencies | `200 operational/degraded`; `503 unavailable`; body has only `status`, `checkedAt`, optional generic `message` | In-process coalescing and edge cache 10 seconds; one 2.5-second end-to-end dependency deadline |
 | `/levytate/status` | Plain-English current state | Operational, Service disruption or Status temporarily unavailable | Server-rendered; canonical `https://www.levytate.co.uk/status` |
 
 API responses are JSON/noindex and expose no provider, environment, deployment, migration, tenant, count, hostname, error or credential details.
 
 ## Dependency classification
 
-Critical: application runtime; required service configuration; database connectivity through the membership read; membership/RBAC schema; Terms acceptance gate; authentication security/audit events. Any critical failure makes readiness unavailable (`503`).
+Critical: application runtime; required service configuration; database connectivity through the membership read; membership/RBAC schema; Terms acceptance gate; authentication security/audit events; the real distributed authentication rate-limit operation; and the active migration marker. Any critical failure makes readiness unavailable (`503`).
 
-Non-critical for core access: prospect-access diagnostics, distributed rate-limit reporting schema and authentication delivery-event reporting. Failure makes internal/public readiness degraded (`200`), not a claim that email delivery itself has failed. Optional AI being disabled is normal and never degrades readiness. Public trust metadata is diagnostic-only.
+Non-critical for core access: prospect-access diagnostics and authentication delivery-event reporting. Failure makes internal/public readiness degraded (`200`), not a claim that email delivery itself has failed. Optional AI being disabled is normal and never degrades readiness. Public trust metadata is diagnostic-only.
 
-Checks select at most one identifier, run concurrently, make no writes/counts, consume no rate limit and send no Auth/email request. There are no retries or recursive health calls. Serverless local recovery logs are diagnostic evidence only and do not constitute reliable global transition alerts.
+Critical checks run concurrently. Optional checks begin only after critical success and share the same 2.5-second deadline. Table checks select at most one identifier. The rate-limit check performs one bounded write through the real RPC in a dedicated `health.readiness` bucket with a high independent limit; it does not consume a user quota or send an Auth/email request. There are no retries or recursive health calls. Serverless local recovery logs are diagnostic evidence only and do not constitute reliable global transition alerts.
 
 ## Platform Admin diagnostics
 
 `GET /api/levytate-platform/diagnostics` requires a valid Supabase-email LevyTate session, one current active and Auth-bound Platform Admin record, subject equality and the explicit `diagnostics:read` permission. Internal beta sessions and employer roles receive the same safe `403`; unauthenticated callers receive `401`.
 
-It reports only labelled states, safe summaries, checked time and useful duration for runtime; membership/RBAC; prospect access; Terms; rate-limit; security/audit; delivery events; public trust definitions; and the migration `023` schema marker. It reports safe configuration presence booleans, environment label, Terms version and unresolved ownership. It does not replace `supabase migration list --linked`, which remains the ledger parity check at cutover.
+It reports only labelled states, safe summaries, checked time and useful duration for runtime; membership/RBAC; prospect access; Terms; the required rate-limit operation; security/audit; delivery events; public trust definitions; and the active `039` schema marker while `038` remains intentionally unapplied. It reports safe configuration presence booleans, environment label, Terms version and unresolved ownership. It does not replace the canonical bootstrap manifest or a target-specific migration-ledger comparison at cutover.
 
 ## Safe logging
 

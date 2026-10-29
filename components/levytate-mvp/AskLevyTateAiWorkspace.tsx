@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
+import { captureCopilotProfileDraft, persistCopilotProfileDraft, type CopilotProfileDraft } from "@/lib/levytate/copilot-profile-save";
 import { getApprenticeshipStandard, type RequestStatus } from "@/lib/levytate/domain";
 import type {
   LevyTateAiAction,
@@ -487,6 +488,8 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
   const [pendingAction, setPendingAction] = useState<LevyTateAiAction | null>(null);
   const [revealedAction, setRevealedAction] = useState<LevyTateAiAction | null>(null);
   const [actionStatus, setActionStatus] = useState("");
+  const [pendingProfileSave, setPendingProfileSave] = useState<CopilotProfileDraft | null>(null);
+  const profileSaveInFlight = useRef(false);
   const loadedEmployeeRef = useRef("");
   const previousContextRef = useRef("");
   const [contextChanges, setContextChanges] = useState<string[]>([]);
@@ -611,6 +614,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
   }, [role, selectedEmployee, selectedEmployeeId, selectedDevelopmentProfile]);
 
   function changeRole(nextRole: AssistantRole) {
+    if (loading || pendingProfileSave) return;
     setRole(nextRole);
     setInput("");
     setError("");
@@ -621,6 +625,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
   }
 
   function chooseEmployee(nextEmployeeId: string) {
+    if (loading || pendingProfileSave) return;
     setSelectedEmployeeId(nextEmployeeId);
     loadedEmployeeRef.current = "";
     setInput("");
@@ -631,6 +636,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
   }
 
   function resetConversation() {
+    if (loading || pendingProfileSave) return;
     const programme = selectedApplication
       ? getApprenticeshipStandard(selectedApplication.apprenticeshipStandardId)?.title ?? selectedApplication.apprenticeshipStandardId
       : selectedPreferredStandard?.title ?? "your recommended programme";
@@ -651,7 +657,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
 
   async function sendMessage(message: string) {
     const trimmed = message.trim();
-    if (!trimmed || loading) return;
+    if (!trimmed || loading || pendingProfileSave || profileSaveInFlight.current) return;
 
     const activeRole = role;
     if (activeRole === "Employee" && !selectedEmployee) {
@@ -707,7 +713,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
       } catch {}
       const answer = financeState
         ? answerLevyFinanceQuestion(trimmed, financeState).message
-        : "There is no imported DAS transaction data to summarise yet. Upload a DAS CSV in Finance first.";
+        : "Finance evidence is temporarily unavailable. Retry when the Finance source reconnects; no balance or transaction count can be confirmed.";
       setConversations((current) => ({ ...current, [activeRole]: [...nextMessages, { id: messageId(), role: "assistant", content: answer }] }));
       setInput("");
       setError("");
@@ -739,6 +745,9 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
     const developmentProfile = shouldUpdateSelectedEmployeeProfile && contextEmployee
       ? updateEmployeeDiscovery(existingDevelopmentProfile ?? createEmployeeDevelopmentProfile(contextEmployee.id), contextEmployee.id, trimmed)
       : existingDevelopmentProfile;
+    const profileDraft = shouldUpdateSelectedEmployeeProfile && developmentProfile && meta
+      ? captureCopilotProfileDraft(developmentProfile, meta)
+      : null;
     const availablePathways = roleRecord
       ? pathwayMappings
           .slice()
@@ -862,7 +871,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
 
       if (shouldUpdateSelectedEmployeeProfile && selectedEmployee && developmentProfile) {
         const existing = selectedDevelopmentProfile ?? createEmployeeDevelopmentProfile(selectedEmployee.id);
-        saveEmployeeDevelopmentProfile({
+        const profile = {
           ...existing,
           ...developmentProfile,
           conversationHistory: [...conversationHistory, { role: "user" as const, content: trimmed }, { role: "assistant" as const, content }].slice(-24),
@@ -870,10 +879,12 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
           recommendationResult: result.recommendationResult ?? existing.recommendationResult,
           preferredStandardId: existing.preferredStandardId,
           updatedAt: nowIso(),
-        });
+        };
+        if (profileDraft) await persistProfile({ ...profileDraft, profile });
       }
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "LevyTate Copilot could not respond.");
+      setInput(trimmed);
     } finally {
       setLoading(false);
     }
@@ -912,27 +923,39 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
     setPendingAction(null);
   }
 
-  function selectRecommendedPathway(title: string) {
-    if (role !== "Employee" || !selectedEmployee) return;
+  async function persistProfile(draft: CopilotProfileDraft) {
+    if (profileSaveInFlight.current) return;
+    profileSaveInFlight.current = true;
+    setPendingProfileSave(draft); setLoading(true); setError(""); setActionStatus("");
+    try {
+      const result = await persistCopilotProfileDraft(draft, meta, saveEmployeeDevelopmentProfile);
+      if (!result.ok) { setError(result.message); return; }
+      setPendingProfileSave(null); setActionStatus(draft.successMessage);
+    } finally { profileSaveInFlight.current = false; setLoading(false); }
+  }
+
+  async function selectRecommendedPathway(title: string) {
+    if (role !== "Employee" || !selectedEmployee || !meta || loading || pendingProfileSave) return;
     const recommendation = latestResponse?.recommendationResult?.recommendations.find((item) => item.title === title)
       ?? selectedDevelopmentProfile?.recommendationResult?.recommendations.find((item) => item.title === title)
       ?? null;
     if (!recommendation) return;
     const existing = selectedDevelopmentProfile ?? createEmployeeDevelopmentProfile(selectedEmployee.id);
-    saveEmployeeDevelopmentProfile({
+    const draft = captureCopilotProfileDraft({
       ...existing,
       conversationProfile: profiles.Employee ?? existing.conversationProfile,
       recommendationResult: latestResponse?.recommendationResult ?? existing.recommendationResult,
       preferredStandardId: recommendation.pathwayId,
       updatedAt: nowIso(),
-    });
-    setActionStatus(`${recommendation.title} is now the preferred pathway for provider matching and application support.`);
+    }, meta, `${recommendation.title} is now the preferred pathway for provider matching and application support.`);
+    await persistProfile(draft);
   }
 
   const employeePrioritySummary = data.profile.priorities.slice(0, 3);
   const conversationStarted = messages.some((message) => message.role === "user");
   const conversationCtaLabel = conversationStarted ? "Continue conversation" : "Start conversation";
-  const conversationDisabled = loading || (role === "Employee" && !selectedEmployee);
+  const conversationDisabled = loading || Boolean(pendingProfileSave) || (role === "Employee" && !selectedEmployee);
+  const profileRecovery = pendingProfileSave ? <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[#bf4159]/15 bg-[#fff4f5] p-3 text-sm" role="status"><p className="w-full">The profile change is not yet confirmed. The exact draft is kept here.</p><button type="button" disabled={loading} onClick={() => void persistProfile(pendingProfileSave)} className="rounded-lg bg-white px-3 py-2 font-semibold disabled:opacity-50">Retry profile save</button><button type="button" disabled={loading} onClick={() => { setPendingProfileSave(null); setError(""); setActionStatus("Pending profile retry dismissed. Reconnect the workspace to confirm whether the earlier save committed."); }} className="rounded-lg bg-white px-3 py-2 disabled:opacity-50">Dismiss retry</button></div> : null;
 
   if (presentation === "drawer" && context) {
     return <div className="flex h-full min-h-0 flex-col bg-white">
@@ -945,6 +968,8 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
         {messages.map((message) => <article key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}><div className={`max-w-[92%] text-[14px] leading-6 ${message.role === "user" ? "rounded-2xl rounded-br-md bg-[#102c3d] px-3.5 py-2.5 text-white" : "w-full text-[#102c3d]/72"}`}><p className="whitespace-pre-wrap">{message.content}</p>{message.response ? <InlineResponse response={message.response} onAction={chooseAction} onQuickReply={(reply) => void sendMessage(reply)} onSelectPathway={role === "Employee" ? selectRecommendedPathway : undefined} selectedPathwayTitle={selectedPreferredStandard?.title ?? null} loading={loading} /> : null}</div></article>)}
         {loading ? <p className="text-sm font-medium text-[#0b776e]">Checking {context.module === "Home" ? "learner operations" : context.contextLabel.toLowerCase()}…</p> : null}
         {error ? <p className="border border-[#bf4159]/15 bg-[#fff4f5] px-3 py-2 text-sm text-[#ad344e]">{error}</p> : null}
+        {profileRecovery}
+        {actionStatus ? <p className="text-sm text-[#0b6f63]" role="status">{actionStatus}</p> : null}
       </div>
       <form onSubmit={submit} className="border-t border-[#102c3d]/[0.08] bg-white p-3">
         <label htmlFor="levytate-contextual-copilot-message" className="sr-only">Message LevyTate Copilot</label>
@@ -968,6 +993,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
                 <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/52">Employee in focus</span>
                 <select
                   value={selectedEmployeeId}
+                  disabled={loading || Boolean(pendingProfileSave)}
                   onChange={(event) => chooseEmployee(event.target.value)}
                   className="h-11 min-w-[260px] rounded-2xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 text-sm font-semibold text-[#102c3d] outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10"
                 >
@@ -984,6 +1010,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
               <button
                 key={item}
                 type="button"
+                disabled={loading || Boolean(pendingProfileSave)}
                 onClick={() => changeRole(item)}
                 className={`min-h-10 rounded-xl px-3 text-xs font-semibold transition ${role === item ? "bg-white text-[#102c3d] shadow-[0_8px_20px_rgba(16,44,61,0.08)]" : "text-[#102c3d]/52 hover:text-[#102c3d]"}`}
               >
@@ -1047,6 +1074,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
               </div>
             ) : null}
             {error ? <p className="rounded-xl bg-[#fff4f5] px-4 py-3 text-sm text-[#ad344e] ring-1 ring-[#bf4159]/[0.12]">{error}</p> : null}
+            {profileRecovery}
           </div>
 
           <form onSubmit={submit} className="border-t border-[#102c3d]/[0.07] bg-white p-4">

@@ -6,7 +6,7 @@ import {
   type EarlyAccessRequest,
   type EarlyAccessStatus,
 } from "@/lib/levytate/early-access/domain";
-import { normaliseSupabaseUrl, readRuntimeEnv } from "@/lib/server/levytate-supabase";
+import { normaliseSupabaseUrl, readRuntimeEnv, supabaseSelectAll } from "@/lib/server/levytate-supabase";
 
 type SupabaseEarlyAccessRow = {
   id: string;
@@ -23,7 +23,7 @@ type SupabaseEarlyAccessRow = {
 const supabaseTableName = "levytate_early_access_requests";
 
 export class EarlyAccessStoreError extends Error {
-  constructor(message: string) {
+  constructor(message: string, readonly status: 400 | 404 | 503 = 400) {
     super(message);
     this.name = "EarlyAccessStoreError";
   }
@@ -76,7 +76,7 @@ export async function createEarlyAccessRequest(input: EarlyAccessCreateInput) {
   };
 
   const saved = await trySaveToSupabase(requireSupabaseConfig(), request);
-  if (!saved) throw new EarlyAccessStoreError("Early access storage is temporarily unavailable.");
+  if (!saved) throw new EarlyAccessStoreError("Early access storage is temporarily unavailable.", 503);
   return saved;
 }
 
@@ -106,7 +106,7 @@ export async function updateEarlyAccessStatus(id: string, status: EarlyAccessSta
   }
 
   const updated = await tryUpdateSupabaseStatus(requireSupabaseConfig(), id, status);
-  if (!updated) throw new EarlyAccessStoreError("Lead could not be found.");
+  if (!updated) throw new EarlyAccessStoreError("Lead could not be found.", 404);
   return updated;
 }
 
@@ -124,7 +124,7 @@ function getSupabaseConfig() {
 
 function requireSupabaseConfig() {
   const config = getSupabaseConfig();
-  if (!config) throw new EarlyAccessStoreError("Early access storage is temporarily unavailable.");
+  if (!config) throw new EarlyAccessStoreError("Early access storage is temporarily unavailable.", 503);
   return config;
 }
 
@@ -152,35 +152,28 @@ async function trySaveToSupabase(
     ]),
   });
 
-  if (!response) throw new EarlyAccessStoreError("Early access storage is temporarily unavailable.");
+  if (!response) throw new EarlyAccessStoreError("Early access storage is temporarily unavailable.", 503);
   if (!response.ok) {
     await readSupabaseError(response);
-    throw new EarlyAccessStoreError("Early access storage is temporarily unavailable.");
+    throw new EarlyAccessStoreError("Early access storage is temporarily unavailable.", 503);
   }
 
   const rows = (await response.json()) as SupabaseEarlyAccessRow[];
-  return mapSupabaseRow(rows[0]) ?? request;
+  const saved = mapSupabaseRow(rows[0]);
+  if (!saved || saved.id !== request.id) throw new EarlyAccessStoreError("Early access storage did not confirm this request. Please try again shortly.", 503);
+  return saved;
 }
 
 async function tryListFromSupabase(config: { url: string; serviceRoleKey: string }) {
   const query = new URLSearchParams({
     select: "id,organisation,contact_name,email,employee_count,biggest_challenge,consent,submitted_at,status",
-    order: "submitted_at.desc",
+    order: "submitted_at.desc,id.asc",
   });
 
-  const response = await tryFetchSupabase(`${config.url}/rest/v1/${supabaseTableName}?${query.toString()}`, {
-    headers: getSupabaseHeaders(config.serviceRoleKey),
-    cache: "no-store",
-  });
-
-  if (!response) throw new EarlyAccessStoreError("Early access leads could not be loaded.");
-  if (!response.ok) {
-    await readSupabaseError(response);
-    throw new EarlyAccessStoreError("Early access leads could not be loaded.");
-  }
-
-  const rows = (await response.json()) as SupabaseEarlyAccessRow[];
-  return rows.map(mapSupabaseRow).filter(Boolean) as EarlyAccessRequest[];
+  try {
+    const rows = await supabaseSelectAll<SupabaseEarlyAccessRow>(config, supabaseTableName, query);
+    return rows.map(mapSupabaseRow).filter(Boolean) as EarlyAccessRequest[];
+  } catch { throw new EarlyAccessStoreError("Early access leads could not be loaded.", 503); }
 }
 
 async function tryGetByEmailFromSupabase(config: { url: string; serviceRoleKey: string }, email: string) {
@@ -195,10 +188,10 @@ async function tryGetByEmailFromSupabase(config: { url: string; serviceRoleKey: 
     cache: "no-store",
   });
 
-  if (!response) throw new EarlyAccessStoreError("Early access lead could not be checked.");
+  if (!response) throw new EarlyAccessStoreError("Early access lead could not be checked.", 503);
   if (!response.ok) {
     await readSupabaseError(response);
-    throw new EarlyAccessStoreError("Early access lead could not be checked.");
+    throw new EarlyAccessStoreError("Early access lead could not be checked.", 503);
   }
 
   const rows = (await response.json()) as SupabaseEarlyAccessRow[];
@@ -221,20 +214,24 @@ async function tryUpdateSupabaseStatus(
     },
   );
 
-  if (!response) throw new EarlyAccessStoreError("Early access lead could not be updated.");
+  if (!response) throw new EarlyAccessStoreError("Early access lead could not be updated.", 503);
   if (!response.ok) {
     await readSupabaseError(response);
-    throw new EarlyAccessStoreError("Early access lead could not be updated.");
+    throw new EarlyAccessStoreError("Early access lead could not be updated.", 503);
   }
 
   const rows = (await response.json()) as SupabaseEarlyAccessRow[];
   const updated = mapSupabaseRow(rows[0]);
-  if (!updated) throw new EarlyAccessStoreError("Updated lead data could not be read.");
+  if (!updated) throw new EarlyAccessStoreError("Updated lead data could not be read.", 503);
   return updated;
 }
 
 function mapSupabaseRow(row: SupabaseEarlyAccessRow | undefined | null) {
   if (!row) return null;
+  if (!row.id || !row.organisation || !row.contact_name || !row.email || !row.employee_count || typeof row.consent !== "boolean"
+    || typeof row.submitted_at !== "string" || !Number.isFinite(Date.parse(row.submitted_at)) || !isEarlyAccessStatus(row.status)) {
+    throw new EarlyAccessStoreError("Early access data could not be verified.", 503);
+  }
 
   return {
     id: row.id,
@@ -243,15 +240,15 @@ function mapSupabaseRow(row: SupabaseEarlyAccessRow | undefined | null) {
     email: row.email,
     employeeCount: row.employee_count,
     biggestChallenge: row.biggest_challenge ?? "",
-    consent: row.consent ?? true,
-    submittedAt: row.submitted_at ?? new Date().toISOString(),
-    status: isEarlyAccessStatus(row.status) ? row.status : "New",
+    consent: row.consent,
+    submittedAt: row.submitted_at,
+    status: row.status,
   } satisfies EarlyAccessRequest;
 }
 
 async function tryFetchSupabase(url: string, init: RequestInit) {
   try {
-    return await fetch(url, init);
+    return await fetch(url, { ...init, signal: AbortSignal.timeout(10_000) });
   } catch {
     return null;
   }

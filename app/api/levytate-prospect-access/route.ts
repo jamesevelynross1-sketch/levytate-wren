@@ -2,6 +2,8 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
 import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
+import { ClientRequestError, readAuthenticatedJson } from "@/lib/server/levytate-request-boundary";
+import { parseAction, prospectActionInput } from "@/lib/server/levytate-operational-input";
 import {
   ProspectAccessError,
   completeProspectGuidance,
@@ -36,7 +38,7 @@ export async function PATCH(request: Request) {
   if (!session) return NextResponse.json({ message: "Unauthorised." }, { status: 401 });
 
   try {
-    const body = (await request.json()) as Record<string, unknown>;
+    const body = parseAction(prospectActionInput, await readAuthenticatedJson(request, session.email));
     if (body.operation === "complete_guidance") {
       return NextResponse.json({ ok: true, access: await completeProspectGuidance(session) });
     }
@@ -62,6 +64,7 @@ export async function PATCH(request: Request) {
 }
 
 function responseFor(error: unknown) {
+  if (error instanceof ClientRequestError) return NextResponse.json({ message: error.message }, { status: error.status });
   const status = error instanceof ProspectAccessError ? error.status : 500;
   const message = error instanceof ProspectAccessError ? error.message : "Prospect access could not be updated.";
   return NextResponse.json({ message }, { status });

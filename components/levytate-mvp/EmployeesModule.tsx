@@ -15,11 +15,13 @@ import {
   TableAction,
 } from "@/components/levytate-mvp/MvpUi";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
+import { WorkspaceAccessPanel } from "@/components/levytate-mvp/WorkspaceAccessPanel";
 import { includesSearch, statusTone } from "@/components/levytate-mvp/module-utils";
 import type { LevyTateRecommendationResult } from "@/lib/levytate/ai/types";
 import { getApprenticeshipStandard } from "@/lib/levytate/domain";
 import { deriveEmployeeOperationalSummary } from "@/lib/levytate/mvp/employee-operational-summary";
-import { parsePeopleCsv, type PeopleImportResult } from "@/lib/levytate/mvp/people-import";
+import { parsePeopleCsv, preparePeopleImport, type PeopleImportResult } from "@/lib/levytate/mvp/people-import";
+import { normalisePeopleRecord, validatePeopleChanges } from "@/lib/levytate/mvp/people-validation";
 import {
   employeeCurrentApplication,
   employeeDevelopmentInterests,
@@ -38,7 +40,7 @@ export function EmployeesModule({ onStartDiscovery, onOpenDirectReport, initialE
   onOpenDirectReport?: (employeeId: string) => void;
   initialEmployeeId?: string | null;
 }) {
-  const { data, saveEmployee, archiveEmployee, can, meta } = useMvpWorkspace();
+  const { data, saveEmployee, importEmployees, archiveEmployee, can, meta, sessionRecovery } = useMvpWorkspace();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("Active");
   const [departmentFilter, setDepartmentFilter] = useState("All");
@@ -46,10 +48,12 @@ export function EmployeesModule({ onStartDiscovery, onOpenDirectReport, initialE
   const [siteFilter, setSiteFilter] = useState("All");
   const [applicationFilter, setApplicationFilter] = useState("All");
   const [draft, setDraft] = useState<MvpEmployee | null>(null);
+  const [draftRevision, setDraftRevision] = useState(0);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
   const [error, setError] = useState("");
-  const [peopleImport, setPeopleImport] = useState<{ fileName: string; result: PeopleImportResult } | null>(null);
+  const [peopleImport, setPeopleImport] = useState<{ fileName: string; result: PeopleImportResult; importId: string; employees: MvpEmployee[] } | null>(null);
   const [importComplete, setImportComplete] = useState(0);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (initialEmployeeId) setSelectedEmployeeId(initialEmployeeId);
@@ -107,9 +111,10 @@ export function EmployeesModule({ onStartDiscovery, onOpenDirectReport, initialE
 
   function blankEmployee(): MvpEmployee {
     const now = nowIso();
+    const id = createMvpId("employee");
     return {
-      id: createMvpId("employee"),
-      employeeNumber: `EMP-${String(data.employees.length + 1).padStart(4, "0")}`,
+      id,
+      employeeNumber: `EMP-${id.slice(-12).toUpperCase()}`,
       name: "",
       email: "",
       jobTitle: "",
@@ -125,64 +130,81 @@ export function EmployeesModule({ onStartDiscovery, onOpenDirectReport, initialE
     };
   }
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
-    if (!draft) return;
-    if (!draft.name.trim() || !draft.jobTitle.trim() || !draft.department.trim()) {
-      setError("Name, job title and department are required.");
-      return;
-    }
-
+    if (!draft || saving) return;
     const isNew = !data.employees.some((item) => item.id === draft.id);
-    const matchedRole = data.roles.find(
+    const matchedRoles = data.roles.filter(
       (role) => role.status === "Active" && role.title.trim().toLowerCase() === draft.jobTitle.trim().toLowerCase(),
     );
+    if (!draft.roleId && matchedRoles.length > 1) { setError("This job title matches more than one active role. Select the intended role library record."); return; }
 
-    const employee = {
+    const input = {
       ...draft,
       name: draft.name.trim(),
       jobTitle: draft.jobTitle.trim(),
       department: draft.department.trim(),
       email: draft.email.trim(),
-      roleId: draft.roleId || matchedRole?.id || "",
+      roleId: draft.roleId || matchedRoles[0]?.id || "",
       updatedAt: nowIso(),
     };
 
-    saveEmployee(employee);
-    setDraft(null);
-    setError("");
-    if (isNew) onStartDiscovery?.(employee.id);
+    setSaving(true); setError("");
+    try {
+      const employee = normalisePeopleRecord(input);
+      validatePeopleChanges([employee], data.employees, data.roles);
+      const result = await saveEmployee(employee, draftRevision);
+      if (!result.ok) { setError(result.message); return; }
+      setDraft(null);
+      if (isNew) onStartDiscovery?.(employee.id);
+    } catch (failure) { setError(failure instanceof Error ? failure.message : "The employee save was not confirmed. Your form has been kept."); }
+    finally { setSaving(false); }
   }
 
   function openEmployee(employee?: MvpEmployee) {
+    if (saving) return;
     setError("");
-    setDraft(employee ? { ...employee } : blankEmployee());
+    const next = employee ? { ...employee } : blankEmployee();
+    setDraft(next);
+    setDraftRevision(meta?.mutationRevisions?.[`levytate_employees:${next.id}`] ?? 0);
   }
 
   async function choosePeopleFile(file?: File) {
     setError(""); setImportComplete(0);
-    if (!file) return;
+    if (!file || saving) return;
     if (!/\.csv$/i.test(file.name) || file.size > 2 * 1024 * 1024) { setError("Choose a CSV file no larger than 2MB."); return; }
-    setPeopleImport({ fileName: file.name, result: parsePeopleCsv(await file.text()) });
+    try {
+      const result = parsePeopleCsv(await file.text());
+      let employees: MvpEmployee[] = [];
+      if (!result.issues.length) {
+        try { employees = preparePeopleImport(result, data.employees, data.roles, () => createMvpId("employee"), nowIso()); }
+        catch (failure) { result.issues.push({ sourceRow: 0, message: failure instanceof Error ? failure.message : "The file could not be validated." }); }
+      }
+      setPeopleImport({ fileName: file.name, result, employees, importId: crypto.randomUUID() });
+    } catch { setError("The file could not be read. No employees were imported."); }
   }
 
-  function importPeople() {
-    if (!peopleImport?.result.rows.length) return;
-    const existingEmailIds = new Map(data.employees.map((employee) => [employee.email.trim().toLowerCase(), employee.id]));
-    const newIds = new Map(peopleImport.result.rows.map((row) => [row.email, createMvpId("employee")]));
-    let imported = 0;
-    for (const row of peopleImport.result.rows) {
-      if (existingEmailIds.has(row.email)) continue;
-      const managerId = row.managerEmail ? existingEmailIds.get(row.managerEmail) ?? newIds.get(row.managerEmail) ?? "" : "";
-      const matchedRole = data.roles.find((role) => role.status === "Active" && role.title.trim().toLowerCase() === row.jobTitle.toLowerCase());
-      const now = nowIso();
-      saveEmployee({ id: newIds.get(row.email)!, employeeNumber: row.employeeNumber || `EMP-${String(data.employees.length + imported + 1).padStart(4, "0")}`, name: row.name, email: row.email, jobTitle: row.jobTitle, roleId: matchedRole?.id ?? "", managerId, department: row.department, site: row.site, platformRole: row.platformRole, status: row.status, startDate: todayIso(), createdAt: now, updatedAt: now });
-      imported += 1;
-    }
-    setImportComplete(imported); setPeopleImport(null);
+  async function importPeople() {
+    if (!peopleImport?.employees.length || peopleImport.result.issues.length || saving) return;
+    setSaving(true); setError("");
+    try {
+      const result = await importEmployees(peopleImport.importId, peopleImport.employees);
+      if (!result.ok) { setError(result.message); return; }
+      setImportComplete(peopleImport.employees.length); setPeopleImport(null);
+    } catch { setError("The import outcome was not confirmed. Keep this preview open and retry the same request."); }
+    finally { setSaving(false); }
+  }
+
+  async function toggleEmployeeArchive(employeeId: string) {
+    if (saving) return;
+    setSaving(true); setError("");
+    try { const result = await archiveEmployee(employeeId); if (!result.ok) setError(result.message); }
+    catch { setError("The employee update was not confirmed. Please retry."); }
+    finally { setSaving(false); }
   }
 
   return (
+    <div className="space-y-6">
     <MvpPanel title={isLineManager ? "My Team" : "Employees"} eyebrow={isLineManager ? "Direct reports" : "Workforce records"}>
       <MvpToolbar
         search={search}
@@ -208,7 +230,8 @@ export function EmployeesModule({ onStartDiscovery, onOpenDirectReport, initialE
           </div>
         }
       />
-      {canWriteEmployees ? <div className="mb-4 flex flex-wrap items-center gap-3"><label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border border-[#102c3d]/[0.10] bg-white px-4 text-xs font-semibold text-[#102c3d]"><FileUp size={15} />Import CSV<input type="file" accept=".csv,text/csv" className="sr-only" onChange={(event) => void choosePeopleFile(event.target.files?.[0])} /></label><span className="text-xs text-[#102c3d]/[0.48]">Required: name, work email, job title, department.</span>{importComplete ? <span className="text-xs font-semibold text-[#0b6f63]">{importComplete} employee{importComplete === 1 ? "" : "s"} imported.</span> : null}</div> : null}
+      {canWriteEmployees ? <div className="mb-4 flex flex-wrap items-center gap-3"><label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border border-[#102c3d]/[0.10] bg-white px-4 text-xs font-semibold text-[#102c3d]"><FileUp size={15} />Import CSV<input type="file" accept=".csv,text/csv" disabled={saving} className="sr-only" onChange={(event) => { void choosePeopleFile(event.target.files?.[0]); event.target.value = ""; }} /></label><span className="text-xs text-[#102c3d]/[0.48]">Required: name, work email, job title, department. No invitations are sent.</span>{importComplete ? <span role="status" className="text-xs font-semibold text-[#0b6f63]">{importComplete} employee{importComplete === 1 ? "" : "s"} imported.</span> : null}</div> : null}
+      {error && !draft && !peopleImport ? <p role="alert" className="mb-4 text-sm font-semibold text-[#b53c52]">{error}</p> : null}
 
       {visible.length ? (
         <div className="grid gap-4 xl:grid-cols-2">
@@ -318,8 +341,9 @@ export function EmployeesModule({ onStartDiscovery, onOpenDirectReport, initialE
       )}
 
       {draft ? (
-        <MvpModal title={data.employees.some((item) => item.id === draft.id) ? "Edit employee" : "Add employee"} onClose={() => setDraft(null)}>
+        <MvpModal title={data.employees.some((item) => item.id === draft.id) ? "Edit employee" : "Add employee"} onClose={() => { if (!saving) setDraft(null); }}>
           <form onSubmit={submit}>
+            <fieldset disabled={saving} className="min-w-0">
             <div className="mb-5 flex items-start gap-3 rounded-xl bg-[#edf7f3] p-4 ring-1 ring-[#159b8f]/[0.10]">
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white text-[#0b8e82]"><UserPlus size={17} aria-hidden="true" /></span>
               <div>
@@ -330,9 +354,10 @@ export function EmployeesModule({ onStartDiscovery, onOpenDirectReport, initialE
 
             <FormGrid>
               <FormField label="Employee name" value={draft.name} onChange={(value) => setDraft({ ...draft, name: value })} required />
+              <FormField label="Work email" type="email" value={draft.email} onChange={(value) => setDraft({ ...draft, email: value })} required />
               <FormField label="Job title" value={draft.jobTitle} onChange={(value) => setDraft({ ...draft, jobTitle: value })} required />
               <FormField label="Department" value={draft.department} onChange={(value) => setDraft({ ...draft, department: value })} required />
-              <FormSelect label="Line manager" value={draft.managerId} onChange={(value) => setDraft({ ...draft, managerId: value })} options={[{ value: "", label: data.employees.length ? "Assign later" : "Add managers as employee records" }, ...data.employees.filter((employee) => employee.id !== draft.id && employee.status === "Active").map((employee) => ({ value: employee.id, label: employee.name }))]} />
+              <FormSelect label="Line manager" value={draft.managerId} onChange={(value) => setDraft({ ...draft, managerId: value })} options={[{ value: "", label: managers.length ? "Assign later" : "Add a Line Manager record first" }, ...managers.filter((employee) => employee.id !== draft.id).map((employee) => ({ value: employee.id, label: employee.name }))]} />
               <FormField label="Site" value={draft.site} onChange={(value) => setDraft({ ...draft, site: value })} wide />
             </FormGrid>
 
@@ -343,7 +368,6 @@ export function EmployeesModule({ onStartDiscovery, onOpenDirectReport, initialE
               </summary>
               <div className="border-t border-[#102c3d]/[0.07] p-4">
                 <FormGrid>
-                  <FormField label="Email" type="email" value={draft.email} onChange={(value) => setDraft({ ...draft, email: value })} />
                   <FormField label="Employee number" value={draft.employeeNumber} onChange={(value) => setDraft({ ...draft, employeeNumber: value })} />
                   <FormSelect label="Assigned role library record" value={draft.roleId} onChange={(value) => {
                     const role = data.roles.find((item) => item.id === value);
@@ -355,12 +379,21 @@ export function EmployeesModule({ onStartDiscovery, onOpenDirectReport, initialE
               </div>
             </details>
 
-            <FormActions onCancel={() => setDraft(null)} label="Save employee" error={error} />
+            <FormActions onCancel={() => setDraft(null)} label={saving ? "Saving…" : "Save employee"} error={error} disabled={saving} submissionBlocked={Boolean(sessionRecovery)} />
+            </fieldset>
           </form>
         </MvpModal>
       ) : null}
 
-      {peopleImport ? <MvpModal title="Review employee import" eyebrow={peopleImport.fileName} onClose={() => setPeopleImport(null)} wide><div className="grid gap-4"><div className="grid gap-3 sm:grid-cols-3"><DecisionFact label="Valid rows" value={String(peopleImport.result.rows.length)} /><DecisionFact label="Rows needing correction" value={String(peopleImport.result.issues.length)} /><DecisionFact label="Existing emails skipped" value={String(peopleImport.result.rows.filter((row) => data.employees.some((employee) => employee.email.trim().toLowerCase() === row.email)).length)} /></div>{peopleImport.result.issues.length ? <div className="max-h-48 overflow-y-auto rounded-xl bg-[#fff8df] p-4 text-xs text-[#765b00]">{peopleImport.result.issues.slice(0, 30).map((issue) => <p key={`${issue.sourceRow}:${issue.message}`} className="py-1">Row {issue.sourceRow}: {issue.message}</p>)}</div> : null}<div className="flex flex-wrap gap-3"><button type="button" disabled={!peopleImport.result.rows.length} onClick={importPeople} className="min-h-11 rounded-full bg-[#102c3d] px-5 text-sm font-semibold text-white disabled:opacity-40">Import valid employees</button><button type="button" onClick={() => setPeopleImport(null)} className="min-h-11 rounded-full px-4 text-sm font-semibold text-[#102c3d]/[0.55]">Cancel</button></div></div></MvpModal> : null}
+      {peopleImport ? <MvpModal title="Review employee import" eyebrow={peopleImport.fileName} onClose={() => { if (!saving) setPeopleImport(null); }} wide>
+        <div className="grid gap-4">
+          <div className="grid gap-3 sm:grid-cols-2"><DecisionFact label="Employees to import" value={String(peopleImport.employees.length)} /><DecisionFact label="Issues requiring correction" value={String(peopleImport.result.issues.length)} /></div>
+          <p className="text-sm text-[#102c3d]/70">All rows are saved together or none are. Existing emails are not skipped or overwritten. Access must be prepared and invited separately.</p>
+          {peopleImport.result.issues.length ? <div role="alert" className="max-h-48 overflow-y-auto rounded-xl bg-[#fff8df] p-4 text-xs text-[#765b00]">{peopleImport.result.issues.slice(0, 30).map((issue) => <p key={`${issue.sourceRow}:${issue.message}`} className="py-1">{issue.sourceRow ? `Row ${issue.sourceRow}: ` : ""}{issue.message}</p>)}</div> : null}
+          {error ? <p role="alert" className="text-sm font-semibold text-[#b53c52]">{error}</p> : null}
+          <div className="flex flex-wrap gap-3"><button type="button" disabled={saving || Boolean(sessionRecovery) || !peopleImport.employees.length || Boolean(peopleImport.result.issues.length)} onClick={() => void importPeople()} className="min-h-11 rounded-full bg-[#102c3d] px-5 text-sm font-semibold text-white disabled:opacity-40">{saving ? "Importing…" : "Import all employees"}</button><button type="button" disabled={saving} onClick={() => setPeopleImport(null)} className="min-h-11 rounded-full px-4 text-sm font-semibold text-[#102c3d]/[0.55] disabled:opacity-40">Cancel</button></div>
+        </div>
+      </MvpModal> : null}
 
       {selectedEmployee ? (
         <MvpModal title={selectedEmployee.name} eyebrow="Employee apprenticeship record" onClose={() => setSelectedEmployeeId(null)} wide>
@@ -371,13 +404,14 @@ export function EmployeesModule({ onStartDiscovery, onOpenDirectReport, initialE
               {canWriteEmployees ? (
                 <>
                   <TableAction onClick={() => openEmployee(selectedEmployee)}>Edit</TableAction>
-                  <TableAction onClick={() => archiveEmployee(selectedEmployee.id)} danger={selectedEmployee.status === "Active"}>
+                  <TableAction onClick={() => void toggleEmployeeArchive(selectedEmployee.id)} danger={selectedEmployee.status === "Active"}>
                     {selectedEmployee.status === "Archived" ? "Restore" : "Archive"}
                   </TableAction>
                 </>
               ) : null}
             </div>
           </div>
+          {error ? <p role="alert" className="mb-4 text-sm font-semibold text-[#b53c52]">{error}</p> : null}
           <div className="grid gap-5 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
             <div className="space-y-4 rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4">
               <section>
@@ -486,6 +520,8 @@ export function EmployeesModule({ onStartDiscovery, onOpenDirectReport, initialE
         </MvpModal>
       ) : null}
     </MvpPanel>
+    {meta?.storageMode === "supabase" && ["Apprenticeship Lead", "Employer Admin"].includes(meta.userRole) ? <WorkspaceAccessPanel /> : null}
+    </div>
   );
 }
 

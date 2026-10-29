@@ -16,10 +16,10 @@ import {
   LevyTateOperationalActionError,
   startOperationalAction,
   updateOperationalActionDueDate,
-  type OperationalActionCancellationKind,
-  type OperationalActionDismissalKind,
 } from "@/lib/server/levytate-operational-actions";
 import { logLevyTateServerError } from "@/lib/server/levytate-safe-api-error";
+import { ClientRequestError, readAuthenticatedJson } from "@/lib/server/levytate-request-boundary";
+import { operationalActionInput, parseAction } from "@/lib/server/levytate-operational-input";
 
 type RouteContext = { params: Promise<{ actionId: string }> };
 
@@ -50,24 +50,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   if (!session) return NextResponse.json({ message: "Unauthorised." }, { status: 401 });
   const { actionId } = await context.params;
   try {
-    const body = await request.json() as {
-      command?: "acknowledge" | "start" | "complete" | "dismiss" | "assign" | "due_date" | "cancel";
-      expectedVersion?: number;
-      completionNote?: string;
-      resolvedOutsideLevyTate?: boolean;
-      dismissalReason?: string;
-      dismissalKind?: OperationalActionDismissalKind;
-      organisationId?: string;
-      actorUserId?: string;
-      ownerType?: "Employee" | "Line Manager" | "Apprenticeship Lead" | "HR" | "Provider" | "Shared";
-      ownerUserId?: string;
-      ownerDisplayName?: string;
-      dueDate?: string;
-      dueDateReason?: string;
-      cancellationReason?: string;
-      cancellationKind?: OperationalActionCancellationKind;
-    };
-    if (!Number.isInteger(body.expectedVersion)) throw new LevyTateOperationalActionError("A valid expectedVersion is required.");
+    const body = parseAction(operationalActionInput, await readAuthenticatedJson(request, session.email));
     let action;
     if (body.command === "acknowledge") action = await acknowledgeOperationalAction(session, actionId, body.expectedVersion!);
     else if (body.command === "start") action = await startOperationalAction(session, actionId, body.expectedVersion!);
@@ -84,6 +67,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 }
 
 function actionErrorResponse(error: unknown) {
+  if (error instanceof ClientRequestError) return NextResponse.json({ message: error.message }, { status: error.status });
   const status = error instanceof LevyTateLearnerLifecyclePermissionError
     ? 403
     : error instanceof LevyTateOperationalActionConflictError

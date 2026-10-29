@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { applyLearnerTransaction, learnerRevision, learnerWritePlan, LearnerTransactionError } from "@/lib/server/levytate-learner-transaction";
 import type { LevyTateBetaSession } from "@/lib/levytate/config/beta-access";
 import { getApprenticeshipStandard } from "@/lib/levytate/domain";
 import {
@@ -83,9 +85,11 @@ import {
 } from "@/lib/levytate/mvp/rbac";
 import {
   getLevyTateSupabaseConfig,
-  supabaseInsert,
+  supabaseFetchJson,
+  supabaseInsert as executeSupabaseInsert,
   supabaseSelect,
-  supabaseUpdate,
+  supabaseSelectAll,
+  supabaseUpdate as executeSupabaseUpdate,
 } from "@/lib/server/levytate-supabase";
 import {
   assertScopeMatchesSession,
@@ -571,65 +575,212 @@ export type ConfirmAssessmentReadinessInput = AssessmentTransitionInput & {
 export type StartAssessmentInput = AssessmentTransitionInput & {
   assessmentStartDate?: string;
 };
+export type EnrolmentConfirmationInput = {
+  idempotencyKey: string;
+  expectedActivityVersion: string;
+  initialProgress: { updateDate: string; targetProgressPercentage: number; actualProgressPercentage: number; summary: string };
+  firstReviewDate: string;
+  firstReviewerName: string;
+};
+export type EmployeeDeclarationInput = { idempotencyKey: string; expectedUpdatedAt: string; confirmed: true; expectedEnglandWorkingHoursPercentage: number };
+export type LearnerOutcomeInput = {
+  outcome: "withdrawal" | "achievement" | "completion_without_achievement";
+  idempotencyKey: string;
+  expectedActivityVersion: string;
+  effectiveDate: string;
+  notes: string;
+  reasonCategory?: string;
+  initiatedBy?: string;
+  providerNotified?: boolean;
+  providerNotifiedDate?: string;
+  employeeNotified?: boolean;
+  employeeNotifiedDate?: string;
+  grade?: string;
+  gradeType?: string;
+  certificateReceived?: boolean;
+  certificateReceivedDate?: string;
+};
+
+export async function recordLearnerOutcome(session: LevyTateBetaSession, learnerId: string, input: LearnerOutcomeInput) {
+  assertEnum(input.outcome, ["withdrawal", "achievement", "completion_without_achievement"], "learner outcome");
+  return atomicLifecycle(input.outcome, [session, learnerId, input], () => recordLearnerOutcomePlan(session, learnerId, input));
+}
+
+async function recordLearnerOutcomePlan(session: LevyTateBetaSession, learnerId: string, input: LearnerOutcomeInput) {
+  const context = await contextForSession(session);
+  assertPermission(context, "learnerLifecycle:status");
+  const learner = await getScopedLearnerRecord(context, learnerId, "write");
+  const status = input.outcome === "withdrawal" ? "withdrawn" : input.outcome === "achievement" ? "achieved" : "completed_without_achievement";
+  assertLearnerLifecycleTransition(learner.lifecycleStatus, status);
+  const collections = await loadLearnerLifecycleCollectionsForRecord(session, learnerId);
+  latestActivityVersionRequired(collections, learner, input.expectedActivityVersion);
+  const id = activityRecordId("learner-outcome", learnerId, input.idempotencyKey);
+  assertOperationalDate(input.effectiveDate, "Outcome effective date");
+  if (learner.actualStartDate) assertDateAfter(input.effectiveDate, learner.actualStartDate, "Outcome effective date", "actual start date", true);
+  const notes = requiredText(input.notes, "Outcome evidence and reason");
+  const timestamp = nowIso();
+  const activeBreak = collections.breaksInLearning.find((item) => item.status === "active");
+  if (activeBreak && input.outcome !== "withdrawal") throw new LevyTateLearnerLifecycleValidationError("An active break must be resolved before completion.");
+  if (input.outcome === "withdrawal") {
+    const next: LearnerWithdrawal = { id, organisationId: context.organisation.id, learnerRecordId: learnerId,
+      withdrawalDate: input.effectiveDate, effectiveDate: input.effectiveDate, reasonCategory: requiredText(input.reasonCategory, "Withdrawal reason"), reasonNotes: notes,
+      initiatedBy: requiredText(input.initiatedBy, "Withdrawal initiated by"), providerNotified: input.providerNotified === true,
+      providerNotifiedDate: notificationDate(input.providerNotified === true, input.providerNotifiedDate, "Provider notified date"),
+      employeeNotified: input.employeeNotified === true, employeeNotifiedDate: notificationDate(input.employeeNotified === true, input.employeeNotifiedDate, "Employee notified date"),
+      recordedBy: context.user.email, recordedAt: timestamp };
+    await supabaseInsert(assertSupabase(), withdrawalsTable, [withdrawalToRow(next)], { prefer: "return=minimal" });
+    if (activeBreak) {
+      assertDateAfter(input.effectiveDate, activeBreak.startDate, "Withdrawal date", "break start date", true);
+      await updateBreakRow(context.organisation.id, { ...activeBreak, status: "converted_to_withdrawal", updatedAt: timestamp });
+    }
+  } else {
+    const assessment = collections.assessmentReadiness[0];
+    if (!assessment || assessment.assessmentStatus !== "in_assessment") throw new LevyTateLearnerLifecycleValidationError("An active assessment record is required before recording a completion outcome.");
+    if (assessment.assessmentStartDate) assertDateAfter(input.effectiveDate, assessment.assessmentStartDate, "Outcome effective date", "assessment start date", true);
+    const achieved = input.outcome === "achievement";
+    const next: LearnerAchievement = { id, organisationId: context.organisation.id, learnerRecordId: learnerId,
+      expectedAchievementDate: learner.expectedEndDate, actualAchievementDate: input.effectiveDate,
+      grade: achieved ? requiredText(input.grade, "Confirmed grade") : "Not achieved", gradeType: achieved ? requiredText(input.gradeType, "Grade type") : "Outcome",
+      certificateReceived: achieved && input.certificateReceived === true,
+      certificateReceivedDate: notificationDate(achieved && input.certificateReceived === true, input.certificateReceivedDate, "Certificate received date"),
+      resultNotes: notes, recordedBy: context.user.email, recordedAt: timestamp };
+    if (next.certificateReceivedDate) assertDateAfter(next.certificateReceivedDate, input.effectiveDate, "Certificate received date", "achievement date", true);
+    await supabaseInsert(assertSupabase(), achievementsTable, [achievementToRow(next)], { prefer: "return=minimal" });
+    await persistAssessmentReadiness(context, assessment, { ...assessment, assessmentStatus: achieved ? "completed" : "unsuccessful", updatedBy: context.user.email, updatedAt: timestamp, version: assessment.version + 1 });
+  }
+  await persistLearnerStatus(context, { ...learner, actualEndDate: input.effectiveDate }, status);
+  await recordLifecycleEvent(context, learnerId, input.outcome === "withdrawal" ? "withdrawn" : input.outcome === "achievement" ? "achievement_recorded" : "lifecycle_status_changed", learner.lifecycleStatus, status,
+    input.outcome === "withdrawal" ? "Learner withdrawal recorded with evidence." : input.outcome === "achievement" ? "Confirmed achievement recorded." : "Completion without achievement recorded with evidence.", { outcome: input.outcome, effectiveDate: input.effectiveDate, evidenceId: id });
+  return getOrganisationLearnerLifecycleRecordDetail(session, learnerId);
+}
+
+export const addLearnerReview = (...args: Parameters<typeof addLearnerReviewPlan>) => atomicLifecycle("review", args, () => addLearnerReviewPlan(...args));
+export const addProgressUpdate = (...args: Parameters<typeof addProgressUpdatePlan>) => atomicLifecycle("progress", args, () => addProgressUpdatePlan(...args));
+export const startBreakInLearning = (...args: Parameters<typeof startBreakInLearningPlan>) => atomicLifecycle("break_start", args, () => startBreakInLearningPlan(...args));
+export const updateBreakInLearning = (...args: Parameters<typeof updateBreakInLearningPlan>) => atomicLifecycle("break_update", args, () => updateBreakInLearningPlan(...args));
+export const returnFromBreak = (...args: Parameters<typeof returnFromBreakPlan>) => atomicLifecycle("break_return", args, () => returnFromBreakPlan(...args));
+export const cancelBreakInLearning = (...args: Parameters<typeof cancelBreakInLearningPlan>) => atomicLifecycle("break_cancel", args, () => cancelBreakInLearningPlan(...args));
+export const updateAssessmentReadinessDetails = (...args: Parameters<typeof updateAssessmentReadinessDetailsPlan>) => atomicLifecycle("assessment_update", args, () => updateAssessmentReadinessDetailsPlan(...args));
+export const moveLearnerToAssessmentPreparation = (...args: Parameters<typeof moveLearnerToAssessmentPreparationPlan>) => atomicLifecycle("assessment_prepare", args, () => moveLearnerToAssessmentPreparationPlan(...args));
+export const confirmLearnerAssessmentReadiness = (...args: Parameters<typeof confirmLearnerAssessmentReadinessPlan>) => atomicLifecycle("assessment_confirm", args, () => confirmLearnerAssessmentReadinessPlan(...args));
+export const startLearnerAssessment = (...args: Parameters<typeof startLearnerAssessmentPlan>) => atomicLifecycle("assessment_start", args, () => startLearnerAssessmentPlan(...args));
+export const updateLearnerPreEnrolmentProgress = (...args: Parameters<typeof updateLearnerPreEnrolmentProgressPlan>) => atomicLifecycle("pre_enrolment", args, () => updateLearnerPreEnrolmentProgressPlan(...args));
+export const markLearnerAsEnrolled = (...args: Parameters<typeof markLearnerAsEnrolledPlan>) => atomicLifecycle("enrol", args, () => markLearnerAsEnrolledPlan(...args));
+export const confirmEmployeeEligibility = (...args: Parameters<typeof confirmEmployeeEligibilityPlan>) => atomicLifecycle("employee_declaration", args, () => confirmEmployeeEligibilityPlan(...args));
+
+async function confirmEmployeeEligibilityPlan(session: LevyTateBetaSession, learnerId: string, input: EmployeeDeclarationInput) {
+  const context = await contextForSession(session);
+  if (context.user.role !== "Employee") throw new LevyTateLearnerLifecyclePermissionError("Only the employee may make their own declaration.");
+  const learner = await getScopedLearnerRecord(context, learnerId, "read");
+  if (learner.lifecycleStatus !== "pre_enrolment" || input.confirmed !== true) throw new LevyTateLearnerLifecycleValidationError("Confirm your declaration during pre-enrolment.");
+  const collections = await loadLearnerLifecycleCollectionsForRecord(session, learnerId);
+  const current = collections.eligibilityDeclarations[0] ?? null;
+  assertFreshVersion(latestPreEnrolmentVersion(learner, current, collections.preEnrolmentChecks[0] ?? null), requiredText(input.expectedUpdatedAt, "Learner version"));
+  assertProgressPercentage(input.expectedEnglandWorkingHoursPercentage, "Expected England working-hours percentage");
+  if (input.expectedEnglandWorkingHoursPercentage < 50) throw new LevyTateLearnerLifecycleValidationError("This declaration requires at least 50% of expected working hours in England. Contact your Apprenticeship Lead if this does not apply.");
+  const now = nowIso();
+  const next: LearnerEligibilityDeclaration = { id: current?.id ?? `${learnerId}-england-hours`, organisationId: context.organisation.id, learnerRecordId: learnerId,
+    declarationType: "england_working_hours", declarationWording: englandWorkingHoursDeclarationWording, declarationVersion: englandWorkingHoursDeclarationVersion,
+    confirmed: true, confirmedByEmployee: learner.employeeId, confirmedAt: now, expectedEnglandWorkingHoursPercentage: input.expectedEnglandWorkingHoursPercentage,
+    verifiedBy: "", verifiedAt: "", verificationStatus: "employee_confirmed", notes: "", createdAt: current?.createdAt ?? now, updatedAt: now };
+  await upsertEligibilityDeclaration(next);
+  await recordLifecycleEvent(context, learnerId, "eligibility_declaration_recorded", "", "", "Employee confirmed their England working-hours declaration; employer verification is still required.", { declarationVersion: next.declarationVersion });
+  return getOrganisationLearnerLifecycleRecordDetail(session, learnerId);
+}
+
+async function atomicLifecycle<T extends object>(action: string, args: [LevyTateBetaSession, string, ...unknown[]], build: () => Promise<T>): Promise<T> {
+  if (learnerWritePlan.getStore()) return build();
+  const [session, learnerId, ...input] = args;
+  const context = await contextForSession(session);
+  const keyInput = input.find((item): item is { idempotencyKey: string } => !!item && typeof item === "object" && "idempotencyKey" in item);
+  const command = { organisationId: context.organisation.id, actorId: context.user.id, learnerId, action, input, idempotencyKey: keyInput?.idempotencyKey };
+  try {
+    const replay = await applyLearnerTransaction<{ kind: "detail" | "container" | "record"; value: unknown }>(command, { probe: true });
+    if (replay) { await reconcile(); return hydrate(replay); }
+    const expectedRevision = await learnerRevision(context.organisation.id, learnerId);
+    const plan = { writes: [] as Array<{ table: string; row: Record<string, unknown> }>, synchronise: false };
+    const value = await learnerWritePlan.run(plan, build);
+    if (!plan.writes.length) throw new LevyTateLearnerLifecycleConflictError("No new mutation matched this command; refresh the learner record.");
+    const result = "activityVersion" in value ? { kind: "detail" as const, value: null }
+      : "learner" in value ? { kind: "container" as const, value: Object.fromEntries(Object.entries(value).filter(([key]) => key !== "learner")) }
+      : { kind: "record" as const, value };
+    const saved = await applyLearnerTransaction(command, { expectedRevision, writes: plan.writes, result });
+    if (!saved) throw new Error("No learner transaction receipt returned");
+    // Derived operational queues refresh from committed lifecycle evidence.
+    await reconcile();
+    return hydrate(saved);
+  } catch (error) {
+    if (error instanceof LearnerTransactionError) {
+      if (error.status === 409) throw new LevyTateLearnerLifecycleConflictError(error.message);
+      if (error.status === 403) throw new LevyTateLearnerLifecyclePermissionError(error.message);
+      if (error.status === 422) throw new LevyTateLearnerLifecycleValidationError(error.message);
+    }
+    throw error;
+  }
+  async function hydrate(result: { kind: "detail" | "container" | "record"; value: unknown }): Promise<T> {
+    if (result.kind === "record") return result.value as T;
+    const learner = await getOrganisationLearnerLifecycleRecordDetail(session, learnerId);
+    return (result.kind === "detail" ? learner : { ...(result.value as object), learner }) as T;
+  }
+  async function reconcile() {
+    if (context.user.role === "Employee") return;
+    try { await synchroniseLearnerOperationalActions(session, learnerId); }
+    catch { throw new LearnerTransactionError("Learner evidence is saved, but its operational queue has not refreshed. Retry the same request to complete recovery without duplicating evidence.", 503); }
+  }
+}
+
+async function supabaseInsert<T>(...args: Parameters<typeof executeSupabaseInsert>): Promise<T[]> {
+  const plan = learnerWritePlan.getStore();
+  if (!plan) return executeSupabaseInsert<T>(...args);
+  const rows = (Array.isArray(args[2]) ? args[2] : [args[2]]) as Record<string, unknown>[];
+  plan.writes.push(...rows.map((row) => ({ table: args[1], row })));
+  return rows as T[];
+}
+async function supabaseUpdate<T>(...args: Parameters<typeof executeSupabaseUpdate>): Promise<T[]> {
+  const plan = learnerWritePlan.getStore();
+  if (!plan) return executeSupabaseUpdate<T>(...args);
+  const row = args[3] as Record<string, unknown>;
+  plan.writes.push({ table: args[1], row });
+  return [row] as T[];
+}
 
 export async function createLearnerRecord(
   session: LevyTateBetaSession,
-  input: Omit<LearnerRecord, "id" | "organisationId" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy" | "recordStatus"> & Partial<Pick<LearnerRecord, "id" | "recordStatus">>,
+  input: Omit<LearnerRecord, "id" | "organisationId" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy" | "recordStatus"> & Partial<Pick<LearnerRecord, "id" | "recordStatus">> & { expectedApplicationRevision?: number; idempotencyKey?: string },
 ) {
   const context = await contextForSession(session);
   assertPermission(context, "learnerLifecycle:write");
-  const employeeId = requiredText(input.employeeId, "Employee");
-  const applicationId = cleanText(input.applicationId);
-  const programmeId = requiredText(input.programmeId, "Programme");
-  const providerId = requiredText(input.providerId, "Provider");
-  const enrolmentId = cleanText(input.enrolmentId);
-  assertEnum(input.lifecycleStatus, ["pre_enrolment", "enrolled", "break_in_learning", "withdrawn", "assessment_preparation", "in_assessment", "achieved", "completed_without_achievement"], "lifecycle status");
-  assertEnum(input.employmentRoute, ["not_confirmed", "existing_employee_upskill", "recruited_as_apprentice"], "employment route");
-  const expectedStartDate = assertValidDate(requiredText(input.expectedStartDate, "Expected start date"), "Expected start date");
-  const actualStartDate = input.actualStartDate ? assertValidDate(input.actualStartDate, "Actual start date") : "";
-  const expectedEndDate = assertValidDate(requiredText(input.expectedEndDate, "Expected end date"), "Expected end date");
-  const actualEndDate = input.actualEndDate ? assertValidDate(input.actualEndDate, "Actual end date") : "";
-  await assertCanAccessEmployee(context, employeeId, "write");
-  await assertNoDuplicateActiveLearnerRecord(context.organisation.id, employeeId, applicationId);
-  await assertOrganisationCatalogueSelection(context.organisation.id, providerId, programmeId);
-
-  const timestamp = nowIso();
-  const record: LearnerRecord = {
-    id: input.id ?? createMvpId("learner"),
-    organisationId: context.organisation.id,
-    employeeId,
-    applicationId,
-    programmeId,
-    providerId,
-    enrolmentId,
-    lifecycleStatus: input.lifecycleStatus,
-    employmentRoute: input.employmentRoute,
-    expectedStartDate,
-    actualStartDate,
-    expectedEndDate,
-    actualEndDate,
-    createdAt: timestamp,
-    updatedAt: timestamp,
-    createdBy: context.user.email,
-    updatedBy: context.user.email,
-    recordStatus: input.recordStatus ?? "Active",
-    demonstrationRecord: input.demonstrationRecord ?? false,
+  if (input.lifecycleStatus !== "pre_enrolment" || input.actualStartDate || input.actualEndDate || input.enrolmentId
+    || input.demonstrationRecord || (input.recordStatus && input.recordStatus !== "Active")) {
+    throw new LevyTateLearnerLifecycleValidationError("Ordinary onboarding starts at pre-enrolment from a final-approved application. Historical learner import is not enabled.");
+  }
+  const applicationId = requiredText(input.applicationId, "Final-approved application");
+  const fields = {
+    employeeId: requiredText(input.employeeId, "Employee"), programmeId: requiredText(input.programmeId, "Programme"),
+    providerId: requiredText(input.providerId, "Provider"), employmentRoute: input.employmentRoute,
+    expectedStartDate: assertValidDate(requiredText(input.expectedStartDate, "Expected start date"), "Expected start date"),
+    expectedEndDate: assertValidDate(requiredText(input.expectedEndDate, "Expected end date"), "Expected end date"),
   };
-
-  await upsertLearnerRecord(record);
-  await recordLifecycleEvent(context, record.id, "learner_record_created", "", record.lifecycleStatus, "Learner lifecycle record created.", { employeeId: record.employeeId, applicationId: record.applicationId });
-  return record;
-}
-
-async function assertOrganisationCatalogueSelection(organisationId: string, providerId: string, programmeId: string) {
-  const [providers, programmes] = await Promise.all([
-    selectMany<{ provider_id: string; status: string }>(organisationProvidersTable, organisationId, `provider_id=eq.${providerId}&status=eq.Active`, "selected_at.desc"),
-    selectMany<{ programme_id: string; provider_id: string; status: string }>(organisationProgrammesTable, organisationId, `programme_id=eq.${programmeId}&provider_id=eq.${providerId}&status=eq.Active`, "selected_at.desc"),
-  ]);
-  if (!providers.length || !programmes.length) {
-    throw new LevyTateLearnerLifecycleValidationError("Existing learners can only be onboarded to an active My Provider and My Programme.");
+  if (!Number.isInteger(input.expectedApplicationRevision) || (input.expectedApplicationRevision ?? -1) < 0) {
+    throw new LevyTateLearnerLifecycleConflictError("Refresh the approved application before starting pre-enrolment.");
+  }
+  const idempotencyKey = input.idempotencyKey ?? createHash("sha256").update(JSON.stringify({ actor: context.user.id, applicationId, revision: input.expectedApplicationRevision, fields })).digest("hex");
+  try {
+    const row = await supabaseFetchJson<LearnerRecordRow>(assertSupabase(), "rpc/levytate_start_pre_enrolment", {
+      method: "POST", body: JSON.stringify({ p_organisation_id: context.organisation.id, p_actor_user_id: context.user.id,
+        p_application_id: applicationId, p_expected_revision: input.expectedApplicationRevision, p_idempotency_key: idempotencyKey, p_input: fields }),
+    });
+    if (!row.id) throw new Error("No persisted learner returned");
+    return learnerRecordFromRow(row);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (message.startsWith("PT409") || message.startsWith("23505")) throw new LevyTateLearnerLifecycleConflictError("The application changed or its learner already exists. Refresh and open the existing record.");
+    if (message.startsWith("PT403")) throw new LevyTateLearnerLifecyclePermissionError("A final-approved matching application and authorised employer account are required.");
+    if (message.startsWith("PT422")) throw new LevyTateLearnerLifecycleValidationError("Check the approved application, selected programme/provider and planned dates.");
+    throw new LevyTateLearnerLifecycleError("Pre-enrolment could not be confirmed. Retry the same action; no partial handoff is committed.");
   }
 }
+
 
 export async function updateLearnerLifecycleStatus(
   session: LevyTateBetaSession,
@@ -733,7 +884,7 @@ export async function updatePreEnrolmentChecks(
   return next;
 }
 
-export async function addLearnerReview(session: LevyTateBetaSession, learnerRecordId: string, input: LearnerReviewInput): Promise<LearnerActivityMutationResult<LearnerReview>> {
+async function addLearnerReviewPlan(session: LevyTateBetaSession, learnerRecordId: string, input: LearnerReviewInput): Promise<LearnerActivityMutationResult<LearnerReview>> {
   const context = await contextForSession(session);
   assertPermission(context, "learnerLifecycle:write");
   const learnerRecord = await getScopedLearnerRecord(context, learnerRecordId, "write");
@@ -743,7 +894,7 @@ export async function addLearnerReview(session: LevyTateBetaSession, learnerReco
   }
   const id = activityRecordId("learner-review", learnerRecordId, input.idempotencyKey);
   const existing = await selectOne<LearnerReviewRow>(reviewsTable, new URLSearchParams({ select: "*", organisation_id: `eq.${context.organisation.id}`, id: `eq.${id}`, limit: "1" }));
-  if (existing) return { record: reviewFromRow(existing), learner: await getOrganisationLearnerLifecycleRecordDetail(session, learnerRecordId), created: false };
+  if (existing) throw new LevyTateLearnerLifecycleConflictError("This review ID already exists without a matching command receipt.");
 
   const collections = await loadLearnerLifecycleCollectionsForRecord(session, learnerRecordId);
   latestActivityVersionRequired(collections, learnerRecord, input.expectedActivityVersion);
@@ -795,14 +946,14 @@ export async function addLearnerReview(session: LevyTateBetaSession, learnerReco
   return { record: next, learner: await getOrganisationLearnerLifecycleRecordDetail(session, learnerRecordId), created: true };
 }
 
-export async function addProgressUpdate(session: LevyTateBetaSession, learnerRecordId: string, input: ProgressUpdateInput): Promise<LearnerActivityMutationResult<LearnerProgressUpdate>> {
+async function addProgressUpdatePlan(session: LevyTateBetaSession, learnerRecordId: string, input: ProgressUpdateInput): Promise<LearnerActivityMutationResult<LearnerProgressUpdate>> {
   const context = await contextForSession(session);
   assertPermission(context, "learnerLifecycle:write");
   const learnerRecord = await getScopedLearnerRecord(context, learnerRecordId, "write");
   assertProgressEligible(learnerRecord.lifecycleStatus);
   const id = activityRecordId("learner-progress", learnerRecordId, input.idempotencyKey);
   const existing = await selectOne<LearnerProgressUpdateRow>(progressTable, new URLSearchParams({ select: "*", organisation_id: `eq.${context.organisation.id}`, id: `eq.${id}`, limit: "1" }));
-  if (existing) return { record: progressUpdateFromRow(existing), learner: await getOrganisationLearnerLifecycleRecordDetail(session, learnerRecordId), created: false };
+  if (existing) throw new LevyTateLearnerLifecycleConflictError("This progress ID already exists without a matching command receipt.");
 
   const collections = await loadLearnerLifecycleCollectionsForRecord(session, learnerRecordId);
   latestActivityVersionRequired(collections, learnerRecord, input.expectedActivityVersion);
@@ -838,7 +989,7 @@ export async function addProgressUpdate(session: LevyTateBetaSession, learnerRec
   return { record: next, learner: await getOrganisationLearnerLifecycleRecordDetail(session, learnerRecordId), created: true };
 }
 
-export async function startBreakInLearning(session: LevyTateBetaSession, learnerRecordId: string, input: StartBreakInLearningInput): Promise<LearnerBreakMutationResult> {
+async function startBreakInLearningPlan(session: LevyTateBetaSession, learnerRecordId: string, input: StartBreakInLearningInput): Promise<LearnerBreakMutationResult> {
   const context = await contextForSession(session);
   assertPermission(context, "learnerLifecycle:status");
   const learner = await getScopedLearnerRecord(context, learnerRecordId, "write");
@@ -869,7 +1020,7 @@ export async function startBreakInLearning(session: LevyTateBetaSession, learner
   return { record: next, learner: await getOrganisationLearnerLifecycleRecordDetail(session, learnerRecordId), created: true };
 }
 
-export async function updateBreakInLearning(session: LevyTateBetaSession, learnerRecordId: string, breakId: string, input: UpdateBreakInLearningInput): Promise<LearnerBreakMutationResult> {
+async function updateBreakInLearningPlan(session: LevyTateBetaSession, learnerRecordId: string, breakId: string, input: UpdateBreakInLearningInput): Promise<LearnerBreakMutationResult> {
   const context = await contextForSession(session);
   assertPermission(context, "learnerLifecycle:status");
   const learner = await getScopedLearnerRecord(context, learnerRecordId, "write");
@@ -910,7 +1061,7 @@ export async function updateBreakInLearning(session: LevyTateBetaSession, learne
   return { record: next, learner: await getOrganisationLearnerLifecycleRecordDetail(session, learnerRecordId), created: false };
 }
 
-export async function returnFromBreak(session: LevyTateBetaSession, learnerRecordId: string, breakId: string, input: ReturnFromBreakInput): Promise<LearnerBreakMutationResult> {
+async function returnFromBreakPlan(session: LevyTateBetaSession, learnerRecordId: string, breakId: string, input: ReturnFromBreakInput): Promise<LearnerBreakMutationResult> {
   const context = await contextForSession(session);
   assertPermission(context, "learnerLifecycle:status");
   const learner = await getScopedLearnerRecord(context, learnerRecordId, "write");
@@ -930,7 +1081,7 @@ export async function returnFromBreak(session: LevyTateBetaSession, learnerRecor
   return { record: next, learner: await getOrganisationLearnerLifecycleRecordDetail(session, learnerRecordId), created: true };
 }
 
-export async function cancelBreakInLearning(session: LevyTateBetaSession, learnerRecordId: string, breakId: string, input: CancelBreakInput): Promise<LearnerBreakMutationResult> {
+async function cancelBreakInLearningPlan(session: LevyTateBetaSession, learnerRecordId: string, breakId: string, input: CancelBreakInput): Promise<LearnerBreakMutationResult> {
   const context = await contextForSession(session);
   assertPermission(context, "learnerLifecycle:status");
   const learner = await getScopedLearnerRecord(context, learnerRecordId, "write");
@@ -980,7 +1131,7 @@ export async function recordWithdrawal(
   return next;
 }
 
-export async function updateAssessmentReadinessDetails(
+async function updateAssessmentReadinessDetailsPlan(
   session: LevyTateBetaSession,
   learnerRecordId: string,
   input: AssessmentReadinessUpdateInput,
@@ -999,7 +1150,7 @@ export async function updateAssessmentReadinessDetails(
   return getOrganisationLearnerLifecycleRecordDetail(session, learnerRecordId);
 }
 
-export async function moveLearnerToAssessmentPreparation(
+async function moveLearnerToAssessmentPreparationPlan(
   session: LevyTateBetaSession,
   learnerRecordId: string,
   input: AssessmentTransitionInput,
@@ -1028,7 +1179,7 @@ export async function moveLearnerToAssessmentPreparation(
   return { learner: await getOrganisationLearnerLifecycleRecordDetail(session, learnerRecordId), created: true };
 }
 
-export async function confirmLearnerAssessmentReadiness(
+async function confirmLearnerAssessmentReadinessPlan(
   session: LevyTateBetaSession,
   learnerRecordId: string,
   input: ConfirmAssessmentReadinessInput,
@@ -1069,7 +1220,7 @@ export async function confirmLearnerAssessmentReadiness(
   return { learner: await getOrganisationLearnerLifecycleRecordDetail(session, learnerRecordId), created: true };
 }
 
-export async function startLearnerAssessment(
+async function startLearnerAssessmentPlan(
   session: LevyTateBetaSession,
   learnerRecordId: string,
   input: StartAssessmentInput,
@@ -1089,6 +1240,8 @@ export async function startLearnerAssessment(
   if (assessmentOrganisationRequired(current.assessmentModel) && !current.assessmentOrganisation) throw new LevyTateLearnerLifecycleValidationError("Record the assessment organisation before moving the learner into assessment.");
   const blockers = await criticalOperationalBlockers(context, learnerRecordId);
   if (blockers.length) throw new LevyTateLearnerLifecycleValidationError(`Assessment entry is blocked: ${blockers[0]}`);
+  const readiness = assessmentResultFor(learner, collections, current, blockers);
+  if (!readiness.readyForAssessment) throw new LevyTateLearnerLifecycleValidationError(readiness.blockingChecks[0]?.message ?? readiness.outstandingChecks[0]?.message ?? "Assessment readiness evidence is incomplete.");
   const timestamp = nowIso();
   const assessmentStartDate = cleanDate(input.assessmentStartDate, "assessment start date") || timestamp.slice(0, 10);
   const next: LearnerAssessmentReadiness = { ...current, assessmentStatus: "in_assessment", assessmentStartDate, updatedBy: context.user.email, updatedAt: timestamp, version: current.version + 1 };
@@ -1322,7 +1475,7 @@ function scopedCollections(collections: LearnerLifecycleCollections, learnerReco
   };
 }
 
-export async function updateLearnerPreEnrolmentProgress(
+async function updateLearnerPreEnrolmentProgressPlan(
   session: LevyTateBetaSession,
   learnerRecordId: string,
   input: PreEnrolmentUpdateInput,
@@ -1342,6 +1495,9 @@ export async function updateLearnerPreEnrolmentProgress(
   const actor = context.user.email;
 
   const recordPatch = buildLearnerRecordPatch(record, input, timestamp, actor);
+  if (recordPatch.next.programmeId !== record.programmeId || recordPatch.next.providerId !== record.providerId) {
+    await assertApprovedLearnerProgrammeSelection(context, recordPatch.next);
+  }
   if (recordPatch.changed) {
     await patchLearnerRecord(context, record, recordPatch.next);
     await emitRecordChangeEvents(context, record, recordPatch.next, input.programme?.changeReason);
@@ -1382,9 +1538,10 @@ export async function updateLearnerPreEnrolmentProgress(
   return getOrganisationLearnerLifecycleRecordDetail(session, learnerRecordId);
 }
 
-export async function markLearnerAsEnrolled(
+async function markLearnerAsEnrolledPlan(
   session: LevyTateBetaSession,
   learnerRecordId: string,
+  input: EnrolmentConfirmationInput,
 ): Promise<LearnerRecordDetail> {
   const context = await contextForSession(session);
   assertPermission(context, "learnerLifecycle:status");
@@ -1398,6 +1555,7 @@ export async function markLearnerAsEnrolled(
   }
 
   const collections = await loadLearnerLifecycleCollectionsForRecord(session, learnerRecordId);
+  latestActivityVersionRequired(collections, record, input?.expectedActivityVersion);
   const readiness = readinessFor(record, collections.eligibilityDeclarations[0] ?? null, collections.preEnrolmentChecks[0] ?? null);
   if (!readiness.readyForEnrolment) {
     const ineligible = readiness.blockingChecks.find((check) => check.id === "employer-eligibility-verification" && check.status === "Needs review");
@@ -1405,6 +1563,25 @@ export async function markLearnerAsEnrolled(
   }
 
   const timestamp = nowIso();
+  if (!input?.initialProgress) throw new LevyTateLearnerLifecycleValidationError("Record the initial progress evidence and first provider review plan.");
+  assertOperationalDate(input.initialProgress.updateDate, "Initial progress date");
+  assertDateAfter(input.initialProgress.updateDate, record.actualStartDate, "Initial progress date", "actual start date", true);
+  assertProgressPercentage(input.initialProgress.targetProgressPercentage, "Initial target progress");
+  assertProgressPercentage(input.initialProgress.actualProgressPercentage, "Initial actual progress");
+  const progressSummary = requiredText(input.initialProgress.summary, "Initial progress evidence summary");
+  const firstReviewDate = assertValidDate(input.firstReviewDate, "First provider review date");
+  assertDateAfter(firstReviewDate, record.actualStartDate, "First provider review date", "actual start date", true);
+  assertPlanningDate(firstReviewDate, "First provider review date");
+  const reviewerName = requiredText(input.firstReviewerName, "First provider reviewer name");
+  const initialProgress: LearnerProgressUpdate = { id: `${record.id}-initial-progress`, organisationId: context.organisation.id, learnerRecordId: record.id,
+    updateDate: input.initialProgress.updateDate, targetProgressPercentage: input.initialProgress.targetProgressPercentage, actualProgressPercentage: input.initialProgress.actualProgressPercentage,
+    variancePercentage: calculateLearnerProgressVariance(input.initialProgress.targetProgressPercentage, input.initialProgress.actualProgressPercentage), progressSource: "manual_l_and_d_update",
+    sourceReference: "Enrolment evidence", updatedBy: context.user.email, summary: progressSummary, supportAction: "", createdAt: timestamp };
+  const firstReview: LearnerReview = { id: `${record.id}-first-provider-review`, organisationId: context.organisation.id, learnerRecordId: record.id,
+    reviewType: "provider_review", reviewDate: firstReviewDate, nextReviewDate: "", reviewerName, reviewerUserId: context.user.id, providerId: record.providerId,
+    summary: "First provider review scheduled at enrolment; no completed review is implied.", actions: [], supportRequired: "", status: "scheduled", createdAt: timestamp, updatedAt: timestamp };
+  await supabaseInsert(assertSupabase(), progressTable, [progressUpdateToRow(initialProgress)]);
+  await supabaseInsert(assertSupabase(), reviewsTable, [reviewToRow(firstReview)]);
   const next: LearnerRecord = {
     ...record,
     lifecycleStatus: "enrolled",
@@ -1446,7 +1623,7 @@ function assessmentResultFor(
     providerId: record.providerId,
     readiness,
     latestProgress: latestLearnerProgressFromCollections(collections.progressUpdates, record.id),
-    latestProviderReview: latestProviderReviewFromCollections(collections.learnerReviews, record.id),
+    latestProviderReview: latestProviderReviewFromCollections(collections.learnerReviews.filter((review) => review.status === "completed" || review.status === "action_required"), record.id),
     criticalOperationalBlockers,
   });
 }
@@ -1641,6 +1818,8 @@ async function criticalOperationalBlockers(context: LifecycleContext, learnerRec
 }
 
 async function synchroniseLearnerOperationalActions(session: LevyTateBetaSession, learnerRecordId: string) {
+  const plan = learnerWritePlan.getStore();
+  if (plan) { plan.synchronise = true; return; }
   const { resolveActionsForLearnerConditionChange } = await import("@/lib/server/levytate-operational-actions");
   await resolveActionsForLearnerConditionChange(session, learnerRecordId);
 }
@@ -1838,6 +2017,26 @@ async function assertProviderInOrganisation(context: LifecycleContext, providerI
   if (!legacyProvider && !selectedProvider) throw new LevyTateLearnerLifecycleValidationError("The selected provider is not available in this organisation.");
 }
 
+async function assertApprovedLearnerProgrammeSelection(context: LifecycleContext, record: LearnerRecord) {
+  const [application, selection, catalogue] = await Promise.all([
+    selectOne<ApplicationViewRow>("levytate_applications", new URLSearchParams({ select: "id,employee_id,apprenticeship_standard_id", organisation_id: `eq.${context.organisation.id}`, id: `eq.${record.applicationId}`, status: "eq.Approved for Enrolment", current_owner: "eq.Provider Partner", limit: "1" })),
+    selectOne<{ programme_id: string }>(organisationProgrammesTable, new URLSearchParams({ select: "programme_id", organisation_id: `eq.${context.organisation.id}`, programme_id: `eq.${record.programmeId}`, provider_id: `eq.${record.providerId}`, status: "eq.Active", limit: "1" })),
+    selectOne<{ id: string }>("levytate_organisations", new URLSearchParams({ select: "id", slug: "eq.levytate-internal", limit: "1" })),
+  ]);
+  if (!application || application.employee_id !== record.employeeId || !selection || !catalogue) {
+    throw new LevyTateLearnerLifecycleValidationError("Programme changes must retain the employee's final-approved application and an active employer selection.");
+  }
+  const [programme, provider, employerProvider] = await Promise.all([
+    selectOne<ProviderProgrammeViewRow>("levytate_provider_programmes", new URLSearchParams({ select: "id,provider_id,programme_name,apprenticeship_standard_id,linked_standard_id,linked_standard_ids,linked_standard_name", organisation_id: `eq.${catalogue.id}`, id: `eq.${record.programmeId}`, provider_id: `eq.${record.providerId}`, status: "eq.Active", record_status: "eq.Active", verification_status: "in.(Verified from provider website,Provider confirmed,LevyTate reviewed)", limit: "1" })),
+    selectOne<{ provider_id: string }>("levytate_providers", new URLSearchParams({ select: "provider_id", organisation_id: `eq.${catalogue.id}`, provider_id: `eq.${record.providerId}`, status: "eq.Active", verification_status: "eq.verified", limit: "1" })),
+    selectOne<{ provider_id: string }>(organisationProvidersTable, new URLSearchParams({ select: "provider_id", organisation_id: `eq.${context.organisation.id}`, provider_id: `eq.${record.providerId}`, status: "eq.Active", limit: "1" })),
+  ]);
+  const standardIds = Array.isArray(programme?.linked_standard_ids) ? programme.linked_standard_ids : [];
+  if (!programme || !provider || !employerProvider || (programme.linked_standard_id !== application.apprenticeship_standard_id && !standardIds.includes(application.apprenticeship_standard_id))) {
+    throw new LevyTateLearnerLifecycleValidationError("The active, verified programme and provider must match the approved apprenticeship standard.");
+  }
+}
+
 function reviewEventType(reviewType: LearnerReviewType): LearnerLifecycleEventType {
   if (reviewType === "provider_review") return "provider_review_recorded";
   if (reviewType === "l_and_d_check_in") return "l_and_d_check_in_recorded";
@@ -1861,7 +2060,9 @@ function buildLearnerRecordPatch(
   if (programme) {
     if (programme.programmeId !== undefined) next.programmeId = cleanText(programme.programmeId);
     if (programme.providerId !== undefined) next.providerId = cleanText(programme.providerId);
-    if (programme.applicationId !== undefined) next.applicationId = cleanText(programme.applicationId);
+    if (programme.applicationId !== undefined && cleanText(programme.applicationId) !== record.applicationId) {
+      throw new LevyTateLearnerLifecycleValidationError("The final-approved application link cannot be changed.");
+    }
     if (programme.expectedStartDate !== undefined) next.expectedStartDate = cleanDate(programme.expectedStartDate, "expected start date");
     if (programme.actualStartDate !== undefined) next.actualStartDate = cleanDate(programme.actualStartDate, "actual start date");
     if (programme.expectedEndDate !== undefined) next.expectedEndDate = cleanDate(programme.expectedEndDate, "expected end date");
@@ -2293,6 +2494,7 @@ async function contextForSession(session: LevyTateBetaSession): Promise<Lifecycl
   const user = await selectOne<UserRow>(usersTable, new URLSearchParams({
     select: "id,organisation_id,email,role",
     email: `eq.${email}`,
+    active: "eq.true",
     limit: "1",
   }));
 
@@ -2303,6 +2505,7 @@ async function contextForSession(session: LevyTateBetaSession): Promise<Lifecycl
   const organisation = await selectOne<OrganisationRow>(organisationsTable, new URLSearchParams({
     select: "id,name",
     id: `eq.${user.organisation_id}`,
+    status: "eq.Active",
     limit: "1",
   }));
 
@@ -2356,18 +2559,6 @@ async function assertCanAccessEmployee(context: LifecycleContext, employeeId: st
   throw new LevyTateLearnerLifecyclePermissionError("You cannot access that learner lifecycle record.");
 }
 
-async function assertNoDuplicateActiveLearnerRecord(organisationId: string, employeeId: string, applicationId: string) {
-  const rows = await selectMany<LearnerRecordRow>(
-    learnerRecordsTable,
-    organisationId,
-    `employee_id=eq.${employeeId}&record_status=eq.Active`,
-    "updated_at.desc",
-  );
-  const duplicate = rows.find((record) => record.application_id === applicationId || !["achieved", "withdrawn", "completed_without_achievement"].includes(record.lifecycle_status));
-  if (duplicate) {
-    throw new LevyTateLearnerLifecycleError("This employee already has an active learner lifecycle record for an apprenticeship journey.");
-  }
-}
 
 async function recordLifecycleEvent(
   context: LifecycleContext,
@@ -2414,12 +2605,12 @@ async function selectMany<T>(table: string, organisationId: string, extraQuery: 
   const query = new URLSearchParams({
     select: "*",
     organisation_id: `eq.${organisationId}`,
-    order,
+    order: `${order},${table === "levytate_providers" ? "provider_id" : "id"}.asc`,
   });
   if (extraQuery) {
     for (const pair of new URLSearchParams(extraQuery)) query.set(pair[0], pair[1]);
   }
-  return supabaseSelect<T>(assertSupabase(), table, query);
+  return supabaseSelectAll<T>(assertSupabase(), table, query);
 }
 
 function organisationQuery(organisationId: string, extra: Record<string, string>) {

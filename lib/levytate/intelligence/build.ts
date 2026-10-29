@@ -34,7 +34,12 @@ export function buildEmployerIntelligence(input: {
 
   const decisions = distinctById(data.applications.filter((application) => decisionOwners.has(application.currentOwner) && !closedApplicationStates.has(application.status)));
   const activeLearners = distinctById(data.learnerRecords.filter((record) => record.recordStatus === "Active" && activeLearnerStates.has(record.lifecycleStatus)));
-  const upcomingEnrolments = distinctById(data.enrolments.filter((enrolment) => upcomingEnrolmentStates.has(enrolment.status)));
+  const progressedApplications = new Set(data.learnerRecords.filter((record) => record.lifecycleStatus !== "pre_enrolment").map((record) => record.applicationId));
+  const upcomingEnrolments = [...new Map([
+    ...data.applications.filter((application) => application.status === "Approved for Enrolment" && !progressedApplications.has(application.id)).map((application) => ({ id: application.id, updatedAt: application.updatedAt })),
+    ...data.learnerRecords.filter((record) => record.recordStatus === "Active" && record.lifecycleStatus === "pre_enrolment").map((record) => ({ id: record.applicationId || record.id, updatedAt: record.updatedAt })),
+    ...data.enrolments.filter((enrolment) => upcomingEnrolmentStates.has(enrolment.status) && !progressedApplications.has(enrolment.applicationId)).map((enrolment) => ({ id: enrolment.applicationId || enrolment.id, updatedAt: enrolment.updatedAt })),
+  ].map((record) => [record.id, record])).values()];
   const assessmentReports = input.assessments.ok ? buildWorkforceReports(input.assessments.value) : [];
   const latestAssessment = assessmentReports[0] ?? null;
   const priorities = buildPriorities(input.workspace.value, input.operations);

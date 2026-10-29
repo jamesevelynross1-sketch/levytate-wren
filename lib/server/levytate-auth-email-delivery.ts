@@ -59,8 +59,7 @@ export function recipientDeliveryHash(email: string) {
     .digest("hex");
 }
 
-export async function recordAuthenticationEmailRequest(email: string) {
-  const requestReference = randomUUID();
+export async function recordAuthenticationEmailRequest(email: string, requestReference: string = randomUUID()) {
   const occurredAt = new Date().toISOString();
   await persistDeliveryEvent({
     environment_namespace: getLevyTateRateLimitEnvironment(),
@@ -115,7 +114,7 @@ export async function shouldSuppressAuthenticationEmail(email: string) {
     return rows.length > 0;
   } catch {
     console.error("LevyTate authentication delivery suppression check unavailable", { outcome: "suppression_check_failed" });
-    return false;
+    throw new AuthenticationEmailDeliveryError("storage_unavailable", "Delivery controls are temporarily unavailable.");
   }
 }
 

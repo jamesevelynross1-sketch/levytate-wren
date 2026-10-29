@@ -1,3 +1,4 @@
+import { readAuthenticatedJson } from "@/lib/server/levytate-request-boundary";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
@@ -39,7 +40,7 @@ export async function POST(
 
   try {
     const { learnerRecordId } = await params;
-    const input = await request.json() as ProgressUpdateInput;
+    const input = await readAuthenticatedJson(request, session.email) as ProgressUpdateInput;
     const result = await addProgressUpdate(session, learnerRecordId, input);
     return NextResponse.json({ ok: true, source: "supabase", message: result.created ? "Progress update recorded." : "Progress update already recorded.", ...result });
   } catch (error) {

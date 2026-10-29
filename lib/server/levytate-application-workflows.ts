@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { applyApplicationCommand } from "@/lib/server/levytate-application-commands";
 import type { LevyTateBetaSession } from "@/lib/levytate/config/beta-access";
 import {
   assertValidApplicationWorkflowSteps,
@@ -100,23 +101,29 @@ export async function attachApplicationWorkflowContexts(organisationId: string, 
   });
 }
 
-export async function startApplicationWorkflow(session: LevyTateBetaSession, applicationId: string, idempotencyKey: string) {
+export async function startApplicationWorkflow(session: LevyTateBetaSession, applicationId: string, idempotencyKey: string, expectedRevision?: number) {
   assertTransitionIdentifiers(applicationId, idempotencyKey);
   const context = await participantContext(session);
-  const rows = await supabaseFetchJson<InstanceRow[]>(requiredConfig(), "rpc/levytate_start_application_workflow", { method: "POST", body: JSON.stringify({ p_organisation_id: context.organisation.id, p_application_id: applicationId, p_actor_user_id: context.user.id, p_idempotency_key: idempotencyKey }) });
-  if (!rows[0]) throw new ApplicationWorkflowServiceError("Application workflow could not be started.", 409);
-  return rows[0];
+  const result = await applyApplicationCommand<{ instance: InstanceRow | null }>(context.organisation.id, context.user.id, {
+    applicationId, action: "submit", expectedRevision: expectedRevision as number, idempotencyKey,
+  });
+  if (!result.instance) throw new ApplicationWorkflowServiceError("Application workflow could not be started.", 409);
+  return result.instance;
 }
 
-export async function transitionApplicationWorkflowForSession(session: LevyTateBetaSession, input: { applicationId: string; action: string; note?: string; idempotencyKey: string; expectedLockVersion: number }) {
+export async function transitionApplicationWorkflowForSession(session: LevyTateBetaSession, input: { applicationId: string; action: string; note?: string; idempotencyKey: string; expectedLockVersion: number; expectedRevision?: number }) {
   assertTransitionIdentifiers(input.applicationId, input.idempotencyKey);
   if (!new Set(["submit", "approve", "continue", "request_information", "resubmit", "decline"]).has(input.action)) throw new ApplicationWorkflowServiceError("Unsupported workflow transition.", 400);
   if (!Number.isInteger(input.expectedLockVersion) || input.expectedLockVersion < 0) throw new ApplicationWorkflowServiceError("A valid workflow version is required.", 400);
   if ((input.note ?? "").length > 2000) throw new ApplicationWorkflowServiceError("Decision notes must be 2,000 characters or fewer.", 400);
   const context = await participantContext(session);
-  const rows = await supabaseFetchJson<InstanceRow[]>(requiredConfig(), "rpc/levytate_transition_application_workflow", { method: "POST", body: JSON.stringify({ p_organisation_id: context.organisation.id, p_application_id: input.applicationId, p_actor_user_id: context.user.id, p_action: input.action, p_note: input.note ?? "", p_idempotency_key: input.idempotencyKey, p_expected_lock_version: input.expectedLockVersion }) });
-  if (!rows[0]) throw new ApplicationWorkflowServiceError("Application workflow transition failed.", 409);
-  return rows[0];
+  const result = await applyApplicationCommand<{ instance: InstanceRow | null }>(context.organisation.id, context.user.id, {
+    applicationId: input.applicationId, action: input.action as "submit" | "approve" | "continue" | "request_information" | "resubmit" | "decline",
+    expectedRevision: input.expectedRevision as number, idempotencyKey: input.idempotencyKey,
+    fields: { note: input.note ?? "", expectedLockVersion: input.expectedLockVersion },
+  });
+  if (!result.instance) throw new ApplicationWorkflowServiceError("Application workflow transition failed.", 409);
+  return result.instance;
 }
 
 export async function getApplicationWorkflowAdminState(session: LevyTateBetaSession) {

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
 import type { LearningTimeActivityInput } from "@/lib/levytate/off-the-job/api";
 import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
-import { BoundedJsonBodyError, readBoundedJson } from "@/lib/server/bounded-json";
+import { ClientRequestError, readAuthenticatedJson } from "@/lib/server/levytate-request-boundary";
 import {
   addLearningTimePriority,
   createLearningTimePlanDraft,
@@ -51,9 +51,9 @@ type LearningTimeAction = {
 };
 
 export async function GET() {
-  const session = await authorisedSession();
-  if (!session) return reply({ message: "Unauthorised." }, 401);
   try {
+    const session = await authorisedSession();
+    if (!session) return reply({ message: "Unauthorised." }, 401);
     return reply(await getLearningTimeWorkspace(session));
   } catch (error) {
     return failure(error);
@@ -61,12 +61,11 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const session = await authorisedSession();
-  if (!session) return reply({ message: "Unauthorised." }, 401);
-  if (request.headers.get("origin") !== new URL(request.url).origin) return reply({ message: "Forbidden." }, 403);
   try {
-    const body = await readBoundedJson(request, 48 * 1024) as LearningTimeAction;
-    if (body.action === "save_activity" && body.activity) return reply(await saveLearningTimeActivity(session, body.activity), 201);
+    const session = await authorisedSession();
+    if (!session) return reply({ message: "Unauthorised." }, 401);
+    const body = await readAuthenticatedJson(request, session.email, 48 * 1024) as LearningTimeAction;
+    if (body.action === "save_activity" && body.activity) return reply(await saveLearningTimeActivity(session, { ...body.activity, idempotencyKey: body.idempotencyKey }), 201);
     if (body.action === "submit_activity" && body.activityId && isNumber(body.lockVersion) && body.idempotencyKey) {
       return reply({ activity: await submitLearningTimeActivity(session, { activityId: body.activityId, lockVersion: body.lockVersion, idempotencyKey: body.idempotencyKey }) });
     }
@@ -83,6 +82,7 @@ export async function POST(request: Request) {
     }
     if (body.action === "create_plan_draft" && body.learnerRecordId && body.originalStartDate && body.practicalStartDate && body.practicalEndDate && body.standardId && body.standardVersion && isNumber(body.priorLearningReductionMinutes) && isNumber(body.individualMinimumMinutes) && isNumber(body.plannedDeliveryMinutes) && body.providerId && body.trainingPlanReference && body.sourceDate) {
       return reply({ version: await createLearningTimePlanDraft(session, {
+        idempotencyKey: body.idempotencyKey ?? "",
         learnerRecordId: body.learnerRecordId, originalStartDate: body.originalStartDate,
         practicalStartDate: body.practicalStartDate, practicalEndDate: body.practicalEndDate,
         standardId: body.standardId, standardVersion: body.standardVersion,
@@ -93,9 +93,10 @@ export async function POST(request: Request) {
         sourceDate: body.sourceDate, inactivityAttentionDays: body.inactivityAttentionDays, notes: body.note,
       }) }, 201);
     }
-    if (body.action === "publish_plan" && body.versionId) return reply({ version: await publishLearningTimePlan(session, { versionId: body.versionId }) });
+    if (body.action === "publish_plan" && body.versionId) return reply({ version: await publishLearningTimePlan(session, { versionId: body.versionId, idempotencyKey: body.idempotencyKey ?? "" }) });
     if (body.action === "add_priority" && body.learnerRecordId && body.planVersionId && body.label && body.sourceReference) {
       return reply({ priority: await addLearningTimePriority(session, {
+        idempotencyKey: body.idempotencyKey ?? "",
         learnerRecordId: body.learnerRecordId, planVersionId: body.planVersionId, label: body.label,
         description: body.description ?? "", ksbReferences: body.ksbReferences,
         sourceType: body.sourceType ?? "provider_training_plan", sourceReference: body.sourceReference,
@@ -104,7 +105,7 @@ export async function POST(request: Request) {
     }
     return reply({ message: "Unsupported Learning Time action." }, 400);
   } catch (error) {
-    if (error instanceof BoundedJsonBodyError) return reply({ message: error.tooLarge ? "The Learning Time action is too large." : "A valid Learning Time action is required." }, error.tooLarge ? 413 : 400);
+    if (error instanceof ClientRequestError) return reply({ message: error.message }, error.status);
     return failure(error);
   }
 }
@@ -115,8 +116,7 @@ async function authorisedSession() {
 }
 
 function failure(error: unknown) {
-  const status = error instanceof LevyTateLearningTimeError ? error.status : 500;
-  if (!(error instanceof LevyTateLearningTimeError)) console.error("Learning Time route failed", error instanceof Error ? error.name : "unknown");
+  const status = error instanceof LevyTateLearningTimeError ? error.status : 503;
   return reply({ message: error instanceof LevyTateLearningTimeError ? error.message : "Learning Time is temporarily unavailable." }, status);
 }
 

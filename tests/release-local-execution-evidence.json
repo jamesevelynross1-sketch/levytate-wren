@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "environment": "local-only",
+  "hostedAcceptance": "not performed",
+  "realClientReleaseApproval": "not granted",
+  "runtime": {"postgresql": "17.11", "auth": "GoTrue 2.197.0", "supabaseCli": "2.122.0", "email": "signed test hook to loopback SMTP capture only"},
+  "runs": [
+    {"name": "Fresh full-chain genuine authentication and connected learner journey", "pass": 168, "fail": 0, "blocked": 1, "evidence": "/private/tmp/levytate-release-runtime.ttcCFL/browser-evidence-1793311701332.json"},
+    {"name": "Separate-role Lift API journey and aggregate export", "pass": 149, "fail": 0, "blocked": 1, "evidence": "/private/tmp/levytate-release-runtime.ttcCFL/browser-evidence-1793311895820.json"},
+    {"name": "Independent Lift PostgreSQL integrity", "pass": 26, "fail": 0, "migrationSha256": "93d009f901e84ef588a5cc85e532a0115654b8502384a20dd2605615560fcd15", "database": "levytate_release_combined17c"},
+    {"name": "Independent Learning Time PostgreSQL integrity after ownership fix", "pass": 35, "fail": 0, "migrationSha256": "f8c1b4af652784f12f8d4222b1cd020b04c8cf42059237a81d858918b36a0197", "database": "levytate_release_combined17d"}
+  ],
+  "retainedFailures": [
+    {"name": "Learning Time receipt replay after membership email reassignment", "pass": 34, "fail": 1, "migrationSha256": "c3bb9cbd374e9407d5ff4555e6ec3889b680f7f7c746e412342b16d3d2ba6d8e", "database": "levytate_release_combined17c", "resolution": "Current-ownership guard passed on fresh corrected candidate"},
+    {"name": "People real UI save committed Employee but failed audit", "pass": 21, "fail": 1, "durableState": "one synthetic Employee, zero corresponding audit rows", "resolution": "Atomic workspace command candidate awaits independent verification"},
+    {"name": "Concurrent readiness fault injection interrupted login", "classification": "harness interference, not product defect", "resolution": "Exclusive local acceptance lock added; repeated sequentially"},
+    {"name": "Manager private Lift data was correctly hidden as 404", "classification": "test expected 403 only", "resolution": "Accept 403 or non-disclosing 404, with additional unchanged-database assertion"},
+    {"name": "Local migration command syntax prevented apply before test", "classification": "harness invocation error; missing RPC, no migration executed", "resolution": "Corrected command applied exact reviewed hash once; 35 checks passed"}
+  ],
+  "limitations": [
+    "Local capture is not proof of external inbox delivery.",
+    "Lift one-participant suppression is verified; minimum-cohort full findings and operational proof acceptance are not claimed.",
+    "Learning Time real-browser connected journey remains to be run; database tests are separate evidence.",
+    "No real customer records, Production change, hosted migration, or paid infrastructure was used."
+  ]
+}

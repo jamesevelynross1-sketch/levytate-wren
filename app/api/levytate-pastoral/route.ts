@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
 import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
-import { BoundedJsonBodyError, readBoundedJson } from "@/lib/server/bounded-json";
+import { ClientRequestError, readAuthenticatedJson } from "@/lib/server/levytate-request-boundary";
 import {
   applyPastoralMutationForSession,
   getPastoralWorkspaceForSession,
@@ -22,12 +22,11 @@ export async function GET() {
 export async function POST(request: Request) {
   const session = await authorisedSession();
   if (!session) return reply({ message: "Unauthorised." }, 401);
-  if (request.headers.get("origin") !== new URL(request.url).origin) return reply({ message: "Forbidden." }, 403);
   try {
-    const action = await readBoundedJson(request, 20 * 1024);
+    const action = await readAuthenticatedJson(request, session.email, 20 * 1024);
     return reply({ ok: true, workspace: await applyPastoralMutationForSession(session, action) });
   } catch (error) {
-    if (error instanceof BoundedJsonBodyError) return reply({ message: error.tooLarge ? "The My Support action is too large." : "A valid My Support action is required." }, error.tooLarge ? 413 : 400);
+    if (error instanceof ClientRequestError) return reply({ message: error.message }, error.status);
     return failure(error);
   }
 }

@@ -8,6 +8,7 @@ import {
   synchroniseOrganisationOperationalActions,
 } from "@/lib/server/levytate-operational-actions";
 import { logLevyTateServerError, operationalActionsRefreshError } from "@/lib/server/levytate-safe-api-error";
+import { assertAuthenticatedWrite, ClientRequestError } from "@/lib/server/levytate-request-boundary";
 
 async function sessionFromCookie() {
   const cookieStore = await cookies();
@@ -29,10 +30,11 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST() {
+export async function POST(request: Request) {
   const session = await sessionFromCookie();
   if (!session) return NextResponse.json({ message: "Unauthorised." }, { status: 401 });
   try {
+    await assertAuthenticatedWrite(request, session.email);
     const result = await synchroniseOrganisationOperationalActions(session);
     return NextResponse.json({ ok: true, result });
   } catch (error) {
@@ -41,6 +43,7 @@ export async function POST() {
 }
 
 function actionErrorResponse(error: unknown) {
+  if (error instanceof ClientRequestError) return NextResponse.json({ message: error.message }, { status: error.status });
   const status = error instanceof LevyTateLearnerLifecyclePermissionError ? 403 : 500;
   if (status === 500) {
     logLevyTateServerError("operational-actions", error);

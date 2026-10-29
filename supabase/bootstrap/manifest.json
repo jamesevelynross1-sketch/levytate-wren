@@ -1,0 +1,88 @@
+{
+  "formatVersion": 1,
+  "purpose": "LG-01A fresh Supabase project bootstrap",
+  "postgresMajorVersion": 17,
+  "anchor": {
+    "version": "20261027174133",
+    "name": "006_create_levytate_production_foundation",
+    "path": "supabase/migrations/006_create_levytate_production_foundation.sql",
+    "sha256": "876321865fd5efd9473c8863078c1d3cd2173927b737555c36266039fea16f35",
+    "isolatedLedgerStatementCount": 1,
+    "isolatedLedgerStatementsSha256": "876321865fd5efd9473c8863078c1d3cd2173927b737555c36266039fea16f35"
+  },
+  "convergence": {
+    "version": "20261027190000",
+    "name": "levytate_fresh_project_convergence",
+    "sha256": "3bd6b681196ff865f50976129981b48601314d2bab2421794648fba51aefb204",
+    "sources": [
+      { "path": "supabase/migrations/009_bootstrap_current_schema.sql", "sha256": "43c7f7668c39693b62ebc7ba8ea4bda519f13047dc250c2722af8b4b93d6ff0c" },
+      { "path": "supabase/migrations/011_create_guidance_source_registry.sql", "sha256": "a8b344539accc5047482b7c686721c238a55a68c813ed0d31194302a7ef85de2" },
+      { "path": "supabase/migrations/012_create_learner_lifecycle_foundation.sql", "sha256": "7c28a76d367f27553c4f17b8a91a47e5b72b0a3f3cdf226a65d964184d5ee17a" },
+      { "path": "supabase/migrations/013_create_persistent_operational_actions.sql", "sha256": "85a4343bf8f48b3a4aefca88a1fc9c0370295258b1a58eaf16457a72430a1088" },
+      { "path": "supabase/migrations/014_extend_operational_action_types_for_assessment.sql", "sha256": "2fcfff844c319c4484dece5378a299b8682200a2e8d4871217f4bdfb116e7f0c" },
+      { "path": "supabase/migrations/015_create_assessment_readiness_management.sql", "sha256": "e1cd8fcc8133841df67f9529a58de6ac8c059840e6aa2e85e9e97b9baa0e78ce" },
+      { "path": "supabase/migrations/016_add_application_review_operational_action.sql", "sha256": "a329dba56d724b77006b2508853a00ed21b6ad3fb1f1904dee0fe5b32b31aa63" },
+      { "path": "supabase/migrations/017_create_prospect_sandbox_foundation.sql", "sha256": "dad0acea9e4e56b8b072aef452bbb47464cfcdfaf82da949f54d06e4ccc8d4b6" },
+      { "path": "supabase/migrations/018_create_prospect_access_lifecycle.sql", "sha256": "fba57fb7c750895595b1ac25f47a76274d749919612f3ffffa4af91d33c6b716" },
+      { "path": "supabase/migrations/020_create_secure_employer_authentication_foundation.sql", "sha256": "6b231b4862aee3ea86eb8f4040aad5d23fc5cf9ccfc206fb6dd649a0b1ce2cdc" },
+      { "path": "supabase/migrations/021_create_distributed_auth_rate_limits.sql", "sha256": "2f4e239905c367ec0a291937d01ee62d99417b63e59199159e212bdd3b41f717" },
+      { "path": "supabase/migrations/022_create_auth_email_delivery_events.sql", "sha256": "ff6cefea05f09bfe3ba8baed877ff2f133841f777b985c88f21e62e359b00546" },
+      { "path": "supabase/migrations/023_create_early_access_terms_acceptances.sql", "sha256": "40233cb1ca967ef3104857587bd129ce7fe45111b73a1fd72dc1d4b99a813cbd" },
+      { "path": "supabase/migrations/024_create_provider_intelligence.sql", "sha256": "e9f64f92fd3d9870c70fe4ef2b0cf17b71a0996bd45824ec1fabe528932e05d8" },
+      { "path": "supabase/migrations/025_create_intelligence_signals.sql", "sha256": "64bcf7051aa838e60a5eb4cf373af954460f67e8ae72809f68661977bac41191" },
+      { "path": "supabase/migrations/026_create_levy_finance_persistence.sql", "sha256": "e7a2d9e950d279c7cc265f52264af6d89c4f6bd8696b6194a3c5196f5e44abba" },
+      { "path": "supabase/migrations/027_create_organisation_catalogue_selections.sql", "sha256": "a472954789c5bc4fafa57ddd3917e330baf8292ff238cfea02ce4f00612fe72a" },
+      { "path": "supabase/migrations/028_create_service_requests.sql", "sha256": "3395555a223611dc6e6cf39de87d2afeb999ca2c797c3b521ceed8e504bef8a0" },
+      { "path": "supabase/migrations/029_correct_service_request_privileges.sql", "sha256": "83f615ad27393a40f24a844a01ee6ade98754cb7f5b8356b984a7b49c627e0ce" },
+      { "path": "supabase/migrations/030_extend_intelligence_signals_for_autopilot.sql", "sha256": "369d8b259080ea42ee19acc74c1393b7fce411f0f2b72e1a1e6a16bd327ddaef" },
+      { "path": "supabase/migrations/031_create_microsoft_copilot_connector_foundation.sql", "sha256": "02d67222d68d40910a12f103015472ebdc009c04b8e79a6c6416550684f12611" },
+      { "path": "supabase/migrations/032_create_configurable_application_workflows.sql", "sha256": "d74c6eb3bb5d54bd5bb71e53e9a4ee644680e62a0ed343c0cb3332644490d5b0" },
+      { "path": "supabase/migrations/033_create_off_the_job_learning_assistant.sql", "sha256": "35236c66e14fed6a2f64dc3c32d557b835b13b69ac9f01b4ba9a16b2ab010cae" },
+      { "path": "supabase/migrations/034_create_workforce_assessments.sql", "sha256": "b9fdfcf81bf71a3b217968cbabec3c520e5999d6170936f52cc2d209b1a7d139" },
+      { "path": "supabase/migrations/035_register_comprehensive_ai_capability_assessment.sql", "sha256": "a34ea92203668e9f7b9c76f4e4a8662ca3f77a23734d2f13644ac980baed72e1" },
+      { "path": "supabase/migrations/036_register_reliable_ai_capability_assessment.sql", "sha256": "d9b55df247169c40b5793867ccff9d2c86d688cdbf22cab7857847374d1d578e" },
+      { "path": "supabase/migrations/037_create_pastoral_support_foundation.sql", "sha256": "4e5a55462f565099412a409c525ae2f5a43f0750276861d492d653f036666ee0" },
+      { "path": "supabase/migrations/039_create_levytate_lift_foundation.sql", "sha256": "f6a258053e9f3de9677bdc9329d17e97f32d3eef80996bd1a5bc165697af14f0" },
+      { "path": "supabase/bootstrap/fresh_project_access_hardening.sql", "sha256": "782bd6f37bd18405cf4e200d04924e5e692af08fdc95012086caeb767b92716a" }
+    ]
+  },
+  "verification": {
+    "localPlatformStubs": {
+      "path": "supabase/bootstrap/local_platform_stubs.sql",
+      "sha256": "d0b0879326969106e607024340800b64d19516366487926f4b51061a5f4c4168"
+    },
+    "freshProjectVerifier": {
+      "path": "supabase/bootstrap/verify_fresh_project.sql",
+      "sha256": "5081d1053664825a219fb423e36013725e45b1676007ac6da2bd3c9976a771cf"
+    },
+    "catalogueSignature": {
+      "path": "supabase/bootstrap/catalogue_signature.sql",
+      "sha256": "113ed5d0f55badb564773ccb37247202c813f2f18e60043db6364ac68483e49b",
+      "localPostgresVersion": "18.4",
+      "expectedObjectCount": 4780,
+      "expectedSha256": "53d14b971e5e5c2bf39f23804200e36139c34dc8dade690086e175bad8b37818"
+    }
+  },
+  "excluded": [
+    { "version": "007", "path": "supabase/migrations/007_provider_programmes_and_standards.sql", "sha256": "bb9ee291a132ac6acaf565b377d5ee70a9b0a0a51cf322d40bc099b6780d2728", "reason": "Broken legacy transform references columns not created by 006 and is superseded by 009." },
+    { "version": "008", "path": "supabase/migrations/008_apprenticeship_standards_csv_import.sql", "sha256": "b3ad2e2f3bd2bbe79903bacc305fc68650c266e6aeac2d85e370bc80b43053bf", "reason": "Legacy standards backfill depends on 007 and its schema effect is superseded by 009." },
+    { "version": "010", "path": "supabase/migrations/010_import_apprenticeship_standards.sql", "sha256": "7fbbf50d3e1c3de5684ca6fbad385210e9065005a3cdadd8dc44984c9d9935dc", "reason": "Stale destructive catalogue snapshot; reference-data approval is a separate gate." },
+    { "version": "019", "path": null, "sha256": null, "reason": "Intentionally absent from this branch and every approved ledger." },
+    { "version": "038", "path": "supabase/migrations/038_create_pastoral_human_follow_up.sql", "sha256": "d324ef2c2b35c0fbd0ccf79d56121915f6b6c82b6384984ac8d6ef828bab4ca3", "reason": "Approval-gated and intentionally unapplied." }
+  ],
+  "preservedEffects": {
+    "applicationTableCount": 113,
+    "liftTableCount": 19,
+    "privateStorageBuckets": [
+      "levytate-organisations",
+      "levytate-provider-documents",
+      "levytate-uploads",
+      "levytate-guidance-sources"
+    ],
+    "referenceRows": [
+      "033 off-the-job requirement rows",
+      "034-036 assessment framework versions",
+      "039 Lift framework version"
+    ]
+  }
+}

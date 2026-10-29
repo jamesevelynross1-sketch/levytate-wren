@@ -1,0 +1,20 @@
+{
+  "formatVersion": 1,
+  "purpose": "Issue 7 client-release candidates; local verification only, hosted execution requires separate approval",
+  "postgresMajorVersion": 17,
+  "approvedBootstrapConvergenceSha256": "3bd6b681196ff865f50976129981b48601314d2bab2421794648fba51aefb204",
+  "migrations": [
+    { "path": "supabase/release-migrations/20261029135739_client_workflow_integrity.sql", "sha256": "46e051400720b86ea6c67b535fdb6bd6888a3ff2697e63951108bc98eda2aecc" },
+    { "path": "supabase/release-migrations/20261029140740_client_identity_invitation_lifecycle.sql", "sha256": "0439140f3a8214347b4d91e0fbb085f5be7513903ca6b64901aeb0046be14b75" },
+    { "path": "supabase/release-migrations/20261029151204_client_finance_integrity.sql", "sha256": "1af0a5d526175a8aabaa3b747508acee8977baa8011bb9b95e7fb6e740045771" },
+    { "path": "supabase/release-migrations/20261029151308_client_people_integrity.sql", "sha256": "bf94e514b7761026fb8f04836936c7d5fe1d945ff76eec716336252adc075315" },
+    { "path": "supabase/release-migrations/20261029152606_client_learner_atomic_commands.sql", "sha256": "0f840da15a2d8ca605ae5880de4a2e0b39365f6067c0a1c72cc3ff35101e1840" },
+    { "path": "supabase/release-migrations/20261029154432_client_catalogue_integrity.sql", "sha256": "0661650e20f40971f72b5b23a8f51245ae02b30709124dcd39aa5c3b0f59d7ea" },
+    { "path": "supabase/release-migrations/20261029155724_client_callback_failure_budget.sql", "sha256": "48c41ab057f35da1de97505971ff368391919fe8d37212f7bc6a3141ae8f38ef" },
+    { "path": "supabase/release-migrations/20261029160250_client_tenant_suspension.sql", "sha256": "630ea06d676553c34ea5ed88251eb196a829ff74dadc2cb449ff60364d02abda" },
+    { "path": "supabase/release-migrations/20261029161250_client_lift_atomic_commands.sql", "sha256": "93d009f901e84ef588a5cc85e532a0115654b8502384a20dd2605615560fcd15" },
+    { "path": "supabase/release-migrations/20261029162529_client_learning_time_integrity.sql", "sha256": "f8c1b4af652784f12f8d4222b1cd020b04c8cf42059237a81d858918b36a0197" },
+    { "path": "supabase/release-migrations/20261029162929_client_workspace_atomic_writes.sql", "sha256": "4c0978c8cdc5cd860e865152e4cb0b96d401a43fb4933b4d3affa7ab3994015d" },
+    { "path": "supabase/release-migrations/20261029220936_client_request_actor_integrity.sql", "sha256": "68551ce00c53d45e216b26e95d134b65c99aec646748008624d65be4c950a393" }
+  ]
+}

@@ -1,4 +1,6 @@
 import { cookies } from "next/headers";
+import { readAuthenticatedJson } from "@/lib/server/levytate-request-boundary";
+import { parseAction, learnerEnrolmentInput } from "@/lib/server/levytate-operational-input";
 import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
 import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
@@ -11,7 +13,7 @@ async function getSession() {
 }
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ learnerRecordId: string }> },
 ) {
   const session = await getSession();
@@ -20,8 +22,9 @@ export async function POST(
   }
 
   try {
+    const input = parseAction(learnerEnrolmentInput, await readAuthenticatedJson(request, session.email, 16 * 1024));
     const { learnerRecordId } = await params;
-    const learner = await markLearnerAsEnrolled(session, learnerRecordId);
+    const learner = await markLearnerAsEnrolled(session, learnerRecordId, input);
     return NextResponse.json({
       ok: true,
       source: "supabase",

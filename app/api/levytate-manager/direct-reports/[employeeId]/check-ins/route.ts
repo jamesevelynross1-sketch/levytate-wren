@@ -2,7 +2,8 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
 import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
-import type { ManagerCheckInInput } from "@/lib/levytate/mvp/manager-check-in";
+import { ClientRequestError, readAuthenticatedJson } from "@/lib/server/levytate-request-boundary";
+import { managerCheckInInput, parseAction } from "@/lib/server/levytate-operational-input";
 import {
   LevyTateManagerCheckInAccessError,
   LevyTateManagerCheckInConflictError,
@@ -19,7 +20,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ emp
 
   try {
     const { employeeId } = await params;
-    const input = await request.json() as ManagerCheckInInput;
+    const input = parseAction(managerCheckInInput, await readAuthenticatedJson(request, session.email));
     const result = await recordManagerDirectReportCheckIn(session, employeeId, input);
     const detail = await getManagerDirectReportLearnerDetail(session, employeeId);
     return NextResponse.json({
@@ -31,6 +32,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ emp
       detail,
     }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
+    if (error instanceof ClientRequestError) return NextResponse.json({ message: error.message }, { status: error.status });
     if (error instanceof LevyTateManagerCheckInAccessError) {
       return NextResponse.json({ message: "This employee is no longer within your direct-report scope." }, { status: 403 });
     }

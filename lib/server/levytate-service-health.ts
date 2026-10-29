@@ -3,64 +3,82 @@ import "server-only";
 import { isInternalBetaLoginEnabled } from "@/lib/levytate/config/beta-access";
 import { levyTateAiEnabled } from "@/lib/levytate/ai/openai";
 import { getCurrentEarlyAccessTermsDocument } from "@/lib/server/levytate-early-access-terms";
-import { getLevyTateSupabaseConfig, readRuntimeEnv, supabaseSelect } from "@/lib/server/levytate-supabase";
-import { classifyReadiness, ServiceHealthTimeoutError } from "@/lib/levytate/service-health-contract";
+import { rateLimitKey } from "@/lib/server/levytate-auth-rate-limit";
+import { getLevyTateRateLimitEnvironment } from "@/lib/server/levytate-auth-rate-limit-config";
+import { getLevyTateSupabaseConfig, readRuntimeEnv, supabaseFetchJson, supabaseSelect } from "@/lib/server/levytate-supabase";
+import { createReadinessCache, evaluateReadinessChecks, ServiceHealthTimeoutError } from "@/lib/levytate/service-health-contract";
+import type { ServiceHealthState, ServiceReadiness } from "@/lib/levytate/service-health-contract";
 import type { LevyTateBetaSession } from "@/lib/levytate/config/beta-access";
 import { normaliseMvpUserRole } from "@/lib/levytate/mvp/rbac";
+import { readBoundedJson } from "@/lib/server/bounded-json";
 
 export type HealthState = "operational" | "degraded" | "unavailable";
 export type HealthComponent = { label: string; state: HealthState; checkedAt: string; summary: string; durationMs?: number };
-export type PublicReadiness = { status: HealthState; checkedAt: string; message?: string };
-export type HealthCheckAdapter = (input: { key: string; table: string; column: string; timeoutMs: number }) => Promise<void>;
+export type PublicReadiness = ServiceReadiness;
+type TableHealthCheck = { key: string; label: string; kind: "table"; table: string; column: string };
+type AuthRateLimitHealthCheck = { key: string; label: string; kind: "auth-rate-limit" };
+type AuthCallbackHealthCheck = { key: string; label: string; kind: "auth-callback-budget" };
+type AuthProviderHealthCheck = { key: string; label: string; kind: "auth-provider" };
+type HealthCheckDefinition = TableHealthCheck | AuthRateLimitHealthCheck | AuthCallbackHealthCheck | AuthProviderHealthCheck;
+export type HealthCheckAdapter = (input: HealthCheckDefinition & { timeoutMs: number }) => Promise<void>;
 
 export const LEVYTATE_HEALTH_TIMEOUT_MS = 2_500;
 export const LEVYTATE_READINESS_CACHE_MS = 10_000;
-export const LEVYTATE_MIGRATION_BASELINE = "023";
+export const LEVYTATE_MIGRATION_BASELINE = "039 (038 intentionally unapplied)";
 
 const criticalChecks = [
-  { key: "membership", table: "levytate_users", column: "id", label: "Membership and RBAC schema" },
-  { key: "terms", table: "levytate_early_access_terms_acceptances", column: "id", label: "Terms acceptance schema" },
-  { key: "security", table: "levytate_audit_events", column: "id", label: "Authentication security events" },
-] as const;
-const nonCriticalChecks = [
-  { key: "prospect", table: "levytate_prospect_access", column: "id", label: "Prospect access schema" },
-  { key: "rate-limit", table: "levytate_auth_rate_limits", column: "environment_namespace", label: "Distributed rate-limit store" },
-  { key: "delivery", table: "levytate_auth_email_delivery_events", column: "id", label: "Authentication delivery events" },
-] as const;
+  { key: "membership", kind: "table", table: "levytate_users", column: "id,active,auth_binding_status,invitation_generation", label: "Membership and invitation schema" },
+  { key: "terms", kind: "table", table: "levytate_early_access_terms_acceptances", column: "id", label: "Terms acceptance schema" },
+  { key: "security", kind: "table", table: "levytate_audit_events", column: "id", label: "Authentication security events" },
+  { key: "rate-limit-operation", kind: "auth-rate-limit", label: "Authentication rate-limit operation" },
+  { key: "callback-budget-operation", kind: "auth-callback-budget", label: "Authentication callback security operation" },
+  { key: "auth-provider", kind: "auth-provider", label: "Individual authentication service" },
+  { key: "migration-baseline", kind: "table", table: "levytate_lift_framework_versions", column: "framework_key", label: "Active migration baseline" },
+  { key: "application-contract", kind: "table", table: "levytate_applications", column: "revision,information_return_owner", label: "Application concurrency schema" },
+  { key: "learner-contract", kind: "table", table: "levytate_learner_records", column: "mutation_revision", label: "Learner concurrency schema" },
+  { key: "people-contract", kind: "table", table: "levytate_people_import_receipts", column: "import_id", label: "People import receipt schema" },
+  { key: "finance-contract", kind: "table", table: "levytate_finance_versions", column: "revision", label: "Finance concurrency schema" },
+  { key: "lift-contract", kind: "table", table: "levytate_lift_workspace_revisions", column: "revision", label: "Lift concurrency schema" },
+  { key: "workspace-contract", kind: "table", table: "levytate_workspace_entity_versions", column: "entity_key,revision", label: "Atomic workspace concurrency schema" },
+  { key: "learning-time-contract", kind: "table", table: "levytate_otj_command_receipts", column: "request_id", label: "Learning Time receipt schema" },
+] as const satisfies readonly HealthCheckDefinition[];
+const optionalChecks = [
+  { key: "prospect", kind: "table", table: "levytate_prospect_access", column: "id", label: "Optional prospect access diagnostics" },
+  { key: "delivery", kind: "table", table: "levytate_auth_email_delivery_events", column: "id", label: "Optional authentication delivery diagnostics" },
+] as const satisfies readonly HealthCheckDefinition[];
 
-let readinessCache: { expiresAt: number; promise: Promise<PublicReadiness> } | null = null;
-let localLastReadiness: HealthState | null = null;
+const readinessCache = createReadinessCache({
+  cacheMs: LEVYTATE_READINESS_CACHE_MS,
+  evaluate: () => calculatePublicReadiness({}),
+  onResult: recordReadinessResult,
+});
 
 export function createLivenessResponse(now = new Date()) {
   return { status: "operational" as const, service: "LevyTate" as const, checkedAt: now.toISOString() };
 }
 
 export async function getPublicReadiness(options: { adapter?: HealthCheckAdapter; now?: Date; bypassCache?: boolean; timeoutMs?: number } = {}) {
-  if (options.adapter || options.bypassCache) return calculatePublicReadiness(options);
-  const now = Date.now();
-  if (readinessCache && readinessCache.expiresAt > now) return readinessCache.promise;
-  const promise = calculatePublicReadiness(options);
-  readinessCache = { expiresAt: now + LEVYTATE_READINESS_CACHE_MS, promise };
-  return promise;
+  if (options.adapter || options.now || options.bypassCache || options.timeoutMs !== undefined) return calculatePublicReadiness(options);
+  return readinessCache.get();
 }
 
 async function calculatePublicReadiness(options: { adapter?: HealthCheckAdapter; now?: Date; timeoutMs?: number }) {
   const checkedAt = (options.now ?? new Date()).toISOString();
   const config = getLevyTateSupabaseConfig();
-  if (!config || !readRuntimeEnv("LEVYTATE_BETA_SESSION_SECRET")) return finishReadiness({ status: "unavailable", checkedAt, message: "Service dependencies are not ready." });
+  if (!config || !readRuntimeEnv("LEVYTATE_BETA_SESSION_SECRET")) return { status: "unavailable", checkedAt, message: "Service dependencies are not ready." } as const;
   const adapter = options.adapter ?? createSupabaseHealthAdapter();
   const timeoutMs = options.timeoutMs ?? LEVYTATE_HEALTH_TIMEOUT_MS;
-  const critical = await Promise.allSettled(criticalChecks.map((item) => adapter({ key: item.key, table: item.table, column: item.column, timeoutMs })));
-  if (critical.some((result) => result.status === "rejected")) return finishReadiness(classifyReadiness({ checkedAt, criticalAvailable: false, nonCriticalAvailable: true }));
-  const optional = await Promise.allSettled(nonCriticalChecks.map((item) => adapter({ key: item.key, table: item.table, column: item.column, timeoutMs })));
-  return finishReadiness(classifyReadiness({ checkedAt, criticalAvailable: true, nonCriticalAvailable: !optional.some((result) => result.status === "rejected") }));
+  return evaluateReadinessChecks({
+    checkedAt,
+    criticalChecks: criticalChecks.map((item) => () => adapter({ ...item, timeoutMs })),
+    optionalChecks: optionalChecks.map((item) => () => adapter({ ...item, timeoutMs })),
+    timeoutMs,
+  });
 }
 
-function finishReadiness(result: PublicReadiness) {
+function recordReadinessResult(result: PublicReadiness, previousStatus: ServiceHealthState | null) {
   if (result.status !== "operational") logHealthEvent("readiness_check_failed", result.status);
-  else if (localLastReadiness && localLastReadiness !== "operational") logHealthEvent("readiness_check_recovered", "operational");
-  localLastReadiness = result.status;
-  return result;
+  else if (previousStatus && previousStatus !== "operational") logHealthEvent("readiness_check_recovered", "operational");
 }
 
 export async function getPlatformDiagnostics(options: { adapter?: HealthCheckAdapter; now?: Date; timeoutMs?: number } = {}) {
@@ -68,21 +86,25 @@ export async function getPlatformDiagnostics(options: { adapter?: HealthCheckAda
   const timeoutMs = options.timeoutMs ?? LEVYTATE_HEALTH_TIMEOUT_MS;
   const adapter = options.adapter ?? createSupabaseHealthAdapter();
   const configuration = configurationSafety();
-  const checks = [...criticalChecks, ...nonCriticalChecks];
+  const checks = [...criticalChecks, ...optionalChecks];
   const results = await Promise.all(checks.map(async (item): Promise<HealthComponent> => {
     const started = performance.now();
+    const isCritical = criticalChecks.some((critical) => critical.key === item.key);
     try {
-      await adapter({ key: item.key, table: item.table, column: item.column, timeoutMs });
-      return { label: item.label, state: "operational", checkedAt, summary: "Required read-only schema operation succeeded.", durationMs: Math.round(performance.now() - started) };
+      await adapter({ ...item, timeoutMs });
+      const summary = item.kind !== "table"
+        ? "Required isolated security operation succeeded."
+        : isCritical ? "Required read-only schema operation succeeded." : "Optional diagnostic read succeeded.";
+      return { label: item.label, state: "operational", checkedAt, summary, durationMs: Math.round(performance.now() - started) };
     } catch (error) {
-      const state: HealthState = criticalChecks.some((critical) => critical.key === item.key) ? "unavailable" : "degraded";
+      const state: HealthState = isCritical ? "unavailable" : "degraded";
       logHealthEvent(error instanceof HealthTimeoutError || error instanceof ServiceHealthTimeoutError ? "health_check_timed_out" : "diagnostic_dependency_failed", item.key);
-      return { label: item.label, state, checkedAt, summary: state === "unavailable" ? "A critical read-only check did not complete." : "Diagnostic reporting is temporarily limited.", durationMs: Math.round(performance.now() - started) };
+      return { label: item.label, state, checkedAt, summary: state === "unavailable" ? "A critical dependency check did not complete." : "Diagnostic reporting is temporarily limited.", durationMs: Math.round(performance.now() - started) };
     }
   }));
   const runtime: HealthComponent = { label: "Application runtime", state: "operational", checkedAt, summary: "The application runtime answered the diagnostic request." };
   const publicTrust: HealthComponent = { label: "Public trust routes", state: "operational", checkedAt, summary: "Six governed public trust route definitions are available." };
-  const migrationState = results.find((item) => item.label === "Terms acceptance schema")?.state ?? "unavailable";
+  const migrationState = results.find((item) => item.label === "Active migration baseline")?.state ?? "unavailable";
   const migration: HealthComponent = { label: "Migration baseline", state: migrationState, checkedAt, summary: migrationState === "operational" ? `Expected active schema marker ${LEVYTATE_MIGRATION_BASELINE} is reachable.` : "The expected active schema marker is unavailable." };
   const components = [runtime, ...results, publicTrust, migration];
   const overall = components.some((item) => item.state === "unavailable") ? "unavailable" : components.some((item) => item.state === "degraded") ? "degraded" : "operational";
@@ -114,19 +136,51 @@ export function configurationSafety() {
 
 export function createSupabaseHealthAdapter(): HealthCheckAdapter {
   const config = getLevyTateSupabaseConfig();
-  return async ({ table, column, timeoutMs }) => {
+  return async (input) => {
     if (!config) throw new Error("configuration");
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const timer = setTimeout(() => controller.abort(), input.timeoutMs);
     try {
-      const query = new URLSearchParams({ select: column, limit: "1" });
-      const response = await fetch(`${config.url}/rest/v1/${table}?${query}`, {
+      if (input.kind === "auth-rate-limit") {
+        const rows = await supabaseFetchJson<Array<{ allowed: boolean; request_count: number }>>(config, "rpc/levytate_consume_auth_rate_limit", {
+          method: "POST",
+          signal: controller.signal,
+          body: JSON.stringify({
+            p_environment_namespace: getLevyTateRateLimitEnvironment(),
+            p_action: "health.readiness",
+            p_key_hash: rateLimitKey("health_probe", "required-rate-limit-operation"),
+            p_window_seconds: 60,
+            p_limit: 10_000,
+            p_route: "/api/levytate-health/ready",
+            p_event_type: "health_readiness_rate_limited",
+          }),
+        });
+        if (rows[0]?.allowed !== true || !Number.isInteger(rows[0].request_count)) throw new Error("dependency");
+        return;
+      }
+      if (input.kind === "auth-callback-budget") {
+        const rows = await supabaseFetchJson<Array<{ allowed: boolean; reset_at: string }>>(config, "rpc/levytate_check_auth_callback_failures", {
+          method: "POST", signal: controller.signal,
+          body: JSON.stringify({ p_environment_namespace: getLevyTateRateLimitEnvironment(), p_key_hash: rateLimitKey("health_probe", "required-callback-budget-operation") }),
+        });
+        if (!Array.isArray(rows) || rows.length !== 1 || rows[0].allowed !== true || !Number.isFinite(Date.parse(rows[0].reset_at))) throw new Error("dependency");
+        return;
+      }
+      if (input.kind === "auth-provider") {
+        const response = await fetch(`${config.url}/auth/v1/health`, {
+          headers: { apikey: config.serviceRoleKey, Accept: "application/json" }, cache: "no-store", signal: controller.signal,
+        });
+        if (!response.ok) throw new Error("dependency");
+        return;
+      }
+      const query = new URLSearchParams({ select: input.column, limit: "1" });
+      const response = await fetch(`${config.url}/rest/v1/${input.table}?${query}`, {
         headers: { apikey: config.serviceRoleKey, Authorization: `Bearer ${config.serviceRoleKey}`, Accept: "application/json" },
         cache: "no-store",
         signal: controller.signal,
       });
       if (!response.ok) throw new Error("dependency");
-      await response.text();
+      if (!Array.isArray(await readBoundedJson(response, 16 * 1024))) throw new Error("dependency");
     } catch (error) {
       if (controller.signal.aborted) throw new HealthTimeoutError();
       throw error;

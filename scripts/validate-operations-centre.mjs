@@ -4,7 +4,7 @@ const checks = [];
 
 async function main() {
   const leadCookie = await login("apprenticeshiplead.demo@levytate.test");
-  const response = await authedFetch("/api/levytate-operations?synchronise=true", leadCookie);
+  const response = await authedFetch("/api/levytate-operations", leadCookie, { method: "POST", headers: { origin: new URL(baseUrl).origin, "content-type": "application/json" }, body: "{}" });
   const body = await safeJson(response);
   check("Apprenticeship Lead can read Operations Centre", response.status === 200, body);
   check("Operations source is live Supabase", body.source === "supabase", body);
@@ -56,7 +56,9 @@ async function main() {
   const isolationDenied = await authedFetch("/api/levytate-operations?organisationId=12000000-0000-4000-8000-000000000001", isolationCookie);
   check("Cross-organisation query is denied", isolationDenied.status === 403, await safeJson(isolationDenied));
   const mutation = await authedFetch("/api/levytate-operations", leadCookie, { method: "POST" });
-  check("Operations endpoint exposes no mutations", mutation.status === 405, await safeJson(mutation));
+  check("Operations refresh rejects writes without an origin", mutation.status === 403, await safeJson(mutation));
+  const legacyMutation = await authedFetch("/api/levytate-operations?synchronise=true", leadCookie);
+  check("Operations GET cannot synchronise state", legacyMutation.status === 400, await safeJson(legacyMutation));
 
   console.log(JSON.stringify({ ok: true, baseUrl, summary: body.summary, checks: checks.length }, null, 2));
 }
