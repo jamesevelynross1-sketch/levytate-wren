@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, BarChart3, CalendarClock, CheckCircle2, Info, Printer, RefreshCw, ShieldCheck, TriangleAlert } from "lucide-react";
+import { ArrowRight, BarChart3, CalendarClock, CheckCircle2, Download, Info, Printer, RefreshCw, ShieldCheck, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { EmployerExecutiveReport } from "@/components/levytate-mvp/EmployerExecutiveReport";
@@ -22,6 +22,26 @@ export function EmployerInsightsModule({ view }: { view: View }) {
   const [loading, setLoading] = useState(true);
   const [selectedCampaignId, setSelectedCampaignId] = useState("");
   const [printing, setPrinting] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
+
+  async function downloadEvidence() {
+    if (exporting) return;
+    setExporting(true); setExportError("");
+    try {
+      const response = await fetch("/api/levytate-employer-insights/export", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}", cache: "no-store" });
+      if (!response.ok) {
+        const payload = await response.json() as { message?: string };
+        throw new Error(payload.message || "Evidence export could not be prepared.");
+      }
+      const url = URL.createObjectURL(await response.blob());
+      const anchor = document.createElement("a");
+      anchor.href = url; anchor.download = "levytate-employer-evidence-v1.json";
+      document.body.appendChild(anchor); anchor.click(); anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (failure) { setExportError(failure instanceof Error ? failure.message : "Evidence export could not be prepared."); }
+    finally { setExporting(false); }
+  }
 
   async function load() {
     setLoading(true);
@@ -66,6 +86,8 @@ export function EmployerInsightsModule({ view }: { view: View }) {
           <div className="flex flex-wrap gap-2">
             <span className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 text-xs text-white/75"><CalendarClock size={14} aria-hidden="true" />Reported {dateTime(data.generatedAt)}</span>
             {view === "overview" ? <button type="button" onClick={() => setPrinting(true)} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-white px-3.5 text-xs font-semibold text-[#102c3d] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/30"><Printer size={14} aria-hidden="true" />Print executive report</button> : null}
+            <button type="button" disabled={exporting} onClick={() => void downloadEvidence()} className={`${button} disabled:cursor-wait disabled:opacity-60`}><Download size={14} aria-hidden="true" />{exporting ? "Preparing evidence…" : "Download aggregate evidence"}</button>
+            <button type="button" onClick={() => void load()} className={button}><RefreshCw size={14} aria-hidden="true" />Refresh sources</button>
           </div>
         </div>
       </div>
@@ -75,6 +97,8 @@ export function EmployerInsightsModule({ view }: { view: View }) {
         <a href="#metric-definitions" className="font-semibold text-[#087c73] hover:underline">View definitions</a>
       </div>
     </section>
+
+    {exportError ? <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">{exportError} Your current report remains available. Retry the download after reconnecting if needed.</p> : null}
 
     {meta?.liftEnabled ? <section className={`${panel} flex flex-col gap-3 border-[#159b8f]/20 bg-[#f4faf7] p-5 sm:flex-row sm:items-center sm:justify-between`}><div><p className={eyebrow}>LevyTate Lift</p><h3 className="mt-1 text-base font-semibold text-[#102c3d]">Continue from evidence to opportunity and proof</h3><p className="mt-1 text-xs leading-5 text-[#102c3d]/55">Lift evidence remains separate from historical assessment scores and workforce aggregates.</p></div><a className={`${button} shrink-0`} href="/levytate/app?module=Assessments">Open Lift <ArrowRight size={14} aria-hidden="true"/></a></section> : null}
 

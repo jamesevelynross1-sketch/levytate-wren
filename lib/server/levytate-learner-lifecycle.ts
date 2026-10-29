@@ -2494,6 +2494,7 @@ async function contextForSession(session: LevyTateBetaSession): Promise<Lifecycl
   const user = await selectOne<UserRow>(usersTable, new URLSearchParams({
     select: "id,organisation_id,email,role",
     email: `eq.${email}`,
+    active: "eq.true",
     limit: "1",
   }));
 
@@ -2504,6 +2505,7 @@ async function contextForSession(session: LevyTateBetaSession): Promise<Lifecycl
   const organisation = await selectOne<OrganisationRow>(organisationsTable, new URLSearchParams({
     select: "id,name",
     id: `eq.${user.organisation_id}`,
+    status: "eq.Active",
     limit: "1",
   }));
 
