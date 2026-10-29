@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { levytateBetaSessionCookie, levytateBetaSessionMaxAge } from "@/lib/levytate/config/beta-access";
+import { levytateBetaSessionCookie, levytateBetaSessionMaxAge, readLevyTateBetaSession } from "@/lib/levytate/config/beta-access";
 import { levytateAuthCookieMaxAge, levytateSupabaseAccessCookie, levytateSupabaseRefreshCookie, refreshEmployerAuth } from "@/lib/server/levytate-auth";
 import { setLevyTateAuthCookies } from "@/lib/server/levytate-auth-cookies";
 import { checkSessionRefreshLimit, LevyTateRateLimitStoreError } from "@/lib/server/levytate-auth-rate-limit";
@@ -13,9 +13,10 @@ export async function POST(request: Request) {
     if (!rateLimit.allowed) return response({ ok: false, message: "Please wait before refreshing your session again." }, 429);
     const store = await cookies();
     const refresh = store.get(levytateSupabaseRefreshCookie)?.value;
-    if (!refresh) throw new Error("missing");
-    const result = await refreshEmployerAuth(refresh);
-    const refreshed = response({ ok: true });
+    const session = await readLevyTateBetaSession(store.get(levytateBetaSessionCookie)?.value);
+    if (!refresh || !session) throw new Error("missing");
+    const result = await refreshEmployerAuth(refresh, session);
+    const refreshed = response({ ok: true, identity: { email: result.membership.email, organisationId: result.membership.organisation_id } });
     setLevyTateAuthCookies(refreshed, request.headers.get("host"), [
       { name: levytateBetaSessionCookie, value: result.sessionToken, maxAge: levytateBetaSessionMaxAge },
       { name: levytateSupabaseAccessCookie, value: result.access_token, maxAge: Math.min(result.expires_in ?? 3600, levytateAuthCookieMaxAge) },

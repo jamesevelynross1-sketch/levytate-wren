@@ -5,13 +5,15 @@ vi.mock("@/lib/server/levytate-auth", () => ({ refreshEmployerAuth: fake.refresh
 vi.mock("@/lib/server/levytate-auth-rate-limit", () => ({ checkSessionRefreshLimit: fake.rate, LevyTateRateLimitStoreError: class extends Error {} }));
 import { POST } from "../app/api/levytate-auth/session/route";
 import { LevyTateRateLimitStoreError } from "../lib/server/levytate-auth-rate-limit";
+import { createLevyTateBetaSession, levytateBetaSessionCookie } from "../lib/levytate/config/beta-access";
 
 const request = (origin = "http://localhost:3000") => new Request("http://localhost:3000/api/levytate-auth/session", { method: "POST", headers: { origin, host: "localhost:3000" } });
-beforeEach(() => {
+beforeEach(async () => {
   vi.clearAllMocks();
-  fake.cookies.mockResolvedValue({ get: () => ({ value: "synthetic-refresh" }) });
+  const token = await createLevyTateBetaSession("fictional@example.test", "beta_user", { authMode: "supabase_email", authSubject: "subject" });
+  fake.cookies.mockResolvedValue({ get: (name: string) => ({ value: name === levytateBetaSessionCookie ? token : "synthetic-refresh" }) });
   fake.rate.mockResolvedValue({ allowed: true });
-  fake.refresh.mockResolvedValue({ sessionToken: "synthetic-session", access_token: "synthetic-access", refresh_token: "synthetic-next-refresh", expires_in: 3600 });
+  fake.refresh.mockResolvedValue({ sessionToken: "synthetic-session", access_token: "synthetic-access", refresh_token: "synthetic-next-refresh", expires_in: 3600, membership: { email: "fictional@example.test", organisation_id: "tenant" } });
 });
 describe("refresh request boundary", () => {
   it("returns dependency unavailable without contacting provider when rate-limit store fails", async () => {
@@ -29,6 +31,10 @@ describe("refresh request boundary", () => {
     fake.refresh.mockRejectedValueOnce(new Error("revoked"));
     const response = await POST(request());
     expect(response.status).toBe(401); expect(response.headers.getSetCookie()).toEqual([]);
+  });
+  it("requires the signed application session as well as a provider refresh credential", async () => {
+    fake.cookies.mockResolvedValue({ get: (name: string) => name === levytateBetaSessionCookie ? undefined : { value: "synthetic-refresh" } });
+    expect((await POST(request())).status).toBe(401); expect(fake.refresh).not.toHaveBeenCalled();
   });
   it("rotates provider and application cookies with host-only attributes", async () => {
     const response = await POST(request());

@@ -71,15 +71,33 @@ describe("employer authentication service boundary", () => {
     await expect(verifyEmployerMagicLink("synthetic-token", "email")).rejects.toMatchObject({ code: "conflict" });
   });
   it("denies suspended tenant at callback and refresh", async () => {
+    const result = await verifyEmployerMagicLink("synthetic-token", "email");
+    const session = await readLevyTateBetaSession(result.sessionToken);
     organisationStatus = "Suspended";
     await expect(verifyEmployerMagicLink("synthetic-token", "email")).rejects.toMatchObject({ code: "unauthorised" });
-    await expect(refreshEmployerAuth("synthetic-refresh")).rejects.toMatchObject({ code: "unauthorised" });
+    await expect(refreshEmployerAuth("synthetic-refresh", session!)).rejects.toMatchObject({ code: "unauthorised" });
   });
   it("denies the previous session after reactivation creates a new binding", async () => {
     const result = await verifyEmployerMagicLink("synthetic-token", "email");
     const old = await readLevyTateBetaSession(result.sessionToken);
     members[0].auth_bound_at = new Date(old!.issuedAt + 1000).toISOString();
     expect(await revalidateEmployerSession(old!)).toBeNull();
+    await expect(refreshEmployerAuth("synthetic-refresh", old!)).rejects.toMatchObject({ code: "unauthorised" });
+  });
+  it("does not accept an old provider refresh credential as a pending reinvitation", async () => {
+    const result = await verifyEmployerMagicLink("synthetic-token", "email");
+    const old = await readLevyTateBetaSession(result.sessionToken);
+    Object.assign(members[0], { auth_subject: null, auth_binding_status: "pending", invitation_status: "accepted", invitation_generation: 3 });
+    vi.mocked(fetch).mockClear();
+    await expect(refreshEmployerAuth("synthetic-refresh", old!)).rejects.toMatchObject({ code: "unauthorised" });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it("refreshes a current binding without accepting a swapped provider identity", async () => {
+    const result = await verifyEmployerMagicLink("synthetic-token", "email");
+    const session = await readLevyTateBetaSession(result.sessionToken);
+    expect((await refreshEmployerAuth("synthetic-refresh", session!)).membership.id).toBe("member");
+    vi.mocked(fetch).mockResolvedValueOnce(Response.json({ user: { id: "other", email: authIdentity.email } }));
+    await expect(refreshEmployerAuth("synthetic-refresh", session!)).rejects.toMatchObject({ code: "unauthorised" });
   });
   it("checks membership, People and organisation on each request", async () => {
     const result = await verifyEmployerMagicLink("synthetic-token", "email");

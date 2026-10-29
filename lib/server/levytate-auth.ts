@@ -73,10 +73,13 @@ export async function verifyEmployerMagicLink(tokenHash: string, type: string) {
   return bindVerifiedIdentity(auth);
 }
 
-export async function refreshEmployerAuth(refreshToken: string) {
+export async function refreshEmployerAuth(refreshToken: string, session: LevyTateBetaSession) {
+  if (!session || session.authMode !== "supabase_email" || session.expiresAt <= Date.now() || !(await revalidateEmployerSession(session))) {
+    throw new LevyTateAuthError("unauthorised", "Your session has ended. Sign in again to continue.", 401);
+  }
   const response = await authFetch("token?grant_type=refresh_token", { method: "POST", body: JSON.stringify({ refresh_token: refreshToken }) });
   if (!response.ok) throw new LevyTateAuthError("invalid_link", "Your session has ended. Sign in again to continue.", 401);
-  return bindVerifiedIdentity(await response.json() as AuthSessionResponse);
+  return bindVerifiedIdentity(await response.json() as AuthSessionResponse, session);
 }
 
 export async function invalidateEmployerAuthSession(accessToken?: string, refreshToken?: string): Promise<EmployerLogoutResult> {
@@ -117,12 +120,15 @@ async function revokeCurrentSession(accessToken: string) {
   return response.ok;
 }
 
-async function bindVerifiedIdentity(auth: AuthSessionResponse) {
+async function bindVerifiedIdentity(auth: AuthSessionResponse, refreshingSession?: LevyTateBetaSession) {
   const email = normaliseBetaEmail(auth.user.email ?? "");
   if (!email || !auth.user.id) throw new LevyTateAuthError("unauthorised", "This email is not currently authorised for LevyTate.");
   const membership = await findMembershipByEmail(email);
   if (!membership) throw new LevyTateAuthError("unauthorised", "This email is not currently authorised for LevyTate.");
   if (!membership.active) throw new LevyTateAuthError("inactive", "Your LevyTate account is not currently active.");
+  if (refreshingSession && (refreshingSession.authSubject !== auth.user.id || refreshingSession.email !== email || membership.auth_subject !== auth.user.id || membership.auth_binding_status !== "bound" || (membership.auth_bound_at && Date.parse(membership.auth_bound_at) > refreshingSession.issuedAt))) {
+    throw new LevyTateAuthError("unauthorised", "Your session has ended. Sign in again to continue.", 401);
+  }
   if (!invitationAllowsActivation(membership)) throw new LevyTateAuthError("unauthorised", "This invitation is not active. Ask your Apprenticeship Lead to send a new invitation.");
   const identity = await validateIdentityMembership(membership);
   if (!identity) throw new LevyTateAuthError("unauthorised", "This email is not currently authorised for LevyTate.");
