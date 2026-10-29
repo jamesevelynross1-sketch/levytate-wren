@@ -1,4 +1,4 @@
-import { readBrowserJson } from "@/lib/server/levytate-request-boundary";
+import { readAuthenticatedJson } from "@/lib/server/levytate-request-boundary";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
@@ -21,7 +21,7 @@ export async function PATCH(
   }
 
   try {
-    const body = (await readBrowserJson(request)) as PreEnrolmentUpdateInput;
+    const body = (await readAuthenticatedJson(request, session.email)) as PreEnrolmentUpdateInput;
     const { learnerRecordId } = await params;
     const learner = await updateLearnerPreEnrolmentProgress(session, learnerRecordId, body);
     return NextResponse.json({ ok: true, source: "supabase", learner, readiness: learner.enrolmentReadiness });

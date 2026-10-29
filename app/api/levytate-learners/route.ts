@@ -1,4 +1,4 @@
-import { readBrowserJson, ClientRequestError } from "@/lib/server/levytate-request-boundary";
+import { readAuthenticatedJson, ClientRequestError } from "@/lib/server/levytate-request-boundary";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ message: "Unauthorised." }, { status: 401 });
   try {
-    const body = await readBrowserJson(request) as Parameters<typeof createLearnerRecord>[1] | null;
+    const body = await readAuthenticatedJson(request, session.email) as Parameters<typeof createLearnerRecord>[1] | null;
     if (!body) return NextResponse.json({ message: "A valid learner onboarding request is required." }, { status: 400 });
     const record = await createLearnerRecord(session, { ...body, demonstrationRecord: false });
     const learner = await getOrganisationLearnerLifecycleRecordDetail(session, record.id);

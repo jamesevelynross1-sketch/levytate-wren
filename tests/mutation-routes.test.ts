@@ -51,8 +51,9 @@ describe("actual cookie-authenticated mutation routes", () => {
     }
   });
   it("passes only validated actions to the authenticated tenant service", async () => {
-    expect((await financePost(request({ action: "balance", amountPence: 0 }))).status).toBe(200);
-    expect(mocks.balance).toHaveBeenCalledWith({ email: "synthetic@example.invalid" }, 0);
+    const options = { expectedConfirmedAt: null, requestId: "7b8aa254-57cb-4079-a4bd-9c462cb6bf5b" };
+    expect((await financePost(request({ action: "balance", amountPence: 0, ...options }))).status).toBe(200);
+    expect(mocks.balance).toHaveBeenCalledWith({ email: "synthetic@example.invalid" }, 0, options);
   });
   it("preserves actionable conflicts from the authoritative application command", async () => {
     mocks.mutate.mockRejectedValue(new ApplicationCommandError("Application changed; refresh. Your input has been retained.", 409));

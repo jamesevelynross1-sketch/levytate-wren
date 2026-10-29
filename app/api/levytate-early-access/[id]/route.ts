@@ -5,6 +5,7 @@ import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authori
 import { isEarlyAccessStatus } from "@/lib/levytate/early-access/domain";
 import { syncPersistentEarlyAccessState } from "@/lib/server/levytate-beta-access-grants";
 import { EarlyAccessStoreError, updateEarlyAccessStatus } from "@/lib/server/levytate-early-access";
+import { ClientRequestError, readAuthenticatedJson, requireActionKeys } from "@/lib/server/levytate-request-boundary";
 
 type PatchBody = {
   status?: unknown;
@@ -26,7 +27,8 @@ export async function PATCH(
   }
 
   try {
-    const body = (await request.json()) as PatchBody;
+    const body = await readAuthenticatedJson(request, session.email) as PatchBody;
+    requireActionKeys(body, ["status"]);
     if (!isEarlyAccessStatus(body.status)) {
       return NextResponse.json(
         { message: "Status is not recognised." },
@@ -44,6 +46,7 @@ export async function PATCH(
 
     return NextResponse.json({ ok: true, lead: leadForAccess, approvalToken });
   } catch (error) {
+    if (error instanceof ClientRequestError) return NextResponse.json({ message: error.message }, { status: error.status });
     const status = error instanceof EarlyAccessStoreError ? 400 : 500;
     return NextResponse.json(
       {

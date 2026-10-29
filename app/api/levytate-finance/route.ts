@@ -15,8 +15,8 @@ export async function POST(request: Request) {
   try {
     const body = parseFinanceAction(await readAuthenticatedJson(request, session.email, 10 * 1024 * 1024));
     if (body.action === "import") return response({ ok: true, ...await importOrganisationFinance(session, body.fileName, body.result) });
-    return response({ ok: true, state: await confirmOrganisationFinanceBalance(session, body.amountPence) });
+    return response({ ok: true, state: await confirmOrganisationFinanceBalance(session, body.amountPence, { expectedConfirmedAt: body.expectedConfirmedAt, requestId: body.requestId }) });
   } catch (error) { return errorResponse(error); }
 }
-function errorResponse(error:unknown){if(error instanceof ClientRequestError)return response({message:error.message},error.status);const status=error instanceof LevyTateLearnerLifecyclePermissionError?403:error instanceof LevyTateFinanceError?400:503;return response({message:status===403?"You do not have access to organisation Finance.":status===400?(error as Error).message:"LevyTate Finance is temporarily unavailable."},status);}
+function errorResponse(error:unknown){if(error instanceof ClientRequestError)return response({message:error.message},error.status);const status=error instanceof LevyTateLearnerLifecyclePermissionError?403:error instanceof LevyTateFinanceError?error.status:503;return response({message:status===403?"You do not have access to organisation Finance.":error instanceof LevyTateFinanceError?error.message:"LevyTate Finance is temporarily unavailable."},status);}
 function response(body:unknown,status=200){return NextResponse.json(body,{status,headers:{"Cache-Control":"private, no-store, max-age=0"}});}

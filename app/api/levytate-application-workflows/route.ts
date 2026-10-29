@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
 import type { ApplicationWorkflowStep } from "@/lib/levytate/application-workflows/domain";
 import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
-import { ClientRequestError, readBrowserJson } from "@/lib/server/levytate-request-boundary";
+import { ClientRequestError, readAuthenticatedJson } from "@/lib/server/levytate-request-boundary";
 import { ApplicationCommandError } from "@/lib/server/levytate-application-commands";
 import {
   ApplicationWorkflowServiceError,
@@ -24,9 +24,8 @@ export async function GET() {
 export async function POST(request: Request) {
   const session = await authorisedSession();
   if (!session) return reply({ message: "Unauthorised." }, 401);
-  if (request.headers.get("origin") !== new URL(request.url).origin) return reply({ message: "Forbidden." }, 403);
   try {
-    const body = await readBrowserJson(request, 32 * 1024) as { action?: string; transitionAction?: string; versionId?: string; steps?: ApplicationWorkflowStep[]; applicationId?: string; idempotencyKey?: string; note?: string; expectedLockVersion?: number; expectedRevision?: number };
+    const body = await readAuthenticatedJson(request, session.email, 32 * 1024) as { action?: string; transitionAction?: string; versionId?: string; steps?: ApplicationWorkflowStep[]; applicationId?: string; idempotencyKey?: string; note?: string; expectedLockVersion?: number; expectedRevision?: number };
     if (body.action === "create_draft") return reply({ draft: await createApplicationWorkflowDraft(session) }, 201);
     if (body.action === "start" && body.applicationId && body.idempotencyKey) return reply({ instance: await startApplicationWorkflow(session, body.applicationId, body.idempotencyKey, body.expectedRevision) }, 201);
     if (body.action === "transition" && body.applicationId && body.idempotencyKey && typeof body.expectedLockVersion === "number") return reply({ instance: await transitionApplicationWorkflowForSession(session, { applicationId: body.applicationId, action: String(body.transitionAction ?? ""), note: body.note, idempotencyKey: body.idempotencyKey, expectedLockVersion: body.expectedLockVersion, expectedRevision: body.expectedRevision }) });

@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { assertBrowserOrigin } from "@/lib/server/levytate-request-boundary";
+import { assertAuthenticatedWrite } from "@/lib/server/levytate-request-boundary";
 import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
 import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
@@ -21,7 +21,7 @@ export async function POST(
   }
 
   try {
-    assertBrowserOrigin(request);
+    await assertAuthenticatedWrite(request, session.email);
     const { learnerRecordId } = await params;
     const learner = await markLearnerAsEnrolled(session, learnerRecordId);
     return NextResponse.json({

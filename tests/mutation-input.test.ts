@@ -10,7 +10,8 @@ const importAction = () => ({ action: "import", fileName: "synthetic.csv", resul
 describe("Finance input contract", () => {
   it("accepts the actual UI import and explicit zero balance", () => {
     expect(parseFinanceAction(importAction()).action).toBe("import");
-    expect(parseFinanceAction({ action: "balance", amountPence: 0 })).toEqual({ action: "balance", amountPence: 0 });
+    const balance = { action: "balance", amountPence: 0, expectedConfirmedAt: null, requestId: "7b8aa254-57cb-4079-a4bd-9c462cb6bf5b" };
+    expect(parseFinanceAction(balance)).toEqual(balance);
   });
   it.each([NaN, Infinity, -1, 1.2, Number.MAX_SAFE_INTEGER + 1, "12"])("rejects unsafe balance %s", (amountPence) => {
     expect(() => parseFinanceAction({ action: "balance", amountPence })).toThrow();
@@ -30,6 +31,10 @@ describe("Finance input contract", () => {
     expect(() => parseFinanceAction(body)).toThrow();
     body.result.sourceRows = 1; body.result.dateRange.from = "2026-10-02";
     expect(() => parseFinanceAction(body)).toThrow();
+  });
+  it("requires a balance version and stable retry identity", () => {
+    expect(() => parseFinanceAction({ action: "balance", amountPence: 0 })).toThrow();
+    expect(() => parseFinanceAction({ action: "balance", amountPence: 0, expectedConfirmedAt: "yesterday", requestId: "not-a-uuid" })).toThrow();
   });
 });
 

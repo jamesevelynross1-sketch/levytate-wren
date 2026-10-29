@@ -1,4 +1,4 @@
-import { readBrowserJson } from "@/lib/server/levytate-request-boundary";
+import { readAuthenticatedJson } from "@/lib/server/levytate-request-boundary";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
@@ -41,7 +41,7 @@ export async function POST(
 
   try {
     const { learnerRecordId } = await params;
-    const input = await readBrowserJson(request) as LearnerReviewInput;
+    const input = await readAuthenticatedJson(request, session.email) as LearnerReviewInput;
     const result = await addLearnerReview(session, learnerRecordId, input);
     const label = learnerReviewTypeLabels[result.record.reviewType];
     return NextResponse.json({ ok: true, source: "supabase", message: result.created ? `${label} recorded.` : `${label} already recorded.`, ...result });

@@ -1,4 +1,4 @@
-import { readBrowserJson } from "@/lib/server/levytate-request-boundary";
+import { readAuthenticatedJson } from "@/lib/server/levytate-request-boundary";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
@@ -12,7 +12,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ lea
   if (!session) return NextResponse.json({ message: "Unauthorised." }, { status: 401 });
   try {
     const { learnerRecordId } = await params;
-    const result = await startLearnerAssessment(session, learnerRecordId, await readBrowserJson(request) as StartAssessmentInput);
+    const result = await startLearnerAssessment(session, learnerRecordId, await readAuthenticatedJson(request, session.email) as StartAssessmentInput);
     return NextResponse.json({ ok: true, source: "supabase", ...result, message: "Learner marked as in assessment." });
   } catch (error) {
     return lifecycleErrorResponse(error);

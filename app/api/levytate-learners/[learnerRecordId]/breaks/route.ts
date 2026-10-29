@@ -1,4 +1,4 @@
-import { readBrowserJson } from "@/lib/server/levytate-request-boundary";
+import { readAuthenticatedJson } from "@/lib/server/levytate-request-boundary";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
@@ -28,7 +28,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ lea
   if (!session) return NextResponse.json({ message: "Unauthorised." }, { status: 401 });
   try {
     const { learnerRecordId } = await params;
-    const result = await startBreakInLearning(session, learnerRecordId, await readBrowserJson(request) as StartBreakInLearningInput);
+    const result = await startBreakInLearning(session, learnerRecordId, await readAuthenticatedJson(request, session.email) as StartBreakInLearningInput);
     return NextResponse.json({ ok: true, source: "supabase", message: result.created ? "Break in learning started." : "Break in learning already recorded.", ...result });
   } catch (error) {
     return lifecycleErrorResponse(error);

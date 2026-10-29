@@ -25,7 +25,7 @@ const transaction = z.strictObject({
   fingerprint: z.string().max(128),
 });
 const financeAction = z.discriminatedUnion("action", [
-  z.strictObject({ action: z.literal("balance"), amountPence: money.nonnegative() }),
+  z.strictObject({ action: z.literal("balance"), amountPence: money.nonnegative(), expectedConfirmedAt: z.iso.datetime({ offset: true }).nullable(), requestId: z.uuid() }),
   z.strictObject({
     action: z.literal("import"), fileName: z.string().trim().min(1).max(255),
     result: z.strictObject({
