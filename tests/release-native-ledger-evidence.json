@@ -1,0 +1,31 @@
+{
+  "formatVersion": 1,
+  "environment": "local",
+  "postgresMajorVersion": 17,
+  "observedAt": "2026-10-29T20:38:51Z",
+  "provenance": "Read-only original native PostgreSQL ledger written by official Supabase CLI 2.122.0 db push; never manually repaired or populated. Not the schema-only combined verifier database.",
+  "cliVersion": "2.122.0",
+  "cliBinarySha256": "fe87a5f9781d5423dbd5ebba2d5a6e1a541d01754d14941c574952e5695eaab0",
+  "statementChecksumAlgorithm": "SHA-256 of UTF-8 statements joined in recorded array order with a single LF (no trailing LF)",
+  "rows": [
+    {
+      "version": "20261027174133",
+      "name": "006_create_levytate_production_foundation",
+      "statementCount": 61,
+      "statementsSha256": "f47356686324f4f41fcf02701f7e3e44bccc8c561d3aa68eecb250355330241a",
+      "sourceFileSha256": "876321865fd5efd9473c8863078c1d3cd2173927b737555c36266039fea16f35"
+    },
+    {
+      "version": "20261027190000",
+      "name": "levytate_fresh_project_convergence",
+      "statementCount": 954,
+      "statementsSha256": "3b582ad74254045351bbd89beee7cf16a5c0d9a16c613848eec3977e07ad947d",
+      "sourceFileSha256": "3bd6b681196ff865f50976129981b48601314d2bab2421794648fba51aefb204"
+    }
+  ],
+  "limitations": [
+    "CLI splits statements; the local anchor has 61 statements, not the isolated hosted anchor's single statement. These representations must not be interchanged.",
+    "The checksum concerns recorded SQL statement content, not current data or a claim of hosted catalogue equivalence.",
+    "Subsequent candidate migrations were applied only to local test databases; their history was not fabricated into this ledger."
+  ]
+}

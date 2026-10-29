@@ -4,7 +4,7 @@
  * Mailpit proves local SMTP capture, not delivery to a real external inbox.
  */
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 import { localUrl, releaseBackend } from "./release-local-fixtures.mjs";
@@ -60,6 +60,7 @@ try {
   const backend = releaseBackend();
   const contexts = new Map();
   const peopleUiOnly=process.env.RELEASE_PEOPLE_UI_ONLY==="true";
+  const exportOnly=process.env.RELEASE_EXPORT_ONLY==="true";
   const failureBudgetStartedAt=new Date().toISOString();
   for (const tenant of manifest.tenants) {
     for (const user of tenant.users) {
@@ -145,6 +146,25 @@ try {
   }
   const failureWrites=failureBudgetWritesSince(failureBudgetStartedAt);
   if(failureWrites!==null)check(`${contexts.size} genuine successful callbacks do not consume failed-link budget`,failureWrites===0);
+  if(process.env.RELEASE_EVIDENCE_EXPORT==="true"||exportOnly){
+    phase="real-role aggregate evidence export";
+    for(const actor of contexts.values()){
+      const response=await actor.context.request.post(`${app}/api/levytate-employer-insights/export`,{headers:{Origin:app},data:{}});
+      if(actor.user.key!=="lead"){
+        check(`${actor.tenant.key} ${actor.user.role}: employer evidence export denied`,response.status()===403);continue;
+      }
+      const body=await response.text();
+      check(`${actor.tenant.key} Lead: aggregate evidence download succeeds`,response.status()===200&&response.headers()["content-disposition"]?.includes("attachment"));
+      const evidence=JSON.parse(body),digest=createHash("sha256").update(body).digest("hex");
+      check(`${actor.tenant.key} Lead: exact export digest and no-store headers`,response.headers()["x-levytate-evidence-sha256"]===digest&&response.headers()["cache-control"].includes("no-store"));
+      const other=manifest.tenants.find(t=>t.id!==actor.tenant.id);
+      check(`${actor.tenant.key} Lead: export is own-tenant aggregate only`,evidence.organisationId===actor.tenant.id&&!body.includes(other.id)&&manifest.tenants.flatMap(t=>t.users).every(u=>!body.includes(u.email))&&!Object.hasOwn(evidence,"employees"));
+      const audit=await backend(`rest/v1/levytate_audit_events?organisation_id=eq.${actor.tenant.id}&action=eq.employer_evidence.prepared&metadata->>sha256=eq.${digest}&select=id,metadata`);
+      check(`${actor.tenant.key} Lead: exact bytes reconcile to one confirmed audit receipt`,audit.length===1&&audit[0].metadata.bytes===Buffer.byteLength(body)&&audit[0].metadata.sha256===digest);
+      const forged=await actor.context.request.post(`${app}/api/levytate-employer-insights/export`,{headers:{Origin:app},data:{organisationId:other.id,fields:["employees"]}});
+      check(`${actor.tenant.key} Lead: caller cannot choose tenant or raw fields`,forged.status()===400);
+    }
+  }
   for(const key of peopleUiOnly?["a:lead"]:["a:employee","a:manager","a:lead"]) {
     const actor=contexts.get(key);
     for(const path of ["levytate-lift","levytate-learning-time","levytate-requests","levytate-pastoral"]){
@@ -200,7 +220,7 @@ try {
     const replay = await item.context.request.get(item.consumedLink, { maxRedirects: 0 });
     check(`${key}: consumed magic link cannot replay`, replay.status() >= 300 && replay.status() < 400 && (replay.headers().location ?? "").includes("invalid-link"));
   }
-  if (manifest.catalogue&&!peopleUiOnly) {
+  if (manifest.catalogue&&!peopleUiOnly&&!exportOnly) {
     phase = "separate-role application and enrolment handoff";
     const employeeA = contexts.get("a:employee"), managerA = contexts.get("a:manager"), leadA = contexts.get("a:lead"), leadB = contexts.get("b:lead");
     const post = (actor, data) => actor.context.request.post(`${app}/api/levytate-workspace`, { headers: { Origin: app }, data });
@@ -273,7 +293,7 @@ try {
       check("no fictional notification claimed delivered",outcomeBody.learner?.withdrawal?.providerNotified===false&&outcomeBody.learner?.withdrawal?.employeeNotified===false);
     }
   }
-  if(!peopleUiOnly){
+  if(!peopleUiOnly&&!exportOnly){
   const employee = contexts.get("a:employee");
   const forged = await employee.context.request.post(`${app}/api/levytate-workspace`, {
     headers: { Origin: app }, data: { type: "saveEmployeeDevelopmentProfile", profile: { employeeId: "b-employee" } },

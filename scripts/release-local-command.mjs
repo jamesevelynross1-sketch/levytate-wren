@@ -48,6 +48,7 @@ const commands = {
   finance: [process.execPath,[resolve(scriptDir,"release-finance-integrity.mjs")]],
   learner: [process.execPath,[resolve(scriptDir,"release-learner-integrity.mjs")]],
   suspension: [process.execPath,[resolve(scriptDir,"release-suspension-integrity.mjs")]],
+  catalogue: [process.execPath,[resolve(scriptDir,"release-catalogue-concurrency.mjs")]],
   start: [process.execPath, [resolve(scriptDir, "release-start-local-stack.mjs")]],
   stop: [`${root}/supabase`, ["stack", "stop", "--workdir", `${root}/project`, "--output-format", "json"]],
   "bootstrap-dry-run": [`${root}/supabase`, ["db", "push", "--local", "--dry-run", "--workdir", `${root}/project`]],

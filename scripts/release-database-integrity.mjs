@@ -56,6 +56,8 @@ try {
     insert into public.levytate_users(id,organisation_id,email,role,access_level,active) values
       ${member("employee", "Employee")},${member("manager", "Line Manager")},${member("lead", "Apprenticeship Lead")},
       ${member("otherManager", "Line Manager")},${member("admin", "Employer Admin")},${member("platform", "Platform Admin")},${member("otherLead", "Apprenticeship Lead", otherOrg)};
+    insert into public.levytate_apprenticeship_standards(id,title,reference_code,status,level,occupational_route) values(${literal(standard)},'Synthetic standard',${literal(standard)},'Approved for delivery',4,'Synthetic');
+    insert into public.levytate_roles(organisation_id,id,title,career_level) values(${literal(org)},${literal(role)},'Synthetic role','Experienced');
     insert into public.levytate_employees(organisation_id,id,employee_number,name,email,platform_role,start_date,manager_id,role_id) values
       (${literal(org)},${literal(manager)},'M','Synthetic Manager',${literal(email("manager"))},'Line Manager','2026-01-01','',''),
       (${literal(org)},${literal(outsider)},'X','Synthetic Other Manager',${literal(email("otherManager"))},'Line Manager','2026-01-01','',''),
@@ -82,10 +84,9 @@ try {
     const catalogId = required(`select id from public.levytate_organisations where slug='levytate-internal';`) || catalog;
     if (catalogId === catalog) required(`insert into public.levytate_organisations(id,name,slug) values(${literal(catalog)},'Synthetic catalogue','levytate-internal');`);
     required(`
-      insert into public.levytate_roles(organisation_id,id,title,career_level) values(${literal(org)},${literal(role)},'Synthetic role','Mixed');
       insert into public.levytate_role_pathway_mappings(organisation_id,id,role_id,apprenticeship_standard_id,recommendation_type) values(${literal(org)},${literal(`mapping-${prefix}`)},${literal(role)},${literal(standard)},'Primary');
-      insert into public.levytate_providers(organisation_id,provider_id,provider_name,provider_type,status,verification_status) values(${literal(catalogId)},${literal(provider)},'Synthetic provider','Independent training provider','Active','verified');
-      insert into public.levytate_provider_programmes(organisation_id,id,provider_id,apprenticeship_standard_id,linked_standard_id,status,record_status,verification_status) values(${literal(catalogId)},${literal(programme)},${literal(provider)},${literal(standard)},${literal(standard)},'Active','Active','LevyTate reviewed');
+      insert into public.levytate_providers(organisation_id,provider_id,provider_name,provider_type,status,verification_status,last_verified,source_urls) values(${literal(catalogId)},${literal(provider)},'Synthetic provider','Independent training provider','Active','verified',current_date,'["https://example.test/synthetic-provider"]');
+      insert into public.levytate_provider_programmes(organisation_id,id,provider_id,apprenticeship_standard_id,linked_standard_id,linked_standard_ids,status,record_status,verification_status,source_url) values(${literal(catalogId)},${literal(programme)},${literal(provider)},${literal(standard)},${literal(standard)},${json([standard])},'Active','Active','LevyTate reviewed','https://example.test/synthetic-programme');
       insert into public.levytate_organisation_providers(organisation_id,provider_id,status) values(${literal(org)},${literal(provider)},'Active');
       insert into public.levytate_organisation_programmes(organisation_id,programme_id,provider_id,status) values(${literal(org)},${literal(programme)},${literal(provider)},'Active');
     `);
