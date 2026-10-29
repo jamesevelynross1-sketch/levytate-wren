@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { operationalActionInput, parseAction } from "../lib/server/levytate-operational-input.ts";
 
 const migration = readFileSync("supabase/migrations/013_create_persistent_operational_actions.sql", "utf8");
+const atomicMigration = readFileSync("supabase/release-migrations/20261029221818_client_operational_action_integrity.sql", "utf8");
 const domain = readFileSync("lib/levytate/mvp/operational-actions.ts", "utf8");
 const server = readFileSync("lib/server/levytate-operational-actions.ts", "utf8");
 const operations = readFileSync("lib/levytate/mvp/operations-centre.ts", "utf8");
@@ -52,13 +53,16 @@ assertIncludes(migration, "levytate_operational_actions_active_source_idx", "Par
 assertIncludes(migration, "where status in ('open', 'acknowledged', 'in_progress')", "Partial uniqueness predicate");
 assertIncludes(migration, "enable row level security", "RLS");
 assertIncludes(migration, "auth.role() = 'service_role'", "Service-role policy");
-assertIncludes(server, "version: `eq.${action.version}`", "Optimistic concurrency control");
+assertIncludes(server, "p_expected_version:expectedVersion", "Server forwards original concurrency revision");
+assertIncludes(atomicMigration, "before_row.version<>p_expected_version", "Atomic optimistic concurrency control");
+assertIncludes(atomicMigration, "receipt.command<>command", "Exact-payload receipt replay");
+assertIncludes(atomicMigration, "revoke insert,update,delete,truncate on public.levytate_operational_actions,public.levytate_operational_action_events", "No non-atomic direct state/history writes");
 assertIncludes(server, "source_condition_resolved", "Automatic completion");
 assertIncludes(server, "dismissalSuppressesUntilConditionClears", "Dismissal recurrence policy");
 assertIncludes(server, "ownershipOverride", "Managed ownership persistence");
 assertIncludes(server, "dueDateOverride", "Controlled due-date override");
 assertIncludes(server, "buildOwnerOptions", "Organisation-scoped owner options");
-assertIncludes(server, "/duplicate|23505/i", "Concurrent insertion recovery");
+assertIncludes(atomicMigration, "source_key=proposed->>'source_key' and status in ('open','acknowledged','in_progress')", "Concurrent source insertion recovery under the transaction lock");
 assertIncludes(api, "expectedVersion", "Mutation version contract");
 assertIncludes(api, "parseAction(operationalActionInput, await readAuthenticatedJson(request, session.email))", "Bounded authenticated strict action contract");
 for (const field of ["organisationId", "actorUserId", "status"]) {

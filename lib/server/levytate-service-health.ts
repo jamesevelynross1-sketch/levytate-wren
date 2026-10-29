@@ -41,6 +41,7 @@ const criticalChecks = [
   { key: "lift-contract", kind: "table", table: "levytate_lift_workspace_revisions", column: "revision", label: "Lift concurrency schema" },
   { key: "workspace-contract", kind: "table", table: "levytate_workspace_entity_versions", column: "entity_key,revision", label: "Atomic workspace concurrency schema" },
   { key: "learning-time-contract", kind: "table", table: "levytate_otj_command_receipts", column: "request_id", label: "Learning Time receipt schema" },
+  { key: "operations-contract", kind: "table", table: "levytate_operational_action_receipts", column: "action_id,expected_version", label: "Atomic Operations receipt schema" },
 ] as const satisfies readonly HealthCheckDefinition[];
 const optionalChecks = [
   { key: "prospect", kind: "table", table: "levytate_prospect_access", column: "id", label: "Optional prospect access diagnostics" },
