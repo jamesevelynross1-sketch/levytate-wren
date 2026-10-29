@@ -47,7 +47,7 @@ createServer(async (request, response) => {
     if (!valid) throw new Error("Invalid hook signature");
     const payload = JSON.parse(raw), email = payload.user?.email, data = payload.email_data;
     if (typeof email !== "string" || !/^release\.[a-f0-9-]+\.[ab]\.(lead|manager|employee)@example\.test$/.test(email) || data?.redirect_to !== callback || !["magiclink", "signup", "invite"].includes(data.email_action_type) || !/^[a-f0-9]+$/.test(data.token_hash ?? "")) throw new Error("Only approved local synthetic sign-in delivery is allowed");
-    await deliver(email, data.token_hash, data.email_action_type === "invite" ? "signup" : data.email_action_type);
+    await deliver(email, data.token_hash, data.email_action_type);
     response.writeHead(200, { "Content-Type": "application/json" }).end("{}");
     console.log("PASS signed local Auth email captured by loopback SMTP");
   } catch {

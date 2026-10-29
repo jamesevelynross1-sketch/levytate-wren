@@ -10,6 +10,14 @@ if (!root?.startsWith("/private/tmp/levytate-release-runtime.")) throw new Error
 const secretPath = `${root}/private-app-secrets.json`;
 if (!existsSync(secretPath)) writeFileSync(secretPath, JSON.stringify({ hookSecret: randomBytes(32).toString("base64"), sessionSecret: randomBytes(48).toString("base64url") }), { mode: 0o600, flag: "wx" });
 const secrets = JSON.parse(readFileSync(secretPath, "utf8"));
+const rateRun = process.env.RELEASE_RATE_LIMIT_RUN;
+let rateSecret;
+if (rateRun) {
+  if (!/^[a-z0-9-]{1,32}$/.test(rateRun)) throw new Error("Invalid local test run name");
+  const ratePath = `${root}/private-rate-limit-${rateRun}.json`;
+  if (!existsSync(ratePath)) writeFileSync(ratePath, JSON.stringify({ secret: randomBytes(48).toString("base64url") }), { mode: 0o600, flag: "wx" });
+  rateSecret = JSON.parse(readFileSync(ratePath, "utf8")).secret;
+}
 const state = JSON.parse(readFileSync(`${root}/private-stack-state.json`, "utf8"));
 const base = state.env.API_URL;
 if (new URL(base).hostname !== "127.0.0.1") throw new Error("Local API must remain loopback");
@@ -18,6 +26,7 @@ const env = {
   ...process.env, SUPABASE_HOME: `${root}/home`, RELEASE_EMAIL_HOOK_SECRET: `v1,whsec_${secrets.hookSecret}`,
   NEXT_PUBLIC_SUPABASE_URL: base, SUPABASE_SERVICE_ROLE_KEY: state.env.SERVICE_ROLE_KEY,
   LEVYTATE_BETA_SESSION_SECRET: secrets.sessionSecret, LEVYTATE_BETA_LOGIN_ENABLED: "false",
+  ...(rateSecret ? { LEVYTATE_AUTH_RATE_LIMIT_SECRET: rateSecret } : {}),
   RELEASE_SUPABASE_URL: base, RELEASE_SUPABASE_SERVICE_KEY: state.env.SERVICE_ROLE_KEY,
   RELEASE_APP_URL: process.env.RELEASE_APP_URL ?? "http://localhost:3107", RELEASE_MAILPIT_URL: state.env.MAILPIT_URL,
   RELEASE_FIXTURE_MANIFEST: process.env.RELEASE_FIXTURE_MANIFEST ?? `${root}/fixture-manifest.json`, RELEASE_EVIDENCE_PATH: `${root}/browser-evidence.json`,

@@ -61,7 +61,8 @@ try {
       await page.goto(`${app}/levytate/login`);
       check(`${label}: no demo login required`, !(await page.getByText("Internal demonstration access", { exact: true }).count()));
       const after = Date.now();
-      if (user.key === "lead") {
+      const memberships = await backend(`rest/v1/levytate_users?id=eq.${user.membershipId}&select=auth_binding_status,invitation_generation`);
+      if (user.key === "lead" || memberships[0]?.auth_binding_status === "bound") {
         phase = `${label}: submit login form`;
         await page.getByLabel("Work email", { exact: true }).fill(user.email);
         await page.getByRole("button", { name: "Send secure sign-in link", exact: true }).click();
@@ -71,7 +72,7 @@ try {
         phase = `${label}: controlled invitation`;
         const lead = contexts.get(`${tenant.key}:lead`);
         const requestId = randomUUID();
-        const invitation = { action: "invite_user", userId: user.membershipId, requestId, expectedGeneration: 0 };
+        const invitation = { action: "invite_user", userId: user.membershipId, requestId, expectedGeneration: memberships[0]?.invitation_generation ?? 0 };
         const invite = await lead.context.request.post(`${app}/api/levytate-workspace/invitations`, { headers: { Origin: app }, data: invitation });
         const accepted = await invite.json();
         if (invite.status() !== 200 || accepted.user?.invitationStatus !== "accepted") console.log("Invitation diagnostic", JSON.stringify({ status: invite.status(), invitationStatus: accepted.user?.invitationStatus, deliveryStatus: accepted.user?.deliveryStatus, message: accepted.message }));
@@ -81,6 +82,7 @@ try {
       }
       phase = `${label}: await local capture`;
       const link = await waitForCapturedLink(mailpit, user.email, app, after);
+      contexts.get(`${tenant.key}:${user.key}`).consumedLink = link;
       check(`${label}: actual sign-in request reached local SMTP capture`, true);
       const callbackResponse = page.waitForResponse((response) => new URL(response.url()).pathname === "/levytate/auth/callback");
       phase = `${label}: redeem app callback`;
@@ -90,6 +92,7 @@ try {
         await page.getByRole("checkbox").check();
         await page.getByRole("button", { name: "Accept Early Access Terms", exact: true }).click();
         await page.waitForURL((url) => url.pathname.includes("/app"));
+        await page.waitForLoadState("load");
       }
       check(`${label}: callback stays on application origin`, new URL(page.url()).origin === app && new URL(page.url()).pathname.includes("/app"));
       const authCookies = (await context.cookies()).filter((cookie) => /^levytate_(beta_session|auth_access|auth_refresh)$/.test(cookie.name));
@@ -101,18 +104,59 @@ try {
       const ownPeople = data.workspace?.data?.employees ?? [];
       check(`${label}: other tenant is absent`, ownPeople.every((person) => !person.id.startsWith(tenant.key === "a" ? "b-" : "a-")));
       if (user.key === "employee") check(`${label}: employee has own People only`, ownPeople.length === 1 && ownPeople[0].id === user.personId);
+      phase = `${label}: browser reload`;
       await page.reload();
+      phase = `${label}: workspace after reload`;
       check(`${label}: authenticated refresh persists`, (await context.request.get(`${app}/api/levytate-workspace`)).status() === 200);
+      phase = `${label}: provider refresh`;
       const refresh = await context.request.post(`${app}/api/levytate-auth/session`, { headers: { Origin: app } });
       check(`${label}: provider session refresh succeeds`, refresh.status() === 200);
-      const replay = await context.request.get(link, { maxRedirects: 0 });
-      check(`${label}: consumed magic link cannot replay`, replay.status() >= 300 && replay.status() < 400 && (replay.headers().location ?? "").includes("invalid-link"));
       for (const width of [320, 390, 768]) {
         await page.setViewportSize({ width, height: 900 });
         check(`${label}: no horizontal overflow at ${width}px`, await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
       }
       await page.setViewportSize({ width: 1280, height: 900 });
     }
+  }
+  // Six valid callbacks plus two adversarial replays fit the unchanged ten-
+  // callback security budget. Do not consume it per-role before others sign in.
+  for (const key of ["a:employee", "b:manager"]) {
+    const item = contexts.get(key);
+    const replay = await item.context.request.get(item.consumedLink, { maxRedirects: 0 });
+    check(`${key}: consumed magic link cannot replay`, replay.status() >= 300 && replay.status() < 400 && (replay.headers().location ?? "").includes("invalid-link"));
+  }
+  if (manifest.catalogue) {
+    phase = "separate-role application and enrolment handoff";
+    const employeeA = contexts.get("a:employee"), managerA = contexts.get("a:manager"), leadA = contexts.get("a:lead"), leadB = contexts.get("b:lead");
+    const post = (actor, data) => actor.context.request.post(`${app}/api/levytate-workspace`, { headers: { Origin: app }, data });
+    const applicationId = `browser-${manifest.run}`;
+    const application = { id: applicationId, employeeId: employeeA.user.personId, apprenticeshipStandardId: manifest.catalogue.standardId, reason: "Synthetic acceptance work need", careerGoal: "Synthetic professional development", supportRequired: "None", status: "Awaiting Manager Review", currentOwner: "Line Manager", revision: 0 };
+    const submit = { type: "saveApplication", application, expectedRevision: 0, idempotencyKey: `browser-submit-${manifest.run}` };
+    const result = await post(employeeA, submit), persisted = await result.json();
+    if (result.status() !== 200) console.log("Application diagnostic", JSON.stringify({ status: result.status(), message: persisted.message }));
+    check("real Employee submits durable application", result.status() === 200 && persisted.workspace?.data?.applications?.some((item) => item.id === applicationId && item.status === "Awaiting Manager Review" && item.revision === 1));
+    check("real Employee lost-response retry succeeds", (await post(employeeA, submit)).status() === 200);
+    check("real Employee cannot create second active application", (await post(employeeA, { ...submit, application: { ...application, id: `${applicationId}-second` }, idempotencyKey: randomUUID() })).status() === 409);
+    const decide = (actor, status, expectedRevision) => post(actor, { type: "updateApplicationStatus", id: applicationId, status, expectedRevision, idempotencyKey: randomUUID(), note: "Synthetic acceptance review" });
+    check("real Lead cannot bypass manager review", [403, 409].includes((await decide(leadA, "Approved for Enrolment", 1)).status()));
+    check("other tenant Lead cannot decide application", [403, 404, 409].includes((await decide(leadB, "Approved for Enrolment", 1)).status()));
+    const managerDecision = await decide(managerA, "Awaiting Final Approval", 1);
+    check("real direct Line Manager advances to Lead", managerDecision.status() === 200 && (await managerDecision.json()).workspace?.data?.applications?.some((item) => item.id === applicationId && item.status === "Awaiting Final Approval" && item.revision === 2));
+    check("stale real manager decision rejected", (await decide(managerA, "Awaiting Final Approval", 1)).status() === 409);
+    const final = await decide(leadA, "Approved for Enrolment", 2);
+    check("real Lead final approval persists after manager", final.status() === 200 && (await final.json()).workspace?.data?.applications?.some((item) => item.id === applicationId && item.status === "Approved for Enrolment" && item.revision === 3));
+    await employeeA.page.reload();
+    const afterRefresh = await employeeA.context.request.get(`${app}/api/levytate-workspace`);
+    check("Employee sees final approval after browser refresh", (await afterRefresh.json()).workspace?.data?.applications?.some((item) => item.id === applicationId && item.status === "Approved for Enrolment"));
+    const handoff = { applicationId, employeeId: employeeA.user.personId, programmeId: manifest.catalogue.programmeId, providerId: manifest.catalogue.providerId, lifecycleStatus: "pre_enrolment", employmentRoute: "existing_employee_upskill", expectedStartDate: "2027-01-01", expectedEndDate: "2028-01-01", expectedApplicationRevision: 3, idempotencyKey: randomUUID() };
+    const start = (actor, data) => actor.context.request.post(`${app}/api/levytate-learners`, { headers: { Origin: app }, data });
+    check("Employee cannot initiate employer enrolment handoff", (await start(employeeA, handoff)).status() === 403);
+    check("direct enrolled status bypass is rejected", (await start(leadA, { ...handoff, lifecycleStatus: "enrolled" })).status() === 400);
+    const started = await start(leadA, handoff), startedBody = await started.json();
+    check("approved application creates genuine pre-enrolment", started.status() === 201 && startedBody.source === "supabase" && startedBody.learner?.lifecycleStatus === "pre_enrolment");
+    check("handoff lost-response retry returns persisted learner", (await start(leadA, handoff)).status() === 201);
+    const row = await backend(`rest/v1/levytate_learner_records?organisation_id=eq.${employeeA.tenant.id}&application_id=eq.${applicationId}&select=id,lifecycle_status`);
+    check("database holds exactly one pre-enrolment handoff", row.length === 1 && row[0].lifecycle_status === "pre_enrolment");
   }
   const employee = contexts.get("a:employee");
   const forged = await employee.context.request.post(`${app}/api/levytate-workspace`, {
@@ -134,7 +178,8 @@ try {
 } catch (error) {
   const blocked = error.message?.startsWith("BLOCKED:");
   results.push({ name: "Acceptance execution", status: blocked ? "BLOCKED" : "FAIL", reason: blocked ? error.message : "A browser/API contract failed; authentication state omitted" });
-  console.error(blocked ? error.message : `FAIL release browser acceptance at ${phase} (${error.name}); authentication state and raw errors withheld`);
+  const networkCode = error.message?.match(/net::[A-Z_]+|ECONNREFUSED|ECONNRESET|Target page, context or browser has been closed|Page crashed/)?.[0] ?? "";
+  console.error(blocked ? error.message : `FAIL release browser acceptance at ${phase} (${error.name} ${networkCode}); authentication state and raw errors withheld`);
   process.exitCode = blocked ? 2 : 1;
 } finally {
   await browser?.close();

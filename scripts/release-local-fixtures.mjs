@@ -31,6 +31,13 @@ export async function createReleaseFixtures() {
   const backend = releaseBackend();
   const run = randomUUID();
   const manifest = { version: 1, run, synthetic: true, environment: "local", tenants: [] };
+  const catalogue = await backend("rest/v1/levytate_organisations?slug=eq.levytate-internal&select=id");
+  const catalogueId = catalogue[0]?.id ?? randomUUID();
+  if (!catalogue.length) await backend("rest/v1/levytate_organisations", "POST", { id: catalogueId, name: "Synthetic catalogue", slug: "levytate-internal", status: "Active" });
+  const providerId = `synthetic-${run}`, programmeId = `synthetic-programme-${run}`, standardId = "ST1490";
+  await backend("rest/v1/levytate_providers", "POST", { organisation_id: catalogueId, provider_id: providerId, provider_name: "Synthetic acceptance provider", provider_type: "Independent training provider", status: "Active", verification_status: "verified" });
+  await backend("rest/v1/levytate_provider_programmes", "POST", { organisation_id: catalogueId, id: programmeId, provider_id: providerId, programme_name: "Synthetic acceptance programme", apprenticeship_standard_id: standardId, linked_standard_id: standardId, status: "Active", record_status: "Active", verification_status: "LevyTate reviewed" });
+  manifest.catalogue = { providerId, programmeId, standardId };
   for (const tenant of ["a", "b"]) {
     const id = randomUUID();
     await backend("rest/v1/levytate_organisations", "POST", {
@@ -39,6 +46,9 @@ export async function createReleaseFixtures() {
       contact_email: `release.${run}.${tenant}.lead@example.test`, workspace_template: "levytate-client-v1", status: "Active",
     });
     await backend("rest/v1/levytate_roles", "POST", { organisation_id: id, id: `${tenant}-role`, title: "Synthetic role", career_level: "Mixed", status: "Active" });
+    await backend("rest/v1/levytate_role_pathway_mappings", "POST", { organisation_id: id, id: `${tenant}-mapping`, role_id: `${tenant}-role`, apprenticeship_standard_id: standardId, recommendation_type: "Primary" });
+    await backend("rest/v1/levytate_organisation_providers", "POST", { organisation_id: id, provider_id: providerId, status: "Active" });
+    await backend("rest/v1/levytate_organisation_programmes", "POST", { organisation_id: id, programme_id: programmeId, provider_id: providerId, status: "Active" });
     const people = [];
     const users = [];
     for (const [key, role] of [["lead", "Apprenticeship Lead"], ["manager", "Line Manager"], ["employee", "Employee"]]) {
@@ -61,7 +71,7 @@ export async function createReleaseFixtures() {
       users.push({ key, role, email, membershipId, personId: key === "lead" ? null : personId });
       if (key !== "lead") people.push({
         organisation_id: id, id: personId, employee_number: `${tenant}-${key}`, name: `Synthetic ${key}`, email,
-        job_title: key, platform_role: role, manager_id: key === "employee" ? `${tenant}-manager` : "",
+        job_title: key, department: "Synthetic", platform_role: role, manager_id: key === "employee" ? `${tenant}-manager` : "",
         role_id: `${tenant}-role`, status: "Active", start_date: "2026-01-01",
       });
     }
