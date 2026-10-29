@@ -66,7 +66,7 @@ export async function requestEmployerSignIn(emailInput: string, redirectTo: stri
 }
 
 export async function verifyEmployerMagicLink(tokenHash: string, type: string) {
-  if (!tokenHash || !["email", "magiclink", "signup"].includes(type)) throw new LevyTateAuthError("invalid_link", "This sign-in link is invalid or has expired.", 400);
+  if (!tokenHash || !["email", "magiclink", "signup", "invite"].includes(type)) throw new LevyTateAuthError("invalid_link", "This sign-in link is invalid or has expired.", 400);
   const response = await authFetch("verify", { method: "POST", body: JSON.stringify({ token_hash: tokenHash, type }) });
   if (!response.ok) throw new LevyTateAuthError("invalid_link", "This sign-in link is invalid or has expired.", 401);
   const auth = await response.json() as AuthSessionResponse;

@@ -42,8 +42,15 @@ describe("controlled individual invitations (service boundary)", () => {
     const result = await inviteClientWorkspaceUser(session, input, callback, request);
     expect(result).toMatchObject({ active: true, invitationStatus: "accepted", deliveryStatus: "accepted", invitationGeneration: 1 });
     await inviteClientWorkspaceUser(session, input, callback, request);
-    expect(send.mock.calls.filter(([url]) => url.includes("/otp?"))).toHaveLength(1);
+    expect(send.mock.calls.filter(([url]) => url.includes("/invite?"))).toHaveLength(1);
+    expect(send.mock.calls.filter(([url]) => url.includes("/otp?"))).toHaveLength(0);
     expect(fake.request).toHaveBeenCalledWith("employee@example.test", requestId);
+  });
+  it("uses ordinary sign-in only after the provider has confirmed email ownership", async () => {
+    send.mockImplementation(async (url: string) => Response.json(url.includes("admin/users") ? { users: [{ id: "auth", email: user.email, email_confirmed_at: "2026-10-29T12:00:00Z" }] } : {}));
+    await inviteClientWorkspaceUser(session, { userId: "member", requestId, expectedGeneration: 0 }, callback, request);
+    expect(send.mock.calls.filter(([url]) => url.includes("/otp?"))).toHaveLength(1);
+    expect(send.mock.calls.filter(([url]) => url.includes("/invite?"))).toHaveLength(0);
   });
   it("keeps provider refusal as failed and inactive", async () => {
     send.mockImplementation(async (url: string) => url.includes("admin/users") ? new Response(JSON.stringify({ users: [{ id: "auth", email: user.email }] })) : new Response("{}", { status: 503 }));
@@ -64,7 +71,7 @@ describe("controlled individual invitations (service boundary)", () => {
       inviteClientWorkspaceUser(session, { userId: "member", requestId: "00000000-0000-4000-8000-000000000002", expectedGeneration: 0 }, callback, request),
     ]);
     expect(outcomes.filter((result) => result.status === "fulfilled")).toHaveLength(1);
-    expect(send.mock.calls.filter(([url]) => url.includes("/otp?"))).toHaveLength(1);
+    expect(send.mock.calls.filter(([url]) => url.includes("/invite?"))).toHaveLength(1);
   });
   it("cannot reactivate a user revoked while the email is in flight", async () => {
     let finish!: (response: Response) => void;

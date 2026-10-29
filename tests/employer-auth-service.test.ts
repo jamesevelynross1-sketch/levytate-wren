@@ -31,6 +31,11 @@ beforeEach(() => {
 });
 
 describe("employer authentication service boundary", () => {
+  it("accepts the provider invitation verification type without manufacturing confirmation", async () => {
+    await verifyEmployerMagicLink("synthetic-one-use-invite", "invite");
+    const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string);
+    expect(body).toEqual({ token_hash: "synthetic-one-use-invite", type: "invite" });
+  });
   it("binds a verified individual only after persisted membership and People checks", async () => {
     const result = await verifyEmployerMagicLink("synthetic-one-use-token", "email");
     expect(members[0]).toMatchObject({ auth_subject: authIdentity.id, auth_binding_status: "bound", invitation_status: "consumed" });

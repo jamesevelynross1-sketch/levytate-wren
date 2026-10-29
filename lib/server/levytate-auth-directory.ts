@@ -1,6 +1,6 @@
 import { normaliseBetaEmail } from "@/lib/levytate/config/beta-access";
 
-export type DirectoryAuthUser = { id: string; email?: string };
+export type DirectoryAuthUser = { id: string; email?: string; email_confirmed_at?: string | null };
 type DirectoryPage = { users?: DirectoryAuthUser[]; next_page?: number | null; last_page?: number; total?: number };
 
 /** Never create an identity from a partial directory result. */

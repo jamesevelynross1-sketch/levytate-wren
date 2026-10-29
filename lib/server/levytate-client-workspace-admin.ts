@@ -16,7 +16,7 @@ const employerRoles = new Set<MvpUserRole>(["Employer Admin", "Apprenticeship Le
 
 type OrganisationRow = { id: string; name: string; slug: string; workspace_name: string; primary_contact: string; contact_email: string; status: string; created_at: string; updated_at: string };
 type UserRow = ClientInvitationFields & { id: string; organisation_id: string; email: string; role: MvpUserRole; access_level: string; display_name: string; active: boolean; auth_subject: string | null; auth_binding_status: string; created_at: string; updated_at: string };
-type AuthUser = { id: string; email?: string };
+type AuthUser = { id: string; email?: string; email_confirmed_at?: string | null };
 const userColumns = "id,organisation_id,email,role,access_level,display_name,active,auth_subject,auth_binding_status,created_at,updated_at,invitation_status,invitation_requested_at,invitation_expires_at,invitation_request_reference,invitation_generation";
 export type ClientWorkspaceUser = { id: string; email: string; displayName: string; role: MvpUserRole; active: boolean; authBindingStatus: string; invitationStatus: string; invitationExpiresAt: string | null; invitationGeneration: number; deliveryStatus: string };
 
@@ -217,7 +217,7 @@ export async function inviteClientWorkspaceUser(session: LevyTateBetaSession, in
   if (!(await validateIdentityMembership({ ...current, active: true }))) throw new ClientWorkspaceAdminError("Create exactly one matching active People record before inviting this user.", 409);
   if (!(await checkMagicLinkRequestLimits(request, current.email)).allowed) throw new ClientWorkspaceAdminError("Please wait before sending another invitation.", 429);
   if (await shouldSuppressAuthenticationEmail(current.email)) throw new ClientWorkspaceAdminError("Delivery is suppressed for this address. Resolve the delivery failure before reinviting.", 409);
-  await ensureAuthUser(current.email);
+  const auth = await ensureAuthUser(current.email);
   const now = new Date().toISOString();
   const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
   const generation = current.invitation_generation + 1;
@@ -230,7 +230,11 @@ export async function inviteClientWorkspaceUser(session: LevyTateBetaSession, in
   try {
     await recordAuthenticationEmailRequest(current.email, requestId);
     await audit(current.organisation_id, actor.user.email, "client_workspace.invitation_requested", current.id, "A controlled individual invitation was requested.", actor.user.role);
-    const response = await authRequest(`otp?redirect_to=${encodeURIComponent(redirectTo)}`, { method: "POST", body: JSON.stringify({ email: current.email, create_user: false }) });
+    // Closed registration must stay closed. GoTrue's public OTP route treats an
+    // unconfirmed identity as signup even when create_user=false; the admin invite
+    // route is the supported way to verify that invited identity's first email.
+    const confirmed = Boolean(auth.user.email_confirmed_at);
+    const response = await authRequest(`${confirmed ? "otp" : "invite"}?redirect_to=${encodeURIComponent(redirectTo)}`, { method: "POST", body: JSON.stringify({ email: current.email, ...(confirmed ? { create_user: false } : {}) }) });
     accepted = response.ok;
     await recordAuthenticationEmailAccepted(current.email, requestId, accepted);
   } catch {
