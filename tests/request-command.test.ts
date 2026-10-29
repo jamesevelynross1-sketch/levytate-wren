@@ -5,7 +5,8 @@ vi.mock("@/lib/server/levytate-learner-lifecycle",()=>({getLearnerLifecycleServe
 vi.mock("@/lib/server/levytate-workspace",()=>({getWorkspaceBootstrapForSession:vi.fn()}));
 vi.mock("@/lib/server/levytate-request-capability",()=>({isRequestsEnabledForOrganisation:vi.fn()}));
 vi.mock("@/lib/server/resend",()=>({sendEmail:vi.fn()}));
-import {requestCommand} from "@/lib/server/levytate-service-requests";
+import {requestCommand,resumableRequestInvitations} from "@/lib/server/levytate-service-requests";
+import type {ServiceRequestInvitation} from "@/lib/levytate/requests/domain";
 beforeEach(()=>vi.clearAllMocks());
 describe("Requests atomic command transport (not real-auth acceptance)",()=>{
  const options={organisationId:"fictional-tenant",actorKind:"employer" as const,actorId:"fictional-actor",command:{action:"create_draft",idempotencyKey:"fictional-command"}};
@@ -22,4 +23,15 @@ describe("Requests atomic command transport (not real-auth acceptance)",()=>{
   await expect(requestCommand(options)).rejects.toMatchObject({status});
   await expect(requestCommand(options)).rejects.not.toThrow("private diagnostic");
  });
+});
+describe("Invitation replay is bounded by the original committed command",()=>{
+ const invitations=[{id:"original",requestId:"request",providerId:"provider",status:"pending_delivery"},{id:"later",requestId:"request",providerId:"later-provider",status:"delivery_failed"}] as ServiceRequestInvitation[];
+ const receipt={requestId:"request",deliveryInvitationIds:["original"]};
+ it.each(["create_draft","update_draft","shortlist","publish_revision"])("%s replay cannot deliver invitations",action=>expect(resumableRequestInvitations({action},receipt,invitations)).toEqual([]));
+ it("outbound replay resumes only the durable original invitation",()=>expect(resumableRequestInvitations({action:"invite_providers",providerIds:["provider","later-provider"]},receipt,invitations)).toEqual([invitations[0]]));
+ it("requires both original provider scope and exact invitation retry scope",()=>{
+  expect(resumableRequestInvitations({action:"invite_providers",providerIds:["later-provider"]},receipt,invitations)).toEqual([]);
+  expect(resumableRequestInvitations({action:"retry_invitation",invitationId:"later"},receipt,invitations)).toEqual([]);
+ });
+ it("an older receipt without a delivery set fails closed",()=>expect(resumableRequestInvitations({action:"invite_providers",providerIds:["provider"]},{requestId:"request"},invitations)).toEqual([]));
 });

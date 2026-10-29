@@ -132,7 +132,14 @@ begin
  end loop;
  perform public.levytate_persist_service_request_action(p_organisation_id,p_changes,p_expected);
  insert into public.levytate_audit_events(organisation_id,actor_email,actor_role,entity_type,entity_id,action,summary,metadata) values(p_organisation_id,actor_email,actor_role,'service_request',request_id::text,'request.'||command_action,'Requests action committed atomically.',jsonb_build_object('actorKind',p_actor_kind,'actorId',p_actor_id,'requestKey',command_key));
- result:=jsonb_build_object('committed',true,'requestId',request_id);
+ -- Bind notification resumption to the exact invitation set authorised at commit,
+ -- never to later additions to this Request. Non-outbound commands have no set.
+ result:=jsonb_build_object('committed',true,'requestId',request_id,'deliveryInvitationIds',coalesce((
+  select jsonb_agg(i.id order by i.id) from public.levytate_service_request_invitations i
+  where i.organisation_id=p_organisation_id and i.request_id=request_id and
+   ((command_action in ('send_request','send_existing_draft','invite_providers') and i.provider_id in (select jsonb_array_elements_text(coalesce(p_command->'providerIds','[]'))))
+    or (command_action='retry_invitation' and i.id=invitation.id))
+ ),'[]'::jsonb));
  insert into public.levytate_request_command_receipts(organisation_id,actor_kind,actor_id,request_key,command,result) values(p_organisation_id,p_actor_kind,p_actor_id,command_key,p_command,result);
  return result;
 exception when invalid_text_representation or numeric_value_out_of_range or invalid_datetime_format or datetime_field_overflow then raise exception using errcode='PT422',message='Invalid Requests field';

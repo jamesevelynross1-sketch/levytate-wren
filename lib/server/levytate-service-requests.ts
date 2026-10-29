@@ -432,12 +432,20 @@ async function persistStore(
 
 export async function requestCommand(options: PersistStoreOptions,changes: JsonRow={},expected: JsonRow={},probe=false) {
   try {
-    const result=await supabaseFetchJson<{committed:true;requestId:string}|null>(config(),"rpc/levytate_apply_request_command",{
+    const result=await supabaseFetchJson<{committed:true;requestId:string;deliveryInvitationIds?:string[]}|null>(config(),"rpc/levytate_apply_request_command",{
       method:"POST",body:JSON.stringify({p_organisation_id:options.organisationId,p_actor_kind:options.actorKind,p_actor_id:options.actorId,p_command:options.command,p_changes:changes,p_expected:expected,p_probe:probe}),
     });
     if (!probe && !result?.committed) throw new LevyTateServiceRequestError("The Request write could not be confirmed. Retry the same action.",503);
     return result;
   } catch(error) { throw normaliseWorkflowError(error); }
+}
+
+export function resumableRequestInvitations(command: JsonRow, receipt: {requestId:string;deliveryInvitationIds?:string[]}, invitations: ServiceRequestInvitation[]) {
+  if (!["send_request","send_existing_draft","invite_providers","retry_invitation"].includes(String(command.action))) return [];
+  const authorisedIds=new Set(receipt.deliveryInvitationIds ?? []);
+  return invitations.filter(item=>item.requestId===receipt.requestId && authorisedIds.has(item.id)
+    && ["pending_delivery","delivery_failed"].includes(item.status)
+    && (command.action==="retry_invitation" ? item.id===command.invitationId : Array.isArray(command.providerIds) && command.providerIds.includes(item.providerId)));
 }
 
 function employerActor(
@@ -738,7 +746,7 @@ export async function applyEmployerRequestActionForSession(
   try {
     if (receipt) {
       // Retrying a committed command may resume only its already-created pending notifications.
-      invitationsToDeliver=store.invitations.filter(item=>item.requestId===receipt.requestId && ["pending_delivery","delivery_failed"].includes(item.status));
+      invitationsToDeliver=resumableRequestInvitations(persistence.command,receipt,store.invitations);
     } else {
     if ("content" in action) action.content = canonicalRequestContent(action.content, workspace);
     if ("privateContext" in action) action.privateContext = canonicalPrivateContext(action.privateContext);
