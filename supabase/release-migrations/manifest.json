@@ -1,0 +1,13 @@
+{
+  "formatVersion": 1,
+  "purpose": "Issue 7 client-release candidates; local verification only, hosted execution requires separate approval",
+  "postgresMajorVersion": 17,
+  "approvedBootstrapConvergenceSha256": "3bd6b681196ff865f50976129981b48601314d2bab2421794648fba51aefb204",
+  "migrations": [
+    { "path": "supabase/release-migrations/20261029135739_client_workflow_integrity.sql", "sha256": "f44a05157929e5deb3cf3e36a224088ec2d4936f69d3b91698808998bcbe477c" },
+    { "path": "supabase/release-migrations/20261029140740_client_identity_invitation_lifecycle.sql", "sha256": "0439140f3a8214347b4d91e0fbb085f5be7513903ca6b64901aeb0046be14b75" },
+    { "path": "supabase/release-migrations/20261029151204_client_finance_integrity.sql", "sha256": "1af0a5d526175a8aabaa3b747508acee8977baa8011bb9b95e7fb6e740045771" },
+    { "path": "supabase/release-migrations/20261029151308_client_people_integrity.sql", "sha256": "bf94e514b7761026fb8f04836936c7d5fe1d945ff76eec716336252adc075315" },
+    { "path": "supabase/release-migrations/20261029152606_client_learner_atomic_commands.sql", "sha256": "0f840da15a2d8ca605ae5880de4a2e0b39365f6067c0a1c72cc3ff35101e1840" }
+  ]
+}
