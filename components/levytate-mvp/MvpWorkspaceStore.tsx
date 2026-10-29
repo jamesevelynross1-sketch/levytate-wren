@@ -4,6 +4,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ProviderCatalogueRecord, ProviderProgramme, RequestStatus } from "@/lib/levytate/domain";
 import type { LevyTateWorkspaceBootstrap, LevyTateWorkspaceMeta, LevyTateWorkspaceMutation } from "@/lib/levytate/mvp/api";
 import { hasMvpPermission, mvpMutationPermission, permissionsForMvpRole, type MvpPermission } from "@/lib/levytate/mvp/rbac";
+import { authenticatedClientFetch } from "@/lib/levytate/client-session";
+import { levyTateEmployerSignInPath } from "@/lib/levytate/hosts";
 import {
   activeApplicationStatuses,
   applicationOwnerForStatus,
@@ -39,9 +41,11 @@ type MvpWorkspaceStore = {
   data: MvpWorkspaceData;
   meta: LevyTateWorkspaceMeta | null;
   hydrated: boolean;
+  sessionRecovery: { message: string; busy: boolean; reconnect: () => Promise<void> } | null;
   can: (permission: MvpPermission) => boolean;
   saveProfile: (profile: MvpWorkspaceProfile) => Promise<WorkspaceMutationResult>;
   saveEmployee: (employee: MvpEmployee) => Promise<WorkspaceMutationResult>;
+  importEmployees: (importId: string, employees: MvpEmployee[]) => Promise<WorkspaceMutationResult>;
   archiveEmployee: (id: string) => Promise<WorkspaceMutationResult>;
   saveEmployeeDevelopmentProfile: (profile: MvpEmployeeDevelopmentProfile) => Promise<WorkspaceMutationResult>;
   saveRole: (role: MvpRole) => Promise<WorkspaceMutationResult>;
@@ -66,6 +70,7 @@ type WorkspaceResponse = {
   ok?: boolean;
   workspace?: LevyTateWorkspaceBootstrap;
   message?: string;
+  code?: string;
 };
 
 const MvpWorkspaceContext = createContext<MvpWorkspaceStore | null>(null);
@@ -88,6 +93,8 @@ function applyMutationLocally(current: MvpWorkspaceData, mutation: LevyTateWorks
       return { ...current, profile: mutation.profile };
     case "saveEmployee":
       return { ...current, employees: upsert(current.employees, mutation.employee, "id") };
+    case "importEmployees":
+      return { ...current, employees: [...current.employees, ...mutation.employees] };
     case "archiveEmployee":
       return {
         ...current,
@@ -168,6 +175,8 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
   const [meta, setMeta] = useState<LevyTateWorkspaceMeta | null>(initialWorkspace?.meta ?? null);
   const [hydrated, setHydrated] = useState(Boolean(initialWorkspace));
   const mutationQueue = useRef(Promise.resolve());
+  const [recoveryMessage, setRecoveryMessage] = useState("");
+  const [recovering, setRecovering] = useState(false);
 
   useEffect(() => {
     if (initialWorkspace) {
@@ -179,7 +188,7 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
 
     async function load() {
       try {
-        const response = await fetch("/api/levytate-workspace", { cache: "no-store" });
+        const response = await authenticatedClientFetch("/api/levytate-workspace");
         const payload = (await response.json()) as WorkspaceResponse;
 
         if (!cancelled && response.ok && payload.workspace) {
@@ -191,13 +200,14 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
         if (!cancelled && (!response.ok || !payload.workspace)) {
           const local = persistLocal ? readLocalWorkspace() : createEmptyMvpWorkspace();
           setData(local);
+          if (!persistLocal) setRecoveryMessage(response.status === 401 ? "Your session has ended. Sign in in a new tab, then reconnect here. Any open forms stay in this tab." : "LevyTate could not load the workspace. Reconnect when the service is available.");
           setMeta({
-            organisationId: "local-fallback",
+            organisationId: persistLocal ? "local-fallback" : "",
             organisationName: "LevyTate employer workspace",
             userEmail: "",
             userRole: "Employee",
             permissions: [],
-            storageMode: "local_fallback",
+            storageMode: persistLocal ? "local_fallback" : "supabase",
             warnings: [payload.message ?? "LevyTate workspace persistence is unavailable."],
           });
         }
@@ -205,13 +215,14 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
         if (!cancelled) {
           const local = persistLocal ? readLocalWorkspace() : createEmptyMvpWorkspace();
           setData(local);
+          if (!persistLocal) setRecoveryMessage("LevyTate could not load the workspace. Reconnect when the service is available.");
           setMeta({
-            organisationId: "local-fallback",
+            organisationId: persistLocal ? "local-fallback" : "",
             organisationName: "LevyTate employer workspace",
             userEmail: "",
             userRole: "Employee",
             permissions: [],
-            storageMode: "local_fallback",
+            storageMode: persistLocal ? "local_fallback" : "supabase",
             warnings: ["LevyTate workspace persistence is unavailable."],
           });
         }
@@ -237,26 +248,30 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
 
   const syncMutation = useCallback((mutation: LevyTateWorkspaceMutation): Promise<WorkspaceMutationResult> => {
     const run = mutationQueue.current.then(async (): Promise<WorkspaceMutationResult> => {
-      if (meta?.storageMode !== "supabase") return { ok: true };
+      if (meta?.storageMode !== "supabase") return { ok: false, message: "This workspace is not connected to persistent storage." };
 
       try {
-        const response = await fetch("/api/levytate-workspace", {
+        const response = await authenticatedClientFetch("/api/levytate-workspace", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
+              "X-LevyTate-Account": meta.userEmail,
             },
             body: JSON.stringify(mutation),
-          });
+          }, { email: meta.userEmail, organisationId: meta.organisationId });
 
         const payload = (await response.json()) as WorkspaceResponse;
         if (!response.ok || !payload.workspace) {
           const message = payload.message ?? "LevyTate could not confirm the latest save. Your information is still in this form; please retry.";
           setMeta((current) => appendWarning(current, message));
+          if (response.status === 401) setRecoveryMessage("Your session has ended. Sign in in a new tab, then reconnect here. Your open forms have been kept.");
+          if (payload.code === "account_changed") setRecoveryMessage(message);
           return { ok: false, message };
         }
 
         setData(payload.workspace.data);
         setMeta(payload.workspace.meta);
+        setRecoveryMessage("");
         return { ok: true, workspace: payload.workspace };
       } catch {
         const message = "LevyTate could not confirm the latest save. Your information is still in this form; please retry.";
@@ -266,10 +281,27 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
     });
     mutationQueue.current = run.then(() => undefined, () => undefined);
     return run;
-  }, [meta?.storageMode]);
+  }, [meta?.storageMode, meta?.userEmail, meta?.organisationId]);
+
+  const reconnect = useCallback(async () => {
+    if (recovering) return;
+    setRecovering(true);
+    try {
+      const response = await authenticatedClientFetch("/api/levytate-workspace");
+      const payload = await response.json() as WorkspaceResponse;
+      if (!response.ok || !payload.workspace) { setRecoveryMessage(payload.message || "The workspace is still unavailable. Your open forms have been kept."); return; }
+      if (meta?.userEmail && (payload.workspace.meta.userEmail !== meta.userEmail || payload.workspace.meta.organisationId !== meta.organisationId)) {
+        setRecoveryMessage("A different account is signed in. Reload the page to switch accounts; do not submit this account's open forms."); return;
+      }
+      setData(payload.workspace.data); setMeta(payload.workspace.meta); setRecoveryMessage("");
+    } catch { setRecoveryMessage("The workspace is still unavailable. Your open forms have been kept."); }
+    finally { setRecovering(false); }
+  }, [recovering, meta?.userEmail, meta?.organisationId]);
 
   const commitMutation = useCallback(async (mutation: LevyTateWorkspaceMutation, alreadyOptimistic = false): Promise<WorkspaceMutationResult> => {
     const permission = mvpMutationPermission[mutation.type];
+    if (recoveryMessage) return { ok: false, message: "Reconnect this workspace before submitting. Your input has been kept." };
+    if (!persistLocal && meta?.storageMode !== "supabase") return { ok: false, message: "This workspace is not connected to persistent storage." };
     const permissions = meta?.permissions ?? permissionsForMvpRole(meta?.userRole);
 
     if (!hasMvpPermission(permissions, permission)) {
@@ -318,15 +350,17 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
     }
 
     return syncMutation(mutation);
-  }, [data.applications, syncMutation, meta, persistLocal]);
+  }, [data.applications, syncMutation, meta, persistLocal, recoveryMessage]);
 
   const value = useMemo<MvpWorkspaceStore>(() => ({
     data,
     meta,
     hydrated,
+    sessionRecovery: recoveryMessage ? { message: recoveryMessage, busy: recovering, reconnect } : null,
     can: (permission) => hasMvpPermission(meta?.permissions ?? permissionsForMvpRole(meta?.userRole), permission),
     saveProfile: (profile) => commitMutation({ type: "saveProfile", profile }),
     saveEmployee: (employee) => commitMutation({ type: "saveEmployee", employee }),
+    importEmployees: (importId, employees) => commitMutation({ type: "importEmployees", importId, employees }),
     archiveEmployee: (id) => commitMutation({ type: "archiveEmployee", id }),
     saveEmployeeDevelopmentProfile: (profile) => commitMutation({ type: "saveEmployeeDevelopmentProfile", profile }),
     saveRole: (role) => commitMutation({ type: "saveRole", role }),
@@ -345,9 +379,24 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
     updateMatchingStatus: (id, status) => commitMutation({ type: "updateMatchingStatus", id, status }),
     saveEnrolment: (enrolment) => commitMutation({ type: "saveEnrolment", enrolment }),
     updateEnrolmentStatus: (id, status) => commitMutation({ type: "updateEnrolmentStatus", id, status }),
-  }), [data, hydrated, meta, commitMutation]);
+  }), [data, hydrated, meta, commitMutation, recoveryMessage, recovering, reconnect]);
 
-  return <MvpWorkspaceContext.Provider value={value}>{children}</MvpWorkspaceContext.Provider>;
+  return <MvpWorkspaceContext.Provider value={value}>
+    <WorkspaceSessionRecovery />
+    {children}
+  </MvpWorkspaceContext.Provider>;
+}
+
+/** Safe outside a workspace too: shared dialogs include this without demo auth. */
+export function WorkspaceSessionRecovery() {
+  const recovery = useContext(MvpWorkspaceContext)?.sessionRecovery;
+  if (!recovery) return null;
+  return <div role="alert" className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+    <p>{recovery.message}</p><div className="mt-3 flex flex-wrap gap-3">
+      <button type="button" className="min-h-11 rounded-full border border-amber-300 px-4 font-semibold" onClick={() => window.open(levyTateEmployerSignInPath(window.location.hostname), "_blank", "noopener,noreferrer")}>Sign in in new tab</button>
+      <button type="button" disabled={recovery.busy} className="min-h-11 rounded-full bg-[#102c3d] px-4 font-semibold text-white disabled:opacity-50" onClick={() => void recovery.reconnect()}>{recovery.busy ? "Reconnecting…" : "Reconnect workspace"}</button>
+    </div>
+  </div>;
 }
 
 export function useMvpWorkspace() {

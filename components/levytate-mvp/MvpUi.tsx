@@ -1,5 +1,7 @@
 "use client";
 
+import { WorkspaceSessionRecovery } from "@/components/levytate-mvp/MvpWorkspaceStore";
+
 import { Plus, Search, X } from "lucide-react";
 import { useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type KeyboardEvent, type ReactNode } from "react";
 
@@ -100,7 +102,7 @@ export function MvpModal({ title, eyebrow, children, onClose, wide = false }: { 
           <div>{eyebrow ? <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">{eyebrow}</p> : null}<h2 id={titleId} className="mt-0.5 text-xl font-semibold text-[#102c3d]">{title}</h2></div>
           <button ref={closeRef} type="button" onClick={onClose} title="Close" aria-label="Close dialog" className="grid h-11 w-11 place-items-center rounded-xl text-[#102c3d]/[0.52] transition hover:bg-[#f5f8f6] hover:text-[#102c3d] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20"><X size={18} /></button>
         </div>
-        <div className="p-5">{children}</div>
+        <div className="p-5"><WorkspaceSessionRecovery />{children}</div>
       </section>
     </div>
   );

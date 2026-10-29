@@ -60,6 +60,7 @@ export type MvpPermission =
 export type MvpWorkspaceMutationType =
   | "saveProfile"
   | "saveEmployee"
+  | "importEmployees"
   | "archiveEmployee"
   | "saveEmployeeDevelopmentProfile"
   | "saveRole"
@@ -235,6 +236,7 @@ export const mvpRolePermissions = {
 export const mvpMutationPermission = {
   saveProfile: "settings:write",
   saveEmployee: "employees:write",
+  importEmployees: "employees:write",
   archiveEmployee: "employees:archive",
   saveEmployeeDevelopmentProfile: "employeeDevelopment:write",
   saveRole: "roles:write",

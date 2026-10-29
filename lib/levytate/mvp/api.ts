@@ -59,6 +59,7 @@ export type LevyTateWorkspaceBootstrap = {
 export type LevyTateWorkspaceMutation =
   | { type: "saveProfile"; profile: MvpWorkspaceProfile }
   | { type: "saveEmployee"; employee: MvpEmployee }
+  | { type: "importEmployees"; importId: string; employees: MvpEmployee[] }
   | { type: "archiveEmployee"; id: string }
   | { type: "saveEmployeeDevelopmentProfile"; profile: MvpEmployeeDevelopmentProfile }
   | { type: "saveRole"; role: MvpRole }

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { ApplicationCommandError, applyApplicationCommand } from "@/lib/server/levytate-application-commands";
+import { archivePeopleRecord, importPeopleRecords, savePeopleRecord } from "@/lib/server/levytate-people";
 import { isApplicationWorkflowsEnabledForOrganisation } from "@/lib/server/levytate-application-workflow-capability";
 import { isOffTheJobAssistantEnabledForOrganisation } from "@/lib/server/levytate-off-the-job-capability";
 import {
@@ -52,6 +53,7 @@ import {
   supabaseDelete,
   supabaseInsert,
   supabaseSelect,
+  supabaseSelectAll,
   supabaseUpdate,
 } from "@/lib/server/levytate-supabase";
 import { getEarlyAccessRequestByEmail } from "@/lib/server/levytate-early-access";
@@ -543,11 +545,14 @@ export async function applyWorkspaceMutationForSession(
       await recordAuditEvent(context, "organisation_profile", organisationId, "profile.saved", "Organisation workspace settings updated.");
       break;
     case "saveEmployee":
-      await saveEmployee(organisationId, mutation.employee);
+      await savePeopleRecord(organisationId, mutation.employee);
       await recordAuditEvent(context, "employee", mutation.employee.id, "employee.saved", `Employee record saved for ${mutation.employee.name}.`);
       break;
+    case "importEmployees":
+      await importPeopleRecords(organisationId, context.user.id, mutation.importId, mutation.employees);
+      break;
     case "archiveEmployee":
-      await toggleArchive(organisationId, employeesTable, "id", mutation.id, "status");
+      await archivePeopleRecord(organisationId, mutation.id);
       await recordAuditEvent(context, "employee", mutation.id, "employee.archived", "Employee record archive state changed.");
       break;
     case "saveEmployeeDevelopmentProfile":
@@ -1236,31 +1241,6 @@ async function saveProfile(organisationId: string, profile: MvpWorkspaceProfile)
   });
 }
 
-async function saveEmployee(organisationId: string, employee: MvpEmployee) {
-  const row: EmployeeRow = {
-    organisation_id: organisationId,
-    id: employee.id,
-    employee_number: employee.employeeNumber,
-    name: employee.name,
-    email: employee.email,
-    job_title: employee.jobTitle,
-    role_id: employee.roleId,
-    manager_id: employee.managerId,
-    department: employee.department,
-    site: employee.site,
-    platform_role: employee.platformRole,
-    status: employee.status,
-    start_date: employee.startDate,
-    created_at: employee.createdAt,
-    updated_at: employee.updatedAt,
-  };
-
-  await supabaseInsert<EmployeeRow>(assertSupabase(), employeesTable, [row], {
-    query: "on_conflict=organisation_id,id",
-    prefer: "resolution=merge-duplicates,return=minimal",
-  });
-}
-
 async function saveEmployeeDevelopmentProfile(organisationId: string, profile: MvpEmployeeDevelopmentProfile) {
   const row: EmployeeDevelopmentProfileRow = {
     organisation_id: organisationId,
@@ -1645,10 +1625,13 @@ async function selectOne<T>(table: string, query: URLSearchParams) {
 }
 
 async function selectMany<T>(table: string, organisationId: string, select: string, order: string) {
-  return supabaseSelect<T>(assertSupabase(), table, new URLSearchParams({
+  const key = table === employeeProfilesTable ? "employee_id"
+    : table === providersTable || table === organisationProvidersTable ? "provider_id"
+    : table === organisationProgrammesTable ? "programme_id" : "id";
+  return supabaseSelectAll<T>(assertSupabase(), table, new URLSearchParams({
     select,
     organisation_id: `eq.${organisationId}`,
-    order,
+    order: order.split(",").some((part) => part.startsWith(`${key}.`)) ? order : `${order},${key}.asc`,
   }));
 }
 
