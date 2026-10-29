@@ -6,6 +6,7 @@ import type { LevyTateWorkspaceBootstrap, LevyTateWorkspaceMeta, LevyTateWorkspa
 import { hasMvpPermission, mvpMutationPermission, permissionsForMvpRole, type MvpPermission } from "@/lib/levytate/mvp/rbac";
 import { authenticatedClientFetch } from "@/lib/levytate/client-session";
 import { levyTateEmployerSignInPath } from "@/lib/levytate/hosts";
+import { workspaceMutationEntity } from "@/lib/levytate/mvp/mutation-revisions";
 import {
   activeApplicationStatuses,
   applicationOwnerForStatus,
@@ -43,24 +44,24 @@ type MvpWorkspaceStore = {
   hydrated: boolean;
   sessionRecovery: { message: string; busy: boolean; reconnect: () => Promise<void> } | null;
   can: (permission: MvpPermission) => boolean;
-  saveProfile: (profile: MvpWorkspaceProfile) => Promise<WorkspaceMutationResult>;
-  saveEmployee: (employee: MvpEmployee) => Promise<WorkspaceMutationResult>;
+  saveProfile: (profile: MvpWorkspaceProfile, expectedRevision?: number) => Promise<WorkspaceMutationResult>;
+  saveEmployee: (employee: MvpEmployee, expectedRevision?: number) => Promise<WorkspaceMutationResult>;
   importEmployees: (importId: string, employees: MvpEmployee[]) => Promise<WorkspaceMutationResult>;
   archiveEmployee: (id: string) => Promise<WorkspaceMutationResult>;
-  saveEmployeeDevelopmentProfile: (profile: MvpEmployeeDevelopmentProfile) => Promise<WorkspaceMutationResult>;
-  saveRole: (role: MvpRole) => Promise<WorkspaceMutationResult>;
+  saveEmployeeDevelopmentProfile: (profile: MvpEmployeeDevelopmentProfile, expectedRevision?: number) => Promise<WorkspaceMutationResult>;
+  saveRole: (role: MvpRole, expectedRevision?: number) => Promise<WorkspaceMutationResult>;
   archiveRole: (id: string) => Promise<WorkspaceMutationResult>;
   saveApplication: (application: MvpApplication) => Promise<WorkspaceMutationResult>;
   updateApplicationStatus: (id: string, status: RequestStatus, note?: string) => Promise<WorkspaceMutationResult>;
-  saveProvider: (provider: ProviderCatalogueRecord) => Promise<WorkspaceMutationResult>;
+  saveProvider: (provider: ProviderCatalogueRecord, expectedRevision?: number) => Promise<WorkspaceMutationResult>;
   archiveProvider: (id: string) => Promise<WorkspaceMutationResult>;
-  saveProviderProgramme: (programme: ProviderProgramme) => Promise<WorkspaceMutationResult>;
+  saveProviderProgramme: (programme: ProviderProgramme, expectedRevision?: number) => Promise<WorkspaceMutationResult>;
   archiveProviderProgramme: (id: string) => Promise<WorkspaceMutationResult>;
   removeProviderProgramme: (id: string) => Promise<WorkspaceMutationResult>;
-  saveProviderRelationship: (relationship: MvpProviderRelationship) => Promise<WorkspaceMutationResult>;
+  saveProviderRelationship: (relationship: MvpProviderRelationship, expectedRevision?: number) => Promise<WorkspaceMutationResult>;
   saveOrganisationProvider: (selection: MvpOrganisationProvider) => Promise<WorkspaceMutationResult>;
   saveOrganisationProgramme: (selection: MvpOrganisationProgramme) => Promise<WorkspaceMutationResult>;
-  saveMatchingRequest: (request: MvpMatchingRequest) => Promise<WorkspaceMutationResult>;
+  saveMatchingRequest: (request: MvpMatchingRequest, expectedRevision?: number) => Promise<WorkspaceMutationResult>;
   updateMatchingStatus: (id: string, status: MvpMatchingStatus) => Promise<WorkspaceMutationResult>;
   saveEnrolment: (enrolment: MvpEnrolment) => Promise<WorkspaceMutationResult>;
   updateEnrolmentStatus: (id: string, status: MvpEnrolmentStatus) => Promise<WorkspaceMutationResult>;
@@ -299,6 +300,8 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
   }, [recovering, meta?.userEmail, meta?.organisationId]);
 
   const commitMutation = useCallback(async (mutation: LevyTateWorkspaceMutation, alreadyOptimistic = false): Promise<WorkspaceMutationResult> => {
+    const entityKey = workspaceMutationEntity(mutation, meta?.organisationId ?? "");
+    if (entityKey) mutation = { ...mutation, expectedRevision: mutation.expectedRevision ?? meta?.mutationRevisions?.[entityKey] ?? 0 };
     const permission = mvpMutationPermission[mutation.type];
     if (recoveryMessage) return { ok: false, message: "Reconnect this workspace before submitting. Your input has been kept." };
     if (!persistLocal && meta?.storageMode !== "supabase") return { ok: false, message: "This workspace is not connected to persistent storage." };
@@ -358,24 +361,24 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
     hydrated,
     sessionRecovery: recoveryMessage ? { message: recoveryMessage, busy: recovering, reconnect } : null,
     can: (permission) => hasMvpPermission(meta?.permissions ?? permissionsForMvpRole(meta?.userRole), permission),
-    saveProfile: (profile) => commitMutation({ type: "saveProfile", profile }),
-    saveEmployee: (employee) => commitMutation({ type: "saveEmployee", employee }),
+    saveProfile: (profile, expectedRevision) => commitMutation({ type: "saveProfile", profile, expectedRevision }),
+    saveEmployee: (employee, expectedRevision) => commitMutation({ type: "saveEmployee", employee, expectedRevision }),
     importEmployees: (importId, employees) => commitMutation({ type: "importEmployees", importId, employees }),
     archiveEmployee: (id) => commitMutation({ type: "archiveEmployee", id, status: data.employees.find((item) => item.id === id)?.status === "Archived" ? "Active" : "Archived" }),
-    saveEmployeeDevelopmentProfile: (profile) => commitMutation({ type: "saveEmployeeDevelopmentProfile", profile }),
-    saveRole: (role) => commitMutation({ type: "saveRole", role }),
+    saveEmployeeDevelopmentProfile: (profile, expectedRevision) => commitMutation({ type: "saveEmployeeDevelopmentProfile", profile, expectedRevision }),
+    saveRole: (role, expectedRevision) => commitMutation({ type: "saveRole", role, expectedRevision }),
     archiveRole: (id) => commitMutation({ type: "archiveRole", id, status: data.roles.find((item) => item.id === id)?.status === "Archived" ? "Active" : "Archived" }),
     saveApplication: (application) => commitMutation({ type: "saveApplication", application, expectedRevision: application.revision ?? 0 }),
     updateApplicationStatus: (id, status, note) => commitMutation({ type: "updateApplicationStatus", id, status, note, expectedRevision: data.applications.find((application) => application.id === id)?.revision ?? 0 }),
-    saveProvider: (provider) => commitMutation({ type: "saveProvider", provider }),
+    saveProvider: (provider, expectedRevision) => commitMutation({ type: "saveProvider", provider, expectedRevision }),
     archiveProvider: (id) => commitMutation({ type: "archiveProvider", id, status: data.providers.find((item) => item.providerId === id)?.status === "Archived" ? "Active" : "Archived" }),
-    saveProviderProgramme: (programme) => commitMutation({ type: "saveProviderProgramme", programme }),
+    saveProviderProgramme: (programme, expectedRevision) => commitMutation({ type: "saveProviderProgramme", programme, expectedRevision }),
     archiveProviderProgramme: (id) => commitMutation({ type: "archiveProviderProgramme", id, status: data.providerProgrammes.find((item) => item.id === id)?.recordStatus === "Archived" ? "Active" : "Archived" }),
     removeProviderProgramme: (id) => commitMutation({ type: "removeProviderProgramme", id }),
-    saveProviderRelationship: (relationship) => commitMutation({ type: "saveProviderRelationship", relationship }),
+    saveProviderRelationship: (relationship, expectedRevision) => commitMutation({ type: "saveProviderRelationship", relationship, expectedRevision }),
     saveOrganisationProvider: (selection) => commitMutation({ type: "saveOrganisationProvider", selection }),
     saveOrganisationProgramme: (selection) => commitMutation({ type: "saveOrganisationProgramme", selection }),
-    saveMatchingRequest: (request) => commitMutation({ type: "saveMatchingRequest", request }),
+    saveMatchingRequest: (request, expectedRevision) => commitMutation({ type: "saveMatchingRequest", request, expectedRevision }),
     updateMatchingStatus: (id, status) => commitMutation({ type: "updateMatchingStatus", id, status }),
     saveEnrolment: (enrolment) => commitMutation({ type: "saveEnrolment", enrolment }),
     updateEnrolmentStatus: (id, status) => commitMutation({ type: "updateEnrolmentStatus", id, status }),

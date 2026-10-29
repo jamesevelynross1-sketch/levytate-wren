@@ -1,7 +1,8 @@
 import { normalisePeopleRecord, PeopleValidationError, validatePeopleChanges } from "@/lib/levytate/mvp/people-validation";
 import type { MvpEmployee } from "@/lib/levytate/mvp/workspace";
 import { ClientRequestError } from "@/lib/server/levytate-request-boundary";
-import { getLevyTateSupabaseConfig, supabaseFetchJson, supabaseInsert, supabaseSelectAll, supabaseUpdate } from "@/lib/server/levytate-supabase";
+import { getLevyTateSupabaseConfig, supabaseFetchJson, supabaseSelectAll } from "@/lib/server/levytate-supabase";
+import { applyAtomicWorkspaceCommand } from "@/lib/server/levytate-workspace-commands";
 
 type EmployeeRow = { organisation_id: string; id: string; employee_number: string; name: string; email: string; job_title: string; role_id: string; manager_id: string; department: string; site: string; platform_role: MvpEmployee["platformRole"]; status: MvpEmployee["status"]; start_date: string; created_at: string; updated_at: string };
 const columns = "id,organisation_id,employee_number,name,email,job_title,role_id,manager_id,department,site,platform_role,status,start_date,created_at,updated_at";
@@ -28,29 +29,28 @@ function row(employee: MvpEmployee) {
     status: employee.status, start_date: employee.startDate, created_at: employee.createdAt, updated_at: employee.updatedAt };
 }
 
-export async function savePeopleRecord(organisationId: string, input: unknown) {
+export function preparePeopleRecord(input: unknown) {
+  try { return row(normalisePeopleRecord(input)); }
+  catch (error) { if (error instanceof PeopleValidationError) throw new ClientRequestError(error.message,422); throw error; }
+}
+
+export async function savePeopleRecord(organisationId: string, input: unknown, actorUserId: string, expectedRevision: number) {
   return safely(async () => {
     const employee = normalisePeopleRecord(input);
     const current = await context(organisationId);
     validatePeopleChanges([employee], current.employees, current.roles);
-    const now = new Date().toISOString();
-    const persisted = await supabaseInsert<EmployeeRow>(config(), "levytate_employees", [{ organisation_id: organisationId, ...row(employee),
-      created_at: current.employees.find((item) => item.id === employee.id)?.createdAt ?? now, updated_at: now,
-    }], { query: "on_conflict=organisation_id,id", prefer: "resolution=merge-duplicates,return=representation" });
-    if (persisted.length !== 1 || persisted[0].id !== employee.id) throw new ClientRequestError("The employee save was not confirmed. Keep this form and retry.", 503);
+    await applyAtomicWorkspaceCommand(organisationId,actorUserId,{type:"saveEmployee",employee,expectedRevision},row(employee));
   });
 }
 
-export async function archivePeopleRecord(organisationId: string, employeeId: string, status: "Active" | "Archived") {
+export async function archivePeopleRecord(organisationId: string, employeeId: string, status: "Active" | "Archived", actorUserId: string, expectedRevision: number) {
   return safely(async () => {
     if (!["Active", "Archived"].includes(status)) throw new ClientRequestError("Choose the requested employee state explicitly.", 422);
     const current = await context(organisationId);
     const employee = current.employees.find((item) => item.id === employeeId);
     if (!employee) throw new ClientRequestError("The employee was not found in this workspace.", 404);
-    if (employee.status === status) return;
     validatePeopleChanges([{ ...employee, status }], current.employees, current.roles);
-    const updated = await supabaseUpdate<EmployeeRow>(config(), "levytate_employees", new URLSearchParams({ organisation_id: `eq.${organisationId}`, id: `eq.${employeeId}`, status: `eq.${employee.status}`, updated_at: `eq.${employee.updatedAt}` }).toString(), { status, updated_at: new Date().toISOString() });
-    if (updated.length !== 1) throw new ClientRequestError("This employee changed. Refresh People before retrying.", 409);
+    await applyAtomicWorkspaceCommand(organisationId,actorUserId,{type:"archiveEmployee",id:employeeId,status,expectedRevision},{status});
   });
 }
 

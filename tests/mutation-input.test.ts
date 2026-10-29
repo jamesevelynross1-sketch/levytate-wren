@@ -40,7 +40,8 @@ describe("Finance input contract", () => {
 
 describe("workspace action envelope", () => {
   it.each(["archiveEmployee", "archiveRole", "archiveProvider", "archiveProviderProgramme"])("%s requires an explicit retry-safe target state", (type) => {
-    expect(parseWorkspaceMutation({ type, id: "synthetic-record", status: "Archived" })).toEqual({ type, id: "synthetic-record", status: "Archived" });
+    expect(parseWorkspaceMutation({ type, id: "synthetic-record", status: "Archived",expectedRevision:0 })).toEqual({ type, id: "synthetic-record", status: "Archived",expectedRevision:0 });
+    expect(() => parseWorkspaceMutation({ type, id: "synthetic-record",status:"Archived" })).toThrow();
     expect(() => parseWorkspaceMutation({ type, id: "synthetic-record" })).toThrow();
     expect(() => parseWorkspaceMutation({ type, id: "synthetic-record", status: "Deleted" })).toThrow();
   });

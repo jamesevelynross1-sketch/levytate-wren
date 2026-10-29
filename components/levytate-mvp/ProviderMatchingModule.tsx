@@ -101,11 +101,12 @@ function buildShortlist(
 }
 
 export function ProviderMatchingModule() {
-  const { data, saveProviderRelationship, saveMatchingRequest, updateMatchingStatus } = useMvpWorkspace();
+  const { data, meta, saveProviderRelationship, saveMatchingRequest, updateMatchingStatus } = useMvpWorkspace();
   const { selectableStandards } = useLevyTateStandards();
   const [search, setSearch] = useState("");
   const [relationshipDraft, setRelationshipDraft] = useState<MvpProviderRelationship | null>(null);
   const [requestDraft, setRequestDraft] = useState<MvpMatchingRequest | null>(null);
+  const [draftRevision, setDraftRevision] = useState(0);
   const [selectedRelationshipProviders, setSelectedRelationshipProviders] = useState<string[]>([]);
   const [selectedRelationshipProgrammes, setSelectedRelationshipProgrammes] = useState<string[]>([]);
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
@@ -241,6 +242,7 @@ export function ProviderMatchingModule() {
   function openRelationship(relationship?: MvpProviderRelationship) {
     const next = relationship ? structuredClone(relationship) : blankRelationship();
     setRelationshipDraft(next);
+    setDraftRevision(meta?.mutationRevisions?.[`levytate_provider_relationships:${next.id}`] ?? 0);
     setSelectedRelationshipProviders(Array.from(new Set(next.backupProviderIds.filter((id) => id && id !== next.preferredProviderId))));
     setSelectedRelationshipProgrammes(Array.from(new Set(next.programmeIds)));
     setRequestDraft(null);
@@ -257,6 +259,7 @@ export function ProviderMatchingModule() {
 
   function openRequest(request?: MvpMatchingRequest) {
     setRequestDraft(request ? structuredClone(request) : blankRequest());
+    setDraftRevision(request ? meta?.mutationRevisions?.[`levytate_matching_requests:${request.id}`] ?? 0 : 0);
     setRelationshipDraft(null);
     setSelectedRelationshipProviders([]);
     setSelectedRelationshipProgrammes([]);
@@ -278,6 +281,7 @@ export function ProviderMatchingModule() {
         backupProviderIds: Array.from(new Set(selectedRelationshipProviders.filter((id) => id && id !== relationshipDraft.preferredProviderId))),
         programmeIds: Array.from(new Set(selectedRelationshipProgrammes)),
       }),
+      draftRevision,
     ));
     if (!saved) return;
     setRelationshipDraft(null);
@@ -305,6 +309,7 @@ export function ProviderMatchingModule() {
         shortlistProviderIds,
         updatedAt: nowIso(),
       }),
+      draftRevision,
     ));
     if (!saved) return;
     setRequestDraft(null);

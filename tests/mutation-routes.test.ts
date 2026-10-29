@@ -26,11 +26,11 @@ describe("actual cookie-authenticated mutation routes", () => {
   });
   it("rejects an unauthenticated mutation before parsing it", async () => {
     mocks.session.mockResolvedValue(null);
-    expect((await workspacePost(request({ type: "archiveEmployee", id: "one", status: "Archived" }))).status).toBe(401);
+    expect((await workspacePost(request({ type: "archiveEmployee", id: "one", status: "Archived", expectedRevision: 0 }))).status).toBe(401);
     expect(mocks.mutate).not.toHaveBeenCalled();
   });
   it("does not replay an old account's draft under a new browser session", async () => {
-    const value = request({ type: "archiveEmployee", id: "one", status: "Archived" });
+    const value = request({ type: "archiveEmployee", id: "one", status: "Archived", expectedRevision: 0 });
     value.headers.set("x-levytate-account", "previous@example.invalid");
     const response = await workspacePost(value);
     expect(response.status).toBe(409); expect(await response.json()).toMatchObject({ code: "account_changed" });
@@ -45,7 +45,7 @@ describe("actual cookie-authenticated mutation routes", () => {
   it("does not expose provider diagnostics on reads or writes", async () => {
     const secret = "provider diagnostic with private credential";
     mocks.mutate.mockRejectedValue(new Error(secret)); mocks.bootstrap.mockRejectedValue(new Error(secret));
-    for (const response of [await workspacePost(request({ type: "archiveEmployee", id: "one", status: "Archived" })), await workspaceGet()]) {
+    for (const response of [await workspacePost(request({ type: "archiveEmployee", id: "one", status: "Archived", expectedRevision: 0 })), await workspaceGet()]) {
       expect(response.status).toBe(503); expect(await response.text()).not.toContain(secret);
       expect(response.headers.get("cache-control")).toContain("no-store");
     }
@@ -62,12 +62,12 @@ describe("actual cookie-authenticated mutation routes", () => {
   });
   it("enforces persistent write budgets before invoking a mutation", async () => {
     mocks.writeLimit.mockResolvedValue({ allowed: false });
-    expect((await workspacePost(request({ type: "archiveEmployee", id: "one", status: "Archived" }))).status).toBe(429);
+    expect((await workspacePost(request({ type: "archiveEmployee", id: "one", status: "Archived", expectedRevision: 0 }))).status).toBe(429);
     expect(mocks.mutate).not.toHaveBeenCalled();
   });
   it("fails closed before persistence when the shared rate-limit store fails", async () => {
     mocks.writeLimit.mockRejectedValue(new LevyTateRateLimitStoreError());
-    expect((await workspacePost(request({ type: "archiveEmployee", id: "one", status: "Archived" }))).status).toBe(503);
+    expect((await workspacePost(request({ type: "archiveEmployee", id: "one", status: "Archived", expectedRevision: 0 }))).status).toBe(503);
     expect(mocks.mutate).not.toHaveBeenCalled();
   });
 });

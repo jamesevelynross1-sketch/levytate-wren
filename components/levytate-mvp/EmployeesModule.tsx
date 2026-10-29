@@ -48,6 +48,7 @@ export function EmployeesModule({ onStartDiscovery, onOpenDirectReport, initialE
   const [siteFilter, setSiteFilter] = useState("All");
   const [applicationFilter, setApplicationFilter] = useState("All");
   const [draft, setDraft] = useState<MvpEmployee | null>(null);
+  const [draftRevision, setDraftRevision] = useState(0);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [peopleImport, setPeopleImport] = useState<{ fileName: string; result: PeopleImportResult; importId: string; employees: MvpEmployee[] } | null>(null);
@@ -152,7 +153,7 @@ export function EmployeesModule({ onStartDiscovery, onOpenDirectReport, initialE
     try {
       const employee = normalisePeopleRecord(input);
       validatePeopleChanges([employee], data.employees, data.roles);
-      const result = await saveEmployee(employee);
+      const result = await saveEmployee(employee, draftRevision);
       if (!result.ok) { setError(result.message); return; }
       setDraft(null);
       if (isNew) onStartDiscovery?.(employee.id);
@@ -163,7 +164,9 @@ export function EmployeesModule({ onStartDiscovery, onOpenDirectReport, initialE
   function openEmployee(employee?: MvpEmployee) {
     if (saving) return;
     setError("");
-    setDraft(employee ? { ...employee } : blankEmployee());
+    const next = employee ? { ...employee } : blankEmployee();
+    setDraft(next);
+    setDraftRevision(meta?.mutationRevisions?.[`levytate_employees:${next.id}`] ?? 0);
   }
 
   async function choosePeopleFile(file?: File) {

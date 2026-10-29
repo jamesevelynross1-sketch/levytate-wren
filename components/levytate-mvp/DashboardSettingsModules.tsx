@@ -270,7 +270,8 @@ function ActionCard({ title, copy, cta, onClick }: { title: string; copy: string
 }
 
 function EmployerPrioritiesSetup({ compact = false, readOnly = false }: { compact?: boolean; readOnly?: boolean }) {
-  const { data, saveProfile } = useMvpWorkspace();
+  const { data, meta, saveProfile } = useMvpWorkspace();
+  const [draftRevision, setDraftRevision] = useState(meta?.mutationRevisions?.[`levytate_organisations:${meta?.organisationId}`] ?? 0);
   const [step, setStep] = useState<"priorities" | "importance" | "complete">(data.profile.priorities.length ? "complete" : "priorities");
   const [selected, setSelected] = useState<MvpEmployerPriorityName[]>(data.profile.priorities.map((item) => item.name));
   const [importance, setImportance] = useState<MvpEmployerPriorityImportance>(data.profile.priorities[0]?.importance ?? "High");
@@ -294,7 +295,7 @@ function EmployerPrioritiesSetup({ compact = false, readOnly = false }: { compac
         importance,
         detail: "",
       })),
-    }));
+    }, draftRevision));
     if (saved) setStep("complete");
   }
 
@@ -310,7 +311,7 @@ function EmployerPrioritiesSetup({ compact = false, readOnly = false }: { compac
             ))}
           </div>
           {readOnly ? <p className="text-xs font-semibold text-[#102c3d]/42">Read-only</p> : (
-            <button type="button" onClick={() => setStep("priorities")} className="shrink-0 rounded-full bg-[#f5f8f6] px-4 py-2 text-xs font-semibold text-[#102c3d]/64 ring-1 ring-[#102c3d]/[0.07]">
+            <button type="button" onClick={() => { setDraftRevision(meta?.mutationRevisions?.[`levytate_organisations:${meta?.organisationId}`] ?? 0); setStep("priorities"); }} className="shrink-0 rounded-full bg-[#f5f8f6] px-4 py-2 text-xs font-semibold text-[#102c3d]/64 ring-1 ring-[#102c3d]/[0.07]">
               Refine priorities
             </button>
           )}
@@ -383,6 +384,7 @@ function EmployerPrioritiesSetup({ compact = false, readOnly = false }: { compac
 export function SettingsModule() {
   const { data, saveProfile, can, meta } = useMvpWorkspace();
   const [draft, setDraft] = useState<MvpWorkspaceProfile>(data.profile);
+  const [draftRevision, setDraftRevision] = useState(meta?.mutationRevisions?.[`levytate_organisations:${meta?.organisationId}`] ?? 0);
   const [saved, setSaved] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [saveError, setSaveError] = useState("");
@@ -393,7 +395,9 @@ export function SettingsModule() {
   const [microsoftCopilotError, setMicrosoftCopilotError] = useState("");
   const canEdit = can("settings:write");
 
-  useEffect(() => { if (!dirty) setDraft(data.profile); }, [data.profile, dirty]);
+  useEffect(() => {
+    if (!dirty) { setDraft(data.profile); setDraftRevision(meta?.mutationRevisions?.[`levytate_organisations:${meta?.organisationId}`] ?? 0); }
+  }, [data.profile, dirty, meta?.mutationRevisions, meta?.organisationId]);
   useEffect(() => {
     let active = true;
     void fetch("/api/levytate-workspace/access", { cache: "no-store" })
@@ -431,7 +435,7 @@ export function SettingsModule() {
       priorities: data.profile.priorities,
       sites: splitMvpList(draft.sites.join(", ")),
       departments: splitMvpList(draft.departments.join(", ")),
-    }));
+    }, draftRevision));
     if (confirmed) { setSaved(true); setDirty(false); }
   }
 

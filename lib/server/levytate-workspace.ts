@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { ApplicationCommandError, applyApplicationCommand } from "@/lib/server/levytate-application-commands";
-import { archivePeopleRecord, importPeopleRecords, savePeopleRecord } from "@/lib/server/levytate-people";
-import { runCatalogueCommand, throwCataloguePersistenceError } from "@/lib/server/levytate-catalogue-commands";
+import { importPeopleRecords, preparePeopleRecord } from "@/lib/server/levytate-people";
+import { applyAtomicWorkspaceCommand } from "@/lib/server/levytate-workspace-commands";
+import { throwCataloguePersistenceError } from "@/lib/server/levytate-catalogue-commands";
 import { parseMatchingRequest, parseProfile, parseProgramme, parseProvider, parseRelationship, parseRole } from "@/lib/server/levytate-catalogue-validation";
 import { ClientRequestError } from "@/lib/server/levytate-request-boundary";
 import { isApplicationWorkflowsEnabledForOrganisation } from "@/lib/server/levytate-application-workflow-capability";
@@ -53,7 +54,6 @@ import {
 import { getCoreEarlyAccessPolicy, hasCoreEarlyAccessCapability } from "@/lib/levytate/core-early-access-policy";
 import {
   getLevyTateSupabaseConfig,
-  supabaseDelete,
   supabaseInsert,
   supabaseSelect,
   supabaseSelectAll,
@@ -322,18 +322,6 @@ type EnrolmentRow = {
   updated_at: string;
 };
 
-type AuditEventRow = {
-  id: string;
-  organisation_id: string;
-  actor_email: string;
-  actor_role: string;
-  entity_type: string;
-  entity_id: string;
-  action: string;
-  summary: string;
-  metadata: unknown;
-  created_at: string;
-};
 
 type WorkspaceContext = {
   organisation: OrganisationRow;
@@ -356,7 +344,6 @@ const organisationProvidersTable = "levytate_organisation_providers";
 const organisationProgrammesTable = "levytate_organisation_programmes";
 const matchingRequestsTable = "levytate_matching_requests";
 const enrolmentsTable = "levytate_enrolments";
-const auditEventsTable = "levytate_audit_events";
 
 export class LevyTateWorkspacePersistenceError extends Error {
   constructor(message: string) {
@@ -384,6 +371,7 @@ export async function getWorkspaceBootstrapForSession(session: LevyTateBetaSessi
     const context = await ensureWorkspaceContext(session);
     await assertWorkspaceReadAllowed(context);
     const preliminaryRole = normaliseMvpUserRole(context.user.role);
+    const versionsBefore = await loadWorkspaceMutationVersions(context);
     const [data, requestsEnabled, applicationWorkflowsEnabled, offTheJobAssistantEnabled, pastoralAccess, liftEnabled] = await Promise.all([
       loadWorkspaceData(context, session),
       isRequestsEnabledForOrganisation(context.organisation.id),
@@ -397,6 +385,7 @@ export async function getWorkspaceBootstrapForSession(session: LevyTateBetaSessi
       ? await hasPublishedApplicationWorkflow(context.organisation.id)
       : false;
     if (applicationWorkflowsEnabled) data.applications = await attachApplicationWorkflowContexts(context.organisation.id, data.applications);
+    const mutationRevisions = await confirmedWorkspaceMutationVersions(context, data, versionsBefore);
     const prospectAccess = await getProspectAccessForSession(session);
     const warnings = [...context.warnings];
     let directReportOperationalSummaries;
@@ -438,6 +427,7 @@ export async function getWorkspaceBootstrapForSession(session: LevyTateBetaSessi
         } : null,
         storageMode: "supabase",
         warnings,
+        mutationRevisions,
       },
     };
   } catch (error) {
@@ -484,6 +474,7 @@ export async function getWorkspaceBootstrapForMicrosoftCopilotActor(
 
   const context: WorkspaceContext = { organisation, user, warnings: [] };
   await assertWorkspaceReadAllowed(context);
+  const versionsBefore = await loadWorkspaceMutationVersions(context);
   const session = microsoftCopilotActorSession(actor);
   const [data, requestsEnabled, applicationWorkflowsEnabled, offTheJobAssistantEnabled, liftEnabled] = await Promise.all([
     loadWorkspaceData(context, session),
@@ -496,6 +487,7 @@ export async function getWorkspaceBootstrapForMicrosoftCopilotActor(
     ? await hasPublishedApplicationWorkflow(actor.organisationId)
     : false;
   if (applicationWorkflowsEnabled) data.applications = await attachApplicationWorkflowContexts(actor.organisationId, data.applications);
+  const mutationRevisions = await confirmedWorkspaceMutationVersions(context, data, versionsBefore);
 
   return {
     data,
@@ -517,6 +509,7 @@ export async function getWorkspaceBootstrapForMicrosoftCopilotActor(
       prospectAccess: null,
       storageMode: "supabase",
       warnings: [],
+      mutationRevisions,
     },
   };
 }
@@ -544,81 +537,29 @@ export async function applyWorkspaceMutationForSession(
 
   try {
   switch (mutation.type) {
-    case "saveProfile":
-      await saveProfile(organisationId, mutation.profile);
-      await recordAuditEvent(context, "organisation_profile", organisationId, "profile.saved", "Organisation workspace settings updated.");
-      break;
-    case "saveEmployee":
-      await savePeopleRecord(organisationId, mutation.employee);
-      await recordAuditEvent(context, "employee", mutation.employee.id, "employee.saved", `Employee record saved for ${mutation.employee.name}.`);
-      break;
-    case "importEmployees":
-      await importPeopleRecords(organisationId, context.user.id, mutation.importId, mutation.employees);
-      break;
-    case "archiveEmployee":
-      await archivePeopleRecord(organisationId, mutation.id, mutation.status);
-      await recordAuditEvent(context, "employee", mutation.id, "employee.archived", "Employee record archive state changed.");
-      break;
-    case "saveEmployeeDevelopmentProfile":
-      await saveEmployeeDevelopmentProfile(organisationId, mutation.profile);
-      await recordAuditEvent(context, "employee_profile", mutation.profile.employeeId, "employee_profile.saved", "Employee development profile updated.");
-      break;
-    case "saveRole":
-      await saveRole(context, mutation.role);
-      break;
-    case "archiveRole":
-      await setArchiveStatus(organisationId, rolesTable, "id", mutation.id, "status", mutation.status);
-      await recordAuditEvent(context, "role", mutation.id, "role.archived", "Role archive state changed.");
-      break;
+    case "saveProfile": await applyAtomicWorkspaceCommand(organisationId, context.user.id, mutation, buildProfileRow(mutation.profile)); break;
+    case "saveEmployee": await applyAtomicWorkspaceCommand(organisationId, context.user.id, mutation, preparePeopleRecord(mutation.employee)); break;
+    case "archiveEmployee": await applyAtomicWorkspaceCommand(organisationId, context.user.id, mutation, {status:mutation.status}); break;
+    case "archiveRole": await applyAtomicWorkspaceCommand(organisationId, context.user.id, mutation, {status:mutation.status}); break;
+    case "archiveProvider": await applyAtomicWorkspaceCommand(organisationId, context.user.id, mutation, {status:mutation.status}); break;
+    case "archiveProviderProgramme": await applyAtomicWorkspaceCommand(organisationId, context.user.id, mutation, {status:mutation.status}); break;
+    case "saveEmployeeDevelopmentProfile": await applyAtomicWorkspaceCommand(organisationId, context.user.id, mutation, buildEmployeeDevelopmentProfileRow(mutation.profile)); break;
+    case "saveProvider": await applyAtomicWorkspaceCommand(organisationId, context.user.id, mutation, buildProviderRow(mutation.provider)); break;
+    case "saveProviderProgramme": await applyAtomicWorkspaceCommand(organisationId, context.user.id, mutation, await buildProviderProgrammeRow(mutation.programme)); break;
+    case "removeProviderProgramme": await applyAtomicWorkspaceCommand(organisationId, context.user.id, mutation, {}); break;
+    case "saveProviderRelationship": await applyAtomicWorkspaceCommand(organisationId, context.user.id, mutation, buildProviderRelationshipRow(mutation.relationship)); break;
+    case "saveMatchingRequest": await applyAtomicWorkspaceCommand(organisationId, context.user.id, mutation, buildMatchingRequestRow(mutation.request)); break;
+    case "updateMatchingStatus": await applyAtomicWorkspaceCommand(organisationId, context.user.id, mutation, {status:mutation.status}); break;
+    case "saveRole": await applyAtomicWorkspaceCommand(organisationId, context.user.id, mutation, buildRoleRow(mutation.role)); break;
+    case "importEmployees": await importPeopleRecords(organisationId, context.user.id, mutation.importId, mutation.employees); break;
     case "saveApplication":
       await persistApplicationCommand(context, mutation);
-      await synchroniseApplicationReviewOperationalActions(session, [mutation.application.id]);
-      break;
+      await synchroniseApplicationReviewOperationalActions(session, [mutation.application.id]); break;
     case "updateApplicationStatus":
       await persistApplicationCommand(context, mutation);
-      await synchroniseApplicationReviewOperationalActions(session, [mutation.id]);
-      break;
-    case "saveProvider":
-      await saveProvider(await getCanonicalCatalogueOrganisationId(), mutation.provider);
-      await recordAuditEvent(context, "provider", mutation.provider.providerId, "provider.saved", `Provider record saved for ${mutation.provider.providerName}.`);
-      break;
-    case "archiveProvider":
-      await setArchiveStatus(await getCanonicalCatalogueOrganisationId(), providersTable, "provider_id", mutation.id, "status", mutation.status);
-      await recordAuditEvent(context, "provider", mutation.id, "provider.archived", "Provider archive state changed.");
-      break;
-    case "saveProviderProgramme":
-      await saveProviderProgramme(await getCanonicalCatalogueOrganisationId(), mutation.programme);
-      await recordAuditEvent(context, "provider_programme", mutation.programme.id, "provider_programme.saved", "Provider programme record saved.");
-      break;
-    case "archiveProviderProgramme":
-      await setArchiveStatus(await getCanonicalCatalogueOrganisationId(), providerProgrammesTable, "id", mutation.id, "record_status", mutation.status);
-      await recordAuditEvent(context, "provider_programme", mutation.id, "provider_programme.archived", "Provider programme archive state changed.");
-      break;
-    case "removeProviderProgramme":
-      await supabaseDelete(assertSupabase(), providerProgrammesTable, buildOrganisationQuery(await getCanonicalCatalogueOrganisationId(), { id: mutation.id }));
-      await recordAuditEvent(context, "provider_programme", mutation.id, "provider_programme.deleted", "Provider programme removed from the catalogue.");
-      break;
-    case "saveProviderRelationship":
-      await saveProviderRelationship(organisationId, mutation.relationship);
-      await recordAuditEvent(context, "provider_relationship", mutation.relationship.id, "provider_relationship.saved", "Provider relationship record saved.");
-      break;
-    case "saveOrganisationProvider":
-      await saveOrganisationProviderSelection(context, mutation.selection);
-      break;
-    case "saveOrganisationProgramme":
-      await saveOrganisationProgrammeSelection(context, mutation.selection);
-      break;
-    case "saveMatchingRequest":
-      await saveMatchingRequest(organisationId, mutation.request);
-      await recordAuditEvent(context, "provider_matching_request", mutation.request.id, "provider_matching_request.saved", "Provider matching request saved.");
-      break;
-    case "updateMatchingStatus":
-      await patchByOrganisation(organisationId, matchingRequestsTable, "id", mutation.id, {
-        status: mutation.status,
-        updated_at: nowIso(),
-      });
-      await recordAuditEvent(context, "provider_matching_request", mutation.id, "provider_matching_request.status_updated", `Provider matching request moved to ${mutation.status}.`);
-      break;
+      await synchroniseApplicationReviewOperationalActions(session, [mutation.id]); break;
+    case "saveOrganisationProvider": await applyAtomicWorkspaceCommand(organisationId, context.user.id, mutation, {provider_id:mutation.selection.providerId,status:mutation.selection.status}); break;
+    case "saveOrganisationProgramme": await applyAtomicWorkspaceCommand(organisationId, context.user.id, mutation, {provider_id:mutation.selection.providerId,status:mutation.selection.status}); break;
     case "saveEnrolment":
     case "updateEnrolmentStatus":
       throw new ApplicationCommandError("Start pre-enrolment from a final-approved application using Learners. Legacy enrolment writes are disabled.", 409);
@@ -1235,9 +1176,9 @@ async function loadWorkspaceData(context: WorkspaceContext, session: LevyTateBet
   return scopeWorkspaceDataForContext(workspace, context);
 }
 
-async function saveProfile(organisationId: string, profile: MvpWorkspaceProfile) {
+function buildProfileRow(profile: MvpWorkspaceProfile) {
   profile = parseProfile(profile);
-  await supabaseUpdate(assertSupabase(), organisationsTable, `id=eq.${organisationId}`, {
+  return {
     name: profile.employerName.trim() || "LevyTate employer workspace",
     workspace_name: profile.workspaceName.trim() || `${profile.employerName.trim() || "LevyTate employer"} workspace`,
     primary_contact: profile.primaryContact.trim(),
@@ -1247,12 +1188,11 @@ async function saveProfile(organisationId: string, profile: MvpWorkspaceProfile)
     departments: profile.departments,
     priorities: profile.priorities,
     updated_at: nowIso(),
-  });
+  };
 }
 
-async function saveEmployeeDevelopmentProfile(organisationId: string, profile: MvpEmployeeDevelopmentProfile) {
-  const row: EmployeeDevelopmentProfileRow = {
-    organisation_id: organisationId,
+function buildEmployeeDevelopmentProfileRow(profile: MvpEmployeeDevelopmentProfile) {
+  const row: Omit<EmployeeDevelopmentProfileRow,"organisation_id"> = {
     employee_id: profile.employeeId,
     stage: profile.stage,
     responsibilities: profile.responsibilities,
@@ -1271,17 +1211,12 @@ async function saveEmployeeDevelopmentProfile(organisationId: string, profile: M
     updated_at: profile.updatedAt,
   };
 
-  await supabaseInsert<EmployeeDevelopmentProfileRow>(assertSupabase(), employeeProfilesTable, [row], {
-    query: "on_conflict=organisation_id,employee_id",
-    prefer: "resolution=merge-duplicates,return=minimal",
-  });
+  return row;
 }
 
-async function saveRole(context: WorkspaceContext, role: MvpRole) {
+function buildRoleRow(role: MvpRole) {
   role = parseRole(role);
-  const organisationId = context.organisation.id;
-  const row: RoleRow = {
-    organisation_id: organisationId,
+  const row: Omit<RoleRow,"organisation_id"> = {
     id: role.id,
     title: role.title,
     department: role.department,
@@ -1304,7 +1239,7 @@ async function saveRole(context: WorkspaceContext, role: MvpRole) {
       funding_route: mapping.fundingRoute,
       delivery_preference: mapping.deliveryPreference,
     }));
-  await runCatalogueCommand("levytate_save_role", { p_organisation_id: organisationId, p_actor_user_id: context.user.id, p_role: row, p_mappings: mappings });
+  return {role:row,mappings};
 }
 
 async function persistApplicationCommand(context: WorkspaceContext, mutation: Extract<LevyTateWorkspaceMutation, { type: "saveApplication" | "updateApplicationStatus" }>) {
@@ -1338,10 +1273,9 @@ async function persistApplicationCommand(context: WorkspaceContext, mutation: Ex
   });
 }
 
-async function saveProvider(organisationId: string, provider: ProviderCatalogueRecord) {
+function buildProviderRow(provider: ProviderCatalogueRecord) {
   provider = parseProvider(provider);
-  const row: ProviderRow = {
-    organisation_id: organisationId,
+  const row: Omit<ProviderRow,"organisation_id"> = {
     provider_id: provider.providerId,
     provider_name: provider.providerName,
     website: provider.website,
@@ -1363,19 +1297,15 @@ async function saveProvider(organisationId: string, provider: ProviderCatalogueR
     verification_status: provider.verificationStatus,
   };
 
-  await supabaseInsert<ProviderRow>(assertSupabase(), providersTable, [row], {
-    query: "on_conflict=organisation_id,provider_id",
-    prefer: "resolution=merge-duplicates,return=minimal",
-  });
+  return row;
 }
-async function saveProviderProgramme(organisationId: string, programme: ProviderProgramme) {
+async function buildProviderProgrammeRow(programme: ProviderProgramme) {
   const normalised = parseProgramme(programme);
   const standard = await selectOne<{ title: string; level: number; route: string; funding_band: number | null; official_url: string }>("levytate_apprenticeship_standards", new URLSearchParams({
     select: "title,level,route,funding_band,official_url", id: `eq.${normalised.linkedStandardId}`, status: "eq.Approved for delivery", limit: "1",
   }));
   if (!standard) throw new ClientRequestError("Choose an approved official standard before saving the programme.", 422);
-  const row: ProviderProgrammeRow = {
-    organisation_id: organisationId,
+  const row: Omit<ProviderProgrammeRow,"organisation_id"> = {
     id: normalised.id,
     provider_id: normalised.providerId,
     programme_name: normalised.programmeName,
@@ -1413,15 +1343,11 @@ async function saveProviderProgramme(organisationId: string, programme: Provider
     updated_at: normalised.updatedAt,
   };
 
-  await supabaseInsert<ProviderProgrammeRow>(assertSupabase(), providerProgrammesTable, [row], {
-    query: "on_conflict=organisation_id,id",
-    prefer: "resolution=merge-duplicates,return=minimal",
-  });
+  return row;
 }
-async function saveProviderRelationship(organisationId: string, relationship: MvpProviderRelationship) {
+function buildProviderRelationshipRow(relationship: MvpProviderRelationship) {
   const normalised = parseRelationship(relationship);
-  const row: ProviderRelationshipRow = {
-    organisation_id: organisationId,
+  const row: Omit<ProviderRelationshipRow,"organisation_id"> = {
     id: normalised.id,
     category: normalised.category,
     preferred_provider_id: normalised.preferredProviderId,
@@ -1433,10 +1359,7 @@ async function saveProviderRelationship(organisationId: string, relationship: Mv
     last_used_date: normalised.lastUsedDate || null,
   };
 
-  await supabaseInsert<ProviderRelationshipRow>(assertSupabase(), providerRelationshipsTable, [row], {
-    query: "on_conflict=organisation_id,id",
-    prefer: "resolution=merge-duplicates,return=minimal",
-  });
+  return row;
 }
 
 async function getCanonicalCatalogueOrganisationId() {
@@ -1450,20 +1373,31 @@ async function getCanonicalCatalogueOrganisationId() {
   return organisation.id;
 }
 
-async function saveOrganisationProviderSelection(context: WorkspaceContext, selection: MvpOrganisationProvider) {
-  await runCatalogueCommand("levytate_select_catalogue", { p_organisation_id: context.organisation.id, p_actor_user_id: context.user.id,
-    p_kind: "provider", p_id: selection.providerId, p_provider_id: selection.providerId, p_status: selection.status });
+async function loadWorkspaceMutationVersions(context: WorkspaceContext) {
+  const organisations = [context.organisation.id];
+  const canonical = context.user.role === "Platform Admin" ? await getCanonicalCatalogueOrganisationId() : null;
+  if (canonical) organisations.push(canonical);
+  const rows = await supabaseSelectAll<{organisation_id:string;entity_key:string;revision:number}>(assertSupabase(),"levytate_workspace_entity_versions",new URLSearchParams({select:"organisation_id,entity_key,revision",organisation_id:`in.(${[...new Set(organisations)].join(",")})`,order:"organisation_id.asc,entity_key.asc"}));
+  return Object.fromEntries(rows.filter((row) => {
+    const globalCatalogue = row.entity_key.startsWith("levytate_providers:") || row.entity_key.startsWith("levytate_provider_programmes:");
+    return row.organisation_id === (globalCatalogue ? canonical : context.organisation.id);
+  }).map((row)=>[row.entity_key,row.revision]));
+}
+async function confirmedWorkspaceMutationVersions(context: WorkspaceContext,data:MvpWorkspaceData,before:Record<string,number>) {
+  const after=await loadWorkspaceMutationVersions(context);
+  if(JSON.stringify(before)!==JSON.stringify(after)) throw new ClientRequestError("Workspace records changed while loading. Reconnect to obtain a consistent version.",409);
+  const allowed=new Set([`levytate_organisations:${context.organisation.id}`,
+    ...data.employees.map((item)=>`levytate_employees:${item.id}`),...data.employeeDevelopmentProfiles.map((item)=>`levytate_employee_development_profiles:${item.employeeId}`),
+    ...data.roles.map((item)=>`levytate_roles:${item.id}`),...data.providers.map((item)=>`levytate_providers:${item.providerId}`),
+    ...data.providerProgrammes.map((item)=>`levytate_provider_programmes:${item.id}`),...data.providerRelationships.map((item)=>`levytate_provider_relationships:${item.id}`),
+    ...data.organisationProviders.map((item)=>`levytate_organisation_providers:${item.providerId}`),...data.organisationProgrammes.map((item)=>`levytate_organisation_programmes:${item.programmeId}`),
+    ...data.matchingRequests.map((item)=>`levytate_matching_requests:${item.id}`)]);
+  return Object.fromEntries(Object.entries(after).filter(([key])=>allowed.has(key)));
 }
 
-async function saveOrganisationProgrammeSelection(context: WorkspaceContext, selection: MvpOrganisationProgramme) {
-  await runCatalogueCommand("levytate_select_catalogue", { p_organisation_id: context.organisation.id, p_actor_user_id: context.user.id,
-    p_kind: "programme", p_id: selection.programmeId, p_provider_id: selection.providerId, p_status: selection.status });
-}
-
-async function saveMatchingRequest(organisationId: string, request: MvpMatchingRequest) {
+function buildMatchingRequestRow(request: MvpMatchingRequest) {
   const normalised = parseMatchingRequest(request);
-  const row: MatchingRequestRow = {
-    organisation_id: organisationId,
+  const row: Omit<MatchingRequestRow,"organisation_id"> = {
     id: normalised.id,
     role_need: normalised.roleNeed,
     department: normalised.department,
@@ -1487,78 +1421,7 @@ async function saveMatchingRequest(organisationId: string, request: MvpMatchingR
     updated_at: normalised.updatedAt,
   };
 
-  await supabaseInsert<MatchingRequestRow>(assertSupabase(), matchingRequestsTable, [row], {
-    query: "on_conflict=organisation_id,id",
-    prefer: "resolution=merge-duplicates,return=minimal",
-  });
-}
-
-async function recordAuditEvent(
-  context: WorkspaceContext,
-  entityType: string,
-  entityId: string,
-  action: string,
-  summary: string,
-  metadata: Record<string, unknown> = {},
-) {
-  const row: AuditEventRow = {
-    id: randomUUID(),
-    organisation_id: context.organisation.id,
-    actor_email: context.user.email,
-    actor_role: context.user.role,
-    entity_type: entityType,
-    entity_id: entityId,
-    action,
-    summary,
-    metadata,
-    created_at: nowIso(),
-  };
-
-  await supabaseInsert<AuditEventRow>(assertSupabase(), auditEventsTable, [row], {
-    prefer: "return=minimal",
-  });
-}
-
-async function setArchiveStatus(
-  organisationId: string,
-  table: string,
-  key: string,
-  value: string,
-  statusField: string,
-  status: "Active" | "Archived",
-) {
-  if (!["Active", "Archived"].includes(status)) throw new ClientRequestError("Choose the requested archive state explicitly.", 422);
-  const row = await selectOne<Record<string, unknown>>(
-    table,
-    new URLSearchParams({
-      select: `${key},${statusField}`,
-      organisation_id: `eq.${organisationId}`,
-      [key]: `eq.${value}`,
-      limit: "1",
-    }),
-  );
-
-  if (!row) {
-    throw new LevyTateWorkspacePersistenceError("Record could not be found.");
-  }
-
-  const saved = await supabaseUpdate<Record<string, unknown>>(assertSupabase(), table, buildOrganisationQuery(organisationId, { [key]: value }), {
-    [statusField]: status,
-    updated_at: nowIso(),
-  }, { prefer: "return=representation" });
-  if (saved.length !== 1 || saved[0][statusField] !== status) throw new ClientRequestError("Archive state could not be confirmed. Refresh before retrying.", 409);
-}
-
-async function patchByOrganisation(
-  organisationId: string,
-  table: string,
-  key: string,
-  value: string,
-  payload: Record<string, unknown>,
-) {
-  await supabaseUpdate(assertSupabase(), table, buildOrganisationQuery(organisationId, { [key]: value }), payload, {
-    prefer: "return=minimal",
-  });
+  return row;
 }
 
 async function selectOne<T>(table: string, query: URLSearchParams) {
@@ -1575,18 +1438,6 @@ async function selectMany<T>(table: string, organisationId: string, select: stri
     organisation_id: `eq.${organisationId}`,
     order: order.split(",").some((part) => part.startsWith(`${key}.`)) ? order : `${order},${key}.asc`,
   }));
-}
-
-function buildOrganisationQuery(organisationId: string, extra: Record<string, string> = {}) {
-  const query = new URLSearchParams({
-    organisation_id: `eq.${organisationId}`,
-  });
-
-  for (const [key, value] of Object.entries(extra)) {
-    query.set(key, `eq.${value}`);
-  }
-
-  return query.toString();
 }
 
 function organisationToProfile(row: OrganisationRow): MvpWorkspaceProfile {

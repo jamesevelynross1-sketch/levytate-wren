@@ -32,26 +32,31 @@ describe("People persistence boundary", () => {
     await expect(importPeopleRecords("tenant-a", "actor", importId, [employee])).rejects.toMatchObject({ status: 403 });
   });
   it("rejects unsupported People fields and missing manager before a manual write", async () => {
-    await expect(savePeopleRecord("tenant-a", { ...employee, organisation_id: "tenant-b" })).rejects.toMatchObject({ status: 422 });
-    await expect(savePeopleRecord("tenant-a", { ...employee, managerId: "missing" })).rejects.toMatchObject({ status: 422 });
+    await expect(savePeopleRecord("tenant-a", { ...employee, organisation_id: "tenant-b" },"actor",0)).rejects.toMatchObject({ status: 422 });
+    await expect(savePeopleRecord("tenant-a", { ...employee, managerId: "missing" },"actor",0)).rejects.toMatchObject({ status: 422 });
     expect(fake.insert).not.toHaveBeenCalled();
   });
-  it("requires a persisted manual save and never trusts client timestamps", async () => {
-    await savePeopleRecord("tenant-a", employee);
-    expect(fake.insert.mock.calls[0][2][0].created_at).not.toBe(employee.createdAt);
-    fake.insert.mockResolvedValueOnce([]);
-    await expect(savePeopleRecord("tenant-a", employee)).rejects.toMatchObject({ status: 503 });
+  it("requires an atomic manual save receipt rather than a standalone entity insert", async () => {
+    fake.fetch.mockResolvedValueOnce({entityKey:"levytate_employees:employee-1",revision:1});
+    await savePeopleRecord("tenant-a", employee,"actor",0);
+    expect(fake.insert).not.toHaveBeenCalled();
+    expect(JSON.parse(fake.fetch.mock.calls[0][2].body)).toMatchObject({p_actor_user_id:"actor",p_expected_revision:0,p_action:"saveEmployee"});
+    fake.fetch.mockResolvedValueOnce({});
+    await expect(savePeopleRecord("tenant-a", employee,"actor",0)).rejects.toMatchObject({ status: 503 });
   });
   it("denies an archive target outside the current tenant", async () => {
-    await expect(archivePeopleRecord("tenant-a", "other-person", "Archived")).rejects.toMatchObject({ status: 404 });
+    await expect(archivePeopleRecord("tenant-a", "other-person", "Archived","actor",0)).rejects.toMatchObject({ status: 404 });
     expect(fake.update).not.toHaveBeenCalled();
   });
   it("does not restore an employee when the same archive is retried", async () => {
     const current = { organisation_id: "tenant-a", id: employee.id, employee_number: employee.employeeNumber, name: employee.name, email: employee.email,
       job_title: employee.jobTitle, role_id: "", manager_id: "", department: employee.department, site: "", platform_role: "Employee", status: "Archived", start_date: employee.startDate, created_at: employee.createdAt, updated_at: employee.updatedAt };
     fake.select.mockImplementation(async (_config, table) => table === "levytate_employees" ? [current] : []);
-    await archivePeopleRecord("tenant-a", employee.id, "Archived");
-    await archivePeopleRecord("tenant-a", employee.id, "Archived");
+    fake.fetch.mockResolvedValue({entityKey:"levytate_employees:employee-1",revision:1,replayed:true});
+    await archivePeopleRecord("tenant-a", employee.id, "Archived","actor",0);
+    await archivePeopleRecord("tenant-a", employee.id, "Archived","actor",0);
     expect(fake.update).not.toHaveBeenCalled();
+    expect(fake.fetch).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(fake.fetch.mock.calls[1][2].body).p_record.status).toBe("Archived");
   });
 });

@@ -49,6 +49,7 @@ export type LevyTateWorkspaceMeta = {
   prospectAccess?: ProspectAccessMeta | null;
   storageMode: MvpWorkspaceStorageMode;
   warnings: string[];
+  mutationRevisions?: Record<string, number>;
 };
 
 export type LevyTateWorkspaceBootstrap = {
@@ -56,7 +57,7 @@ export type LevyTateWorkspaceBootstrap = {
   meta: LevyTateWorkspaceMeta;
 };
 
-export type LevyTateWorkspaceMutation =
+export type LevyTateWorkspaceMutation = (
   | { type: "saveProfile"; profile: MvpWorkspaceProfile }
   | { type: "saveEmployee"; employee: MvpEmployee }
   | { type: "importEmployees"; importId: string; employees: MvpEmployee[] }
@@ -77,4 +78,5 @@ export type LevyTateWorkspaceMutation =
   | { type: "saveMatchingRequest"; request: MvpMatchingRequest }
   | { type: "updateMatchingStatus"; id: string; status: MvpMatchingStatus }
   | { type: "saveEnrolment"; enrolment: MvpEnrolment }
-  | { type: "updateEnrolmentStatus"; id: string; status: MvpEnrolmentStatus };
+  | { type: "updateEnrolmentStatus"; id: string; status: MvpEnrolmentStatus }
+) & { expectedRevision?: number };

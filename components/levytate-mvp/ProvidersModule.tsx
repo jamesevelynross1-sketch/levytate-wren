@@ -606,7 +606,7 @@ export function ProvidersModule({ onRequest }: { onRequest?: (context: { program
 }
 
 function ProviderAdministration() {
-  const { data, saveProvider, saveProviderProgramme, archiveProviderProgramme, removeProviderProgramme } = useMvpWorkspace();
+  const { data, meta, saveProvider, saveProviderProgramme, archiveProviderProgramme, removeProviderProgramme } = useMvpWorkspace();
   const { selectableStandards } = useLevyTateStandards();
   const [filters, setFilters] = useState<ProviderCatalogueFilters>(defaultProviderCatalogueFilters);
   const [compareProviderIds, setCompareProviderIds] = useState<string[]>([]);
@@ -614,6 +614,7 @@ function ProviderAdministration() {
   const [programmeView, setProgrammeView] = useState<ProgrammeView | null>(null);
   const [providerDraft, setProviderDraft] = useState<ProviderCatalogueRecord | null>(null);
   const [programmeDraft, setProgrammeDraft] = useState<ProviderProgramme | null>(null);
+  const [draftRevision, setDraftRevision] = useState(0);
   const [standardSearch, setStandardSearch] = useState("");
   const [selectedGoalId, setSelectedGoalId] = useState(buyingGoals[0].id);
   const [selectedWorkforceArea, setSelectedWorkforceArea] = useState("Operations");
@@ -740,12 +741,14 @@ function ProviderAdministration() {
 
   function openProviderEditor(provider?: ProviderCatalogueRecord) {
     setProviderDraft(provider ? structuredClone(provider) : blankProvider());
+    setDraftRevision(provider ? meta?.mutationRevisions?.[`levytate_providers:${provider.providerId}`] ?? 0 : 0);
     setProgrammeDraft(null);
     setError("");
   }
 
   function openProgrammeEditor(providerId: string, programme?: ProviderProgramme) {
     setProgrammeDraft(programme ? structuredClone(programme) : blankProgramme(providerId));
+    setDraftRevision(programme ? meta?.mutationRevisions?.[`levytate_provider_programmes:${programme.id}`] ?? 0 : 0);
     setProviderDraft(null);
     setStandardSearch("");
     setError("");
@@ -764,6 +767,7 @@ function ProviderAdministration() {
         ...providerDraft,
         providerName: providerDraft.providerName.trim(),
       }),
+      draftRevision,
     ));
     if (!saved) return;
     setProviderDraft(null);
@@ -799,6 +803,7 @@ function ProviderAdministration() {
         programmeName: programmeDraft.programmeName.trim(),
         updatedAt: nowIso(),
       }),
+      draftRevision,
     ));
     if (!saved) return;
     setProgrammeDraft(null);
