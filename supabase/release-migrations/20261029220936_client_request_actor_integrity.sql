@@ -11,7 +11,7 @@ returns jsonb language plpgsql security definer set search_path=public,pg_temp a
 #variable_conflict use_variable
 declare
  actor public.levytate_users;member public.levytate_provider_memberships;receipt public.levytate_request_command_receipts;request public.levytate_service_requests;invitation public.levytate_service_request_invitations;
- command_action text:=p_command->>'action';command_key text:=p_command->>'idempotencyKey';request_id uuid;allowed text[];entry record;item jsonb;current_row jsonb;expected_rows jsonb;table_name text;field_name text;result jsonb;actor_email text;actor_role text;
+ command_action text:=p_command->>'action';command_key text:=p_command->>'idempotencyKey';request_id uuid;allowed text[];required text[];entry record;item jsonb;current_row jsonb;expected_rows jsonb;table_name text;field_name text;result jsonb;actor_email text;actor_role text;
 begin
  if coalesce(nullif(current_setting('request.jwt.claim.role',true),''),nullif(current_setting('request.jwt.claims',true),'')::jsonb->>'role','')<>'service_role' then raise exception using errcode='PT403',message='Server credential required';end if;
  if p_organisation_id is null or p_actor_id is null or p_actor_kind is null or p_actor_kind not in ('employer','provider') or p_probe is null or jsonb_typeof(p_command) is distinct from 'object' or jsonb_typeof(p_changes) is distinct from 'object' or jsonb_typeof(p_expected) is distinct from 'object' or command_key is null or command_key !~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,198}[A-Za-z0-9]$' or command_action is null then raise exception using errcode='PT422',message='Invalid Requests command';end if;
@@ -66,7 +66,7 @@ begin
   when 'send_existing_draft' then array['requests_update','versions_insert','invitations_insert']
   when 'publish' then array['requests_update','versions_insert']
   when 'publish_revision' then array['requests_update','versions_insert','invitations_update']
-  when 'invite_providers' then array['invitations_insert'] when 'retry_invitation' then array[]::text[]
+  when 'invite_providers' then array['requests_update','invitations_insert'] when 'retry_invitation' then array[]::text[]
   when 'record_invitation_delivery' then array['invitations_update']
   when 'mark_viewed' then array['invitations_update'] when 'save_draft' then array['responses_insert','responses_update','invitations_update']
   when 'submit_response' then array['responses_insert','responses_update','response_versions_insert','invitations_update','requests_update']
@@ -129,6 +129,35 @@ begin
     end loop;
    end if;
   end loop;
+ end loop;
+ -- Allowed write kinds are not sufficient: a command must commit its domain
+ -- effect and immutable publication/submission evidence, not an empty receipt.
+ required:=case command_action
+  when 'create_draft' then array['requests_insert'] when 'update_draft' then array['requests_update']
+  when 'send_request' then array['requests_insert','versions_insert']
+  when 'publish' then array['requests_update','versions_insert']
+  when 'publish_revision' then array['requests_update','versions_insert']
+  when 'send_existing_draft' then case when request.status='draft' then array['requests_update','versions_insert'] else array[]::text[] end
+  when 'submit_response' then array['response_versions_insert','invitations_update']
+  when 'ask_clarification' then array['clarifications_insert'] when 'answer_clarification' then array['clarifications_update']
+  when 'confirm_agreement' then array['agreements_insert','decisions_update','requests_update']
+  when 'confirm_and_handover' then array['agreements_insert','decisions_update','requests_update','handovers_insert']
+  when 'handover' then array['handovers_insert']
+  when 'extend_deadline' then array['requests_update','versions_insert']
+  when 'cancel' then array['requests_update'] when 'close_request' then array['requests_update']
+  when 'decline' then array['invitations_update'] when 'record_invitation_delivery' then array['invitations_update']
+  when 'record_response_notification' then array['events_insert'] else array[]::text[] end;
+ foreach field_name in array required loop
+  if jsonb_array_length(coalesce(p_changes->field_name,'[]'))<>1 and field_name<>'events_insert' then raise exception using errcode='PT422',message='Required Requests write or immutable evidence missing';end if;
+  if field_name='events_insert' and jsonb_array_length(coalesce(p_changes->field_name,'[]'))<1 then raise exception using errcode='PT422',message='Notification evidence missing';end if;
+ end loop;
+ if command_action in ('save_draft','submit_response') and jsonb_array_length(coalesce(p_changes->'responses_insert','[]'))+jsonb_array_length(coalesce(p_changes->'responses_update','[]'))<>1 then raise exception using errcode='PT422',message='Exactly one response write required';end if;
+ if command_action in ('shortlist','decline_provider','progress_to_agreement','not_proceeded') and jsonb_array_length(coalesce(p_changes->'decisions_insert','[]'))+jsonb_array_length(coalesce(p_changes->'decisions_update','[]'))<>1 then raise exception using errcode='PT422',message='Exactly one decision write required';end if;
+ for item in select value from jsonb_array_elements(coalesce(p_changes->'versions_insert','[]')) loop
+  if (item->>'version')::integer is distinct from coalesce((p_changes->'requests_insert'->0->>'current_version')::integer,(p_changes->'requests_update'->0->>'current_version')::integer) then raise exception using errcode='PT422',message='Publication snapshot version mismatch';end if;
+ end loop;
+ for item in select value from jsonb_array_elements(coalesce(p_changes->'response_versions_insert','[]')) loop
+  if not exists(select 1 from jsonb_array_elements(coalesce(p_changes->'responses_insert','[]')||coalesce(p_changes->'responses_update','[]')) r where r->>'id'=item->>'response_id' and r->>'current_version'=item->>'version' and r->>'invitation_id'=item->>'invitation_id') then raise exception using errcode='PT422',message='Submission snapshot identity/version mismatch';end if;
  end loop;
  perform public.levytate_persist_service_request_action(p_organisation_id,p_changes,p_expected);
  insert into public.levytate_audit_events(organisation_id,actor_email,actor_role,entity_type,entity_id,action,summary,metadata) values(p_organisation_id,actor_email,actor_role,'service_request',request_id::text,'request.'||command_action,'Requests action committed atomically.',jsonb_build_object('actorKind',p_actor_kind,'actorId',p_actor_id,'requestKey',command_key));
