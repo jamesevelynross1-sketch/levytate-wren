@@ -217,6 +217,8 @@ export async function findPersistedAssistantReply(
   const rows = await supabaseSelect<MessageRow>(requireConfig(), "levytate_pastoral_messages", query);
   const row = rows[0];
   if (!row) return null;
+  // A retry without a conversationId must not decrypt history after expiry.
+  await getOwnedConversation(context,row.conversation_id);
   const envelope = decryptMessageEnvelope(context, row);
   return { message: decryptMessage(context, row), response: envelope.assistantResponse ?? null, conversationId: row.conversation_id };
 }
@@ -232,7 +234,7 @@ export async function persistPastoralExchange(input: {
 }) {
   if (!input.preference?.save_history || !input.context.employee) return null;
   const config = requireConfig();
-  const conversation = input.conversation ?? await createConversation(input.context, input.preference.history_retention_days);
+  const conversation = input.conversation ? await getOwnedConversation(input.context,input.conversation.id) : await createConversation(input.context, input.preference.history_retention_days);
   const existing = await supabaseSelect<MessageRow>(config, "levytate_pastoral_messages", new URLSearchParams({
     select: messageSelect,
     organisation_id: `eq.${input.context.organisation.id}`,
@@ -405,6 +407,7 @@ async function listOwnedConversations(context: PastoralServerContext) {
     organisation_id: `eq.${context.organisation.id}`,
     employee_id: `eq.${context.employee.id}`,
     owner_user_id: `eq.${context.user.id}`,
+    retention_expires_at: `gt.${new Date().toISOString()}`,
     order: "updated_at.desc",
     limit: "20",
   }));
@@ -418,7 +421,7 @@ async function listOwnedConversations(context: PastoralServerContext) {
   })));
 }
 
-async function getOwnedConversation(context: PastoralServerContext, conversationId: string) {
+async function getOwnedConversation(context: PastoralServerContext, conversationId: string, allowExpired=false) {
   assertEmployeeContext(context);
   const rows = await supabaseSelect<ConversationRow>(requireConfig(), "levytate_pastoral_conversations", new URLSearchParams({
     select: conversationSelect,
@@ -428,11 +431,12 @@ async function getOwnedConversation(context: PastoralServerContext, conversation
     owner_user_id: `eq.${context.user.id}`,
     limit: "1",
   }));
-  if (!rows[0]) throw new LevyTatePastoralError("That saved conversation is unavailable.", 404);
+  if (!rows[0] || (!allowExpired && (!Number.isFinite(Date.parse(rows[0].retention_expires_at)) || Date.parse(rows[0].retention_expires_at)<=Date.now()))) throw new LevyTatePastoralError("That saved conversation is unavailable.", 404);
   return rows[0];
 }
 
 async function loadConversationMessages(context: PastoralServerContext, conversation: ConversationRow) {
+  if (!Number.isFinite(Date.parse(conversation.retention_expires_at)) || Date.parse(conversation.retention_expires_at)<=Date.now()) throw new LevyTatePastoralError("That saved conversation is unavailable.",404);
   const rows = await supabaseSelect<MessageRow>(requireConfig(), "levytate_pastoral_messages", new URLSearchParams({
     select: messageSelect,
     organisation_id: `eq.${context.organisation.id}`,
@@ -450,6 +454,8 @@ function decryptMessage(context: PastoralServerContext, row: MessageRow): Pastor
 }
 
 function decryptMessageEnvelope(context: PastoralServerContext, row: MessageRow) {
+  assertEmployeeContext(context);
+  if(row.owner_user_id!==context.user.id || row.employee_id!==context.employee.id) throw new LevyTatePastoralError("That saved conversation is unavailable.",404);
   return decryptPastoralJson<{ content: string; assistantResponse?: Omit<PastoralAssistantResponse, "conversationId"> }>({
     ciphertext: row.ciphertext,
     nonce: row.nonce,
@@ -459,7 +465,7 @@ function decryptMessageEnvelope(context: PastoralServerContext, row: MessageRow)
 }
 
 async function deleteConversation(context: PastoralServerContext, conversationId: string) {
-  const conversation = await getOwnedConversation(context, conversationId);
+  const conversation = await getOwnedConversation(context, conversationId,true);
   await supabaseDelete(requireConfig(), "levytate_pastoral_conversations", new URLSearchParams({
     organisation_id: `eq.${context.organisation.id}`,
     id: `eq.${conversation.id}`,
