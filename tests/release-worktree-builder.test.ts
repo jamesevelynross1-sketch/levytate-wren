@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
-import { buildReleaseWorktree, validateBaseline, verifyReleaseSources } from "../scripts/build-release-supabase-worktree.mjs";
+import { buildReleaseWorktree, ledgerChecksumAlgorithm, validateBaseline, verifyReleaseSources } from "../scripts/build-release-supabase-worktree.mjs";
 
 const temporaryDirectories: string[] = [];
 afterEach(async () => { for (const directory of temporaryDirectories.splice(0)) await rm(directory, { recursive: true }); });
@@ -14,9 +14,10 @@ async function baselineFixture(mode: "fresh" | "shared") {
   const bootstrap = verified.bootstrap;
   // Synthetic metadata exercises the offline builder contract only. It is never
   // presented as observed hosted history or inserted into any migration ledger.
-  const rows = mode === "fresh" ? [bootstrap.anchor, bootstrap.convergence].map((source) => ({ version: source.version, name: source.name, statementCount: 1, statementsSha256: source.sha256 }))
+  const reference = JSON.parse(await readFile(new URL("./release-native-ledger-evidence.json", import.meta.url), "utf8")) as { rows: Array<{ version: string; name: string; statementCount: number; statementsSha256: string }> };
+  const rows = mode === "fresh" ? reference.rows.map(({ version, name, statementCount, statementsSha256 }) => ({ version, name, statementCount, statementsSha256 }))
     : [bootstrap.anchor, ...bootstrap.convergence.sources].filter((source) => /^supabase\/migrations\/\d{3}_/.test(source.path)).map((source) => ({ version: basename(source.path).split("_")[0], name: basename(source.path).replace(/^\d+_/, "").slice(0, -4), statementCount: 1, statementsSha256: source.sha256 }));
-  return { verified, baseline: { formatVersion: 1, postgresMajorVersion: 17, environment: "local", observedAt: "2026-10-29T12:00:00Z", rows } };
+  return { verified, baseline: { formatVersion: 1, postgresMajorVersion: 17, environment: "local", observedAt: "2026-10-29T12:00:00Z", statementChecksumAlgorithm: ledgerChecksumAlgorithm, rows } };
 }
 
 describe("separate release migration worktrees (offline artifacts, no database execution)", () => {
@@ -49,6 +50,17 @@ describe("separate release migration worktrees (offline artifacts, no database e
   it("rejects missing shared schema history rather than scheduling historical catch-up", async () => {
     const { verified, baseline } = await baselineFixture("shared");
     expect(() => validateBaseline("shared", { ...baseline, rows: baseline.rows.slice(1) }, verified.bootstrap)).toThrow("missing required historical");
+  });
+  it("rejects a source-file hash substituted for the actual convergence ledger checksum", async () => {
+    const { verified, baseline } = await baselineFixture("fresh");
+    expect(() => validateBaseline("fresh", { ...baseline, rows: baseline.rows.map((row) => row.version === verified.bootstrap.convergence.version ? { ...row, statementCount: 1, statementsSha256: verified.bootstrap.convergence.sha256 } : row) }, verified.bootstrap)).toThrow("Convergence recorded-statement checksum");
+    expect(() => validateBaseline("fresh", { ...baseline, statementChecksumAlgorithm: "json-stringify" }, verified.bootstrap)).toThrow("checksum algorithm");
+  });
+  it("never substitutes the local split anchor for the isolated hosted single-statement anchor", async () => {
+    const { verified, baseline } = await baselineFixture("fresh");
+    expect(() => validateBaseline("fresh", { ...baseline, environment: "isolated-preview" }, verified.bootstrap)).toThrow("exact environment");
+    const rows = baseline.rows.map((row) => row.version === verified.bootstrap.anchor.version ? { ...row, statementCount: verified.bootstrap.anchor.isolatedLedgerStatementCount, statementsSha256: verified.bootstrap.anchor.isolatedLedgerStatementsSha256 } : row);
+    expect(validateBaseline("fresh", { ...baseline, environment: "isolated-preview", rows }, verified.bootstrap)).toEqual([]);
   });
   it("rejects038, duplicate rows, unknown history and secret-bearing evidence", async () => {
     const { verified, baseline } = await baselineFixture("shared");

@@ -12,8 +12,17 @@ const approvedConvergence = "3bd6b681196ff865f50976129981b48601314d2bab242179464
 const checksum = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const isHash = (value) => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
 const versionOf = (path) => basename(path).split("_")[0];
+export const ledgerChecksumAlgorithm = "sha256-utf8-ordered-statements-lf-no-trailing-lf-v1";
+const officialLedgerEvidenceSha256 = "50499bc67f95f6801102154a85a883cc64ee0696dbea8a3359452c0bdccf4452";
+const officialAnchor = { statementCount: 61, statementsSha256: "f47356686324f4f41fcf02701f7e3e44bccc8c561d3aa68eecb250355330241a" };
+const officialConvergence = { statementCount: 954, statementsSha256: "3b582ad74254045351bbd89beee7cf16a5c0d9a16c613848eec3977e07ad947d" };
 
 export async function verifyReleaseSources(root = repositoryRoot) {
+  // Recorded statement-array bytes differ from migration-file bytes. These
+  // checksums came from the original official CLI replay, never a fabricated
+  // verifier ledger. A different parser representation requires fresh review.
+  const ledgerEvidence = await readFile(resolve(root, "tests/release-native-ledger-evidence.json"));
+  if (checksum(ledgerEvidence) !== officialLedgerEvidenceSha256) throw new Error("Official local ledger reference changed; independently review it before updating the lock.");
   const manifestBytes = await readFile(resolve(root, "supabase/release-migrations/manifest.json"));
   const manifest = JSON.parse(manifestBytes);
   if (manifest.formatVersion !== 1 || manifest.postgresMajorVersion !== 17 || manifest.approvedBootstrapConvergenceSha256 !== approvedConvergence || !Array.isArray(manifest.migrations) || !manifest.migrations.length) throw new Error("Invalid release manifest or approved bootstrap identity.");
@@ -41,7 +50,8 @@ export async function verifyReleaseSources(root = repositoryRoot) {
 export function validateBaseline(mode, baseline, bootstrap) {
   if (!["fresh", "shared"].includes(mode) || baseline?.formatVersion !== 1 || baseline.postgresMajorVersion !== 17 || !Array.isArray(baseline.rows) || !baseline.rows.length
     || !["local", "isolated-preview", "shared-history-read-only"].includes(baseline.environment) || typeof baseline.observedAt !== "string" || !Number.isFinite(Date.parse(baseline.observedAt))) throw new Error("Explicit PostgreSQL 17 read-only ledger evidence is required.");
-  if (Object.keys(baseline).some((key) => !["formatVersion", "postgresMajorVersion", "environment", "observedAt", "rows"].includes(key))) throw new Error("Ledger evidence must contain metadata only, never credentials.");
+  if (Object.keys(baseline).some((key) => !["formatVersion", "postgresMajorVersion", "environment", "observedAt", "statementChecksumAlgorithm", "rows"].includes(key))) throw new Error("Ledger evidence must contain metadata only, never credentials.");
+  if (baseline.statementChecksumAlgorithm !== ledgerChecksumAlgorithm) throw new Error("Explicit ordered-statement checksum algorithm required; file hashes cannot stand in for ledger checksums.");
   const versions = new Set();
   for (const row of baseline.rows) {
     if (typeof row.version !== "string" || !/^\d{3,14}$/.test(row.version) || typeof row.name !== "string" || !/^[a-z0-9_]+$/.test(row.name)
@@ -55,7 +65,11 @@ export function validateBaseline(mode, baseline, bootstrap) {
     const expected = [bootstrap.anchor, bootstrap.convergence];
     if (baseline.rows.length !== expected.length || expected.some((source) => !baseline.rows.some((row) => row.version === source.version && row.name === source.name))) throw new Error("Fresh release requires the already-verified anchor and convergence ledger only; complete bootstrap separately.");
     const anchor = baseline.rows.find((row) => row.version === bootstrap.anchor.version);
-    if (anchor.statementCount !== bootstrap.anchor.isolatedLedgerStatementCount || anchor.statementsSha256 !== bootstrap.anchor.isolatedLedgerStatementsSha256) throw new Error("Fresh anchor statement checksum does not match approval.");
+    const isolatedAnchor = anchor.statementCount === bootstrap.anchor.isolatedLedgerStatementCount && anchor.statementsSha256 === bootstrap.anchor.isolatedLedgerStatementsSha256;
+    const localAnchor = baseline.environment === "local" && anchor.statementCount === officialAnchor.statementCount && anchor.statementsSha256 === officialAnchor.statementsSha256;
+    if (!isolatedAnchor && !localAnchor) throw new Error("Fresh anchor statement checksum does not match the exact environment approval/reference.");
+    const convergence = baseline.rows.find((row) => row.version === bootstrap.convergence.version);
+    if (convergence.statementCount !== officialConvergence.statementCount || convergence.statementsSha256 !== officialConvergence.statementsSha256) throw new Error("Convergence recorded-statement checksum does not match the independent official CLI replay.");
     return [];
   }
   if (baseline.environment === "isolated-preview") throw new Error("Do not substitute shared history for an isolated fresh-project ledger.");
@@ -79,6 +93,8 @@ export async function buildReleaseWorktree(options) {
   const sharedSources = validateBaseline(options.mode, baseline, verified.bootstrap);
   const evidence = { formatVersion: 1, mode: options.mode, environment: baseline.environment, postgresMajorVersion: 17, manifestSha256: verified.manifestSha256,
     baselineEvidenceSha256: checksum(baselineBytes), approvedBootstrapConvergenceSha256: approvedConvergence,
+    statementChecksumAlgorithm: ledgerChecksumAlgorithm, officialLedgerEvidenceSha256,
+    baselineContentVerification: options.mode === "fresh" ? "exact-reviewed-statement-checksums" : "version-and-name-only-independent-catalogue-approval-required",
     expectedAppliedBaseline: baseline.rows.map(({ version, name }) => ({ version, name })),
     expectedPendingMigrations: verified.manifest.migrations.map((source) => ({ filename: basename(source.path), sha256: source.sha256 })),
     excludedVersions: ["019", "038"], hostedExecutionAuthorised: false, linkedDryRunRequired: true };

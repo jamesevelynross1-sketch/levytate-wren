@@ -5,6 +5,7 @@ export type BootstrapManifest = {
   excluded: Array<{ version: string; path: string | null; sha256: string | null }>;
 };
 export type ReleaseManifest = { formatVersion: number; postgresMajorVersion: number; approvedBootstrapConvergenceSha256: string; migrations: MigrationSource[] };
+export const ledgerChecksumAlgorithm: string;
 export function verifyReleaseSources(root?: string): Promise<{ manifest: ReleaseManifest; bootstrap: BootstrapManifest; manifestSha256: string }>;
 export function validateBaseline(mode: string, baseline: unknown, bootstrap: BootstrapManifest): MigrationSource[];
 export function buildReleaseWorktree(options: { root?: string; mode: "fresh" | "shared"; baseline: string; output?: string; verifyOnly?: boolean }): Promise<{
@@ -15,6 +16,9 @@ export function buildReleaseWorktree(options: { root?: string; mode: "fresh" | "
   manifestSha256: string;
   baselineEvidenceSha256: string;
   approvedBootstrapConvergenceSha256: string;
+  statementChecksumAlgorithm: string;
+  officialLedgerEvidenceSha256: string;
+  baselineContentVerification: string;
   expectedAppliedBaseline: Array<{ version: string; name: string }>;
   expectedPendingMigrations: Array<{ filename: string; sha256: string }>;
   excludedVersions: string[];
