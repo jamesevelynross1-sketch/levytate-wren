@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
 import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
 import { ClientRequestError, readAuthenticatedJson } from "@/lib/server/levytate-request-boundary";
+import { logLevyTateServerError } from "@/lib/server/levytate-safe-api-error";
 import {
   LevyTateServiceRequestError,
   applyEmployerRequestActionForSession,
@@ -10,9 +11,9 @@ import {
 } from "@/lib/server/levytate-service-requests";
 
 export async function GET() {
-  const session = await employerSession();
-  if (!session) return noStore({ message: "Unauthorised." }, 401);
   try {
+    const session = await employerSession();
+    if (!session) return noStore({ message: "Unauthorised." }, 401);
     return noStore({ ok: true, workspace: await getEmployerRequestsWorkspaceForSession(session) });
   } catch (error) {
     return safeError(error);
@@ -20,9 +21,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const session = await employerSession();
-  if (!session) return noStore({ message: "Unauthorised." }, 401);
   try {
+    const session = await employerSession();
+    if (!session) return noStore({ message: "Unauthorised." }, 401);
     const action = await readAuthenticatedJson(request, session.email);
     return noStore({ ok: true, workspace: await applyEmployerRequestActionForSession(session, action) });
   } catch (error) {
@@ -38,7 +39,7 @@ async function employerSession() {
 function safeError(error: unknown) {
   if (error instanceof ClientRequestError) return noStore({ message: error.message }, error.status);
   if (error instanceof LevyTateServiceRequestError) return noStore({ message: error.message }, error.status);
-  console.error("LevyTate Requests route failed", error instanceof Error ? error.name : "unknown");
+  logLevyTateServerError("employer-requests", error);
   return noStore({ message: "Requests are temporarily unavailable." }, 503);
 }
 

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
+import { assertBrowserOrigin, readBrowserJson } from "../lib/server/levytate-request-boundary.ts";
 import {
   addProviderMembershipForTest,
   answerClarification,
@@ -835,9 +836,12 @@ check(
 );
 check(
   "156 Platform Admin provider-access mutation bodies are bounded",
-  providerAccessAdminRoute.includes("maximumRequestBodyBytes") &&
-    providerAccessAdminRoute.includes("readBoundedJson(request, maximumRequestBodyBytes)"),
+  providerAccessAdminRoute.includes("const maximumRequestBodyBytes = 16 * 1024") &&
+    providerAccessAdminRoute.includes("readAuthenticatedJson(request, session.email, maximumRequestBodyBytes)"),
 );
+await assert.rejects(() => readBrowserJson(new Request("http://localhost:3107/api/levytate-platform/provider-access", {
+  method: "POST", headers: { origin: "http://localhost:3107", "content-type": "application/json" }, body: JSON.stringify({ displayName: "界".repeat(6000) }),
+}), 16 * 1024), (error) => error.status === 413);
 
 check(
   "157 strict employer payload validation accepts a complete closed action",
@@ -971,9 +975,13 @@ check(
 );
 check(
   "166 every new browser mutation route requires an explicit matching Origin",
-  [employerRoute, providerRoute, providerAuthRoute, providerLogoutRoute, providerAccessAdminRoute]
-    .every((source) => source.includes('origin === new URL(request.url).origin') && !source.includes("!origin ||")),
+  [employerRoute, providerRoute, providerAccessAdminRoute].every((source) => source.includes("await readAuthenticatedJson(request, session.email"))
+    && providerAuthRoute.includes("await readBrowserJson(request,")
+    && providerLogoutRoute.includes("assertBrowserOrigin(request)"),
 );
+for (const origin of [null, "http://other.localhost:3107", "https://untrusted.invalid"]) {
+  assert.throws(() => assertBrowserOrigin(new Request("http://localhost:3107/api/levytate-requests", { headers: origin ? { origin } : {} })), (error) => error.status === 403);
+}
 check(
   "167 provider logout clears browser caches and revalidates BFCache restores",
   providerLogoutRoute.includes('Clear-Site-Data')
@@ -1431,8 +1439,8 @@ check(
   "198 every Requests browser JSON endpoint uses a streaming byte-bounded parser",
   boundedJson.includes("request.body.getReader()")
     && boundedJson.includes("received > maximumBytes")
-    && [employerRoute, providerRoute, providerAuthRoute, providerAccessAdminRoute]
-      .every((source) => source.includes("readBoundedJson(")),
+    && [employerRoute, providerRoute, providerAccessAdminRoute].every((source) => source.includes("await readAuthenticatedJson(request, session.email"))
+    && providerAuthRoute.includes("await readBrowserJson(request,"),
 );
 check(
   "199 provider reactivation invalidates old sessions and requires a fresh bound callback",

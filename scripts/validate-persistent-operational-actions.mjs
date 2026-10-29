@@ -1,4 +1,6 @@
 import { readFileSync } from "node:fs";
+import assert from "node:assert/strict";
+import { operationalActionInput, parseAction } from "../lib/server/levytate-operational-input.ts";
 
 const migration = readFileSync("supabase/migrations/013_create_persistent_operational_actions.sql", "utf8");
 const domain = readFileSync("lib/levytate/mvp/operational-actions.ts", "utf8");
@@ -58,9 +60,13 @@ assertIncludes(server, "dueDateOverride", "Controlled due-date override");
 assertIncludes(server, "buildOwnerOptions", "Organisation-scoped owner options");
 assertIncludes(server, "/duplicate|23505/i", "Concurrent insertion recovery");
 assertIncludes(api, "expectedVersion", "Mutation version contract");
-assertIncludes(api, "organisationId?: string", "Client organisation input is accepted only as ignored input");
-assertIncludes(api, "actorUserId?: string", "Client actor input is accepted only as ignored input");
-assertIncludes(api, 'command?: "acknowledge" | "start" | "complete" | "dismiss" | "assign" | "due_date" | "cancel"', "Narrow action-management commands");
+assertIncludes(api, "parseAction(operationalActionInput, await readAuthenticatedJson(request, session.email))", "Bounded authenticated strict action contract");
+for (const field of ["organisationId", "actorUserId", "status"]) {
+  assert.throws(() => parseAction(operationalActionInput, { command: "acknowledge", expectedVersion: 1, [field]: "forged" }), (error) => error.status === 400);
+}
+assert.throws(() => parseAction(operationalActionInput, { command: "approve", expectedVersion: 1 }), (error) => error.status === 400);
+assert.throws(() => parseAction(operationalActionInput, { command: "acknowledge" }), (error) => error.status === 400);
+assert.deepEqual(parseAction(operationalActionInput, { command: "acknowledge", expectedVersion: 1 }), { command: "acknowledge", expectedVersion: 1 });
 
 console.log(JSON.stringify({
   ok: true,

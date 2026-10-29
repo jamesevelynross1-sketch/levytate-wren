@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
 import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
 import { ClientRequestError, readAuthenticatedJson, requireActionKeys } from "@/lib/server/levytate-request-boundary";
+import { logLevyTateServerError } from "@/lib/server/levytate-safe-api-error";
 import {
   LevyTateProviderAccessAdminError,
   listProviderAccessForAdmin,
@@ -17,18 +18,18 @@ const responseHeaders = {
 const maximumRequestBodyBytes = 16 * 1024;
 
 export async function GET() {
-  const session = await currentSession();
-  if (!session) return reply({ message: "Unauthorised." }, 401);
   try {
+    const session = await currentSession();
+    if (!session) return reply({ message: "Unauthorised." }, 401);
     return reply({ ok: true, providers: await listProviderAccessForAdmin(session) });
   } catch (error) {
     return failure(error);
   }
 }
 export async function POST(request: Request) {
-  const session = await currentSession();
-  if (!session) return reply({ message: "Unauthorised." }, 401);
   try {
+    const session = await currentSession();
+    if (!session) return reply({ message: "Unauthorised." }, 401);
     const body = await readAuthenticatedJson(request, session.email, maximumRequestBodyBytes);
     requireActionKeys(body, ["providerId", "email", "displayName", "role"]);
     return reply({ ok: true, membership: await provisionProviderAccess(session, body) }, 201);
@@ -38,9 +39,9 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const session = await currentSession();
-  if (!session) return reply({ message: "Unauthorised." }, 401);
   try {
+    const session = await currentSession();
+    if (!session) return reply({ message: "Unauthorised." }, 401);
     const body = await readAuthenticatedJson(request, session.email, maximumRequestBodyBytes);
     requireActionKeys(body, ["membershipId", "operation", "role", "displayName"]);
     return reply({ ok: true, membership: await updateProviderAccess(session, body) });
@@ -61,7 +62,7 @@ function failure(error: unknown) {
     ? error.message
     : "Provider access administration is temporarily unavailable.";
   if (!(error instanceof LevyTateProviderAccessAdminError)) {
-    console.error("LevyTate provider access administration failed", error instanceof Error ? error.name : "unknown");
+    logLevyTateServerError("provider-access-admin", error);
   }
   return reply({ message }, status);
 }

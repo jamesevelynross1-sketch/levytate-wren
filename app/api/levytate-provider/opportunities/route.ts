@@ -10,11 +10,12 @@ import {
   getProviderWorkspaceBootstrapForSession,
 } from "@/lib/server/levytate-service-requests";
 import { ClientRequestError, readAuthenticatedJson } from "@/lib/server/levytate-request-boundary";
+import { logLevyTateServerError } from "@/lib/server/levytate-safe-api-error";
 
 export async function GET() {
-  const session = await providerSession();
-  if (!session) return noStore({ message: "Unauthorised." }, 401);
   try {
+    const session = await providerSession();
+    if (!session) return noStore({ message: "Unauthorised." }, 401);
     const workspace = await getProviderWorkspaceBootstrapForSession(session);
     if (!workspace) return noStore({ message: "Opportunities are unavailable." }, 404);
     return noStore({ ok: true, workspace });
@@ -24,9 +25,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const session = await providerSession();
-  if (!session) return noStore({ message: "Unauthorised." }, 401);
   try {
+    const session = await providerSession();
+    if (!session) return noStore({ message: "Unauthorised." }, 401);
     const action = await readAuthenticatedJson(request, session.email, 64 * 1024);
     return noStore({ ok: true, opportunity: await applyProviderRequestActionForSession(session, action) });
   } catch (error) {
@@ -42,7 +43,7 @@ async function providerSession() {
 function safeError(error: unknown) {
   if (error instanceof ClientRequestError) return noStore({ message: error.message }, error.status);
   if (error instanceof LevyTateServiceRequestError) return noStore({ message: error.message }, error.status);
-  console.error("LevyTate provider Opportunities route failed", error instanceof Error ? error.name : "unknown");
+  logLevyTateServerError("provider-opportunities", error);
   return noStore({ message: "Opportunities are temporarily unavailable." }, 503);
 }
 
