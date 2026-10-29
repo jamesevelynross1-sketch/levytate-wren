@@ -70,16 +70,18 @@ export function OperationsCentreModule({ onOpenLearner, onSignalContext }: { onO
       if (learner !== "All") params.set("learner", learner);
       if (programme !== "All") params.set("programme", programme);
       if (assignment !== "all") params.set("assignment", assignment);
-      if (initialSynchronisationPending.current) {
-        params.set("synchronise", "true");
-        initialSynchronisationPending.current = false;
-      }
+      const synchronise = initialSynchronisationPending.current;
       try {
-        const response = await fetch(`/api/levytate-operations${params.size ? `?${params}` : ""}`, { cache: "no-store", signal: controller.signal });
+        const response = await fetch(`/api/levytate-operations${params.size ? `?${params}` : ""}`, {
+          method: synchronise ? "POST" : "GET", cache: "no-store", signal: controller.signal,
+          ...(synchronise ? { headers: { "content-type": "application/json" }, body: "{}" } : {}),
+        });
         const payload = (await response.json()) as OperationsApiResponse;
         if (!response.ok || !payload.summary || !payload.queues || !payload.filterOptions || !payload.recentActivity) {
           throw new Error(payload.message ?? "Operations data is unavailable.");
         }
+        if (controller.signal.aborted) return;
+        if (synchronise) initialSynchronisationPending.current = false;
         setData(payload as OperationsResponse);
       } catch (loadError) {
         if (!(loadError instanceof DOMException && loadError.name === "AbortError")) {

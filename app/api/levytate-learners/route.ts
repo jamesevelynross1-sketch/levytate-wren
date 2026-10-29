@@ -14,40 +14,37 @@ import {
 } from "@/lib/server/levytate-learner-lifecycle";
 import { buildLearnerListSummary } from "@/lib/levytate/mvp/learner-record-view";
 
+const headers = { "Cache-Control": "private, no-store, max-age=0" };
+
 async function getSession() {
   const cookieStore = await cookies();
   return readAuthorisedLevyTateBetaSession(cookieStore.get(levytateBetaSessionCookie)?.value);
 }
 
 export async function POST(request: Request) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ message: "Unauthorised." }, { status: 401 });
   try {
+    const session = await getSession();
+    if (!session) return NextResponse.json({ message: "Unauthorised." }, { status: 401, headers });
     const body = await readAuthenticatedJson(request, session.email) as Parameters<typeof createLearnerRecord>[1] | null;
-    if (!body) return NextResponse.json({ message: "A valid learner onboarding request is required." }, { status: 400 });
+    if (!body) return NextResponse.json({ message: "A valid learner onboarding request is required." }, { status: 400, headers });
     const record = await createLearnerRecord(session, { ...body, demonstrationRecord: false });
     const learner = await getOrganisationLearnerLifecycleRecordDetail(session, record.id);
-    return NextResponse.json({ ok: true, source: "supabase", learner }, { status: 201 });
+    return NextResponse.json({ ok: true, source: "supabase", learner }, { status: 201, headers });
   } catch (error) {
-    if (error instanceof ClientRequestError) return NextResponse.json({ message: error.message }, { status: error.status });
-    const status = error instanceof LevyTateLearnerLifecyclePermissionError ? 403 : error instanceof LevyTateLearnerLifecycleConflictError ? 409 : error instanceof LevyTateLearnerLifecycleValidationError ? 400 : 500;
-    return NextResponse.json({ message: status === 403 ? "You do not have permission to create learner records." : [400, 409].includes(status) ? (error as Error).message : "The learner record could not be created." }, { status });
+    if (error instanceof ClientRequestError) return NextResponse.json({ message: error.message }, { status: error.status, headers });
+    const status = error instanceof LevyTateLearnerLifecyclePermissionError ? 403 : error instanceof LevyTateLearnerLifecycleConflictError ? 409 : error instanceof LevyTateLearnerLifecycleValidationError ? 400 : 503;
+    return NextResponse.json({ message: status === 403 ? "You do not have permission to create learner records." : [400, 409].includes(status) ? (error as Error).message : "The learner record could not be created. Please try again." }, { status, headers });
   }
 }
 
 export async function GET(request: Request) {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ message: "Unauthorised." }, { status: 401 });
-  }
-
-  const url = new URL(request.url);
-  const learnerRecordId = url.searchParams.get("learnerRecordId")?.trim();
-
   try {
+    const session = await getSession();
+    if (!session) return NextResponse.json({ message: "Unauthorised." }, { status: 401, headers });
+    const learnerRecordId = new URL(request.url).searchParams.get("learnerRecordId")?.trim();
     if (learnerRecordId) {
       const learner = await getOrganisationLearnerLifecycleRecordDetail(session, learnerRecordId);
-      return NextResponse.json({ ok: true, source: "supabase", learner });
+      return NextResponse.json({ ok: true, source: "supabase", learner }, { headers });
     }
 
     const learners = await listOrganisationLearnerLifecycleSummaries(session);
@@ -56,21 +53,20 @@ export async function GET(request: Request) {
       source: "supabase",
       summary: buildLearnerListSummary(learners),
       learners,
-    });
+    }, { headers });
   } catch (error) {
     const status = error instanceof LevyTateLearnerLifecyclePermissionError
       ? 403
       : error instanceof LevyTateLearnerLifecycleError
         ? 404
-        : 500;
+        : 503;
 
-    return NextResponse.json({ message: messageFor(error, status) }, { status });
+    return NextResponse.json({ message: messageFor(status) }, { status, headers });
   }
 }
 
-function messageFor(error: unknown, status: number) {
+function messageFor(status: number) {
   if (status === 403) return "You do not have access to organisation learner records.";
   if (status === 404) return "Learner record was not found.";
-  if (error instanceof Error) return error.message;
   return "Learner lifecycle records are temporarily unavailable.";
 }
