@@ -11,10 +11,10 @@ const request = (token: string) => new Request(`http://localhost/levytate/auth/c
 beforeEach(() => {
   counts.clear(); persistence.mockReset(); vi.stubEnv("LEVYTATE_AUTH_RATE_LIMIT_SECRET", "synthetic-local-unit-test");
   persistence.mockImplementation(async (_config, path, init) => {
-    if (path.startsWith("levytate_auth_rate_limits?")) {
-      const query = new URLSearchParams(path.split("?")[1]);
-      const count = counts.get(`${query.get("action")!.slice(3)}:${query.get("key_hash")!.slice(3)}`);
-      return count ? [{ request_count: count, expires_at: new Date(Date.now() + 900000).toISOString() }] : [];
+    if (path === "rpc/levytate_check_auth_callback_failures") {
+      const body = JSON.parse(init.body);
+      const count = counts.get(`magic_link.callback.failure:${body.p_key_hash}`) ?? 0;
+      return [{ allowed: count < 10, reset_at: new Date(Date.now() + 900000).toISOString() }];
     }
     const body = JSON.parse(init.body);
     const key = `${body.p_action}:${body.p_key_hash}`;
@@ -46,7 +46,7 @@ describe("callback budgets (modelled persistence, not hosted Auth evidence)", ()
   });
   it("fails closed when the failed-only bucket read is unavailable or malformed", async () => {
     const realModel = persistence.getMockImplementation()!;
-    persistence.mockImplementation(async (...args) => args[1].startsWith("levytate_auth_rate_limits?") ? [{ request_count: "10", expires_at: "invalid" }] : realModel(...args));
+    persistence.mockImplementation(async (...args) => args[1] === "rpc/levytate_check_auth_callback_failures" ? [{ allowed: "true", reset_at: "invalid" }] : realModel(...args));
     await expect(checkCallbackAttemptLimit(request("one"))).rejects.toMatchObject({ name: "LevyTateRateLimitStoreError" });
   });
 });

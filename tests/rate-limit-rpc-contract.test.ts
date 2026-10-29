@@ -21,7 +21,12 @@ describe("rate-limit client / reviewed SQL input contract", () => {
       return [field, new RegExp(match![1])];
     }));
     rpc.mockImplementation(async (_config, path, init) => {
-      if (path.startsWith("levytate_auth_rate_limits?")) return [];
+      if (path === "rpc/levytate_check_auth_callback_failures") {
+        const body = JSON.parse(init.body);
+        expect(Object.keys(body).sort()).toEqual(["p_environment_namespace", "p_key_hash"]);
+        expect(body.p_key_hash).toMatch(/^[a-f0-9]{64}$/);
+        return [{ allowed: true, reset_at: "2026-10-29T16:00:00Z" }];
+      }
       expect(path).toBe("rpc/levytate_consume_auth_rate_limit");
       const body = JSON.parse(init.body);
       for (const field of Object.keys(patterns)) expect(body[`p_${field}`]).toMatch(patterns[field]);
@@ -40,6 +45,8 @@ describe("rate-limit client / reviewed SQL input contract", () => {
     await limits.checkMicrosoftCopilotRequestLimits(request, "synthetic-tenant", "synthetic-object");
     await limits.checkStrategyBuilderLimits(request, "synthetic@example.invalid", "/api/strategy-builder/generate");
     await limits.checkPublicSubmissionLimits(request, "synthetic@example.invalid", "/api/opportunity-review/submit");
-    expect(rpc).toHaveBeenCalledTimes(25);
+    await limits.checkEarlyAccessSubmissionLimits(request, "synthetic@example.invalid");
+    await limits.checkDeliveryWebhookLimit(request);
+    expect(rpc).toHaveBeenCalledTimes(29);
   });
 });

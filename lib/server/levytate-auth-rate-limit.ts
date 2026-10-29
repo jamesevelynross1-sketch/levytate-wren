@@ -35,13 +35,11 @@ export async function checkCallbackAttemptLimit(request: Request) {
   try {
     const config = getLevyTateSupabaseConfig();
     if (!config) throw new LevyTateRateLimitStoreError();
-    const query = new URLSearchParams({ select: "request_count,expires_at", environment_namespace: `eq.${getLevyTateRateLimitEnvironment()}`,
-      action: "eq.magic_link.callback.failure", key_hash: `eq.${networkRateLimitKey(request)}`,
-      expires_at: `gt.${new Date().toISOString()}`, order: "expires_at.desc", limit: "1" });
-    const rows = await supabaseFetchJson<Array<{ request_count: number; expires_at: string }>>(config, `levytate_auth_rate_limits?${query}`);
-    if (!Array.isArray(rows) || rows.length > 1 || rows.some((row) => !Number.isSafeInteger(row.request_count) || row.request_count < 1 || !Number.isFinite(Date.parse(row.expires_at)))) throw new LevyTateRateLimitStoreError();
-    return rows[0]?.request_count >= levyTateAuthRateLimits.invalidCallbackNetwork.limit
-      ? { allowed: false, resetAt: rows[0].expires_at } : { allowed: true as const };
+    const rows = await supabaseFetchJson<Array<{ allowed: boolean; reset_at: string }>>(config, "rpc/levytate_check_auth_callback_failures", {
+      method: "POST", body: JSON.stringify({ p_environment_namespace: getLevyTateRateLimitEnvironment(), p_key_hash: networkRateLimitKey(request) }),
+    });
+    if (!Array.isArray(rows) || rows.length !== 1 || typeof rows[0].allowed !== "boolean" || !Number.isFinite(Date.parse(rows[0].reset_at))) throw new LevyTateRateLimitStoreError();
+    return { allowed: rows[0].allowed, resetAt: rows[0].reset_at };
   } catch { throw new LevyTateRateLimitStoreError(); }
 }
 
@@ -79,6 +77,20 @@ export async function checkLevyTateCopilotLimits(request: Request, email: string
     check("copilot.identity.minute", rateLimitKey("email", email.trim().toLowerCase()), "/api/levytate-ai", "copilot_rate_limited", { limit: 12, windowSeconds: 60 }),
     check("copilot.identity.hour", rateLimitKey("email", email.trim().toLowerCase()), "/api/levytate-ai", "copilot_rate_limited", { limit: 120, windowSeconds: 3600 }),
     check("copilot.network.hour", networkRateLimitKey(request), "/api/levytate-ai", "copilot_rate_limited", { limit: 1200, windowSeconds: 3600 }),
+  ]);
+}
+
+export async function checkEarlyAccessSubmissionLimits(request: Request, email: string) {
+  return consumeChecks([
+    check("early_access.email", rateLimitKey("email", email.trim().toLowerCase()), "/api/levytate-early-access", "public_form_rate_limited", levyTateAuthRateLimits.publicFormEmailHour),
+    check("early_access.network", networkRateLimitKey(request), "/api/levytate-early-access", "public_form_rate_limited", levyTateAuthRateLimits.publicFormNetworkHour),
+    check("early_access.global", rateLimitKey("global", "early-access"), "/api/levytate-early-access", "public_form_rate_limited", { limit: 500, windowSeconds: 3600 }),
+  ]);
+}
+
+export async function checkDeliveryWebhookLimit(request: Request) {
+  return consumeChecks([
+    check("delivery_webhook.network", networkRateLimitKey(request), "/api/levytate-auth/delivery-events/resend", "delivery_webhook_rate_limited", { limit: 600, windowSeconds: 60 }),
   ]);
 }
 

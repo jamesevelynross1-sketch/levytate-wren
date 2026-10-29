@@ -1,6 +1,7 @@
 import { BoundedJsonBodyError, readBoundedJson } from "@/lib/server/bounded-json";
 import { checkAuthenticatedWriteLimit, LevyTateRateLimitStoreError } from "@/lib/server/levytate-auth-rate-limit";
 import { applicationRequestOrigin } from "@/lib/server/levytate-request-origin";
+import { getLevyTateWebsiteOrigin } from "@/lib/levytate/hosts";
 
 export class ClientRequestError extends Error {
   constructor(message: string, readonly status: 400 | 403 | 404 | 409 | 413 | 415 | 422 | 429 | 503) {
@@ -43,6 +44,18 @@ export function assertBrowserOrigin(request: Request) {
 
 export async function readBrowserJson(request: Request, maximumBytes = 64 * 1024): Promise<Record<string, unknown>> {
   assertBrowserOrigin(request);
+  return readJsonObject(request, maximumBytes);
+}
+
+/** Public marketing forms intentionally allow the configured website origin.
+ * They do not use authenticated cookies; this exception must not guard app writes.
+ */
+export async function readPublicBrowserJson(request: Request, maximumBytes = 8 * 1024): Promise<Record<string, unknown>> {
+  if (request.headers.get("origin") !== getLevyTateWebsiteOrigin()) assertBrowserOrigin(request);
+  return readJsonObject(request, maximumBytes);
+}
+
+async function readJsonObject(request: Request, maximumBytes: number): Promise<Record<string, unknown>> {
   if (request.headers.get("content-type")?.split(";", 1)[0].trim().toLowerCase() !== "application/json") {
     throw new ClientRequestError("Send this action as JSON.", 415);
   }

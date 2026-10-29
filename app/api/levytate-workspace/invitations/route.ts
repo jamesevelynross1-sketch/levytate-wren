@@ -4,7 +4,7 @@ import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
 import { levyTateAuthCallbackUrl } from "@/lib/levytate/hosts";
 import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
 import { ClientWorkspaceAdminError, inviteClientWorkspaceUser, listWorkspaceUsers, provisionClientWorkspaceUser, updateClientWorkspaceUser } from "@/lib/server/levytate-client-workspace-admin";
-import { ClientRequestError, readBrowserJson, requireActionKeys } from "@/lib/server/levytate-request-boundary";
+import { ClientRequestError, readBrowserJson, requireActionKeys, assertAuthenticatedWrite } from "@/lib/server/levytate-request-boundary";
 import { applicationRequestUrl } from "@/lib/server/levytate-request-origin";
 
 async function session() { const store = await cookies(); return readAuthorisedLevyTateBetaSession(store.get(levytateBetaSessionCookie)?.value); }
@@ -17,6 +17,7 @@ export async function POST(request: Request) {
     const body = await readBrowserJson(request, 8192);
     const current = await session();
     if (!current) return reply({ message: "Unauthorised." }, 401);
+    await assertAuthenticatedWrite(request, current.email);
     if (body.action === "provision_user") {
       requireActionKeys(body, ["action", "email", "displayName", "role"]);
       const scope = await listWorkspaceUsers(current);

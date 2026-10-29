@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { assertBrowserOrigin, readBrowserForm, readBrowserJson, requireActionKeys } from "@/lib/server/levytate-request-boundary";
+import { assertBrowserOrigin, readBrowserForm, readBrowserJson, readPublicBrowserJson, requireActionKeys } from "@/lib/server/levytate-request-boundary";
+import { readBoundedText } from "@/lib/server/bounded-json";
 
 const url = "https://candidate.vercel.app/api/levytate-workspace";
 beforeEach(() => { vi.stubEnv("VERCEL_ENV", "preview"); vi.stubEnv("VERCEL_URL", "candidate.vercel.app"); });
@@ -9,6 +10,18 @@ function request(body: string, headers: Record<string, string> = {}) {
 }
 
 describe("cookie-authenticated write boundary", () => {
+  it("limits the configured public website exception to unauthenticated marketing forms", async () => {
+    await expect(readPublicBrowserJson(request("{}", { origin: "https://www.levytate.co.uk" }))).resolves.toEqual({});
+    await expect(readBrowserJson(request("{}", { origin: "https://www.levytate.co.uk" }))).rejects.toMatchObject({ status: 403 });
+    for (const origin of ["https://evil.example", "https://www.levytate.co.uk.evil.example", "null", ""]) {
+      await expect(readPublicBrowserJson(request("{}", { origin }))).rejects.toMatchObject({ status: 403 });
+    }
+  });
+  it("preserves signed raw bytes as UTF-8 text and refuses oversized streams", async () => {
+    const signed = ' { "message": "synthetic 😀" }\n';
+    expect(await readBoundedText(request(signed), 100)).toBe(signed);
+    await expect(readBoundedText(request(signed, { "content-length": "1" }), 10)).rejects.toMatchObject({ tooLarge: true });
+  });
   it.each(["https://www.levytate.co.uk", "https://sibling.candidate.vercel.app", "null", ""])('rejects origin %s before consuming body', async (origin) => {
     const value = request('{"action":"save"}', { origin });
     await expect(readBrowserJson(value)).rejects.toMatchObject({ status: 403 });

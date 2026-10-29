@@ -4,7 +4,7 @@ import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
 import { levyTateAuthCallbackUrl } from "@/lib/levytate/hosts";
 import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
 import { ClientWorkspaceAdminError, createClientWorkspace, inviteClientWorkspaceUser, listClientWorkspaces, provisionClientWorkspaceUser, updateClientWorkspaceUser } from "@/lib/server/levytate-client-workspace-admin";
-import { ClientRequestError, readBrowserJson, requireActionKeys } from "@/lib/server/levytate-request-boundary";
+import { ClientRequestError, readBrowserJson, requireActionKeys, assertAuthenticatedWrite } from "@/lib/server/levytate-request-boundary";
 import { applicationRequestUrl } from "@/lib/server/levytate-request-origin";
 
 async function session() { const store = await cookies(); return readAuthorisedLevyTateBetaSession(store.get(levytateBetaSessionCookie)?.value); }
@@ -17,6 +17,7 @@ export async function POST(request: Request) {
     const body = await readBrowserJson(request, 8192);
     const current = await session();
     if (!current) return reply({ message: "Unauthorised." }, 401);
+    await assertAuthenticatedWrite(request, current.email);
     if (body.action === "create_workspace") {
       requireActionKeys(body, ["action", "name", "workspaceName", "primaryContact", "contactEmail", "initialRole"]);
       return reply({ ok: true, workspace: await createClientWorkspace(current, body) }, 201);
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
   } catch (error) { return failure(error); }
 }
 export async function PATCH(request: Request) {
-  try { const body = await readBrowserJson(request, 4096); requireActionKeys(body, ["userId", "role", "active"]); const current = await session(); if (!current) return reply({ message: "Unauthorised." }, 401); return reply({ ok: true, user: await updateClientWorkspaceUser(current, body) }); }
+  try { const body = await readBrowserJson(request, 4096); requireActionKeys(body, ["userId", "role", "active"]); const current = await session(); if (!current) return reply({ message: "Unauthorised." }, 401); await assertAuthenticatedWrite(request, current.email); return reply({ ok: true, user: await updateClientWorkspaceUser(current, body) }); }
   catch (error) { return failure(error); }
 }
 function failure(error: unknown) { const known = error instanceof ClientWorkspaceAdminError || error instanceof ClientRequestError; return reply({ message: known ? error.message : "Client workspace administration is temporarily unavailable." }, known ? error.status : 503); }

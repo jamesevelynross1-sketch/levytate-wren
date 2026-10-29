@@ -121,6 +121,23 @@ describe("LevyTate public readiness", () => {
 });
 
 describe("authentication rate-limit readiness probe", () => {
+  it.each(["callback-budget-operation", "auth-provider"])("treats %s outage as critical without exposing diagnostics", async (key) => {
+    stubRequiredEnvironment();
+    const result = await getPublicReadiness({ bypassCache: true, adapter: async (input) => {
+      if (input.key === key) throw new Error("private dependency detail");
+    } });
+    expect(result.status).toBe("unavailable");
+    expect(JSON.stringify(result)).not.toContain("private dependency detail");
+  });
+  it("checks the narrowly scoped callback RPC without direct table reads or consuming failures", async () => {
+    stubRequiredEnvironment();
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify([{ allowed: true, reset_at: checkedAt }]), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await createSupabaseHealthAdapter()({ key: "callback-budget-operation", kind: "auth-callback-budget", label: "Callback budget", timeoutMs: 50 });
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url.endsWith("/rpc/levytate_check_auth_callback_failures")).toBe(true);
+    expect(Object.keys(JSON.parse(String(init.body))).sort()).toEqual(["p_environment_namespace", "p_key_hash"]);
+  });
   it("probes the actual composite-key Lift framework schema rather than an invented id", async () => {
     stubRequiredEnvironment();
     const observed: unknown[] = [];
