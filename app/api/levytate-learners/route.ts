@@ -1,9 +1,11 @@
+import { readBrowserJson, ClientRequestError } from "@/lib/server/levytate-request-boundary";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
 import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
 import {
   LevyTateLearnerLifecycleError,
+  LevyTateLearnerLifecycleConflictError,
   LevyTateLearnerLifecyclePermissionError,
   LevyTateLearnerLifecycleValidationError,
   createLearnerRecord,
@@ -21,14 +23,15 @@ export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ message: "Unauthorised." }, { status: 401 });
   try {
-    const body = await request.json().catch(() => null) as Parameters<typeof createLearnerRecord>[1] | null;
+    const body = await readBrowserJson(request) as Parameters<typeof createLearnerRecord>[1] | null;
     if (!body) return NextResponse.json({ message: "A valid learner onboarding request is required." }, { status: 400 });
     const record = await createLearnerRecord(session, { ...body, demonstrationRecord: false });
     const learner = await getOrganisationLearnerLifecycleRecordDetail(session, record.id);
     return NextResponse.json({ ok: true, source: "supabase", learner }, { status: 201 });
   } catch (error) {
-    const status = error instanceof LevyTateLearnerLifecyclePermissionError ? 403 : error instanceof LevyTateLearnerLifecycleValidationError ? 400 : 500;
-    return NextResponse.json({ message: status === 403 ? "You do not have permission to create learner records." : status === 400 ? (error as Error).message : "The learner record could not be created." }, { status });
+    if (error instanceof ClientRequestError) return NextResponse.json({ message: error.message }, { status: error.status });
+    const status = error instanceof LevyTateLearnerLifecyclePermissionError ? 403 : error instanceof LevyTateLearnerLifecycleConflictError ? 409 : error instanceof LevyTateLearnerLifecycleValidationError ? 400 : 500;
+    return NextResponse.json({ message: status === 403 ? "You do not have permission to create learner records." : [400, 409].includes(status) ? (error as Error).message : "The learner record could not be created." }, { status });
   }
 }
 

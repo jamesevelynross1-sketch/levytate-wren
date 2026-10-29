@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { assertBrowserOrigin } from "@/lib/server/levytate-request-boundary";
 import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
 import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
@@ -11,7 +12,7 @@ async function getSession() {
 }
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ learnerRecordId: string }> },
 ) {
   const session = await getSession();
@@ -20,6 +21,7 @@ export async function POST(
   }
 
   try {
+    assertBrowserOrigin(request);
     const { learnerRecordId } = await params;
     const learner = await markLearnerAsEnrolled(session, learnerRecordId);
     return NextResponse.json({

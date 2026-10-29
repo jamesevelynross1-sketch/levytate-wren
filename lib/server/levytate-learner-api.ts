@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ClientRequestError } from "@/lib/server/levytate-request-boundary";
 import {
   LevyTateLearnerLifecycleConflictError,
   LevyTateLearnerLifecycleError,
@@ -8,6 +9,7 @@ import {
 import { logLevyTateServerError } from "@/lib/server/levytate-safe-api-error";
 
 export function lifecycleErrorResponse(error: unknown) {
+  if (error instanceof ClientRequestError) return NextResponse.json({ message: error.message }, { status: error.status });
   const status = error instanceof LevyTateLearnerLifecyclePermissionError
     ? 403
     : error instanceof LevyTateLearnerLifecycleValidationError

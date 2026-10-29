@@ -63,8 +63,8 @@ export type LevyTateWorkspaceMutation =
   | { type: "saveEmployeeDevelopmentProfile"; profile: MvpEmployeeDevelopmentProfile }
   | { type: "saveRole"; role: MvpRole }
   | { type: "archiveRole"; id: string }
-  | { type: "saveApplication"; application: MvpApplication }
-  | { type: "updateApplicationStatus"; id: string; status: RequestStatus; note?: string }
+  | { type: "saveApplication"; application: MvpApplication; expectedRevision?: number; idempotencyKey?: string }
+  | { type: "updateApplicationStatus"; id: string; status: RequestStatus; note?: string; expectedRevision?: number; idempotencyKey?: string }
   | { type: "saveProvider"; provider: ProviderCatalogueRecord }
   | { type: "archiveProvider"; id: string }
   | { type: "saveProviderProgramme"; programme: ProviderProgramme }

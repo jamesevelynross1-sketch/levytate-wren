@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { LevyTateBetaSession } from "@/lib/levytate/config/beta-access";
 import { getApprenticeshipStandard } from "@/lib/levytate/domain";
 import {
@@ -83,6 +84,7 @@ import {
 } from "@/lib/levytate/mvp/rbac";
 import {
   getLevyTateSupabaseConfig,
+  supabaseFetchJson,
   supabaseInsert,
   supabaseSelect,
   supabaseUpdate,
@@ -574,62 +576,41 @@ export type StartAssessmentInput = AssessmentTransitionInput & {
 
 export async function createLearnerRecord(
   session: LevyTateBetaSession,
-  input: Omit<LearnerRecord, "id" | "organisationId" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy" | "recordStatus"> & Partial<Pick<LearnerRecord, "id" | "recordStatus">>,
+  input: Omit<LearnerRecord, "id" | "organisationId" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy" | "recordStatus"> & Partial<Pick<LearnerRecord, "id" | "recordStatus">> & { expectedApplicationRevision?: number; idempotencyKey?: string },
 ) {
   const context = await contextForSession(session);
   assertPermission(context, "learnerLifecycle:write");
-  const employeeId = requiredText(input.employeeId, "Employee");
-  const applicationId = cleanText(input.applicationId);
-  const programmeId = requiredText(input.programmeId, "Programme");
-  const providerId = requiredText(input.providerId, "Provider");
-  const enrolmentId = cleanText(input.enrolmentId);
-  assertEnum(input.lifecycleStatus, ["pre_enrolment", "enrolled", "break_in_learning", "withdrawn", "assessment_preparation", "in_assessment", "achieved", "completed_without_achievement"], "lifecycle status");
-  assertEnum(input.employmentRoute, ["not_confirmed", "existing_employee_upskill", "recruited_as_apprentice"], "employment route");
-  const expectedStartDate = assertValidDate(requiredText(input.expectedStartDate, "Expected start date"), "Expected start date");
-  const actualStartDate = input.actualStartDate ? assertValidDate(input.actualStartDate, "Actual start date") : "";
-  const expectedEndDate = assertValidDate(requiredText(input.expectedEndDate, "Expected end date"), "Expected end date");
-  const actualEndDate = input.actualEndDate ? assertValidDate(input.actualEndDate, "Actual end date") : "";
-  await assertCanAccessEmployee(context, employeeId, "write");
-  await assertNoDuplicateActiveLearnerRecord(context.organisation.id, employeeId, applicationId);
-  await assertOrganisationCatalogueSelection(context.organisation.id, providerId, programmeId);
-
-  const timestamp = nowIso();
-  const record: LearnerRecord = {
-    id: input.id ?? createMvpId("learner"),
-    organisationId: context.organisation.id,
-    employeeId,
-    applicationId,
-    programmeId,
-    providerId,
-    enrolmentId,
-    lifecycleStatus: input.lifecycleStatus,
-    employmentRoute: input.employmentRoute,
-    expectedStartDate,
-    actualStartDate,
-    expectedEndDate,
-    actualEndDate,
-    createdAt: timestamp,
-    updatedAt: timestamp,
-    createdBy: context.user.email,
-    updatedBy: context.user.email,
-    recordStatus: input.recordStatus ?? "Active",
-    demonstrationRecord: input.demonstrationRecord ?? false,
+  if (input.lifecycleStatus !== "pre_enrolment" || input.actualStartDate || input.actualEndDate || input.enrolmentId
+    || input.demonstrationRecord || (input.recordStatus && input.recordStatus !== "Active")) {
+    throw new LevyTateLearnerLifecycleValidationError("Ordinary onboarding starts at pre-enrolment from a final-approved application. Historical learner import is not enabled.");
+  }
+  const applicationId = requiredText(input.applicationId, "Final-approved application");
+  const fields = {
+    employeeId: requiredText(input.employeeId, "Employee"), programmeId: requiredText(input.programmeId, "Programme"),
+    providerId: requiredText(input.providerId, "Provider"), employmentRoute: input.employmentRoute,
+    expectedStartDate: assertValidDate(requiredText(input.expectedStartDate, "Expected start date"), "Expected start date"),
+    expectedEndDate: assertValidDate(requiredText(input.expectedEndDate, "Expected end date"), "Expected end date"),
   };
-
-  await upsertLearnerRecord(record);
-  await recordLifecycleEvent(context, record.id, "learner_record_created", "", record.lifecycleStatus, "Learner lifecycle record created.", { employeeId: record.employeeId, applicationId: record.applicationId });
-  return record;
-}
-
-async function assertOrganisationCatalogueSelection(organisationId: string, providerId: string, programmeId: string) {
-  const [providers, programmes] = await Promise.all([
-    selectMany<{ provider_id: string; status: string }>(organisationProvidersTable, organisationId, `provider_id=eq.${providerId}&status=eq.Active`, "selected_at.desc"),
-    selectMany<{ programme_id: string; provider_id: string; status: string }>(organisationProgrammesTable, organisationId, `programme_id=eq.${programmeId}&provider_id=eq.${providerId}&status=eq.Active`, "selected_at.desc"),
-  ]);
-  if (!providers.length || !programmes.length) {
-    throw new LevyTateLearnerLifecycleValidationError("Existing learners can only be onboarded to an active My Provider and My Programme.");
+  if (!Number.isInteger(input.expectedApplicationRevision) || (input.expectedApplicationRevision ?? -1) < 0) {
+    throw new LevyTateLearnerLifecycleConflictError("Refresh the approved application before starting pre-enrolment.");
+  }
+  const idempotencyKey = input.idempotencyKey ?? createHash("sha256").update(JSON.stringify({ actor: context.user.id, applicationId, revision: input.expectedApplicationRevision, fields })).digest("hex");
+  try {
+    const row = await supabaseFetchJson<LearnerRecordRow>(assertSupabase(), "rpc/levytate_start_pre_enrolment", {
+      method: "POST", body: JSON.stringify({ p_organisation_id: context.organisation.id, p_actor_user_id: context.user.id,
+        p_application_id: applicationId, p_expected_revision: input.expectedApplicationRevision, p_idempotency_key: idempotencyKey, p_input: fields }),
+    });
+    if (!row.id) throw new Error("No persisted learner returned");
+    return learnerRecordFromRow(row);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (message.startsWith("PT409") || message.startsWith("23505")) throw new LevyTateLearnerLifecycleConflictError("The application changed or its learner already exists. Refresh and open the existing record.");
+    if (message.startsWith("PT403")) throw new LevyTateLearnerLifecyclePermissionError("A final-approved matching application and authorised employer account are required.");
+    if (message.startsWith("PT422")) throw new LevyTateLearnerLifecycleValidationError("Check the approved application, selected programme/provider and planned dates.");
+    throw new LevyTateLearnerLifecycleError("Pre-enrolment could not be confirmed. Retry the same action; no partial handoff is committed.");
   }
 }
+
 
 export async function updateLearnerLifecycleStatus(
   session: LevyTateBetaSession,
@@ -1342,6 +1323,9 @@ export async function updateLearnerPreEnrolmentProgress(
   const actor = context.user.email;
 
   const recordPatch = buildLearnerRecordPatch(record, input, timestamp, actor);
+  if (recordPatch.next.programmeId !== record.programmeId || recordPatch.next.providerId !== record.providerId) {
+    await assertApprovedLearnerProgrammeSelection(context, recordPatch.next);
+  }
   if (recordPatch.changed) {
     await patchLearnerRecord(context, record, recordPatch.next);
     await emitRecordChangeEvents(context, record, recordPatch.next, input.programme?.changeReason);
@@ -1838,6 +1822,26 @@ async function assertProviderInOrganisation(context: LifecycleContext, providerI
   if (!legacyProvider && !selectedProvider) throw new LevyTateLearnerLifecycleValidationError("The selected provider is not available in this organisation.");
 }
 
+async function assertApprovedLearnerProgrammeSelection(context: LifecycleContext, record: LearnerRecord) {
+  const [application, selection, catalogue] = await Promise.all([
+    selectOne<ApplicationViewRow>("levytate_applications", new URLSearchParams({ select: "id,employee_id,apprenticeship_standard_id", organisation_id: `eq.${context.organisation.id}`, id: `eq.${record.applicationId}`, status: "eq.Approved for Enrolment", current_owner: "eq.Provider Partner", limit: "1" })),
+    selectOne<{ programme_id: string }>(organisationProgrammesTable, new URLSearchParams({ select: "programme_id", organisation_id: `eq.${context.organisation.id}`, programme_id: `eq.${record.programmeId}`, provider_id: `eq.${record.providerId}`, status: "eq.Active", limit: "1" })),
+    selectOne<{ id: string }>("levytate_organisations", new URLSearchParams({ select: "id", slug: "eq.levytate-internal", limit: "1" })),
+  ]);
+  if (!application || application.employee_id !== record.employeeId || !selection || !catalogue) {
+    throw new LevyTateLearnerLifecycleValidationError("Programme changes must retain the employee's final-approved application and an active employer selection.");
+  }
+  const [programme, provider, employerProvider] = await Promise.all([
+    selectOne<ProviderProgrammeViewRow>("levytate_provider_programmes", new URLSearchParams({ select: "id,provider_id,programme_name,apprenticeship_standard_id,linked_standard_id,linked_standard_ids,linked_standard_name", organisation_id: `eq.${catalogue.id}`, id: `eq.${record.programmeId}`, provider_id: `eq.${record.providerId}`, status: "eq.Active", record_status: "eq.Active", verification_status: "in.(Verified from provider website,Provider confirmed,LevyTate reviewed)", limit: "1" })),
+    selectOne<{ provider_id: string }>("levytate_providers", new URLSearchParams({ select: "provider_id", organisation_id: `eq.${catalogue.id}`, provider_id: `eq.${record.providerId}`, status: "eq.Active", verification_status: "eq.verified", limit: "1" })),
+    selectOne<{ provider_id: string }>(organisationProvidersTable, new URLSearchParams({ select: "provider_id", organisation_id: `eq.${context.organisation.id}`, provider_id: `eq.${record.providerId}`, status: "eq.Active", limit: "1" })),
+  ]);
+  const standardIds = Array.isArray(programme?.linked_standard_ids) ? programme.linked_standard_ids : [];
+  if (!programme || !provider || !employerProvider || (programme.linked_standard_id !== application.apprenticeship_standard_id && !standardIds.includes(application.apprenticeship_standard_id))) {
+    throw new LevyTateLearnerLifecycleValidationError("The active, verified programme and provider must match the approved apprenticeship standard.");
+  }
+}
+
 function reviewEventType(reviewType: LearnerReviewType): LearnerLifecycleEventType {
   if (reviewType === "provider_review") return "provider_review_recorded";
   if (reviewType === "l_and_d_check_in") return "l_and_d_check_in_recorded";
@@ -1861,7 +1865,9 @@ function buildLearnerRecordPatch(
   if (programme) {
     if (programme.programmeId !== undefined) next.programmeId = cleanText(programme.programmeId);
     if (programme.providerId !== undefined) next.providerId = cleanText(programme.providerId);
-    if (programme.applicationId !== undefined) next.applicationId = cleanText(programme.applicationId);
+    if (programme.applicationId !== undefined && cleanText(programme.applicationId) !== record.applicationId) {
+      throw new LevyTateLearnerLifecycleValidationError("The final-approved application link cannot be changed.");
+    }
     if (programme.expectedStartDate !== undefined) next.expectedStartDate = cleanDate(programme.expectedStartDate, "expected start date");
     if (programme.actualStartDate !== undefined) next.actualStartDate = cleanDate(programme.actualStartDate, "actual start date");
     if (programme.expectedEndDate !== undefined) next.expectedEndDate = cleanDate(programme.expectedEndDate, "expected end date");
@@ -2356,18 +2362,6 @@ async function assertCanAccessEmployee(context: LifecycleContext, employeeId: st
   throw new LevyTateLearnerLifecyclePermissionError("You cannot access that learner lifecycle record.");
 }
 
-async function assertNoDuplicateActiveLearnerRecord(organisationId: string, employeeId: string, applicationId: string) {
-  const rows = await selectMany<LearnerRecordRow>(
-    learnerRecordsTable,
-    organisationId,
-    `employee_id=eq.${employeeId}&record_status=eq.Active`,
-    "updated_at.desc",
-  );
-  const duplicate = rows.find((record) => record.application_id === applicationId || !["achieved", "withdrawn", "completed_without_achievement"].includes(record.lifecycle_status));
-  if (duplicate) {
-    throw new LevyTateLearnerLifecycleError("This employee already has an active learner lifecycle record for an apprenticeship journey.");
-  }
-}
 
 async function recordLifecycleEvent(
   context: LifecycleContext,

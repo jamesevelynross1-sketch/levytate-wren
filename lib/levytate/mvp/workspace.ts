@@ -140,6 +140,7 @@ export type MvpApplicationHistoryEntry = {
 
 export type MvpApplication = {
   id: string;
+  revision?: number;
   employeeId: string;
   apprenticeshipStandardId: string;
   status: RequestStatus;

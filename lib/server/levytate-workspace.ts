@@ -1,14 +1,11 @@
 import { randomUUID } from "node:crypto";
+import { ApplicationCommandError, applyApplicationCommand } from "@/lib/server/levytate-application-commands";
 import { isApplicationWorkflowsEnabledForOrganisation } from "@/lib/server/levytate-application-workflow-capability";
 import { isOffTheJobAssistantEnabledForOrganisation } from "@/lib/server/levytate-off-the-job-capability";
 import {
   attachApplicationWorkflowContexts,
-  getPublishedApplicationWorkflowPolicy,
   hasPublishedApplicationWorkflow,
-  startApplicationWorkflow,
-  transitionApplicationWorkflowForSession,
 } from "@/lib/server/levytate-application-workflows";
-import { applicationRequiresPublishedWorkflow } from "@/lib/levytate/application-workflows/compatibility";
 import { listManagerDirectReportOperationalSummaries } from "@/lib/server/levytate-manager-operational-summaries";
 import type {
   ProviderCatalogueRecord,
@@ -23,9 +20,6 @@ import type { LevyTateBetaSession } from "@/lib/levytate/config/beta-access";
 import type { MicrosoftCopilotActor } from "@/lib/levytate/microsoft-copilot";
 import type { LevyTateWorkspaceBootstrap, LevyTateWorkspaceMeta, LevyTateWorkspaceMutation } from "@/lib/levytate/mvp/api";
 import {
-  activeApplicationStatuses,
-  applicationOwnerForStatus,
-  buildApplicationHistoryEntry,
   createEmptyMvpWorkspace,
   normaliseMatchingRequest,
   normaliseProviderProgramme,
@@ -179,6 +173,7 @@ type ApplicationRow = {
   manager_note: string;
   submitted_at: string;
   updated_at: string;
+  revision: number;
 };
 
 type ApplicationHistoryRow = {
@@ -357,8 +352,6 @@ const organisationProgrammesTable = "levytate_organisation_programmes";
 const matchingRequestsTable = "levytate_matching_requests";
 const enrolmentsTable = "levytate_enrolments";
 const auditEventsTable = "levytate_audit_events";
-const lineManagerReviewStatuses: RequestStatus[] = ["Submitted to Line Manager", "Awaiting Manager Review"];
-const lineManagerDecisionStatuses: RequestStatus[] = ["Approved by Line Manager", "More information requested", "Declined by Line Manager"];
 
 export class LevyTateWorkspacePersistenceError extends Error {
   constructor(message: string) {
@@ -374,52 +367,6 @@ export class LevyTateWorkspacePermissionError extends Error {
   }
 }
 
-type WorkflowInstanceGuardRow = {
-  id: string;
-  state: "active" | "needs_information" | "declined" | "ready_for_provider";
-  lock_version: number;
-};
-
-async function getApplicationWorkflowProtection(organisationId: string, applicationId: string) {
-  const [policy, instances, existing] = await Promise.all([
-    getPublishedApplicationWorkflowPolicy(organisationId),
-    supabaseSelect<WorkflowInstanceGuardRow>(assertSupabase(), "levytate_application_workflow_instances", new URLSearchParams({
-      select: "id,state,lock_version",
-      organisation_id: `eq.${organisationId}`,
-      application_id: `eq.${applicationId}`,
-      limit: "1",
-    })),
-    selectOne<ApplicationRow>(applicationsTable, new URLSearchParams({
-      select: "id,employee_id,apprenticeship_standard_id,status,current_owner,reason,career_goal,support_required,manager_note,submitted_at,updated_at",
-      organisation_id: `eq.${organisationId}`,
-      id: `eq.${applicationId}`,
-      limit: "1",
-    })),
-  ]);
-  const historyRows = existing ? await supabaseSelect<ApplicationHistoryRow>(
-    assertSupabase(),
-    applicationHistoryTable,
-    new URLSearchParams({
-      select: "id,application_id,status,owner,note,created_at",
-      organisation_id: `eq.${organisationId}`,
-      application_id: `eq.${applicationId}`,
-      order: "created_at.asc",
-    }),
-  ) : [];
-  const history = historyRows.map((entry) => ({
-    id: entry.id,
-    status: entry.status,
-    owner: entry.owner,
-    note: entry.note,
-    createdAt: entry.created_at,
-  }));
-  const requiresPublishedWorkflow = Boolean(policy && (!existing || applicationRequiresPublishedWorkflow({
-    status: existing.status,
-    submittedAt: existing.submitted_at,
-    history,
-  }, policy.firstPublishedAt)));
-  return { policy, instance: instances[0] ?? null, existing, history, requiresPublishedWorkflow };
-}
 
 export async function getWorkspaceBootstrapForSession(session: LevyTateBetaSession): Promise<LevyTateWorkspaceBootstrap> {
   const config = getLevyTateSupabaseConfig();
@@ -616,18 +563,12 @@ export async function applyWorkspaceMutationForSession(
       await recordAuditEvent(context, "role", mutation.id, "role.archived", "Role archive state changed.");
       break;
     case "saveApplication":
-      if (normaliseMvpUserRole(context.user.role) === "Employee" && await shouldSubmitApplicationThroughPublishedWorkflow(organisationId, mutation.application)) {
-        await submitApplicationThroughPublishedWorkflow(context, session, mutation.application);
-      } else {
-        await saveApplication(organisationId, await normaliseEmployerCreatedWorkflowDraft(context, mutation.application));
-      }
+      await persistApplicationCommand(context, mutation);
       await synchroniseApplicationReviewOperationalActions(session, [mutation.application.id]);
-      await recordAuditEvent(context, "application", mutation.application.id, "application.saved", "Application record saved.");
       break;
     case "updateApplicationStatus":
-      await updateApplicationStatus(organisationId, mutation.id, mutation.status, mutation.note);
+      await persistApplicationCommand(context, mutation);
       await synchroniseApplicationReviewOperationalActions(session, [mutation.id]);
-      await recordAuditEvent(context, "application", mutation.id, "application.status_updated", `Application moved to ${mutation.status}.`, { note: mutation.note ?? "" });
       break;
     case "saveProvider":
       await saveProvider(organisationId, mutation.provider);
@@ -673,16 +614,8 @@ export async function applyWorkspaceMutationForSession(
       await recordAuditEvent(context, "provider_matching_request", mutation.id, "provider_matching_request.status_updated", `Provider matching request moved to ${mutation.status}.`);
       break;
     case "saveEnrolment":
-      await saveEnrolment(organisationId, mutation.enrolment);
-      await recordAuditEvent(context, "enrolment", mutation.enrolment.id, "enrolment.saved", "Enrolment record saved.");
-      break;
     case "updateEnrolmentStatus":
-      await patchByOrganisation(organisationId, enrolmentsTable, "id", mutation.id, {
-        status: mutation.status,
-        updated_at: nowIso(),
-      });
-      await recordAuditEvent(context, "enrolment", mutation.id, "enrolment.status_updated", `Enrolment moved to ${mutation.status}.`);
-      break;
+      throw new ApplicationCommandError("Start pre-enrolment from a final-approved application using Learners. Legacy enrolment writes are disabled.", 409);
     default:
       throw new LevyTateWorkspacePersistenceError("Mutation type is not supported.");
   }
@@ -695,223 +628,22 @@ async function assertMutationAllowed(context: WorkspaceContext, mutation: LevyTa
   if (role === "Platform Admin") {
     const workspaceAdministration = mutation.type === "saveProfile";
     const providerCatalogueAdministration = ["saveProvider", "archiveProvider", "saveProviderProgramme", "archiveProviderProgramme", "removeProviderProgramme"].includes(mutation.type);
-    if (
-      (!workspaceAdministration || !hasCoreEarlyAccessCapability(role, "platform-workspace-administration")) &&
-      (!providerCatalogueAdministration || !hasCoreEarlyAccessCapability(role, "platform-provider-catalogue"))
-    ) {
+    if ((!workspaceAdministration || !hasCoreEarlyAccessCapability(role, "platform-workspace-administration"))
+      && (!providerCatalogueAdministration || !hasCoreEarlyAccessCapability(role, "platform-provider-catalogue"))) {
       throw new LevyTateWorkspacePermissionError("Platform Admin cannot perform employer operational mutations.");
     }
   }
-  if (!canRunMvpMutation(context.user.role, mutation.type)) {
-    throw new LevyTateWorkspacePermissionError(
-      `${normaliseMvpUserRole(context.user.role)} cannot perform ${mutation.type}.`,
-    );
-  }
-
-  if (mutation.type === "saveApplication") {
-    await assertOneActiveApplication(context.organisation.id, mutation.application);
-  }
-
-  if ((mutation.type === "saveApplication" || mutation.type === "updateApplicationStatus") && await isApplicationWorkflowsEnabledForOrganisation(context.organisation.id)) {
-    const applicationId = mutation.type === "saveApplication" ? mutation.application.id : mutation.id;
-    const protection = await getApplicationWorkflowProtection(context.organisation.id, applicationId);
-    if (protection.instance && (mutation.type === "updateApplicationStatus" || role !== "Employee")) {
-      throw new LevyTateWorkspacePermissionError("This application uses a versioned workflow and must be progressed through its current workflow decision.");
-    }
-    if (!protection.instance && protection.policy && protection.requiresPublishedWorkflow) {
-      if (mutation.type === "updateApplicationStatus") {
-        throw new LevyTateWorkspacePermissionError("This application must be submitted by the employee before its configured approval workflow can begin.");
-      }
-      if (role !== "Employee" && (mutation.application.status !== "Draft" || mutation.application.currentOwner !== "Employee")) {
-        throw new LevyTateWorkspacePermissionError("Employer users may prepare this draft, but only the employee can submit it into the configured approval workflow.");
-      }
-    }
-  }
-
+  if (!canRunMvpMutation(context.user.role, mutation.type)) throw new LevyTateWorkspacePermissionError(`${role} cannot perform ${mutation.type}.`);
+  // The command transaction rechecks active membership, tenant, current People
+  // hierarchy and workflow state together. Pre-read authorization would race it.
+  if (mutation.type === "saveApplication" || mutation.type === "updateApplicationStatus") return;
   if (role === "Employer Admin" || role === "Apprenticeship Lead") return;
-
-  const employees = await selectMany<EmployeeRow>(
-    employeesTable,
-    context.organisation.id,
-    "id,email,manager_id,status,employee_number,name,job_title,role_id,department,site,platform_role,start_date,created_at,updated_at",
-    "name.asc",
-  );
-  const currentEmployee = employees.find((employee) =>
-    employee.status === "Active" && employee.email.trim().toLowerCase() === context.user.email.trim().toLowerCase()
-  );
+  const employees = await selectMany<EmployeeRow>(employeesTable, context.organisation.id,
+    "id,email,manager_id,status,employee_number,name,job_title,role_id,department,site,platform_role,start_date,created_at,updated_at", "name.asc");
   const visibleEmployeeIds = readableEmployeeIdsForUser(context.user.email, role, employees);
-
-  if (visibleEmployeeIds.size === 0) {
-    throw new LevyTateWorkspacePermissionError("Your user account is not linked to an active employee record.");
-  }
-
-  const assertCanAccessEmployee = (employeeId: string) => {
-    if (visibleEmployeeIds.has(employeeId)) return;
+  if (visibleEmployeeIds.size === 0) throw new LevyTateWorkspacePermissionError("Your user account is not linked to an active employee record.");
+  if (mutation.type === "saveEmployeeDevelopmentProfile" && !visibleEmployeeIds.has(mutation.profile.employeeId)) {
     throw new LevyTateWorkspacePermissionError("You cannot access that employee record.");
-  };
-
-  switch (mutation.type) {
-    case "saveEmployeeDevelopmentProfile":
-      assertCanAccessEmployee(mutation.profile.employeeId);
-      return;
-    case "saveApplication":
-      assertCanAccessEmployee(mutation.application.employeeId);
-      await assertEmployeeCanSaveApplication(context.organisation.id, mutation.application, role, employees);
-      return;
-    case "updateApplicationStatus": {
-      const application = await selectOne<ApplicationRow>(applicationsTable, new URLSearchParams({
-        select: "id,employee_id,status,current_owner",
-        organisation_id: `eq.${context.organisation.id}`,
-        id: `eq.${mutation.id}`,
-        limit: "1",
-      }));
-      if (!application) {
-        throw new LevyTateWorkspacePermissionError("Application record was not found.");
-      }
-      assertCanAccessEmployee(application.employee_id);
-      if (role === "Line Manager") {
-        assertLineManagerCanUpdateApplication(currentEmployee, application, mutation.status, mutation.note);
-      }
-      return;
-    }
-    default:
-      return;
-  }
-}
-
-async function assertOneActiveApplication(organisationId: string, application: MvpApplication) {
-  if (!activeApplicationStatuses().includes(application.status)) return;
-
-  const applications = await selectMany<ApplicationRow>(
-    applicationsTable,
-    organisationId,
-    "id,employee_id,status",
-    "updated_at.desc",
-  );
-
-  const existingActive = applications.find((item) =>
-    item.employee_id === application.employeeId &&
-    item.id !== application.id &&
-    activeApplicationStatuses().includes(item.status)
-  );
-
-  if (existingActive) {
-    throw new LevyTateWorkspacePermissionError("This employee already has an active apprenticeship application.");
-  }
-}
-
-async function assertEmployeeCanSaveApplication(
-  organisationId: string,
-  application: MvpApplication,
-  role: ReturnType<typeof normaliseMvpUserRole>,
-  employees: EmployeeRow[],
-) {
-  if (role !== "Employee") return;
-
-  const employeeEditableStatuses: RequestStatus[] = ["Draft", "More information requested"];
-  const employeeSaveStatuses: RequestStatus[] = ["Draft", "Submitted to Line Manager", "Awaiting Manager Review"];
-
-  if (!employeeSaveStatuses.includes(application.status)) {
-    throw new LevyTateWorkspacePermissionError("Employees can save drafts or submit applications to their line manager only.");
-  }
-
-  const existing = await selectOne<ApplicationRow>(
-    applicationsTable,
-    new URLSearchParams({
-      select: "id,employee_id,status",
-      organisation_id: `eq.${organisationId}`,
-      id: `eq.${application.id}`,
-      limit: "1",
-    }),
-  );
-
-  if (existing && !employeeEditableStatuses.includes(existing.status)) {
-    const protection = await getApplicationWorkflowProtection(organisationId, application.id);
-    const recoverableUnpinnedSubmission = !protection.instance && Boolean(protection.policy && protection.requiresPublishedWorkflow);
-    if (protection.instance?.state !== "needs_information" && !recoverableUnpinnedSubmission) {
-      throw new LevyTateWorkspacePermissionError("Submitted applications cannot be edited unless more information has been requested.");
-    }
-  }
-
-  if (!existing) {
-    await assertOrganisationProgrammeAllowsApplication(organisationId, application.apprenticeshipStandardId);
-  }
-
-  const employee = employees.find((item) => item.id === application.employeeId);
-  if (!employee?.role_id) {
-    throw new LevyTateWorkspacePermissionError("Your employee record is not linked to a role library entry.");
-  }
-
-  const mapping = await selectOne<RoleMappingRow>(
-    roleMappingsTable,
-    new URLSearchParams({
-      select: "id",
-      organisation_id: `eq.${organisationId}`,
-      role_id: `eq.${employee.role_id}`,
-      apprenticeship_standard_id: `eq.${application.apprenticeshipStandardId}`,
-      limit: "1",
-    }),
-  );
-
-  if (!mapping) {
-    throw new LevyTateWorkspacePermissionError("Employees can only apply for programmes mapped to their assigned role.");
-  }
-}
-
-async function assertOrganisationProgrammeAllowsApplication(organisationId: string, apprenticeshipStandardId: string) {
-  const selections = await selectMany<OrganisationProgrammeRow>(
-    organisationProgrammesTable,
-    organisationId,
-    "programme_id,provider_id,status,selected_at,updated_at",
-    "selected_at.desc",
-  );
-  const activeProgrammeIds = new Set(selections.filter((selection) => selection.status === "Active").map((selection) => selection.programme_id));
-  if (!activeProgrammeIds.size) {
-    throw new LevyTateWorkspacePermissionError("Your organisation has not published any apprenticeship programmes yet.");
-  }
-
-  const canonicalOrganisationId = await getCanonicalCatalogueOrganisationId();
-  const programmes = await selectMany<ProviderProgrammeRow>(
-    providerProgrammesTable,
-    canonicalOrganisationId,
-    "id,linked_standard_id,linked_standard_ids,status,record_status",
-    "created_at.asc",
-  );
-  const permitted = programmes.some((programme) =>
-    activeProgrammeIds.has(programme.id) &&
-    programme.status === "Active" &&
-    programme.record_status === "Active" &&
-    (programme.linked_standard_id === apprenticeshipStandardId || stringArray(programme.linked_standard_ids).includes(apprenticeshipStandardId))
-  );
-  if (!permitted) {
-    throw new LevyTateWorkspacePermissionError("Employees can only apply for an active programme in My Programmes.");
-  }
-}
-
-function assertLineManagerCanUpdateApplication(
-  manager: EmployeeRow | undefined,
-  application: ApplicationRow,
-  nextStatus: RequestStatus,
-  note: string | undefined,
-) {
-  if (!manager) {
-    throw new LevyTateWorkspacePermissionError("Your user account is not linked to an active line manager record.");
-  }
-
-  if (application.employee_id === manager.id) {
-    throw new LevyTateWorkspacePermissionError("Line managers cannot review their own application.");
-  }
-
-  if (!lineManagerDecisionStatuses.includes(nextStatus)) {
-    throw new LevyTateWorkspacePermissionError("Line managers can only approve, request more information or decline applications.");
-  }
-
-  if (!lineManagerReviewStatuses.includes(application.status)) {
-    throw new LevyTateWorkspacePermissionError("This application is not awaiting a line manager decision.");
-  }
-
-  if (!note?.trim()) {
-    throw new LevyTateWorkspacePermissionError("A manager decision note is required.");
   }
 }
 
@@ -1427,7 +1159,7 @@ async function loadWorkspaceData(context: WorkspaceContext, session: LevyTateBet
     selectMany<EmployeeDevelopmentProfileRow>(employeeProfilesTable, organisationId, "employee_id,stage,responsibilities,current_skills,business_functions,current_capabilities,apprenticeship_indicators,ai_opportunities,data_opportunities,automation_opportunities,future_capabilities,conversation_history,conversation_profile,recommendation_result,preferred_standard_id,updated_at", "updated_at.desc"),
     selectMany<RoleRow>(rolesTable, organisationId, "id,title,department,business_area,career_level,skills_tags,progression,status,created_at,updated_at", "title.asc"),
     selectMany<RoleMappingRow>(roleMappingsTable, organisationId, "id,role_id,apprenticeship_standard_id,recommendation_type,priority,business_rationale,funding_route,delivery_preference", "priority.asc"),
-    selectMany<ApplicationRow>(applicationsTable, organisationId, "id,employee_id,apprenticeship_standard_id,status,current_owner,reason,career_goal,support_required,manager_note,submitted_at,updated_at", "submitted_at.desc"),
+    selectMany<ApplicationRow>(applicationsTable, organisationId, "id,revision,employee_id,apprenticeship_standard_id,status,current_owner,reason,career_goal,support_required,manager_note,submitted_at,updated_at", "submitted_at.desc"),
     selectMany<ApplicationHistoryRow>(applicationHistoryTable, organisationId, "id,application_id,status,owner,note,created_at", "created_at.asc"),
     canonicalOrganisationId
       ? selectMany<ProviderRow>(providersTable, canonicalOrganisationId, "provider_id,provider_name,website,provider_type,sectors,industries,technologies,delivery_models,regions,employer_types,specialisms,contact_name,contact_email,ofsted_rating,status,source_urls,notes,last_verified,verification_status", "provider_name.asc")
@@ -1596,196 +1328,34 @@ async function saveRole(organisationId: string, role: MvpRole) {
   }
 }
 
-async function normaliseEmployerCreatedWorkflowDraft(context: WorkspaceContext, application: MvpApplication) {
+async function persistApplicationCommand(context: WorkspaceContext, mutation: Extract<LevyTateWorkspaceMutation, { type: "saveApplication" | "updateApplicationStatus" }>) {
   const role = normaliseMvpUserRole(context.user.role);
-  if (role !== "Apprenticeship Lead" && role !== "Employer Admin") return application;
-  if (!await isApplicationWorkflowsEnabledForOrganisation(context.organisation.id)) return application;
-  const protection = await getApplicationWorkflowProtection(context.organisation.id, application.id);
-  if (!protection.policy || protection.instance || !protection.requiresPublishedWorkflow) return application;
-  const now = application.updatedAt || nowIso();
-  const actor = context.user.display_name?.trim() || role;
-  const history: MvpApplicationHistoryEntry[] = protection.existing ? protection.history : [{
-    id: `history-${randomUUID()}`,
-    status: "Draft" as const,
-    owner: role,
-    note: `Application draft created by ${actor}. The employee needs to review and submit it before the approval workflow begins.`,
-    createdAt: now,
-  }];
-  return {
-    ...application,
-    status: "Draft" as const,
-    currentOwner: "Employee" as const,
-    history,
-  };
-}
-
-async function shouldSubmitApplicationThroughPublishedWorkflow(organisationId: string, application: MvpApplication) {
-  if (!["Submitted to Line Manager", "Awaiting Manager Review"].includes(application.status)) return false;
-  if (!await isApplicationWorkflowsEnabledForOrganisation(organisationId)) return false;
-  const protection = await getApplicationWorkflowProtection(organisationId, application.id);
-  if (protection.instance) return protection.instance.state === "needs_information" || protection.instance.state === "active";
-  return Boolean(protection.policy && protection.requiresPublishedWorkflow);
-}
-
-async function submitApplicationThroughPublishedWorkflow(
-  context: WorkspaceContext,
-  session: LevyTateBetaSession,
-  application: MvpApplication,
-) {
-  const organisationId = context.organisation.id;
-  const protection = await getApplicationWorkflowProtection(organisationId, application.id);
-  if (!protection.instance && (!protection.policy || !protection.requiresPublishedWorkflow)) {
-    throw new LevyTateWorkspacePermissionError("This application is not eligible for the configured workflow.");
-  }
-  const now = nowIso();
-  const draftHistory = protection.history.length ? protection.history : [{
-    id: `history-${randomUUID()}`,
-    status: "Draft" as const,
-    owner: "Employee" as const,
-    note: "Employee saved an application draft.",
-    createdAt: now,
-  }];
-  const safeBeforeTransition: MvpApplication = {
-    ...application,
-    status: protection.instance?.state === "needs_information" ? "More information requested" : "Draft",
-    currentOwner: "Employee",
-    submittedAt: protection.existing?.submitted_at ?? application.submittedAt,
-    updatedAt: now,
-    history: draftHistory,
-    workflow: undefined,
-    workflowPreview: undefined,
-  };
-
-  // Persist answers in a non-progressed state first. The migration-032 RPC then
-  // pins the published version and records the employee transition atomically.
-  // A failure can leave a retryable draft, never a submitted legacy record.
-  await saveApplication(organisationId, safeBeforeTransition);
-  if (!protection.instance) {
-    await startApplicationWorkflow(session, application.id, `submit:${application.id}`);
-  } else if (protection.instance.state === "needs_information") {
-    await transitionApplicationWorkflowForSession(session, {
-      applicationId: application.id,
-      action: "resubmit",
-      note: "Application information resubmitted.",
-      idempotencyKey: `resubmit:${application.id}:${protection.instance.lock_version}`,
-      expectedLockVersion: protection.instance.lock_version,
+  if (mutation.type === "saveApplication") {
+    const application = mutation.application;
+    const submit = ["Submitted to Line Manager", "Awaiting Manager Review"].includes(application.status);
+    if (!["Draft", "Submitted to Line Manager", "Awaiting Manager Review"].includes(application.status)
+      || application.currentOwner !== (submit ? "Line Manager" : "Employee")) {
+      throw new ApplicationCommandError("Status and decision ownership cannot be edited through a draft.", 422);
+    }
+    await applyApplicationCommand(context.organisation.id, context.user.id, {
+      applicationId: application.id, action: submit ? "save_and_submit" : "save_draft",
+      expectedRevision: mutation.expectedRevision ?? application.revision ?? 0, idempotencyKey: mutation.idempotencyKey,
+      fields: { employeeId: application.employeeId, apprenticeshipStandardId: application.apprenticeshipStandardId,
+        reason: application.reason, careerGoal: application.careerGoal, supportRequired: application.supportRequired,
+        ...(application.workflow ? { expectedLockVersion: application.workflow.instance.lockVersion } : {}) },
     });
+    return;
   }
-
-  const [workflowApplication] = await attachApplicationWorkflowContexts(organisationId, [safeBeforeTransition]);
-  if (!workflowApplication.workflow) {
-    throw new LevyTateWorkspacePersistenceError("The configured application workflow could not be confirmed after submission.");
-  }
-  const currentStep = workflowApplication.workflow.version.steps.find((step) => step.id === workflowApplication.workflow?.instance.currentStepId);
-  const action = protection.instance?.state === "needs_information" ? "resubmitted" : "submitted";
-  const historyNote = `Employee ${action} application. Workflow moved to ${currentStep?.label ?? "the next configured step"}.`;
-  const history = draftHistory.some((entry) => entry.note === historyNote) ? draftHistory : [
-    ...draftHistory,
-    buildApplicationHistoryEntry(workflowApplication.status, historyNote, workflowApplication.workflow.instance.lastProgressedAt),
-  ];
-  const submittedAt = workflowApplication.workflow.events?.find((event) => event.action === "submit")?.createdAt ?? now;
-  await saveApplication(organisationId, {
-    ...safeBeforeTransition,
-    status: workflowApplication.status,
-    currentOwner: workflowApplication.currentOwner,
-    submittedAt,
-    updatedAt: workflowApplication.workflow.instance.lastProgressedAt,
-    history,
-  });
-}
-
-async function saveApplication(organisationId: string, application: MvpApplication) {
-  const existing = await selectOne<ApplicationRow>(
-    applicationsTable,
-    new URLSearchParams({
-      select: "id,status,current_owner",
-      organisation_id: `eq.${organisationId}`,
-      id: `eq.${application.id}`,
-      limit: "1",
-    }),
-  );
-  const history = [...application.history];
-  const latestHistory = history.at(-1);
-  const resubmittedForManagerReview = existing?.status === "More information requested"
-    && lineManagerReviewStatuses.includes(application.status)
-    && (!latestHistory || !lineManagerReviewStatuses.includes(latestHistory.status));
-  if (resubmittedForManagerReview) {
-    history.push(buildApplicationHistoryEntry(application.status, "Application resubmitted to Line Manager."));
-  }
-  const row: ApplicationRow = {
-    organisation_id: organisationId,
-    id: application.id,
-    employee_id: application.employeeId,
-    apprenticeship_standard_id: application.apprenticeshipStandardId,
-    status: application.status,
-    current_owner: application.currentOwner,
-    reason: application.reason,
-    career_goal: application.careerGoal,
-    support_required: application.supportRequired,
-    manager_note: application.managerNote,
-    submitted_at: application.submittedAt,
-    updated_at: application.updatedAt,
-  };
-
-  await supabaseInsert<ApplicationRow>(assertSupabase(), applicationsTable, [row], {
-    query: "on_conflict=organisation_id,id",
-    prefer: "resolution=merge-duplicates,return=minimal",
-  });
-
-  await supabaseDelete(assertSupabase(), applicationHistoryTable, buildOrganisationQuery(organisationId, { application_id: application.id }));
-  if (history.length) {
-    const historyRows: ApplicationHistoryRow[] = history.map((entry) => ({
-      organisation_id: organisationId,
-      id: entry.id,
-      application_id: application.id,
-      status: entry.status,
-      owner: entry.owner,
-      note: entry.note,
-      created_at: entry.createdAt,
-    }));
-    await supabaseInsert<ApplicationHistoryRow>(assertSupabase(), applicationHistoryTable, historyRows, {
-      query: "on_conflict=organisation_id,id",
-      prefer: "resolution=merge-duplicates,return=minimal",
-    });
-  }
-}
-
-async function updateApplicationStatus(organisationId: string, id: string, status: RequestStatus, note?: string) {
-  const current = await selectOne<ApplicationRow>(
-    applicationsTable,
-    new URLSearchParams({
-      select: "id,employee_id,apprenticeship_standard_id,status,current_owner,reason,career_goal,support_required,manager_note,submitted_at,updated_at",
-      organisation_id: `eq.${organisationId}`,
-      id: `eq.${id}`,
-      limit: "1",
-    }),
-  );
-
-  if (!current) {
-    throw new LevyTateWorkspacePersistenceError("Application record could not be found.");
-  }
-
-  await patchByOrganisation(organisationId, applicationsTable, "id", id, {
-    status,
-    current_owner: applicationOwnerForStatus(status),
-    manager_note: note ?? current.manager_note,
-    updated_at: nowIso(),
-  });
-
-  const historyEntry = buildApplicationHistoryEntry(status, note ?? `Status updated to ${status}.`);
-  const historyRow: ApplicationHistoryRow = {
-    organisation_id: organisationId,
-    id: historyEntry.id,
-    application_id: id,
-    status: historyEntry.status,
-    owner: historyEntry.owner,
-    note: historyEntry.note,
-    created_at: historyEntry.createdAt,
-  };
-
-  await supabaseInsert<ApplicationHistoryRow>(assertSupabase(), applicationHistoryTable, [historyRow], {
-    query: "on_conflict=organisation_id,id",
-    prefer: "resolution=merge-duplicates,return=minimal",
+  const managerApprove = role === "Line Manager" && ["Approved by Line Manager", "Submitted to Apprenticeship Lead", "Awaiting Final Approval"].includes(mutation.status);
+  const leadApprove = role === "Apprenticeship Lead" && mutation.status === "Approved for Enrolment";
+  const decline = (role === "Line Manager" && mutation.status === "Declined by Line Manager")
+    || (role === "Apprenticeship Lead" && mutation.status === "Declined by Apprenticeship Lead");
+  const information = ["Line Manager", "Apprenticeship Lead"].includes(role) && mutation.status === "More information requested";
+  const action = managerApprove || leadApprove ? "approve" : decline ? "decline" : information ? "request_information" : null;
+  if (!action) throw new ApplicationCommandError("This role cannot request that application transition.", 403);
+  await applyApplicationCommand(context.organisation.id, context.user.id, {
+    applicationId: mutation.id, action, expectedRevision: mutation.expectedRevision as number,
+    idempotencyKey: mutation.idempotencyKey, fields: { note: mutation.note ?? "" },
   });
 }
 
@@ -2000,26 +1570,6 @@ async function saveMatchingRequest(organisationId: string, request: MvpMatchingR
     prefer: "resolution=merge-duplicates,return=minimal",
   });
 }
-async function saveEnrolment(organisationId: string, enrolment: MvpEnrolment) {
-  const row: EnrolmentRow = {
-    organisation_id: organisationId,
-    id: enrolment.id,
-    application_id: enrolment.applicationId,
-    employee_id: enrolment.employeeId,
-    provider_id: enrolment.providerId,
-    apprenticeship_standard_id: enrolment.apprenticeshipStandardId,
-    status: enrolment.status,
-    start_date: enrolment.startDate,
-    notes: enrolment.notes,
-    created_at: enrolment.createdAt,
-    updated_at: enrolment.updatedAt,
-  };
-
-  await supabaseInsert<EnrolmentRow>(assertSupabase(), enrolmentsTable, [row], {
-    query: "on_conflict=organisation_id,id",
-    prefer: "resolution=merge-duplicates,return=minimal",
-  });
-}
 
 async function recordAuditEvent(
   context: WorkspaceContext,
@@ -2194,6 +1744,7 @@ function roleRowToRecord(row: RoleRow, mappings: RoleMappingRow[]): MvpRole {
 function applicationRowToRecord(row: ApplicationRow, historyRows: ApplicationHistoryRow[]): MvpApplication {
   return {
     id: row.id,
+    revision: row.revision,
     employeeId: row.employee_id,
     apprenticeshipStandardId: row.apprenticeship_standard_id,
     status: row.status,
