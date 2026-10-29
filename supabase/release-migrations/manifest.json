@@ -12,6 +12,7 @@
     { "path": "supabase/release-migrations/20261029154432_client_catalogue_integrity.sql", "sha256": "0661650e20f40971f72b5b23a8f51245ae02b30709124dcd39aa5c3b0f59d7ea" },
     { "path": "supabase/release-migrations/20261029155724_client_callback_failure_budget.sql", "sha256": "48c41ab057f35da1de97505971ff368391919fe8d37212f7bc6a3141ae8f38ef" },
     { "path": "supabase/release-migrations/20261029160250_client_tenant_suspension.sql", "sha256": "630ea06d676553c34ea5ed88251eb196a829ff74dadc2cb449ff60364d02abda" },
-    { "path": "supabase/release-migrations/20261029161250_client_lift_atomic_commands.sql", "sha256": "93d009f901e84ef588a5cc85e532a0115654b8502384a20dd2605615560fcd15" }
+    { "path": "supabase/release-migrations/20261029161250_client_lift_atomic_commands.sql", "sha256": "93d009f901e84ef588a5cc85e532a0115654b8502384a20dd2605615560fcd15" },
+    { "path": "supabase/release-migrations/20261029162529_client_learning_time_integrity.sql", "sha256": "f8c1b4af652784f12f8d4222b1cd020b04c8cf42059237a81d858918b36a0197" }
   ]
 }

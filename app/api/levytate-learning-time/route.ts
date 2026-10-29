@@ -51,9 +51,9 @@ type LearningTimeAction = {
 };
 
 export async function GET() {
-  const session = await authorisedSession();
-  if (!session) return reply({ message: "Unauthorised." }, 401);
   try {
+    const session = await authorisedSession();
+    if (!session) return reply({ message: "Unauthorised." }, 401);
     return reply(await getLearningTimeWorkspace(session));
   } catch (error) {
     return failure(error);
@@ -61,9 +61,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const session = await authorisedSession();
-  if (!session) return reply({ message: "Unauthorised." }, 401);
   try {
+    const session = await authorisedSession();
+    if (!session) return reply({ message: "Unauthorised." }, 401);
     const body = await readAuthenticatedJson(request, session.email, 48 * 1024) as LearningTimeAction;
     if (body.action === "save_activity" && body.activity) return reply(await saveLearningTimeActivity(session, { ...body.activity, idempotencyKey: body.idempotencyKey }), 201);
     if (body.action === "submit_activity" && body.activityId && isNumber(body.lockVersion) && body.idempotencyKey) {
@@ -116,8 +116,7 @@ async function authorisedSession() {
 }
 
 function failure(error: unknown) {
-  const status = error instanceof LevyTateLearningTimeError ? error.status : 500;
-  if (!(error instanceof LevyTateLearningTimeError)) console.error("Learning Time route failed", error instanceof Error ? error.name : "unknown");
+  const status = error instanceof LevyTateLearningTimeError ? error.status : 503;
   return reply({ message: error instanceof LevyTateLearningTimeError ? error.message : "Learning Time is temporarily unavailable." }, status);
 }
 
