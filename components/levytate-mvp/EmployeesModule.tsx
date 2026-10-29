@@ -40,7 +40,7 @@ export function EmployeesModule({ onStartDiscovery, onOpenDirectReport, initialE
   onOpenDirectReport?: (employeeId: string) => void;
   initialEmployeeId?: string | null;
 }) {
-  const { data, saveEmployee, importEmployees, archiveEmployee, can, meta } = useMvpWorkspace();
+  const { data, saveEmployee, importEmployees, archiveEmployee, can, meta, sessionRecovery } = useMvpWorkspace();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("Active");
   const [departmentFilter, setDepartmentFilter] = useState("All");
@@ -376,7 +376,7 @@ export function EmployeesModule({ onStartDiscovery, onOpenDirectReport, initialE
               </div>
             </details>
 
-            <FormActions onCancel={() => setDraft(null)} label={saving ? "Saving…" : "Save employee"} error={error} disabled={saving} />
+            <FormActions onCancel={() => setDraft(null)} label={saving ? "Saving…" : "Save employee"} error={error} disabled={saving} submissionBlocked={Boolean(sessionRecovery)} />
             </fieldset>
           </form>
         </MvpModal>
@@ -388,7 +388,7 @@ export function EmployeesModule({ onStartDiscovery, onOpenDirectReport, initialE
           <p className="text-sm text-[#102c3d]/70">All rows are saved together or none are. Existing emails are not skipped or overwritten. Access must be prepared and invited separately.</p>
           {peopleImport.result.issues.length ? <div role="alert" className="max-h-48 overflow-y-auto rounded-xl bg-[#fff8df] p-4 text-xs text-[#765b00]">{peopleImport.result.issues.slice(0, 30).map((issue) => <p key={`${issue.sourceRow}:${issue.message}`} className="py-1">{issue.sourceRow ? `Row ${issue.sourceRow}: ` : ""}{issue.message}</p>)}</div> : null}
           {error ? <p role="alert" className="text-sm font-semibold text-[#b53c52]">{error}</p> : null}
-          <div className="flex flex-wrap gap-3"><button type="button" disabled={saving || !peopleImport.employees.length || Boolean(peopleImport.result.issues.length)} onClick={() => void importPeople()} className="min-h-11 rounded-full bg-[#102c3d] px-5 text-sm font-semibold text-white disabled:opacity-40">{saving ? "Importing…" : "Import all employees"}</button><button type="button" disabled={saving} onClick={() => setPeopleImport(null)} className="min-h-11 rounded-full px-4 text-sm font-semibold text-[#102c3d]/[0.55] disabled:opacity-40">Cancel</button></div>
+          <div className="flex flex-wrap gap-3"><button type="button" disabled={saving || Boolean(sessionRecovery) || !peopleImport.employees.length || Boolean(peopleImport.result.issues.length)} onClick={() => void importPeople()} className="min-h-11 rounded-full bg-[#102c3d] px-5 text-sm font-semibold text-white disabled:opacity-40">{saving ? "Importing…" : "Import all employees"}</button><button type="button" disabled={saving} onClick={() => setPeopleImport(null)} className="min-h-11 rounded-full px-4 text-sm font-semibold text-[#102c3d]/[0.55] disabled:opacity-40">Cancel</button></div>
         </div>
       </MvpModal> : null}
 
