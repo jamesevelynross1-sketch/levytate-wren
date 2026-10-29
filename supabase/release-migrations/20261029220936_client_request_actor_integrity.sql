@@ -138,7 +138,7 @@ begin
   when 'publish' then array['requests_update','versions_insert']
   when 'publish_revision' then array['requests_update','versions_insert']
   when 'send_existing_draft' then case when request.status='draft' then array['requests_update','versions_insert'] else array[]::text[] end
-  when 'submit_response' then array['response_versions_insert','invitations_update']
+  when 'submit_response' then array['requests_update','response_versions_insert','invitations_update']
   when 'ask_clarification' then array['clarifications_insert'] when 'answer_clarification' then array['clarifications_update']
   when 'confirm_agreement' then array['agreements_insert','decisions_update','requests_update']
   when 'confirm_and_handover' then array['agreements_insert','decisions_update','requests_update','handovers_insert']
@@ -157,7 +157,7 @@ begin
   if (item->>'version')::integer is distinct from coalesce((p_changes->'requests_insert'->0->>'current_version')::integer,(p_changes->'requests_update'->0->>'current_version')::integer) then raise exception using errcode='PT422',message='Publication snapshot version mismatch';end if;
  end loop;
  for item in select value from jsonb_array_elements(coalesce(p_changes->'response_versions_insert','[]')) loop
-  if not exists(select 1 from jsonb_array_elements(coalesce(p_changes->'responses_insert','[]')||coalesce(p_changes->'responses_update','[]')) r where r->>'id'=item->>'response_id' and r->>'current_version'=item->>'version' and r->>'invitation_id'=item->>'invitation_id') then raise exception using errcode='PT422',message='Submission snapshot identity/version mismatch';end if;
+  if not exists(select 1 from jsonb_array_elements(coalesce(p_changes->'responses_insert','[]')||coalesce(p_changes->'responses_update','[]')) r where r->>'id'=item->>'response_id' and r->>'current_version'=item->>'version' and r->>'invitation_id'=invitation.id::text and r->>'provider_id'=item->>'provider_id' and r->>'request_version'=item->>'request_version' and r->'draft_content'=item->'submitted_content') then raise exception using errcode='PT422',message='Submission snapshot identity/version/content mismatch';end if;
  end loop;
  perform public.levytate_persist_service_request_action(p_organisation_id,p_changes,p_expected);
  insert into public.levytate_audit_events(organisation_id,actor_email,actor_role,entity_type,entity_id,action,summary,metadata) values(p_organisation_id,actor_email,actor_role,'service_request',request_id::text,'request.'||command_action,'Requests action committed atomically.',jsonb_build_object('actorKind',p_actor_kind,'actorId',p_actor_id,'requestKey',command_key));

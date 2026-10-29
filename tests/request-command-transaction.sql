@@ -7,7 +7,7 @@ insert into public.levytate_users(id,organisation_id,email,role,access_level,act
  ('93000000-0000-4000-a000-000000000003','93000000-0000-4000-a000-000000000001','employee-requests@example.invalid','Employee','Employer',true);
 insert into public.levytate_organisation_capabilities(organisation_id,requests_enabled) values('93000000-0000-4000-a000-000000000001',true);
 do $$
-declare org uuid:='93000000-0000-4000-a000-000000000001';lead uuid:='93000000-0000-4000-a000-000000000002';emp uuid:='93000000-0000-4000-a000-000000000003';rid uuid:='93000000-0000-4000-a000-000000000004';member uuid:='93000000-0000-4000-a000-000000000005';invite uuid:='93000000-0000-4000-a000-000000000006';command jsonb;data jsonb;expected jsonb;result jsonb;
+declare org uuid:='93000000-0000-4000-a000-000000000001';lead uuid:='93000000-0000-4000-a000-000000000002';emp uuid:='93000000-0000-4000-a000-000000000003';rid uuid:='93000000-0000-4000-a000-000000000004';member uuid:='93000000-0000-4000-a000-000000000005';invite uuid:='93000000-0000-4000-a000-000000000006';command jsonb;data jsonb;expected jsonb;result jsonb;invdata jsonb;reqdata jsonb;
 begin
  command:=jsonb_build_object('action','create_draft','idempotencyKey','synthetic-request-create','content',jsonb_build_object('title','Synthetic request','requirement','Fictional local test','responseDeadline',current_date+14));
  data:=jsonb_build_object('organisation_id',org,'id',rid,'title','Synthetic request','requirement','Fictional local test','request_mode','need_led','readiness','exploring','learner_volume','{"kind":"not_confirmed"}'::jsonb,'workplace_location','{"kind":"not_confirmed"}'::jsonb,'delivery_preferences','[]'::jsonb,'preferred_start','{"kind":"not_confirmed"}'::jsonb,'departments','[]'::jsonb,'target_roles','[]'::jsonb,'internal_private_context','{}'::jsonb,'status','draft','response_deadline',current_date+14,'current_version',0,'created_by',lead,'created_at',now(),'updated_at',now());
@@ -41,6 +41,13 @@ begin
  perform public.levytate_apply_request_command(org,'provider',member,command,jsonb_build_object('responses_insert',jsonb_build_array(data)),expected);
  if (select count(*) from public.levytate_service_request_responses where organisation_id=org and status='draft')<>1 then raise exception 'Provider draft failed';end if;
  if public.levytate_apply_request_command(org,'provider',member,command,'{}','{}',true)->>'committed'<>'true' then raise exception 'Provider receipt failed';end if;
+ select to_jsonb(r) into data from public.levytate_service_request_responses r where organisation_id=org and invitation_id=invite;
+ select to_jsonb(i) into invdata from public.levytate_service_request_invitations i where organisation_id=org and id=invite;
+ select to_jsonb(r) into reqdata from public.levytate_service_requests r where organisation_id=org and id=rid;
+ expected:=jsonb_build_object('requests',jsonb_build_array(jsonb_build_object('id',rid,'updated_at',reqdata->'updated_at')),'responses',jsonb_build_array(jsonb_build_object('id',data->'id','updated_at',data->'updated_at')),'invitations',jsonb_build_array(jsonb_build_object('id',invite,'updated_at',invdata->'updated_at')));
+ command:=command||'{"action":"submit_response","idempotencyKey":"synthetic-submit-response"}';
+ perform public.levytate_apply_request_command(org,'provider',member,command,jsonb_build_object('requests_update',jsonb_build_array(reqdata||'{"status":"responses_received"}'),'responses_update',jsonb_build_array(data||jsonb_build_object('status','submitted','current_version',1,'submitted_at',now())),'invitations_update',jsonb_build_array(invdata||'{"status":"responded"}'),'response_versions_insert',jsonb_build_array(jsonb_build_object('organisation_id',org,'response_id',data->'id','request_id',rid,'provider_id',data->'provider_id','request_version',1,'version',1,'submitted_content',data->'draft_content','submitted_by_provider_membership_id',member,'submitted_at',now()))),expected);
+ if (select count(*) from public.levytate_service_request_response_versions where organisation_id=org)<>1 then raise exception 'Canonical submission serializer shape failed';end if;
  update public.levytate_provider_memberships set active=false where id=member;
  begin perform public.levytate_apply_request_command(org,'provider',member,command,'{}','{}',true);raise exception 'Revoked provider receipt accepted';exception when sqlstate 'PT403' then null;end;
  update public.levytate_users set active=false where id=lead;
