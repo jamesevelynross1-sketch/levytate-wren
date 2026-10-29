@@ -6,6 +6,7 @@ import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authori
 import { ClientWorkspaceAdminError, createClientWorkspace, inviteClientWorkspaceUser, listClientWorkspaces, provisionClientWorkspaceUser, updateClientWorkspaceUser } from "@/lib/server/levytate-client-workspace-admin";
 import { ClientRequestError, readBrowserJson, requireActionKeys, assertAuthenticatedWrite } from "@/lib/server/levytate-request-boundary";
 import { applicationRequestUrl } from "@/lib/server/levytate-request-origin";
+import { suspendClientTenant } from "@/lib/server/levytate-tenant-lifecycle";
 
 async function session() { const store = await cookies(); return readAuthorisedLevyTateBetaSession(store.get(levytateBetaSessionCookie)?.value); }
 export async function GET() {
@@ -18,6 +19,7 @@ export async function POST(request: Request) {
     const current = await session();
     if (!current) return reply({ message: "Unauthorised." }, 401);
     await assertAuthenticatedWrite(request, current.email);
+    if (body.action === "suspend_workspace") return reply({ ok: true, suspension: await suspendClientTenant(current, body) });
     if (body.action === "create_workspace") {
       requireActionKeys(body, ["action", "name", "workspaceName", "primaryContact", "contactEmail", "initialRole"]);
       return reply({ ok: true, workspace: await createClientWorkspace(current, body) }, 201);

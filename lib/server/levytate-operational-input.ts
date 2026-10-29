@@ -10,6 +10,26 @@ const id = z.string().trim().min(1).max(200);
 const note = z.string().max(4000);
 const version = z.number().int().nonnegative().max(2147483647);
 const dateText = z.string().max(10);
+const commandKey = z.string().regex(/^[A-Za-z0-9:_-]{8,128}$/);
+const calendarDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) => {
+  const parsed = Date.parse(`${value}T00:00:00Z`);
+  return Number.isFinite(parsed) && new Date(parsed).toISOString().slice(0, 10) === value;
+});
+const optionalDate = z.union([calendarDate, z.literal("")]).optional();
+export const learnerEnrolmentInput = z.strictObject({
+  idempotencyKey: commandKey, expectedActivityVersion: id,
+  initialProgress: z.strictObject({ updateDate: calendarDate, targetProgressPercentage: z.number().min(0).max(100), actualProgressPercentage: z.number().min(0).max(100), summary: note.trim().min(1) }),
+  firstReviewDate: calendarDate, firstReviewerName: z.string().trim().min(1).max(200),
+});
+export const employeeDeclarationInput = z.strictObject({
+  idempotencyKey: commandKey, expectedUpdatedAt: id, confirmed: z.literal(true), expectedEnglandWorkingHoursPercentage: z.number().min(50).max(100),
+});
+export const learnerOutcomeInput = z.strictObject({
+  outcome: z.enum(["withdrawal", "achievement", "completion_without_achievement"]), idempotencyKey: commandKey, expectedActivityVersion: id,
+  effectiveDate: calendarDate, notes: note.trim().min(1), reasonCategory: z.string().max(200).optional(), initiatedBy: z.string().max(200).optional(),
+  providerNotified: z.boolean().optional(), providerNotifiedDate: optionalDate, employeeNotified: z.boolean().optional(), employeeNotifiedDate: optionalDate,
+  grade: z.string().max(200).optional(), gradeType: z.string().max(200).optional(), certificateReceived: z.boolean().optional(), certificateReceivedDate: optionalDate,
+});
 const enumKeys = <T extends Record<string, string>>(labels: T) => z.enum(Object.keys(labels) as [Extract<keyof T, string>, ...Extract<keyof T, string>[]]);
 export function parseAction<T>(schema: z.ZodType<T>, body: unknown): T {
   const result = schema.safeParse(body);

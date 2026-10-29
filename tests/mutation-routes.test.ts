@@ -45,7 +45,7 @@ describe("actual cookie-authenticated mutation routes", () => {
   it("does not expose provider diagnostics on reads or writes", async () => {
     const secret = "provider diagnostic with private credential";
     mocks.mutate.mockRejectedValue(new Error(secret)); mocks.bootstrap.mockRejectedValue(new Error(secret));
-    for (const response of [await workspacePost(request({ type: "archiveEmployee", id: "one" })), await workspaceGet()]) {
+    for (const response of [await workspacePost(request({ type: "archiveEmployee", id: "one", status: "Archived" })), await workspaceGet()]) {
       expect(response.status).toBe(503); expect(await response.text()).not.toContain(secret);
       expect(response.headers.get("cache-control")).toContain("no-store");
     }
