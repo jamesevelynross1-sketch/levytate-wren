@@ -21,7 +21,8 @@ import { isLiftEnabledForOrganisation } from "@/lib/server/levytate-lift-capabil
 import { buildLiftOpportunities, interpretLiftAssessment, liftManagerEvidenceId, validateLiftAnswers } from "@/lib/server/levytate-lift-interpretation";
 import { groupLiftOpportunityCandidates, type LiftOpportunityCandidateForGrouping } from "@/lib/server/levytate-lift-grouping";
 import { calculateLiftCapacityValue, canTransitionLiftProof } from "@/lib/levytate/lift/value";
-import { getLevyTateSupabaseConfig, supabaseInsert, supabaseSelect, supabaseSelectAll, supabaseUpdate } from "@/lib/server/levytate-supabase";
+import { getLevyTateSupabaseConfig, supabaseInsert, supabaseSelect, supabaseSelectAll, supabaseUpdate as persistUpdate } from "@/lib/server/levytate-supabase";
+import { insertLiftPlan, liftRevision, liftWritePlan, runLiftTransaction, selectLiftPlan, updateLiftPlan } from "@/lib/server/levytate-lift-transaction";
 
 type EmployeeRow = { id: string; name: string; email: string; department: string; job_title: string; manager_id: string; status: string };
 type ParticipantRow = { id: string; campaign_id: string; employee_id: string; manager_employee_id: string; employee_name_snapshot: string; status: string; submitted_at: string | null };
@@ -67,6 +68,7 @@ export async function getLiftWorkspaceForSession(session: LevyTateBetaSession): 
   const role = normaliseMvpUserRole(context.user.role);
   if (role === "Platform Admin") throw new LevyTateLiftError("Lift is unavailable for this role.", 403);
   if (!await isLiftEnabledForOrganisation(context.organisation.id)) throw new LevyTateLiftError("Lift is not enabled for this workspace.", 404);
+  const mutationRevision = await liftRevision(context.organisation.id);
   const employees = await selectAll<EmployeeRow>(context.organisation.id, "levytate_employees", { status: "eq.Active", order: "name.asc" });
   const employee = employees.find((item) => item.email.trim().toLowerCase() === session.email.trim().toLowerCase()) ?? null;
   if ((role === "Employee" || role === "Line Manager") && !employee) throw new LevyTateLiftError("Your account is not linked to an active employee record.", 403);
@@ -81,7 +83,9 @@ export async function getLiftWorkspaceForSession(session: LevyTateBetaSession): 
   const manager = role === "Line Manager" && employee ? await managerWorkspace(context.organisation.id, employee, employees, observations, assessments) : null;
   const aggregate = role === "Apprenticeship Lead" || role === "Employer Admin" ? await leaderWorkspace(context.organisation.id, participants) : { opportunities: [], decisions: [], proofs: [] };
   const dates = participants.flatMap((item) => item.submitted_at ? [item.submitted_at] : []);
+  if (mutationRevision !== await liftRevision(context.organisation.id)) throw new LevyTateLiftError("Lift changed while loading. Refresh to load a consistent workspace.", 409);
   return {
+    mutationRevision,
     enabled: true,
     generatedAt: new Date().toISOString(),
     role: role as LiftWorkspace["role"],
@@ -120,6 +124,7 @@ export async function applyLiftActionForSession(session: LevyTateBetaSession, va
   const role = normaliseMvpUserRole(context.user.role);
   if (!await isLiftEnabledForOrganisation(context.organisation.id)) throw new LevyTateLiftError("Lift is not enabled for this workspace.", 404);
   const employee = (await select<EmployeeRow>(context.organisation.id, "levytate_employees", { email: `eq.${session.email.trim().toLowerCase()}`, status: "eq.Active", limit: "1" }))[0] ?? null;
+  await runLiftTransaction(context.organisation.id, context.user.id, action, async () => {
   switch (action.action) {
     case "invite_people": await invitePeople(context, role, action); break;
     case "save_assessment": await saveAssessment(context, role, employee, action); break;
@@ -132,6 +137,7 @@ export async function applyLiftActionForSession(session: LevyTateBetaSession, va
     case "record_decision": await recordDecision(context, role, action); break;
     case "record_proof": await recordProof(context, role, action); break;
   }
+  });
   return getLiftWorkspaceForSession(session);
 }
 
@@ -158,6 +164,7 @@ export async function saveAssessment(context: Context, role: string, employee: E
   assertRole(role, ["Employee", "Line Manager", "Apprenticeship Lead", "Employer Admin"]);
   if (!employee) throw new LevyTateLiftError("Active employee record required.", 403);
   const assessment = await ownAssessment(context.organisation.id, action.assessmentId, employee.id);
+  if (assessment.status !== "draft") throw new LevyTateLiftError("Submitted assessment evidence is immutable.", 409);
   if (assessment.current_revision !== action.expectedRevision) throw new LevyTateLiftError("The assessment changed; refresh before saving.", 409);
   const answers = sanitiseAnswers(action.answers);
   await supabaseUpdate(config(), tables.revisions, scope(context.organisation.id, { assessment_id: assessment.id, revision_number: assessment.current_revision }), { answers, updated_at: new Date().toISOString() });
@@ -259,8 +266,8 @@ export async function recordProof(context: Context, role: string, action: Extrac
   const existing = (await select<ProofRow>(context.organisation.id, tables.proofs, { opportunity_id: `eq.${opportunity.id}`, limit: "1" }))[0] ?? null;
   if (existing && existing.revision !== action.expectedRevision) throw new LevyTateLiftError("Proof record changed; refresh before saving.", 409);
   const proof = action.proof;
-  const current = proof as LiftProofRecord;
-  const decisionRecorded = (await select<DecisionRow>(context.organisation.id, tables.decisions, { opportunity_id: `eq.${opportunity.id}`, limit: "1" })).length > 0;
+  const current = { ...proof, state: existing?.state ?? opportunity.state } as LiftProofRecord;
+  const decisionRecorded = (await select<DecisionRow>(context.organisation.id, tables.decisions, { opportunity_id: `eq.${opportunity.id}`, status: "eq.selected", limit: "1" })).length > 0;
   if (!canTransitionLiftProof({ current: { ...current, opportunityId: opportunity.id, updatedAt: new Date().toISOString() }, nextState: proof.state, decisionRecorded })) throw new LevyTateLiftError("The required decision, baseline, outcome or review evidence is incomplete.", 409);
   const evidenceRows = [proof.baseline, proof.outcome].filter((item): item is NonNullable<typeof item> => Boolean(item)).map((item) => ({
     id: item.id,
@@ -291,13 +298,14 @@ export async function recordProof(context: Context, role: string, action: Extrac
 
 async function managerWorkspace(organisationId: string, manager: EmployeeRow, employees: EmployeeRow[], observations: ObservationRow[], assessments: AssessmentRow[]): Promise<LiftWorkspace["manager"]> {
   const direct = employees.filter((item) => item.manager_id === manager.id);
-  const contexts = await selectAll<{ id: string }>(organisationId, tables.teamContexts, { manager_employee_id: `eq.${manager.id}`, status: "eq.submitted", limit: "1" });
-  return { teamContextSubmitted: contexts.length > 0, directReports: await Promise.all(direct.map(async (person) => {
+  const contexts = await selectAll<{ id: string; revision_number: number }>(organisationId, tables.teamContexts, { manager_employee_id: `eq.${manager.id}`, status: "eq.submitted", order: "revision_number.desc", limit: "1" });
+  return { teamContextSubmitted: contexts.length > 0, teamContextRevision: contexts[0]?.revision_number ?? 0, directReports: await Promise.all(direct.map(async (person) => {
     const observation = observations.find((item) => item.manager_employee_id === manager.id && item.employee_id === person.id && item.status !== "revoked");
     const assessment = assessments.find((item) => item.employee_id === person.id && item.campaign_id === observation?.campaign_id);
     const released = Boolean(observation?.active_submission_revision && assessment?.active_submission_revision);
     const interpretation = released && assessment ? (await select<InterpretationRow>(organisationId, tables.interpretations, { participant_id: `eq.${assessment.participant_id}`, status: "in.(provisional,reviewed)", order: "created_at.desc", limit: "1" }))[0] ?? null : null;
-    return { employeeId: person.id, employeeName: person.name, perspectiveStatus: observation?.active_submission_revision ? "submitted" : observation ? "draft" : "not_started", employeeFindingsReleased: released, employeeFindings: interpretation ? object<{ findings?: LiftCapabilityFinding[] }>(interpretation.findings_snapshot).findings ?? [] : [] };
+    const draft = observation?.status === "draft" ? (await select<ObservationRevisionRow>(organisationId, tables.observationRevisions, { observation_id: `eq.${observation.id}`, revision_number: `eq.${observation.current_revision}`, limit: "1" }))[0] : null;
+    return { employeeId: person.id, employeeName: person.name, perspectiveStatus: observation?.active_submission_revision ? "submitted" : observation ? "draft" : "not_started", currentRevision: observation?.current_revision ?? 1, draft: draft ? { workflowGroup: draft.workflow_group_key, observedWork: draft.observed_work, observationRecency: draft.observation_recency, supportDegree: draft.support_degree, capabilityObservations: strings(draft.capability_observations), example: strings(draft.concrete_examples).join("\n"), opportunity: draft.suitable_opportunity, outcome: draft.intended_outcome, conditions: draft.condition_time } : undefined, employeeFindingsReleased: released, employeeFindings: interpretation ? object<{ findings?: LiftCapabilityFinding[] }>(interpretation.findings_snapshot).findings ?? [] : [] };
   })) };
 }
 
@@ -373,7 +381,56 @@ function evidenceView(row: EvidenceRow): import("@/lib/levytate/lift/domain").Li
 function candidateForGrouping(row: OpportunityCandidateRow): LiftOpportunityCandidateForGrouping { return { id: row.id, campaignId: row.campaign_id, employeeId: row.employee_id, frameworkKey: row.framework_key, questionnaireVersion: row.questionnaire_version, interpretationVersion: row.interpretation_version, groupingVersion: row.grouping_version, workflowGroup: row.workflow_group_key, capabilityIds: strings(row.capability_ids) as import("@/lib/levytate/lift/domain").LiftCapability[], relationship: row.relationship_type, supportingEvidenceIds: strings(row.supporting_evidence_ids), contradictoryEvidenceIds: strings(row.contradictory_evidence_ids) }; }
 function submittedEmployeesByCampaign(participants: ParticipantRow[]) { const result = new Map<string, string[]>(); for (const participant of participants) { if (participant.status !== "submitted") continue; result.set(participant.campaign_id, [...(result.get(participant.campaign_id) ?? []), participant.employee_id]); } return result; }
 
-function parseAction(value: unknown): LiftAction { if (!value || typeof value !== "object") throw new LevyTateLiftError("A valid Lift action is required."); const input = value as Record<string, unknown>; if (typeof input.action !== "string" || typeof input.idempotencyKey !== "string" || !/^[a-zA-Z0-9:_-]{8,128}$/.test(input.idempotencyKey)) throw new LevyTateLiftError("A valid action and idempotency key are required."); const allowed = new Set(["invite_people","save_assessment","submit_assessment","save_team_context","save_manager_perspective","submit_manager_perspective","add_manager_perspective_addendum","record_employee_context","record_decision","record_proof"]); if (!allowed.has(input.action)) throw new LevyTateLiftError("Lift action is not supported."); return value as LiftAction; }
+function parseAction(value: unknown): LiftAction {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new LevyTateLiftError("A valid Lift action is required.");
+  const input = value as Record<string, unknown>;
+  const fields: Record<string, string[]> = {
+    invite_people: ["title","businessObjective","employeeIds","frameworkKey","questionnaireVersion","interpretationVersion"],
+    save_assessment: ["assessmentId","answers","currentQuestionIndex","expectedRevision"], submit_assessment: ["assessmentId","expectedRevision"],
+    save_team_context: ["purpose","workflows","friction","expectedChanges","availableSupport","expectedRevision"],
+    save_manager_perspective: ["employeeId","observations","expectedRevision"], submit_manager_perspective: ["employeeId","expectedRevision"],
+    add_manager_perspective_addendum: ["employeeId","clarification"], record_employee_context: ["managerObservationId","context","disputed"],
+    record_decision: ["opportunityId","decision"], record_proof: ["opportunityId","proof","expectedRevision"],
+  };
+  if (typeof input.action !== "string" || !Object.hasOwn(fields,input.action) || typeof input.idempotencyKey !== "string" || !/^[a-zA-Z0-9:_-]{8,128}$/.test(input.idempotencyKey)) throw new LevyTateLiftError("A valid action and retry key are required.");
+  if (!Number.isSafeInteger(input.expectedWorkspaceRevision) || (input.expectedWorkspaceRevision as number)<0) throw new LevyTateLiftError("Refresh Lift before saving; a current workspace revision is required.",409);
+  const allowed = ["action","idempotencyKey","expectedWorkspaceRevision",...fields[input.action]];
+  if (Object.keys(input).some((key) => !allowed.includes(key)) || fields[input.action].some((key) => !(key in input))) throw new LevyTateLiftError("Lift action fields are incomplete or unsupported.");
+  for (const key of fields[input.action]) {
+    const item = input[key];
+    if (["expectedRevision","currentQuestionIndex"].includes(key)) { if (!Number.isSafeInteger(item) || (item as number)<0) throw new LevyTateLiftError("A valid Lift revision and question index are required."); }
+    else if (["answers","observations","decision","proof"].includes(key)) { if (!item || typeof item!=="object" || Array.isArray(item)) throw new LevyTateLiftError("Lift evidence must be an object."); }
+    else if (key==="employeeIds") { if (!Array.isArray(item) || !item.length || item.length>500 || item.some((id) => typeof id!=="string" || !id.trim()) || new Set(item).size!==item.length) throw new LevyTateLiftError("Select between one and 500 distinct employees."); }
+    else if (key==="disputed") { if (typeof item!=="boolean") throw new LevyTateLiftError("A valid context decision is required."); }
+    else if (typeof item!=="string" || item.length>8000) throw new LevyTateLiftError("Lift action text is invalid or too long.");
+  }
+  if (input.action === "save_manager_perspective") {
+    const observation = input.observations as Record<string, unknown>;
+    const listKeys = ["capabilityObservations","concreteExamples"];
+    const textKeys = ["workflowGroup","observedWork","observationRecency","opportunityToObserve","supportDegree","suitableOpportunity","intendedOutcome","conditionTime","conditionTools","conditionAccess","conditionSupervision","conditionSuitableWork"];
+    if (Object.entries(observation).some(([key,item]) => listKeys.includes(key) ? !validStringArray(item,30,5000) : !textKeys.includes(key) || typeof item!=="string" || item.length>5000)) throw new LevyTateLiftError("Workplace Perspective fields are invalid.");
+  }
+  if (input.action === "record_decision") {
+    const decision = input.decision as Record<string, unknown>;
+    if (!["selected","deferred","gather_evidence"].includes(String(decision.status)) || ["selectedOptionId","rationale","owner","intendedMeasure"].some((key) => typeof decision[key]!=="string" || !(decision[key] as string).trim()) || !Array.isArray(decision.assumptions) || decision.assumptions.length>100 || !validStringArray(decision.sharedBenefitIds,100,500)) throw new LevyTateLiftError("A complete decision and assumptions are required.");
+    for (const assumption of decision.assumptions) {
+      if (!assumption || typeof assumption!=="object" || ["id","label","value"].some((key) => typeof assumption[key]!=="string") || (assumption.unit!==null && typeof assumption.unit!=="string") || !["reported","reviewed","measured"].includes(assumption.status)) throw new LevyTateLiftError("Decision assumptions are invalid.");
+    }
+  }
+  if (input.action === "record_proof") {
+    const proof = input.proof as Record<string, unknown>;
+    if (!["signal_identified","work_context_confirmed","change_tested","outcome_evidenced","paused","not_supported","no_improvement"].includes(String(proof.state)) || ["agreedScope","owner","intendedMeasure"].some((key) => typeof proof[key]!=="string") || !["not_reviewed","internal_review","external_review"].includes(String(proof.verification)) || !validStringArray(proof.limitations,30,2000) || !validStringArray(proof.otherRelevantChanges,30,2000) || (proof.reviewedBy!==null && typeof proof.reviewedBy!=="string") || (proof.followUpAt!==null && (typeof proof.followUpAt!=="string" || !Number.isFinite(Date.parse(proof.followUpAt))))) throw new LevyTateLiftError("Proof fields are invalid.");
+    for (const name of ["baseline","outcome"] as const) {
+      const evidence=proof[name] as Record<string,unknown> | null;
+      if (evidence===null) continue;
+      if (!evidence || typeof evidence!=="object" || ["id","source","version","recordedAt","description"].some((key) => typeof evidence[key]!=="string") || !Number.isFinite(Date.parse(evidence.recordedAt as string)) || evidence.source!==(name==="baseline" ? "operational_baseline" : "measured_outcome") || !validStringArray(evidence.limitations,30,2000)) throw new LevyTateLiftError("Proof evidence is invalid.");
+      const quantity=evidence.quantity as Record<string,unknown> | undefined;
+      if (quantity && (typeof quantity.value!=="number" || !Number.isFinite(quantity.value) || quantity.value<0 || ["unit","population","period"].some((key) => typeof quantity[key]!=="string" || !(quantity[key] as string).trim()))) throw new LevyTateLiftError("Proof measures require finite non-negative quantities and their units, population and period.");
+    }
+  }
+  return value as LiftAction;
+}
+function validStringArray(value: unknown, max: number, maxLength: number) { return Array.isArray(value) && value.length<=max && value.every((item) => typeof item==="string" && item.length<=maxLength); }
 function sanitiseAnswers(value: LiftAnswerMap) { if (!value || typeof value !== "object" || Array.isArray(value)) throw new LevyTateLiftError("Lift answers must be an object."); const safe: LiftAnswerMap = {}; for (const question of liftQuestionnaire) { const answer = value[question.id]; if (answer === undefined || answer === null || answer === "") safe[question.id] = null; else if (question.type === "long_text") { if (typeof answer !== "string") throw new LevyTateLiftError(`Answer for ${question.id} must be text.`); safe[question.id] = bounded(answer, 5000); } else { if (typeof answer !== "string" || !question.options?.some((option) => option.value === answer)) throw new LevyTateLiftError(`Answer for ${question.id} is invalid.`); safe[question.id] = answer; } } return safe; }
 function observationPayload(value: Record<string, unknown>) { const workflowGroup = String(value.workflowGroup ?? "other_reviewed"); return { workflow_group_key: liftWorkflowGroups.includes(workflowGroup as (typeof liftWorkflowGroups)[number]) ? workflowGroup : "other_reviewed", observed_work: bounded(String(value.observedWork ?? ""), 5000), observation_recency: bounded(String(value.observationRecency ?? ""), 500), opportunity_to_observe: ["enough","limited","not_enough"].includes(String(value.opportunityToObserve)) ? value.opportunityToObserve : "not_enough", support_degree: ["independent","some_support","substantial_support","not_observed"].includes(String(value.supportDegree)) ? value.supportDegree : "not_observed", capability_observations: uniqueStrings(value.capabilityObservations, 10), concrete_examples: uniqueStrings(value.concreteExamples, 5), suitable_opportunity: bounded(String(value.suitableOpportunity ?? ""), 3000), intended_outcome: bounded(String(value.intendedOutcome ?? ""), 3000), condition_time: bounded(String(value.conditionTime ?? ""), 1000), condition_tools: bounded(String(value.conditionTools ?? ""), 1000), condition_access: bounded(String(value.conditionAccess ?? ""), 1000), condition_supervision: bounded(String(value.conditionSupervision ?? ""), 1000), condition_suitable_work: bounded(String(value.conditionSuitableWork ?? ""), 1000) }; }
 function assertRole(role: string, allowed: string[]) { if (!allowed.includes(role)) throw new LevyTateLiftError(`${role} cannot perform this Lift action.`, 403); }
@@ -386,7 +443,8 @@ function nullableObject<T>(value: unknown): T | null { return value && typeof va
 function stableUuid(...parts: string[]) { const hash = createHash("sha256").update(parts.join(":")) .digest("hex"); return `${hash.slice(0,8)}-${hash.slice(8,12)}-4${hash.slice(13,16)}-a${hash.slice(17,20)}-${hash.slice(20,32)}`; }
 function config() { const value = getLevyTateSupabaseConfig(); if (!value) throw new LevyTateLiftError("Lift persistence is unavailable.", 503); return value; }
 function scope(organisationId: string, values: Record<string, string | number>) { const params = new URLSearchParams({ organisation_id: `eq.${organisationId}` }); Object.entries(values).forEach(([key, value]) => params.set(key, `eq.${value}`)); return params.toString(); }
-async function select<T>(organisationId: string, table: string, params: Record<string, string>) { return supabaseSelect<T>(config(), table, new URLSearchParams({ select: "*", organisation_id: `eq.${organisationId}`, ...params })); }
-async function selectAll<T>(organisationId: string, table: string, params: Record<string, string>) { return supabaseSelectAll<T>(config(), table, new URLSearchParams({ select: "*", organisation_id: `eq.${organisationId}`, ...params })); }
-async function insert(table: string, rows: unknown[], ignore = false) { if (!rows.length) return []; return supabaseInsert(config(), table, rows, ignore ? { prefer: "resolution=ignore-duplicates,return=representation" } : undefined); }
+async function select<T>(organisationId: string, table: string, params: Record<string, string>) { if (liftWritePlan.getStore() && table.startsWith("levytate_lift_")) return selectLiftPlan<T>(table, params); return supabaseSelect<T>(config(), table, new URLSearchParams({ select: "*", organisation_id: `eq.${organisationId}`, ...params })); }
+async function selectAll<T>(organisationId: string, table: string, params: Record<string, string>) { if (liftWritePlan.getStore() && table.startsWith("levytate_lift_")) return selectLiftPlan<T>(table, params); if (params.limit) return select<T>(organisationId, table, params); const order = params.order ? `${params.order},id.asc` : "id.asc"; return supabaseSelectAll<T>(config(), table, new URLSearchParams({ select: "*", organisation_id: `eq.${organisationId}`, ...params, order })); }
+async function insert(table: string, rows: unknown[], ignore = false) { if (!rows.length) return []; if (liftWritePlan.getStore()) return insertLiftPlan(table, rows as Record<string, unknown>[], ignore); return supabaseInsert(config(), table, rows, ignore ? { prefer: "resolution=ignore-duplicates,return=representation" } : undefined); }
+async function supabaseUpdate<T>(connection: ReturnType<typeof config>, table: string, query: string, body: Record<string, unknown>): Promise<T[]> { if (liftWritePlan.getStore()) return updateLiftPlan<T>(table, Object.fromEntries(new URLSearchParams(query)), body); return persistUpdate<T>(connection, table, query, body); }
 type Context = Awaited<ReturnType<typeof getLearnerLifecycleServerContext>>;

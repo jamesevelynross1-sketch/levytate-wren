@@ -4,6 +4,7 @@ import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
 import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
 import { ClientRequestError, readAuthenticatedJson } from "@/lib/server/levytate-request-boundary";
 import { applyLiftActionForSession, getLiftWorkspaceForSession, LevyTateLiftError } from "@/lib/server/levytate-lift";
+import { LiftTransactionError } from "@/lib/server/levytate-lift-transaction";
 
 export async function GET() {
   const session = await currentSession();
@@ -20,5 +21,5 @@ export async function POST(request: Request) {
 }
 
 async function currentSession() { const store = await cookies(); return readAuthorisedLevyTateBetaSession(store.get(levytateBetaSessionCookie)?.value); }
-function failure(error: unknown) { if (error instanceof LevyTateLiftError) return reply({ message: error.message }, error.status); console.error("LevyTate Lift route failed", error instanceof Error ? error.name : "unknown"); return reply({ message: "Lift is temporarily unavailable." }, 503); }
+function failure(error: unknown) { if (error instanceof LevyTateLiftError || error instanceof LiftTransactionError) return reply({ message: error.message }, error.status); console.error("LevyTate Lift route failed", error instanceof Error ? error.name : "unknown"); return reply({ message: "Lift is temporarily unavailable." }, 503); }
 function reply(body: unknown, status = 200) { return NextResponse.json(body, { status, headers: { "Cache-Control": "private, no-store, max-age=0", "X-Robots-Tag": "noindex, nofollow" } }); }
