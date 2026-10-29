@@ -152,7 +152,7 @@ type OperationalActionEventRow = {
   created_at: string;
 };
 
-type ActionContext = Awaited<ReturnType<typeof getLearnerLifecycleServerContext>> & { actorDisplayName: string; sourceVersions?: Record<string,string> };
+type ActionContext = Awaited<ReturnType<typeof getLearnerLifecycleServerContext>> & { actorDisplayName: string; sourceVersions?: Record<string,string>; originalRequest?:Record<string,unknown> };
 
 function rememberLearnerSources(context: ActionContext, details: LearnerRecordDetail[]) {
   context.sourceVersions={...context.sourceVersions,...Object.fromEntries(details.map(item=>[`learner:${item.learnerRecordId}`,item.updatedAt]))};
@@ -399,7 +399,7 @@ export async function acknowledgeManagerDirectReportOperationalAction(
   const context = await managerOperationalActionContext(session);
   const action = await requireManagerScopedAction(context, actionId);
   requireManagerActionAccess(context, action);
-  if (action.status === "acknowledged") return action;
+  const replay=await prepareOperationalRequest(context,action,expectedVersion,"transition",{action:"acknowledge"});if(replay)return replay;
   if (isOperationalActionTerminal(action.status)) throw new LevyTateOperationalActionConflictError("This action is already closed.");
   if (action.status !== "open") throw new LevyTateOperationalActionError("Only open actions can be acknowledged.");
   assertVersion(action, expectedVersion);
@@ -415,7 +415,7 @@ export async function startManagerDirectReportOperationalAction(
   const context = await managerOperationalActionContext(session);
   const action = await requireManagerScopedAction(context, actionId);
   requireManagerActionAccess(context, action);
-  if (action.status === "in_progress") return action;
+  const replay=await prepareOperationalRequest(context,action,expectedVersion,"transition",{action:"start",note});if(replay)return replay;
   if (isOperationalActionTerminal(action.status)) throw new LevyTateOperationalActionConflictError("This action is already closed.");
   if (action.status !== "open" && action.status !== "acknowledged") {
     throw new LevyTateOperationalActionError("Only open or acknowledged actions can be started.");
@@ -791,7 +791,7 @@ export async function completeOperationalAction(
 ) {
   const context = await requireOperationalActionContext(session, "write");
   const action = await requireScopedAction(context, actionId);
-  if (action.status === "completed") return action;
+  const replay=await prepareOperationalRequest(context,action,expectedVersion,"transition",{action:"complete",completionNote,resolvedOutsideLevyTate});if(replay)return replay;
   assertNotApplicationSourceManaged(action);
   assertVersion(action, expectedVersion);
   const details = await listOrganisationLearnerLifecycleDetails(session);
@@ -822,6 +822,7 @@ export async function assignOperationalActionOwner(
 ) {
   const context = await requireOperationalActionContext(session, "write");
   const action = await requireScopedAction(context, actionId);
+  const replay=await prepareOperationalRequest(context,action,expectedVersion,"owner",{action:"assign_owner",owner});if(replay)return replay;
   assertNotApplicationSourceManaged(action);
   assertVersion(action, expectedVersion);
   if (isOperationalActionTerminal(action.status)) throw new LevyTateOperationalActionError("Terminal actions cannot be reassigned.");
@@ -861,6 +862,7 @@ export async function updateOperationalActionDueDate(
 ) {
   const context = await requireOperationalActionContext(session, "write");
   const action = await requireScopedAction(context, actionId);
+  const replay=await prepareOperationalRequest(context,action,expectedVersion,"due",{action:"due_date",dueDate,reason});if(replay)return replay;
   assertNotApplicationSourceManaged(action);
   assertVersion(action, expectedVersion);
   if (isOperationalActionTerminal(action.status)) throw new LevyTateOperationalActionError("Terminal actions cannot have their due date changed.");
@@ -899,7 +901,7 @@ export async function cancelOperationalAction(
   const context = await requireOperationalActionContext(session, "write");
   const action = await requireScopedAction(context, actionId);
   assertNotApplicationSourceManaged(action);
-  if (action.status === "cancelled") return action;
+  const replay=await prepareOperationalRequest(context,action,expectedVersion,"transition",{action:"cancel",reason,category});if(replay)return replay;
   assertVersion(action, expectedVersion);
   if (!operationalActionCancellationKinds.includes(category)) throw new LevyTateOperationalActionError("A supported cancellation category is required.");
   const cleanReason = reason.trim();
@@ -930,7 +932,7 @@ export async function dismissOperationalAction(
   const context = await requireOperationalActionContext(session, "write");
   const action = await requireScopedAction(context, actionId);
   assertNotApplicationSourceManaged(action);
-  if (action.status === "dismissed") return action;
+  const replay=await prepareOperationalRequest(context,action,expectedVersion,"transition",{action:"dismiss",reason,dismissalKind});if(replay)return replay;
   assertVersion(action, expectedVersion);
   if (!operationalActionDismissalKinds.includes(dismissalKind)) throw new LevyTateOperationalActionError("A supported dismissal category is required.");
   const cleanReason = reason.trim();
@@ -1014,7 +1016,7 @@ async function transitionAction(
   const context = await requireOperationalActionContext(session, "write");
   const action = await requireScopedAction(context, actionId);
   assertNotApplicationSourceManaged(action);
-  if (action.status === target) return action;
+  const replay=await prepareOperationalRequest(context,action,expectedVersion,"transition",{action:target==="acknowledged"?"acknowledge":"start",...(target==="in_progress"?{note:""}:{})});if(replay)return replay;
   assertVersion(action, expectedVersion);
   return transitionScopedAction(context, action, target, extra);
 }
@@ -1152,16 +1154,25 @@ async function markDismissedConditionCleared(context: ActionContext, action: Per
 }
 
 type OperationWrite = "create"|"sync"|"transition"|"source_resolve"|"owner"|"due"|"clear";
+async function prepareOperationalRequest(context:ActionContext,action:PersistentOperationalAction,expectedVersion:number,operation:OperationWrite,request:Record<string,unknown>) {
+  if(!Number.isInteger(expectedVersion)||expectedVersion<1)throw new LevyTateOperationalActionConflictError("A valid action revision is required.");
+  context.originalRequest=request;
+  const row=await operationalActionRpc(context,action.id,expectedVersion,operation,{},undefined,"",true);
+  return row? actionFromRow(row):null;
+}
 async function versionedUpdate(context: ActionContext, action: PersistentOperationalAction, changes: Record<string, unknown>,operation:OperationWrite="transition",summary="Operational source refreshed.") {
   const sourceKey=action.actionType==="review_application"?`application:${action.applicationId}`:`learner:${action.learnerRecordId}`;
   return atomicOperationalActionWrite(context,action.id,action.version,operation,changes,context.sourceVersions?.[sourceKey],summary);
 }
 
 export async function atomicOperationalActionWrite(context: ActionContext,actionId:string,expectedVersion:number,operation:OperationWrite,changes:Record<string,unknown>,sourceVersion?:string,summary="Operational condition detected.") {
+  const row=await operationalActionRpc(context,actionId,expectedVersion,operation,changes,sourceVersion,summary,false);
+  if (!row?.id) throw new LevyTateOperationalActionError("The Operations write could not be confirmed. Refresh before retrying.");
+  return actionFromRow(row);
+}
+async function operationalActionRpc(context:ActionContext,actionId:string,expectedVersion:number,operation:OperationWrite,changes:Record<string,unknown>,sourceVersion:string|undefined,summary:string,probe:boolean) {
   try {
-    const row=await supabaseFetchJson<OperationalActionRow|null>(requireConfig(),"rpc/levytate_apply_operational_action",{method:"POST",body:JSON.stringify({p_organisation_id:context.organisation.id,p_actor_user_id:context.user.id,p_action_id:actionId,p_expected_version:expectedVersion,p_operation:operation,p_changes:changes,p_source_version:sourceVersion??null,p_summary:summary})});
-    if (!row?.id) throw new LevyTateOperationalActionError("The Operations write could not be confirmed. Refresh before retrying.");
-    return actionFromRow(row);
+    return await supabaseFetchJson<OperationalActionRow|null>(requireConfig(),"rpc/levytate_apply_operational_action",{method:"POST",body:JSON.stringify({p_organisation_id:context.organisation.id,p_actor_user_id:context.user.id,p_action_id:actionId,p_expected_version:expectedVersion,p_operation:operation,p_changes:changes,p_source_version:sourceVersion??null,p_summary:summary,p_request:context.originalRequest??null,p_probe:probe})});
   } catch(error) {
     if(error instanceof LevyTateSupabaseError){
       if(/PT409|40001|23505/.test(error.message)) throw new LevyTateOperationalActionConflictError("The action or its source changed. Refresh and try again.");

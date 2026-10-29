@@ -12,7 +12,7 @@ revoke all on public.levytate_operational_action_receipts from public,anon,authe
 grant select on public.levytate_operational_action_receipts to service_role;
 
 create function public.levytate_apply_operational_action(
- p_organisation_id uuid,p_actor_user_id uuid,p_action_id text,p_expected_version integer,p_operation text,p_changes jsonb,p_source_version timestamptz default null,p_summary text default ''
+ p_organisation_id uuid,p_actor_user_id uuid,p_action_id text,p_expected_version integer,p_operation text,p_changes jsonb,p_source_version timestamptz default null,p_summary text default '',p_request jsonb default null,p_probe boolean default false
 ) returns jsonb language plpgsql security definer set search_path=pg_catalog,public as $$
 declare
  actor public.levytate_users;before_row public.levytate_operational_actions;after_row public.levytate_operational_actions;
@@ -23,7 +23,7 @@ declare
 begin
  if coalesce(nullif(current_setting('request.jwt.claim.role',true),''),nullif(current_setting('request.jwt.claims',true),'')::jsonb->>'role','')<>'service_role' then raise exception using errcode='PT403',message='Server credential required';end if;
  if p_organisation_id is null or p_actor_user_id is null or nullif(p_action_id,'') is null or length(p_action_id)>160 or p_expected_version is null or p_expected_version<0
-  or p_operation is null or p_operation not in ('create','sync','transition','source_resolve','owner','due','clear') or jsonb_typeof(p_changes) is distinct from 'object' or length(p_changes::text)>32768 or p_summary is null or length(p_summary)>4000 then raise exception using errcode='PT422',message='Invalid Operations command';end if;
+  or p_operation is null or p_operation not in ('create','sync','transition','source_resolve','owner','due','clear') or jsonb_typeof(p_changes) is distinct from 'object' or length(p_changes::text)>32768 or p_summary is null or length(p_summary)>4000 or p_probe is null or (p_request is not null and (jsonb_typeof(p_request) is distinct from 'object' or length(p_request::text)>8192)) or (p_probe and (p_request is null or p_operation not in ('transition','owner','due'))) then raise exception using errcode='PT422',message='Invalid Operations command';end if;
  perform pg_advisory_xact_lock(hashtextextended('levytate-catalogue-integrity',0));
  perform pg_advisory_xact_lock(hashtextextended('levytate-people:'||p_organisation_id::text,0));
  perform 1 from public.levytate_organisations where id=p_organisation_id and status='Active' for share;if not found then raise exception using errcode='PT403',message='Workspace inactive';end if;
@@ -71,7 +71,7 @@ begin
   ((proposed->>'owner_type'='Line Manager' and proposed->>'action_type' in ('review_application','confirm_probation','record_manager_check_in','obtain_manager_readiness_confirmation') and coalesce(proposed->>'owner_user_id','') in ('',actor.id::text))
    or (proposed->>'owner_type'='Shared' and coalesce(proposed->>'owner_user_id','')='' and proposed->>'action_type'='address_progress_exception' and proposed->'metadata'->>'sourceCondition'='support_intervention:manager_check_in'))
  ) then raise exception using errcode='PT403',message='Current direct-report action required';end if;
- if actor.role='Line Manager' and (p_operation in ('owner','due','clear') or (p_operation='transition' and proposed->>'status' not in ('acknowledged','in_progress'))) then raise exception using errcode='PT403',message='Manager action not authorised';end if;
+ if actor.role='Line Manager' and (p_operation in ('owner','due','clear') or (p_operation='transition' and not p_probe and proposed->>'status' not in ('acknowledged','in_progress')) or (p_probe and p_request->>'action' not in ('acknowledge','start'))) then raise exception using errcode='PT403',message='Manager action not authorised';end if;
  if nullif(proposed->>'owner_user_id','') is not null then
   select * into owner from public.levytate_users where organisation_id=p_organisation_id and id=(proposed->>'owner_user_id')::uuid and active;
   if owner.id is null or (proposed->>'owner_type'='Line Manager' and (owner.role<>'Line Manager' or lower(btrim(owner.email)) is distinct from lower(btrim(manager.email))))
@@ -86,8 +86,10 @@ begin
  for k in select unnest(array['ownershipOverride','dueDateOverride','cancellation']) loop
   if command->'changes'->'metadata' ? k then command:=jsonb_set(command,array['changes','metadata',k],(command->'changes'->'metadata'->k)-array['assignedAt','setAt','cancelledAt']);end if;
  end loop;
+ if p_request is not null then command:=jsonb_build_object('operation',p_operation,'request',p_request);end if;
  select * into receipt from public.levytate_operational_action_receipts where organisation_id=p_organisation_id and action_id=p_action_id and expected_version=p_expected_version and actor_user_id=p_actor_user_id;
  if found then if receipt.command<>command then raise exception using errcode='PT409',message='Action retry payload differs';end if;return receipt.result;end if;
+ if p_probe then return null;end if;
  source_required:=p_operation in ('create','sync','source_resolve','due','clear') or (p_operation='transition' and proposed->>'status'='completed');
  if source_required and (p_source_version is null or source_version is distinct from p_source_version) then raise exception using errcode='PT409',message='Source evidence changed; refresh';end if;
  if p_operation='create' then
@@ -110,6 +112,14 @@ begin
    if target='completed' and p_operation='transition' and (changes->>'completion_method' is distinct from 'user_completed' or length(btrim(coalesce(changes->>'completion_note','')))<12) then raise exception using errcode='PT422',message='Explicit completion evidence required';end if;
    if target='dismissed' and (changes->>'completion_method' is distinct from 'dismissed' or length(btrim(coalesce(changes->>'dismissal_reason','')))<12) then raise exception using errcode='PT422',message='Dismissal evidence required';end if;
    if target='cancelled' and length(btrim(coalesce(changes->>'completion_note','')))<12 then raise exception using errcode='PT422',message='Cancellation evidence required';end if;
+   -- A current timestamp proves freshness, not resolution. Critical source
+   -- conditions must actually be cleared in their authoritative workflow.
+   if target in ('completed','dismissed','cancelled') and (
+    (before_row.metadata->>'sourceCondition'='eligibility_not_eligible' and not exists(select 1 from public.levytate_learner_eligibility_declarations d where d.organisation_id=p_organisation_id and d.learner_record_id=learner.id and d.verification_status<>'not_eligible'))
+    or (before_row.metadata->>'sourceCondition'='hr_declined' and not exists(select 1 from public.levytate_learner_pre_enrolment_checks c where c.organisation_id=p_organisation_id and c.learner_record_id=learner.id and c.hr_approval_status<>'declined'))
+    or (before_row.metadata->>'sourceCondition'='probation_not_passed' and not exists(select 1 from public.levytate_learner_pre_enrolment_checks c where c.organisation_id=p_organisation_id and c.learner_record_id=learner.id and c.probation_status<>'not_passed'))
+    or (before_row.metadata->>'sourceCondition'='lifecycle_inconsistent' and learner.lifecycle_status='break_in_learning' and not exists(select 1 from public.levytate_learner_breaks_in_learning b where b.organisation_id=p_organisation_id and b.learner_record_id=learner.id and b.status='active'))
+   ) then raise exception using errcode='PT409',message='Critical source condition remains unresolved';end if;
    if target in ('acknowledged','in_progress') and changes ?| array['completed_at','completed_by','completion_method','completion_note','dismissed_at','dismissed_by','dismissal_reason'] then raise exception using errcode='PT403',message='Unrelated terminal evidence denied';end if;
    if p_operation='source_resolve' and (target not in ('completed','cancelled') or (target='completed' and changes->>'completion_method' is distinct from 'source_condition_resolved')) then raise exception using errcode='PT422',message='Source resolution method required';end if;
    if target='acknowledged' then changes:=changes||jsonb_build_object('acknowledged_at',now_at,'acknowledged_by',actor.id::text);
@@ -148,6 +158,6 @@ begin
  return to_jsonb(after_row);
 exception when invalid_text_representation or numeric_value_out_of_range or invalid_datetime_format or datetime_field_overflow or not_null_violation or check_violation then raise exception using errcode='PT422',message='Invalid Operations field';
 end $$;
-revoke all on function public.levytate_apply_operational_action(uuid,uuid,text,integer,text,jsonb,timestamptz,text) from public,anon,authenticated,service_role;
-grant execute on function public.levytate_apply_operational_action(uuid,uuid,text,integer,text,jsonb,timestamptz,text) to service_role;
+revoke all on function public.levytate_apply_operational_action(uuid,uuid,text,integer,text,jsonb,timestamptz,text,jsonb,boolean) from public,anon,authenticated,service_role;
+grant execute on function public.levytate_apply_operational_action(uuid,uuid,text,integer,text,jsonb,timestamptz,text,jsonb,boolean) to service_role;
 revoke insert,update,delete,truncate on public.levytate_operational_actions,public.levytate_operational_action_events from service_role;
