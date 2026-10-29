@@ -67,6 +67,13 @@ export function parseWorkspaceMutation(body: Record<string, unknown>): LevyTateW
     const payload = body[field];
     if (!payload || typeof payload !== "object" || Array.isArray(payload)) invalidAction();
     validateBoundedValue(payload);
+  } else if (type === "importEmployees") {
+    requireActionKeys(body, ["type", "importId", "employees"]);
+    if (!z.uuid().safeParse(body.importId).success || !Array.isArray(body.employees) || body.employees.length < 1 || body.employees.length > 500) invalidAction();
+    for (const employee of body.employees) {
+      if (!employee || typeof employee !== "object" || Array.isArray(employee)) invalidAction();
+      validateBoundedValue(employee);
+    }
   } else if (archiveActions.includes(type)) {
     requireActionKeys(body, ["type", "id"]);
     if (!identifier.safeParse(body.id).success) invalidAction();

@@ -39,6 +39,13 @@ describe("Finance input contract", () => {
 });
 
 describe("workspace action envelope", () => {
+  it("accepts a bounded People import with a stable receipt and rejects malformed envelopes", () => {
+    const body = { type: "importEmployees", importId: "7b8aa254-57cb-4079-a4bd-9c462cb6bf5b", employees: [{ id: "synthetic-person" }] };
+    expect(parseWorkspaceMutation(body)).toEqual(body);
+    for (const change of [{ importId: "invalid" }, { employees: [] }, { employees: Array(501).fill({}) }, { employees: [null] }, { employees: [[]] }, { organisationId: "other-tenant" }]) {
+      expect(() => parseWorkspaceMutation({ ...body, ...change })).toThrow();
+    }
+  });
   it("keeps expected revision and retry key for authoritative commands", () => {
     const body = { type: "updateApplicationStatus", id: "app-1", status: "Approved by Line Manager", note: "Synthetic review", expectedRevision: 3, idempotencyKey: "synthetic-retry-key" };
     expect(parseWorkspaceMutation(body)).toEqual(body);

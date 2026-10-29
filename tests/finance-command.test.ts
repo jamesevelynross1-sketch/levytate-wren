@@ -25,7 +25,10 @@ describe("Finance transport and data validation (not live authentication evidenc
         const offset = Number(url.searchParams.get("offset"));
         value = Array.from({ length: offset === 0 ? 1000 : 1 }, (_, i) => ({ fingerprint: `row-${offset + i}`, transaction_date: "2026-01-01", description: "Synthetic credit", category: "levy_in", amount_pence: 100, source_row: i + 1, reported_balance_pence: null }));
       }
-      return Response.json(value);
+      const offset = Number(url.searchParams.get("offset"));
+      const rows = value as unknown[];
+      const total = url.pathname.endsWith("levytate_finance_transactions") ? 1001 : rows.length;
+      return Response.json(value, { headers: { "Content-Range": rows.length ? `${offset}-${offset + rows.length - 1}/${total}` : "*/0" } });
     }));
     const result = await getOrganisationFinanceState(session);
     expect(result.transactions).toHaveLength(1001);
@@ -36,7 +39,7 @@ describe("Finance transport and data validation (not live authentication evidenc
 
   it("refuses to describe repeatedly changing pages as reconciled totals", async () => {
     let revision = 0;
-    vi.stubGlobal("fetch", vi.fn(async (input: string) => Response.json(input.includes("finance_versions") ? [{ revision: revision++ }] : [])));
+    vi.stubGlobal("fetch", vi.fn(async (input: string) => Response.json(input.includes("finance_versions") ? [{ revision: revision++ }] : [], { headers: { "Content-Range": input.includes("finance_versions") ? "0-0/1" : "*/0" } })));
     await expect(getOrganisationFinanceState(session)).rejects.toMatchObject({ status: 503 });
   });
 
@@ -44,7 +47,7 @@ describe("Finance transport and data validation (not live authentication evidenc
     const commands: Record<string, unknown>[] = [];
     vi.stubGlobal("fetch", vi.fn(async (input: string, init?: RequestInit) => {
       if (input.includes("rpc/")) { commands.push(JSON.parse(String(init?.body))); return Response.json(imported); }
-      return Response.json([]);
+      return Response.json([], { headers: { "Content-Range": "*/0" } });
     }));
     const result = { sourceRows: 1, transactions: [transaction], dateRange: { from: "1900-01-01", to: "2099-01-01" } };
     await importOrganisationFinance(session, "fixture.csv", result);

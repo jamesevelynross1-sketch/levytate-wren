@@ -46,8 +46,8 @@ export async function checkSessionRefreshLimit(request: Request) {
  */
 export async function checkAuthenticatedWriteLimit(request: Request, email: string) {
   return consumeChecks([
-    check("workspace_write.identity.minute", rateLimitKey("email", email.trim().toLowerCase()), "/api/levytate-workspace/*", "workspace_write_rate_limited", { limit: 120, windowSeconds: 60 }),
-    check("workspace_write.network.minute", networkRateLimitKey(request), "/api/levytate-workspace/*", "workspace_write_rate_limited", { limit: 600, windowSeconds: 60 }),
+    check("workspace_write.identity.minute", rateLimitKey("email", email.trim().toLowerCase()), "/api/levytate-workspace", "workspace_write_rate_limited", { limit: 120, windowSeconds: 60 }),
+    check("workspace_write.network.minute", networkRateLimitKey(request), "/api/levytate-workspace", "workspace_write_rate_limited", { limit: 600, windowSeconds: 60 }),
   ]);
 }
 
