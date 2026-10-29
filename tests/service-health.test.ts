@@ -121,7 +121,7 @@ describe("LevyTate public readiness", () => {
 });
 
 describe("authentication rate-limit readiness probe", () => {
-  it.each(["application-contract", "learner-contract", "people-contract", "finance-contract", "lift-contract"])("does not report ready when the required release schema %s is absent", async (key) => {
+  it.each(["application-contract", "learner-contract", "people-contract", "finance-contract", "lift-contract", "workspace-contract", "learning-time-contract"])("does not report ready when the required release schema %s is absent", async (key) => {
     stubRequiredEnvironment();
     const result = await getPublicReadiness({ bypassCache: true, adapter: async (input) => { if (input.key === key) throw new Error("missing required release schema"); } });
     expect(result.status).toBe("unavailable");
