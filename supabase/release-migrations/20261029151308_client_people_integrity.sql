@@ -9,8 +9,8 @@ returns void language plpgsql security definer set search_path=pg_catalog,public
 begin
   if exists(select 1 from public.levytate_employees e where e.organisation_id=p_organisation_id and
     (e.platform_role not in ('Employee','Line Manager','Department Head','Apprenticeship Lead')
-      or (e.status='Active' and not exists(select 1 from public.levytate_roles r where r.organisation_id=e.organisation_id and r.id=e.role_id and r.status='Active')))) then
-    raise exception using errcode='PT422',message='Active People require an active same-workspace role and a valid platform role'; end if;
+      or (e.status='Active' and e.role_id<>'' and not exists(select 1 from public.levytate_roles r where r.organisation_id=e.organisation_id and r.id=e.role_id and r.status='Active')))) then
+    raise exception using errcode='PT422',message='Assigned People roles must be active in the same workspace'; end if;
   if exists(select 1 from public.levytate_employees e where e.organisation_id=p_organisation_id and e.status='Active' and e.manager_id<>'' and
     (e.manager_id=e.id or not exists(select 1 from public.levytate_employees m where m.organisation_id=e.organisation_id and m.id=e.manager_id and m.status='Active' and m.platform_role='Line Manager'))) then
     raise exception using errcode='PT422',message='Active direct reports require an active same-workspace Line Manager'; end if;
@@ -91,8 +91,9 @@ begin
     f.key not in ('id','employee_number','name','email','job_title','role_id','manager_id','department','site','platform_role','status','start_date','created_at','updated_at')
     or jsonb_typeof(f.value)<>'string' or length(f.value#>>'{}')>500) then raise exception using errcode='PT422',message='Invalid People field'; end if;
   if exists(select 1 from jsonb_array_elements(p_employees) e where
-    not(e ?& array['id','employee_number','name','email','role_id','platform_role','status','start_date'])
+    not(e ?& array['id','employee_number','name','email','job_title','department','role_id','platform_role','status','start_date'])
     or nullif(btrim(e->>'id'),'') is null or nullif(btrim(e->>'employee_number'),'') is null or nullif(btrim(e->>'name'),'') is null
+    or nullif(btrim(e->>'job_title'),'') is null or nullif(btrim(e->>'department'),'') is null
     or e->>'email' !~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$'
     or e->>'status' not in ('Active','Archived') or e->>'start_date' !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$') then
     raise exception using errcode='PT422',message='People row is missing valid identity, role, status or date'; end if;
