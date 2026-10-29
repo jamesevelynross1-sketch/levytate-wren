@@ -74,6 +74,9 @@ begin
   if exists (select 1 from jsonb_object_keys(p_fields) k where k not in
     ('employeeId','apprenticeshipStandardId','reason','careerGoal','supportRequired','note','expectedLockVersion'))
   then raise exception using errcode='PT422', message='Application state and history are server owned'; end if;
+  -- Catalogue writers take this same transaction lock before their row locks.
+  -- Serialise eligibility reads with provider/programme archival and selection.
+  perform pg_advisory_xact_lock(hashtextextended('levytate-catalogue-integrity',0));
   select * into v_actor from public.levytate_users where id=p_actor_user_id and organisation_id=p_organisation_id and active for share;
   if not found or v_actor.role not in ('Employee','Line Manager','Apprenticeship Lead','Employer Admin') then
     raise exception using errcode='PT403',message='Active employer membership required';
