@@ -184,7 +184,9 @@ try {
     check("same-account recovery uses a genuine new Auth callback", new URL(login.url()).pathname.includes("/app"));
     await login.close();
     await dialog.getByRole("button", { name: "Reconnect workspace", exact: true }).click();
-    await dialog.getByRole("button", { name: "Reconnect workspace", exact: true }).waitFor({ state: "detached" });
+    // Reconnect changes its own label to Reconnecting immediately. Wait for the
+    // stable sibling to disappear so the server reload, not just busy UI, ended.
+    await dialog.getByRole("button", { name: "Sign in in new tab", exact: true }).waitFor({ state: "detached" });
     check("reconnected form retains original typed values", await dialog.getByLabel("Employee name", { exact: true }).inputValue() === syntheticName && await dialog.getByLabel("Work email", { exact: true }).inputValue() === syntheticEmail);
     await dialog.getByRole("button", { name: "Save employee", exact: true }).click();
     try{await dialog.waitFor({ state: "detached" });}
@@ -230,6 +232,46 @@ try {
     check("handoff lost-response retry returns persisted learner", (await start(leadA, handoff)).status() === 201);
     const row = await backend(`rest/v1/levytate_learner_records?organisation_id=eq.${employeeA.tenant.id}&application_id=eq.${applicationId}&select=id,lifecycle_status`);
     check("database holds exactly one pre-enrolment handoff", row.length === 1 && row[0].lifecycle_status === "pre_enrolment");
+    if(process.env.RELEASE_LEARNER_JOURNEY==="true"){
+      phase="genuine Employee declaration and employer enrolment";
+      const base=`${app}/api/levytate-learners/${row[0].id}`,today=new Date().toISOString().slice(0,10),reviewDay=new Date(Date.now()+30*86400000).toISOString().slice(0,10);
+      const detail=async actor=>{const response=await actor.context.request.get(base);check(`learner detail is genuinely available to ${actor.user.role}`,response.status()===200);return(await response.json()).learner;};
+      const mutation=async(actor,suffix,data,method="POST")=>{const response=await actor.context.request.fetch(`${base}/${suffix}`,{method,headers:{Origin:app},data});if(response.status()>=500)console.log(`DIAGNOSTIC learner ${suffix} status ${response.status()}`);return response;};
+      let learner=await detail(employeeA);
+      const declaration={idempotencyKey:randomUUID(),expectedUpdatedAt:learner.updatedAt,confirmed:true,expectedEnglandWorkingHoursPercentage:100};
+      check("Lead cannot fabricate genuine employee declaration",(await mutation(leadA,"employee-declaration",declaration)).status()===403);
+      check("other tenant Employee cannot confirm this learner declaration",[403,404].includes((await mutation(contexts.get("b:employee"),"employee-declaration",declaration)).status()));
+      const declared=await mutation(employeeA,"employee-declaration",declaration),declaredBody=await declared.json();
+      check("real Employee declaration persists before employer verification",declared.status()===200&&declaredBody.learner?.eligibilityDeclaration?.verificationStatus==="employee_confirmed");
+      check("real employee declaration retry returns durable receipt",(await mutation(employeeA,"employee-declaration",declaration)).status()===200);
+      learner=await detail(leadA);
+      const verification={idempotencyKey:randomUUID(),expectedUpdatedAt:learner.updatedAt,eligibilityVerification:{verificationStatus:"employer_verified",notes:"Synthetic verified employment evidence"},probation:{probationStatus:"not_required"},hrApproval:{hrApprovalStatus:"approved",hrApprovedDate:today},programme:{actualStartDate:today}};
+      check("Employee cannot verify employer eligibility",(await mutation(employeeA,"pre-enrolment",verification,"PATCH")).status()===403);
+      const verified=await mutation(leadA,"pre-enrolment",verification,"PATCH"),verifiedBody=await verified.json();
+      check("real Lead verification completes required readiness",verified.status()===200&&verifiedBody.learner?.enrolmentReadiness?.readyForEnrolment===true);
+      learner=verifiedBody.learner;
+      const enrol={idempotencyKey:randomUUID(),expectedActivityVersion:learner.activityVersion,initialProgress:{updateDate:today,targetProgressPercentage:0,actualProgressPercentage:0,summary:"Synthetic explicit initial provider baseline"},firstReviewDate:reviewDay,firstReviewerName:"Synthetic provider reviewer"};
+      check("Line Manager cannot bypass employer enrolment role",(await mutation(managerA,"enrol",enrol)).status()===403);
+      check("missing initial progress cannot be silently fabricated",(await mutation(leadA,"enrol",{...enrol,initialProgress:undefined})).status()===400);
+      const enrolled=await mutation(leadA,"enrol",enrol),enrolledBody=await enrolled.json();
+      check("real Lead enrols learner with explicit initial evidence",enrolled.status()===200&&enrolledBody.learner?.lifecycleStatus==="enrolled");
+      check("real enrolment retry does not duplicate records",(await mutation(leadA,"enrol",enrol)).status()===200);
+      const connected=await backend(`rest/v1/levytate_enrolments?organisation_id=eq.${employeeA.tenant.id}&application_id=eq.${applicationId}&select=id,status`);
+      check("actual database links one Live learner enrolment",connected.length===1&&connected[0].status==="Live learner");
+      await employeeA.page.reload();
+      check("Employee new page session reads durable enrolled journey",(await detail(employeeA)).lifecycleStatus==="enrolled");
+      const finalWorkspace=await employeeA.context.request.get(`${app}/api/levytate-workspace`);
+      check("Employee application and enrolment show connected completed handoff",(await finalWorkspace.json()).workspace?.data?.applications?.some(item=>item.id===applicationId&&item.status==="Completed"));
+      learner=await detail(leadA);
+      const withdrawal={outcome:"withdrawal",idempotencyKey:randomUUID(),expectedActivityVersion:learner.activityVersion,effectiveDate:today,reasonCategory:"other",initiatedBy:"learner",notes:"Synthetic agreed withdrawal for end-to-end acceptance",providerNotified:false,employeeNotified:false};
+      check("Employee cannot set official withdrawal outcome",(await mutation(employeeA,"outcome",withdrawal)).status()===403);
+      const outcome=await mutation(leadA,"outcome",withdrawal),outcomeBody=await outcome.json();
+      check("real Lead terminal outcome commits durable withdrawal",outcome.status()===200&&outcomeBody.learner?.lifecycleStatus==="withdrawn");
+      check("terminal outcome retry returns committed result",(await mutation(leadA,"outcome",withdrawal)).status()===200);
+      const ended=await backend(`rest/v1/levytate_enrolments?organisation_id=eq.${employeeA.tenant.id}&application_id=eq.${applicationId}&select=id,status`);
+      check("terminal outcome updates corresponding enrolment to Cancelled",ended.length===1&&ended[0].status==="Cancelled");
+      check("no fictional notification claimed delivered",outcomeBody.learner?.withdrawal?.providerNotified===false&&outcomeBody.learner?.withdrawal?.employeeNotified===false);
+    }
   }
   if(!peopleUiOnly){
   const employee = contexts.get("a:employee");
