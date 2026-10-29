@@ -412,7 +412,7 @@ export function normaliseProviderRecord(provider: Partial<ProviderCatalogueRecor
     sourceUrls: normaliseTagValues(provider.sourceUrls),
     notes,
     commercialProfile: mergeProviderCommercialProfile(provider, normaliseProviderCommercialProfile(provider.commercialProfile ?? parsedNotes.commercialProfile)),
-    lastVerified: provider.lastVerified ?? todayIso(),
+    lastVerified: provider.lastVerified ?? "",
     verificationStatus: provider.verificationStatus ?? "needs_verification",
   } satisfies ProviderCatalogueRecord;
 }
@@ -496,8 +496,8 @@ export function normaliseProviderRelationship(relationship: Partial<MvpProviderR
     programmeIds: normaliseTagValues(relationship.programmeIds ?? relationship.apprenticeshipStandardIds),
     status: relationship.status ?? "Preferred",
     notes: relationship.notes ?? "",
-    reviewDate: relationship.reviewDate ?? todayIso(),
-    lastUsedDate: relationship.lastUsedDate ?? todayIso(),
+    reviewDate: relationship.reviewDate ?? "",
+    lastUsedDate: relationship.lastUsedDate ?? "",
   } satisfies MvpProviderRelationship;
 }
 

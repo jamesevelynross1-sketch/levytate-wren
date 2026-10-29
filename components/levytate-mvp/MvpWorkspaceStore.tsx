@@ -98,7 +98,7 @@ function applyMutationLocally(current: MvpWorkspaceData, mutation: LevyTateWorks
     case "archiveEmployee":
       return {
         ...current,
-        employees: current.employees.map((employee) => employee.id === mutation.id ? { ...employee, status: employee.status === "Archived" ? "Active" : "Archived", updatedAt: nowIso() } : employee),
+        employees: current.employees.map((employee) => employee.id === mutation.id ? { ...employee, status: mutation.status, updatedAt: nowIso() } : employee),
       };
     case "saveEmployeeDevelopmentProfile":
       return {
@@ -110,7 +110,7 @@ function applyMutationLocally(current: MvpWorkspaceData, mutation: LevyTateWorks
     case "archiveRole":
       return {
         ...current,
-        roles: current.roles.map((role) => role.id === mutation.id ? { ...role, status: role.status === "Archived" ? "Active" : "Archived", updatedAt: nowIso() } : role),
+        roles: current.roles.map((role) => role.id === mutation.id ? { ...role, status: mutation.status, updatedAt: nowIso() } : role),
       };
     case "saveApplication":
       return {
@@ -134,14 +134,14 @@ function applyMutationLocally(current: MvpWorkspaceData, mutation: LevyTateWorks
     case "archiveProvider":
       return {
         ...current,
-        providers: current.providers.map((provider) => provider.providerId === mutation.id ? { ...provider, status: provider.status === "Archived" ? "Active" : "Archived" } : provider),
+        providers: current.providers.map((provider) => provider.providerId === mutation.id ? { ...provider, status: mutation.status } : provider),
       };
     case "saveProviderProgramme":
       return { ...current, providerProgrammes: upsert(current.providerProgrammes, normaliseProviderProgramme(mutation.programme), "id") };
     case "archiveProviderProgramme":
       return {
         ...current,
-        providerProgrammes: current.providerProgrammes.map((programme) => programme.id === mutation.id ? { ...programme, recordStatus: programme.recordStatus === "Archived" ? "Active" : "Archived", updatedAt: nowIso() } : programme),
+        providerProgrammes: current.providerProgrammes.map((programme) => programme.id === mutation.id ? { ...programme, recordStatus: mutation.status, updatedAt: nowIso() } : programme),
       };
     case "removeProviderProgramme":
       return { ...current, providerProgrammes: current.providerProgrammes.filter((programme) => programme.id !== mutation.id) };
@@ -361,16 +361,16 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
     saveProfile: (profile) => commitMutation({ type: "saveProfile", profile }),
     saveEmployee: (employee) => commitMutation({ type: "saveEmployee", employee }),
     importEmployees: (importId, employees) => commitMutation({ type: "importEmployees", importId, employees }),
-    archiveEmployee: (id) => commitMutation({ type: "archiveEmployee", id }),
+    archiveEmployee: (id) => commitMutation({ type: "archiveEmployee", id, status: data.employees.find((item) => item.id === id)?.status === "Archived" ? "Active" : "Archived" }),
     saveEmployeeDevelopmentProfile: (profile) => commitMutation({ type: "saveEmployeeDevelopmentProfile", profile }),
     saveRole: (role) => commitMutation({ type: "saveRole", role }),
-    archiveRole: (id) => commitMutation({ type: "archiveRole", id }),
+    archiveRole: (id) => commitMutation({ type: "archiveRole", id, status: data.roles.find((item) => item.id === id)?.status === "Archived" ? "Active" : "Archived" }),
     saveApplication: (application) => commitMutation({ type: "saveApplication", application, expectedRevision: application.revision ?? 0 }),
     updateApplicationStatus: (id, status, note) => commitMutation({ type: "updateApplicationStatus", id, status, note, expectedRevision: data.applications.find((application) => application.id === id)?.revision ?? 0 }),
     saveProvider: (provider) => commitMutation({ type: "saveProvider", provider }),
-    archiveProvider: (id) => commitMutation({ type: "archiveProvider", id }),
+    archiveProvider: (id) => commitMutation({ type: "archiveProvider", id, status: data.providers.find((item) => item.providerId === id)?.status === "Archived" ? "Active" : "Archived" }),
     saveProviderProgramme: (programme) => commitMutation({ type: "saveProviderProgramme", programme }),
-    archiveProviderProgramme: (id) => commitMutation({ type: "archiveProviderProgramme", id }),
+    archiveProviderProgramme: (id) => commitMutation({ type: "archiveProviderProgramme", id, status: data.providerProgrammes.find((item) => item.id === id)?.recordStatus === "Archived" ? "Active" : "Archived" }),
     removeProviderProgramme: (id) => commitMutation({ type: "removeProviderProgramme", id }),
     saveProviderRelationship: (relationship) => commitMutation({ type: "saveProviderRelationship", relationship }),
     saveOrganisationProvider: (selection) => commitMutation({ type: "saveOrganisationProvider", selection }),

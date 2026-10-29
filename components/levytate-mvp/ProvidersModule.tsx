@@ -1,4 +1,5 @@
 "use client";
+import { useCatalogueAction } from "@/components/levytate-mvp/useCatalogueAction";
 
 import {
   ArrowUpRight,
@@ -66,7 +67,6 @@ import {
   normaliseProviderProgramme,
   normaliseProviderRecord,
   nowIso,
-  todayIso,
 } from "@/lib/levytate/mvp/workspace";
 
 const providerTypes: ProviderType[] = [
@@ -145,11 +145,11 @@ function fallbackProviderDescription(provider: ProviderCatalogueRecord) {
 }
 
 function downloadLabels(links: CommercialLink[]) {
-  return links.map((item) => item.label);
+  return links.map((item) => item.url || item.label);
 }
 
 function labelsToLinks(labels: string[], kind: CommercialLink["kind"] = "Download") {
-  return labels.map((label) => ({ label, url: "", kind }));
+  return labels.map((label) => ({ label, url: label, kind }));
 }
 
 function cleanDisplayText(value: unknown) {
@@ -620,6 +620,7 @@ function ProviderAdministration() {
   const [selectedOrganisationContext, setSelectedOrganisationContext] = useState("Private sector");
   const [introRequest, setIntroRequest] = useState<{ providerName: string; programmeName?: string } | null>(null);
   const [error, setError] = useState("");
+  const { saving, perform } = useCatalogueAction(setError);
 
   const providerStats = useMemo(() => {
     const activeProviders = data.providers.filter((provider) => provider.status === "Active");
@@ -696,7 +697,7 @@ function ProviderAdministration() {
       status: "Active",
       sourceUrls: [],
       notes: "",
-      lastVerified: todayIso(),
+      lastVerified: "",
       verificationStatus: "needs_verification",
       commercialProfile: emptyProviderCommercialProfile(),
     });
@@ -750,7 +751,7 @@ function ProviderAdministration() {
     setError("");
   }
 
-  function submitProvider(event: FormEvent) {
+  async function submitProvider(event: FormEvent) {
     event.preventDefault();
     if (!providerDraft) return;
     if (!providerDraft.providerName.trim()) {
@@ -758,18 +759,18 @@ function ProviderAdministration() {
       return;
     }
 
-    saveProvider(
+    const saved = await perform(() => saveProvider(
       normaliseProviderRecord({
         ...providerDraft,
         providerName: providerDraft.providerName.trim(),
-        lastVerified: todayIso(),
       }),
-    );
+    ));
+    if (!saved) return;
     setProviderDraft(null);
     setError("");
   }
 
-  function submitProgramme(event: FormEvent) {
+  async function submitProgramme(event: FormEvent) {
     event.preventDefault();
     if (!programmeDraft) return;
     if (!programmeDraft.programmeName.trim()) {
@@ -792,25 +793,27 @@ function ProviderAdministration() {
       return;
     }
 
-    saveProviderProgramme(
+    const saved = await perform(() => saveProviderProgramme(
       normaliseProviderProgramme({
         ...programmeDraft,
         programmeName: programmeDraft.programmeName.trim(),
         updatedAt: nowIso(),
       }),
-    );
+    ));
+    if (!saved) return;
     setProgrammeDraft(null);
     setError("");
   }
 
-  function removeProgramme(programme: ProviderProgramme) {
+  async function removeProgramme(programme: ProviderProgramme) {
     if (window.confirm(`Remove ${programme.programmeName} from the marketplace catalogue?`)) {
-      removeProviderProgramme(programme.id);
+      if (await perform(() => removeProviderProgramme(programme.id))) setProgrammeDraft(null);
     }
   }
 
   return (
     <div className="grid gap-5">
+      {error && !providerDraft && !programmeDraft ? <p role="alert" className="text-sm text-red-700">{error}</p> : null}
       <OperationalMetricRail items={[
         { label: "Programme routes", value: providerStats.liveProgrammes, tone: "info" },
         { label: "Verified providers", value: providerStats.verifiedProviders, tone: "healthy" },
@@ -943,7 +946,7 @@ function ProviderAdministration() {
       ) : null}
 
       {providerDraft ? (
-        <MvpModal title={providerDraft.providerName || "Add provider partner"} eyebrow="Marketplace record" onClose={() => setProviderDraft(null)} wide>
+        <MvpModal title={providerDraft.providerName || "Add provider partner"} eyebrow="Marketplace record" onClose={() => { if (!saving) setProviderDraft(null); }} wide><fieldset disabled={saving}>
           <form onSubmit={submitProvider} className="grid gap-5 lg:grid-cols-[minmax(0,1.3fr)_360px]">
             <div className="grid gap-4">
               <FormSection title="Core identity" copy="Capture the provider positioning LevyTate will use in the marketplace.">
@@ -952,6 +955,10 @@ function ProviderAdministration() {
                   <FormSelect label="Provider type" value={providerDraft.providerType} onChange={(value) => setProviderDraft({ ...providerDraft, providerType: value as ProviderType })} options={providerTypes} />
                   <FormField label="Website" value={providerDraft.website} onChange={(value) => setProviderDraft({ ...providerDraft, website: value })} />
                   <FormField label="Ofsted" value={providerDraft.ofstedRating} onChange={(value) => setProviderDraft({ ...providerDraft, ofstedRating: value })} />
+                  <FormSelect label="Verification status" value={providerDraft.verificationStatus} onChange={(value) => setProviderDraft({ ...providerDraft, verificationStatus: value as ProviderCatalogueRecord["verificationStatus"] })} options={[{ value: "needs_verification", label: "Needs verification" }, { value: "verified", label: "Verified against source evidence" }]} />
+                  <FormField label="Last verified against source" type="date" value={providerDraft.lastVerified} onChange={(value) => setProviderDraft({ ...providerDraft, lastVerified: value })} />
+                  <FormTagInput label="Source URLs (required for verification)" values={providerDraft.sourceUrls} onChange={(value) => setProviderDraft({ ...providerDraft, sourceUrls: value })} wide />
+                  <FormSelect label="Record status" value={providerDraft.status} onChange={(value) => setProviderDraft({ ...providerDraft, status: value as ProviderCatalogueRecord["status"] })} options={["Active", "Archived"]} />
                   <FormField label="Positioning statement" value={providerDraft.commercialProfile.positioningStatement} onChange={(value) => setProviderDraft({ ...providerDraft, commercialProfile: { ...providerDraft.commercialProfile, positioningStatement: value } })} wide />
                   <FormTextArea label="Provider summary" value={providerDraft.commercialProfile.organisationDescription} onChange={(value) => setProviderDraft({ ...providerDraft, commercialProfile: { ...providerDraft.commercialProfile, organisationDescription: value } })} rows={4} wide />
                 </FormGrid>
@@ -980,7 +987,7 @@ function ProviderAdministration() {
                   <FormTagInput label="Employer sizes" values={providerDraft.commercialProfile.employerSizesSupported} onChange={(value) => setProviderDraft({ ...providerDraft, commercialProfile: { ...providerDraft.commercialProfile, employerSizesSupported: value } })} wide />
                   <FormTagInput label="Case studies" values={providerDraft.commercialProfile.caseStudies} onChange={(value) => setProviderDraft({ ...providerDraft, commercialProfile: { ...providerDraft.commercialProfile, caseStudies: value } })} wide />
                   <FormTagInput label="Testimonials" values={providerDraft.commercialProfile.testimonials} onChange={(value) => setProviderDraft({ ...providerDraft, commercialProfile: { ...providerDraft.commercialProfile, testimonials: value } })} wide />
-                  <FormTagInput label="Downloads" values={downloadLabels(providerDraft.commercialProfile.downloads)} onChange={(value) => setProviderDraft({ ...providerDraft, commercialProfile: { ...providerDraft.commercialProfile, downloads: labelsToLinks(value) } })} wide />
+                  <FormTagInput label="Download URLs" values={downloadLabels(providerDraft.commercialProfile.downloads)} onChange={(value) => setProviderDraft({ ...providerDraft, commercialProfile: { ...providerDraft.commercialProfile, downloads: labelsToLinks(value) } })} wide />
                   <FormTextArea label="Pricing notes" value={providerDraft.commercialProfile.pricingNotes} onChange={(value) => setProviderDraft({ ...providerDraft, commercialProfile: { ...providerDraft.commercialProfile, pricingNotes: value } })} rows={3} wide />
                   <FormTextArea label="Commercial notes" value={providerDraft.commercialProfile.commercialNotes} onChange={(value) => setProviderDraft({ ...providerDraft, commercialProfile: { ...providerDraft.commercialProfile, commercialNotes: value } })} rows={3} wide />
                 </FormGrid>
@@ -993,13 +1000,13 @@ function ProviderAdministration() {
               <ProviderHeroCard provider={providerDraft} programmeCount={data.providerProgrammes.filter((programme) => programme.providerId === providerDraft.providerId && programme.recordStatus === "Active").length} />
               <MarketplaceSignalCard title="Buyer confidence" copy="Use this preview to keep the provider record sounding commercial, clear and employer-ready." items={[providerDraft.commercialProfile.positioningStatement || "Add a sharper marketplace positioning statement", providerDraft.commercialProfile.pricingNotes || "Add a brief commercial fit note", `${commercialProfileCompletion(providerDraft.commercialProfile)}% profile completeness`]} />
             </div>
-          </form>
+          </form></fieldset>
         </MvpModal>
       ) : null}
 
       {programmeDraft ? (
-        <MvpModal title={programmeDraft.programmeName || "Add programme"} eyebrow="Programme catalogue" onClose={() => setProgrammeDraft(null)} wide>
-          <ProgrammeEditor draft={programmeDraft} onDraft={setProgrammeDraft} standardSearch={standardSearch} onStandardSearch={setStandardSearch} onSubmit={submitProgramme} onCancel={() => setProgrammeDraft(null)} onArchive={() => archiveProviderProgramme(programmeDraft.id)} onRemove={() => removeProgramme(programmeDraft)} error={error} standards={selectableStandards} />
+        <MvpModal title={programmeDraft.programmeName || "Add programme"} eyebrow="Programme catalogue" onClose={() => { if (!saving) setProgrammeDraft(null); }} wide><fieldset disabled={saving}>
+          <ProgrammeEditor draft={programmeDraft} onDraft={setProgrammeDraft} standardSearch={standardSearch} onStandardSearch={setStandardSearch} onSubmit={submitProgramme} onCancel={() => setProgrammeDraft(null)} onArchive={() => { void perform(() => archiveProviderProgramme(programmeDraft.id)).then((saved) => { if (saved) setProgrammeDraft(null); }); }} onRemove={() => removeProgramme(programmeDraft)} error={error} standards={selectableStandards} /></fieldset>
         </MvpModal>
       ) : null}
     </div>

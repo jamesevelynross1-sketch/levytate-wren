@@ -41,12 +41,13 @@ export async function savePeopleRecord(organisationId: string, input: unknown) {
   });
 }
 
-export async function archivePeopleRecord(organisationId: string, employeeId: string) {
+export async function archivePeopleRecord(organisationId: string, employeeId: string, status: "Active" | "Archived") {
   return safely(async () => {
+    if (!["Active", "Archived"].includes(status)) throw new ClientRequestError("Choose the requested employee state explicitly.", 422);
     const current = await context(organisationId);
     const employee = current.employees.find((item) => item.id === employeeId);
     if (!employee) throw new ClientRequestError("The employee was not found in this workspace.", 404);
-    const status = employee.status === "Active" ? "Archived" : "Active";
+    if (employee.status === status) return;
     validatePeopleChanges([{ ...employee, status }], current.employees, current.roles);
     const updated = await supabaseUpdate<EmployeeRow>(config(), "levytate_employees", new URLSearchParams({ organisation_id: `eq.${organisationId}`, id: `eq.${employeeId}`, status: `eq.${employee.status}`, updated_at: `eq.${employee.updatedAt}` }).toString(), { status, updated_at: new Date().toISOString() });
     if (updated.length !== 1) throw new ClientRequestError("This employee changed. Refresh People before retrying.", 409);

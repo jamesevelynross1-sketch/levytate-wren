@@ -10,7 +10,7 @@ const optionalId = z.union([id, z.literal("")]);
 const list = z.array(text).max(100);
 const ids = z.array(id).max(100).refine((items) => new Set(items).size === items.length, "References must be unique.");
 const email = z.union([z.email().max(254), z.literal("")]);
-const url = z.union([z.url().refine((value) => { const parsed = new URL(value); return ["http:", "https:"].includes(parsed.protocol) && !parsed.username && !parsed.password; }, "Use an http or https URL without credentials."), z.literal("")]);
+const url = z.union([z.url().refine((value) => { try { const parsed = new URL(value); return ["http:", "https:"].includes(parsed.protocol) && !parsed.username && !parsed.password; } catch { return false; } }, "Use an http or https URL without credentials."), z.literal("")]);
 const date = z.string().refine((value) => !value || (/^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value), "Use a valid calendar date.");
 const timestamp = z.iso.datetime({ offset: true });
 const funding = z.enum(["Potentially levy-funded", "Potentially funded through levy/co-investment", "Commercial training budget"]);
@@ -33,7 +33,8 @@ const provider = z.strictObject({
   sectors: list, industries: list, technologies: list, deliveryModels: list, regions: list, employerTypes: list, specialisms: list,
   contactName: text, contactEmail: email, ofstedRating: text, status: z.enum(["Active", "Archived"]), sourceUrls: z.array(url.refine(Boolean)).max(30),
   notes: z.string().max(10000), commercialProfile: providerCommercial, lastVerified: date, verificationStatus: z.enum(["verified", "needs_verification"]),
-}).refine((record) => record.verificationStatus !== "verified" || (record.sourceUrls.length > 0 && Boolean(record.lastVerified)), "Verified providers require source evidence and a verification date.");
+}).refine((record) => record.verificationStatus !== "verified" || (record.sourceUrls.length > 0 && Boolean(record.lastVerified)), "Verified providers require source evidence and a verification date.")
+  .refine((record) => !record.lastVerified || record.lastVerified <= new Date().toISOString().slice(0, 10), "Verification cannot be dated in the future.");
 const programme = z.strictObject({
   id, providerId: id, programmeName: required, shortDescription: text, fullDescription: z.string().max(20000),
   status: z.enum(["Active", "Needs verification", "Paused", "Not available", "Defunded / unavailable for new starts"]),

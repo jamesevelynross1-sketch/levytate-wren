@@ -135,12 +135,14 @@ export async function supabaseDelete(
   table: string,
   query: string,
 ) {
-  return supabaseFetchRaw(config, `${table}?${query}`, {
+  const response = await supabaseFetchRaw(config, `${table}?${query}`, {
     method: "DELETE",
     headers: {
       Prefer: "return=minimal",
     },
   });
+  if (!response.ok) throw new LevyTateSupabaseError(await formatSupabaseError(response));
+  return response;
 }
 
 export async function supabaseFetchJson<T>(

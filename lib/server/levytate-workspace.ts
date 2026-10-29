@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { ApplicationCommandError, applyApplicationCommand } from "@/lib/server/levytate-application-commands";
 import { archivePeopleRecord, importPeopleRecords, savePeopleRecord } from "@/lib/server/levytate-people";
+import { runCatalogueCommand, throwCataloguePersistenceError } from "@/lib/server/levytate-catalogue-commands";
+import { parseMatchingRequest, parseProfile, parseProgramme, parseProvider, parseRelationship, parseRole } from "@/lib/server/levytate-catalogue-validation";
+import { ClientRequestError } from "@/lib/server/levytate-request-boundary";
 import { isApplicationWorkflowsEnabledForOrganisation } from "@/lib/server/levytate-application-workflow-capability";
 import { isOffTheJobAssistantEnabledForOrganisation } from "@/lib/server/levytate-off-the-job-capability";
 import {
@@ -207,7 +210,7 @@ type ProviderRow = {
   status: ProviderCatalogueRecord["status"];
   source_urls: unknown;
   notes: string;
-  last_verified: string;
+  last_verified: string | null;
   verification_status: ProviderCatalogueRecord["verificationStatus"];
 };
 type ProviderProgrammeRow = {
@@ -258,8 +261,8 @@ type ProviderRelationshipRow = {
   programme_ids: unknown;
   status: MvpProviderRelationship["status"];
   notes: string;
-  review_date: string;
-  last_used_date: string;
+  review_date: string | null;
+  last_used_date: string | null;
 };
 
 type OrganisationProviderRow = {
@@ -539,6 +542,7 @@ export async function applyWorkspaceMutationForSession(
   const organisationId = context.organisation.id;
   await assertMutationAllowed(context, mutation);
 
+  try {
   switch (mutation.type) {
     case "saveProfile":
       await saveProfile(organisationId, mutation.profile);
@@ -552,7 +556,7 @@ export async function applyWorkspaceMutationForSession(
       await importPeopleRecords(organisationId, context.user.id, mutation.importId, mutation.employees);
       break;
     case "archiveEmployee":
-      await archivePeopleRecord(organisationId, mutation.id);
+      await archivePeopleRecord(organisationId, mutation.id, mutation.status);
       await recordAuditEvent(context, "employee", mutation.id, "employee.archived", "Employee record archive state changed.");
       break;
     case "saveEmployeeDevelopmentProfile":
@@ -560,11 +564,10 @@ export async function applyWorkspaceMutationForSession(
       await recordAuditEvent(context, "employee_profile", mutation.profile.employeeId, "employee_profile.saved", "Employee development profile updated.");
       break;
     case "saveRole":
-      await saveRole(organisationId, mutation.role);
-      await recordAuditEvent(context, "role", mutation.role.id, "role.saved", `Role library record saved for ${mutation.role.title}.`);
+      await saveRole(context, mutation.role);
       break;
     case "archiveRole":
-      await toggleArchive(organisationId, rolesTable, "id", mutation.id, "status");
+      await setArchiveStatus(organisationId, rolesTable, "id", mutation.id, "status", mutation.status);
       await recordAuditEvent(context, "role", mutation.id, "role.archived", "Role archive state changed.");
       break;
     case "saveApplication":
@@ -576,23 +579,23 @@ export async function applyWorkspaceMutationForSession(
       await synchroniseApplicationReviewOperationalActions(session, [mutation.id]);
       break;
     case "saveProvider":
-      await saveProvider(organisationId, mutation.provider);
+      await saveProvider(await getCanonicalCatalogueOrganisationId(), mutation.provider);
       await recordAuditEvent(context, "provider", mutation.provider.providerId, "provider.saved", `Provider record saved for ${mutation.provider.providerName}.`);
       break;
     case "archiveProvider":
-      await toggleArchive(organisationId, providersTable, "provider_id", mutation.id, "status");
+      await setArchiveStatus(await getCanonicalCatalogueOrganisationId(), providersTable, "provider_id", mutation.id, "status", mutation.status);
       await recordAuditEvent(context, "provider", mutation.id, "provider.archived", "Provider archive state changed.");
       break;
     case "saveProviderProgramme":
-      await saveProviderProgramme(organisationId, mutation.programme);
+      await saveProviderProgramme(await getCanonicalCatalogueOrganisationId(), mutation.programme);
       await recordAuditEvent(context, "provider_programme", mutation.programme.id, "provider_programme.saved", "Provider programme record saved.");
       break;
     case "archiveProviderProgramme":
-      await toggleArchive(organisationId, providerProgrammesTable, "id", mutation.id, "record_status");
+      await setArchiveStatus(await getCanonicalCatalogueOrganisationId(), providerProgrammesTable, "id", mutation.id, "record_status", mutation.status);
       await recordAuditEvent(context, "provider_programme", mutation.id, "provider_programme.archived", "Provider programme archive state changed.");
       break;
     case "removeProviderProgramme":
-      await supabaseDelete(assertSupabase(), providerProgrammesTable, buildOrganisationQuery(organisationId, { id: mutation.id }));
+      await supabaseDelete(assertSupabase(), providerProgrammesTable, buildOrganisationQuery(await getCanonicalCatalogueOrganisationId(), { id: mutation.id }));
       await recordAuditEvent(context, "provider_programme", mutation.id, "provider_programme.deleted", "Provider programme removed from the catalogue.");
       break;
     case "saveProviderRelationship":
@@ -601,11 +604,9 @@ export async function applyWorkspaceMutationForSession(
       break;
     case "saveOrganisationProvider":
       await saveOrganisationProviderSelection(context, mutation.selection);
-      await recordAuditEvent(context, "organisation_provider", mutation.selection.providerId, "organisation_provider.saved", `Organisation provider selection set to ${mutation.selection.status}.`);
       break;
     case "saveOrganisationProgramme":
       await saveOrganisationProgrammeSelection(context, mutation.selection);
-      await recordAuditEvent(context, "organisation_programme", mutation.selection.programmeId, "organisation_programme.saved", `Organisation programme selection set to ${mutation.selection.status}.`);
       break;
     case "saveMatchingRequest":
       await saveMatchingRequest(organisationId, mutation.request);
@@ -624,21 +625,28 @@ export async function applyWorkspaceMutationForSession(
     default:
       throw new LevyTateWorkspacePersistenceError("Mutation type is not supported.");
   }
+  } catch (error) {
+    if (["saveProfile", "saveRole", "archiveRole", "saveProvider", "archiveProvider", "saveProviderProgramme", "archiveProviderProgramme", "removeProviderProgramme", "saveProviderRelationship", "saveOrganisationProvider", "saveOrganisationProgramme", "saveMatchingRequest", "updateMatchingStatus"].includes(mutation.type)
+      && !(error instanceof LevyTateWorkspacePermissionError)) throwCataloguePersistenceError(error);
+    throw error;
+  }
 
   return getWorkspaceBootstrapForSession(session);
 }
 
 async function assertMutationAllowed(context: WorkspaceContext, mutation: LevyTateWorkspaceMutation) {
   const role = normaliseMvpUserRole(context.user.role);
+  const providerCatalogueAdministration = ["saveProvider", "archiveProvider", "saveProviderProgramme", "archiveProviderProgramme", "removeProviderProgramme"].includes(mutation.type);
+  if (providerCatalogueAdministration && role !== "Platform Admin") throw new LevyTateWorkspacePermissionError("Only Platform Admin can change the canonical catalogue. Use My Providers and My Programmes for employer selections.");
   if (role === "Platform Admin") {
     const workspaceAdministration = mutation.type === "saveProfile";
-    const providerCatalogueAdministration = ["saveProvider", "archiveProvider", "saveProviderProgramme", "archiveProviderProgramme", "removeProviderProgramme"].includes(mutation.type);
     if ((!workspaceAdministration || !hasCoreEarlyAccessCapability(role, "platform-workspace-administration"))
       && (!providerCatalogueAdministration || !hasCoreEarlyAccessCapability(role, "platform-provider-catalogue"))) {
       throw new LevyTateWorkspacePermissionError("Platform Admin cannot perform employer operational mutations.");
     }
   }
   if (!canRunMvpMutation(context.user.role, mutation.type)) throw new LevyTateWorkspacePermissionError(`${role} cannot perform ${mutation.type}.`);
+  if (role === "Platform Admin") return;
   // The command transaction rechecks active membership, tenant, current People
   // hierarchy and workflow state together. Pre-read authorization would race it.
   if (mutation.type === "saveApplication" || mutation.type === "updateApplicationStatus") return;
@@ -1228,6 +1236,7 @@ async function loadWorkspaceData(context: WorkspaceContext, session: LevyTateBet
 }
 
 async function saveProfile(organisationId: string, profile: MvpWorkspaceProfile) {
+  profile = parseProfile(profile);
   await supabaseUpdate(assertSupabase(), organisationsTable, `id=eq.${organisationId}`, {
     name: profile.employerName.trim() || "LevyTate employer workspace",
     workspace_name: profile.workspaceName.trim() || `${profile.employerName.trim() || "LevyTate employer"} workspace`,
@@ -1268,7 +1277,9 @@ async function saveEmployeeDevelopmentProfile(organisationId: string, profile: M
   });
 }
 
-async function saveRole(organisationId: string, role: MvpRole) {
+async function saveRole(context: WorkspaceContext, role: MvpRole) {
+  role = parseRole(role);
+  const organisationId = context.organisation.id;
   const row: RoleRow = {
     organisation_id: organisationId,
     id: role.id,
@@ -1283,15 +1294,7 @@ async function saveRole(organisationId: string, role: MvpRole) {
     updated_at: role.updatedAt,
   };
 
-  await supabaseInsert<RoleRow>(assertSupabase(), rolesTable, [row], {
-    query: "on_conflict=organisation_id,id",
-    prefer: "resolution=merge-duplicates,return=minimal",
-  });
-
-  await supabaseDelete(assertSupabase(), roleMappingsTable, buildOrganisationQuery(organisationId, { role_id: role.id }));
-  if (role.pathwayMappings.length) {
-    const mappings: RoleMappingRow[] = role.pathwayMappings.map((mapping) => ({
-      organisation_id: organisationId,
+  const mappings = role.pathwayMappings.map((mapping) => ({
       id: mapping.id,
       role_id: role.id,
       apprenticeship_standard_id: mapping.apprenticeshipStandardId,
@@ -1301,11 +1304,7 @@ async function saveRole(organisationId: string, role: MvpRole) {
       funding_route: mapping.fundingRoute,
       delivery_preference: mapping.deliveryPreference,
     }));
-    await supabaseInsert<RoleMappingRow>(assertSupabase(), roleMappingsTable, mappings, {
-      query: "on_conflict=organisation_id,id",
-      prefer: "resolution=merge-duplicates,return=minimal",
-    });
-  }
+  await runCatalogueCommand("levytate_save_role", { p_organisation_id: organisationId, p_actor_user_id: context.user.id, p_role: row, p_mappings: mappings });
 }
 
 async function persistApplicationCommand(context: WorkspaceContext, mutation: Extract<LevyTateWorkspaceMutation, { type: "saveApplication" | "updateApplicationStatus" }>) {
@@ -1340,6 +1339,7 @@ async function persistApplicationCommand(context: WorkspaceContext, mutation: Ex
 }
 
 async function saveProvider(organisationId: string, provider: ProviderCatalogueRecord) {
+  provider = parseProvider(provider);
   const row: ProviderRow = {
     organisation_id: organisationId,
     provider_id: provider.providerId,
@@ -1359,7 +1359,7 @@ async function saveProvider(organisationId: string, provider: ProviderCatalogueR
     status: provider.status,
     source_urls: provider.sourceUrls,
     notes: serialiseProviderRecordNotes(provider.notes, provider.commercialProfile),
-    last_verified: provider.lastVerified,
+    last_verified: provider.lastVerified || null,
     verification_status: provider.verificationStatus,
   };
 
@@ -1369,7 +1369,11 @@ async function saveProvider(organisationId: string, provider: ProviderCatalogueR
   });
 }
 async function saveProviderProgramme(organisationId: string, programme: ProviderProgramme) {
-  const normalised = normaliseProviderProgramme(programme);
+  const normalised = parseProgramme(programme);
+  const standard = await selectOne<{ title: string; level: number; route: string; funding_band: number | null; official_url: string }>("levytate_apprenticeship_standards", new URLSearchParams({
+    select: "title,level,route,funding_band,official_url", id: `eq.${normalised.linkedStandardId}`, status: "eq.Approved for delivery", limit: "1",
+  }));
+  if (!standard) throw new ClientRequestError("Choose an approved official standard before saving the programme.", 422);
   const row: ProviderProgrammeRow = {
     organisation_id: organisationId,
     id: normalised.id,
@@ -1396,11 +1400,11 @@ async function saveProviderProgramme(organisationId: string, programme: Provider
     apprenticeship_standard_id: normalised.linkedStandardId || normalised.linkedStandardIds[0] || '',
     linked_standard_id: normalised.linkedStandardId || normalised.linkedStandardIds[0] || null,
     linked_standard_ids: normalised.linkedStandardIds,
-    linked_standard_name: normalised.linkedStandardName,
-    level: normalised.level,
-    route: normalised.route,
-    funding_band: normalised.fundingBand,
-    official_url: normalised.officialUrl,
+    linked_standard_name: standard.title,
+    level: standard.level,
+    route: standard.route,
+    funding_band: standard.funding_band,
+    official_url: standard.official_url,
     source_url: normalised.sourceUrl,
     notes: serialiseProgrammeRecordNotes(normalised.notes, normalised.commercialProfile),
     funding_route: normalised.fundingRoute,
@@ -1415,7 +1419,7 @@ async function saveProviderProgramme(organisationId: string, programme: Provider
   });
 }
 async function saveProviderRelationship(organisationId: string, relationship: MvpProviderRelationship) {
-  const normalised = normaliseProviderRelationship(relationship);
+  const normalised = parseRelationship(relationship);
   const row: ProviderRelationshipRow = {
     organisation_id: organisationId,
     id: normalised.id,
@@ -1425,8 +1429,8 @@ async function saveProviderRelationship(organisationId: string, relationship: Mv
     programme_ids: normalised.programmeIds,
     status: normalised.status,
     notes: normalised.notes,
-    review_date: normalised.reviewDate,
-    last_used_date: normalised.lastUsedDate,
+    review_date: normalised.reviewDate || null,
+    last_used_date: normalised.lastUsedDate || null,
   };
 
   await supabaseInsert<ProviderRelationshipRow>(assertSupabase(), providerRelationshipsTable, [row], {
@@ -1438,7 +1442,7 @@ async function saveProviderRelationship(organisationId: string, relationship: Mv
 async function getCanonicalCatalogueOrganisationId() {
   const organisation = await selectOne<OrganisationRow>(
     organisationsTable,
-    new URLSearchParams({ select: "id", slug: "eq.levytate-internal", limit: "1" }),
+    new URLSearchParams({ select: "id", slug: "eq.levytate-internal", status: "eq.Active", limit: "1" }),
   );
   if (!organisation) {
     throw new LevyTateWorkspacePersistenceError("The canonical LevyTate catalogue is unavailable.");
@@ -1447,79 +1451,17 @@ async function getCanonicalCatalogueOrganisationId() {
 }
 
 async function saveOrganisationProviderSelection(context: WorkspaceContext, selection: MvpOrganisationProvider) {
-  const canonicalOrganisationId = await getCanonicalCatalogueOrganisationId();
-  const provider = await selectOne<ProviderRow>(providersTable, new URLSearchParams({
-    select: "provider_id,status",
-    organisation_id: `eq.${canonicalOrganisationId}`,
-    provider_id: `eq.${selection.providerId}`,
-    limit: "1",
-  }));
-  if (!provider || provider.status !== "Active") {
-    throw new LevyTateWorkspacePermissionError("Only an active canonical provider can be added to My Providers.");
-  }
-
-  const row: OrganisationProviderRow = {
-    organisation_id: context.organisation.id,
-    provider_id: selection.providerId,
-    status: selection.status,
-    selected_by: context.user.email,
-    selected_at: selection.selectedAt || nowIso(),
-    updated_at: nowIso(),
-  };
-  await supabaseInsert<OrganisationProviderRow>(assertSupabase(), organisationProvidersTable, [row], {
-    query: "on_conflict=organisation_id,provider_id",
-    prefer: "resolution=merge-duplicates,return=minimal",
-  });
-  if (selection.status === "Inactive") {
-    await supabaseUpdate(
-      assertSupabase(),
-      organisationProgrammesTable,
-      `organisation_id=eq.${context.organisation.id}&provider_id=eq.${encodeURIComponent(selection.providerId)}&status=eq.Active`,
-      { status: "Inactive", updated_at: nowIso() },
-      { prefer: "return=minimal" },
-    );
-  }
+  await runCatalogueCommand("levytate_select_catalogue", { p_organisation_id: context.organisation.id, p_actor_user_id: context.user.id,
+    p_kind: "provider", p_id: selection.providerId, p_provider_id: selection.providerId, p_status: selection.status });
 }
 
 async function saveOrganisationProgrammeSelection(context: WorkspaceContext, selection: MvpOrganisationProgramme) {
-  const canonicalOrganisationId = await getCanonicalCatalogueOrganisationId();
-  const programme = await selectOne<ProviderProgrammeRow>(providerProgrammesTable, new URLSearchParams({
-    select: "id,provider_id,status,record_status",
-    organisation_id: `eq.${canonicalOrganisationId}`,
-    id: `eq.${selection.programmeId}`,
-    provider_id: `eq.${selection.providerId}`,
-    limit: "1",
-  }));
-  if (!programme || programme.status !== "Active" || programme.record_status !== "Active") {
-    throw new LevyTateWorkspacePermissionError("Only an active canonical programme can be added to My Programmes.");
-  }
-
-  const now = nowIso();
-  if (selection.status === "Active") {
-    await saveOrganisationProviderSelection(context, {
-      providerId: programme.provider_id,
-      status: "Active",
-      selectedAt: selection.selectedAt || now,
-      updatedAt: now,
-    });
-  }
-  const row: OrganisationProgrammeRow = {
-    organisation_id: context.organisation.id,
-    programme_id: selection.programmeId,
-    provider_id: programme.provider_id,
-    status: selection.status,
-    selected_by: context.user.email,
-    selected_at: selection.selectedAt || now,
-    updated_at: now,
-  };
-  await supabaseInsert<OrganisationProgrammeRow>(assertSupabase(), organisationProgrammesTable, [row], {
-    query: "on_conflict=organisation_id,programme_id",
-    prefer: "resolution=merge-duplicates,return=minimal",
-  });
+  await runCatalogueCommand("levytate_select_catalogue", { p_organisation_id: context.organisation.id, p_actor_user_id: context.user.id,
+    p_kind: "programme", p_id: selection.programmeId, p_provider_id: selection.providerId, p_status: selection.status });
 }
 
 async function saveMatchingRequest(organisationId: string, request: MvpMatchingRequest) {
-  const normalised = normaliseMatchingRequest(request);
+  const normalised = parseMatchingRequest(request);
   const row: MatchingRequestRow = {
     organisation_id: organisationId,
     id: normalised.id,
@@ -1578,13 +1520,15 @@ async function recordAuditEvent(
   });
 }
 
-async function toggleArchive(
+async function setArchiveStatus(
   organisationId: string,
   table: string,
   key: string,
   value: string,
   statusField: string,
+  status: "Active" | "Archived",
 ) {
+  if (!["Active", "Archived"].includes(status)) throw new ClientRequestError("Choose the requested archive state explicitly.", 422);
   const row = await selectOne<Record<string, unknown>>(
     table,
     new URLSearchParams({
@@ -1599,12 +1543,11 @@ async function toggleArchive(
     throw new LevyTateWorkspacePersistenceError("Record could not be found.");
   }
 
-  const current = typeof row[statusField] === "string" ? row[statusField] : "Active";
-  const next = current === "Archived" ? "Active" : "Archived";
-  await patchByOrganisation(organisationId, table, key, value, {
-    [statusField]: next,
+  const saved = await supabaseUpdate<Record<string, unknown>>(assertSupabase(), table, buildOrganisationQuery(organisationId, { [key]: value }), {
+    [statusField]: status,
     updated_at: nowIso(),
-  });
+  }, { prefer: "return=representation" });
+  if (saved.length !== 1 || saved[0][statusField] !== status) throw new ClientRequestError("Archive state could not be confirmed. Refresh before retrying.", 409);
 }
 
 async function patchByOrganisation(
@@ -1767,7 +1710,7 @@ function providerRowToRecord(row: ProviderRow): ProviderCatalogueRecord {
     status: row.status,
     sourceUrls: stringArray(row.source_urls),
     notes: row.notes,
-    lastVerified: row.last_verified,
+    lastVerified: row.last_verified ?? "",
     verificationStatus: row.verification_status,
   });
 }
@@ -1821,8 +1764,8 @@ function providerRelationshipRowToRecord(row: ProviderRelationshipRow): MvpProvi
     apprenticeshipStandardIds: stringArray(row.apprenticeship_standard_ids),
     status: row.status,
     notes: row.notes,
-    reviewDate: row.review_date,
-    lastUsedDate: row.last_used_date,
+    reviewDate: row.review_date ?? "",
+    lastUsedDate: row.last_used_date ?? "",
   });
 }
 

@@ -43,7 +43,15 @@ describe("People persistence boundary", () => {
     await expect(savePeopleRecord("tenant-a", employee)).rejects.toMatchObject({ status: 503 });
   });
   it("denies an archive target outside the current tenant", async () => {
-    await expect(archivePeopleRecord("tenant-a", "other-person")).rejects.toMatchObject({ status: 404 });
+    await expect(archivePeopleRecord("tenant-a", "other-person", "Archived")).rejects.toMatchObject({ status: 404 });
+    expect(fake.update).not.toHaveBeenCalled();
+  });
+  it("does not restore an employee when the same archive is retried", async () => {
+    const current = { organisation_id: "tenant-a", id: employee.id, employee_number: employee.employeeNumber, name: employee.name, email: employee.email,
+      job_title: employee.jobTitle, role_id: "", manager_id: "", department: employee.department, site: "", platform_role: "Employee", status: "Archived", start_date: employee.startDate, created_at: employee.createdAt, updated_at: employee.updatedAt };
+    fake.select.mockImplementation(async (_config, table) => table === "levytate_employees" ? [current] : []);
+    await archivePeopleRecord("tenant-a", employee.id, "Archived");
+    await archivePeopleRecord("tenant-a", employee.id, "Archived");
     expect(fake.update).not.toHaveBeenCalled();
   });
 });

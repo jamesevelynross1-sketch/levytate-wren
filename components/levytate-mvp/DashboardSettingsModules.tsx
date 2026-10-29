@@ -1,4 +1,5 @@
 "use client";
+import { useCatalogueAction } from "@/components/levytate-mvp/useCatalogueAction";
 
 import { Check, ChevronDown, Target } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
@@ -273,12 +274,8 @@ function EmployerPrioritiesSetup({ compact = false, readOnly = false }: { compac
   const [step, setStep] = useState<"priorities" | "importance" | "complete">(data.profile.priorities.length ? "complete" : "priorities");
   const [selected, setSelected] = useState<MvpEmployerPriorityName[]>(data.profile.priorities.map((item) => item.name));
   const [importance, setImportance] = useState<MvpEmployerPriorityImportance>(data.profile.priorities[0]?.importance ?? "High");
-
-  useEffect(() => {
-    if (!data.profile.priorities.length) return;
-    setSelected(data.profile.priorities.map((item) => item.name));
-    setImportance(data.profile.priorities[0]?.importance ?? "High");
-  }, [data.profile.priorities]);
+  const [error, setError] = useState("");
+  const { saving, perform } = useCatalogueAction(setError);
 
   function togglePriority(priority: MvpEmployerPriorityName) {
     setSelected((current) => current.includes(priority)
@@ -288,8 +285,8 @@ function EmployerPrioritiesSetup({ compact = false, readOnly = false }: { compac
         : current);
   }
 
-  function save() {
-    saveProfile({
+  async function save() {
+    const saved = await perform(() => saveProfile({
       ...data.profile,
       priorities: selected.map((name) => ({
         id: data.profile.priorities.find((item) => item.name === name)?.id ?? createMvpId("priority"),
@@ -297,8 +294,8 @@ function EmployerPrioritiesSetup({ compact = false, readOnly = false }: { compac
         importance,
         detail: "",
       })),
-    });
-    setStep("complete");
+    }));
+    if (saved) setStep("complete");
   }
 
   if (step === "complete") {
@@ -374,7 +371,8 @@ function EmployerPrioritiesSetup({ compact = false, readOnly = false }: { compac
           </div>
           <div className="mt-6 flex items-center justify-between">
             <button type="button" onClick={() => setStep("priorities")} className="text-xs font-semibold text-[#102c3d]/52">Back</button>
-            <button type="button" onClick={save} className="h-11 rounded-full bg-[#102c3d] px-5 text-sm font-semibold text-white">Save priorities</button>
+            {error ? <p role="alert" className="text-sm text-red-700">{error}</p> : null}
+            <button type="button" disabled={saving} onClick={save} className="h-11 rounded-full bg-[#102c3d] px-5 text-sm font-semibold text-white">{saving ? "Saving…" : "Save priorities"}</button>
           </div>
         </div>
       )}
@@ -386,13 +384,16 @@ export function SettingsModule() {
   const { data, saveProfile, can, meta } = useMvpWorkspace();
   const [draft, setDraft] = useState<MvpWorkspaceProfile>(data.profile);
   const [saved, setSaved] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const { saving, perform } = useCatalogueAction(setSaveError);
   const [accessUsers, setAccessUsers] = useState<WorkspaceAccessUser[] | null>(null);
   const [accessError, setAccessError] = useState("");
   const [microsoftCopilot, setMicrosoftCopilot] = useState<MicrosoftCopilotConnectionStatus | null>(null);
   const [microsoftCopilotError, setMicrosoftCopilotError] = useState("");
   const canEdit = can("settings:write");
 
-  useEffect(() => { setDraft(data.profile); }, [data.profile]);
+  useEffect(() => { if (!dirty) setDraft(data.profile); }, [data.profile, dirty]);
   useEffect(() => {
     let active = true;
     void fetch("/api/levytate-workspace/access", { cache: "no-store" })
@@ -421,16 +422,17 @@ export function SettingsModule() {
     return () => { active = false; };
   }, [meta?.userRole]);
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
     if (!canEdit) return;
-    saveProfile({
+    setSaved(false);
+    const confirmed = await perform(() => saveProfile({
       ...draft,
       priorities: data.profile.priorities,
       sites: splitMvpList(draft.sites.join(", ")),
       departments: splitMvpList(draft.departments.join(", ")),
-    });
-    setSaved(true);
+    }));
+    if (confirmed) { setSaved(true); setDirty(false); }
   }
 
   return (
@@ -445,7 +447,7 @@ export function SettingsModule() {
           <ChevronDown size={18} className="text-[#102c3d]/42 transition group-open:rotate-180" aria-hidden="true" />
         </summary>
         {canEdit ? (
-          <form onSubmit={submit} className="border-t border-[#102c3d]/[0.07] p-5">
+          <form onSubmit={submit} onChange={() => { setDirty(true); setSaved(false); }} className="border-t border-[#102c3d]/[0.07] p-5"><fieldset disabled={saving}>
             <FormGrid>
               <FormField label="Employer name" value={draft.employerName} onChange={(value) => setDraft({ ...draft, employerName: value })} />
               <FormField label="Workspace name" value={draft.workspaceName} onChange={(value) => setDraft({ ...draft, workspaceName: value })} required />
@@ -456,10 +458,10 @@ export function SettingsModule() {
               <FormField label="Departments" value={draft.departments.join(", ")} onChange={(value) => setDraft({ ...draft, departments: splitMvpList(value) })} wide />
             </FormGrid>
             <div className="mt-5 flex items-center justify-between border-t border-[#102c3d]/[0.07] pt-4">
-              {saved ? <p className="text-xs font-semibold text-[#0b6f63]">Workspace saved.</p> : <span />}
-              <button className="h-10 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white">Save details</button>
+              {saveError ? <p role="alert" className="text-sm text-red-700">{saveError}</p> : saved ? <p role="status" className="text-xs font-semibold text-[#0b6f63]">Workspace saved.</p> : <span />}
+              <button className="h-10 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white">{saving ? "Saving…" : "Save details"}</button>
             </div>
-          </form>
+          </fieldset></form>
         ) : (
           <div className="border-t border-[#102c3d]/[0.07] p-5">
             <div className="grid gap-4 md:grid-cols-2">

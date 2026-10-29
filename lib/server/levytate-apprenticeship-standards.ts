@@ -1,9 +1,8 @@
 import {
-  getApprenticeshipStandardsImport,
   searchApprenticeshipStandardsList,
 } from "@/lib/levytate/domain";
 import type { ApprenticeshipStandard } from "@/lib/levytate/domain";
-import { getLevyTateSupabaseConfig, supabaseSelect } from "@/lib/server/levytate-supabase";
+import { getLevyTateSupabaseConfig, supabaseSelectAll } from "@/lib/server/levytate-supabase";
 
 type ApprenticeshipStandardRow = {
   id: string;
@@ -27,7 +26,7 @@ type ApprenticeshipStandardRow = {
 };
 
 export type LevyTateStandardsResponse = {
-  source: "supabase" | "fallback";
+  source: "supabase" | "unavailable";
   counts: {
     totalRecords: number;
     apprenticeshipStandards: number;
@@ -44,9 +43,8 @@ export type LevyTateStandardsQuery = {
 
 const standardsTable = "levytate_apprenticeship_standards";
 
-function toOfficialUrl(referenceCode: string, officialUrl?: string | null) {
-  if (officialUrl?.startsWith("http")) return officialUrl;
-  return `https://skillsengland.education.gov.uk/apprenticeships/${referenceCode.toLowerCase()}`;
+function toOfficialUrl(officialUrl?: string | null) {
+  try { const parsed = new URL(officialUrl ?? ""); return ["https:", "http:"].includes(parsed.protocol) && !parsed.username && !parsed.password ? parsed.href : ""; } catch { return ""; }
 }
 
 function toDateString(value?: string | null) {
@@ -80,15 +78,15 @@ function normaliseDomainStatus(status?: string | null) {
     case "in development":
       return "In development" as const;
     default:
-      return "Live" as const;
+      return "Proposed" as const;
   }
 }
 
 function rowToDomain(row: ApprenticeshipStandardRow): ApprenticeshipStandard {
   const referenceCode = row.reference_code || row.id;
   const route = row.route || row.occupational_route || "Unknown";
-  const lastUpdated = toDateString(row.last_updated) || toDateString(row.last_verified) || new Date().toISOString().slice(0, 10);
-  const sourceStatus = row.status || "Approved for delivery";
+  const lastUpdated = toDateString(row.last_updated);
+  const sourceStatus = row.status || "Unknown";
 
   return {
     id: row.id || referenceCode,
@@ -99,10 +97,10 @@ function rowToDomain(row: ApprenticeshipStandardRow): ApprenticeshipStandard {
     fundingBand: typeof row.funding_band === "number" ? row.funding_band : null,
     typicalDuration: row.typical_duration || "Duration to confirm",
     status: normaliseDomainStatus(sourceStatus),
-    officialUrl: toOfficialUrl(referenceCode, row.official_url),
-    version: row.version || "Current",
-    lastVerified: lastUpdated,
-    lastSyncedAt: lastUpdated,
+    officialUrl: toOfficialUrl(row.official_url),
+    version: row.version || "Unknown",
+    lastVerified: toDateString(row.last_verified),
+    lastSyncedAt: "",
     programmeType: row.programme_type || "Apprenticeship standard",
     sourceStatus,
     integratedDegree: row.integrated_degree || "",
@@ -117,18 +115,14 @@ export async function loadLevyTateStandards(query: LevyTateStandardsQuery = {}):
   const config = getLevyTateSupabaseConfig();
 
   if (!config) {
-    return loadFallbackStandards(query);
+    return unavailableStandards();
   }
 
   try {
-    const rows = await supabaseSelect<ApprenticeshipStandardRow>(config, standardsTable, new URLSearchParams({
+    const rows = await supabaseSelectAll<ApprenticeshipStandardRow>(config, standardsTable, new URLSearchParams({
       select: "id,title,reference_code,version,status,route,occupational_route,level,funding_band,typical_duration,official_url,last_updated,last_verified,job_titles,overview,programme_type,integrated_degree,professional_recognition",
-      order: "title.asc",
+      order: "title.asc,id.asc",
     }));
-
-    if (!rows.length) {
-      return loadFallbackStandards(query);
-    }
 
     const standards = rows.map(rowToDomain);
     const apprenticeshipStandards = standards.filter((standard) => standard.programmeType === "Apprenticeship standard").length;
@@ -147,24 +141,10 @@ export async function loadLevyTateStandards(query: LevyTateStandardsQuery = {}):
       }),
     };
   } catch {
-    return loadFallbackStandards(query);
+    return unavailableStandards();
   }
 }
 
-function loadFallbackStandards(query: LevyTateStandardsQuery = {}): LevyTateStandardsResponse {
-  const fallbackImport = getApprenticeshipStandardsImport();
-  const fallback = fallbackImport.standards;
-
-  return {
-    source: "fallback",
-    counts: {
-      totalRecords: fallbackImport.source.totalRecords ?? fallback.length,
-      apprenticeshipStandards: fallbackImport.source.totalStandards ?? fallback.filter((standard) => standard.programmeType === "Apprenticeship standard").length,
-      approvedForDelivery: fallbackImport.source.approvedForDelivery ?? fallbackImport.source.activeStandards ?? fallback.filter((standard) => standard.programmeType === "Apprenticeship standard" && (standard.sourceStatus === "Approved for delivery" || standard.status === "Live")).length,
-    },
-    standards: searchApprenticeshipStandardsList(fallback, query.search ?? "", {
-      status: query.status,
-      programmeType: query.programmeType,
-    }),
-  };
+function unavailableStandards(): LevyTateStandardsResponse {
+  return { source: "unavailable", counts: { totalRecords: 0, apprenticeshipStandards: 0, approvedForDelivery: 0 }, standards: [] };
 }
