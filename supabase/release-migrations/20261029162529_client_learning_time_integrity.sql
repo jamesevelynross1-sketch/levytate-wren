@@ -21,10 +21,16 @@ begin
  if not found or actor.role not in ('Employee','Apprenticeship Lead','Employer Admin') then raise exception using errcode='PT403',message='Active authorised membership required';end if;
  perform 1 from public.levytate_organisations where id=p_organisation_id and status='Active' for share;if not found then raise exception using errcode='PT403',message='Workspace inactive';end if;
  perform 1 from public.levytate_organisation_capabilities where organisation_id=p_organisation_id and off_the_job_assistant_enabled for share;if not found then raise exception using errcode='PT404',message='Learning Time disabled';end if;
+ if actor.role='Employee' and p_action not in ('save_activity','submit_activity','transition_activity') then raise exception using errcode='PT403',message='Employer oversight required';end if;
+ if p_action in ('save_activity','submit_activity') and actor.role<>'Employee' then raise exception using errcode='PT403',message='Employee evidence must be individual';end if;
  -- Actor-level lock makes lost-response retries atomic even across resource kinds.
  perform pg_advisory_xact_lock(hashtextextended('levytate-otj-command:'||p_organisation_id::text||':'||p_actor_user_id::text,0));
  select * into receipt from public.levytate_otj_command_receipts r where r.organisation_id=p_organisation_id and r.actor_user_id=p_actor_user_id and r.request_id=command_scope.request_id;
- if found then if receipt.command<>command then raise exception using errcode='PT409',message='Retry key conflicts';end if;return receipt.result;end if;
+ if found then
+  if receipt.command<>command then raise exception using errcode='PT409',message='Retry key conflicts';end if;
+  if actor.role='Employee' and not exists(select 1 from public.levytate_learner_records l join public.levytate_employees e on e.organisation_id=l.organisation_id and e.id=l.employee_id where l.organisation_id=p_organisation_id and l.id=receipt.result->>'learner_record_id' and l.record_status='Active' and e.status='Active' and lower(btrim(e.email))=lower(btrim(actor.email))) then raise exception using errcode='PT403',message='Receipt is outside current employee scope';end if;
+  return receipt.result;
+ end if;
  if p_probe then return null;end if;
  if p_action in ('save_activity','create_plan_draft','add_priority') then subject:=p_input->>'learnerRecordId';
  elsif p_action='publish_plan' then select p.learner_record_id into subject from public.levytate_otj_plan_versions v join public.levytate_otj_plans p on p.organisation_id=v.organisation_id and p.id=v.plan_id where v.organisation_id=p_organisation_id and v.id=(p_input->>'versionId')::uuid;

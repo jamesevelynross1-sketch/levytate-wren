@@ -63,8 +63,10 @@ export function LearningTimeModule() {
       setWorkspace(payload);
       const requested = new URLSearchParams(window.location.search).get("learner") ?? "";
       setSelectedLearnerId((current) => current || (payload.learners.some((entry) => entry.learnerRecordId === requested) ? requested : payload.learners[0]?.learnerRecordId || ""));
+      return true;
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Learning Time is unavailable.");
+      return false;
     } finally { setLoading(false); }
   }, []);
 
@@ -83,15 +85,17 @@ export function LearningTimeModule() {
       const response = await fetch("/api/levytate-learning-time", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({...fields,idempotencyKey}) });
       const payload = await response.json() as { message?: string };
       if (!response.ok) throw new Error(payload.message || "The Learning Time action could not be completed.");
+      setNotice(success);
+      if (!await load()) return false;
       pendingKeys.current.delete(fingerprint);
-      setNotice(success); await load(); return true;
+      return true;
     } catch (actionError) {
       setError(actionError instanceof Error ? actionError.message : "The Learning Time action could not be completed.");
       return false;
     } finally { setBusy(false);inFlight.current=false; }
   }, [load]);
 
-  if (loading) return <LoadState />;
+  if (loading && !workspace) return <LoadState />;
   if (error && !workspace) return <MessageState title="Learning Time is unavailable" copy={error} tone="error" onRetry={() => void load()} />;
   if (!workspace) return null;
 

@@ -47,6 +47,8 @@ begin
  update public.levytate_learner_records set actual_end_date=null where organisation_id=org and id='otj-learner';
  begin perform public.levytate_assert_learning_time_period(org,'otj-learner',(version->>'id')::uuid,current_date-4);raise exception 'Unknown terminal date allowed';exception when sqlstate 'PT422' then null;end;
  if public.levytate_apply_learning_time_command(org,emp,'save_activity',input,'{}',true)<>replayed then raise exception 'Lost-response probe changed after lifecycle transition';end if;
+ update public.levytate_users set email='different-employee@example.invalid' where id=emp;
+ begin perform public.levytate_apply_learning_time_command(org,emp,'save_activity',input,'{}',true);raise exception 'Reassigned receipt leaked';exception when sqlstate 'PT403' then null;end;
  if has_table_privilege('service_role','public.levytate_otj_activities','insert') or has_function_privilege('service_role','public.levytate_submit_otj_activity(uuid,uuid,uuid,text,integer)','execute') or has_function_privilege('authenticated','public.levytate_apply_learning_time_command(uuid,uuid,text,jsonb,jsonb,boolean)','execute') then raise exception 'Unsafe privilege';end if;
  raise notice 'Learning Time local transaction checks passed';
 end $$;
