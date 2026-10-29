@@ -1515,8 +1515,7 @@ async function recordAuditEvent(
   };
 
   await supabaseInsert<AuditEventRow>(assertSupabase(), auditEventsTable, [row], {
-    query: "on_conflict=id",
-    prefer: "resolution=merge-duplicates,return=minimal",
+    prefer: "return=minimal",
   });
 }
 
