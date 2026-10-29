@@ -10,6 +10,7 @@ import { createReadinessCache, evaluateReadinessChecks, ServiceHealthTimeoutErro
 import type { ServiceHealthState, ServiceReadiness } from "@/lib/levytate/service-health-contract";
 import type { LevyTateBetaSession } from "@/lib/levytate/config/beta-access";
 import { normaliseMvpUserRole } from "@/lib/levytate/mvp/rbac";
+import { readBoundedJson } from "@/lib/server/bounded-json";
 
 export type HealthState = "operational" | "degraded" | "unavailable";
 export type HealthComponent = { label: string; state: HealthState; checkedAt: string; summary: string; durationMs?: number };
@@ -26,13 +27,18 @@ export const LEVYTATE_READINESS_CACHE_MS = 10_000;
 export const LEVYTATE_MIGRATION_BASELINE = "039 (038 intentionally unapplied)";
 
 const criticalChecks = [
-  { key: "membership", kind: "table", table: "levytate_users", column: "id", label: "Membership and RBAC schema" },
+  { key: "membership", kind: "table", table: "levytate_users", column: "id,active,auth_binding_status,invitation_generation", label: "Membership and invitation schema" },
   { key: "terms", kind: "table", table: "levytate_early_access_terms_acceptances", column: "id", label: "Terms acceptance schema" },
   { key: "security", kind: "table", table: "levytate_audit_events", column: "id", label: "Authentication security events" },
   { key: "rate-limit-operation", kind: "auth-rate-limit", label: "Authentication rate-limit operation" },
   { key: "callback-budget-operation", kind: "auth-callback-budget", label: "Authentication callback security operation" },
   { key: "auth-provider", kind: "auth-provider", label: "Individual authentication service" },
   { key: "migration-baseline", kind: "table", table: "levytate_lift_framework_versions", column: "framework_key", label: "Active migration baseline" },
+  { key: "application-contract", kind: "table", table: "levytate_applications", column: "revision,information_return_owner", label: "Application concurrency schema" },
+  { key: "learner-contract", kind: "table", table: "levytate_learner_records", column: "mutation_revision", label: "Learner concurrency schema" },
+  { key: "people-contract", kind: "table", table: "levytate_people_import_receipts", column: "import_id", label: "People import receipt schema" },
+  { key: "finance-contract", kind: "table", table: "levytate_finance_versions", column: "revision", label: "Finance concurrency schema" },
+  { key: "lift-contract", kind: "table", table: "levytate_lift_workspace_revisions", column: "revision", label: "Lift concurrency schema" },
 ] as const satisfies readonly HealthCheckDefinition[];
 const optionalChecks = [
   { key: "prospect", kind: "table", table: "levytate_prospect_access", column: "id", label: "Optional prospect access diagnostics" },
@@ -172,7 +178,7 @@ export function createSupabaseHealthAdapter(): HealthCheckAdapter {
         signal: controller.signal,
       });
       if (!response.ok) throw new Error("dependency");
-      await response.text();
+      if (!Array.isArray(await readBoundedJson(response, 16 * 1024))) throw new Error("dependency");
     } catch (error) {
       if (controller.signal.aborted) throw new HealthTimeoutError();
       throw error;

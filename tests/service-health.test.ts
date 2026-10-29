@@ -121,6 +121,15 @@ describe("LevyTate public readiness", () => {
 });
 
 describe("authentication rate-limit readiness probe", () => {
+  it.each(["application-contract", "learner-contract", "people-contract", "finance-contract", "lift-contract"])("does not report ready when the required release schema %s is absent", async (key) => {
+    stubRequiredEnvironment();
+    const result = await getPublicReadiness({ bypassCache: true, adapter: async (input) => { if (input.key === key) throw new Error("missing required release schema"); } });
+    expect(result.status).toBe("unavailable");
+  });
+  it.each([new Response("not a Data API response"), Response.json({ message: "wrong shape" }), new Response("x".repeat(17000))])("rejects a malformed successful schema response", async (response) => {
+    stubRequiredEnvironment(); vi.stubGlobal("fetch", vi.fn(async () => response));
+    await expect(createSupabaseHealthAdapter()({ key: "test", label: "test", kind: "table", table: "levytate_users", column: "id", timeoutMs: 50 })).rejects.toThrow();
+  });
   it.each(["callback-budget-operation", "auth-provider"])("treats %s outage as critical without exposing diagnostics", async (key) => {
     stubRequiredEnvironment();
     const result = await getPublicReadiness({ bypassCache: true, adapter: async (input) => {
