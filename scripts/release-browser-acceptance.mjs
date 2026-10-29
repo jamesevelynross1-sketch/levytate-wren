@@ -5,12 +5,23 @@
  */
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { randomUUID } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 import { localUrl, releaseBackend } from "./release-local-fixtures.mjs";
 
 const results = [];
 let browser;
 let phase = "initialisation";
+function failureBudgetWritesSince(since) {
+  const root=process.env.RELEASE_LOCAL_RUNTIME;
+  if(!root?.startsWith("/private/tmp/levytate-release-runtime."))return null;
+  const state=JSON.parse(readFileSync(`${root}/private-stack-state.json`,"utf8")),db=new URL(state.env.DB_URL);
+  if(db.hostname!=="127.0.0.1")throw new Error("Local failure-budget observation required");
+  if(!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(since))throw new Error("Invalid observation timestamp");
+  const r=spawnSync(process.env.RELEASE_PSQL??"/opt/homebrew/opt/postgresql@17/bin/psql",["-X","-A","-t","-q","-v","ON_ERROR_STOP=1"],{env:{...process.env,PGHOST:db.hostname,PGPORT:db.port,PGUSER:db.username,PGPASSWORD:db.password,PGDATABASE:db.pathname.slice(1)},input:`select count(*) from public.levytate_auth_rate_limits where action='magic_link.callback.failure' and updated_at>='${since}'::timestamptz;`,encoding:"utf8"});
+  if(r.status||!/^\d+$/.test(r.stdout.trim()))throw new Error("Failure-budget observation unavailable");
+  return Number(r.stdout.trim());
+}
 function check(name, condition) {
   results.push({ name, status: condition ? "PASS" : "FAIL" });
   console.log(`${condition ? "PASS" : "FAIL"} ${name}`);
@@ -48,14 +59,18 @@ try {
   browser = await chromium.launch({ headless: true });
   const backend = releaseBackend();
   const contexts = new Map();
+  const peopleUiOnly=process.env.RELEASE_PEOPLE_UI_ONLY==="true";
+  const failureBudgetStartedAt=new Date().toISOString();
   for (const tenant of manifest.tenants) {
     for (const user of tenant.users) {
+      if(peopleUiOnly&&(tenant.key!=="a"||user.key!=="lead"))continue;
       const label = `${tenant.key} ${user.role}`;
       const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
       const page = await context.newPage();
       page.on("response", (response) => {
         const path = new URL(response.url()).pathname;
         if (path.startsWith("/api/levytate-auth/") && response.status() >= 400) console.log(`DIAGNOSTIC auth API status ${response.status()} at ${path}`);
+        if(path==="/api/levytate-workspace"&&response.status()>=400)console.log(`DIAGNOSTIC workspace API status ${response.status()}`);
       });
       contexts.set(`${tenant.key}:${user.key}`, { context, page, user, tenant });
       await page.goto(`${app}/levytate/login`);
@@ -98,6 +113,16 @@ try {
       const authCookies = (await context.cookies()).filter((cookie) => /^levytate_(beta_session|auth_access|auth_refresh)$/.test(cookie.name));
       const activeHeaders = callbackCookies.filter((value) => !/Max-Age=0/i.test(value));
       check(`${label}: three HttpOnly host-only cookies`, authCookies.length === 3 && authCookies.every((cookie) => cookie.httpOnly && cookie.path === "/" && cookie.domain === new URL(app).hostname && cookie.sameSite !== "None") && activeHeaders.every((value) => !/Domain=/i.test(value)));
+      if (user.key === "employee" && process.env.RELEASE_SUPABASE_ANON_KEY) {
+        const origin = localUrl(process.env.RELEASE_SUPABASE_URL, "RELEASE_SUPABASE_URL");
+        const access = authCookies.find((cookie) => cookie.name === "levytate_auth_access").value;
+        const direct = await fetch(`${origin}/rest/v1/levytate_employees?select=id`, { headers: { apikey: process.env.RELEASE_SUPABASE_ANON_KEY, Authorization: `Bearer ${access}` } });
+        check(`${label}: genuine authenticated Data API cannot read employer tables directly`, [401, 403].includes(direct.status));
+        const anonymous = await fetch(`${origin}/rest/v1/levytate_users?select=id`, { headers: { apikey: process.env.RELEASE_SUPABASE_ANON_KEY, Authorization: `Bearer ${process.env.RELEASE_SUPABASE_ANON_KEY}` } });
+        check(`${label}: anonymous Data API cannot enumerate memberships`, [401, 403].includes(anonymous.status));
+        const budget = await fetch(`${origin}/rest/v1/rpc/levytate_check_auth_callback_failures`, { method:"POST",headers: { apikey: process.env.RELEASE_SUPABASE_ANON_KEY, Authorization: `Bearer ${access}`,"Content-Type":"application/json" },body:JSON.stringify({p_environment_namespace:"local",p_key_hash:"a".repeat(64)}) });
+        check(`${label}: actual authenticated identity cannot inspect callback budgets`, [401,403].includes(budget.status));
+      }
       const workspace = await context.request.get(`${app}/api/levytate-workspace`);
       const data = await workspace.json();
       check(`${label}: canonical role and tenant resolved`, workspace.status() === 200 && data.workspace?.meta?.userRole === user.role && data.workspace?.meta?.organisationId === tenant.id);
@@ -118,14 +143,62 @@ try {
       await page.setViewportSize({ width: 1280, height: 900 });
     }
   }
-  // Six valid callbacks plus two adversarial replays fit the unchanged ten-
-  // callback security budget. Do not consume it per-role before others sign in.
-  for (const key of ["a:employee", "b:manager"]) {
+  const failureWrites=failureBudgetWritesSince(failureBudgetStartedAt);
+  if(failureWrites!==null)check(`${contexts.size} genuine successful callbacks do not consume failed-link budget`,failureWrites===0);
+  for(const key of peopleUiOnly?["a:lead"]:["a:employee","a:manager","a:lead"]) {
+    const actor=contexts.get(key);
+    for(const path of ["levytate-lift","levytate-learning-time","levytate-requests","levytate-pastoral"]){
+      const gated=await actor.context.request.get(`${app}/api/${path}`);
+      check(`${key}: unapproved ${path} remains tenant-gated`,gated.status()===404);
+    }
+  }
+  if (process.env.RELEASE_UI_RECOVERY === "true") {
+    phase = "People form survives genuine session loss and reauthentication";
+    const lead = contexts.get("a:lead"), page = lead.page;
+    await page.goto(`${app}/levytate/app?module=People`);
+    await page.getByRole("button", { name: "Add employee", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Add employee", exact: true });
+    const syntheticName = `Synthetic retained draft ${manifest.run.slice(0, 8)}`, syntheticEmail = `ui.${manifest.run}.person@example.test`;
+    await dialog.getByLabel("Employee name", { exact: true }).fill(syntheticName);
+    await dialog.getByLabel("Work email", { exact: true }).fill(syntheticEmail);
+    await dialog.getByLabel("Job title", { exact: true }).fill("Synthetic role");
+    await dialog.getByLabel("Department", { exact: true }).fill("Synthetic department");
+    const ended = await lead.context.request.post(`${app}/api/levytate-beta-logout`, { headers: { Origin: app }, maxRedirects: 0 });
+    check("real provider logout invalidates session while unsaved form remains", ended.status() === 303);
+    await dialog.getByRole("button", { name: "Save employee", exact: true }).click();
+    await dialog.getByRole("button", { name: "Reconnect workspace", exact: true }).waitFor();
+    check("401 retains unsaved People form", await dialog.getByLabel("Employee name", { exact: true }).inputValue() === syntheticName);
+    const reached = new Set();
+    await dialog.getByRole("button", { name: "Close dialog" }).focus();
+    for (let index = 0; index < 16; index++) { await page.keyboard.press("Tab"); reached.add(await page.evaluate(() => document.activeElement?.textContent?.trim())); }
+    check("keyboard trap includes both session recovery controls", reached.has("Sign in in new tab") && reached.has("Reconnect workspace"));
+    const opened = lead.context.waitForEvent("page");
+    await dialog.getByRole("button", { name: "Sign in in new tab", exact: true }).click();
+    const login = await opened;
+    await login.waitForLoadState();
+    const sentAt = Date.now();
+    await login.getByLabel("Work email", { exact: true }).fill(lead.user.email);
+    await login.getByRole("button", { name: "Send secure sign-in link", exact: true }).click();
+    await login.getByRole("heading", { name: "Check your email", exact: true }).waitFor();
+    await login.goto(await waitForCapturedLink(mailpit, lead.user.email, app, sentAt));
+    check("same-account recovery uses a genuine new Auth callback", new URL(login.url()).pathname.includes("/app"));
+    await login.close();
+    await dialog.getByRole("button", { name: "Reconnect workspace", exact: true }).click();
+    await dialog.getByRole("button", { name: "Reconnect workspace", exact: true }).waitFor({ state: "detached" });
+    check("reconnected form retains original typed values", await dialog.getByLabel("Employee name", { exact: true }).inputValue() === syntheticName && await dialog.getByLabel("Work email", { exact: true }).inputValue() === syntheticEmail);
+    await dialog.getByRole("button", { name: "Save employee", exact: true }).click();
+    try{await dialog.waitFor({ state: "detached" });}
+    catch(error){console.log("People inline error",(await dialog.getByRole("alert").allTextContents()).join(" | ").slice(0,1200));throw error;}
+    const stored = await backend(`rest/v1/levytate_employees?organisation_id=eq.${lead.tenant.id}&email=eq.${encodeURIComponent(syntheticEmail)}&select=id,name`);
+    check("recovered People form durably saves exactly once", stored.length === 1 && stored[0].name === syntheticName);
+  }
+  // Exercise replay only after all real identities have independently signed in.
+  for (const key of peopleUiOnly?[]:["a:employee", "b:manager"]) {
     const item = contexts.get(key);
     const replay = await item.context.request.get(item.consumedLink, { maxRedirects: 0 });
     check(`${key}: consumed magic link cannot replay`, replay.status() >= 300 && replay.status() < 400 && (replay.headers().location ?? "").includes("invalid-link"));
   }
-  if (manifest.catalogue) {
+  if (manifest.catalogue&&!peopleUiOnly) {
     phase = "separate-role application and enrolment handoff";
     const employeeA = contexts.get("a:employee"), managerA = contexts.get("a:manager"), leadA = contexts.get("a:lead"), leadB = contexts.get("b:lead");
     const post = (actor, data) => actor.context.request.post(`${app}/api/levytate-workspace`, { headers: { Origin: app }, data });
@@ -158,6 +231,7 @@ try {
     const row = await backend(`rest/v1/levytate_learner_records?organisation_id=eq.${employeeA.tenant.id}&application_id=eq.${applicationId}&select=id,lifecycle_status`);
     check("database holds exactly one pre-enrolment handoff", row.length === 1 && row[0].lifecycle_status === "pre_enrolment");
   }
+  if(!peopleUiOnly){
   const employee = contexts.get("a:employee");
   const forged = await employee.context.request.post(`${app}/api/levytate-workspace`, {
     headers: { Origin: app }, data: { type: "saveEmployeeDevelopmentProfile", profile: { employeeId: "b-employee" } },
@@ -167,6 +241,7 @@ try {
   await backend(`rest/v1/levytate_users?id=eq.${manager.user.membershipId}`, "PATCH", { active: false });
   check("revoked Manager blocked on next authenticated API request", [401, 403].includes((await manager.context.request.get(`${app}/api/levytate-workspace`)).status()));
   check("revocation leaves second tenant unaffected", (await contexts.get("b:manager").context.request.get(`${app}/api/levytate-workspace`)).status() === 200);
+  }
   for (const { context, user, tenant } of contexts.values()) {
     const logout = await context.request.post(`${app}/api/levytate-beta-logout`, { headers: { Origin: app }, maxRedirects: 0 });
     check(`${tenant.key} ${user.role}: logout confirmed`, logout.status() === 303);

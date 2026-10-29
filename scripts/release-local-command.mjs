@@ -22,20 +22,31 @@ const state = JSON.parse(readFileSync(`${root}/private-stack-state.json`, "utf8"
 const base = state.env.API_URL;
 if (new URL(base).hostname !== "127.0.0.1") throw new Error("Local API must remain loopback");
 const scriptDir = dirname(fileURLToPath(import.meta.url));
+const database=new URL(state.env.DB_URL);
+if(database.hostname!=="127.0.0.1")throw new Error("Local database must remain loopback");
 const env = {
   ...process.env, SUPABASE_HOME: `${root}/home`, RELEASE_EMAIL_HOOK_SECRET: `v1,whsec_${secrets.hookSecret}`,
   NEXT_PUBLIC_SUPABASE_URL: base, SUPABASE_SERVICE_ROLE_KEY: state.env.SERVICE_ROLE_KEY,
   LEVYTATE_BETA_SESSION_SECRET: secrets.sessionSecret, LEVYTATE_BETA_LOGIN_ENABLED: "false",
   ...(rateSecret ? { LEVYTATE_AUTH_RATE_LIMIT_SECRET: rateSecret } : {}),
   RELEASE_SUPABASE_URL: base, RELEASE_SUPABASE_SERVICE_KEY: state.env.SERVICE_ROLE_KEY,
+  RELEASE_SUPABASE_ANON_KEY: state.env.ANON_KEY,
   RELEASE_APP_URL: process.env.RELEASE_APP_URL ?? "http://localhost:3107", RELEASE_MAILPIT_URL: state.env.MAILPIT_URL,
   RELEASE_FIXTURE_MANIFEST: process.env.RELEASE_FIXTURE_MANIFEST ?? `${root}/fixture-manifest.json`, RELEASE_EVIDENCE_PATH: `${root}/browser-evidence.json`,
+  PGPASSWORD:database.password,RELEASE_PGHOST:database.hostname,RELEASE_PGPORT:database.port,RELEASE_PGUSER:database.username,
+  RELEASE_PGDATABASE:process.env.RELEASE_TEST_DATABASE,RELEASE_PSQL:process.env.RELEASE_PSQL??"/opt/homebrew/opt/postgresql@17/bin/psql",
 };
 const mode = process.argv[2];
 const commands = {
   hook: [process.execPath, [resolve(scriptDir, "release-local-email-hook.mjs")]],
   seed: [process.execPath, [resolve(scriptDir, "release-local-fixtures.mjs")]],
   browser: [process.execPath, [resolve(scriptDir, "release-browser-acceptance.mjs")]],
+  "callback-budget": [process.execPath,[resolve(scriptDir,"release-callback-budget-integrity.mjs")]],
+  readiness: [process.execPath,[resolve(scriptDir,"release-readiness-integrity.mjs")]],
+  database: [process.execPath,[resolve(scriptDir,"release-database-integrity.mjs")]],
+  people: [process.execPath,[resolve(scriptDir,"release-people-integrity.mjs")]],
+  finance: [process.execPath,[resolve(scriptDir,"release-finance-integrity.mjs")]],
+  learner: [process.execPath,[resolve(scriptDir,"release-learner-integrity.mjs")]],
   start: [process.execPath, [resolve(scriptDir, "release-start-local-stack.mjs")]],
   stop: [`${root}/supabase`, ["stack", "stop", "--workdir", `${root}/project`, "--output-format", "json"]],
   "bootstrap-dry-run": [`${root}/supabase`, ["db", "push", "--local", "--dry-run", "--workdir", `${root}/project`]],
