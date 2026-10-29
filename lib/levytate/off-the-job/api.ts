@@ -137,6 +137,8 @@ export type LearningTimeWorkspace = {
 };
 
 export type LearningTimeActivityInput = {
+  idempotencyKey?: string;
+  lockVersion?: number;
   learnerRecordId: string;
   activityId?: string;
   activityDate: string;

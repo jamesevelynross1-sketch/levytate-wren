@@ -65,7 +65,7 @@ export async function POST(request: Request) {
   if (!session) return reply({ message: "Unauthorised." }, 401);
   try {
     const body = await readAuthenticatedJson(request, session.email, 48 * 1024) as LearningTimeAction;
-    if (body.action === "save_activity" && body.activity) return reply(await saveLearningTimeActivity(session, body.activity), 201);
+    if (body.action === "save_activity" && body.activity) return reply(await saveLearningTimeActivity(session, { ...body.activity, idempotencyKey: body.idempotencyKey }), 201);
     if (body.action === "submit_activity" && body.activityId && isNumber(body.lockVersion) && body.idempotencyKey) {
       return reply({ activity: await submitLearningTimeActivity(session, { activityId: body.activityId, lockVersion: body.lockVersion, idempotencyKey: body.idempotencyKey }) });
     }
@@ -82,6 +82,7 @@ export async function POST(request: Request) {
     }
     if (body.action === "create_plan_draft" && body.learnerRecordId && body.originalStartDate && body.practicalStartDate && body.practicalEndDate && body.standardId && body.standardVersion && isNumber(body.priorLearningReductionMinutes) && isNumber(body.individualMinimumMinutes) && isNumber(body.plannedDeliveryMinutes) && body.providerId && body.trainingPlanReference && body.sourceDate) {
       return reply({ version: await createLearningTimePlanDraft(session, {
+        idempotencyKey: body.idempotencyKey ?? "",
         learnerRecordId: body.learnerRecordId, originalStartDate: body.originalStartDate,
         practicalStartDate: body.practicalStartDate, practicalEndDate: body.practicalEndDate,
         standardId: body.standardId, standardVersion: body.standardVersion,
@@ -92,9 +93,10 @@ export async function POST(request: Request) {
         sourceDate: body.sourceDate, inactivityAttentionDays: body.inactivityAttentionDays, notes: body.note,
       }) }, 201);
     }
-    if (body.action === "publish_plan" && body.versionId) return reply({ version: await publishLearningTimePlan(session, { versionId: body.versionId }) });
+    if (body.action === "publish_plan" && body.versionId) return reply({ version: await publishLearningTimePlan(session, { versionId: body.versionId, idempotencyKey: body.idempotencyKey ?? "" }) });
     if (body.action === "add_priority" && body.learnerRecordId && body.planVersionId && body.label && body.sourceReference) {
       return reply({ priority: await addLearningTimePriority(session, {
+        idempotencyKey: body.idempotencyKey ?? "",
         learnerRecordId: body.learnerRecordId, planVersionId: body.planVersionId, label: body.label,
         description: body.description ?? "", ksbReferences: body.ksbReferences,
         sourceType: body.sourceType ?? "provider_training_plan", sourceReference: body.sourceReference,

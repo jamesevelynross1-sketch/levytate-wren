@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertCircle, CheckCircle2, LoaderCircle, Plus, Send, Sparkles } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import type {
   LearningTimeActivityInput,
   LearningTimeActivityView,
@@ -51,6 +51,8 @@ export function LearningTimeModule() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const pendingKeys = useRef(new Map<string,string>());
+  const inFlight = useRef(false);
 
   const load = useCallback(async () => {
     setLoading(true); setError("");
@@ -70,16 +72,23 @@ export function LearningTimeModule() {
   const selectedLearner = useMemo(() => workspace?.learners.find((entry) => entry.learnerRecordId === selectedLearnerId) ?? workspace?.learners[0] ?? null, [selectedLearnerId, workspace]);
 
   const act = useCallback(async (body: JsonRecord, success: string) => {
+    if (inFlight.current) return false;
+    inFlight.current=true;
     setBusy(true); setError(""); setNotice("");
     try {
-      const response = await fetch("/api/levytate-learning-time", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const fields = Object.fromEntries(Object.entries(body).filter(([key]) => key!=="idempotencyKey"));
+      const fingerprint=JSON.stringify(fields);
+      const idempotencyKey=pendingKeys.current.get(fingerprint) ?? clientKey("learning-time");
+      pendingKeys.current.set(fingerprint,idempotencyKey);
+      const response = await fetch("/api/levytate-learning-time", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({...fields,idempotencyKey}) });
       const payload = await response.json() as { message?: string };
       if (!response.ok) throw new Error(payload.message || "The Learning Time action could not be completed.");
+      pendingKeys.current.delete(fingerprint);
       setNotice(success); await load(); return true;
     } catch (actionError) {
       setError(actionError instanceof Error ? actionError.message : "The Learning Time action could not be completed.");
       return false;
-    } finally { setBusy(false); }
+    } finally { setBusy(false);inFlight.current=false; }
   }, [load]);
 
   if (loading) return <LoadState />;
@@ -155,7 +164,7 @@ function LearnerSummary({ learner }: { learner: LearningTimeLearnerView }) {
 function ActivityForm({ learner, existing, prepared, busy, onSaved, act }: { learner: LearningTimeLearnerView; existing: LearningTimeActivityView | null; prepared: AssistantPreparedDraft | null; busy: boolean; onSaved: () => void; act: (body: JsonRecord, success: string) => Promise<boolean> }) {
   const today = new Date().toISOString().slice(0, 10);
   const suggestion = prepared?.activity;
-  const [form, setForm] = useState<LearningTimeActivityInput>(() => ({ learnerRecordId: learner.learnerRecordId, activityId: existing?.id, activityDate: existing?.activityDate ?? (prepared ? "" : today), startedAt: existing?.startedAt ?? (prepared ? "" : "09:00"), endedAt: existing?.endedAt ?? (prepared ? "" : "10:00"), breakMinutes: existing?.breakMinutes ?? 0, category: existing?.category ?? suggestion?.category ?? "provider_workshop", title: existing?.title ?? suggestion?.title ?? "", description: existing?.description ?? suggestion?.description ?? "", whatWasNew: existing?.whatWasNew ?? suggestion?.whatWasNew ?? "", standardRelevance: existing?.standardRelevance ?? suggestion?.standardRelevance ?? "", reflection: existing?.reflection ?? suggestion?.reflection ?? "", workingHoursBasis: existing?.workingHoursBasis ?? suggestion?.workingHoursBasis ?? "not_confirmed", compensationNote: existing?.compensationNote ?? suggestion?.compensationNote ?? "", separateFromProductiveWork: existing?.separateFromProductiveWork ?? suggestion?.separateFromProductiveWork ?? null, ksbReferences: existing?.ksbReferences ?? [], evidenceReference: existing?.evidenceReference ?? "" }));
+  const [form, setForm] = useState<LearningTimeActivityInput>(() => ({ learnerRecordId: learner.learnerRecordId, activityId: existing?.id, lockVersion: existing?.lockVersion, activityDate: existing?.activityDate ?? (prepared ? "" : today), startedAt: existing?.startedAt ?? "", endedAt: existing?.endedAt ?? "", breakMinutes: existing?.breakMinutes ?? 0, category: existing?.category ?? suggestion?.category ?? "provider_workshop", title: existing?.title ?? suggestion?.title ?? "", description: existing?.description ?? suggestion?.description ?? "", whatWasNew: existing?.whatWasNew ?? suggestion?.whatWasNew ?? "", standardRelevance: existing?.standardRelevance ?? suggestion?.standardRelevance ?? "", reflection: existing?.reflection ?? suggestion?.reflection ?? "", workingHoursBasis: existing?.workingHoursBasis ?? suggestion?.workingHoursBasis ?? "not_confirmed", compensationNote: existing?.compensationNote ?? suggestion?.compensationNote ?? "", separateFromProductiveWork: existing?.separateFromProductiveWork ?? suggestion?.separateFromProductiveWork ?? null, ksbReferences: existing?.ksbReferences ?? [], evidenceReference: existing?.evidenceReference ?? "" }));
   const update = <K extends keyof LearningTimeActivityInput>(key: K, value: LearningTimeActivityInput[K]) => setForm((current) => ({ ...current, [key]: value }));
   const submit = async (event: FormEvent) => { event.preventDefault(); if (await act({ action: "save_activity", activity: form }, existing ? "Draft updated." : "Private draft saved.")) onSaved(); };
   return <form onSubmit={submit} className="mb-5 grid gap-4 rounded-2xl border border-[#0b8075]/15 bg-[#f2f8f6] p-4 sm:grid-cols-2">
@@ -195,12 +204,24 @@ function ActivityList({ learner, canEdit, canReview, busy, onEdit, act }: { lear
 }
 
 function ConfirmationButton({ learner, activity, busy, act }: { learner: LearningTimeLearnerView; activity: LearningTimeActivityView; busy: boolean; act: (body: JsonRecord, success: string) => Promise<boolean> }) {
-  const confirm = () => {
-    const reference = window.prompt("Enter the attributable provider source reference (for example, LMS record or provider confirmation ID).");
-    if (!reference) return;
-    void act({ action: "record_confirmation", activityId: activity.id, outcome: "confirmed", confirmedMinutes: activity.durationMinutes, sourceType: "provider_report", providerId: learner.providerId, sourceReference: reference, sourceDate: new Date().toISOString().slice(0, 10), note: "Provider-confirmed record captured by an authorised employer user.", idempotencyKey: clientKey("confirm") }, "Attributable provider confirmation recorded.");
+  const [open,setOpen]=useState(false);
+  const [form,setForm]=useState({outcome:"",minutes:"",sourceType:"",reference:"",date:"",note:""});
+  const update=(field: keyof typeof form,value: string)=>setForm(current=>({...current,[field]:value}));
+  const confirm = async (event: FormEvent) => {
+    event.preventDefault();
+    if (await act({ action: "record_confirmation", activityId: activity.id, outcome: form.outcome, confirmedMinutes: Number(form.minutes), sourceType: form.sourceType, providerId: learner.providerId, sourceReference: form.reference, sourceDate: form.date, note: form.note }, "Attributable provider confirmation recorded.")) setOpen(false);
   };
-  return <button type="button" disabled={busy} onClick={confirm} className={primaryButton}>Record provider confirmation</button>;
+  if (!open) return <button type="button" disabled={busy} onClick={()=>setOpen(true)} className={primaryButton}>Record provider confirmation</button>;
+  return <form onSubmit={confirm} className="grid w-full gap-3 rounded-xl bg-[#f6f9f7] p-4 sm:grid-cols-2">
+    <p className="text-xs leading-5 sm:col-span-2">Transcribe the provider’s actual evidence. LevyTate does not confirm time on the provider’s behalf.</p>
+    <Field label="Provider outcome"><select required value={form.outcome} onChange={event=>update("outcome",event.target.value)} className={inputClass}><option value="">Select actual outcome</option><option value="confirmed">Confirmed</option><option value="partially_confirmed">Partially confirmed</option><option value="not_confirmed">Not confirmed</option></select></Field>
+    <Field label={`Confirmed minutes (maximum ${activity.durationMinutes})`}><input required type="number" min={0} max={activity.durationMinutes} step={1} value={form.minutes} onChange={event=>update("minutes",event.target.value)} className={inputClass}/></Field>
+    <Field label="Provider evidence type"><select required value={form.sourceType} onChange={event=>update("sourceType",event.target.value)} className={inputClass}><option value="">Select evidence type</option><option value="provider_report">Provider report</option><option value="provider_email">Provider email</option><option value="provider_review">Provider review</option><option value="mis_lms_import">MIS / LMS record</option><option value="provider_api">Provider API record</option><option value="other_documented_provider_evidence">Other documented provider evidence</option></select></Field>
+    <Field label="Evidence date"><input required type="date" min={activity.activityDate} max={new Date().toISOString().slice(0,10)} value={form.date} onChange={event=>update("date",event.target.value)} className={inputClass}/></Field>
+    <Field label="Attributable source reference"><input required maxLength={1000} value={form.reference} onChange={event=>update("reference",event.target.value)} className={inputClass}/></Field>
+    <Field label="Evidence note"><textarea maxLength={2000} value={form.note} onChange={event=>update("note",event.target.value)} className={inputClass}/></Field>
+    <div className="flex gap-2 sm:col-span-2"><button disabled={busy} className={primaryButton}>Save provider evidence</button><button type="button" disabled={busy} onClick={()=>setOpen(false)} className={secondaryButton}>Cancel</button></div>
+  </form>;
 }
 
 function PlanPanel({ learner, busy, act }: { learner: LearningTimeLearnerView; busy: boolean; act: (body: JsonRecord, success: string) => Promise<boolean> }) {
@@ -215,8 +236,7 @@ function PriorityForm({ learner, busy, act }: { learner: LearningTimeLearnerView
 }
 
 function PlanForm({ learner, busy, act }: { learner: LearningTimeLearnerView; busy: boolean; act: (body: JsonRecord, success: string) => Promise<boolean> }) {
-  const today = new Date().toISOString().slice(0, 10);
-  const [form, setForm] = useState({ originalStartDate: today, practicalStartDate: today, practicalEndDate: "", standardId: learner.standardId, standardVersion: "", individualHours: "187", plannedHours: "200", priorLearningHours: "0", legacyHours: "", trainingPlanReference: "", sourceDate: today });
+  const [form, setForm] = useState({ originalStartDate: "", practicalStartDate: "", practicalEndDate: "", standardId: learner.standardId, standardVersion: "", individualHours: "", plannedHours: "", priorLearningHours: "", legacyHours: "", trainingPlanReference: "", sourceDate: "" });
   const update = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
   const submit = (event: FormEvent) => { event.preventDefault(); void act({ action: "create_plan_draft", learnerRecordId: learner.learnerRecordId, originalStartDate: form.originalStartDate, practicalStartDate: form.practicalStartDate, practicalEndDate: form.practicalEndDate, standardId: form.standardId, standardVersion: form.standardVersion, priorLearningReductionMinutes: Math.round(Number(form.priorLearningHours) * 60), individualMinimumMinutes: Math.round(Number(form.individualHours) * 60), plannedDeliveryMinutes: Math.round(Number(form.plannedHours) * 60), legacyIndicativeMinimumMinutes: form.legacyHours ? Math.round(Number(form.legacyHours) * 60) : null, providerId: learner.providerId, trainingPlanReference: form.trainingPlanReference, sourceType: "provider_training_plan", sourceDate: form.sourceDate }, "Draft plan created. Publish it only after checking the official requirement and agreed training plan."); };
   return <form onSubmit={submit} className="grid gap-3"><Field label="Original apprenticeship start"><input required type="date" value={form.originalStartDate} onChange={(event) => update("originalStartDate", event.target.value)} className={inputClass}/></Field><Field label="Practical period"><div className="grid grid-cols-2 gap-2"><input aria-label="Practical period start" required type="date" value={form.practicalStartDate} onChange={(event) => update("practicalStartDate", event.target.value)} className={inputClass}/><input aria-label="Practical period end" required type="date" value={form.practicalEndDate} onChange={(event) => update("practicalEndDate", event.target.value)} className={inputClass}/></div></Field><Field label="Standard and version"><div className="grid grid-cols-2 gap-2"><input required value={form.standardId} onChange={(event) => update("standardId", event.target.value)} placeholder="ST1512" className={inputClass}/><input required value={form.standardVersion} onChange={(event) => update("standardVersion", event.target.value)} placeholder="2.1" className={inputClass}/></div></Field><Field label="Individual minimum hours"><input required min={0} step="0.5" type="number" value={form.individualHours} onChange={(event) => update("individualHours", event.target.value)} className={inputClass}/></Field><Field label="Planned delivery hours"><input required min={0} step="0.5" type="number" value={form.plannedHours} onChange={(event) => update("plannedHours", event.target.value)} className={inputClass}/></Field><Field label="Prior-learning reduction hours"><input required min={0} step="0.5" type="number" value={form.priorLearningHours} onChange={(event) => update("priorLearningHours", event.target.value)} className={inputClass}/></Field><Field label="Legacy indicative minimum hours (required only for starts before 1 August 2025)"><input min={0} step="0.5" type="number" value={form.legacyHours} onChange={(event) => update("legacyHours", event.target.value)} className={inputClass}/></Field><Field label="Training-plan reference"><input required value={form.trainingPlanReference} onChange={(event) => update("trainingPlanReference", event.target.value)} className={inputClass}/></Field><Field label="Source date"><input required type="date" value={form.sourceDate} onChange={(event) => update("sourceDate", event.target.value)} className={inputClass}/></Field><button disabled={busy} className={primaryButton}>Create versioned draft</button><p className="text-[11px] leading-5 text-[#102c3d]/50">Publishing is a separate governed action. A future version never silently rewrites an earlier plan.</p></form>;

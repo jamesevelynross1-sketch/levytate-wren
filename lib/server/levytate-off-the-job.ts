@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import type { LevyTateBetaSession } from "@/lib/levytate/config/beta-access";
 import type {
   LearningTimeActivityInput,
@@ -25,9 +24,8 @@ import { isOffTheJobAssistantEnabledForOrganisation } from "@/lib/server/levytat
 import {
   getLevyTateSupabaseConfig,
   supabaseFetchJson,
-  supabaseInsert,
   supabaseSelect,
-  supabaseUpdate,
+  supabaseSelectAll,
 } from "@/lib/server/levytate-supabase";
 
 const regulatoryNotice = "LevyTate helps you prepare and organise learning evidence. Your training provider remains responsible for confirming the evidence used for off-the-job training.";
@@ -79,24 +77,22 @@ export async function getLearningTimeWorkspace(session: LevyTateBetaSession): Pr
   const { organisation, user } = await authorisedContext(session);
   const config = requireConfig();
   const role = normaliseMvpUserRole(user.role);
-  const employees = await supabaseSelect<EmployeeRow>(config, "levytate_employees", new URLSearchParams({
+  const employees = await supabaseSelectAll<EmployeeRow>(config, "levytate_employees", new URLSearchParams({
     select: "id,name,email,job_title,department,site,manager_id,status",
     organisation_id: `eq.${organisation.id}`,
     status: "eq.Active",
-    order: "name.asc",
-    limit: "1000",
+    order: "name.asc,id.asc",
   }));
   const visibleEmployees = scopedEmployees(role, user.email, employees);
   const employeeIds = visibleEmployees.map((employee) => employee.id);
   if (!employeeIds.length) return emptyWorkspace(role);
 
-  const learnerRows = await supabaseSelect<LearnerRow>(config, "levytate_learner_records", new URLSearchParams({
+  const learnerRows = await supabaseSelectAll<LearnerRow>(config, "levytate_learner_records", new URLSearchParams({
     select: "id,employee_id,programme_id,provider_id,lifecycle_status,actual_start_date,expected_start_date,expected_end_date,record_status",
     organisation_id: `eq.${organisation.id}`,
     employee_id: inFilter(employeeIds),
     record_status: "eq.Active",
-    order: "updated_at.desc",
-    limit: "1000",
+    order: "updated_at.desc,id.asc",
   }));
   if (!learnerRows.length) return emptyWorkspace(role);
   const learnerIds = learnerRows.map((learner) => learner.id);
@@ -202,6 +198,8 @@ export async function saveLearningTimeActivity(session: LevyTateBetaSession, inp
   const { organisation, user } = await authorisedContext(session);
   if (normaliseMvpUserRole(user.role) !== "Employee") throw new LevyTateLearningTimeError("Only an employee may create their own learning-time activity.", 403);
   assertActivityInput(input);
+  const previous = await probeLearningTimeCommand<ActivityRow>(organisation.id,user.id,"save_activity",input as unknown as Record<string,unknown>);
+  if (previous) return { activity: previous, assessment: { outcome: previous.deterministic_outcome, durationMinutes: previous.duration_minutes, reasons: stringArray(previous.deterministic_reasons), passedTests: [], failedTests: [], clarificationItems: [], warnings: [] } };
   const config = requireConfig();
   const employee = (await supabaseSelect<EmployeeRow>(config, "levytate_employees", new URLSearchParams({
     select: "id,name,email,job_title,department,site,manager_id,status", organisation_id: `eq.${organisation.id}`,
@@ -213,26 +211,28 @@ export async function saveLearningTimeActivity(session: LevyTateBetaSession, inp
     organisation_id: `eq.${organisation.id}`, id: `eq.${input.learnerRecordId}`, employee_id: `eq.${employee.id}`, record_status: "eq.Active", limit: "1",
   })))[0];
   if (!learner) throw new LevyTateLearningTimeError("The learner record was not found in your scope.", 404);
+  const pinnedActivity = input.activityId ? (await supabaseSelect<ActivityRow>(config,"levytate_otj_activities",new URLSearchParams({select:"id,plan_version_id",organisation_id:`eq.${organisation.id}`,id:`eq.${input.activityId}`,created_by_user_id:`eq.${user.id}`,limit:"1"})))[0] : null;
+  if (input.activityId && !pinnedActivity) throw new LevyTateLearningTimeError("Your activity was not found.",404);
   const plan = (await supabaseSelect<PlanRow>(config, "levytate_otj_plans", new URLSearchParams({
     select: "id,learner_record_id,status,current_published_version_id", organisation_id: `eq.${organisation.id}`,
     learner_record_id: `eq.${learner.id}`, status: "eq.published", limit: "1",
   })))[0];
   if (!plan?.current_published_version_id) throw new LevyTateLearningTimeError("Your agreed learning-time plan has not been configured yet.", 409);
   const version = (await supabaseSelect<PlanVersionRow>(config, "levytate_otj_plan_versions", new URLSearchParams({
-    select: planVersionSelect, organisation_id: `eq.${organisation.id}`, id: `eq.${plan.current_published_version_id}`, status: "eq.published", limit: "1",
+    select: planVersionSelect, organisation_id: `eq.${organisation.id}`, id: `eq.${pinnedActivity?.plan_version_id ?? plan.current_published_version_id}`, status: "in.(published,superseded)", limit: "1",
   })))[0];
   if (!version) throw new LevyTateLearningTimeError("The published learning-time plan is unavailable.", 409);
   const activeBreak = (await supabaseSelect<BreakRow>(config, "levytate_learner_breaks_in_learning", new URLSearchParams({
     select: "learner_record_id,start_date,actual_return_date,status", organisation_id: `eq.${organisation.id}`,
     learner_record_id: `eq.${learner.id}`, status: "eq.active", limit: "1",
   })))[0];
-  const sameDay = await supabaseSelect<ActivityRow>(config, "levytate_otj_activities", new URLSearchParams({
+  const sameDay = await supabaseSelectAll<ActivityRow>(config, "levytate_otj_activities", new URLSearchParams({
     select: activitySelect, organisation_id: `eq.${organisation.id}`, learner_record_id: `eq.${learner.id}`,
-    activity_date: `eq.${input.activityDate}`, status: "not.in.(withdrawn,not_counted)", limit: "100",
+    activity_date: `eq.${input.activityDate}`, status: "not.in.(withdrawn,not_counted)", order: "id.asc",
   }));
   const overlap = sameDay.some((activity) => activity.id !== input.activityId && timesOverlap(input.startedAt, input.endedAt, activity.started_at, activity.ended_at));
   const assessment = assessCandidateOffTheJobActivity({
-    lifecycleStatus: learner.lifecycle_status,
+    lifecycleStatus: learner.lifecycle_status === "break_in_learning" && activeBreak?.start_date && input.activityDate < activeBreak.start_date ? "enrolled" : learner.lifecycle_status,
     activityDate: input.activityDate,
     startedAt: input.startedAt,
     endedAt: input.endedAt,
@@ -277,36 +277,9 @@ export async function saveLearningTimeActivity(session: LevyTateBetaSession, inp
     evidence_reference: bounded(input.evidenceReference || "", 1000),
     deterministic_outcome: assessment.outcome,
     deterministic_reasons: assessment.reasons.slice(0, 20).map((reason) => bounded(reason, 500)),
-    status: nonCounted ? "not_counted" : "draft",
-    created_by_user_id: user.id,
-    created_by_email: user.email.toLowerCase(),
-    submitted_at: nonCounted ? new Date().toISOString() : null,
-    lock_version: 0,
-    updated_at: new Date().toISOString(),
   };
-  if (input.activityId) {
-    const existing = (await supabaseSelect<ActivityRow>(config, "levytate_otj_activities", new URLSearchParams({
-      select: activitySelect, organisation_id: `eq.${organisation.id}`, id: `eq.${input.activityId}`,
-      created_by_user_id: `eq.${user.id}`, status: "in.(draft,needs_information)", limit: "1",
-    })))[0];
-    if (!existing) throw new LevyTateLearningTimeError("Only your private draft or returned activity can be edited.", 409);
-    const [updated] = await supabaseUpdate<ActivityRow>(config, "levytate_otj_activities", `organisation_id=eq.${organisation.id}&id=eq.${existing.id}&status=in.(draft,needs_information)&lock_version=eq.${existing.lock_version}`, {
-      ...row, status: existing.status, submitted_at: existing.submitted_at,
-      created_by_user_id: existing.created_by_user_id, created_by_email: user.email.toLowerCase(), lock_version: existing.lock_version + 1,
-    });
-    if (!updated) throw new LevyTateLearningTimeError("The draft changed; refresh before trying again.", 409);
-    return { activity: updated, assessment };
-  }
-  const [created] = await supabaseInsert<ActivityRow>(config, "levytate_otj_activities", [{ id: randomUUID(), ...row }]);
-  if (!created) throw new LevyTateLearningTimeError("The learning activity could not be saved.", 503);
-  await supabaseInsert(config, "levytate_otj_activity_events", [{
-    id: randomUUID(), organisation_id: organisation.id, activity_id: created.id,
-    event_type: nonCounted ? "marked_not_counted" : "draft_created", actor_user_id: user.id, actor_role: user.role,
-    previous_state: null, new_state: created.status,
-    safe_summary: nonCounted ? "Ineligible activity retained as a non-counted learning note." : "Private learner draft created.",
-    idempotency_key: randomUUID(),
-  }], { prefer: "return=minimal" });
-  return { activity: created, assessment };
+  const activity = await learningTimeCommand<ActivityRow>(organisation.id,user.id,"save_activity",input as unknown as Record<string,unknown>,row);
+  return { activity, assessment };
 }
 
 export async function submitLearningTimeActivity(session: LevyTateBetaSession, input: { activityId: string; lockVersion: number; idempotencyKey: string }) {
@@ -326,19 +299,12 @@ export async function submitLearningTimeActivity(session: LevyTateBetaSession, i
   if (activity?.lock_version === input.lockVersion && stringArray(activity.deterministic_reasons).some((reason) => reason.toLowerCase().includes("overlaps another learning activity"))) {
     throw new LevyTateLearningTimeError("Overlapping activity requires resolution before submission.", 409);
   }
-  return rpc<ActivityRow>("levytate_submit_otj_activity", {
-    p_organisation_id: organisation.id, p_activity_id: input.activityId, p_actor_user_id: user.id,
-    p_idempotency_key: idempotency(input.idempotencyKey), p_expected_lock_version: input.lockVersion,
-  });
+  return learningTimeCommand<ActivityRow>(organisation.id,user.id,"submit_activity",input);
 }
 
 export async function transitionLearningTimeActivity(session: LevyTateBetaSession, input: { activityId: string; action: string; note: string; lockVersion: number; idempotencyKey: string }) {
   const { organisation, user } = await authorisedContext(session);
-  return rpc<ActivityRow>("levytate_transition_otj_activity", {
-    p_organisation_id: organisation.id, p_activity_id: input.activityId, p_actor_user_id: user.id,
-    p_action: input.action, p_safe_summary: bounded(input.note, 1000), p_idempotency_key: idempotency(input.idempotencyKey),
-    p_expected_lock_version: input.lockVersion,
-  });
+  return learningTimeCommand<ActivityRow>(organisation.id,user.id,"transition_activity",input);
 }
 
 export async function recordLearningTimeConfirmation(session: LevyTateBetaSession, input: {
@@ -350,16 +316,11 @@ export async function recordLearningTimeConfirmation(session: LevyTateBetaSessio
   if (!confirmationSourceTypes.has(input.sourceType)) throw new LevyTateLearningTimeError("A valid attributable provider source type is required.");
   if (!Number.isInteger(input.confirmedMinutes) || input.confirmedMinutes < 0) throw new LevyTateLearningTimeError("Confirmed minutes must be a non-negative whole number.");
   assertIsoDate(input.sourceDate, "Provider source date");
-  return rpc<ConfirmationRow>("levytate_record_otj_confirmation", {
-    p_organisation_id: organisation.id, p_activity_id: input.activityId, p_actor_user_id: user.id,
-    p_outcome: input.outcome, p_confirmed_minutes: input.confirmedMinutes, p_source_type: input.sourceType,
-    p_provider_id: boundedRequired(input.providerId, 200, "Provider"),
-    p_source_reference: boundedRequired(input.sourceReference, 1000, "Provider source reference"),
-    p_source_date: input.sourceDate, p_note: bounded(input.note, 2000), p_idempotency_key: idempotency(input.idempotencyKey),
-  });
+  return learningTimeCommand<ConfirmationRow>(organisation.id,user.id,"record_confirmation",input);
 }
 
 export async function createLearningTimePlanDraft(session: LevyTateBetaSession, input: {
+  idempotencyKey: string;
   learnerRecordId: string; originalStartDate: string; practicalStartDate: string; practicalEndDate: string;
   standardId: string; standardVersion: string; priorLearningReductionMinutes: number; individualMinimumMinutes: number;
   plannedDeliveryMinutes: number; legacyIndicativeMinimumMinutes?: number | null; providerId: string;
@@ -367,6 +328,8 @@ export async function createLearningTimePlanDraft(session: LevyTateBetaSession, 
 }) {
   const { organisation, user } = await authorisedContext(session);
   assertPlanManager(user.role);
+  const previous=await probeLearningTimeCommand<PlanVersionRow>(organisation.id,user.id,"create_plan_draft",input);
+  if (previous) return previous;
   assertIsoDate(input.originalStartDate, "Original apprenticeship start date");
   assertIsoDate(input.practicalStartDate, "Practical-period start date");
   assertIsoDate(input.practicalEndDate, "Practical-period end date");
@@ -395,20 +358,7 @@ export async function createLearningTimePlanDraft(session: LevyTateBetaSession, 
   if (regime === "standard_minimum" && input.individualMinimumMinutes < adjustedFloor) throw new LevyTateLearningTimeError("The individual minimum cannot be below the applicable standard minimum after prior-learning reduction or the current 187-hour floor.");
   if (regime === "legacy_percentage" && !Number.isInteger(input.legacyIndicativeMinimumMinutes)) throw new LevyTateLearningTimeError("A legacy indicative minimum from the agreed training plan is required.");
   if (!Number.isInteger(input.plannedDeliveryMinutes) || input.plannedDeliveryMinutes < input.individualMinimumMinutes) throw new LevyTateLearningTimeError("Planned delivery cannot be below the individual minimum.");
-  let plan = (await supabaseSelect<PlanRow>(config, "levytate_otj_plans", new URLSearchParams({
-    select: "id,learner_record_id,status,current_published_version_id", organisation_id: `eq.${organisation.id}`,
-    learner_record_id: `eq.${learner.id}`, limit: "1",
-  })))[0];
-  if (!plan) {
-    [plan] = await supabaseInsert<PlanRow>(config, "levytate_otj_plans", [{ id: randomUUID(), organisation_id: organisation.id, learner_record_id: learner.id, status: "draft", created_by: user.id }]);
-  }
-  if (!plan) throw new LevyTateLearningTimeError("The learning-time plan could not be created.", 503);
-  const versions = await supabaseSelect<PlanVersionRow>(config, "levytate_otj_plan_versions", new URLSearchParams({
-    select: planVersionSelect, organisation_id: `eq.${organisation.id}`, plan_id: `eq.${plan.id}`, order: "version_number.desc", limit: "100",
-  }));
-  if (versions.some((version) => version.status === "draft")) throw new LevyTateLearningTimeError("A draft plan version already exists.", 409);
-  const [version] = await supabaseInsert<PlanVersionRow>(config, "levytate_otj_plan_versions", [{
-    id: randomUUID(), organisation_id: organisation.id, plan_id: plan.id, version_number: (versions[0]?.version_number ?? 0) + 1,
+  return learningTimeCommand<PlanVersionRow>(organisation.id,user.id,"create_plan_draft",input,{
     policy_regime: regime, original_apprenticeship_start_date: input.originalStartDate,
     practical_period_start_date: input.practicalStartDate, practical_period_end_date: input.practicalEndDate,
     standard_id: boundedRequired(input.standardId, 40, "Standard"), standard_version: boundedRequired(input.standardVersion, 40, "Standard version"),
@@ -418,19 +368,18 @@ export async function createLearningTimePlanDraft(session: LevyTateBetaSession, 
     planned_delivery_minutes: input.plannedDeliveryMinutes, provider_id: boundedRequired(input.providerId, 200, "Provider"),
     training_plan_reference: boundedRequired(input.trainingPlanReference, 500, "Training-plan reference"), source_type: input.sourceType,
     source_date: input.sourceDate, inactivity_attention_days: input.inactivityAttentionDays ?? 28,
-    notes: bounded(input.notes || "", 4000), status: "draft", created_by: user.id,
-  }]);
-  await supabaseUpdate(config, "levytate_otj_plans", `organisation_id=eq.${organisation.id}&id=eq.${plan.id}`, { status: "draft", updated_at: new Date().toISOString() }, { prefer: "return=minimal" });
-  return version;
+    notes: bounded(input.notes || "", 4000),
+  });
 }
 
-export async function publishLearningTimePlan(session: LevyTateBetaSession, input: { versionId: string }) {
+export async function publishLearningTimePlan(session: LevyTateBetaSession, input: { versionId: string; idempotencyKey: string }) {
   const { organisation, user } = await authorisedContext(session);
   assertPlanManager(user.role);
-  return rpc<PlanVersionRow>("levytate_publish_otj_plan", { p_organisation_id: organisation.id, p_version_id: input.versionId, p_actor_user_id: user.id });
+  return learningTimeCommand<PlanVersionRow>(organisation.id,user.id,"publish_plan",input);
 }
 
 export async function addLearningTimePriority(session: LevyTateBetaSession, input: {
+  idempotencyKey: string;
   learnerRecordId: string; planVersionId: string; label: string; description: string; ksbReferences?: string[];
   sourceType: string; sourceReference: string; targetDate?: string | null;
 }) {
@@ -438,15 +387,12 @@ export async function addLearningTimePriority(session: LevyTateBetaSession, inpu
   assertPlanManager(user.role);
   if (!prioritySourceTypes.has(input.sourceType)) throw new LevyTateLearningTimeError("A valid learning-priority source type is required.");
   if (input.targetDate) assertIsoDate(input.targetDate, "Priority target date");
-  const config = requireConfig();
-  const [priority] = await supabaseInsert<PriorityRow>(config, "levytate_otj_learning_priorities", [{
-    id: randomUUID(), organisation_id: organisation.id, learner_record_id: input.learnerRecordId,
+  return learningTimeCommand<PriorityRow>(organisation.id,user.id,"add_priority",input,{
     plan_version_id: input.planVersionId, label: boundedRequired(input.label, 180, "Priority label"),
     description: bounded(input.description, 2000), ksb_references: boundedStringArray(input.ksbReferences, 30, 80),
     source_type: input.sourceType, source_reference: boundedRequired(input.sourceReference, 500, "Priority source"),
-    target_date: input.targetDate || null, status: "active", created_by: user.id,
-  }]);
-  return priority;
+    target_date: input.targetDate || null,
+  });
 }
 
 async function authorisedContext(session: LevyTateBetaSession) {
@@ -454,8 +400,8 @@ async function authorisedContext(session: LevyTateBetaSession) {
   if (!(await isOffTheJobAssistantEnabledForOrganisation(context.organisation.id))) {
     throw new LevyTateLearningTimeError("Learning Time is not enabled for this organisation.", 404);
   }
-  if (normaliseMvpUserRole(context.user.role) === "Platform Admin") {
-    throw new LevyTateLearningTimeError("Platform Admin cannot access employer learning evidence.", 403);
+  if (!["Employee","Line Manager","Apprenticeship Lead","Employer Admin"].includes(normaliseMvpUserRole(context.user.role))) {
+    throw new LevyTateLearningTimeError("This role cannot access individual learning evidence.", 403);
   }
   return context;
 }
@@ -546,20 +492,41 @@ function latestConfirmations(rows: ConfirmationRow[]) {
 async function selectByLearners<T>(table: string, organisationId: string, learnerIds: string[], select: string) {
   if (!learnerIds.length) return [];
   const config = requireConfig();
-  return supabaseSelect<T>(config, table, new URLSearchParams({ select, organisation_id: `eq.${organisationId}`, learner_record_id: inFilter(learnerIds), limit: "5000" }));
+  return supabaseSelectAll<T>(config, table, new URLSearchParams({ select, organisation_id: `eq.${organisationId}`, learner_record_id: inFilter(learnerIds), order: "id.asc" }));
 }
 
 async function selectByIds<T>(table: string, field: string, ids: string[], select: string, organisationId?: string) {
   if (!ids.length) return [];
   const config = requireConfig();
-  const query = new URLSearchParams({ select, [field]: inFilter([...new Set(ids)]), limit: "5000" });
+  const query = new URLSearchParams({ select, [field]: inFilter([...new Set(ids)]), order: table === "levytate_providers" ? "organisation_id.asc,provider_id.asc" : "id.asc" });
+  if (!organisationId && ["levytate_provider_programmes","levytate_providers"].includes(table)) {
+    const [catalogue] = await supabaseSelect<{id:string}>(config,"levytate_organisations",new URLSearchParams({select:"id",slug:"eq.levytate-internal",limit:"1"}));
+    if (!catalogue) throw new LevyTateLearningTimeError("The canonical programme catalogue is unavailable.",503);
+    organisationId=catalogue.id;
+  }
   if (organisationId) query.set("organisation_id", `eq.${organisationId}`);
-  return supabaseSelect<T>(config, table, query);
+  return supabaseSelectAll<T>(config, table, query);
 }
 
-async function rpc<T>(name: string, body: Record<string, unknown>) {
-  const result = await supabaseFetchJson<T[]>(requireConfig(), `rpc/${name}`, { method: "POST", body: JSON.stringify(body) });
-  return result[0] ?? null;
+export async function learningTimeCommand<T>(organisationId: string,actorId: string,action: string,input: Record<string,unknown>,row: Record<string,unknown>={}) {
+  const result=await invokeLearningTimeCommand<T>(organisationId,actorId,action,input,row,false);
+  if (!result) throw new LevyTateLearningTimeError("The learning-time write could not be confirmed.",503);
+  return result;
+}
+export async function probeLearningTimeCommand<T>(organisationId: string,actorId: string,action: string,input: Record<string,unknown>) {
+  return invokeLearningTimeCommand<T>(organisationId,actorId,action,input,{},true);
+}
+async function invokeLearningTimeCommand<T>(organisationId: string,actorId: string,action: string,input: Record<string,unknown>,row: Record<string,unknown>,probe: boolean) {
+  idempotency(input.idempotencyKey as string);
+  try {
+    const result = await supabaseFetchJson<T | null>(requireConfig(), "rpc/levytate_apply_learning_time_command", { method: "POST", body: JSON.stringify({p_organisation_id:organisationId,p_actor_user_id:actorId,p_action:action,p_input:input,p_row:row,p_probe:probe}) });
+    return result;
+  } catch(error) {
+    if (error instanceof LevyTateLearningTimeError) throw error;
+    const code=error instanceof Error ? error.message : "";
+    const status=/^(PT409|23505|40001)/.test(code)?409:code.startsWith("PT403")?403:code.startsWith("PT404")?404:/^(PT422|22|23)/.test(code)?422:503;
+    throw new LevyTateLearningTimeError(status===409?"Learning Time changed; refresh before retrying. Your input is retained.":status===403?"This Learning Time action is not permitted for your current role.":status===422?"Check the activity evidence, dates and required plan fields.":"Learning Time persistence could not be confirmed. Retry the same request.",status);
+  }
 }
 
 function assertPlanManager(role: string) {
