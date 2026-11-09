@@ -5,7 +5,7 @@ import { levyTateAiEnabled } from "@/lib/levytate/ai/openai";
 import { getCurrentEarlyAccessTermsDocument } from "@/lib/server/levytate-early-access-terms";
 import { decodeAuthRateLimitResult, isValidAuthResetInstant, rateLimitKey } from "@/lib/server/levytate-auth-rate-limit";
 import { getLevyTateRateLimitEnvironment } from "@/lib/server/levytate-auth-rate-limit-config";
-import { getLevyTateSupabaseConfig, readRuntimeEnv, supabaseFetchJson, supabaseSelect } from "@/lib/server/levytate-supabase";
+import { getLevyTateSupabaseConfig, readRuntimeEnv, supabaseFetchJson, supabaseFetchRaw, supabaseSelect } from "@/lib/server/levytate-supabase";
 import { createReadinessCache, evaluateReadinessChecks, ServiceHealthTimeoutError } from "@/lib/levytate/service-health-contract";
 import type { ServiceHealthState, ServiceReadiness } from "@/lib/levytate/service-health-contract";
 import type { LevyTateBetaSession } from "@/lib/levytate/config/beta-access";
@@ -19,7 +19,8 @@ type TableHealthCheck = { key: string; label: string; kind: "table"; table: stri
 type AuthRateLimitHealthCheck = { key: string; label: string; kind: "auth-rate-limit" };
 type AuthCallbackHealthCheck = { key: string; label: string; kind: "auth-callback-budget" };
 type AuthProviderHealthCheck = { key: string; label: string; kind: "auth-provider" };
-type HealthCheckDefinition = TableHealthCheck | AuthRateLimitHealthCheck | AuthCallbackHealthCheck | AuthProviderHealthCheck;
+type ReleaseContractHealthCheck = { key: string; label: string; kind: "release-contract" };
+type HealthCheckDefinition = TableHealthCheck | AuthRateLimitHealthCheck | AuthCallbackHealthCheck | AuthProviderHealthCheck | ReleaseContractHealthCheck;
 export type HealthCheckAdapter = (input: HealthCheckDefinition & { timeoutMs: number }) => Promise<void>;
 
 export const LEVYTATE_HEALTH_TIMEOUT_MS = 2_500;
@@ -42,6 +43,8 @@ const criticalChecks = [
   { key: "workspace-contract", kind: "table", table: "levytate_workspace_entity_versions", column: "entity_key,revision", label: "Atomic workspace concurrency schema" },
   { key: "learning-time-contract", kind: "table", table: "levytate_otj_command_receipts", column: "request_id", label: "Learning Time receipt schema" },
   { key: "operations-contract", kind: "table", table: "levytate_operational_action_receipts", column: "action_id,expected_version", label: "Atomic Operations receipt schema" },
+  { key: "personal-discovery-contract", kind: "table", table: "levytate_employee_development_profiles", column: "saved_programme_ids,compared_programme_ids,discovery_revision", label: "Individual programme discovery schema" },
+  { key: "client-release-contract", kind: "release-contract", label: "Required client workflow contracts" },
 ] as const satisfies readonly HealthCheckDefinition[];
 const optionalChecks = [
   { key: "prospect", kind: "table", table: "levytate_prospect_access", column: "id", label: "Optional prospect access diagnostics" },
@@ -142,6 +145,18 @@ export function createSupabaseHealthAdapter(): HealthCheckAdapter {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), input.timeoutMs);
     try {
+      if (input.kind === "release-contract") {
+        const response = await supabaseFetchRaw(config, "rpc/levytate_required_client_contracts", {
+          method: "POST", signal: controller.signal, redirect: "error", body: "{}",
+        });
+        if (!response.ok) throw new Error("dependency");
+        const result: unknown = await readBoundedJson(response, 1024);
+        if (!result || typeof result !== "object" || Array.isArray(result)
+          || Object.keys(result).sort().join(",") !== "available,version"
+          || (result as { version?: unknown }).version !== "20261109182509"
+          || (result as { available?: unknown }).available !== true) throw new Error("dependency");
+        return;
+      }
       if (input.kind === "auth-rate-limit") {
         const rows = await supabaseFetchJson<Array<{ allowed: boolean; request_count: number }>>(config, "rpc/levytate_consume_auth_rate_limit", {
           method: "POST",

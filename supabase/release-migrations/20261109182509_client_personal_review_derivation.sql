@@ -169,3 +169,28 @@ exception when invalid_text_representation or numeric_value_out_of_range or inva
 end $$;
 revoke all on function public.levytate_apply_operational_action(uuid,uuid,text,integer,text,jsonb,timestamptz,text,jsonb,boolean) from public,anon,authenticated,service_role;
 grant execute on function public.levytate_apply_operational_action(uuid,uuid,text,integer,text,jsonb,timestamptz,text,jsonb,boolean) to service_role;
+
+-- Read-only release contract. Created after the required command migrations;
+-- health checks must not report an older, reachable schema as this release.
+-- SECURITY INVOKER: no elevated database access and no business-data reads.
+create function public.levytate_required_client_contracts() returns jsonb
+language sql stable security invoker set search_path=pg_catalog,public as $$
+ select jsonb_build_object('version','20261109182509','available',
+  coalesce((select bool_and(coalesce(has_function_privilege('service_role',to_regprocedure(signature),'EXECUTE'),false)
+   and not coalesce(has_function_privilege('anon',to_regprocedure(signature),'EXECUTE'),true)
+   and not coalesce(has_function_privilege('authenticated',to_regprocedure(signature),'EXECUTE'),true))
+   from unnest(array[
+    'public.levytate_apply_application_command(uuid,uuid,text,text,integer,text,jsonb)',
+    'public.levytate_apply_learner_command(uuid,uuid,text,text,text,jsonb,integer,jsonb,jsonb,boolean)',
+    'public.levytate_start_pre_enrolment(uuid,uuid,text,integer,text,jsonb)',
+    'public.levytate_personal_programme_choices(uuid,jsonb)',
+    'public.levytate_reactivation_command(uuid,jsonb)',
+    'public.levytate_apply_operational_action(uuid,uuid,text,integer,text,jsonb,timestamptz,text,jsonb,boolean)'
+   ]) signature),false)
+  and exists(select 1 from pg_index where indexrelid=to_regclass('public.levytate_applications_one_active_employee') and indisvalid and indisunique)
+  and exists(select 1 from pg_class where oid=to_regclass('public.levytate_tenant_reactivation_requests') and relrowsecurity)
+  and (select count(*)=3 from information_schema.columns where table_schema='public' and table_name='levytate_employee_development_profiles'
+    and column_name in('saved_programme_ids','compared_programme_ids','discovery_revision')));
+$$;
+revoke all on function public.levytate_required_client_contracts() from public,anon,authenticated,service_role;
+grant execute on function public.levytate_required_client_contracts() to service_role;
