@@ -1,5 +1,6 @@
 import type { LevyFinanceState } from "@/lib/levytate/finance/types";
 import type { EmployerRequestsWorkspaceBootstrap } from "@/lib/levytate/requests/api";
+import { decodeLiftReadResponse } from "@/lib/levytate/client-module-reads";
 import type { LiftWorkspace } from "@/lib/levytate/lift/domain";
 import type { AssessmentWorkspace } from "@/lib/levytate/assessments/api";
 
@@ -26,15 +27,10 @@ export function decodeFinanceMutationResponse(value: unknown): LevyFinanceState 
 const roles = ["Employee", "Line Manager", "Apprenticeship Lead", "Employer Admin"];
 
 export function decodeLiftMutationResponse(value: unknown): LiftWorkspace {
-  const result = record(value), workspace = record(result.workspace);
-  if (result.ok !== true || workspace.enabled !== true || !roles.includes(String(workspace.role))
-    || !Number.isSafeInteger(workspace.mutationRevision) || Number(workspace.mutationRevision) < 0
-    || typeof workspace.generatedAt !== "string" || !Number.isFinite(Date.parse(workspace.generatedAt))
-    || !workspace.framework || !workspace.coverage
-    || [workspace.availableEmployees, workspace.opportunities, workspace.decisions, workspace.proofs].some((items) => !Array.isArray(items))) {
-    throw new Error("The Lift update could not be confirmed.");
-  }
-  return workspace as LiftWorkspace;
+  // A command result is published to the same React view as a fresh read.
+  // Validate the complete view before releasing its retained command.
+  try { return decodeLiftReadResponse(value); }
+  catch { throw new Error("The Lift update could not be confirmed."); }
 }
 
 export function decodeAssessmentMutationResponse(value: unknown): AssessmentWorkspace {
