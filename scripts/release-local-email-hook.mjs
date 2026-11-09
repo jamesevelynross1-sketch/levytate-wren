@@ -2,8 +2,9 @@
 import { createServer } from "node:http";
 import { connect } from "node:net";
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync, statSync } from "node:fs";
 import { createInterface } from "node:readline";
+import { assertLifecycleManifest, lifecycleRecipients } from "./release-lifecycle-fixtures.mjs";
 
 const root = process.env.RELEASE_LOCAL_RUNTIME;
 if (!root?.startsWith("/private/tmp/levytate-release-runtime.")) throw new Error("Dedicated local runtime required");
@@ -15,6 +16,12 @@ const fixture=JSON.parse(readFileSync(`${root}/fixture-manifest.json`,"utf8"));
 if(!fixture.synthetic||fixture.environment!=="local"||!/^[-a-f0-9]{36}$/.test(fixture.run))throw new Error("Exact synthetic email manifest required");
 const callbacks=new Map(fixture.tenants.flatMap(tenant=>tenant.users.map(user=>[user.email,"http://localhost:3107/levytate/auth/callback"])));
 for(const key of["primary","secondary"])callbacks.set(`release.${fixture.run}.provider.${key}@example.test`,"http://localhost:3107/levytate/provider/auth/callback");
+const lifecyclePath=`${root}/lifecycle-fixture-manifest.json`;
+if(existsSync(lifecyclePath)){
+  if((statSync(lifecyclePath).mode&0o077)!==0)throw new Error("Restricted lifecycle manifest required");
+  const extension=assertLifecycleManifest(JSON.parse(readFileSync(lifecyclePath,"utf8")),fixture.run,true);
+  for(const email of lifecycleRecipients(extension,fixture.run))callbacks.set(email,"http://localhost:3107/levytate/auth/callback");
+}
 const port=Number(process.env.RELEASE_EMAIL_HOOK_PORT??"3117");
 if(![3117,3118].includes(port))throw new Error("Dedicated local hook port required");
 

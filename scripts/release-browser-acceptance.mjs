@@ -80,6 +80,8 @@ try {
   const accountUiOnly=process.env.RELEASE_ACCOUNT_UI_ONLY==="true";
   const peopleUiOnly=process.env.RELEASE_PEOPLE_UI_ONLY==="true"||accountUiOnly;
   const exportOnly=process.env.RELEASE_EXPORT_ONLY==="true";
+  const lifecycleOnly=process.env.RELEASE_LIFECYCLE_ONLY==="true";
+  if(!lifecycleOnly){
   const failureBudgetStartedAt=new Date().toISOString();
   for (const tenant of manifest.tenants) {
     for (const user of tenant.users) {
@@ -425,6 +427,13 @@ try {
     phase="retained account form after genuine account switch";
     const {verifyRetainedAccountSwitch}=await import("./release-account-browser.mjs");
     await verifyRetainedAccountSwitch({app,mailpit,manifest,contexts,backend,waitForCapturedLink,check});
+  }
+  }
+  if(lifecycleOnly||process.env.RELEASE_LIFECYCLE_JOURNEY==="true"){
+    phase="genuine independent Platform Admin lifecycle journey";
+    const{verifyLifecycle}=await import("./release-lifecycle-browser.mjs");
+    const extension=JSON.parse(readFileSync(`${process.env.RELEASE_LOCAL_RUNTIME}/lifecycle-fixture-manifest.json`,"utf8"));
+    await independentJourney("Platform Admin lifecycle",()=>verifyLifecycle({app,mailpit,browser,manifest,extension,backend,waitForCapturedLink,check}));
   }
   for (const [key,{ context, user, tenant }] of contexts) {
     const logout = await context.request.post(`${app}/api/levytate-beta-logout`, { headers: { Origin: app }, maxRedirects: 0 });
