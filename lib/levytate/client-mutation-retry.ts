@@ -5,7 +5,7 @@ type Fetcher = typeof authenticatedClientFetch;
 /** One retained command per mounted form owner. Memory only; never browser storage. */
 export function createPinnedClientMutation<T>(identity: ClientIdentity | null, path: string,
   decode: (value: unknown) => T, fetcher: Fetcher = authenticatedClientFetch,
-  readResponse: (response: Response) => Promise<unknown> = (response) => response.json()) {
+  readResponse: (response: Response) => Promise<unknown> = (response) => response.json(), method: "POST" | "PATCH" = "POST") {
   const expected = identity ? { ...identity } : null;
   let pending: { body: string; confirmed?: (value: T) => void } | null = null;
   let busy = false;
@@ -19,7 +19,7 @@ export function createPinnedClientMutation<T>(identity: ClientIdentity | null, p
     let value: T;
     try {
       const response = await fetcher(path, {
-        method: "POST", headers: { "Content-Type": "application/json", "X-LevyTate-Account": expected.email },
+        method, headers: { "Content-Type": "application/json", "X-LevyTate-Account": expected.email },
         body: attempt.body, signal: AbortSignal.timeout(30_000),
       }, expected);
       if (!response.ok) {
