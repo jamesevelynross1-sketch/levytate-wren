@@ -11,11 +11,14 @@ const secret = JSON.parse(readFileSync(`${root}/private-app-secrets.json`, "utf8
 const state = JSON.parse(readFileSync(`${root}/private-stack-state.json`, "utf8"));
 const smtp = state.endpoints["mail.smtp"];
 if (smtp.address !== "127.0.0.1") throw new Error("SMTP must remain loopback capture only");
-const callback = "http://localhost:3107/levytate/auth/callback";
+const fixture=JSON.parse(readFileSync(`${root}/fixture-manifest.json`,"utf8"));
+if(!fixture.synthetic||fixture.environment!=="local"||!/^[-a-f0-9]{36}$/.test(fixture.run))throw new Error("Exact synthetic email manifest required");
+const callbacks=new Map(fixture.tenants.flatMap(tenant=>tenant.users.map(user=>[user.email,"http://localhost:3107/levytate/auth/callback"])));
+for(const key of["primary","secondary"])callbacks.set(`release.${fixture.run}.provider.${key}@example.test`,"http://localhost:3107/levytate/provider/auth/callback");
 const port=Number(process.env.RELEASE_EMAIL_HOOK_PORT??"3117");
 if(![3117,3118].includes(port))throw new Error("Dedicated local hook port required");
 
-async function deliver(to, token, type) {
+async function deliver(to, token, type, callback) {
   const socket = connect(smtp.port, "127.0.0.1");
   socket.setTimeout(4000, () => socket.destroy(new Error("Local SMTP timeout")));
   const lines = createInterface({ input: socket, crlfDelay: Infinity })[Symbol.asyncIterator]();
@@ -48,8 +51,9 @@ createServer(async (request, response) => {
     const valid = signature.split(" ").some((part) => { const actual = Buffer.from(part.replace(/^v1,/, ""), "base64"); return actual.length === expected.length && timingSafeEqual(actual, expected); });
     if (!valid) throw new Error("Invalid hook signature");
     const payload = JSON.parse(raw), email = payload.user?.email, data = payload.email_data;
-    if (typeof email !== "string" || !/^release\.[a-f0-9-]+\.[ab]\.(lead|manager|employee)@example\.test$/.test(email) || data?.redirect_to !== callback || !["magiclink", "signup", "invite"].includes(data.email_action_type) || !/^[a-f0-9]+$/.test(data.token_hash ?? "")) throw new Error("Only approved local synthetic sign-in delivery is allowed");
-    await deliver(email, data.token_hash, data.email_action_type);
+    const callback=callbacks.get(email);
+    if (!callback || data?.redirect_to !== callback || !["magiclink", "signup", "invite"].includes(data.email_action_type) || (callback.includes("/provider/")&&data.email_action_type!=="magiclink") || !/^[a-f0-9]+$/.test(data.token_hash ?? "")) throw new Error("Only approved local synthetic sign-in delivery is allowed");
+    await deliver(email, data.token_hash, data.email_action_type,callback);
     response.writeHead(200, { "Content-Type": "application/json" }).end("{}");
     console.log("PASS signed local Auth email captured by loopback SMTP");
   } catch {

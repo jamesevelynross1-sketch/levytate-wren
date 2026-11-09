@@ -383,6 +383,11 @@ try {
       check("no fictional notification claimed delivered",outcomeBody.learner?.withdrawal?.providerNotified===false&&outcomeBody.learner?.withdrawal?.employeeNotified===false);
     }
   }
+  if(process.env.RELEASE_REQUESTS_JOURNEY==="true"){
+    phase="genuine provider request, response and catalogue handoff";
+    const{verifyRequests}=await import("./release-requests-browser.mjs");
+    await verifyRequests({app,mailpit,manifest,contexts,browser,backend,check});
+  }
   if(process.env.RELEASE_STALE_PEOPLE_EDITOR==="true"){
     phase="two genuine sessions and stale People reconnect";
     const{verifyStalePeopleEditor}=await import("./release-people-stale-browser.mjs");
