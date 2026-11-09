@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-const state = vi.hoisted(() => ({ session: vi.fn(), context: vi.fn(), detail: vi.fn(), declare: vi.fn(), limit: vi.fn() }));
+const state = vi.hoisted(() => ({ session: vi.fn(), context: vi.fn(), detail: vi.fn(), declare: vi.fn(), limit: vi.fn(), memberships: vi.fn() }));
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => ({ value: "synthetic-session" }) }) }));
+vi.mock("@/lib/server/levytate-supabase", async (original) => ({ ...await original<typeof import("@/lib/server/levytate-supabase")>(), getLevyTateSupabaseConfig: () => ({}), supabaseSelect: state.memberships }));
 vi.mock("@/lib/server/levytate-authorised-session", () => ({ readAuthorisedLevyTateBetaSession: state.session }));
 vi.mock("@/lib/server/levytate-auth-rate-limit", () => ({ checkAuthenticatedWriteLimit: state.limit, LevyTateRateLimitStoreError: class extends Error {} }));
 vi.mock("@/lib/server/levytate-learner-lifecycle", async (original) => ({ ...await original<typeof import("@/lib/server/levytate-learner-lifecycle")>(), getLearnerLifecycleServerContext: state.context, getOrganisationLearnerLifecycleRecordDetail: state.detail, confirmEmployeeEligibility: state.declare }));
@@ -20,6 +21,12 @@ describe("personal declaration account boundary (route units)", () => {
   it("denies a stale-account declaration before write budget or mutation", async () => {
     expect((await POST(request("POST", "previous@example.test", command), params)).status).toBe(409);
     expect(state.declare).not.toHaveBeenCalled(); expect(state.limit).not.toHaveBeenCalled();
+  });
+  it("denies a retained learner read after the same account moves workspace", async () => {
+    state.memberships.mockResolvedValue([{ email: "current@example.test", organisation_id: "71000000-0000-4000-8000-000000000002", active: true }]);
+    const retained = request("GET", "current@example.test"); retained.headers.set("x-levytate-organisation", "71000000-0000-4000-8000-000000000001");
+    expect((await GET(retained, params)).status).toBe(409);
+    expect(state.detail).not.toHaveBeenCalled(); expect(state.context).not.toHaveBeenCalled();
   });
   it("returns the authoritative tenant envelope for the own read", async () => {
     const result = await GET(request("GET", "current@example.test"), params);

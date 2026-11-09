@@ -5,7 +5,7 @@ import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authori
 import { lifecycleErrorResponse } from "@/lib/server/levytate-learner-api";
 import { getOrganisationLearnerLifecycleRecordDetail, getLearnerLifecycleServerContext } from "@/lib/server/levytate-learner-lifecycle";
 
-import { assertExpectedAccount } from "@/lib/server/levytate-request-boundary";
+import { assertExpectedWorkspace } from "@/lib/server/levytate-request-boundary";
 
 async function getSession() {
   const cookieStore = await cookies();
@@ -22,7 +22,7 @@ export async function GET(
   }
 
   try {
-    assertExpectedAccount(request, session.email);
+    await assertExpectedWorkspace(request, session.email);
     const { organisation } = await getLearnerLifecycleServerContext(session);
     const { learnerRecordId } = await params;
     const learner = await getOrganisationLearnerLifecycleRecordDetail(session, learnerRecordId);
