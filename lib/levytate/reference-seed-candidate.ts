@@ -47,6 +47,8 @@ export function buildReferenceSeedCandidate(standardsBytes: string, providersByt
     if (!/^(ST|AU|FA)\d{4}$/.test(text(row.id)) || row.referenceCode !== row.id || !statuses.has(text(row.sourceStatus)) || !types.has(text(row.programmeType))
       || !Number.isInteger(row.level) || Number(row.level) < 2 || Number(row.level) > 8 || !text(row.version)
       || (row.fundingBand !== null && (!Number.isSafeInteger(row.fundingBand) || Number(row.fundingBand) < 0))) throw new Error("Invalid standard identity, status or numeric evidence");
+    const expectedType = { ST: "Apprenticeship standard", AU: "Apprenticeship unit", FA: "Foundation apprenticeship" }[text(row.id).slice(0, 2)];
+    if (row.programmeType !== expectedType) throw new Error("Standard identifier and programme type differ");
     https(row.officialUrl, true); date(row.lastVerified);
     if (!new RegExp(`^/apprenticeships/${text(row.id).toLowerCase()}(?:-|/|$)`).test(new URL(text(row.officialUrl)).pathname.toLowerCase())) throw new Error("Official source URL must identify its standard");
     if (row.lastVerified !== standardsDate) throw new Error("Standard source date differs from the declared snapshot");
@@ -55,14 +57,20 @@ export function buildReferenceSeedCandidate(standardsBytes: string, providersByt
   if (!standards.length || !providers.length || !programmes.length) throw new Error("A populated reference candidate is required");
   unique(providers, "providerId"); unique(programmes, "id");
   for (const row of providers) { if (!text(row.providerName)) throw new Error("Provider name required"); https(row.providerCatalogueUrl); }
-  const providerIds = new Set(providers.map((row) => row.providerId)), byStandard = new Map(standards.map((row) => [row.id, row]));
+  const byProvider = new Map(providers.map((row) => [row.providerId, row])), byStandard = new Map(standards.map((row) => [row.id, row]));
   for (const row of programmes) {
-    if (!providerIds.has(row.providerId) || !text(row.providerProgrammeName) || date(row.verifiedAt) !== providersDate) throw new Error("Programme provider, name and recorded date required");
+    const provider = byProvider.get(row.providerId);
+    if (!provider || row.providerName !== provider.providerName || !text(row.providerProgrammeName) || date(row.verifiedAt) !== providersDate) throw new Error("Programme provider, name and recorded date required");
+    https(row.programmeUrl); https(row.providerCatalogueUrl);
+    if (row.providerCatalogueUrl !== provider.providerCatalogueUrl) throw new Error("Programme catalogue evidence must match its provider");
     if (!Array.isArray(row.sourceUrls) || !row.sourceUrls.length) throw new Error("Programme source evidence required");
     row.sourceUrls.forEach((url) => https(url));
-    if (text(row.standardCode)) {
+    if (typeof row.standardCode !== "string" || row.standardCode !== row.standardCode.trim()) throw new Error("Explicit standard mapping or empty archived mapping required");
+    if (row.standardCode) {
       const standard = byStandard.get(row.standardCode);
       if (!standard || standard.title !== row.standardTitle || standard.version !== row.standardVersion || standard.level !== row.standardLevel) throw new Error("Programme standard mapping does not match the recorded source");
+    } else if (row.standardTitle !== "" || row.standardVersion !== "" || row.standardLevel !== null || row.recordStatus !== "Archived" || row.verificationStatus !== "Needs manual review" || !["Not available", "Needs verification"].includes(text(row.status))) {
+      throw new Error("Unmapped programmes must retain explicit archived manual-review state");
     }
   }
   const byId = (key: string) => (a: Row, b: Row) => String(a[key]).localeCompare(String(b[key]), "en");

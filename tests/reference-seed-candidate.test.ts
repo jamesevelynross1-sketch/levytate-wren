@@ -14,7 +14,7 @@ describe("offline reference approval artifact", () => {
     expect(buildReferenceSeedCandidate(source, providers)).toEqual(result);
     expect(createHash("sha256").update(`${JSON.stringify(result, null, 2)}\n`).digest("hex")).toBe("cb92a93ba5dfdd91347efac6faac2ff1445ea2a9f24c67614c8e379f42dbdb8c");
   });
-  for (const change of ["duplicate", "badStatus", "fakeDate", "unsafeUrl", "differentStandardUrl", "invalidFunding"] as const) {
+  for (const change of ["duplicate", "badStatus", "fakeDate", "unsafeUrl", "differentStandardUrl", "invalidFunding", "wrongStandardType"] as const) {
     it(`rejects ${change} instead of inventing valid reference evidence`, () => {
       const fixture = JSON.parse(source);
       if (change === "duplicate") fixture.standards.push(fixture.standards[0]);
@@ -23,16 +23,21 @@ describe("offline reference approval artifact", () => {
       if (change === "unsafeUrl") fixture.standards[0].officialUrl = "https://skillsengland.education.gov.uk.example.test/apprenticeships/st1361";
       if (change === "differentStandardUrl") fixture.standards[0].officialUrl = "https://skillsengland.education.gov.uk/apprenticeships/st0001";
       if (change === "invalidFunding") fixture.standards[0].fundingBand = -1;
+      if (change === "wrongStandardType") fixture.standards[0].programmeType = "Apprenticeship unit";
       expect(() => buildReferenceSeedCandidate(JSON.stringify(fixture), providers)).toThrow();
     });
   }
-  for (const change of ["unknownProvider", "wrongStandard", "missingSource", "duplicateProgramme"] as const) {
+  for (const change of ["unknownProvider", "wrongStandard", "missingSource", "duplicateProgramme", "unsafeProgrammeUrl", "credentialProgrammeCatalogue", "mismatchedProviderName", "nullMappedStandard"] as const) {
     it(`rejects ${change} in provider/programme input`, () => {
       const fixture = JSON.parse(providers);
       if (change === "unknownProvider") fixture.programmes[0].providerId = "missing";
       if (change === "wrongStandard") fixture.programmes[0].standardVersion = "unverified";
       if (change === "missingSource") fixture.programmes[0].sourceUrls = [];
       if (change === "duplicateProgramme") fixture.programmes.push(fixture.programmes[0]);
+      if (change === "unsafeProgrammeUrl") fixture.programmes[0].programmeUrl = "javascript:alert(1)";
+      if (change === "credentialProgrammeCatalogue") fixture.programmes[0].providerCatalogueUrl = "https://user:synthetic@example.test/catalogue";
+      if (change === "mismatchedProviderName") fixture.programmes[0].providerName = "Wrong provider";
+      if (change === "nullMappedStandard") fixture.programmes[0].standardCode = null;
       expect(() => buildReferenceSeedCandidate(source, JSON.stringify(fixture))).toThrow();
     });
   }
