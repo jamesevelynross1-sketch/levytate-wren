@@ -12,6 +12,8 @@ import { lockAcceptanceRuntime } from "./release-runtime-lock.mjs";
 
 const results = [];
 let browser;
+let app;
+const contexts = new Map();
 let phase = "initialisation";
 let releaseRuntime;
 let restoreLift;
@@ -39,6 +41,10 @@ function check(name, condition) {
   console.log(`${condition ? "PASS" : "FAIL"} ${name}`);
   if (!condition) throw new Error("Acceptance assertion failed");
 }
+async function independentJourney(name, task) {
+  try { await task(); return true; }
+  catch(error){const blocked=error.message?.startsWith("BLOCKED:");results.push({name,status:blocked?"BLOCKED":"FAIL",reason:blocked?error.message:"Independent journey failed; authentication state omitted"});console.error(`${blocked?"BLOCKED":"FAIL"} independent ${name}; unrelated checks may continue in this bounded run`);if(process.exitCode!==1)process.exitCode=blocked?2:1;return false;}
+}
 async function waitForCapturedLink(mailpit, email, appOrigin, after) {
   for (let attempt = 0; attempt < 40; attempt++) {
     const list = await fetch(`${mailpit}/api/v1/messages`).then((response) => response.json());
@@ -62,7 +68,7 @@ async function waitForCapturedLink(mailpit, email, appOrigin, after) {
 
 try {
   releaseRuntime=lockAcceptanceRuntime("genuine-browser-acceptance");
-  const app = localUrl(process.env.RELEASE_APP_URL, "RELEASE_APP_URL");
+  app = localUrl(process.env.RELEASE_APP_URL, "RELEASE_APP_URL");
   const mailpit = localUrl(process.env.RELEASE_MAILPIT_URL, "RELEASE_MAILPIT_URL");
   if (!process.env.RELEASE_FIXTURE_MANIFEST) throw new Error("BLOCKED: synthetic fixture manifest unavailable");
   const manifest = JSON.parse(readFileSync(process.env.RELEASE_FIXTURE_MANIFEST, "utf8"));
@@ -71,7 +77,6 @@ try {
   const { chromium } = await import(modulePath ? pathToFileURL(modulePath).href : "playwright");
   browser = await chromium.launch({ headless: true });
   const backend = releaseBackend();
-  const contexts = new Map();
   const accountUiOnly=process.env.RELEASE_ACCOUNT_UI_ONLY==="true";
   const peopleUiOnly=process.env.RELEASE_PEOPLE_UI_ONLY==="true"||accountUiOnly;
   const exportOnly=process.env.RELEASE_EXPORT_ONLY==="true";
@@ -305,6 +310,7 @@ try {
     const replay = await item.context.request.get(item.consumedLink, { maxRedirects: 0 });
     check(`${key}: consumed magic link cannot replay`, replay.status() >= 300 && replay.status() < 400 && (replay.headers().location ?? "").includes("invalid-link"));
   }
+  await independentJourney("connected application and learner workflow",async()=>{
   if (manifest.catalogue&&!peopleUiOnly&&!exportOnly) {
     phase = "separate-role application and enrolment handoff";
     const employeeA = contexts.get("a:employee"), managerA = contexts.get("a:manager"), leadA = contexts.get("a:lead"), leadB = contexts.get("b:lead");
@@ -383,22 +389,23 @@ try {
       check("no fictional notification claimed delivered",outcomeBody.learner?.withdrawal?.providerNotified===false&&outcomeBody.learner?.withdrawal?.employeeNotified===false);
     }
   }
+  });
   if(process.env.RELEASE_REQUESTS_JOURNEY==="true"){
     phase="genuine provider request, response and catalogue handoff";
     const{verifyRequests}=await import("./release-requests-browser.mjs");
-    await verifyRequests({app,mailpit,manifest,contexts,browser,backend,check});
+    await independentJourney("provider Requests workflow",()=>verifyRequests({app,mailpit,manifest,contexts,browser,backend,check}));
   }
   if(process.env.RELEASE_USABILITY_JOURNEY==="true"){
     phase="genuine Copilot scope, keyboard, zoom and print";
     const{verifyUsability}=await import("./release-usability-browser.mjs");
-    await verifyUsability({app,manifest,contexts,check});
+    await independentJourney("Copilot and browser usability",()=>verifyUsability({app,manifest,contexts,check}));
   }
   if(process.env.RELEASE_STALE_PEOPLE_EDITOR==="true"){
     phase="two genuine sessions and stale People reconnect";
     const{verifyStalePeopleEditor}=await import("./release-people-stale-browser.mjs");
-    await verifyStalePeopleEditor({app,mailpit,manifest,lead:contexts.get("a:lead"),browser,backend,waitForCapturedLink,check});
+    await independentJourney("stale People editor",()=>verifyStalePeopleEditor({app,mailpit,manifest,lead:contexts.get("a:lead"),browser,backend,waitForCapturedLink,check}));
   }
-  if(!peopleUiOnly&&!exportOnly){
+  if(!peopleUiOnly&&!exportOnly&&!results.some(item=>item.status==="FAIL"||item.status==="BLOCKED")){
   const employee = contexts.get("a:employee");
   const forged = await employee.context.request.post(`${app}/api/levytate-workspace`, {
     headers: { Origin: app }, data: { type: "saveEmployeeDevelopmentProfile", profile: { employeeId: "b-employee" } },
@@ -414,12 +421,13 @@ try {
     const {verifyRetainedAccountSwitch}=await import("./release-account-browser.mjs");
     await verifyRetainedAccountSwitch({app,mailpit,manifest,contexts,backend,waitForCapturedLink,check});
   }
-  for (const { context, user, tenant } of contexts.values()) {
+  for (const [key,{ context, user, tenant }] of contexts) {
     const logout = await context.request.post(`${app}/api/levytate-beta-logout`, { headers: { Origin: app }, maxRedirects: 0 });
     check(`${tenant.key} ${user.role}: logout confirmed`, logout.status() === 303);
     check(`${tenant.key} ${user.role}: no access after logout`, (await context.request.get(`${app}/api/levytate-workspace`)).status() === 401);
     check(`${tenant.key} ${user.role}: refresh cannot restore logged-out session`, (await context.request.post(`${app}/api/levytate-auth/session`, { headers: { Origin: app } })).status() === 401);
     await context.close();
+    contexts.delete(key);
   }
   results.push({ name: "External inbox delivery", status: "BLOCKED", reason: "Local SMTP capture proves no external inbox delivery" });
 } catch (error) {
@@ -430,6 +438,7 @@ try {
   process.exitCode = blocked ? 2 : 1;
 } finally {
   try{restoreLift?.();}catch{results.push({name:"Restore local-only Lift capability to disabled",status:"FAIL"});console.error("FAIL local Lift capability restoration; inspect synthetic runtime before more acceptance");process.exitCode=1;}
+  if(app&&contexts.size){let loggedOut=0;for(const{context}of contexts.values()){try{const r=await context.request.post(`${app}/api/levytate-beta-logout`,{headers:{Origin:app},maxRedirects:0});if(r.status()===303)loggedOut++;}catch{/* Raw transport errors may carry Auth details. */}}console.log(`Local failed-run cleanup: ${loggedOut}/${contexts.size} logout responses confirmed; all browser contexts closing`);}
   await browser?.close();
   releaseRuntime?.();
   const evidence = { schemaVersion: 1, environment: "local", authenticationMethod: "requested-sign-in-link-through-local-smtp", authenticatedRolesVerified: results.filter((item) => item.name.endsWith("canonical role and tenant resolved") && item.status === "PASS").length, emailEvidence: "local-smtp-capture-only", results };

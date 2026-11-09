@@ -24,11 +24,13 @@ try{
  insert into public.levytate_organisation_providers(organisation_id,provider_id,status)values(${q(a)},${q(provider)},'Active');insert into public.levytate_organisation_programmes(organisation_id,programme_id,provider_id,status)values ${programmes.map(id=>`(${q(a)},${q(id)},${q(provider)},'Active')`).join(",")};`);
  check("browser roles cannot execute personal choice RPC",need("select not has_function_privilege('anon','public.levytate_personal_programme_choices(uuid,jsonb)','EXECUTE') and not has_function_privilege('authenticated','public.levytate_personal_programme_choices(uuid,jsonb)','EXECUTE');")==="t");
  const empty=JSON.parse(need(service(rpc(employee,null))));check("read returns only own empty personal choices",empty.employeeId===person&&empty.revision===0&&empty.savedProgrammeIds.length===0);
+ check("read supplies exact current available programme IDs",JSON.stringify([...empty.availableProgrammeIds].sort())===JSON.stringify([...programmes].sort()));
  deny("Lead cannot use personal Employee choices",lead,command("save",programmes[0],0));
  deny("second tenant cannot save unpublished employer programme",other,command("save",programmes[0],0));
  deny("numeric programme ID cannot be coerced even for unsave",employee,command("unsave",12345,0),["PT422"]);
  deny("caller cannot supply a different actor or employee",employee,{...command("save",programmes[0],0),employeeId:managerPerson},["PT422"]);
  for(const [label,patch] of[["suspended canonical catalogue",`update public.levytate_organisations set status='Suspended' where id=${q(catalog)};`],["withdrawn official standard",`update public.levytate_apprenticeship_standards set status='Retired' where id=${q(standard)};`],["missing programme source evidence",`update public.levytate_provider_programmes set source_url='' where organisation_id=${q(catalog)} and id=${q(programmes[0])};`]]){
+  const read=JSON.parse(need(`begin;${patch}set local role service_role;set local request.jwt.claim.role='service_role';${rpc(employee,null)}rollback;`));check(`${label} is absent from current authoritative read`,!read.availableProgrammeIds.includes(programmes[0]));
   const r=sql(`begin;${patch}set local role service_role;set local request.jwt.claim.role='service_role';${rpc(employee,command("save",programmes[0],0))}rollback;`);check(`${label} prevents claiming currently available save`,!r.ok&&r.code==="PT422");
  }
  const save=command("save",programmes[0],0),races=await Promise.all([concurrent(service(rpc(employee,save))),concurrent(service(rpc(employee,save)))]);
