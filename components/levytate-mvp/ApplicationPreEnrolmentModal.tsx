@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
+import { useRetainedWorkspaceRequest } from "@/components/levytate-mvp/useRetainedWorkspaceRequest";
 import { FormField, FormGrid, FormSelect, MvpModal } from "@/components/levytate-mvp/MvpUi";
 import type { MvpApplication } from "@/lib/levytate/mvp/workspace";
 import type { LearnerRecordDetail } from "@/lib/levytate/mvp/learner-record-view";
@@ -9,6 +10,7 @@ import type { LearnerRecordDetail } from "@/lib/levytate/mvp/learner-record-view
 export function ApplicationPreEnrolmentModal({ application, onClose, onComplete }: {
   application?: MvpApplication; onClose: () => void; onComplete: (learner: LearnerRecordDetail) => void;
 }) {
+  const request = useRetainedWorkspaceRequest();
   const { data } = useMvpWorkspace();
   const approved = data.applications.filter((item) => item.status === "Approved for Enrolment"
     && !data.learnerRecords.some((learner) => learner.applicationId === item.id && learner.recordStatus === "Active"));
@@ -33,7 +35,7 @@ export function ApplicationPreEnrolmentModal({ application, onClose, onComplete 
     if (!selected || !programme || !expectedStartDate || !expectedEndDate) { setError("Choose the approved application, matching programme and planned dates."); return; }
     setBusy(true); setError("");
     try {
-      const response = await fetch("/api/levytate-learners", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+      const response = await request("/api/levytate-learners", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
         applicationId: selected.id, expectedApplicationRevision: selected.revision, employeeId: selected.employeeId,
         programmeId: programme.id, providerId: programme.providerId, employmentRoute, expectedStartDate, expectedEndDate,
         lifecycleStatus: "pre_enrolment", actualStartDate: "", actualEndDate: "", enrolmentId: "",
