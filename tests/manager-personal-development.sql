@@ -76,11 +76,7 @@ select pg_temp.denied($q$select pg_temp.declare('senior','own',0,'manager-senior
 select pg_temp.denied($q$select pg_temp.declare('foreign','own',0,'manager-foreign-declare')$q$,'PT403','foreign tenant actor cannot declare');
 select pg_temp.denied($q$select pg_temp.declare('manager','own',0,'manager-self-verify','employer_verified')$q$,'PT403','own manager cannot self-verify employer eligibility');
 reset role;
-savepoint ambiguous_person;
-insert into public.levytate_employees(organisation_id,id,employee_number,name,email,platform_role,start_date,role_id,manager_id) values ('61000000-0000-4000-8000-000000000001','manager-dev-duplicate','duplicate','Synthetic duplicate','MANAGER-DEV-MANAGER@EXAMPLE.TEST','Line Manager',current_date,'manager-dev-role','manager-dev-senior');
-set local role service_role;
-select pg_temp.denied($q$select pg_temp.declare('manager','own',0,'manager-ambiguous-declare')$q$,'PT403','ambiguous active People identity cannot make a declaration');
-rollback to savepoint ambiguous_person;
+select pg_temp.denied($q$insert into public.levytate_employees(organisation_id,id,employee_number,name,email,platform_role,start_date,role_id,manager_id) values ('61000000-0000-4000-8000-000000000001','manager-dev-duplicate','duplicate','Synthetic duplicate','MANAGER-DEV-MANAGER@EXAMPLE.TEST','Line Manager',current_date,'manager-dev-role','manager-dev-senior')$q$,'23505','normalised People uniqueness prevents ambiguous identity');
 set local role service_role;
 select pg_temp.check_test(pg_temp.declare('manager','own',0,'manager-own-declare')->>'confirmed'='true','own manager learner declaration commits');
 select pg_temp.check_test(pg_temp.declare('manager','own',0,'manager-own-declare')->>'confirmed'='true','own manager declaration retry replays');
