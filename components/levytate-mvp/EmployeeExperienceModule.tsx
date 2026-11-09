@@ -402,7 +402,6 @@ function buildEmployeeContext(data: MvpWorkspaceData, email?: string): EmployeeC
   const role = data.roles.find((item) => item.id === employee?.roleId) ?? null;
   const profile = data.employeeDevelopmentProfiles.find((item) => item.employeeId === employee?.id) ?? null;
   const application = employee ? personalApplicationRecord(data, employee.id) : null;
-  const closed = closedApplicationOutcome(application);
   const mappings = role ? [...role.pathwayMappings].sort((left, right) => left.priority - right.priority) : [];
   const activeProgrammeIds = new Set(data.organisationProgrammes.filter((item) => item.status === "Active").map((item) => item.programmeId));
   const availableProgrammeForMapping = (candidate: MvpPathwayMapping) => data.providerProgrammes.find((item) =>
@@ -412,11 +411,9 @@ function buildEmployeeContext(data: MvpWorkspaceData, email?: string): EmployeeC
     ? mappings.find((item) => item.apprenticeshipStandardId === application.apprenticeshipStandardId) ?? null
     : mappings.find((item) => availableProgrammeForMapping(item)) ?? null;
   const standard = application ? getApprenticeshipStandard(application.apprenticeshipStandardId) : mapping ? getApprenticeshipStandard(mapping.apprenticeshipStandardId) : null;
-  const programme = mapping ? (application
-    ? data.providerProgrammes.find((item) => item.linkedStandardId === mapping.apprenticeshipStandardId || item.linkedStandardIds.includes(mapping.apprenticeshipStandardId)) ?? null
-    : availableProgrammeForMapping(mapping)) : null;
-  const recordedLearner = closed && application ? data.learnerRecords.find((record) => record.applicationId === application.id && record.employeeId === employee?.id) : null;
-  const recordedProgramme = recordedLearner ? data.providerProgrammes.find((item) => item.id === recordedLearner.programmeId) : null;
+  const programme = !application && mapping ? availableProgrammeForMapping(mapping) : null;
+  const recordedLearner = application ? data.learnerRecords.find((record) => record.applicationId === application.id && record.employeeId === employee?.id) : null;
+  const recordedProgramme = recordedLearner ? data.providerProgrammes.find((item) => item.id === recordedLearner.programmeId && item.providerId === recordedLearner.providerId) : null;
   const recordedProvider = recordedLearner ? data.providers.find((item) => item.providerId === recordedLearner.providerId) : null;
 
   return {
@@ -428,8 +425,8 @@ function buildEmployeeContext(data: MvpWorkspaceData, email?: string): EmployeeC
     programmeAvailable: Boolean(programme && activeProgrammeIds.has(programme.id)),
     standardTitle: standard?.title ?? mapping?.apprenticeshipStandardId ?? "Programme to confirm",
     standardLevel: standard?.level ? `Level ${standard.level}` : "Level to confirm",
-    programmeName: closed ? recordedProgramme?.programmeName || standard?.title || "Recorded apprenticeship application" : programme?.programmeName ?? (application ? standard?.title : null) ?? "No published programme",
-    providerName: closed ? recordedProvider?.providerName || (recordedLearner?.providerId ? "Provider no longer in the current catalogue" : "Not confirmed for this application") : providerLabel(data, programme?.providerId),
+    programmeName: application ? recordedProgramme?.programmeName || standard?.title || "Recorded apprenticeship application" : programme?.programmeName ?? "No published programme",
+    providerName: application ? recordedProvider?.providerName || (recordedLearner?.providerId ? "Provider no longer in the current catalogue" : "Not confirmed for this application") : providerLabel(data, programme?.providerId),
   };
 }
 
