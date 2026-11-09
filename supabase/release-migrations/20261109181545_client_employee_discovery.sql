@@ -26,6 +26,7 @@ begin
  end if;
  -- Same catalogue lock as publication/archive and application creation.
  perform pg_advisory_xact_lock(hashtextextended('levytate-catalogue-integrity',0));
+ perform 1 from public.levytate_organisations where slug='levytate-internal' and status='Active' for share;
  select * into actor from public.levytate_users where id=p_actor and active and auth_binding_status='bound' and auth_subject is not null for share;
  if not found or actor.role not in('Employee','Line Manager') then raise exception using errcode='PT403',message='Personal development account required';end if;
  perform 1 from public.levytate_organisations where id=actor.organisation_id and status='Active' for share;
@@ -41,7 +42,7 @@ begin
    join public.levytate_providers provider on provider.organisation_id=p.organisation_id and provider.provider_id=p.provider_id and provider.status='Active' and provider.verification_status='verified' and provider.last_verified is not null and jsonb_array_length(provider.source_urls)>0
    join public.levytate_organisation_providers r on r.organisation_id=s.organisation_id and r.provider_id=s.provider_id and r.status='Active'
    where s.organisation_id=actor.organisation_id and s.status='Active' and p.status='Active' and p.record_status='Active'
-    and p.verification_status in('Verified from provider website','Provider confirmed','LevyTate reviewed') and nullif(p.source_url,'') is not null
+    and p.verification_status in('Verified from provider website','Provider confirmed','LevyTate reviewed') and nullif(btrim(p.source_url),'') is not null
     and jsonb_array_length(p.linked_standard_ids)>0 and not exists(select 1 from jsonb_array_elements_text(p.linked_standard_ids) standard_id where not exists(select 1 from public.levytate_apprenticeship_standards standard where standard.id=standard_id and standard.status='Approved for delivery'));
  if p_command is not null then
   select * into receipt from public.levytate_audit_events where id=request_id;

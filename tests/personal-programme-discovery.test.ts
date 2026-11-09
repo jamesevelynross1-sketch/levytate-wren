@@ -28,6 +28,7 @@ describe("individual programme discovery contracts", () => {
     data.applications = [{ id: "active", employeeId: "own", status: "Awaiting Manager Review" }] as typeof data.applications;
     expect(availablePersonalProgrammes(data, session.email)).toHaveLength(1);
     data.providerProgrammes[0].sourceUrl = ""; expect(availablePersonalProgrammes(data, session.email)).toEqual([]);
+    data.providerProgrammes[0].sourceUrl = "   "; expect(availablePersonalProgrammes(data, session.email)).toEqual([]);
     data.providerProgrammes[0].sourceUrl = "https://example.test/programme";
     data.providers[0].verificationStatus = "Needs verification" as typeof data.providers[0]["verificationStatus"];
     expect(availablePersonalProgrammes(data, session.email)).toEqual([]);

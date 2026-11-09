@@ -7,6 +7,7 @@ import { createMvpId, nowIso, type MvpApplication } from "@/lib/levytate/mvp/wor
 import { employeeCurrentApplication } from "@/lib/levytate/mvp/workspace-insights";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { MvpModal, MvpPanel, StatusBadge } from "@/components/levytate-mvp/MvpUi";
+import { EmployeeEligibilityPanel } from "@/components/levytate-mvp/EmployeeEligibilityPanel";
 
 const endpoint = "/api/levytate-programme-discovery";
 const button = "min-h-11 rounded-xl border border-[#102c3d]/20 px-4 py-2 text-sm font-semibold disabled:opacity-50";
@@ -81,6 +82,7 @@ export function PersonalProgrammeDiscovery({ onNavigate }: { onNavigate: (target
 
   if (!person) return <MvpPanel title="Your development" eyebrow="Individual account"><p>Your account needs exactly one active People record. Ask your Apprenticeship Lead to check the linkage.</p></MvpPanel>;
   return <div className="grid min-w-0 gap-5">
+    {learnerRecords.filter((record) => record.recordStatus === "Active" && record.lifecycleStatus === "pre_enrolment").map((record) => <EmployeeEligibilityPanel key={record.id} learnerId={record.id} />)}
     {learnerRecords.length || applicationHistory.length ? <MvpPanel title="Your recorded journey" eyebrow="Current and previous development"><p className="mb-3 text-sm leading-6">Your existing records remain here when your employer changes its published programme choices.</p><div className="grid gap-3">{learnerRecords.map((record) => {
       const programme = data.providerProgrammes.find((item) => item.id === record.programmeId);
       const provider = data.providers.find((item) => item.providerId === record.providerId);
