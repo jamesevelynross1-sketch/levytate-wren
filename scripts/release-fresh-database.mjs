@@ -52,7 +52,16 @@ const [socket, port] = sql(source, "select current_setting('unix_socket_director
 if (!/^\/private\/tmp\/supabase-\d+\/pg-[a-f0-9]+$/.test(socket) || !/^\d+$/.test(port)) throw new Error("Unexpected native administrative socket; stop without changing configuration");
 const platformArgs = ["-h", socket, "-p", port, "-U", "supabase_admin"];
 if (command("psql", [...platformArgs, "-XAtq", "-d", source, "-c", "select rolsuper from pg_roles where rolname=current_user;"]).trim() !== "t") throw new Error("Expected local managed schema owner unavailable");
-const platform = command("pg_dump", [...platformArgs, "-d", source, "--schema-only", "--schema=auth", "--schema=storage", "--schema=supabase_migrations"]);
+let platform = command("pg_dump", [...platformArgs, "-d", source, "--schema-only", "--schema=auth", "--schema=storage", "--schema=supabase_migrations"]);
+// This application-owned trigger references a public function which deliberately
+// does not exist until the reviewed application chain is replayed below. Exclude
+// exactly that one statement from the platform-only schema copy; its hash-locked
+// candidate must be present and reinstalls it. No managed trigger is removed.
+const storageGuard = "CREATE TRIGGER levytate_storage_lifecycle_write_guard BEFORE INSERT OR UPDATE ON storage.objects FOR EACH ROW EXECUTE FUNCTION public.levytate_storage_lifecycle_write_guard();";
+if (platform.includes(storageGuard)) {
+  if (platform.split(storageGuard).length !== 2 || !candidates.some(entry => entry.path.endsWith("/20261109175443_tenant_storage_lifecycle_boundary.sql") && entry.sha256 === "bbb3a2f1f2ce89b84ccecb53fddde0014baec945aea633a06dc1b97dc062032d")) throw new Error("Storage application trigger requires its exact reviewed replay migration");
+  platform = platform.replace(storageGuard, "-- Application Storage guard is installed by its exact reviewed migration below.");
+}
 sql(source, `create database ${name} template template0;`);
 command("psql", [...platformArgs, "-XAtq", "-v", "ON_ERROR_STOP=1", "-d", name], platform);
 for (const migration of migrations) {
