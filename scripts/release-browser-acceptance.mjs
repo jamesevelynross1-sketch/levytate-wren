@@ -465,7 +465,11 @@ try {
     phase="genuine independent Platform Admin lifecycle journey";
     const{verifyLifecycle}=await import("./release-lifecycle-browser.mjs");
     const extension=JSON.parse(readFileSync(`${process.env.RELEASE_LOCAL_RUNTIME}/lifecycle-fixture-manifest.json`,"utf8"));
-    await independentJourney("Platform Admin lifecycle",()=>verifyLifecycle({app,mailpit,browser,manifest,extension,backend,waitForCapturedLink,check}));
+    await independentJourney("Platform Admin lifecycle",async()=>{
+      const evidence=await verifyLifecycle({app,mailpit,browser,manifest,extension,backend,waitForCapturedLink,check,resumeSuspended:process.env.RELEASE_LIFECYCLE_RESUME_SUSPENDED==="true",verifyBlankWorkspace:process.env.RELEASE_BLANK_WORKSPACE_JOURNEY==="true"});
+      if(evidence.result==="PARTIAL")for(const name of evidence.missingMandatoryChecks)results.push({name:`Lifecycle: ${name}`,status:"BLOCKED",reason:"Earlier genuine context was closed; no session fabricated"});
+      writeFileSync(`${process.env.RELEASE_LOCAL_RUNTIME}/lifecycle-browser-result-${Date.now()}.json`,JSON.stringify({...evidence,candidateCommit},null,2),{mode:0o600,flag:"wx"});
+    });
   }
   for (const [key,{ context, user, tenant }] of contexts) {
     const logout = await context.request.post(`${app}/api/levytate-beta-logout`, { headers: { Origin: app }, maxRedirects: 0 });

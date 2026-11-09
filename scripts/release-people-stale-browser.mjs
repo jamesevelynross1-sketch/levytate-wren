@@ -70,6 +70,6 @@ export async function verifyStalePeopleEditor({app,mailpit,manifest,lead,browser
   const audit=await backend(`rest/v1/levytate_audit_events?organisation_id=eq.${lead.tenant.id}&entity_id=eq.${person.id}&action=eq.employee.saved&select=id`);
   check("rejected stale save creates no false-success audit",audit.length===2);
   await dialog.getByRole("button",{name:"Close dialog",exact:true}).click();
- }finally{await second.close();}
+ }finally{try{await second.request.post(`${app}/api/levytate-beta-logout`,{headers:{Origin:app,"X-LevyTate-Account":lead.user.email,"X-LevyTate-Organisation":lead.tenant.id},maxRedirects:0,timeout:10000});}catch{}await second.close();}
  }catch(error){console.log(`DIAGNOSTIC stale People stage: ${step}`);throw error;}
 }
