@@ -6,6 +6,18 @@ type RateLimitRule = { limit: number; windowSeconds: number };
 type RateLimitResult = { allowed: boolean; request_count: number; remaining: number; reset_at: string };
 type RateLimitCheck = { action: string; actorKey: string; route: string; eventType: string; rule: RateLimitRule };
 
+// Accept PostgreSQL JSON timestamps and RFC 3339 without accepting Date.parse's
+// numeric shorthand, implicit local timezone or invalid-day rollover.
+function validResetInstant(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  const match = /^(\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])[T ](?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d{1,6})?(?:Z|[+-](?:[01]\d|2[0-3])(?::?[0-5]\d)?)$/.exec(value);
+  if (!match || !Number.isFinite(Date.parse(value))) return false;
+  const year = Number(match[1]), month = Number(match[2]), day = Number(match[3]);
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return year > 0 && day <= days[month - 1];
+}
+
 export class LevyTateRateLimitStoreError extends Error {
   constructor() { super("Authentication security controls are temporarily unavailable."); this.name = "LevyTateRateLimitStoreError"; }
 }
@@ -38,7 +50,7 @@ export async function checkCallbackAttemptLimit(request: Request) {
     const rows = await supabaseFetchJson<Array<{ allowed: boolean; reset_at: string }>>(config, "rpc/levytate_check_auth_callback_failures", {
       method: "POST", body: JSON.stringify({ p_environment_namespace: getLevyTateRateLimitEnvironment(), p_key_hash: networkRateLimitKey(request) }),
     });
-    if (!Array.isArray(rows) || rows.length !== 1 || typeof rows[0].allowed !== "boolean" || !Number.isFinite(Date.parse(rows[0].reset_at))) throw new LevyTateRateLimitStoreError();
+    if (!Array.isArray(rows) || rows.length !== 1 || !rows[0] || typeof rows[0].allowed !== "boolean" || !validResetInstant(rows[0].reset_at)) throw new LevyTateRateLimitStoreError();
     return { allowed: rows[0].allowed, resetAt: rows[0].reset_at };
   } catch { throw new LevyTateRateLimitStoreError(); }
 }
@@ -174,9 +186,10 @@ async function consumeWithRetry(item: RateLimitCheck) {
         }),
       });
       if (!Array.isArray(rows) || rows.length !== 1 || !rows[0] || typeof rows[0].allowed !== "boolean"
-        || !Number.isSafeInteger(rows[0].request_count) || rows[0].request_count < 0
-        || !Number.isSafeInteger(rows[0].remaining) || rows[0].remaining < 0
-        || typeof rows[0].reset_at !== "string" || !Number.isFinite(Date.parse(rows[0].reset_at))) {
+        || !Number.isSafeInteger(rows[0].request_count) || rows[0].request_count < 1 || rows[0].request_count > item.rule.limit + 1
+        || rows[0].allowed !== (rows[0].request_count <= item.rule.limit)
+        || !Number.isSafeInteger(rows[0].remaining) || rows[0].remaining !== Math.max(item.rule.limit - rows[0].request_count, 0)
+        || !validResetInstant(rows[0].reset_at)) {
         throw new LevyTateRateLimitStoreError();
       }
       return rows[0];

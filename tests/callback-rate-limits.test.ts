@@ -18,7 +18,7 @@ beforeEach(() => {
     }
     const body = JSON.parse(init.body);
     const key = `${body.p_action}:${body.p_key_hash}`;
-    const count = (counts.get(key) ?? 0) + 1; counts.set(key, count);
+    const count = Math.min((counts.get(key) ?? 0) + 1, body.p_limit + 1); counts.set(key, count);
     return [{ allowed: count <= body.p_limit, request_count: count, remaining: Math.max(0, body.p_limit - count), reset_at: new Date(Date.now() + body.p_window_seconds * 1000).toISOString() }];
   });
 });
@@ -47,6 +47,11 @@ describe("callback budgets (modelled persistence, not hosted Auth evidence)", ()
   it("fails closed when the failed-only bucket read is unavailable or malformed", async () => {
     const realModel = persistence.getMockImplementation()!;
     persistence.mockImplementation(async (...args) => args[1] === "rpc/levytate_check_auth_callback_failures" ? [{ allowed: "true", reset_at: "invalid" }] : realModel(...args));
+    await expect(checkCallbackAttemptLimit(request("one"))).rejects.toMatchObject({ name: "LevyTateRateLimitStoreError" });
+  });
+  it.each([null, "0", "2026-02-30T00:00:00Z", "2026-11-09T18:30:00", 0])("rejects malformed failed-only reset timestamp %s", async (reset_at) => {
+    const realModel = persistence.getMockImplementation()!;
+    persistence.mockImplementation(async (...args) => args[1] === "rpc/levytate_check_auth_callback_failures" ? [{ allowed: true, reset_at }] : realModel(...args));
     await expect(checkCallbackAttemptLimit(request("one"))).rejects.toMatchObject({ name: "LevyTateRateLimitStoreError" });
   });
 });

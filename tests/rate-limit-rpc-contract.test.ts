@@ -31,7 +31,7 @@ describe("rate-limit client / reviewed SQL input contract", () => {
       const body = JSON.parse(init.body);
       for (const field of Object.keys(patterns)) expect(body[`p_${field}`]).toMatch(patterns[field]);
       expect(body.p_key_hash).toMatch(/^[a-f0-9]{64}$/);
-      return [{ allowed: true, request_count: 1, remaining: 1, reset_at: "2026-10-29T16:00:00Z" }];
+      return [{ allowed: true, request_count: 1, remaining: body.p_limit - 1, reset_at: "2026-10-29T16:00:00Z" }];
     });
     const request = new Request("http://localhost:3107/api/levytate-workspace");
     await limits.checkMagicLinkRequestLimits(request, "synthetic@example.invalid");
