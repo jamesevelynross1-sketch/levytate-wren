@@ -6,6 +6,7 @@ import { authenticatedClientFetch } from "@/lib/levytate/client-session";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { TenantRetentionPolicyEditor } from "@/components/levytate-mvp/TenantRetentionPolicyEditor";
 import { buildTenantRetentionPolicy, emptyTenantRetentionForm, tenantLocalTimeToInstant, type LifecycleOwnerOption, type TenantRetentionForm } from "@/lib/levytate/mvp/tenant-retention-form";
+import { decodeTenantLifecycleControls, decodeTenantLifecycleResponse } from "@/lib/levytate/mvp/tenant-lifecycle-response";
 
 type Employer = { id: string; name: string; status: string };
 type Draft = { caseId: string; requestId: string; organisationId: string; purpose: "export" | "delete"; policy: TenantRetentionForm; recipientPublicKey: string; exportExpiresAt: string };
@@ -44,8 +45,9 @@ export function TenantOffboardingPanel({ employers, onChanged }: { employers: Em
     setLoading(true);
     try {
       const response = await request({ cache: "no-store" });
-      const payload = await response.json() as { cases?: OffboardingCase[]; owners?: LifecycleOwnerOption[]; reactivations?: TenantReactivationRequest[]; message?: string };
-      if (!response.ok || !Array.isArray(payload.cases) || !Array.isArray(payload.owners) || !Array.isArray(payload.reactivations)) throw new Error(payload.message || "Lifecycle controls are unavailable.");
+      const value: unknown = await response.json();
+      if (!response.ok) throw new Error("Lifecycle controls are unavailable. Keep the original request until the recorded state can be confirmed.");
+      const payload = decodeTenantLifecycleControls(value);
       setCases(payload.cases); setOwners(payload.owners); setReactivations(payload.reactivations);
       return true;
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Lifecycle cases are unavailable."); return false; }
@@ -60,8 +62,10 @@ export function TenantOffboardingPanel({ employers, onChanged }: { employers: Em
     setRetryCommand(pending); setBusy(true); setError("");
     try {
       const response = await request({ method: "POST", headers: { "Content-Type": "application/json" }, body: pending.serialized });
-      const payload = await response.json() as { message?: string; download?: unknown; completion?: unknown; erasure?: unknown; reactivation?: unknown };
-      if (!response.ok) throw new Error(payload.message || "The lifecycle step was not confirmed. Inspect the case or retry this request.");
+      const value: unknown = await response.json();
+      if (!response.ok) throw new Error(value && typeof value === "object" && "message" in value && typeof value.message === "string" ? value.message : "The lifecycle step was not confirmed. Inspect the case or retry this request.");
+      if (!identity.current) throw new Error("The original workspace identity is unavailable. Your request is retained.");
+      const payload = decodeTenantLifecycleResponse(value, pending.body, identity.current);
       if (payload.download) download(payload.download, `levytate-encrypted-export-${String(body.caseId)}.json`);
       if (payload.completion) download(payload.completion, `levytate-disposal-evidence-${String(body.caseId)}.json`);
       if (payload.erasure) download(payload.erasure, `levytate-evidence-erasure-${String(body.caseId)}.json`);

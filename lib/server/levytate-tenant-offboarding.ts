@@ -6,6 +6,7 @@ import { ClientRequestError } from "@/lib/server/levytate-request-boundary";
 import { getLevyTateSupabaseConfig, readRuntimeEnv, supabaseFetchJson } from "@/lib/server/levytate-supabase";
 import { parseTenantRetentionPolicy, retentionExceptions, type TenantRetentionPolicy } from "@/lib/server/levytate-tenant-data-policy";
 import { buildTenantExport, canonicalExportJson, encryptTenantExport, type EncryptedTenantExport, type TenantExportObject, type TenantExportSnapshot } from "@/lib/server/levytate-tenant-export-envelope";
+import type { LifecycleConfirmation } from "@/lib/levytate/mvp/tenant-lifecycle-response";
 
 const identifier = z.uuid();
 const reference = z.string().trim().min(5).max(500);
@@ -54,7 +55,7 @@ async function authorised(session: LevyTateBetaSession) {
   if (actor.user.role !== "Platform Admin") throw new ClientRequestError("Only Platform Admin can manage employer offboarding.", 403);
   const config = getLevyTateSupabaseConfig();
   if (!config) throw new ClientRequestError("Employer offboarding is unavailable.", 503);
-  return { actorId: actor.user.id, config };
+  return { actorId: actor.user.id, actorEmail: actor.user.email.trim().toLowerCase(), actorOrganisationId: actor.organisation.id, config };
 }
 async function rpc<T>(config: Config, name: string, body: Record<string, unknown>): Promise<T> {
   try { return await supabaseFetchJson<T>(config, `rpc/${name}`, { method: "POST", body: JSON.stringify(body) }); }
@@ -131,7 +132,10 @@ function signedEvidence(evidence: unknown) {
 }
 
 /** Closed workflow. Browsers cannot supply provider plans, snapshots or receipts. */
-export async function runTenantOffboarding(session: LevyTateBetaSession, input: unknown) {
+export async function runTenantOffboarding(session: LevyTateBetaSession, input: unknown): Promise<{
+  confirmation: LifecycleConfirmation; case?: CaseResult; download?: EncryptedTenantExport;
+  completion?: ReturnType<typeof signedEvidence>; reactivation?: ReturnType<typeof signedEvidence>; erasure?: unknown;
+}> {
   const parsed = command.safeParse(input);
   if (!parsed.success) throw new ClientRequestError("Use a supported lifecycle action with its original request and current revision.", 400);
   const data = parsed.data;
@@ -140,17 +144,21 @@ export async function runTenantOffboarding(session: LevyTateBetaSession, input: 
     const ttl = Date.parse(data.exportExpiresAt) - Date.now();
     if (ttl <= 0 || ttl > 7 * 86_400_000) throw new ClientRequestError("Export availability must expire within seven days.", 422);
   }
-  const { actorId, config } = await authorised(session);
+  const { actorId, actorEmail, actorOrganisationId, config } = await authorised(session);
+  const confirmed = <T extends object>(payload: T) => ({ ...payload, confirmation: {
+    action: data.action, caseId: "caseId" in data ? data.caseId : null, reactivationId: "reactivationId" in data ? data.reactivationId : null,
+    requestId: "requestId" in data ? data.requestId : null, actorEmail, actorOrganisationId,
+  } });
   if (data.action === "request_reactivation" || data.action === "approve_reactivation" || data.action === "cancel_reactivation") {
     const value = await rpc<{ id: string; status: string }>(config, "levytate_reactivation_command", { p_actor: actorId, p_command: data });
     if (value.id !== data.reactivationId || !["requested", "approved", "cancelled"].includes(value.status)) throw new ClientRequestError(errorMessage, 503);
-    return { reactivation: signedEvidence(value) };
+    return confirmed({ reactivation: signedEvidence(value) });
   }
-  if (data.action === "download") return { download: await rpc<EncryptedTenantExport>(config, "levytate_offboarding_download", { p_actor: actorId, p_case: data.caseId }) };
-  if (data.action === "erase_evidence") return { erasure: await rpc(config, "levytate_offboarding_erase_evidence", { p_actor: actorId, p_case: data.caseId, p_reference: data.reference }) };
+  if (data.action === "download") return confirmed({ download: await rpc<EncryptedTenantExport>(config, "levytate_offboarding_download", { p_actor: actorId, p_case: data.caseId }) });
+  if (data.action === "erase_evidence") return confirmed({ erasure: await rpc(config, "levytate_offboarding_erase_evidence", { p_actor: actorId, p_case: data.caseId, p_reference: data.reference }) });
   if (data.action === "export") {
     const prior = await rpc<{ result: CaseResult | null }>(config, "levytate_offboarding_receipt", { p_actor: actorId, p_request: data.requestId, p_command: data });
-    if (prior.result) return { case: result(prior.result, data.caseId) };
+    if (prior.result) return confirmed({ case: result(prior.result, data.caseId) });
     const snapshot = await rpc<Snapshot>(config, "levytate_offboarding_snapshot", { p_actor: actorId, p_case: data.caseId });
     if (snapshot.snapshotId !== data.caseId || snapshot.revision !== data.expectedRevision || !Array.isArray(snapshot.storageObjects) || snapshot.storageObjects.length > 1000 || snapshot.storageObjects.reduce((size, item) => size + item.size, 0) > 12 * 1024 * 1024) throw new ClientRequestError("The snapshot changed or exceeds the bounded online export. An approved offline export may be needed.", 409);
     const objects: TenantExportObject[] = [];
@@ -158,7 +166,7 @@ export async function runTenantOffboarding(session: LevyTateBetaSession, input: 
     const built = buildTenantExport(snapshot, objects);
     const envelope = encryptTenantExport(built.payload, built.manifestSha256, snapshot.recipientPublicKey, snapshot.expiresAt);
     const value = await rpc<CaseResult>(config, "levytate_offboarding_command", { p_actor: actorId, p_command: { ...data, action: "record_export", clientCommand: data, envelope, manifest: built.manifest, snapshotHash: snapshot.snapshotHash, storageInventory: snapshot.storageObjects } });
-    return { case: result(value, data.caseId) };
+    return confirmed({ case: result(value, data.caseId) });
   }
   if (data.action === "execute_delete") {
     // Validate signing before crossing the irreversible boundary.
@@ -166,7 +174,7 @@ export async function runTenantOffboarding(session: LevyTateBetaSession, input: 
     const cases = await rpc<OffboardingCase[]>(config, "levytate_offboarding_status", { p_actor: actorId, p_case: data.caseId });
     if (cases.length !== 1) throw new ClientRequestError("Lifecycle case not found.", 404);
     const current = cases[0];
-    if (current.status === "completed") return { completion: signedEvidence(await rpc(config, "levytate_offboarding_finish_delete", { p_actor: actorId, p_case: data.caseId })) };
+    if (current.status === "completed") return confirmed({ completion: signedEvidence(await rpc(config, "levytate_offboarding_finish_delete", { p_actor: actorId, p_case: data.caseId })) });
     if (current.status !== "deleting") await rpc(config, "levytate_offboarding_command", { p_actor: actorId, p_command: { ...data, action: "begin_delete", clientCommand: data } });
     const plan = await rpc<DisposalPlan>(config, "levytate_offboarding_disposal_plan", { p_actor: actorId, p_case: data.caseId });
     if (plan.caseId !== data.caseId || !Array.isArray(plan.storage) || !Array.isArray(plan.identities) || !Array.isArray(plan.manifest?.storage)) throw new ClientRequestError(errorMessage, 503);
@@ -193,8 +201,8 @@ export async function runTenantOffboarding(session: LevyTateBetaSession, input: 
       const response = await fetch(`${config.url}/auth/v1/admin/users/${encodeURIComponent(identity.id)}`, { method: "DELETE", headers: { ...headers(config), "Content-Type": "application/json" }, body: JSON.stringify({ should_soft_delete: false }), redirect: "error", signal: AbortSignal.timeout(15_000) });
       if (!response.ok && response.status !== 404) throw new ClientRequestError(errorMessage, 503);
     }
-    return { completion: signedEvidence(await rpc(config, "levytate_offboarding_finish_delete", { p_actor: actorId, p_case: data.caseId })) };
+    return confirmed({ completion: signedEvidence(await rpc(config, "levytate_offboarding_finish_delete", { p_actor: actorId, p_case: data.caseId })) });
   }
   const value = await rpc<CaseResult>(config, "levytate_offboarding_command", { p_actor: actorId, p_command: data });
-  return { case: result(value, data.caseId) };
+  return confirmed({ case: result(value, data.caseId) });
 }

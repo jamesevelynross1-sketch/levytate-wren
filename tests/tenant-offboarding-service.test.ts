@@ -13,7 +13,7 @@ const expiry = () => new Date(Date.now() + 86_400_000).toISOString();
 const snapshot = () => ({ organisationId: tenant, snapshotId: caseId, revision: 2, generatedAt: new Date().toISOString(), recipientPublicKey: publicPem, snapshotHash: "0".repeat(64), expiresAt: expiry(), organisation: { id: tenant, name: "Synthetic employer" }, tables: { levytate_users: [{ id: actor, organisation_id: tenant, email: "synthetic@example.test", auth_subject: "sensitive-auth-subject-unit-only", refreshToken: "private-token" }], levytate_pastoral_messages: [{ id: caseId, organisation_id: tenant, ciphertext: "sensitive-pastoral-ciphertext-unit-only" }] }, storageObjects: [{ bucket: "levytate-uploads", path: `${tenant}/file.txt`, size: 5, version: actor }] });
 beforeEach(() => {
   vi.clearAllMocks(); vi.stubGlobal("fetch", mocks.fetch);
-  mocks.context.mockResolvedValue({ user: { id: actor, role: "Platform Admin" } });
+  mocks.context.mockResolvedValue({ user: { id: actor, role: "Platform Admin", email: session.email }, organisation: { id: tenant } });
   mocks.fetch.mockResolvedValue(new Response("hello"));
   mocks.rpc.mockImplementation(async (_config, path, init) => {
     const body = JSON.parse(init.body);
@@ -24,6 +24,7 @@ beforeEach(() => {
   });
 });
 const exportCommand = { action: "export", caseId, requestId, expectedRevision: 2 };
+const confirmation = { action: "export", caseId, requestId, reactivationId: null, actorEmail: session.email, actorOrganisationId: tenant };
 function policy() { return { version: "levytate-offboarding-v1", approvalReference: "synthetic-policy", clientNoticeReference: "synthetic-notice", supportHandoverReference: "synthetic-support", recoveryBoundaryReference: "synthetic-recovery", dataOwnerUserId: actor, serviceOwnerUserId: requestId, evidenceRetainUntil: expiry(), schedules: tenantDataClasses.map((dataClass) => ({ dataClass, retainUntil: new Date(Date.now() - 86_400_000).toISOString(), action: "delete", approvalReference: "synthetic-class" })) }; }
 
 describe("offboarding closed service boundary (mock transport; real cryptography)", () => {
@@ -35,6 +36,8 @@ describe("offboarding closed service boundary (mock transport; real cryptography
   it("does not accept browser-supplied snapshot, provider plan or internal actions", async () => {
     await expect(runTenantOffboarding(session, { ...exportCommand, snapshot: {} })).rejects.toMatchObject({ status: 400 });
     await expect(runTenantOffboarding(session, { ...exportCommand, action: "record_export" })).rejects.toMatchObject({ status: 400 });
+    await expect(runTenantOffboarding(session, { ...exportCommand, confirmation: { actorEmail: "other@example.test" } })).rejects.toMatchObject({ status: 400 });
+    await expect(runTenantOffboarding(session, { ...exportCommand, actorOrganisationId: caseId })).rejects.toMatchObject({ status: 400 });
   });
   it("never stores a private key or assumes missing retention approvals", async () => {
     const request = { action: "request", caseId, requestId, organisationId: tenant, purpose: "delete", policy: policy(), recipientPublicKey: keys.privateKey.export({ type: "pkcs8", format: "pem" }).toString(), exportExpiresAt: expiry() };
@@ -43,7 +46,7 @@ describe("offboarding closed service boundary (mock transport; real cryptography
     expect(mocks.rpc).not.toHaveBeenCalled();
   });
   it("exports exact bytes using real authenticated encryption without private support or credentials", async () => {
-    await expect(runTenantOffboarding(session, exportCommand)).resolves.toEqual({ case: { id: caseId, status: "exported", revision: 3 } });
+    await expect(runTenantOffboarding(session, exportCommand)).resolves.toEqual({ case: { id: caseId, status: "exported", revision: 3 }, confirmation });
     const write = mocks.rpc.mock.calls.find((call) => call[1].endsWith("_command"));
     const saved = JSON.parse(write![2].body).p_command;
     expect(saved.clientCommand).toEqual(exportCommand);
@@ -59,8 +62,16 @@ describe("offboarding closed service boundary (mock transport; real cryptography
   });
   it("a lost export reply is recovered from its durable receipt without another download or encryption", async () => {
     mocks.rpc.mockResolvedValue({ result: { id: caseId, status: "exported", revision: 3 } });
-    await expect(runTenantOffboarding(session, exportCommand)).resolves.toEqual({ case: { id: caseId, status: "exported", revision: 3 } });
+    await expect(runTenantOffboarding(session, exportCommand)).resolves.toEqual({ case: { id: caseId, status: "exported", revision: 3 }, confirmation });
     expect(mocks.fetch).not.toHaveBeenCalled(); expect(mocks.rpc).toHaveBeenCalledTimes(1);
+  });
+  it("derives confirmation from the canonical actor and explicitly omits absent request IDs", async () => {
+    const envelope = { ciphertext: "unchanged-encrypted-bytes" };
+    mocks.context.mockResolvedValue({ user: { id: actor, role: "Platform Admin", email: "canonical-admin@example.test" }, organisation: { id: requestId } });
+    mocks.rpc.mockResolvedValue(envelope);
+    const value = await runTenantOffboarding(session, { action: "download", caseId });
+    expect(value).toEqual({ download: envelope, confirmation: { action: "download", caseId, reactivationId: null, requestId: null, actorEmail: "canonical-admin@example.test", actorOrganisationId: requestId } });
+    expect(value.download).toBe(envelope);
   });
   it("byte mismatch aborts before a false exported result", async () => {
     mocks.fetch.mockResolvedValue(new Response("different bytes"));
