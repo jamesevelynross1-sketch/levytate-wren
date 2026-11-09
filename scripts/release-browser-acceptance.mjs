@@ -424,6 +424,11 @@ try {
     const{verifyFinance}=await import("./release-finance-browser.mjs");
     await independentJourney("Finance import and report evidence",()=>verifyFinance({app,manifest,contexts,backend,check}));
   }
+  if(process.env.RELEASE_READ_SCOPE_JOURNEY==="true"){
+    phase="genuine retained account and employer read boundaries";
+    const{verifyReadScope}=await import("./release-read-scope-browser.mjs");
+    await independentJourney("retained read boundaries",()=>verifyReadScope({app,contexts,check}));
+  }
   if(process.env.RELEASE_USABILITY_JOURNEY==="true"){
     phase="genuine Copilot scope, keyboard, zoom and print";
     const{verifyUsability}=await import("./release-usability-browser.mjs");
