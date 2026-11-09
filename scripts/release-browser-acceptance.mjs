@@ -43,7 +43,7 @@ function check(name, condition) {
 }
 async function independentJourney(name, task) {
   try { await task(); return true; }
-  catch(error){const blocked=error.message?.startsWith("BLOCKED:");results.push({name,status:blocked?"BLOCKED":"FAIL",reason:blocked?error.message:"Independent journey failed; authentication state omitted"});console.error(`${blocked?"BLOCKED":"FAIL"} independent ${name}; unrelated checks may continue in this bounded run`);if(process.exitCode!==1)process.exitCode=blocked?2:1;return false;}
+  catch(error){const blocked=error.message?.startsWith("BLOCKED:");const stage=error.message?.match(/^(?:Manager|Lifecycle) browser acceptance failed during ([a-z -]+);/)?.[1];results.push({name,status:blocked?"BLOCKED":"FAIL",reason:blocked?error.message:`Independent journey failed${stage?` during ${stage}`:""}; authentication state omitted`});console.error(`${blocked?"BLOCKED":"FAIL"} independent ${name}${stage?` during ${stage}`:""}; unrelated checks may continue in this bounded run`);if(process.exitCode!==1)process.exitCode=blocked?2:1;return false;}
 }
 async function waitForCapturedLink(mailpit, email, appOrigin, after) {
   for (let attempt = 0; attempt < 40; attempt++) {
@@ -405,6 +405,12 @@ try {
     phase="resume persisted learner learning activity and outcome";
     const{resumeLearner}=await import("./release-learner-resume-browser.mjs");
     await independentJourney("retained learner completion",()=>resumeLearner({app,manifest,contexts,backend,check}));
+  }
+  if(process.env.RELEASE_MANAGER_JOURNEY==="true"){
+    phase="genuine own Manager development with distinct superior";
+    const{verifyManagerDevelopment}=await import("./release-manager-browser.mjs");
+    const extension=JSON.parse(readFileSync(`${process.env.RELEASE_LOCAL_RUNTIME}/manager-fixture-manifest.json`,"utf8"));
+    await independentJourney("Manager personal development",()=>verifyManagerDevelopment({app,mailpit,browser,manifest,extension,backend,waitForCapturedLink,check,existingContexts:contexts}));
   }
   if(process.env.RELEASE_REQUESTS_JOURNEY==="true"){
     phase="genuine provider request, response and catalogue handoff";

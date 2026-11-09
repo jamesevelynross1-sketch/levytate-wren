@@ -5,6 +5,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { readFileSync, existsSync, statSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { assertLifecycleManifest, lifecycleRecipients } from "./release-lifecycle-fixtures.mjs";
+import { assertManagerManifest, managerRecipients } from "./release-manager-fixtures.mjs";
 
 const root = process.env.RELEASE_LOCAL_RUNTIME;
 if (!root?.startsWith("/private/tmp/levytate-release-runtime.")) throw new Error("Dedicated local runtime required");
@@ -21,6 +22,12 @@ if(existsSync(lifecyclePath)){
   if((statSync(lifecyclePath).mode&0o077)!==0)throw new Error("Restricted lifecycle manifest required");
   const extension=assertLifecycleManifest(JSON.parse(readFileSync(lifecyclePath,"utf8")),fixture.run,true);
   for(const email of lifecycleRecipients(extension,fixture.run))callbacks.set(email,"http://localhost:3107/levytate/auth/callback");
+}
+const managerPath=`${root}/manager-fixture-manifest.json`;
+if(existsSync(managerPath)){
+  if((statSync(managerPath).mode&0o077)!==0)throw new Error("Restricted manager manifest required");
+  const extension=assertManagerManifest(JSON.parse(readFileSync(managerPath,"utf8")),fixture,true);
+  for(const email of managerRecipients(extension,fixture))callbacks.set(email,"http://localhost:3107/levytate/auth/callback");
 }
 const port=Number(process.env.RELEASE_EMAIL_HOOK_PORT??"3117");
 if(![3117,3118].includes(port))throw new Error("Dedicated local hook port required");
