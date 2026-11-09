@@ -46,8 +46,10 @@ export async function verifyStalePeopleEditor({app,mailpit,manifest,lead,browser
   await secondPage.goto(await waitForCapturedLink(mailpit,lead.user.email,app,at));
   check("second editor has independently redeemed real Auth",new URL(secondPage.url()).pathname.includes("/app"));
   const response=await second.request.get(`${app}/api/levytate-workspace`),workspace=(await response.json()).workspace,person=workspace.data.employees.find(e=>e.email===email);
+  const beforeAudit=await backend(`rest/v1/levytate_audit_events?organisation_id=eq.${lead.tenant.id}&entity_id=eq.${person.id}&action=eq.employee.saved&select=id`);
+  const competingTitle=`Newer independently saved edit ${Date.now()}`;
   const key=`levytate_employees:${person.id}`,revision=workspace.meta.mutationRevisions[key]??0;
-  const change=await second.request.post(`${app}/api/levytate-workspace`,{headers:{Origin:app},data:{type:"saveEmployee",expectedRevision:revision,employee:{...person,jobTitle:"Newer independently saved edit"}}});
+  const change=await second.request.post(`${app}/api/levytate-workspace`,{headers:{Origin:app},data:{type:"saveEmployee",expectedRevision:revision,employee:{...person,jobTitle:competingTitle}}});
   check("independent session commits a newer People revision",change.status()===200);
   step="retain edit during genuine logout";
   await lead.context.request.post(`${app}/api/levytate-beta-logout`,{headers:{Origin:app},maxRedirects:0});
@@ -66,9 +68,9 @@ export async function verifyStalePeopleEditor({app,mailpit,manifest,lead,browser
   check("reconnected stale editor receives409 rather than overwriting",(await saveResponse).status()===409);
   check("conflict retains the original unsaved text",await dialog.getByLabel("Job title",{exact:true}).inputValue()==="Stale retained edit must not win");
   const durable=await backend(`rest/v1/levytate_employees?organisation_id=eq.${lead.tenant.id}&id=eq.${person.id}&select=job_title`);
-  check("newer server value survives stale reconnect/save",durable[0]?.job_title==="Newer independently saved edit");
+  check("newer server value survives stale reconnect/save",durable[0]?.job_title===competingTitle);
   const audit=await backend(`rest/v1/levytate_audit_events?organisation_id=eq.${lead.tenant.id}&entity_id=eq.${person.id}&action=eq.employee.saved&select=id`);
-  check("rejected stale save creates no false-success audit",audit.length===2);
+  check("rejected stale save creates no false-success audit",audit.length===beforeAudit.length+1);
   await dialog.getByRole("button",{name:"Close dialog",exact:true}).click();
  }finally{try{await second.request.post(`${app}/api/levytate-beta-logout`,{headers:{Origin:app,"X-LevyTate-Account":lead.user.email,"X-LevyTate-Organisation":lead.tenant.id},maxRedirects:0,timeout:10000});}catch{}await second.close();}
  }catch(error){console.log(`DIAGNOSTIC stale People stage: ${step}`);throw error;}

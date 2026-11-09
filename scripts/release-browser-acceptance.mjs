@@ -418,7 +418,12 @@ try {
     phase="genuine own Manager development with distinct superior";
     const{verifyManagerDevelopment}=await import("./release-manager-browser.mjs");
     const extension=JSON.parse(readFileSync(`${process.env.RELEASE_LOCAL_RUNTIME}/manager-fixture-manifest.json`,"utf8"));
-    await independentJourney("Manager personal development",()=>verifyManagerDevelopment({app,mailpit,browser,manifest,extension,backend,waitForCapturedLink,check,existingContexts:contexts}));
+    let managerResult;
+    await independentJourney("Manager personal development",async()=>{managerResult=await verifyManagerDevelopment({app,mailpit,browser,manifest,extension,backend,waitForCapturedLink,check,existingContexts:contexts});});
+    if(process.env.RELEASE_MANAGER_LEARNING_JOURNEY==="true"){
+      if(managerResult?.learnerId){const{verifyManagerLearningTime}=await import("./release-manager-learning-browser.mjs");await independentJourney("Manager personal Learning Time",()=>verifyManagerLearningTime({app,manifest,contexts,learnerId:managerResult.learnerId,backend,check}));}
+      else results.push({name:"Manager personal Learning Time",status:"BLOCKED",reason:"Own Manager enrolment was not confirmed in this bounded genuine run"});
+    }
   }
   if(process.env.RELEASE_REQUESTS_JOURNEY==="true"){
     phase="genuine provider request, response and catalogue handoff";
