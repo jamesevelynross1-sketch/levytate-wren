@@ -49,7 +49,7 @@ begin
   if v_client_id is null or v_client_id!~'^[a-zA-Z0-9:_-]{8,118}$' then raise exception using errcode='PT422',message='Invalid exchange identifier';end if;
   v_key:='exchange:'||v_client_id;
   v_fields:=array['action','request_hmac','client_message_id','conversation_id'];
-  if v_action='exchange' then v_fields:=v_fields||array['new_conversation_id','expected_sequence','policy_version','messages'];end if;
+  if v_action='exchange' then v_fields:=v_fields||array['new_conversation_id','expected_sequence','expected_preference_version','policy_version','messages'];end if;
  elsif v_action='preference' then
   v_expected:=(p_command->>'expected_version')::integer;
   if v_expected is null or v_expected<0 or jsonb_typeof(p_command->'save_history') is distinct from 'boolean'
@@ -118,7 +118,7 @@ begin
    values(p_organisation_id,p_employee_id,p_owner_user_id,'conversation',v_requested_id,'conversation.deleted','completed',v_key);
   v_conversation_id:=v_requested_id;v_result:=jsonb_build_object('deleted',true,'conversationId',v_requested_id);
  else
-  if v_preference.save_history is distinct from true then raise exception using errcode='PT409',message='History saving changed';end if;
+  if v_preference.save_history is distinct from true or v_preference.lock_version is distinct from (p_command->>'expected_preference_version')::integer then raise exception using errcode='PT409',message='History saving changed';end if;
   v_requested_id:=(p_command->>'conversation_id')::uuid;v_expected:=(p_command->>'expected_sequence')::integer;v_version:=p_command->>'policy_version';
   if v_expected is null or v_expected<0 or mod(v_expected,2)<>0 or v_version is distinct from 'pastoral-support-v1'
     or jsonb_typeof(p_command->'messages') is distinct from 'array' or jsonb_array_length(p_command->'messages')<>2 then

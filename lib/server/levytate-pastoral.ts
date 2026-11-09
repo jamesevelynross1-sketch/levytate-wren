@@ -236,6 +236,7 @@ export async function persistPastoralExchange(input: {
   const result = await historyCommand(input.context, {
     action: "exchange", client_message_id: clientMessageId, conversation_id: input.conversation?.id ?? null,
     new_conversation_id: input.conversation ? null : conversationId, expected_sequence: expectedSequence,
+    expected_preference_version: input.preference.lock_version,
     policy_version: pastoralPolicyVersion, messages: [employeeCipher, assistantCipher],
     request_hmac: exchangeHmac(input.context, input.conversation?.id, clientMessageId, input.employeeMessage, input.requestDetails),
   });
@@ -379,10 +380,10 @@ async function loadConversationMessages(context: PastoralServerContext, conversa
     organisation_id: `eq.${context.organisation.id}`,
     conversation_id: `eq.${conversation.id}`,
     owner_user_id: `eq.${context.user.id}`,
-    order: "sequence_number.asc",
+    order: "sequence_number.desc",
     limit: "100",
   }));
-  return rows.map((row) => decryptMessage(context, row));
+  return rows.reverse().map((row) => decryptMessage(context, row));
 }
 
 function decryptMessage(context: PastoralServerContext, row: MessageRow): PastoralConversationMessage {
@@ -767,9 +768,13 @@ function parseMutation(value: unknown): PastoralSupportMutation {
   const mutation = value as Record<string, unknown>;
   if (mutation.action === "set_history_preference") {
     if (Object.keys(mutation).some((key) => !["action", "saveHistory", "retentionDays", "expectedVersion"].includes(key)) || typeof mutation.saveHistory !== "boolean" || !Number.isSafeInteger(mutation.expectedVersion) || Number(mutation.expectedVersion) < 0) throw new LevyTatePastoralError("Reload your privacy settings before changing them.", 409);
+    if (mutation.retentionDays !== undefined && (typeof mutation.retentionDays !== "number" || !Number.isInteger(mutation.retentionDays) || mutation.retentionDays < 1 || mutation.retentionDays > 90)) throw new LevyTatePastoralError("Choose a retention period between 1 and 90 days.", 422);
     return { action: mutation.action, saveHistory: mutation.saveHistory, retentionDays: numberOrUndefined(mutation.retentionDays), expectedVersion: Number(mutation.expectedVersion) };
   }
-  if (mutation.action === "delete_conversation") return { action: mutation.action, conversationId: String(mutation.conversationId ?? "") };
+  if (mutation.action === "delete_conversation") {
+    if (Object.keys(mutation).some((key) => !["action", "conversationId"].includes(key)) || typeof mutation.conversationId !== "string") throw new LevyTatePastoralError("A valid conversation deletion is required.");
+    return { action: mutation.action, conversationId: mutation.conversationId };
+  }
   if (mutation.action === "submit_support_request") return {
     action: mutation.action,
     recipientId: String(mutation.recipientId ?? ""),

@@ -228,8 +228,17 @@ async function consumeRateLimit(organisationId: string, userId: string) {
 }
 
 function parseRequest(value: unknown): PastoralAssistantRequest {
-  if (!value || typeof value !== "object") throw new LevyTatePastoralError("A valid message is required.");
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new LevyTatePastoralError("A valid message is required.");
   const item = value as Record<string, unknown>;
+  if (Object.keys(item).some((key) => !["message", "conversationId", "clientMessageId", "recentMessages", "draftSupportRequest"].includes(key))
+    || typeof item.message !== "string" || item.message.length > 3000 || typeof item.clientMessageId !== "string"
+    || (item.draftSupportRequest !== undefined && typeof item.draftSupportRequest !== "boolean")
+    || (item.conversationId != null && typeof item.conversationId !== "string")
+    || (item.recentMessages !== undefined && (!Array.isArray(item.recentMessages) || item.recentMessages.length > 8 || item.recentMessages.some((entry: unknown) => {
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) return true;
+      const message = entry as Record<string, unknown>;
+      return Object.keys(message).some((key) => !["author", "content"].includes(key)) || (message.author !== "employee" && message.author !== "assistant") || typeof message.content !== "string" || message.content.length > 3000;
+    })))) throw new LevyTatePastoralError("A valid bounded My Support message is required.");
   const message = bounded(item.message, 3000);
   if (!message) throw new LevyTatePastoralError("Tell My Support what would help today.");
   const clientMessageId = String(item.clientMessageId ?? "").trim();

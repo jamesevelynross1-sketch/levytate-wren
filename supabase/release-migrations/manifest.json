@@ -18,6 +18,7 @@
     { "path": "supabase/release-migrations/20261029220936_client_request_actor_integrity.sql", "sha256": "210c6f082144baf89a56aca6db3e382ee9f3c77fdb58669f0cf766afddc4665e" },
     { "path": "supabase/release-migrations/20261029221818_client_operational_action_integrity.sql", "sha256": "ef0adaf16608441575634909416c80dba984206c7587d3b98da5e9701f4e1d5f" },
     { "path": "supabase/release-migrations/20261109165014_client_admin_atomic_commands.sql", "sha256": "3d1a0fa63e34077b6b28d7249c6dc95e3f3c46ac044a28ebbdc82c173c74d5bb" },
+    { "path": "supabase/release-migrations/20261109165018_client_private_history_integrity.sql", "sha256": "bb4eab1b177538022f8043a8114c528f7d70e16dd49e5fa8c4937ce194ec05e0" },
     { "path": "supabase/release-migrations/20261109165542_client_invitation_atomic_attempts.sql", "sha256": "e79ac762ee3b63fa15aa0902f278456cc5b5e9c98d1580474541bcb180888632" }
   ]
 }
