@@ -10,16 +10,21 @@ export function ownDevelopmentPerson(data: MvpWorkspaceData, email: string) {
   return email.trim() && people.length === 1 ? people[0] : null;
 }
 
-export function availablePersonalProgrammes(data: MvpWorkspaceData, email: string) {
+export function availablePersonalProgrammes(data: MvpWorkspaceData, email: string, availableProgrammeIds?: readonly string[]) {
   const person = ownDevelopmentPerson(data, email);
   if (!person) return [];
+  // Connected workspaces redact the catalogue's internal evidence URLs. Their
+  // independently verified availability response supplies that evidence instead.
+  // An explicit empty response must never fall back to unverified catalogue data.
+  const authoritativeIds = availableProgrammeIds === undefined ? null : new Set(availableProgrammeIds);
   const mappings = data.roles.find((role) => role.id === person.roleId)?.pathwayMappings ?? [];
   const providerIds = new Set(data.organisationProviders.filter((item) => item.status === "Active").map((item) => item.providerId));
   const programmeIds = new Set(data.organisationProgrammes.filter((item) => item.status === "Active" && providerIds.has(item.providerId)).map((item) => item.programmeId));
   return data.providerProgrammes.flatMap((programme) => {
-    const provider = data.providers.find((item) => item.providerId === programme.providerId && item.status === "Active" && item.verificationStatus === "verified" && item.lastVerified && item.sourceUrls.length);
+    if (authoritativeIds && !authoritativeIds.has(programme.id)) return [];
+    const provider = data.providers.find((item) => item.providerId === programme.providerId && item.status === "Active" && item.verificationStatus === "verified" && item.lastVerified && (authoritativeIds || item.sourceUrls.length));
     if (!provider || !programmeIds.has(programme.id) || programme.status !== "Active" || programme.recordStatus !== "Active"
-      || !programme.sourceUrl.trim() || !programme.linkedStandardIds.length || !["Verified from provider website", "Provider confirmed", "LevyTate reviewed"].includes(programme.verificationStatus)) return [];
+      || (!authoritativeIds && !programme.sourceUrl.trim()) || !programme.linkedStandardIds.length || !["Verified from provider website", "Provider confirmed", "LevyTate reviewed"].includes(programme.verificationStatus)) return [];
     const mapping = [...mappings].sort((a, b) => a.priority - b.priority).find((item) => item.apprenticeshipStandardId === programme.linkedStandardId || programme.linkedStandardIds.includes(item.apprenticeshipStandardId)) ?? null;
     return [{ programme, provider, mapping }];
   }).sort((a, b) => Number(Boolean(b.mapping)) - Number(Boolean(a.mapping)) || a.programme.programmeName.localeCompare(b.programme.programmeName));

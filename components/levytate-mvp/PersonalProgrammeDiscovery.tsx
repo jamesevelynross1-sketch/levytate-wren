@@ -21,7 +21,7 @@ export function PersonalProgrammeDiscovery({ onNavigate }: { onNavigate: (target
   const learnerRecords = data.learnerRecords.filter((record) => record.employeeId === person?.id);
   const applicationHistory = data.applications.filter((application) => application.employeeId === person?.id && application.id !== active?.id && !learnerRecords.some((record) => record.applicationId === application.id));
   const [choices, setChoices] = useState<PersonalProgrammeChoices | null>(null);
-  const programmes = availablePersonalProgrammes(data, identity.current?.email ?? "").filter(({ programme }) => choices?.availableProgrammeIds.includes(programme.id));
+  const programmes = availablePersonalProgrammes(data, identity.current?.email ?? "", choices?.availableProgrammeIds ?? []);
   const [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [error, setError] = useState("");
   const [query, setQuery] = useState(""), [savedOnly, setSavedOnly] = useState(false), [detail, setDetail] = useState<string | null>(null);
   const pending = useRef<ChoiceCommand | null>(null), pendingApplication = useRef<MvpApplication | null>(null), working = useRef(false);
