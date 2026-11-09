@@ -173,7 +173,12 @@ async function consumeWithRetry(item: RateLimitCheck) {
           p_event_type: item.eventType,
         }),
       });
-      if (!rows[0]) throw new LevyTateRateLimitStoreError();
+      if (!Array.isArray(rows) || rows.length !== 1 || !rows[0] || typeof rows[0].allowed !== "boolean"
+        || !Number.isSafeInteger(rows[0].request_count) || rows[0].request_count < 0
+        || !Number.isSafeInteger(rows[0].remaining) || rows[0].remaining < 0
+        || typeof rows[0].reset_at !== "string" || !Number.isFinite(Date.parse(rows[0].reset_at))) {
+        throw new LevyTateRateLimitStoreError();
+      }
       return rows[0];
     } catch (error) {
       failure = error;

@@ -36,6 +36,16 @@ import { routeOperationalCopilotQuery } from "@/lib/server/levytate-copilot-tool
 import { ClientRequestError, readBrowserJson } from "@/lib/server/levytate-request-boundary";
 import { checkLevyTateCopilotLimits, LevyTateRateLimitStoreError } from "@/lib/server/levytate-auth-rate-limit";
 
+const clientFields = new Set([
+  "role", "userRole", "selectedEmployee", "selectedSite", "currentSection", "userMessage", "conversationHistory", "conversationProfile", "previousRecommendationResult",
+  "employerContext", "currentWorkspace", "currentApplication", "roleMappings", "providerCatalogue", "availablePathways", "employerPriorities", "employeeDiscovery",
+  "workspaceEmployeeContext", "preferredStandardId", "operationalContext", "contextData",
+]);
+
+function copilotJson(body: unknown, init: { status?: number } = {}) {
+  return NextResponse.json(body, { ...init, headers: { "Cache-Control": "private, no-store", Pragma: "no-cache", Vary: "Cookie" } });
+}
+
 function mergeSafetyNotes(fallback: string[], generated: string[]) {
   const seen = new Set<string>();
   return [...generated, ...fallback].filter((item) => {
@@ -134,35 +144,38 @@ export async function POST(request: Request) {
   try {
     const session = await getSession();
     if (!session) {
-      return NextResponse.json({ message: "Unauthorised." }, { status: 401 });
+      return copilotJson({ message: "Unauthorised." }, { status: 401 });
     }
     if (session.accessLevel === "beta_admin") {
-      return NextResponse.json({ message: "Employer operational Copilot is not available to Platform Admin." }, { status: 403 });
+      return copilotJson({ message: "Employer operational Copilot is not available to Platform Admin." }, { status: 403 });
     }
 
-    parsedRequest = parseLevyTateAiRequest(await readBrowserJson(request, 256 * 1024));
+    const input = await readBrowserJson(request, 256 * 1024);
+    if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).some((key) => !clientFields.has(key))) throw new ClientRequestError("Unsupported Copilot request fields.", 400);
+    parsedRequest = parseLevyTateAiRequest(input);
     if (!parsedRequest) {
-      return NextResponse.json({ message: "Invalid LevyTate Copilot request payload." }, { status: 400 });
+      return copilotJson({ message: "Invalid LevyTate Copilot request payload." }, { status: 400 });
     }
 
     if (!(await checkLevyTateCopilotLimits(request, session.email)).allowed) {
-      return NextResponse.json({ message: "Please wait a moment before asking another question." }, { status: 429 });
+      return copilotJson({ message: "Please wait a moment before asking another question." }, { status: 429 });
     }
 
     const workspace = await getWorkspaceBootstrapForSession(session);
+    if (workspace.meta.userRole === "Platform Admin") return copilotJson({ message: "Employer operational Copilot is not available to Platform Admin." }, { status: 403 });
     parsedRequest = sanitiseCopilotRequest(parsedRequest, workspace);
 
     const operationalResponse = await routeOperationalCopilotQuery(session, parsedRequest);
-    if (operationalResponse) return NextResponse.json(operationalResponse);
+    if (operationalResponse) return copilotJson(operationalResponse);
 
     parsedRequest = withConversationMemory(parsedRequest);
 
     const fallback = buildGroundedFallback(parsedRequest);
     if (isDeterministicEmployeeStateResponse(parsedRequest, fallback)) {
-      return NextResponse.json(finaliseResponse(parsedRequest, fallback));
+      return copilotJson(finaliseResponse(parsedRequest, fallback));
     }
     if (!levyTateAiEnabled()) {
-      return NextResponse.json(finaliseResponse(parsedRequest, fallback));
+      return copilotJson(finaliseResponse(parsedRequest, fallback));
     }
 
     const guidanceItems = await getCopilotGuidanceItems({
@@ -179,17 +192,17 @@ export async function POST(request: Request) {
       contextPrompt: buildLevyTateAiUserPrompt({ request: parsedRequest, groundedContext, fallback }),
     });
 
-    return NextResponse.json(finaliseResponse(parsedRequest, mergeGeneratedGuidance(fallback, generated)));
+    return copilotJson(finaliseResponse(parsedRequest, mergeGeneratedGuidance(fallback, generated)));
   } catch (error) {
-    if (error instanceof ClientRequestError) return NextResponse.json({ message: error.message }, { status: error.status });
-    if (error instanceof LevyTateRateLimitStoreError) return NextResponse.json({ message: "Copilot security controls are temporarily unavailable." }, { status: 503 });
+    if (error instanceof ClientRequestError) return copilotJson({ message: error.message }, { status: error.status });
+    if (error instanceof LevyTateRateLimitStoreError) return copilotJson({ message: "Copilot security controls are temporarily unavailable." }, { status: 503 });
     console.error("LevyTate Copilot request failed", { outcome: groundedFallback ? "provider_generation_unavailable" : "grounding_unavailable" });
 
     if (parsedRequest && groundedFallback) {
-      return NextResponse.json(finaliseResponse(parsedRequest, { ...groundedFallback, safetyNotes: [...groundedFallback.safetyNotes, "AI generation is temporarily unavailable. This response uses verified platform data only."] }));
+      return copilotJson(finaliseResponse(parsedRequest, { ...groundedFallback, safetyNotes: [...groundedFallback.safetyNotes, "AI generation is temporarily unavailable. This response uses verified platform data only."] }));
     }
 
-    return NextResponse.json({ message: "LevyTate Copilot cannot verify the required platform data right now. Please try again." }, { status: 503 });
+    return copilotJson({ message: "LevyTate Copilot cannot verify the required platform data right now. Please try again." }, { status: 503 });
   }
 }
 
@@ -287,7 +300,7 @@ function sanitiseCopilotRequest(request: LevyTateAiRequest, workspace: LevyTateW
       futureCapabilities: employeeProfile.futureCapabilities,
       stage: employeeProfile.stage,
     } : undefined,
-    workspaceEmployeeContext: buildScopedEmployeeContext(data.employees, employee, roleRecord, application, employeeProfile ?? undefined, request, {
+    workspaceEmployeeContext: buildScopedEmployeeContext(data.employees, employee, visibleRoleRecord, application, employeeProfile ?? undefined, request, {
       providerName: providerProgramme.provider?.providerName,
       programmeName: providerProgramme.programme?.programmeName,
       linkedStandard: standard?.title,

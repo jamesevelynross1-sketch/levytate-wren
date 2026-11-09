@@ -30,9 +30,7 @@ const productRules = [
 function catalogueContext(request: LevyTateAiRequest) {
   if (request.role !== "Apprenticeship Lead" && request.role !== "LevyTate Admin") return [];
 
-  const supplied = request.providerCatalogue?.length
-    ? request.providerCatalogue
-    : mvpProviderCatalogue.slice(0, 16).map((provider) => ({
+  const supplied = request.providerCatalogue ?? mvpProviderCatalogue.slice(0, 16).map((provider) => ({
         providerName: provider.providerName,
         sectors: provider.sectors,
         deliveryModels: provider.deliveryModels,
@@ -46,7 +44,7 @@ function catalogueContext(request: LevyTateAiRequest) {
 }
 
 function pathwayContext(request: LevyTateAiRequest) {
-  const supplied = request.availablePathways?.length ? request.availablePathways : getLiveApprenticeshipStandards().map((standard) => ({
+  const supplied = request.availablePathways ?? getLiveApprenticeshipStandards().map((standard) => ({
     title: standard.title,
     standard: "Level " + standard.level + " " + standard.title + " (" + standard.referenceCode + ")",
     status: "Available for role-fit review",
