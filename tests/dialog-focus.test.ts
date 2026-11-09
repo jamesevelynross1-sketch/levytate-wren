@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dialogTabBoundary, dialogTabStops, isTopmostDialog, topmostModalDialog } from "../lib/levytate/dialog-focus";
+import { dialogTabBoundary, dialogTabStops, isTopmostDialog, restoreDialogFocus, topmostModalDialog } from "../lib/levytate/dialog-focus";
 
 // Unit model for ordering/filtering only. Actual keyboard behaviour is separately
 // exercised in the genuine-auth browser acceptance suite.
@@ -30,6 +30,13 @@ function fixture() {
 }
 
 describe("shared dialog focus contract", () => {
+  it("restores only a still-connected trigger after cleanup", () => {
+    let count = 0;
+    expect(restoreDialogFocus({ isConnected: true, focus: () => { count += 1; } })).toBe(true);
+    expect(restoreDialogFocus({ isConnected: false, focus: () => { count += 1; } })).toBe(false);
+    expect(restoreDialogFocus(null)).toBe(false);
+    expect(count).toBe(1);
+  });
   it("excludes hidden, inert, unrendered, disabled and negative-tabindex controls", () => {
     const { element, dialog } = fixture();
     const active = element();

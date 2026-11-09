@@ -13,6 +13,12 @@ export function topmostModalDialog(document: Document) {
   return Array.from(document.querySelectorAll<HTMLElement>('[role="dialog"][aria-modal="true"]')).filter(isVisible).at(-1) ?? null;
 }
 
+export function restoreDialogFocus(previousFocus: Pick<HTMLElement, "isConnected" | "focus"> | null) {
+  if (!previousFocus?.isConnected) return false;
+  previousFocus.focus();
+  return true;
+}
+
 export function dialogTabStops(dialog: HTMLElement) {
   return Array.from(dialog.querySelectorAll<HTMLElement>("button, a[href], input, select, textarea, summary, [tabindex], [contenteditable='true']"))
     .filter((element) => element.tabIndex >= 0 && !element.matches(":disabled") && isVisible(element))

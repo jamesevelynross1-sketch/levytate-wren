@@ -1,7 +1,7 @@
 "use client";
 
 import { WorkspaceSessionRecovery } from "@/components/levytate-mvp/MvpWorkspaceStore";
-import { dialogTabBoundary, dialogTabStops, isTopmostDialog } from "@/lib/levytate/dialog-focus";
+import { dialogTabBoundary, dialogTabStops, isTopmostDialog, restoreDialogFocus } from "@/lib/levytate/dialog-focus";
 
 import { Plus, Search, X } from "lucide-react";
 import { useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type KeyboardEvent, type ReactNode } from "react";
@@ -92,7 +92,7 @@ export function MvpModal({ title, eyebrow, children, onClose, wide = false }: { 
     return () => {
       document.removeEventListener("keydown", onKeyDown);
       document.removeEventListener("focusin", onFocusIn);
-      if (previousFocus?.isConnected) previousFocus.focus();
+      restoreDialogFocus(previousFocus);
     };
   }, []);
 
