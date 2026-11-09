@@ -56,6 +56,11 @@ describe("manager own Learning Time service and rendered permissions (fictional 
     const render = (index: number) => renderToStaticMarkup(createElement(LearningTimeLearnerContent, { workspace, learner: workspace.learners[index], busy: false, act: async () => false }));
     expect(render(0)).toContain("Add learning activity"); expect(render(0)).not.toContain("Candidate activity review");
     expect(render(1)).toContain("Direct-report learning summary"); expect(render(1)).not.toContain("Add learning activity"); expect(render(1)).not.toContain("Employer check");
+    expect(render(1)).not.toContain("Withdraw activity");
+    workspace.learners[0].activities[0].status = "submitted";
+    expect(render(0)).toContain("Withdraw activity"); expect(render(0)).not.toContain("Employer check");
+    workspace.learners[0].activities[0].status = "withdrawn";
+    expect(render(0)).not.toContain("Withdraw activity");
   });
   it.each(["missing", "ambiguous", "archived"])("fails closed for %s own People identity before loading a manager's reports", async state => {
     if (state === "missing") source.people = source.people.filter(item => item.id !== "manager");
