@@ -9,8 +9,9 @@ const state=JSON.parse(readFileSync(`${root}/private-stack-state.json`,"utf8")),
 if(db.hostname!=="127.0.0.1")throw new Error("Fault injection is restricted to the dedicated loopback stack");
 const app=localUrl(process.env.RELEASE_APP_URL??"http://localhost:3107","RELEASE_APP_URL");
 const faultTarget=process.env.RELEASE_FAULT_TARGET??"consume";
-if(!["consume","callback-inspection"].includes(faultTarget))throw new Error("Unapproved local fault target");
-const signature=faultTarget==="consume"?"public.levytate_consume_auth_rate_limit(text,text,text,integer,integer,text,text,timestamptz)":"public.levytate_check_auth_callback_failures(text,text)";
+const signatures={consume:"public.levytate_consume_auth_rate_limit(text,text,text,integer,integer,text,text,timestamptz)","callback-inspection":"public.levytate_check_auth_callback_failures(text,text)","release-contract":"public.levytate_required_client_contracts()"};
+if(!Object.hasOwn(signatures,faultTarget))throw new Error("Unapproved local fault target");
+const signature=signatures[faultTarget];
 const env={...process.env,PGHOST:db.hostname,PGPORT:db.port,PGUSER:db.username,PGPASSWORD:db.password,PGDATABASE:db.pathname.slice(1)};
 function sql(input){const r=spawnSync(process.env.RELEASE_PSQL??"/opt/homebrew/opt/postgresql@17/bin/psql",["-X","-A","-t","-q","-v","ON_ERROR_STOP=1"],{input,env,encoding:"utf8"});if(r.status)throw new Error("Local fault-injection SQL failed");return r.stdout.trim();}
 let injected=false,passed=0,failed=0;
@@ -33,9 +34,11 @@ try{
     const refresh=await fetch(`${app}/api/levytate-auth/session`,{method:"POST",headers:{Origin:app}});
     check("session refresh fails unavailable when security store fails",refresh.status===503);
   }
-  const callback=await fetch(`${app}/levytate/auth/callback?token_hash=synthetic-invalid&type=magiclink`,{redirect:"manual"});
-  const callbackLocation=new URL(callback.headers.get("location")??"/",app);
-  check("callback security-store outage redirects to same-origin unavailable, not invalid token",[302,303,307].includes(callback.status)&&callbackLocation.origin===app&&callbackLocation.searchParams.get("auth")==="unavailable");
+  if(faultTarget!=="release-contract"){
+    const callback=await fetch(`${app}/levytate/auth/callback?token_hash=synthetic-invalid&type=magiclink`,{redirect:"manual"});
+    const callbackLocation=new URL(callback.headers.get("location")??"/",app);
+    check("callback security-store outage redirects to same-origin unavailable, not invalid token",[302,303,307].includes(callback.status)&&callbackLocation.origin===app&&callbackLocation.searchParams.get("auth")==="unavailable");
+  }
   check("liveness remains distinct from unavailable readiness",(await fetch(`${app}/api/levytate-health/live`)).status===200);
 }catch(error){failed++;console.error(`FAIL readiness execution ${error.message}`);}
 finally{
