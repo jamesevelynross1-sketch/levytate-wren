@@ -2,6 +2,11 @@
 
 import { AlertTriangle, FileUp, PoundSterling } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
+import { usePinnedClientMutation } from "@/components/levytate-mvp/usePinnedClientMutation";
+import { ClientMutationRecovery } from "@/components/levytate-mvp/ClientMutationRecovery";
+import { authenticatedClientFetch } from "@/lib/levytate/client-session";
+import { decodeFinanceMutationResponse } from "@/lib/levytate/client-module-responses";
 
 import { calculateLevyFinance, financeReportingPeriod, formatGbp, monthLabel } from "@/lib/levytate/finance/calculations";
 import { financeUploadMaxBytes, mergeFinanceTransactions, parseDasCsv, sanitiseFinanceFileName } from "@/lib/levytate/finance/das-import";
@@ -22,9 +27,11 @@ export function LevyFinanceModule({ organisationId, demoMode }: { organisationId
   const [error, setError] = useState("");
   const [balanceInput, setBalanceInput] = useState("");
   const [loading, setLoading] = useState(!demoMode);
-  const [busy, setBusy] = useState(false);
   const [reload, setReload] = useState(0);
-  const balanceRequest = useRef<{ value: number; version: string | null; requestId: string } | null>(null);
+  const { meta } = useMvpWorkspace();
+  const identity = useRef(meta ? { email: meta.userEmail, organisationId: meta.organisationId } : null);
+  const mutation = usePinnedClientMutation(identity.current, "/api/levytate-finance", decodeFinanceMutationResponse);
+  const busy = mutation.working;
 
   useEffect(() => {
     if (demoMode) {
@@ -35,7 +42,7 @@ export function LevyFinanceModule({ organisationId, demoMode }: { organisationId
     }
     let cancelled = false;
     setLoading(true);
-    void fetch("/api/levytate-finance", { cache: "no-store" })
+    void authenticatedClientFetch("/api/levytate-finance", {}, identity.current ?? undefined)
       .then(async (response) => {
         const body = await response.json() as { state?: LevyFinanceState; message?: string };
         if (!response.ok || !body.state) throw new Error(body.message || "Finance unavailable.");
@@ -55,6 +62,7 @@ export function LevyFinanceModule({ organisationId, demoMode }: { organisationId
   }
 
   async function chooseFile(file?: File) {
+    if (mutation.locked) return;
     setError("");
     if (!file) return;
     if (!/\.csv$/i.test(file.name) || !["text/csv", "application/csv", "application/vnd.ms-excel", "text/plain", ""].includes(file.type)) return setError("Choose a valid CSV file.");
@@ -65,24 +73,19 @@ export function LevyFinanceModule({ organisationId, demoMode }: { organisationId
   }
 
   function confirmMapping() {
-    if (!upload) return;
+    if (!upload || mutation.locked) return;
     const result = parseDasCsv(upload.csv, upload.mapping);
     setUpload({ ...upload, result });
   }
 
   async function importTransactions() {
-    if (busy || !upload || upload.result.needsMapping || !upload.result.transactions.length) return;
+    if (mutation.locked || !upload || upload.result.needsMapping || !upload.result.transactions.length) return;
     if (upload.result.issues.length || upload.result.sourceRows > 10000) return setError("Correct malformed rows and keep the file within 10,000 source rows before importing.");
     setError("");
     if (!demoMode) {
-      setBusy(true);
       try {
-        const response = await fetch("/api/levytate-finance", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "import", fileName: upload.fileName, result: { transactions: upload.result.transactions, sourceRows: upload.result.sourceRows, dateRange: upload.result.dateRange } }) });
-        const body = await response.json() as { state?: LevyFinanceState; message?: string };
-        if (!response.ok || !body.state) throw new Error(body.message || "The DAS import could not be saved.");
-        setState(body.state); setUpload(null);
+        await mutation.execute({ action: "import", fileName: upload.fileName, result: { transactions: upload.result.transactions, sourceRows: upload.result.sourceRows, dateRange: upload.result.dateRange } }, (next) => { setState(next); setUpload(null); setError(""); });
       } catch (failure) { setError(failure instanceof Error ? failure.message : "Finance could not confirm persistence. Your file is retained for a safe retry."); }
-      finally { setBusy(false); }
       return;
     }
     const current = state ?? { version: 1, mode: demoMode ? "local_import" : "session_import", transactions: [], imports: [] };
@@ -95,21 +98,15 @@ export function LevyFinanceModule({ organisationId, demoMode }: { organisationId
   }
 
   async function confirmBalance() {
-    if (!state || busy) return;
+    if (!state || mutation.locked) return;
     const number = Number(balanceInput.replace(/[£,\s]/g, ""));
     if (!Number.isFinite(number) || number < 0) return setError("Enter the current DAS balance as a positive amount.");
     const amountPence = Math.round(number * 100);
     if (!demoMode) {
       const version = state.manualBalanceConfirmedAt ?? null;
-      if (!balanceRequest.current || balanceRequest.current.value !== amountPence || balanceRequest.current.version !== version) balanceRequest.current = { value: amountPence, version, requestId: crypto.randomUUID() };
-      setBusy(true);
       try {
-        const response = await fetch("/api/levytate-finance", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "balance", amountPence, expectedConfirmedAt: version, requestId: balanceRequest.current.requestId }) });
-        const body = await response.json() as { state?: LevyFinanceState; message?: string };
-        if (!response.ok || !body.state) throw new Error(body.message || "The DAS balance could not be saved.");
-        setState(body.state); balanceRequest.current = null;
+        await mutation.execute({ action: "balance", amountPence, expectedConfirmedAt: version, requestId: crypto.randomUUID() }, (next) => { setState(next); setBalanceInput(""); setError(""); });
       } catch (failure) { setError(failure instanceof Error ? failure.message : "Finance could not confirm the balance. Retry with the retained value."); return; }
-      finally { setBusy(false); }
     } else save({ ...state, manualBalancePence: amountPence, manualBalanceConfirmedAt: new Date().toISOString().slice(0, 10) });
     setBalanceInput(""); setError("");
   }
@@ -117,7 +114,7 @@ export function LevyFinanceModule({ organisationId, demoMode }: { organisationId
   if (loading) return <section className="grid min-h-[300px] place-items-center bg-white text-sm font-semibold text-[#102c3d]/[0.55]">Loading organisation finance…</section>;
   if (!state && error && !upload) return <section role="alert" className="bg-white p-6"><p>{error}</p><button type="button" onClick={() => setReload((value) => value + 1)} className="mt-4 min-h-11 px-4 font-semibold">Retry Finance</button></section>;
   if ((!state || !state.transactions.length) && !upload) return <EmptyFinance onFile={chooseFile} error={error} />;
-  if (upload) return <ImportWorkspace upload={upload} setUpload={setUpload} onMapping={confirmMapping} onImport={importTransactions} onCancel={() => { if (!busy) setUpload(null); }} error={error} busy={busy} />;
+  if (upload) return <div className="grid gap-4"><ClientMutationRecovery mutation={mutation}/><fieldset disabled={mutation.locked} className="min-w-0 border-0 p-0"><ImportWorkspace upload={upload} setUpload={setUpload} onMapping={confirmMapping} onImport={importTransactions} onCancel={() => { if (!mutation.locked) setUpload(null); }} error={error} busy={busy} /></fieldset></div>;
   if (!state || !summary) return null;
 
   const latest = summary.latest;
@@ -126,7 +123,7 @@ export function LevyFinanceModule({ organisationId, demoMode }: { organisationId
   const providerSpend = breakdown(state, "providerName");
   const programmeSpend = breakdown(state, "programmeName");
 
-  return <div className="grid gap-5" data-testid="levy-finance-module">
+  return <div className="grid gap-4"><ClientMutationRecovery mutation={mutation}/><fieldset disabled={mutation.locked} className="min-w-0 border-0 p-0"><div className="grid gap-5" data-testid="levy-finance-module">
     <div className="flex flex-wrap items-start justify-between gap-4">
       <div className="flex items-center gap-2"><PoundSterling size={18} className="text-[#0b776e]" /><p className="text-sm font-semibold text-[#102c3d]">Levy position</p></div>
       <div className="text-right"><p className="text-xs font-semibold text-[#0b776e]">{state.mode === "fixture" ? "Illustrative finance data" : "Latest DAS import"}</p><p className="mt-1 text-xs text-[#102c3d]/[0.44]">{lastImport ? `Imported ${displayDate(lastImport.importedAt)}` : "No data imported"}</p></div>
@@ -164,7 +161,7 @@ export function LevyFinanceModule({ organisationId, demoMode }: { organisationId
     {(providerSpend.length || programmeSpend.length) ? <section className="grid gap-4 lg:grid-cols-2">{providerSpend.length ? <Breakdown title="Spend by provider" rows={providerSpend} /> : null}{programmeSpend.length ? <Breakdown title="Spend by programme" rows={programmeSpend} /> : null}</section> : null}
     {summary.unknownTransactions.length ? <section className="border border-[#e6b74a]/[0.25] bg-[#fffaf0] p-5"><div className="flex items-center gap-2"><AlertTriangle size={17} className="text-[#9a6a00]" /><h2 className="text-lg font-semibold">Needs review</h2></div><p className="mt-1 text-sm text-[#102c3d]/[0.56]">{summary.unknownTransactions.length} imported rows could not be classified and are excluded from category totals.</p><div className="mt-3 grid gap-2">{summary.unknownTransactions.slice(0, 8).map((item) => <div key={item.fingerprint} className="grid gap-1 border-t border-[#102c3d]/[0.07] pt-2 text-xs sm:grid-cols-[100px_1fr_auto]"><span>{item.transactionDate}</span><span>{item.description}</span><span className="font-semibold tabular-nums">{formatGbp(item.amountPence, true)}</span></div>)}</div></section> : null}
     {error ? <p className="text-sm font-semibold text-[#ad344e]">{error}</p> : null}
-  </div>;
+  </div></fieldset></div>;
 }
 
 function EmptyFinance({ onFile, error }: { onFile: (file?: File) => void; error: string }) { return <section className="grid min-h-[360px] place-items-center border border-[#102c3d]/[0.07] bg-white p-6 text-center"><div className="max-w-lg"><div className="mx-auto grid h-12 w-12 place-items-center bg-[#eaf5f1] text-[#0b776e]"><FileUp size={22} /></div><h2 className="mt-5 text-2xl font-semibold">Bring your DAS finance data into LevyTate</h2><p className="mt-3 text-sm leading-6 text-[#102c3d]/[0.56]">Upload the transaction history from your Apprenticeship Service account to calculate the monthly levy position. Imports are stored only in this organisation.</p><label className="mt-5 inline-flex min-h-11 cursor-pointer items-center bg-[#102c3d] px-5 text-sm font-semibold text-white">Upload DAS transactions<input type="file" accept=".csv,text/csv" className="sr-only" onChange={(event) => void onFile(event.target.files?.[0])} /></label>{error ? <p className="mt-4 text-sm text-[#ad344e]">{error}</p> : null}</div></section>; }

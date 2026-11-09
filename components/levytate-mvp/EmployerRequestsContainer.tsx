@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { authenticatedClientFetch } from "@/lib/levytate/client-session";
+import { decodeRequestsMutationResponse } from "@/lib/levytate/client-module-responses";
+import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
+import { usePinnedClientMutation } from "@/components/levytate-mvp/usePinnedClientMutation";
+import { ClientMutationRecovery } from "@/components/levytate-mvp/ClientMutationRecovery";
 import {
   EmployerRequestsModule,
   type EmployerRequestAgreementSnapshot,
@@ -30,7 +35,9 @@ export function EmployerRequestsContainer({
 }: Pick<EmployerRequestsModuleProps, "onOpenMarketplace" | "onOpenMyProviders" | "onOpenMyProgrammes">) {
   const [workspace, setWorkspace] = useState<EmployerRequestsWorkspaceBootstrap | null>(null);
   const [error, setError] = useState("");
-  const pendingCommands=useRef(new Map<string,string>());
+  const { meta } = useMvpWorkspace();
+  const identity = useRef(meta ? { email: meta.userEmail, organisationId: meta.organisationId } : null);
+  const mutation = usePinnedClientMutation(identity.current, "/api/levytate-requests", (value) => decodeRequestsMutationResponse(value, identity.current?.organisationId));
   const initialContext = useMemo(() => {
     if (typeof window === "undefined") return undefined;
     const params = new URLSearchParams(window.location.search);
@@ -41,10 +48,10 @@ export function EmployerRequestsContainer({
 
   useEffect(() => {
     let live = true;
-    void fetch("/api/levytate-requests", { credentials: "same-origin", cache: "no-store" })
+    void authenticatedClientFetch("/api/levytate-requests", {}, identity.current ?? undefined)
       .then(async (response) => {
         const body = await response.json() as { workspace?: EmployerRequestsWorkspaceBootstrap; message?: string };
-        if (!response.ok || !body.workspace) throw new Error(body.message ?? "Requests could not be loaded.");
+        if (!response.ok || !body.workspace || body.workspace.organisation.id !== identity.current?.organisationId) throw new Error(body.message ?? "Requests could not be loaded for this account. Reload to reconnect.");
         if (live) setWorkspace(body.workspace);
       })
       .catch((caught) => { if (live) setError(message(caught)); });
@@ -52,20 +59,7 @@ export function EmployerRequestsContainer({
   }, []);
 
   async function mutate(action: EmployerRequestAction) {
-    const fingerprint=JSON.stringify(Object.fromEntries(Object.entries(action).filter(([key])=>key!=="idempotencyKey")));
-    const idempotencyKey=pendingCommands.current.get(fingerprint)??action.idempotencyKey;
-    pendingCommands.current.set(fingerprint,idempotencyKey);
-    const response = await fetch("/api/levytate-requests", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({...action,idempotencyKey}),
-    });
-    const body = await response.json().catch(() => null) as { workspace?: EmployerRequestsWorkspaceBootstrap; message?: string } | null;
-    if (!response.ok || !body?.workspace) throw new Error(body?.message ?? "We couldn’t save this Request. Please try again.");
-    setWorkspace(body.workspace);
-    pendingCommands.current.delete(fingerprint);
-    return body.workspace;
+    return mutation.execute(action, setWorkspace);
   }
 
   if (error) return <RequestLoadState title="Requests are unavailable" copy={error} />;
@@ -76,7 +70,7 @@ export function EmployerRequestsContainer({
   const requests = workspace.requests.map((request) => requestView(request, workspace));
   const convert = (brief: EmployerRequestBrief, responseDeadline?: string) => contentFromBrief(brief, responseDeadline, workspace);
 
-  return (
+  return (<div className="grid gap-4"><ClientMutationRecovery mutation={mutation}/><fieldset disabled={mutation.locked} key={mutation.reconciled} className="min-w-0 border-0 p-0">
     <EmployerRequestsModule
       organisationName={workspace.organisation.name}
       requests={requests}
@@ -122,7 +116,7 @@ export function EmployerRequestsContainer({
       onConfirmAgreement={(requestId, responseId, handover) => mutate({ action: "confirm_and_handover", requestId, responseId, ...handover, idempotencyKey: crypto.randomUUID() }).then(() => undefined)}
       onRecordDidNotProceed={(requestId, responseId, privateDecisionNote) => mutate({ action: "not_proceeded", requestId, responseId, privateDecisionNote, idempotencyKey: crypto.randomUUID() }).then(() => undefined)}
     />
-  );
+  </fieldset></div>);
 }
 
 function RequestLoadState({ title, copy }: { title: string; copy: string }) {
