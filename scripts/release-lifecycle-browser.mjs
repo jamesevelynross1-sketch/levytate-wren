@@ -18,9 +18,10 @@ async function downloadJson(download) {
     return JSON.parse(Buffer.concat(chunks).toString("utf8"));
   } finally { await download.delete(); }
 }
-export async function verifyLifecycle({ app: value, mailpit: mailValue, browser, manifest, extension, backend, waitForCapturedLink, check, resumeSuspended = false, verifyBlankWorkspace = false }) {
+export async function verifyLifecycle({ app: value, mailpit: mailValue, browser, manifest, extension, backend, waitForCapturedLink, check, resumeSuspended = false, verifyBlankWorkspace = false, resumeBlankWorkspaceId = null }) {
   const app = localUrl(value, "lifecycle app"), mailpit = localUrl(mailValue, "lifecycle capture");
   if (typeof resumeSuspended !== "boolean" || typeof verifyBlankWorkspace !== "boolean") throw new Error("Explicit local lifecycle options required");
+  if (resumeBlankWorkspaceId !== null && (!resumeSuspended || !verifyBlankWorkspace || typeof resumeBlankWorkspaceId !== "string" || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(resumeBlankWorkspaceId))) throw new Error("An explicit reviewed blank-workspace UUID is required for continuation");
   const plan = assertLifecycleManifest(extension, manifest.run, true), actors = new Map();
   let phase = "normal sign-in";
   let blankWorkspace;
@@ -99,32 +100,45 @@ export async function verifyLifecycle({ app: value, mailpit: mailValue, browser,
       report("continuation does not overwrite an existing lifecycle or reactivation request", !recorded.cases.some((item) => item.tenant_id === plan.target.id) && !recorded.reactivations.some((item) => item.organisation_id === plan.target.id));
     }
     if (verifyBlankWorkspace) {
-      phase = "genuine blank employer creation";
+      phase = resumeBlankWorkspaceId ? "existing blank employer verification" : "genuine blank employer creation";
       const name = `Synthetic blank client ${plan.run}`, email = `lg.${plan.run}.blank-lead@example.test`;
-      report("new blank employer fixture does not exist already", (await backend(`rest/v1/levytate_organisations?contact_email=eq.${encodeURIComponent(email)}&select=id`)).length === 0);
-      const beforeAuth = await backend("auth/v1/admin/users?page=1&per_page=1000");
-      report("bounded Auth observation covers the local identity directory", Array.isArray(beforeAuth.users) && beforeAuth.users.length < 1000 && beforeAuth.users.every((user) => user.email !== email));
-      const mailBefore = await fetch(`${mailpit}/api/v1/messages`).then((response) => response.json());
-      report("local email observation has an exact message count", Number.isSafeInteger(mailBefore.total) && Array.isArray(mailBefore.messages));
-      await reload(a); await a.page.getByRole("button", { name: "Create employer", exact: true }).click();
-      const dialog = a.page.getByRole("dialog");
-      for (const [label, value] of [["Organisation name", name], ["Workspace name", name], ["Primary contact", "Synthetic pending Lead"], ["Primary contact email", email]]) await dialog.getByLabel(label, { exact: true }).fill(value);
-      await dialog.getByRole("combobox", { name: "Initial role", exact: true }).selectOption("Apprenticeship Lead");
-      const created = a.page.waitForResponse((item) => new URL(item.url()).pathname === "/api/levytate-platform/workspaces" && item.request().method() === "POST");
-      await dialog.getByRole("button", { name: "Create blank workspace", exact: true }).click();
-      const response = await created, payload = await response.json();
-      report("genuine Platform Admin creates a blank employer through UI", response.status() === 200 && payload.workspace?.name === name && payload.workspace.users?.length === 1);
-      const workspaceId = payload.workspace.id, membershipId = payload.workspace.users[0].id;
-      report(`new blank employer fixture recorded for later cleanup: ${workspaceId}`, /^[a-f0-9-]{36}$/.test(workspaceId) && ![plan.target.id, plan.operator.id, ...manifest.tenants.map((item) => item.id)].includes(workspaceId));
+      const existing = await backend(`rest/v1/levytate_organisations?contact_email=eq.${encodeURIComponent(email)}&select=id,name,contact_email,status`);
+      let workspaceId, membershipId, beforeAuth, mailBefore;
+      if (resumeBlankWorkspaceId) {
+        report("continuation identifies exactly the reviewed blank employer without creating another", existing.length === 1 && existing[0].id === resumeBlankWorkspaceId && existing[0].name === name && existing[0].contact_email === email && existing[0].status === "Active");
+        workspaceId = resumeBlankWorkspaceId;
+      } else {
+        report("new blank employer fixture does not exist already", existing.length === 0);
+        beforeAuth = await backend("auth/v1/admin/users?page=1&per_page=1000");
+        report("bounded Auth observation covers the local identity directory", Array.isArray(beforeAuth.users) && beforeAuth.users.length < 1000 && beforeAuth.users.every((user) => user.email !== email));
+        mailBefore = await fetch(`${mailpit}/api/v1/messages`).then((response) => response.json());
+        report("local email observation has an exact message count", Number.isSafeInteger(mailBefore.total) && Array.isArray(mailBefore.messages));
+        await reload(a); await a.page.getByRole("button", { name: "Create employer", exact: true }).click();
+        const dialog = a.page.getByRole("dialog");
+        for (const [label, value] of [["Organisation name", name], ["Workspace name", name], ["Primary contact", "Synthetic pending Lead"], ["Primary contact email", email]]) await dialog.getByLabel(label, { exact: true }).fill(value);
+        await dialog.getByRole("combobox", { name: "Initial role", exact: true }).selectOption("Apprenticeship Lead");
+        const created = a.page.waitForResponse((item) => new URL(item.url()).pathname === "/api/levytate-platform/workspaces" && item.request().method() === "POST");
+        await dialog.getByRole("button", { name: "Create blank workspace", exact: true }).click();
+        const response = await created, payload = await response.json();
+        report("genuine Platform Admin creates a blank employer through UI", response.status() === 201 && payload.workspace?.name === name && payload.workspace.users?.length === 1);
+        workspaceId = payload.workspace.id; membershipId = payload.workspace.users[0].id;
+      }
+      report(`blank employer fixture recorded for later cleanup: ${workspaceId}`, /^[a-f0-9-]{36}$/.test(workspaceId) && ![plan.target.id, plan.operator.id, ...manifest.tenants.map((item) => item.id)].includes(workspaceId));
       const users = await backend(`rest/v1/levytate_users?organisation_id=eq.${workspaceId}&select=id,email,role,active,auth_subject,auth_binding_status,invitation_status,invitation_generation`);
+      if (resumeBlankWorkspaceId) membershipId = users[0]?.id;
       report("initial Lead remains inactive, unbound and never invited", users.length === 1 && users[0].id === membershipId && users[0].email === email && users[0].role === "Apprenticeship Lead" && users[0].active === false && users[0].auth_subject === null && users[0].auth_binding_status === "pending" && users[0].invitation_status === "not_requested" && users[0].invitation_generation === 0);
       for (const table of ["levytate_employees", "levytate_employee_development_profiles", "levytate_roles", "levytate_applications", "levytate_enrolments", "levytate_learner_records", "levytate_organisation_providers", "levytate_organisation_programmes", "levytate_finance_imports", "levytate_finance_transactions", "levytate_finance_balances"]) {
         report(`blank employer has no seeded ${table.replace("levytate_", "")} records`, (await backend(`rest/v1/${table}?organisation_id=eq.${workspaceId}&select=organisation_id&limit=1`)).length === 0);
       }
       const afterAuth = await backend("auth/v1/admin/users?page=1&per_page=1000"), mailAfter = await fetch(`${mailpit}/api/v1/messages`).then((response) => response.json());
-      report("blank workspace creation creates no provider Auth identity", Array.isArray(afterAuth.users) && JSON.stringify(afterAuth.users.map((user) => user.id).sort()) === JSON.stringify(beforeAuth.users.map((user) => user.id).sort()) && afterAuth.users.every((user) => user.email !== email));
-      report("blank workspace creation sends no invitation or other email", mailAfter.total === mailBefore.total && !(mailAfter.messages ?? []).some((item) => item.To?.some((to) => to.Address === email)));
-      blankWorkspace = { organisationId: workspaceId, pendingMembershipId: membershipId, invitationSent: false, authCreated: false };
+      if (resumeBlankWorkspaceId) {
+        report("existing pending Lead has no Auth identity in the complete present directory", Array.isArray(afterAuth.users) && afterAuth.users.length < 1000 && afterAuth.users.every((user) => user.email !== email));
+        report("existing pending Lead has no message in the complete present capture", Array.isArray(mailAfter.messages) && mailAfter.total === mailAfter.messages.length && !mailAfter.messages.some((item) => item.To?.some((to) => to.Address === email)));
+      } else {
+        report("blank workspace creation creates no provider Auth identity", Array.isArray(afterAuth.users) && JSON.stringify(afterAuth.users.map((user) => user.id).sort()) === JSON.stringify(beforeAuth.users.map((user) => user.id).sort()) && afterAuth.users.every((user) => user.email !== email));
+        report("blank workspace creation sends no invitation or other email", mailAfter.total === mailBefore.total && !(mailAfter.messages ?? []).some((item) => item.To?.some((to) => to.Address === email)));
+      }
+      blankWorkspace = { organisationId: workspaceId, pendingMembershipId: membershipId, evidence: resumeBlankWorkspaceId ? "Present-state verification only; no historical creation, Auth-directory delta or delivery claim" : "Genuine UI creation with before/after Auth and email observations" };
     }
     phase = "role denial and suspension";
     if (member) report("employer Lead cannot read platform lifecycle cases", (await member.context.request.get(`${app}${endpoint}`, { headers: headers(member) })).status() === 403);
