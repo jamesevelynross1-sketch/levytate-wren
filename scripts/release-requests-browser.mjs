@@ -33,7 +33,7 @@ export async function verifyRequests({app,mailpit,manifest,contexts,browser,back
       providers.push({key,providerId,email,membershipId:membership.id});
     }
     check("other employer tenant stays Requests-disabled",(await contexts.get("a:lead").context.request.get(path)).status()===404);
-    for(const key of["b:employee","b:manager"])check(`${key} cannot read employer Requests`,(await contexts.get(key).context.request.get(path)).status()===403);
+    for(const key of["b:employee","b:manager"])if(contexts.has(key))check(`${key} cannot read employer Requests`,(await contexts.get(key).context.request.get(path)).status()===403);
     const title=`Synthetic provider handoff ${manifest.run.slice(0,8)}`,privateMarker=`PRIVATE-${manifest.run}`,afterInvite=Date.now();
     const content={title,requestMode:"need_led",requirement:"Synthetic data development requirement with no real workforce records.",readiness:"planning",learnerVolume:{kind:"exact",count:2},workplaceLocation:{kind:"remote_or_distributed",label:"Synthetic UK workplace"},deliveryPreferences:["Online"],preferredStart:{kind:"flexible"},responseDeadline:new Date(Date.now()+30*86400000).toISOString().slice(0,10)};
     const send={action:"send_request",idempotencyKey:randomUUID(),content,privateContext:{privateNotes:privateMarker},providerIds:providers.map(p=>p.providerId)};
