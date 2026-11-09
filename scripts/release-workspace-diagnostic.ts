@@ -7,6 +7,8 @@ async function main(){
  const state=JSON.parse(readFileSync(`${root}/private-stack-state.json`,"utf8")),fixture=JSON.parse(readFileSync(`${root}/fixture-manifest.json`,"utf8"));
  if(new URL(state.env.API_URL).hostname!=="127.0.0.1"||!fixture.synthetic||fixture.environment!=="local")throw new Error("Local fixture only");
  process.env.NEXT_PUBLIC_SUPABASE_URL=state.env.API_URL;process.env.SUPABASE_SERVICE_ROLE_KEY=state.env.SERVICE_ROLE_KEY;
+ const transport=globalThis.fetch.bind(globalThis);
+ globalThis.fetch=async(input,init)=>{const response=await transport(input,init),url=new URL(input instanceof Request?input.url:String(input));if(url.origin===new URL(state.env.API_URL).origin&&url.pathname==="/rest/v1/rpc/levytate_apply_operational_action"&&!response.ok){const payload=await response.clone().json().catch(()=>null);console.log(JSON.stringify({diagnostic:"operational-rpc-error",status:response.status,code:typeof payload?.code==="string"&&/^[A-Z0-9]{5}$/.test(payload.code)?payload.code:"unclassified"}));}return response;};
  const user=fixture.tenants[0].users.find((u:{key:string})=>u.key==="employee"),r=await fetch(`${state.env.API_URL}/rest/v1/levytate_users?id=eq.${user.membershipId}&select=auth_subject`,{headers:{apikey:state.env.SERVICE_ROLE_KEY,Authorization:`Bearer ${state.env.SERVICE_ROLE_KEY}`}}),rows=await r.json();
  const {getWorkspaceBootstrapForSession,applyWorkspaceMutationForSession}=await import("../lib/server/levytate-workspace");
  const session={email:user.email,authSubject:rows[0].auth_subject,authMode:"supabase_email" as const,accessLevel:"beta_user" as const,issuedAt:Math.floor(Date.now()/1000),expiresAt:Math.floor(Date.now()/1000)+300};
