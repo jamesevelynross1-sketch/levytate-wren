@@ -1,7 +1,7 @@
 "use client";
 
 import { CheckCircle2, Clock3, FileText, GraduationCap, HeartHandshake, LockKeyhole, MessageCircle, ShieldCheck } from "lucide-react";
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, useRef, useState, type FormEvent } from "react";
 import type { LucideIcon } from "lucide-react";
 import { getApprenticeshipStandard } from "@/lib/levytate/domain";
 import {
@@ -26,6 +26,9 @@ import {
 } from "@/components/levytate-mvp/MvpUi";
 import { statusTone } from "@/components/levytate-mvp/module-utils";
 import { EmployeeEligibilityPanel } from "@/components/levytate-mvp/EmployeeEligibilityPanel";
+import { PersonalProgrammeDiscovery } from "@/components/levytate-mvp/PersonalProgrammeDiscovery";
+import { ownDevelopmentPerson } from "@/lib/levytate/mvp/programme-discovery";
+import { ClientMutationRecovery } from "@/components/levytate-mvp/ClientMutationRecovery";
 
 type EmployeeModuleTarget = "Home" | "My Programme" | "My Application" | "My Support" | "Copilot" | "Knowledge";
 
@@ -123,6 +126,7 @@ export function EmployeeProgrammeModule({ onNavigate }: { onNavigate: (target: E
     ...(context.profile?.automationOpportunities ?? []),
   ].filter(Boolean).slice(0, 8);
 
+  if (meta?.storageMode === "supabase") return <PersonalProgrammeDiscovery onNavigate={onNavigate} />;
   if (!context.employee) return <EmployeeSetupNotice />;
   if (!context.application && !context.programmeAvailable) return <EmployeeProgrammeUnavailable onNavigate={onNavigate} />;
 
@@ -191,6 +195,9 @@ export function EmployeeApplicationModule({ onNavigate }: { onNavigate: (target:
   const [error, setError] = useState("");
   const [savedMessage, setSavedMessage] = useState("");
   const [saving, setSaving] = useState(false);
+  const pending = useRef<MvpApplication | null>(null);
+  const working = useRef(false);
+  const [uncertain, setUncertain] = useState(false);
 
   if (!context.employee) return <EmployeeSetupNotice />;
 
@@ -212,7 +219,7 @@ export function EmployeeApplicationModule({ onNavigate }: { onNavigate: (target:
   const manager = managerName(data, context.employee);
 
   async function save(status: MvpApplication["status"], note: string) {
-    if (!context.employee || !context.mapping) return;
+    if (working.current || pending.current || !context.employee || (!existing && !context.mapping)) return;
     if (!editable) {
       setError("Your submitted answers are locked. You can edit them only if your manager requests more information.");
       return;
@@ -226,12 +233,12 @@ export function EmployeeApplicationModule({ onNavigate }: { onNavigate: (target:
       ...(existing ?? {
         id: createMvpId("application"),
         employeeId: context.employee.id,
-        apprenticeshipStandardId: context.mapping.apprenticeshipStandardId,
+        apprenticeshipStandardId: context.mapping!.apprenticeshipStandardId,
         submittedAt: now,
         history: [],
       }),
       employeeId: context.employee.id,
-      apprenticeshipStandardId: context.mapping.apprenticeshipStandardId,
+      apprenticeshipStandardId: existing?.apprenticeshipStandardId ?? context.mapping!.apprenticeshipStandardId,
       status,
       currentOwner: applicationOwnerForStatus(status),
       reason: draft.reason,
@@ -245,17 +252,31 @@ export function EmployeeApplicationModule({ onNavigate }: { onNavigate: (target:
         buildApplicationHistoryEntry(status, note, now),
       ],
     };
+    pending.current = next;
+    await sendPending();
+  }
+
+  async function sendPending() {
+    if (working.current || !pending.current) return;
+    const original = pending.current;
+    working.current = true;
     setSaving(true);
     setError("");
     setSavedMessage("");
-    const result = await saveApplication(next);
-    setSaving(false);
-    if (!result.ok) {
-      setError(result.message);
-      return;
+    try {
+      const result = await saveApplication(original);
+      if (!result.ok) throw new Error(result.message);
+      pending.current = null;
+      setUncertain(false);
+      setSavedMessage(original.status === "Draft" ? "Draft saved." : configurableWorkflow ? "Application submitted to your organisation's approval workflow." : "Application submitted to your line manager.");
+      if (original.status !== "Draft") setFormOpen(false);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "The application update could not be confirmed.");
+      setUncertain(true);
+    } finally {
+      working.current = false;
+      setSaving(false);
     }
-    setSavedMessage(status === "Draft" ? "Draft saved." : configurableWorkflow ? "Application submitted to your organisation's approval workflow." : "Application submitted to your line manager.");
-    if (status !== "Draft") setFormOpen(false);
   }
 
   function onSaveDraft(event: FormEvent) {
@@ -317,7 +338,7 @@ export function EmployeeApplicationModule({ onNavigate }: { onNavigate: (target:
           ) : null}
 
           {showForm ? (
-            <form onSubmit={onSaveDraft}>
+            <form onSubmit={onSaveDraft}><fieldset disabled={saving || uncertain} className="min-w-0">
               <div className="rounded-xl border border-[#102c3d]/[0.07] bg-white p-4">
                 <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                   <div>
@@ -349,8 +370,9 @@ export function EmployeeApplicationModule({ onNavigate }: { onNavigate: (target:
                   </button>
                 </div>
               </div>
-            </form>
+            </fieldset></form>
           ) : null}
+          <ClientMutationRecovery mutation={{ pending: uncertain, working: saving, error, retry: () => { void sendPending(); } }} />
         </div>
       </MvpPanel>
 
@@ -363,11 +385,12 @@ export function EmployeeApplicationModule({ onNavigate }: { onNavigate: (target:
 }
 
 function useEmployeeContext(data: MvpWorkspaceData): EmployeeContext {
-  return useMemo(() => buildEmployeeContext(data), [data]);
+  const { meta } = useMvpWorkspace();
+  return useMemo(() => buildEmployeeContext(data, meta?.storageMode === "supabase" ? meta.userEmail : undefined), [data, meta?.storageMode, meta?.userEmail]);
 }
 
-function buildEmployeeContext(data: MvpWorkspaceData): EmployeeContext {
-  const employee = data.employees.find((item) => item.status === "Active") ?? data.employees[0] ?? null;
+function buildEmployeeContext(data: MvpWorkspaceData, email?: string): EmployeeContext {
+  const employee = email === undefined ? data.employees.find((item) => item.status === "Active") ?? data.employees[0] ?? null : ownDevelopmentPerson(data, email);
   const role = data.roles.find((item) => item.id === employee?.roleId) ?? null;
   const profile = data.employeeDevelopmentProfiles.find((item) => item.employeeId === employee?.id) ?? null;
   const application = employee ? employeeCurrentApplication(data, employee.id) : null;
@@ -377,9 +400,9 @@ function buildEmployeeContext(data: MvpWorkspaceData): EmployeeContext {
     activeProgrammeIds.has(item.id) && (item.linkedStandardId === candidate.apprenticeshipStandardId || item.linkedStandardIds.includes(candidate.apprenticeshipStandardId))
   ) ?? null;
   const mapping = application
-    ? mappings.find((item) => item.apprenticeshipStandardId === application.apprenticeshipStandardId) ?? mappings[0] ?? null
+    ? mappings.find((item) => item.apprenticeshipStandardId === application.apprenticeshipStandardId) ?? null
     : mappings.find((item) => availableProgrammeForMapping(item)) ?? null;
-  const standard = mapping ? getApprenticeshipStandard(mapping.apprenticeshipStandardId) : null;
+  const standard = application ? getApprenticeshipStandard(application.apprenticeshipStandardId) : mapping ? getApprenticeshipStandard(mapping.apprenticeshipStandardId) : null;
   const programme = mapping ? (application
     ? data.providerProgrammes.find((item) => item.linkedStandardId === mapping.apprenticeshipStandardId || item.linkedStandardIds.includes(mapping.apprenticeshipStandardId)) ?? null
     : availableProgrammeForMapping(mapping)) : null;

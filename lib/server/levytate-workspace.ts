@@ -1083,6 +1083,7 @@ async function loadWorkspaceData(context: WorkspaceContext, session: LevyTateBet
     new URLSearchParams({
       select: "id,slug",
       slug: "eq.levytate-internal",
+      status: "eq.Active",
       limit: "1",
     }),
   );

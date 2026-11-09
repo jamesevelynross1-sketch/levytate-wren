@@ -208,6 +208,7 @@ export const mvpRolePermissions = {
     "employees:read",
     "employeeDevelopment:write",
     "applications:read",
+    "applications:write",
     "applications:status",
     "learnerLifecycle:read",
     "learningTime:read",
