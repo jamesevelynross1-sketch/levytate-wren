@@ -11,24 +11,27 @@ function authCount(email) {
   const r = spawnSync("/opt/homebrew/opt/postgresql@17/bin/psql", ["-XAtq", "-v", "ON_ERROR_STOP=1"], { input: `select count(*) from auth.users where email='${email}';`, encoding: "utf8", env: { ...process.env, PGHOST: db.hostname, PGPORT: db.port, PGUSER: db.username, PGPASSWORD: db.password, PGDATABASE: db.pathname.slice(1) } });
   if (r.status) throw new Error("Local account observation unavailable"); return Number(r.stdout.trim());
 }
-const formOn = page => page.locator("form").filter({ has: page.getByRole("button", { name: "Prepare account", exact: true }) });
+const formOn = page => page.getByRole("form", { name: "Prepare individual account", exact: true });
 export async function verifyAccountPreparation({ app, manifest, contexts, backend, check }) {
   const lead = contexts.get("a:lead"), other = contexts.get("b:lead"), page = lead.page;
   const endpoint = `${app}/api/levytate-workspace/invitations`;
   const denied = await lead.context.request.get(endpoint, { headers: { "X-LevyTate-Account": other.user.email } });
   check("account listing rejects a different retained account fingerprint", denied.status() === 409);
-  for (const key of ["a:employee", "a:manager"]) check(`${key}: cannot list individual account administration`, (await contexts.get(key).context.request.get(endpoint)).status() === 403);
+  for (const key of ["a:employee", "a:manager"]) if(contexts.has(key))check(`${key}: cannot list individual account administration`, (await contexts.get(key).context.request.get(endpoint)).status() === 403);
+  console.log("DIAGNOSTIC account UI: navigate People");
   await page.goto(`${app}/levytate/app?module=People`);
   await page.getByRole("heading", { name: "Individual account access", exact: true }).waitFor();
+  console.log("DIAGNOSTIC account UI: fill prepared account");
   const form = formOn(page), email = `release.${manifest.run}.a.prepared@example.test`;
   await form.getByLabel("Name", { exact: true }).fill("Synthetic prepared account");
   await form.getByLabel("Work email", { exact: true }).fill(email);
-  await form.getByLabel("Account role", { exact: true }).selectOption("Apprenticeship Lead");
-  let intercepted = false;
+  await form.getByRole("combobox", { name: /^Account role/ }).selectOption("Apprenticeship Lead");
+  console.log("DIAGNOSTIC account UI: drop successful response");
+  let intercepted = false, originalRequest;
   const disconnect = async route => {
     if (!intercepted && route.request().method() === "POST" && route.request().postDataJSON()?.action === "provision_user") {
-      intercepted = true; const response = await route.fetch();
-      if (response.status() !== 200) throw new Error("Account preparation failed before simulated response loss");
+      intercepted = true; originalRequest = route.request().postDataJSON(); const response = await route.fetch();
+      if (response.status() !== 201) throw new Error("Account preparation failed before simulated response loss");
       await route.abort("connectionreset");
     } else await route.continue();
   };
@@ -37,9 +40,11 @@ export async function verifyAccountPreparation({ app, manifest, contexts, backen
   finally { await page.unroute("**/api/levytate-workspace/invitations", disconnect); }
   const persisted = await backend(`rest/v1/levytate_users?organisation_id=eq.${lead.tenant.id}&email=eq.${encodeURIComponent(email)}&select=id,active,invitation_status,invitation_generation`);
   check("lost account response retains one pending membership and no Auth identity", intercepted && persisted.length === 1 && !persisted[0].active && persisted[0].invitation_status === "not_requested" && authCount(email) === 0);
+  check("uncertain account outcome freezes the exact original input", await form.getByLabel("Name", { exact: true }).isDisabled() && await form.getByLabel("Work email", { exact: true }).isDisabled() && await form.getByRole("combobox", { name: /^Account role/ }).isDisabled());
   const retryResponse = page.waitForResponse(r => r.url() === endpoint && r.request().method() === "POST");
-  await form.getByRole("button", { name: "Prepare account", exact: true }).click();
-  check("UI retry confirms original prepared membership", (await retryResponse).status() === 200);
+  await page.getByRole("button", { name: "Retry account preparation", exact: true }).click();
+  const retried = await retryResponse;
+  check("UI retry confirms original prepared membership and identical request key/body", retried.status() === 201 && JSON.stringify(retried.request().postDataJSON()) === JSON.stringify(originalRequest));
   await page.getByText("Synthetic prepared account", { exact: true }).waitFor();
   await page.reload(); await page.getByText("Synthetic prepared account", { exact: true }).waitFor();
   const after = await backend(`rest/v1/levytate_users?email=eq.${encodeURIComponent(email)}&select=id`);
@@ -54,7 +59,7 @@ export async function verifyRetainedAccountSwitch({ app, mailpit, manifest, cont
   const form = formOn(page), email = `release.${manifest.run}.a.retained@example.test`;
   await form.getByLabel("Name", { exact: true }).fill("Synthetic retained account draft");
   await form.getByLabel("Work email", { exact: true }).fill(email);
-  await form.getByLabel("Account role", { exact: true }).selectOption("Apprenticeship Lead");
+  await form.getByRole("combobox", { name: /^Account role/ }).selectOption("Apprenticeship Lead");
   check("genuine logout leaves a retained unsent account form", (await lead.context.request.post(`${app}/api/levytate-beta-logout`, { headers: { Origin: app }, maxRedirects: 0 })).status() === 303);
   const login = await lead.context.newPage();
   await login.goto(`${app}/levytate/login`);

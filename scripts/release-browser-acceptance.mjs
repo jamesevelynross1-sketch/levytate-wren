@@ -72,12 +72,14 @@ try {
   browser = await chromium.launch({ headless: true });
   const backend = releaseBackend();
   const contexts = new Map();
-  const peopleUiOnly=process.env.RELEASE_PEOPLE_UI_ONLY==="true";
+  const accountUiOnly=process.env.RELEASE_ACCOUNT_UI_ONLY==="true";
+  const peopleUiOnly=process.env.RELEASE_PEOPLE_UI_ONLY==="true"||accountUiOnly;
   const exportOnly=process.env.RELEASE_EXPORT_ONLY==="true";
   const failureBudgetStartedAt=new Date().toISOString();
   for (const tenant of manifest.tenants) {
     for (const user of tenant.users) {
-      if(peopleUiOnly&&(tenant.key!=="a"||user.key!=="lead"))continue;
+      if(peopleUiOnly&&!accountUiOnly&&(tenant.key!=="a"||user.key!=="lead"))continue;
+      if(accountUiOnly&&user.key!=="lead")continue;
       const label = `${tenant.key} ${user.role}`;
       const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
       const page = await context.newPage();
@@ -161,6 +163,14 @@ try {
   }
   const failureWrites=failureBudgetWritesSince(failureBudgetStartedAt);
   if(failureWrites!==null)check(`${contexts.size} genuine successful callbacks do not consume failed-link budget`,failureWrites===0);
+  if(process.env.RELEASE_ACCOUNT_PROBE==="true"){
+    phase="targeted account panel navigation";
+    const page=contexts.get("a:lead").page;
+    await page.goto(`${app}/levytate/app?module=People`);
+    try{await page.getByRole("heading",{name:"Individual account access",exact:true}).waitFor({timeout:15000});}
+    catch{console.log("DIAGNOSTIC account panel",JSON.stringify({path:new URL(page.url()).pathname,headings:await page.getByRole("heading").allTextContents(),peopleButtons:await page.getByRole("button",{name:"People",exact:true}).count()}));throw new Error("Account panel did not render");}
+    check("genuine Lead People navigation renders individual account controls",true);
+  }
   if(process.env.RELEASE_ACCOUNT_JOURNEY==="true"){
     phase="genuine account preparation and lost-response retry";
     const {verifyAccountPreparation}=await import("./release-account-browser.mjs");
