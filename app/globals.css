@@ -444,12 +444,12 @@ a {
     display: none !important;
   }
 
-  .opportunity-review-report,
-  .opportunity-review-report *,
-  .assessment-campaign-report,
-  .assessment-campaign-report *,
-  .employer-intelligence-report,
-  .employer-intelligence-report * {
+  body:has(.opportunity-review-report) .opportunity-review-report,
+  body:has(.opportunity-review-report) .opportunity-review-report *,
+  body.assessment-report-printing .assessment-campaign-report,
+  body.assessment-report-printing .assessment-campaign-report *,
+  body.employer-intelligence-printing .employer-intelligence-report,
+  body.employer-intelligence-printing .employer-intelligence-report * {
     visibility: visible !important;
   }
 
