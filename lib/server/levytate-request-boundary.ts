@@ -2,6 +2,7 @@ import { BoundedJsonBodyError, readBoundedJson } from "@/lib/server/bounded-json
 import { checkAuthenticatedWriteLimit, LevyTateRateLimitStoreError } from "@/lib/server/levytate-auth-rate-limit";
 import { applicationRequestOrigin } from "@/lib/server/levytate-request-origin";
 import { getLevyTateWebsiteOrigin } from "@/lib/levytate/hosts";
+import { getLevyTateSupabaseConfig, supabaseSelect } from "@/lib/server/levytate-supabase";
 
 export class ClientRequestError extends Error {
   constructor(message: string, readonly status: 400 | 403 | 404 | 409 | 413 | 415 | 422 | 429 | 503) {
@@ -18,7 +19,7 @@ export async function readAuthenticatedJson(request: Request, actorEmail: string
 
 export async function assertAuthenticatedWrite(request: Request, actorEmail: string) {
   assertBrowserOrigin(request);
-  assertExpectedAccount(request, actorEmail);
+  await assertExpectedWorkspace(request, actorEmail);
   try {
     if (!(await checkAuthenticatedWriteLimit(request, actorEmail)).allowed) {
       throw new ClientRequestError("Too many changes in a short time. Wait a minute before retrying.", 429);
@@ -35,6 +36,39 @@ export function assertExpectedAccount(request: Request, actorEmail: string) {
   if (expected !== null && expected.trim().toLowerCase() !== actorEmail.trim().toLowerCase()) {
     throw new ClientRequestError("A different account is signed in. Reload to switch accounts; this form was not submitted.", 409);
   }
+}
+
+/** Optional stale-form protection after session authorisation, never an access grant.
+ * Resolve the current membership instead of trusting the tenant supplied by a
+ * browser. Provider and internal callers without this header retain their own
+ * boundaries; actor/tenant authorisation still runs inside every service/RPC.
+ */
+export async function assertExpectedWorkspace(request: Request, actorEmail: string) {
+  assertExpectedAccount(request, actorEmail);
+  const supplied = request.headers.get("x-levytate-organisation");
+  if (supplied === null) return;
+  const expected = supplied.trim().toLowerCase();
+  const changed = () => new ClientRequestError("Your workspace has changed. Reload to reconnect; this form was not submitted.", 409);
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(expected)) throw changed();
+  const config = getLevyTateSupabaseConfig();
+  if (!config) throw new ClientRequestError("Account checks are temporarily unavailable. No change has been made.", 503);
+  type Membership = { email: string; organisation_id: string; active: boolean };
+  let members: Membership[];
+  try {
+    members = await supabaseSelect<Membership>(config, "levytate_users", new URLSearchParams({
+      select: "email,organisation_id,active", email: `eq.${actorEmail.trim().toLowerCase()}`, limit: "2",
+    }));
+  } catch {
+    throw new ClientRequestError("Account checks are temporarily unavailable. No change has been made.", 503);
+  }
+  if (!Array.isArray(members)) throw new ClientRequestError("Account checks are temporarily unavailable. No change has been made.", 503);
+  if (members.length !== 1) throw changed();
+  const member = members[0];
+  if (!member || typeof member.email !== "string" || typeof member.organisation_id !== "string" || typeof member.active !== "boolean") {
+    throw new ClientRequestError("Account checks are temporarily unavailable. No change has been made.", 503);
+  }
+  if (!member.active || member.email.trim().toLowerCase() !== actorEmail.trim().toLowerCase()
+    || member.organisation_id.toLowerCase() !== expected) throw changed();
 }
 
 /** Cookie-authenticated writes require the browser's exact application origin.

@@ -8,7 +8,10 @@ export function createAuthenticatedClientFetch(transport: Transport) {
     const origin = "https://levytate-client.invalid";
     if (!path.startsWith("/") || new URL(path, origin).origin !== origin) throw new Error("Authenticated requests must use this application origin.");
     const headers = new Headers(init.headers);
-    if (expected) headers.set("X-LevyTate-Account", expected.email);
+    if (expected) {
+      headers.set("X-LevyTate-Account", expected.email);
+      headers.set("X-LevyTate-Organisation", expected.organisationId);
+    }
     const options: RequestInit = { ...init, headers, credentials: "same-origin", cache: "no-store" };
     const response = await transport(path, options);
     if (response.status !== 401 || path === "/api/levytate-auth/session") return response;

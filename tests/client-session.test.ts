@@ -10,10 +10,18 @@ describe("browser session recovery", () => {
   });
   it("pins the original account on the first request as well as after a refresh", async () => {
     const transport = vi.fn().mockResolvedValue(Response.json({ ok: true }));
-    const headers = new Headers({ "content-type": "application/json", "X-LevyTate-Account": "stale@example.test" });
+    const headers = new Headers({ "content-type": "application/json", "X-LevyTate-Account": "stale@example.test", "X-LevyTate-Organisation": "stale-tenant" });
     await createAuthenticatedClientFetch(transport)("/api/levytate-workspace/invitations", { method: "POST", headers, body: "same-command" }, identity);
     expect(new Headers(transport.mock.calls[0][1].headers).get("X-LevyTate-Account")).toBe(identity.email);
+    expect(new Headers(transport.mock.calls[0][1].headers).get("X-LevyTate-Organisation")).toBe(identity.organisationId);
     expect(headers.get("X-LevyTate-Account")).toBe("stale@example.test");
+    expect(headers.get("X-LevyTate-Organisation")).toBe("stale-tenant");
+  });
+  it("does not invent tenant or account headers for callers without a pinned identity", async () => {
+    const transport = vi.fn().mockResolvedValue(Response.json({ ok: true }));
+    await createAuthenticatedClientFetch(transport)("/api/levytate-provider/opportunities", { method: "POST" });
+    const headers = new Headers(transport.mock.calls[0][1].headers);
+    expect(headers.has("X-LevyTate-Account")).toBe(false); expect(headers.has("X-LevyTate-Organisation")).toBe(false);
   });
   it.each([403, 409, 429, 500, 503])("never replays a failed or uncertain %s write", async (status) => {
     const transport = vi.fn().mockResolvedValue(new Response(null, { status }));
