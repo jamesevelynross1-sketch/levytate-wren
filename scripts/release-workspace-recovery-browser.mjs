@@ -108,7 +108,7 @@ export async function verifyWorkspaceRecovery({ app: origin, applicant, applicat
     report("visible reconnect reads genuine same-account submitted state", read.status() === 200 && actual.meta?.userEmail === user.email && actual.meta.organisationId === tenant.id && actual.data.applications.some(row => row.id === applicationId && ["Awaiting Manager Review", "Submitted to Line Manager"].includes(row.status)));
     // The application is now read-only, but its exact retained receipt must be
     // recoverable. A fresh edited command would still be denied by the server.
-    await recovery.getByRole("button", { name: "Reconnect workspace", exact: true }).waitFor({ state: "hidden" });
+    await page.getByText(originalAnswer, { exact: true }).waitFor();
     report("pending update stays open after reconnect", await recovery.isVisible());
     const submitReplay = page.waitForResponse(predicate);
     await recovery.getByRole("button", { name: "Retry original update", exact: true }).click();
@@ -118,6 +118,7 @@ export async function verifyWorkspaceRecovery({ app: origin, applicant, applicat
     report("confirmed submission receipt creates no duplicate revision, history, receipt or audit", same(submitted, await snapshot()));
     await page.reload();
     await page.getByRole("heading", { name: "My application", exact: true }).waitFor();
+    await page.getByText(originalAnswer, { exact: true }).waitFor();
     report("recorded answers survive refresh after successful genuine recovery", (await snapshot()).row.reason === originalAnswer && await page.getByText(originalAnswer, { exact: true }).count() === 1);
   } finally { await login.close(); }
   return { applicationId, status: submitted.row.status, revision: submitted.row.revision };

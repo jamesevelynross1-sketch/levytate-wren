@@ -6,7 +6,7 @@ import { closedApplicationOutcome, personalApplicationHistory, personalApplicati
 import { employeeCurrentApplication } from "@/lib/levytate/mvp/workspace-insights";
 import { createDefaultApplicationWorkflow } from "@/lib/levytate/application-workflows/domain";
 const store = vi.hoisted(() => ({ current: {} as Record<string, unknown> }));
-vi.mock("@/components/levytate-mvp/MvpWorkspaceStore", () => ({ useMvpWorkspace: () => store.current }));
+vi.mock("@/components/levytate-mvp/MvpWorkspaceStore", () => ({ useMvpWorkspace: () => store.current, WorkspaceSessionRecovery: () => null }));
 import { EmployeeApplicationModule, EmployeeHomeModule } from "@/components/levytate-mvp/EmployeeExperienceModule";
 
 const at = "2026-11-09T18:00:00Z";

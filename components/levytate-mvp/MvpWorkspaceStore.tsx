@@ -44,6 +44,7 @@ type MvpWorkspaceStore = {
   meta: LevyTateWorkspaceMeta | null;
   hydrated: boolean;
   sessionRecovery: { message: string; busy: boolean; reconnect: () => Promise<void> } | null;
+  sessionReconnect: { busy: boolean; reconnect: () => Promise<void> } | null;
   can: (permission: MvpPermission) => boolean;
   saveProfile: (profile: MvpWorkspaceProfile, expectedRevision?: number) => Promise<WorkspaceMutationResult>;
   saveEmployee: (employee: MvpEmployee, expectedRevision?: number) => Promise<WorkspaceMutationResult>;
@@ -186,6 +187,7 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
   const mutationQueue = useRef(Promise.resolve());
   const [recoveryMessage, setRecoveryMessage] = useState("");
   const [recovering, setRecovering] = useState(false);
+  const recoveringNow = useRef(false);
 
   useEffect(() => {
     if (initialWorkspace) {
@@ -303,7 +305,8 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
   }, [meta?.storageMode, applicationRecovery]);
 
   const reconnect = useCallback(async () => {
-    if (recovering) return;
+    if (recoveringNow.current) return;
+    recoveringNow.current = true;
     setRecovering(true);
     try {
       const response = await authenticatedClientFetch("/api/levytate-workspace", {}, identity.current ?? undefined);
@@ -313,8 +316,8 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
       identity.current ??= { email: workspace.meta.userEmail, organisationId: workspace.meta.organisationId };
       setData(workspace.data); setMeta(workspace.meta); setRecoveryMessage("");
     } catch { setRecoveryMessage("The workspace is still unavailable. Your open forms have been kept."); }
-    finally { setRecovering(false); }
-  }, [recovering]);
+    finally { recoveringNow.current = false; setRecovering(false); }
+  }, []);
 
   const commitMutation = useCallback(async (mutation: LevyTateWorkspaceMutation, alreadyOptimistic = false): Promise<WorkspaceMutationResult> => {
     const entityKey = workspaceMutationEntity(mutation, meta?.organisationId ?? "");
@@ -378,6 +381,7 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
     meta,
     hydrated,
     sessionRecovery: recoveryMessage ? { message: recoveryMessage, busy: recovering, reconnect } : null,
+    sessionReconnect: meta?.storageMode === "supabase" && identity.current?.email && identity.current.organisationId ? { busy: recovering, reconnect } : null,
     can: (permission) => hasMvpPermission(meta?.permissions ?? permissionsForMvpRole(meta?.userRole), permission),
     saveProfile: (profile, expectedRevision) => commitMutation({ type: "saveProfile", profile, expectedRevision }),
     saveEmployee: (employee, expectedRevision) => commitMutation({ type: "saveEmployee", employee, expectedRevision }),
@@ -409,13 +413,19 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
 }
 
 /** Safe outside a workspace too: shared dialogs include this without demo auth. */
-export function WorkspaceSessionRecovery() {
-  const recovery = useContext(MvpWorkspaceContext)?.sessionRecovery;
+export function WorkspaceSessionRecovery({ allowReconnect = false, disabled = false }: { allowReconnect?: boolean; disabled?: boolean } = {}) {
+  const workspace = useContext(MvpWorkspaceContext);
+  // Module-specific requests can encounter an ended session independently of
+  // Store writes. Their native pending dialog must keep this path reachable.
+  const recovery = workspace?.sessionRecovery ?? (allowReconnect && workspace?.sessionReconnect ? {
+    ...workspace.sessionReconnect,
+    message: "If your sign-in has ended, sign in in a new tab and reconnect here. Your original update stays pending until a retry confirms it.",
+  } : null);
   if (!recovery) return null;
   return <div role="alert" className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
     <p>{recovery.message}</p><div className="mt-3 flex flex-wrap gap-3">
-      <button type="button" className="min-h-11 rounded-full border border-amber-300 px-4 font-semibold" onClick={() => window.open(levyTateEmployerSignInPath(window.location.hostname), "_blank", "noopener,noreferrer")}>Sign in in new tab</button>
-      <button type="button" disabled={recovery.busy} className="min-h-11 rounded-full bg-[#102c3d] px-4 font-semibold text-white disabled:opacity-50" onClick={() => void recovery.reconnect()}>{recovery.busy ? "Reconnecting…" : "Reconnect workspace"}</button>
+      <button type="button" disabled={disabled || recovery.busy} className="min-h-11 rounded-full border border-amber-300 px-4 font-semibold disabled:opacity-50" onClick={() => window.open(levyTateEmployerSignInPath(window.location.hostname), "_blank", "noopener,noreferrer")}>Sign in in new tab</button>
+      <button type="button" disabled={disabled || recovery.busy} className="min-h-11 rounded-full bg-[#102c3d] px-4 font-semibold text-white disabled:opacity-50" onClick={() => void recovery.reconnect()}>{recovery.busy ? "Reconnecting…" : "Reconnect workspace"}</button>
     </div>
   </div>;
 }

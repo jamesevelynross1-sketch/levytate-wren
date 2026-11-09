@@ -5,7 +5,7 @@ import { createEmptyMvpWorkspace, normaliseProviderProgramme, normaliseProviderR
 import type { LearnerRecord } from "@/lib/levytate/mvp/learner-lifecycle";
 import { findRelease2NavigationArea, getRelease2Navigation } from "@/lib/levytate/release-2-navigation";
 const store = vi.hoisted(() => ({ current: {} as Record<string, unknown> }));
-vi.mock("@/components/levytate-mvp/MvpWorkspaceStore", () => ({ useMvpWorkspace: () => store.current }));
+vi.mock("@/components/levytate-mvp/MvpWorkspaceStore", () => ({ useMvpWorkspace: () => store.current, WorkspaceSessionRecovery: () => null }));
 import { PersonalProgrammeDiscovery } from "@/components/levytate-mvp/PersonalProgrammeDiscovery";
 import { EmployeeApplicationModule, EmployeeHomeModule } from "@/components/levytate-mvp/EmployeeExperienceModule";
 const at = "2026-11-09T18:00:00Z";
