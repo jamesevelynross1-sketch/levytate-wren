@@ -19,7 +19,7 @@ import {
   updateOperationalActionDueDate,
 } from "@/lib/server/levytate-operational-actions";
 import { logLevyTateServerError } from "@/lib/server/levytate-safe-api-error";
-import { ClientRequestError, readAuthenticatedJson } from "@/lib/server/levytate-request-boundary";
+import { assertExpectedWorkspace, ClientRequestError, readAuthenticatedJson } from "@/lib/server/levytate-request-boundary";
 import { operationalActionInput, parseAction } from "@/lib/server/levytate-operational-input";
 
 type RouteContext = { params: Promise<{ actionId: string }> };
@@ -37,6 +37,7 @@ export async function GET(request: Request, context: RouteContext) {
   try {
     const session = await sessionFromCookie();
     if (!session) return reply({ message: "Unauthorised." }, 401);
+    await assertExpectedWorkspace(request, session.email);
     const { actionId } = await context.params;
     if (new URL(request.url).searchParams.get("management") === "true") {
       const detail = await getOperationalActionManagementDetail(session, actionId);
