@@ -4,11 +4,18 @@ import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
 import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
 import { confirmOrganisationFinanceBalance, getOrganisationFinanceState, importOrganisationFinance, LevyTateFinanceError } from "@/lib/server/levytate-finance";
 import { LevyTateLearnerLifecyclePermissionError } from "@/lib/server/levytate-learner-lifecycle";
-import { ClientRequestError, readAuthenticatedJson } from "@/lib/server/levytate-request-boundary";
+import { assertExpectedWorkspace, ClientRequestError, readAuthenticatedJson } from "@/lib/server/levytate-request-boundary";
 import { parseFinanceAction } from "@/lib/server/levytate-mutation-input";
 
 async function sessionFromCookie(){const store=await cookies();return readAuthorisedLevyTateBetaSession(store.get(levytateBetaSessionCookie)?.value);}
-export async function GET(){const session=await sessionFromCookie();if(!session)return response({message:"Unauthorised."},401);try{return response({ok:true,state:await getOrganisationFinanceState(session)});}catch(error){return errorResponse(error);}}
+export async function GET(request: Request) {
+  try {
+    const session = await sessionFromCookie();
+    if (!session) return response({ message: "Unauthorised." }, 401);
+    await assertExpectedWorkspace(request, session.email);
+    return response({ ok: true, state: await getOrganisationFinanceState(session) });
+  } catch (error) { return errorResponse(error); }
+}
 export async function POST(request: Request) {
   const session = await sessionFromCookie();
   if (!session) return response({ message: "Unauthorised." }, 401);

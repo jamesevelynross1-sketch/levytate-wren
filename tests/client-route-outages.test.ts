@@ -23,7 +23,7 @@ function request(method = "POST", body: unknown = {}) {
 }
 const context = { params: Promise.resolve({ actionId: "synthetic-action" }) };
 const routes = [
-  ["employer GET", () => employer.GET()], ["employer POST", () => employer.POST(request())],
+  ["employer GET", () => employer.GET(request("GET"))], ["employer POST", () => employer.POST(request())],
   ["provider GET", () => provider.GET()], ["provider POST", () => provider.POST(request())],
   ["access GET", () => access.GET()], ["access POST", () => access.POST(request())], ["access PATCH", () => access.PATCH(request("PATCH"))],
   ["action GET", () => action.GET(request("GET"), context)], ["action PATCH", () => action.PATCH(request("PATCH", { command: "acknowledge", expectedVersion: 1 }), context)],

@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
 import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
-import { ClientRequestError, readAuthenticatedJson } from "@/lib/server/levytate-request-boundary";
+import { assertExpectedWorkspace, ClientRequestError, readAuthenticatedJson } from "@/lib/server/levytate-request-boundary";
 import { logLevyTateServerError } from "@/lib/server/levytate-safe-api-error";
 import {
   LevyTateServiceRequestError,
@@ -10,10 +10,11 @@ import {
   getEmployerRequestsWorkspaceForSession,
 } from "@/lib/server/levytate-service-requests";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const session = await employerSession();
     if (!session) return noStore({ message: "Unauthorised." }, 401);
+    await assertExpectedWorkspace(request, session.email);
     return noStore({ ok: true, workspace: await getEmployerRequestsWorkspaceForSession(session) });
   } catch (error) {
     return safeError(error);

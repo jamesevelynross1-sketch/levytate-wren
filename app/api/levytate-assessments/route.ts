@@ -2,19 +2,21 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
 import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
-import { ClientRequestError, readAuthenticatedJson } from "@/lib/server/levytate-request-boundary";
+import { assertExpectedWorkspace, ClientRequestError, readAuthenticatedJson } from "@/lib/server/levytate-request-boundary";
 import {
   applyAssessmentActionForSession,
   getAssessmentWorkspaceForSession,
   LevyTateAssessmentError,
 } from "@/lib/server/levytate-assessments";
 
-export async function GET() {
-  const session = await employerSession();
-  if (!session) return reply({ message: "Unauthorised." }, 401);
+export async function GET(request: Request) {
   try {
+    const session = await employerSession();
+    if (!session) return reply({ message: "Unauthorised." }, 401);
+    await assertExpectedWorkspace(request, session.email);
     return reply({ ok: true, workspace: await getAssessmentWorkspaceForSession(session) });
   } catch (error) {
+    if (error instanceof ClientRequestError) return reply({ message: error.message }, error.status);
     return failure(error);
   }
 }

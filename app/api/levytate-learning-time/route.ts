@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
 import type { LearningTimeActivityInput } from "@/lib/levytate/off-the-job/api";
 import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
-import { ClientRequestError, readAuthenticatedJson } from "@/lib/server/levytate-request-boundary";
+import { assertExpectedWorkspace, ClientRequestError, readAuthenticatedJson } from "@/lib/server/levytate-request-boundary";
 import {
   addLearningTimePriority,
   createLearningTimePlanDraft,
@@ -50,12 +50,14 @@ type LearningTimeAction = {
   targetDate?: string | null;
 };
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const session = await authorisedSession();
     if (!session) return reply({ message: "Unauthorised." }, 401);
+    await assertExpectedWorkspace(request, session.email);
     return reply(await getLearningTimeWorkspace(session));
   } catch (error) {
+    if (error instanceof ClientRequestError) return reply({ message: error.message }, error.status);
     return failure(error);
   }
 }
