@@ -300,11 +300,6 @@ try {
     check("recovered People row has exactly one confirmed append-only audit",storedAudit.length===1);
   }
   // Exercise replay only after all real identities have independently signed in.
-  if(process.env.RELEASE_STALE_PEOPLE_EDITOR==="true"){
-    phase="two genuine sessions and stale People reconnect";
-    const{verifyStalePeopleEditor}=await import("./release-people-stale-browser.mjs");
-    await verifyStalePeopleEditor({app,mailpit,manifest,lead:contexts.get("a:lead"),browser,backend,waitForCapturedLink,check});
-  }
   for (const key of peopleUiOnly?[]:["a:employee", "b:manager"]) {
     const item = contexts.get(key);
     const replay = await item.context.request.get(item.consumedLink, { maxRedirects: 0 });
@@ -387,6 +382,11 @@ try {
       check("terminal outcome updates corresponding enrolment to Cancelled",ended.length===1&&ended[0].status==="Cancelled");
       check("no fictional notification claimed delivered",outcomeBody.learner?.withdrawal?.providerNotified===false&&outcomeBody.learner?.withdrawal?.employeeNotified===false);
     }
+  }
+  if(process.env.RELEASE_STALE_PEOPLE_EDITOR==="true"){
+    phase="two genuine sessions and stale People reconnect";
+    const{verifyStalePeopleEditor}=await import("./release-people-stale-browser.mjs");
+    await verifyStalePeopleEditor({app,mailpit,manifest,lead:contexts.get("a:lead"),browser,backend,waitForCapturedLink,check});
   }
   if(!peopleUiOnly&&!exportOnly){
   const employee = contexts.get("a:employee");
