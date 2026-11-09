@@ -4,13 +4,13 @@ import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
 import { levyTateAuthCallbackUrl } from "@/lib/levytate/hosts";
 import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
 import { ClientWorkspaceAdminError, createClientWorkspace, inviteClientWorkspaceUser, listClientWorkspaces, provisionClientWorkspaceUser, updateClientWorkspaceUser } from "@/lib/server/levytate-client-workspace-admin";
-import { ClientRequestError, readBrowserJson, requireActionKeys, assertAuthenticatedWrite } from "@/lib/server/levytate-request-boundary";
+import { ClientRequestError, readBrowserJson, requireActionKeys, assertAuthenticatedWrite, assertExpectedAccount } from "@/lib/server/levytate-request-boundary";
 import { applicationRequestUrl } from "@/lib/server/levytate-request-origin";
 import { suspendClientTenant } from "@/lib/server/levytate-tenant-lifecycle";
 
 async function session() { const store = await cookies(); return readAuthorisedLevyTateBetaSession(store.get(levytateBetaSessionCookie)?.value); }
-export async function GET() {
-  try { const current = await session(); if (!current) return reply({ message: "Unauthorised." }, 401); return reply({ ok: true, workspaces: await listClientWorkspaces(current) }); }
+export async function GET(request?: Request) {
+  try { const current = await session(); if (!current) return reply({ message: "Unauthorised." }, 401); if (request) assertExpectedAccount(request, current.email); return reply({ ok: true, workspaces: await listClientWorkspaces(current) }); }
   catch (error) { return failure(error); }
 }
 export async function POST(request: Request) {

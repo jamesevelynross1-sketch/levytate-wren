@@ -17,12 +17,9 @@ async function getSession() {
 }
 
 export async function GET() {
-  const session = await getSession();
-  if (!session) {
-    return noStore({ message: "Unauthorised." }, 401);
-  }
-
   try {
+    const session = await getSession();
+    if (!session) return noStore({ message: "Unauthorised." }, 401);
     const workspace = await getWorkspaceBootstrapForSession(session);
     return noStore({ ok: true, workspace });
   } catch (error) {
@@ -35,6 +32,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  try {
   const session = await getSession();
   if (!session) {
     return noStore({ message: "Unauthorised." }, 401);
@@ -44,7 +42,6 @@ export async function POST(request: Request) {
     return noStore({ code: "account_changed", message: "A different account is signed in. Reload to switch accounts; this form was not submitted." }, 409);
   }
 
-  try {
     const mutation = parseWorkspaceMutation(await readAuthenticatedJson(request, session.email, 1024 * 1024));
     const workspace = await applyWorkspaceMutationForSession(session, mutation);
     return noStore({ ok: true, workspace });

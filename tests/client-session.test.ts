@@ -8,6 +8,13 @@ describe("browser session recovery", () => {
     expect((await request("/api/levytate-workspace", { method: "POST", body: "stable-input" }, identity)).status).toBe(200);
     expect(transport.mock.calls[0]).toEqual(transport.mock.calls[2]); expect(transport.mock.calls[1][0]).toBe("/api/levytate-auth/session");
   });
+  it("pins the original account on the first request as well as after a refresh", async () => {
+    const transport = vi.fn().mockResolvedValue(Response.json({ ok: true }));
+    const headers = new Headers({ "content-type": "application/json", "X-LevyTate-Account": "stale@example.test" });
+    await createAuthenticatedClientFetch(transport)("/api/levytate-workspace/invitations", { method: "POST", headers, body: "same-command" }, identity);
+    expect(new Headers(transport.mock.calls[0][1].headers).get("X-LevyTate-Account")).toBe(identity.email);
+    expect(headers.get("X-LevyTate-Account")).toBe("stale@example.test");
+  });
   it.each([403, 409, 429, 500, 503])("never replays a failed or uncertain %s write", async (status) => {
     const transport = vi.fn().mockResolvedValue(new Response(null, { status }));
     expect((await createAuthenticatedClientFetch(transport)("/api/levytate-workspace", { method: "POST", body: "stable-input" }, identity)).status).toBe(status);
@@ -29,6 +36,7 @@ describe("browser session recovery", () => {
   });
   it("never sends authenticated requests to an external origin", async () => {
     const transport = vi.fn(); const request = createAuthenticatedClientFetch(transport);
-    await expect(request("https://example.test/api")).rejects.toThrow(); await expect(request("//example.test/api")).rejects.toThrow(); expect(transport).not.toHaveBeenCalled();
+    for (const path of ["https://example.test/api", "//example.test/api", "/\\example.test/api", "/\n/example.test/api", " /api"]) await expect(request(path)).rejects.toThrow();
+    expect(transport).not.toHaveBeenCalled();
   });
 });

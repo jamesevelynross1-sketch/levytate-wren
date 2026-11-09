@@ -50,6 +50,15 @@ describe("actual cookie-authenticated mutation routes", () => {
       expect(response.headers.get("cache-control")).toContain("no-store");
     }
   });
+  it("returns a safe unavailable response when authentication itself is unavailable", async () => {
+    const diagnostic = "private authentication dependency diagnostic";
+    mocks.session.mockRejectedValue(new Error(diagnostic));
+    for (const response of [await workspacePost(request({ type: "archiveEmployee", id: "one", status: "Archived", expectedRevision: 0 })), await workspaceGet()]) {
+      expect(response.status).toBe(503); expect(await response.text()).not.toContain(diagnostic);
+      expect(response.headers.get("cache-control")).toContain("no-store");
+    }
+    expect(mocks.mutate).not.toHaveBeenCalled(); expect(mocks.bootstrap).not.toHaveBeenCalled();
+  });
   it("passes only validated actions to the authenticated tenant service", async () => {
     const options = { expectedConfirmedAt: null, requestId: "7b8aa254-57cb-4079-a4bd-9c462cb6bf5b" };
     expect((await financePost(request({ action: "balance", amountPence: 0, ...options }))).status).toBe(200);

@@ -4,16 +4,26 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import type { ClientWorkspaceUser } from "@/lib/server/levytate-client-workspace-admin";
 import type { MvpUserRole } from "@/lib/levytate/mvp/rbac";
 import { MvpPanel } from "@/components/levytate-mvp/MvpUi";
+import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
+import { authenticatedClientFetch, type ClientIdentity } from "@/lib/levytate/client-session";
+
+function useMountedAccount() {
+  const { meta } = useMvpWorkspace();
+  const identity = useRef<ClientIdentity | null>(null);
+  if (!identity.current && meta?.userEmail && meta.organisationId) identity.current = { email: meta.userEmail, organisationId: meta.organisationId };
+  return identity.current;
+}
 
 export function InvitationControls({ user, endpoint, onChanged, onError }: { user: ClientWorkspaceUser; endpoint: string; onChanged: (user: ClientWorkspaceUser) => void; onError: (message: string) => void }) {
+  const identity = useMountedAccount();
   const [busy, setBusy] = useState(false);
   const retry = useRef<{ requestId: string; expectedGeneration: number } | null>(null);
   async function send() {
-    if (busy) return;
+    if (busy || !identity) return;
     setBusy(true); onError("");
     retry.current ??= { requestId: crypto.randomUUID(), expectedGeneration: user.invitationGeneration };
     try {
-      const response = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "invite_user", userId: user.id, ...retry.current }) });
+      const response = await authenticatedClientFetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "invite_user", userId: user.id, ...retry.current }) }, identity);
       const payload = await response.json() as { user?: ClientWorkspaceUser; message?: string };
       if (!response.ok || !payload.user) {
         if (response.status === 409) retry.current = null;
@@ -25,12 +35,15 @@ export function InvitationControls({ user, endpoint, onChanged, onError }: { use
     finally { setBusy(false); }
   }
   return <div className="flex flex-wrap items-center gap-2">
-    <button type="button" disabled={busy} onClick={() => void send()} className="min-h-11 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white disabled:opacity-50">{busy ? "Sending…" : user.invitationGeneration ? "Send new invitation" : "Send invitation"}</button>
+    <button type="button" disabled={busy || !identity} onClick={() => void send()} className="min-h-11 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white disabled:opacity-50">{busy ? "Sending…" : retry.current ? "Retry invitation request" : user.invitationGeneration ? "Send new invitation" : "Send invitation"}</button>
     <span className="text-xs text-[#102c3d]/70" role="status">Link: {user.invitationStatus.replaceAll("_", " ")} · Email: {user.deliveryStatus === "accepted" ? "provider accepted; delivery unconfirmed" : user.deliveryStatus.replaceAll("_", " ")}</span>
   </div>;
 }
 
 export function WorkspaceAccessPanel() {
+  const identity = useMountedAccount();
+  const email = identity?.email;
+  const organisationId = identity?.organisationId;
   const endpoint = "/api/levytate-workspace/invitations";
   const [users, setUsers] = useState<ClientWorkspaceUser[]>([]);
   const [roles, setRoles] = useState<MvpUserRole[]>([]);
@@ -41,23 +54,24 @@ export function WorkspaceAccessPanel() {
   const prepareRetry = useRef<{ fingerprint: string; requestId: string } | null>(null);
   const revokeRetry = useRef(new Map<string, { requestId: string; expectedGeneration: number; role: MvpUserRole }>());
   const load = useCallback(async () => {
+    if (!email || !organisationId) return;
     setLoading(true); setError("");
     try {
-      const response = await fetch(endpoint, { cache: "no-store" });
+      const response = await authenticatedClientFetch(endpoint, {}, { email, organisationId });
       const payload = await response.json() as { users?: ClientWorkspaceUser[]; roles?: MvpUserRole[]; message?: string };
       if (!response.ok) throw new Error(payload.message || "Workspace access could not be loaded.");
       setUsers(payload.users ?? []); setRoles(payload.roles ?? []);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Workspace access could not be loaded."); }
     finally { setLoading(false); }
-  }, []);
+  }, [email, organisationId]);
   useEffect(() => { void load(); }, [load]);
   const changed = (user: ClientWorkspaceUser) => setUsers((current) => current.map((candidate) => candidate.id === user.id ? user : candidate));
   async function prepare(event: FormEvent) {
-    event.preventDefault(); if (busy) return; setBusy("prepare"); setError("");
+    event.preventDefault(); if (busy || !email || !organisationId) return; setBusy("prepare"); setError("");
     const fingerprint = JSON.stringify(draft);
     if (prepareRetry.current?.fingerprint !== fingerprint) prepareRetry.current = { fingerprint, requestId: crypto.randomUUID() };
     try {
-      const response = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "provision_user", ...draft, requestId: prepareRetry.current.requestId }) });
+      const response = await authenticatedClientFetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "provision_user", ...draft, requestId: prepareRetry.current.requestId }) }, { email, organisationId });
       const payload = await response.json() as { user?: ClientWorkspaceUser; message?: string };
       if (!response.ok || !payload.user) throw new Error(payload.message || "Access could not be prepared.");
       setUsers((current) => [...current.filter((user) => user.id !== payload.user!.id), payload.user!]); setDraft({ displayName: "", email: "", role: "Employee" }); prepareRetry.current = null;
@@ -65,11 +79,11 @@ export function WorkspaceAccessPanel() {
     finally { setBusy(""); }
   }
   async function revoke(user: ClientWorkspaceUser) {
-    if (busy) return;
+    if (busy || !email || !organisationId) return;
     setBusy(user.id); setError("");
     if (!revokeRetry.current.has(user.id)) revokeRetry.current.set(user.id, { requestId: crypto.randomUUID(), expectedGeneration: user.invitationGeneration, role: user.role });
     try {
-      const response = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "revoke_user", userId: user.id, ...revokeRetry.current.get(user.id) }) });
+      const response = await authenticatedClientFetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "revoke_user", userId: user.id, ...revokeRetry.current.get(user.id) }) }, { email, organisationId });
       const payload = await response.json() as { user?: ClientWorkspaceUser; message?: string };
       if (!response.ok || !payload.user) {
         if (response.status === 409) revokeRetry.current.delete(user.id);
@@ -80,7 +94,7 @@ export function WorkspaceAccessPanel() {
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Access revocation could not be confirmed."); }
     finally { setBusy(""); }
   }
-  return <MvpPanel title="Individual account access" eyebrow="Invitations" actions={<button type="button" onClick={() => void load()} disabled={loading} className="min-h-11 rounded-full px-4 text-xs font-semibold ring-1 ring-[#102c3d]/20">Refresh access</button>}>
+  return <MvpPanel title="Individual account access" eyebrow="Invitations" actions={<button type="button" onClick={() => void load()} disabled={loading || Boolean(busy)} className="min-h-11 rounded-full px-4 text-xs font-semibold ring-1 ring-[#102c3d]/20">Refresh access</button>}>
     <p className="mb-4 text-sm leading-6 text-[#102c3d]/70">Create People records first for Employees and Line Managers. Preparing access sends no email; use Send invitation to request an individual secure sign-in link. Provider acceptance is separate from inbox delivery.</p>
     {error ? <p role="alert" className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-800">{error}</p> : null}
     {loading ? <p role="status">Loading account access…</p> : <>

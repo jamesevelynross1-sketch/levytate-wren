@@ -18,6 +18,7 @@ export async function readAuthenticatedJson(request: Request, actorEmail: string
 
 export async function assertAuthenticatedWrite(request: Request, actorEmail: string) {
   assertBrowserOrigin(request);
+  assertExpectedAccount(request, actorEmail);
   try {
     if (!(await checkAuthenticatedWriteLimit(request, actorEmail)).allowed) {
       throw new ClientRequestError("Too many changes in a short time. Wait a minute before retrying.", 429);
@@ -25,6 +26,14 @@ export async function assertAuthenticatedWrite(request: Request, actorEmail: str
   } catch (error) {
     if (error instanceof LevyTateRateLimitStoreError) throw new ClientRequestError("Security controls are temporarily unavailable. No change has been made.", 503);
     throw error;
+  }
+}
+
+/** A retained form belongs to the account that loaded it, even when another tab signs in. */
+export function assertExpectedAccount(request: Request, actorEmail: string) {
+  const expected = request.headers.get("x-levytate-account");
+  if (expected !== null && expected.trim().toLowerCase() !== actorEmail.trim().toLowerCase()) {
+    throw new ClientRequestError("A different account is signed in. Reload to switch accounts; this form was not submitted.", 409);
   }
 }
 
