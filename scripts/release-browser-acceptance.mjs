@@ -11,6 +11,8 @@ import { localUrl, releaseBackend } from "./release-local-fixtures.mjs";
 import { lockAcceptanceRuntime } from "./release-runtime-lock.mjs";
 
 const results = [];
+const commitRead=spawnSync("git",["rev-parse","HEAD"],{encoding:"utf8"});
+const candidateCommit=commitRead.status===0&&/^[a-f0-9]{40}$/.test(commitRead.stdout.trim())?commitRead.stdout.trim():null;
 let browser;
 let app;
 const contexts = new Map();
@@ -475,7 +477,7 @@ try {
   if(app&&contexts.size){let loggedOut=0;for(const{context}of contexts.values()){try{const r=await context.request.post(`${app}/api/levytate-beta-logout`,{headers:{Origin:app},maxRedirects:0});if(r.status()===303)loggedOut++;}catch{/* Raw transport errors may carry Auth details. */}}console.log(`Local failed-run cleanup: ${loggedOut}/${contexts.size} logout responses confirmed; all browser contexts closing`);}
   await browser?.close();
   releaseRuntime?.();
-  const evidence = { schemaVersion: 1, environment: "local", authenticationMethod: "requested-sign-in-link-through-local-smtp", authenticatedRolesVerified: results.filter((item) => item.name.endsWith("canonical role and tenant resolved") && item.status === "PASS").length, emailEvidence: "local-smtp-capture-only", results };
+  const evidence = { schemaVersion: 1, environment: "local", candidateCommit, authenticationMethod: "requested-sign-in-link-through-local-smtp", authenticatedRolesVerified: results.filter((item) => item.name.endsWith("canonical role and tenant resolved") && item.status === "PASS").length, emailEvidence: "local-smtp-capture-only", results };
   if (process.env.RELEASE_EVIDENCE_PATH?.startsWith("/private/tmp/")) {
     const requested = process.env.RELEASE_EVIDENCE_PATH;
     const path = existsSync(requested) ? requested.replace(/\.json$/, `-${Date.now()}.json`) : requested;
