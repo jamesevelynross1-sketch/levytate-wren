@@ -49,7 +49,9 @@ enable_anonymous_sign_ins = false
 enable_refresh_token_rotation = true
 refresh_token_reuse_interval = 10
 [auth.email]
-enable_signup = false
+# CLI 2.122.1 maps this flag to the email-provider switch (Supabase CLI #7055).
+# Public registration remains disabled by auth.enable_signup above.
+enable_signup = true
 enable_confirmations = true
 double_confirm_changes = true
 max_frequency = "1s"

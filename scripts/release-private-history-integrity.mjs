@@ -23,13 +23,13 @@ const probe = key => ({ action: "probe_exchange", request_hmac: "c".repeat(64), 
 let passed = 0, failed = 0;
 const check = (name, pass) => { pass ? passed++ : failed++; console.log(`${pass ? "PASS" : "FAIL"} ${name}`); };
 const reject = (name, body, codes, actor = owner, tenant = org) => { const r = sql(tx(rpc(body, actor, tenant))); check(name, !r.ok && codes.includes(r.code)); };
-async function afterPeopleLock(statement) {
+async function afterPeopleLock(statement, lock = `select pg_advisory_xact_lock(hashtextextended('levytate-people:'||${q(org)}::text,0));`) {
   let mark; const locked = new Promise(resolve => mark = resolve);
   const holder = new Promise(resolve => {
     const p = spawn(bin, args, { env, stdio: ["pipe", "pipe", "pipe"] }); let out = "", err = "";
     p.stdout.on("data", c => { out += c; if (out.includes("LOCKED")) mark(); }); p.stderr.on("data", c => err += c);
     p.on("close", code => { mark(); resolve(parse(code, out, err)); });
-    p.stdin.end(`begin;select pg_advisory_xact_lock(hashtextextended('levytate-people:'||${q(org)}::text,0));select 'LOCKED';select pg_sleep(2);commit;`);
+    p.stdin.end(`begin;${lock}select 'LOCKED';select pg_sleep(2);commit;`);
   });
   await locked; const result = await parallel(statement); const held = await holder;
   if (!held.ok) throw new Error("Synthetic lock holder failed"); return result;
@@ -64,6 +64,22 @@ try {
   need(`update public.levytate_pastoral_access_eligibility set expires_at=clock_timestamp()+interval '1 day' where organisation_id=${q(org)};update public.levytate_pastoral_conversations set retention_expires_at=clock_timestamp()+interval '1 second' where id=${q(conversation)};`);
   const expiredConversation = await afterPeopleLock(tx(rpc(probe("first-concurrent"))));
   check("retention expiring while waiting for a lock denies saved reply", !expiredConversation.ok && expiredConversation.code === "PT404");
+  need(`update public.levytate_pastoral_conversations set retention_expires_at=clock_timestamp()+interval '1 day' where id=${q(conversation)};update public.levytate_pastoral_access_eligibility set expires_at=clock_timestamp()+interval '1 second' where organisation_id=${q(org)};`);
+  const eligibilityRowWait = await afterPeopleLock(tx(rpc(probe("first-concurrent"))), `select id from public.levytate_pastoral_access_eligibility where organisation_id=${q(org)} for update;`);
+  check("eligibility row-lock wait cannot extend adult approval", !eligibilityRowWait.ok && eligibilityRowWait.code === "PT403");
+  need(`update public.levytate_pastoral_access_eligibility set expires_at=clock_timestamp()+interval '1 day' where organisation_id=${q(org)};update public.levytate_pastoral_conversations set retention_expires_at=clock_timestamp()+interval '1 second' where id=${q(conversation)};`);
+  const conversationRowWait = await afterPeopleLock(tx(rpc(probe("first-concurrent"))), `select id from public.levytate_pastoral_conversations where id=${q(conversation)} for update;`);
+  check("conversation row-lock wait cannot extend retention", !conversationRowWait.ok && conversationRowWait.code === "PT404");
+  const delay = `release_private_delay_${employee.replaceAll("-", "_")}`;
+  need(`create function public.${delay}() returns trigger language plpgsql as $$begin if new.organisation_id=${q(org)}::uuid then perform pg_sleep(2);end if;return new;end;$$;create trigger ${delay} before insert on public.levytate_pastoral_audit_events for each row execute function public.${delay}();`);
+  try {
+    need(`update public.levytate_pastoral_access_eligibility set expires_at=clock_timestamp()+interval '1 second' where organisation_id=${q(org)};`);
+    const lateConsent = sql(tx(rpc(preference(3, false))));
+    check("eligibility expiry during audit rolls back consent and receipt", !lateConsent.ok && lateConsent.code === "PT403" && need(`select (save_history and lock_version=3)::text from public.levytate_pastoral_preferences where organisation_id=${q(org)};`) === "true" && need(`select count(*) from public.levytate_pastoral_history_receipts where organisation_id=${q(org)} and request_key='preference:3';`) === "0");
+    need(`update public.levytate_pastoral_access_eligibility set expires_at=clock_timestamp()+interval '1 day' where organisation_id=${q(org)};update public.levytate_pastoral_conversations set retention_expires_at=clock_timestamp()+interval '1 second' where id=${q(conversation)};`);
+    const lateAppend = sql(tx(rpc(exchange("late-audit-append", conversation, 4, 3))));
+    check("retention expiry during audit rolls back both messages and sequence", !lateAppend.ok && lateAppend.code === "PT404" && need(`select count(*) from public.levytate_pastoral_messages where organisation_id=${q(org)};`) === "4" && need(`select last_sequence_number from public.levytate_pastoral_conversations where id=${q(conversation)};`) === "4");
+  } finally { need(`drop trigger ${delay} on public.levytate_pastoral_audit_events;drop function public.${delay}();`); }
   const deletion = { action: "delete", request_hmac: "e".repeat(64), conversation_id: conversation };
   const deleteRace = await Promise.all([0, 1].map(() => parallel(tx(rpc(deletion)))));
   check("concurrent owner deletion leaves one tombstone and no ciphertext", deleteRace.every(r => r.ok) && deleteRace.filter(r => JSON.parse(r.value).replayed).length === 1 && need(`select count(*) from public.levytate_pastoral_messages where organisation_id=${q(org)};`) === "0");
