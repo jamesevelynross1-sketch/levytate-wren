@@ -33,7 +33,7 @@ import type { MvpApplication, MvpEmployee, MvpEmployeeDevelopmentProfile, MvpRol
 import { getWorkspaceBootstrapForSession } from "@/lib/server/levytate-workspace";
 import { getCopilotGuidanceItems } from "@/lib/server/levytate-guidance-sources";
 import { routeOperationalCopilotQuery } from "@/lib/server/levytate-copilot-tools";
-import { ClientRequestError, readBrowserJson } from "@/lib/server/levytate-request-boundary";
+import { assertExpectedWorkspace, ClientRequestError, readBrowserJson } from "@/lib/server/levytate-request-boundary";
 import { checkLevyTateCopilotLimits, LevyTateRateLimitStoreError } from "@/lib/server/levytate-auth-rate-limit";
 
 const clientFields = new Set([
@@ -157,6 +157,7 @@ export async function POST(request: Request) {
       return copilotJson({ message: "Invalid LevyTate Copilot request payload." }, { status: 400 });
     }
 
+    await assertExpectedWorkspace(request, session.email);
     if (!(await checkLevyTateCopilotLimits(request, session.email)).allowed) {
       return copilotJson({ message: "Please wait a moment before asking another question." }, { status: 429 });
     }

@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
+import { useRetainedWorkspaceRequest } from "@/components/levytate-mvp/useRetainedWorkspaceRequest";
 import { captureCopilotProfileDraft, persistCopilotProfileDraft, type CopilotProfileDraft } from "@/lib/levytate/copilot-profile-save";
 import { getApprenticeshipStandard, type RequestStatus } from "@/lib/levytate/domain";
 import type {
@@ -477,6 +478,7 @@ function buildWorkspaceEmployeeResolution(
 
 export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, presentation = "standalone", context }: { initialEmployeeId?: string | null; onNavigate?: (target: string) => void; presentation?: "standalone" | "drawer"; context?: LevyTateCopilotContext }) {
   const { data, meta, saveEmployeeDevelopmentProfile } = useMvpWorkspace();
+  const request = useRetainedWorkspaceRequest();
   const financeIdentity = useRef(meta ? { email: meta.userEmail, organisationId: meta.organisationId } : null);
   const [role, setRole] = useState<AssistantRole>("Employee");
   const [conversations, setConversations] = useState<Record<AssistantRole, ChatMessage[]>>(initialConversations);
@@ -677,10 +679,11 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
     if (context?.entityType === "intelligence_signal") {
       let signal: IntelligenceSignal | undefined;
       try {
-        const response = await fetch("/api/levytate-intelligence/signals", { cache: "no-store" });
+        const response = await request("/api/levytate-intelligence/signals", { cache: "no-store" });
+        if (!response.ok) { setError("The Intelligence evidence cannot be verified for this account. Reload the workspace before retrying."); return; }
         const payload = await response.json() as { signals?: IntelligenceSignal[] };
         if (response.ok) signal = payload.signals?.find((item) => item.id === context.entityId);
-      } catch {}
+      } catch { setError("The Intelligence evidence is temporarily unavailable. Your question is retained."); return; }
       const query = trimmed.toLowerCase();
       const answer = !signal
         ? "This Intelligence Signal is not available in the current permitted context."
@@ -850,7 +853,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
     setActionStatus("");
 
     try {
-      const response = await fetch("/api/levytate-ai", {
+      const response = await request("/api/levytate-ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

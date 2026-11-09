@@ -3,6 +3,7 @@
 import { ArrowRight, CheckCircle2, Eye, Lightbulb, ShieldAlert, TrendingDown, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
+import { useRetainedWorkspaceRequest } from "@/components/levytate-mvp/useRetainedWorkspaceRequest";
 import { SemanticStatus, type OperationalTone } from "@/components/levytate-mvp/OperationalVisuals";
 import { type IntelligenceDismissalReason, type IntelligenceSignal } from "@/lib/levytate/intelligence/progress-review";
 
@@ -10,6 +11,7 @@ const dismissalReasons: IntelligenceDismissalReason[] = ["Already resolved", "In
 
 export function ProgressReviewIntelligencePanel({ enabled, onSignalContext }: { enabled: boolean; onSignalContext?: (signal: IntelligenceSignal | null) => void }) {
   const { data } = useMvpWorkspace();
+  const request = useRetainedWorkspaceRequest();
   const [signals, setSignals] = useState<IntelligenceSignal[]>([]);
   const [selected, setSelected] = useState<IntelligenceSignal | null>(null);
   const [dismissalReason, setDismissalReason] = useState<IntelligenceDismissalReason>("No action required");
@@ -22,7 +24,7 @@ export function ProgressReviewIntelligencePanel({ enabled, onSignalContext }: { 
     if (!enabled) return;
     let cancelled = false;
     setLoading(true);
-    void fetch("/api/levytate-intelligence/signals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "analyse" }) })
+    void request("/api/levytate-intelligence/signals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "analyse" }) })
       .then(async (response) => {
         const body = await response.json() as { signals?: IntelligenceSignal[]; message?: string };
         if (!response.ok) throw new Error(body.message || "Intelligence refresh failed.");
@@ -31,21 +33,23 @@ export function ProgressReviewIntelligencePanel({ enabled, onSignalContext }: { 
       .catch(() => { if (!cancelled) setError("Intelligence signals could not be refreshed safely."); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [enabled]);
+  }, [enabled, request]);
   if (!enabled) return null;
 
   const open = (signal: IntelligenceSignal) => { setSelected(signal); setNotice(""); };
   const close = () => { setSelected(null); setNotice(""); };
   async function update(signal: IntelligenceSignal, action: "acknowledge" | "dismiss" | "accept", reason?: IntelligenceDismissalReason) {
     setError("");
-    const response = await fetch("/api/levytate-intelligence/signals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, signalId: signal.id, reason }) });
-    const body = await response.json() as { signal?: IntelligenceSignal; message?: string };
-    if (!response.ok || !body.signal) { setError(body.message || "The signal could not be updated."); return; }
-    setSignals((current) => body.signal?.status === "dismissed" ? current.filter((item) => item.id !== signal.id) : current.map((item) => item.id === signal.id ? body.signal! : item));
-    setSelected(body.signal);
-    if (action === "accept") onSignalContext?.(body.signal);
-    setNotice(action === "accept" ? "Operational action created." : action === "acknowledge" ? "Signal acknowledged for human follow-up." : "Signal dismissed with its reason recorded.");
-    if (action === "dismiss") close();
+    try {
+      const response = await request("/api/levytate-intelligence/signals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, signalId: signal.id, reason }) });
+      const body = await response.json() as { signal?: IntelligenceSignal; message?: string };
+      if (!response.ok || !body.signal) { setError(body.message || "The signal could not be updated."); return; }
+      setSignals((current) => body.signal?.status === "dismissed" ? current.filter((item) => item.id !== signal.id) : current.map((item) => item.id === signal.id ? body.signal! : item));
+      setSelected(body.signal);
+      if (action === "accept") onSignalContext?.(body.signal);
+      setNotice(action === "accept" ? "Operational action created." : action === "acknowledge" ? "Signal acknowledged for human follow-up." : "Signal dismissed with its reason recorded.");
+      if (action === "dismiss") close();
+    } catch { setError("The signal update could not be confirmed. Your selection is retained; reload to verify the current account and result."); }
   }
   const visibleSignals = signals.filter((signal) => !["dismissed", "resolved"].includes(signal.status)).slice(0, 4);
   const primary = visibleSignals[0];
