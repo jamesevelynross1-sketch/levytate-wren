@@ -8,6 +8,8 @@
 
 Document revision: this report is created by the audit on a descendant documentation commit; the audited source SHA above does not itself contain this file. Use Git history for the report commit.
 
+The dated audit findings below are the **27 October baseline**, not a statement that later engineering fixes are absent. The 9 November interaction additions in Appendix A map the issue #7 implementation to executable checks. Current owners, commits, actual runs and outstanding blockers belong in the single `LEVYTATE_CLIENT_RELEASE_EXECUTION.md` checklist. Local engineering evidence does not amend hosted acceptance or authorise real-client release.
+
 This document records current evidence and defines the executable acceptance matrix for the first paying employer. It supersedes claims that historic Preview or Client V1 acceptance is current Production approval. A Vercel `Ready` state, successful build or old workflow script is not client acceptance.
 
 ## Decision
@@ -200,6 +202,7 @@ Every unmarked case is mandatory. Cases explicitly marked `P1-CONDITIONAL` may b
 - **CLA-AUTH-07 — P1-CONDITIONAL** — Session expiry preserves unsaved input where possible and provides a clear reauthentication path; refresh cannot broaden role/tenant scope.
 - **CLA-AUTH-08** — Logout invalidates the current provider session where available, always clears local state, and remains safe when the provider revoke call fails.
 - **CLA-AUTH-09** — Directory lookup works beyond 1,000 users without duplicate identity creation.
+- **CLA-AUTH-10** — A form loaded under account/tenant A cannot submit after another tab changes account or the same email acquires a different canonical tenant. The first request and any authorised session-refresh retry retain the original identity. A mismatch returns a recoverable conflict before the write; unavailable identity checks return unavailable, never a silent success.
 
 ### E. Role and navigation boundaries
 
@@ -225,6 +228,7 @@ Every unmarked case is mandatory. Cases explicitly marked `P1-CONDITIONAL` may b
 - **CLA-CAT-02** — Programme selection ensures the provider relationship and persists after refresh/new session.
 - **CLA-CAT-03** — Provider deactivation applies the documented programme consequence without changing another tenant or the global catalogue.
 - **CLA-CAT-04 — P1-CONDITIONAL** — Failed selection/deactivation shows no success, retains user context and supports safe retry.
+- **CLA-CAT-05** — Employee and Line Manager personal discovery uses the employer's published live catalogue. Saved choices and comparisons persist for that individual across refresh and a new authenticated session, remain available during an active application, and never substitute demo recommendations for an empty live catalogue.
 
 ### H. Application and approval integrity
 
@@ -237,6 +241,7 @@ Every unmarked case is mandatory. Cases explicitly marked `P1-CONDITIONAL` may b
 - **CLA-APP-07** — Skip, reverse, replay, duplicate click, forged status/owner, stale expected state and lost-response retry are rejected or return the exact prior result.
 - **CLA-APP-08** — If configurable workflows are enabled for the first employer, a published version is pinned to each application and later edits do not rewrite in-flight history; otherwise capability/configuration evidence proves the engine is disabled and the accepted server-enforced fallback is the only path.
 - **CLA-APP-09** — Decision note requirements and audit events are retained for approve, decline and request-information outcomes.
+- **CLA-APP-10** — A Line Manager can create, submit and track their own application and make their own learner declaration. Their current manager performs the manager decision. The personal journey does not permit self-review, drafting/declarations for reports, a second active application, or withdrawal of a pinned workflow.
 
 ### I. Enrolment and learner operation
 
@@ -274,6 +279,7 @@ Every unmarked case is mandatory. Cases explicitly marked `P1-CONDITIONAL` may b
 - **CLA-RES-03** — Chrome/Edge current desktop plus 320 px and 375/390 px mobile complete invitation, import, application, approval, Finance and logout without horizontal page overflow.
 - **CLA-RES-04** — Keyboard-only navigation, drawer, modal focus trap, forms, error summary and visible focus work; labels/status announcements are understandable.
 - **CLA-RES-05** — No raw database/provider/configuration error, credential, login code or authentication state appears in UI, logs, screenshots or evidence attachments.
+- **CLA-RES-06** — For Requests, Finance, Learning Time, Lift, historical Assessments and private Support, hold a response after a real synthetic commit, then lose it. Inputs remain frozen while the outcome is uncertain; explicit retry sends the original body, revision and idempotency key under the original account. Reload reconciles persisted state. A confirmed write followed by a failed read must not resend the write. Evidence export preserves the exact audited UTF-8 response bytes; preparing a new export may create a new audit event and is not a business-write idempotency claim. Check the recovery dialog above existing dialogs using keyboard and mobile layouts.
 
 ### M. Employer offboarding and data lifecycle
 
@@ -308,6 +314,32 @@ This inventory was read from audited source `59547ede9b1cd62496516065ad7c306320e
 ### Contextual Copilot intents
 
 `learners_needing_attention`, `highest_risk_actions`, `applications_awaiting_review`, `applications_returned`, `applications_approved`, `application_status`, `manager_check_ins`, `employee_review_status`, `employee_support`, `team_summary`, `learners_behind_target`, `learners_without_recent_progress`, `learners_ending_before`, `overdue_reviews`, `ready_to_enrol`, `pre_enrolment_blockers`, `active_breaks`, `assessment_readiness`, `operational_actions`, `provider_operational_summary`, `programme_operational_summary`, `organisation_providers`, `organisation_programmes`, `programme_directory`, `learning_time_summary`, `learning_time_attention`, `learning_time_planning`, `access_boundary`.
+
+### 9 November issue #7 interaction additions
+
+Source mapping inspected on integration candidate `f1c04b825d4aa0f80ad09a0510d6abb827ab860c`, plus reviewed request-pin checkpoint `3ab2294`. Component names below are in `components/levytate-mvp`; server services are in `lib/server`. These are executable entry points and verification targets, not a blanket PASS for every visible control. Use separate real Employee, current Line Manager and Apprenticeship Lead sessions in two fictional tenants; the demo role switcher does not meet the authentication cases.
+
+| Client interaction | Server permission and durable record boundary | Executable verification entry points |
+| --- | --- | --- |
+| Blank employer, People, roles and invitations: `ClientWorkspaceAdminModule`, `WorkspaceAccessPanel`, `EmployeesModule`, `RolesModule` | Platform provisioning; employer membership/People pairing; versioned atomic workspace and invitation commands | `scripts/release-client-admin-integrity.mjs`, `release-client-invitation-integrity.mjs`, `release-account-browser.mjs`, `release-people-stale-browser.mjs`; `tests/workspace-atomic-integrity.sql` |
+| Provider/programme selection: `ProvidersModule`, `EmployerPortfolioModules` | Employer-scoped selections against active verified canonical catalogue; catalogue lock shared with application/learner eligibility | `tests/catalogue-integrity.sql`; `scripts/release-catalogue-concurrency.mjs` |
+| Personal discovery and application: `PersonalProgrammeDiscovery`, `EmployeeExperienceModule`, `ApplicationsModule` | Own saved/compared programmes; own application; current-manager then Lead decisions; one-active constraint and atomic receipt/history | `tests/personal-programme-discovery.test.ts`, `personal-programme-route.test.ts`, `manager-personal-development.sql`; `scripts/release-database-integrity.mjs`, `release-browser-acceptance.mjs` |
+| Pre-enrolment, declarations and learner operations: `LearnersModule`, `EmployeeEligibilityPanel` | Final approval handoff; explicit own declaration; authorised learner command revision, receipt, related writes and audit | `tests/manager-personal-declaration.test.ts`; `scripts/release-learner-integrity.mjs`; core browser acceptance |
+| Operations and manager tasks: `OperationsCentreModule`, `ManagerActionsHome`, `OperationalActionDetail` | Current report/organisation scope; atomic action transition, assignment, completion and attention reconciliation | `tests/operational-action-transaction.sql`, `independent-operations-critical.sql` |
+| Requests: `EmployerRequestsContainer` and separate provider workspace | Employer command receipt and invitation generation; provider invitation/membership scope; no unintended delivery | `tests/request-command-transaction.sql`; `scripts/release-requests-integrity.mjs`, `release-requests-browser.mjs` |
+| Finance and Insights: `LevyFinanceModule`, `EmployerInsightsModule` | Finance import/balance commands; source reconciliation; disclosure-filtered evidence and export audit | `scripts/release-finance-integrity.mjs`; `tests/intelligence-reconciliation.test.ts`, `intelligence-evidence-export.test.ts`, `client-module-responses.test.ts` |
+| Learning Time: `LearningTimeModule` | Own activity versus manager/provider confirmation; versioned plans, revisions and atomic command receipts | `tests/learning-time-transaction.sql`; `scripts/release-learning-time-integrity.mjs`, `release-learning-time-browser.mjs` |
+| Lift and historical Assessments: `LiftModule`, `AssessmentsModule` | Capability/role/disclosure gates; Lift workspace and record revisions; own responses versus authorised review | `tests/lift-transaction.sql`; `scripts/release-lift-integrity.mjs`; existing workforce assessment validators; `tests/client-module-responses.test.ts` |
+| My Support: `PastoralSupportModule` | Existing 037 private-history service and atomic audit receipts; employee ownership, eligibility, encryption, expiry and consent | `tests/pastoral-history-integrity.sql`, `pastoral-history-service.test.ts`; independent expiry/privacy/concurrency evidence in the execution checklist |
+| Copilot: `AskLevyTateAiWorkspace`, `PersistentCopilot` | Role-scoped live context and repeated entity authorisation; strict model response, no raw diagnostics, rate/cost controls; no autonomous workflow write | `tests/copilot-boundary.test.ts`, `copilot-provider-boundary.test.ts`, `copilot-operational-boundary.test.ts`, `copilot-rate-limit-wire.test.ts` |
+| Tenant lifecycle: `TenantOffboardingPanel` | Two-person export/disposal approval, legal holds, frozen tenant, shared-identity retention, independent Storage/Auth disposal | `scripts/release-offboarding-auth-reservations.mjs`, `release-offboarding-races.mjs`, `release-offboarding-durable-check.mjs`; separate actual Auth/Storage drill evidence |
+| All retained forms and session recovery | Original email/tenant pin, uncertain original command retained only in memory, explicit retry/reload and fail-closed dependency checks | `tests/client-session.test.ts`, `workspace-request-pin.test.ts`, `client-mutation-retry.test.ts`; **CLA-AUTH-10 / CLA-RES-06 require real browser/API/database runs** |
+
+The specialised route inventory additionally includes `/api/levytate-workspace/invitations`, `/api/levytate-programme-discovery`, `/api/levytate-requests`, `/api/levytate-provider/opportunities`, `/api/levytate-learning-time/**`, `/api/levytate-lift`, `/api/levytate-pastoral/**`, `/api/levytate-employer-insights/export` and `/api/levytate-platform/offboarding`. Add these families to cross-tenant, revoked-identity, forged-write and retry runs; do not treat a hidden navigation item as server denial.
+
+The UI repair checkpoints `59903b1` and `9eb2fca` were verified with focused transport/contract tests, lint and a production build; `3ab2294` reproduced and fixed same-email/changed-tenant first-request handling with injected membership responses. Those checks do **not** establish hosted delivery, browser focus behavior or every module's live persistence. The independent Auth-reservation harness `7f75890` passed 59 checks against a dedicated local PostgreSQL 17 schema and real lifecycle RPCs; it does **not** claim Auth API deletion or encrypted delivery acceptance.
+
+Outstanding implementation/verification must remain visible: saved/compared discovery and the Manager personal journey need connected browser acceptance; legacy assessment persistence needs its own durable failure cases; optional-module buttons need the explicit recovery cases above. Existing Support's human follow-up SQL depends on unapproved 038 and cannot be run or called accepted; only the approved 037 private-history path has local database evidence. Live pastoral/assessment activation, paid model evaluation, hosted migrations, external invitations and real-client promotion remain distinct approval gates. These gates do not justify leaving unrelated safe local engineering unfinished.
 
 ## Appendix B — reproducible database evidence
 
