@@ -25,7 +25,7 @@ create table public.levytate_pastoral_history_receipts(
  primary key(organisation_id,owner_user_id,request_key),
  foreign key(organisation_id,employee_id) references public.levytate_employees(organisation_id,id) on delete restrict
 );
-comment on table public.levytate_pastoral_history_receipts is 'Restricted non-content retry receipts. Conversation ID intentionally survives employee deletion to prevent replay resurrection; never include in general employer exports.';
+comment on table public.levytate_pastoral_history_receipts is 'Restricted non-content retry receipts. Conversation ID intentionally survives conversation deletion to prevent replay resurrection; never include in general employer exports.';
 alter table public.levytate_pastoral_history_receipts enable row level security;
 alter table public.levytate_pastoral_history_receipts force row level security;
 revoke all on public.levytate_pastoral_history_receipts from public,anon,authenticated,service_role;
@@ -36,9 +36,10 @@ declare
  v_actor public.levytate_users%rowtype;v_employee public.levytate_employees%rowtype;
  v_preference public.levytate_pastoral_preferences%rowtype;v_conversation public.levytate_pastoral_conversations%rowtype;
  v_receipt public.levytate_pastoral_history_receipts%rowtype;v_message public.levytate_pastoral_messages%rowtype;
+ v_eligibility public.levytate_pastoral_access_eligibility%rowtype;
  v_action text:=p_command->>'action';v_key text;v_hmac text:=p_command->>'request_hmac';v_expected integer;
  v_conversation_id uuid;v_requested_id uuid;v_fields text[];v_result jsonb;v_envelope jsonb;
- v_now timestamptz:=clock_timestamp();v_client_id text;v_index integer;v_version text;
+ v_now timestamptz;v_client_id text;v_index integer;v_version text;
 begin
  if auth.role() is distinct from 'service_role' then raise exception using errcode='42501',message='Service role required';end if;
  if p_organisation_id is null or p_owner_user_id is null or p_employee_id is null or jsonb_typeof(p_command) is distinct from 'object'
@@ -77,10 +78,11 @@ begin
  if not found then raise exception using errcode='PT403',message='Current private history owner required';end if;
  perform 1 from public.levytate_organisation_capabilities where organisation_id=p_organisation_id and pastoral_support_enabled for share;
  if not found then raise exception using errcode='PT403',message='Private history is unavailable';end if;
- perform 1 from public.levytate_pastoral_access_eligibility where organisation_id=p_organisation_id and employee_id=p_employee_id
+ select * into v_eligibility from public.levytate_pastoral_access_eligibility where organisation_id=p_organisation_id and employee_id=p_employee_id
   and owner_user_id=p_owner_user_id and active and age_assurance_status='adult' and approved_by is not null and approved_at is not null
-  and (expires_at is null or expires_at>v_now) for share;
- if not found then raise exception using errcode='PT403',message='Private history is unavailable';end if;
+  for share;
+ -- Evaluate time after acquiring row locks, which may themselves wait beyond expiry.
+ if not found or v_eligibility.expires_at<=clock_timestamp() then raise exception using errcode='PT403',message='Private history is unavailable';end if;
  select * into v_preference from public.levytate_pastoral_preferences where organisation_id=p_organisation_id and owner_user_id=p_owner_user_id for update;
  if found and v_preference.employee_id<>p_employee_id then raise exception using errcode='PT403',message='Private history is unavailable';end if;
  select * into v_receipt from public.levytate_pastoral_history_receipts where organisation_id=p_organisation_id and owner_user_id=p_owner_user_id and request_key=v_key;
@@ -89,15 +91,21 @@ begin
   if v_action in ('exchange','probe_exchange') then
    if v_preference.save_history is distinct from true then raise exception using errcode='PT409',message='History saving changed';end if;
    select * into v_conversation from public.levytate_pastoral_conversations where organisation_id=p_organisation_id and id=v_receipt.conversation_id
-    and employee_id=p_employee_id and owner_user_id=p_owner_user_id and retention_expires_at>v_now for share;
-   if not found then raise exception using errcode='PT404',message='Saved conversation unavailable';end if;
+    and employee_id=p_employee_id and owner_user_id=p_owner_user_id for share;
+   if not found or v_conversation.retention_expires_at<=clock_timestamp() then raise exception using errcode='PT404',message='Saved conversation unavailable';end if;
    select * into v_message from public.levytate_pastoral_messages where organisation_id=p_organisation_id and conversation_id=v_conversation.id
     and employee_id=p_employee_id and owner_user_id=p_owner_user_id and client_message_id=v_client_id||':assistant';
    if not found then raise exception using errcode='PT409',message='Saved exchange incomplete';end if;
+   v_now:=clock_timestamp();
+   if v_eligibility.expires_at<=v_now then raise exception using errcode='PT403',message='Private history is unavailable';end if;
+   if v_conversation.retention_expires_at<=v_now then raise exception using errcode='PT404',message='Saved conversation unavailable';end if;
    return v_receipt.result||jsonb_build_object('replayed',true,'message',to_jsonb(v_message));
   end if;
+  if v_eligibility.expires_at<=clock_timestamp() then raise exception using errcode='PT403',message='Private history is unavailable';end if;
   return v_receipt.result||jsonb_build_object('replayed',true);
  end if;
+ v_now:=clock_timestamp();
+ if v_eligibility.expires_at<=v_now then raise exception using errcode='PT403',message='Private history is unavailable';end if;
  if v_action='probe_exchange' then return null;end if;
 
  if v_action='preference' then
@@ -133,8 +141,8 @@ begin
   else
    v_conversation_id:=v_requested_id;
    select * into v_conversation from public.levytate_pastoral_conversations where organisation_id=p_organisation_id and id=v_conversation_id
-    and employee_id=p_employee_id and owner_user_id=p_owner_user_id and retention_expires_at>v_now and status='active' for update;
-   if not found then raise exception using errcode='PT404',message='Saved conversation unavailable';end if;
+    and employee_id=p_employee_id and owner_user_id=p_owner_user_id and status='active' for update;
+   if not found or v_conversation.retention_expires_at<=clock_timestamp() then raise exception using errcode='PT404',message='Saved conversation unavailable';end if;
   end if;
   if v_conversation.last_sequence_number<>v_expected then raise exception using errcode='PT409',message='Saved conversation changed';end if;
   for v_index in 0..1 loop
@@ -152,6 +160,10 @@ begin
  end if;
  insert into public.levytate_pastoral_history_receipts(organisation_id,owner_user_id,employee_id,request_key,action,request_hmac,conversation_id,result)
   values(p_organisation_id,p_owner_user_id,p_employee_id,v_key,v_action,v_hmac,v_conversation_id,v_result);
+ -- Any wait during writes must also roll back the entire command after expiry.
+ v_now:=clock_timestamp();
+ if v_eligibility.expires_at<=v_now then raise exception using errcode='PT403',message='Private history is unavailable';end if;
+ if v_action='exchange' and v_conversation.retention_expires_at<=v_now then raise exception using errcode='PT404',message='Saved conversation unavailable';end if;
  return v_result||jsonb_build_object('replayed',false)||case when v_action='exchange' then jsonb_build_object('message',to_jsonb(v_message)) else '{}'::jsonb end;
 end; $$;
 revoke all on function public.levytate_pastoral_history_command(uuid,uuid,text,jsonb) from public,anon,authenticated,service_role;
