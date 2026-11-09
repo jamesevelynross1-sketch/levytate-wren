@@ -22,16 +22,13 @@ import { getPastoralNavigationAccess } from "@/lib/server/levytate-pastoral-capa
 import {
   decryptPastoralJson,
   digestPastoralPayload,
+  authenticatePastoralHistoryCommand,
   encryptPastoralJson,
-  type PastoralCiphertext,
 } from "@/lib/server/levytate-pastoral-crypto";
 import {
   getLevyTateSupabaseConfig,
-  supabaseDelete,
   supabaseFetchJson,
-  supabaseInsert,
   supabaseSelect,
-  supabaseUpdate,
 } from "@/lib/server/levytate-supabase";
 
 const privacyNotice = "Private conversations are available only to you through My Support. They are not visible in normal manager, Apprenticeship Lead, employer, Platform Admin, Copilot, assessment or reporting views. A support request shares only the fields you review and send.";
@@ -45,7 +42,7 @@ type PastoralServerContext = Awaited<ReturnType<typeof getLearnerLifecycleServer
 };
 
 type EmployeeRow = { id: string; name: string; email: string; status: string };
-type PreferenceRow = { id: string; save_history: boolean; history_retention_days: number };
+type PreferenceRow = { id: string; save_history: boolean; history_retention_days: number; lock_version: number };
 type RecipientRow = {
   id: string;
   recipient_kind: PastoralSupportRecipient["kind"];
@@ -63,6 +60,7 @@ type ConversationRow = {
   retention_expires_at: string;
   created_at: string;
   updated_at: string;
+  last_sequence_number: number;
 };
 type MessageRow = {
   id: string;
@@ -167,7 +165,7 @@ export async function getPastoralWorkspaceForSession(session: LevyTateBetaSessio
 export async function applyPastoralMutationForSession(session: LevyTateBetaSession, input: unknown) {
   const mutation = parseMutation(input);
   const context = await authorisedPastoralContext(session);
-  if (mutation.action === "set_history_preference") await updateHistoryPreference(context, mutation.saveHistory, mutation.retentionDays);
+  if (mutation.action === "set_history_preference") await updateHistoryPreference(context, mutation.saveHistory, mutation.retentionDays, mutation.expectedVersion);
   else if (mutation.action === "delete_conversation") await deleteConversation(context, mutation.conversationId);
   else if (mutation.action === "submit_support_request") await submitSupportRequest(context, mutation);
   else if (mutation.action === "transition_support_request") await transitionSupportRequest(context, mutation);
@@ -199,28 +197,15 @@ export async function findPersistedAssistantReply(
   context: PastoralServerContext,
   conversationId: string | null | undefined,
   clientMessageId: string,
+  employeeMessage: string,
+  requestDetails?: unknown,
 ) {
   assertEmployeeContext(context);
-  const query = new URLSearchParams({
-    select: messageSelect,
-    organisation_id: `eq.${context.organisation.id}`,
-    employee_id: `eq.${context.employee.id}`,
-    owner_user_id: `eq.${context.user.id}`,
-    client_message_id: `eq.${clientMessageId}:assistant`,
-    order: "created_at.desc",
-    limit: "1",
+  const result = await historyCommand(context, {
+    action: "probe_exchange", client_message_id: validExchangeId(clientMessageId), conversation_id: conversationId ?? null,
+    request_hmac: exchangeHmac(context, conversationId, clientMessageId, employeeMessage, requestDetails),
   });
-  if (conversationId) {
-    const conversation = await getOwnedConversation(context, conversationId);
-    query.set("conversation_id", `eq.${conversation.id}`);
-  }
-  const rows = await supabaseSelect<MessageRow>(requireConfig(), "levytate_pastoral_messages", query);
-  const row = rows[0];
-  if (!row) return null;
-  // A retry without a conversationId must not decrypt history after expiry.
-  await getOwnedConversation(context,row.conversation_id);
-  const envelope = decryptMessageEnvelope(context, row);
-  return { message: decryptMessage(context, row), response: envelope.assistantResponse ?? null, conversationId: row.conversation_id };
+  return result ? savedExchange(context, result) : null;
 }
 
 export async function persistPastoralExchange(input: {
@@ -229,47 +214,32 @@ export async function persistPastoralExchange(input: {
   conversation: ConversationRow | null;
   clientMessageId: string;
   employeeMessage: string;
+  requestDetails?: unknown;
   assistantMessage: string;
   assistantResponse?: Omit<PastoralAssistantResponse, "conversationId">;
 }) {
   if (!input.preference?.save_history || !input.context.employee) return null;
-  const config = requireConfig();
-  const conversation = input.conversation ? await getOwnedConversation(input.context,input.conversation.id) : await createConversation(input.context, input.preference.history_retention_days);
-  const existing = await supabaseSelect<MessageRow>(config, "levytate_pastoral_messages", new URLSearchParams({
-    select: messageSelect,
-    organisation_id: `eq.${input.context.organisation.id}`,
-    conversation_id: `eq.${conversation.id}`,
-    client_message_id: `eq.${input.clientMessageId}`,
-    limit: "1",
-  }));
-  if (existing.length) return conversation.id;
-  const sequenceRows = await supabaseSelect<Pick<MessageRow, "sequence_number">>(config, "levytate_pastoral_messages", new URLSearchParams({
-    select: "sequence_number",
-    organisation_id: `eq.${input.context.organisation.id}`,
-    conversation_id: `eq.${conversation.id}`,
-    order: "sequence_number.desc",
-    limit: "1",
-  }));
-  const sequence = (sequenceRows[0]?.sequence_number ?? 0) + 1;
+  const conversationId = input.conversation?.id ?? randomUUID();
+  const expectedSequence = input.conversation?.last_sequence_number ?? 0;
+  if (!Number.isSafeInteger(expectedSequence) || expectedSequence < 0) throw new LevyTatePastoralError("Reload the saved conversation before continuing.", 409);
+  const sequence = expectedSequence + 1;
+  const clientMessageId = validExchangeId(input.clientMessageId);
   const employeeCipher = encryptPastoralJson(
     { content: input.employeeMessage },
-    messageAssociatedData(input.context.organisation.id, input.context.employee.id, conversation.id, sequence, input.clientMessageId),
+    messageAssociatedData(input.context.organisation.id, input.context.employee.id, conversationId, sequence, clientMessageId),
   );
-  const assistantClientId = `${input.clientMessageId}:assistant`;
+  const assistantClientId = `${clientMessageId}:assistant`;
   const assistantCipher = encryptPastoralJson(
     { content: input.assistantMessage, assistantResponse: input.assistantResponse },
-    messageAssociatedData(input.context.organisation.id, input.context.employee.id, conversation.id, sequence + 1, assistantClientId),
+    messageAssociatedData(input.context.organisation.id, input.context.employee.id, conversationId, sequence + 1, assistantClientId),
   );
-  await supabaseInsert(config, "levytate_pastoral_messages", [
-    messageInsert(input.context, conversation.id, sequence, "employee", input.clientMessageId, employeeCipher),
-    messageInsert(input.context, conversation.id, sequence + 1, "assistant", assistantClientId, assistantCipher),
-  ]);
-  await supabaseUpdate(config, "levytate_pastoral_conversations", new URLSearchParams({
-    organisation_id: `eq.${input.context.organisation.id}`,
-    id: `eq.${conversation.id}`,
-    owner_user_id: `eq.${input.context.user.id}`,
-  }).toString(), { last_message_at: new Date().toISOString() });
-  return conversation.id;
+  const result = await historyCommand(input.context, {
+    action: "exchange", client_message_id: clientMessageId, conversation_id: input.conversation?.id ?? null,
+    new_conversation_id: input.conversation ? null : conversationId, expected_sequence: expectedSequence,
+    policy_version: pastoralPolicyVersion, messages: [employeeCipher, assistantCipher],
+    request_hmac: exchangeHmac(input.context, input.conversation?.id, clientMessageId, input.employeeMessage, input.requestDetails),
+  });
+  return savedExchange(input.context, result);
 }
 
 async function employeeWorkspace(context: PastoralServerContext): Promise<PastoralWorkspace> {
@@ -291,6 +261,7 @@ async function employeeWorkspace(context: PastoralServerContext): Promise<Pastor
       name: context.employee.name,
       historySavingEnabled: preference?.save_history ?? false,
       historyRetentionDays: preference?.history_retention_days ?? 30,
+      historyPreferenceVersion: preference?.lock_version ?? 0,
       learnerContext,
     },
     recipients: recipients.map(recipientView),
@@ -348,7 +319,7 @@ async function getEmployee(organisationId: string, email: string) {
 async function getPreference(context: PastoralServerContext) {
   if (!context.employee) return null;
   const rows = await supabaseSelect<PreferenceRow>(requireConfig(), "levytate_pastoral_preferences", new URLSearchParams({
-    select: "id,save_history,history_retention_days",
+    select: "id,save_history,history_retention_days,lock_version",
     organisation_id: `eq.${context.organisation.id}`,
     employee_id: `eq.${context.employee.id}`,
     owner_user_id: `eq.${context.user.id}`,
@@ -357,47 +328,13 @@ async function getPreference(context: PastoralServerContext) {
   return rows[0] ?? null;
 }
 
-async function updateHistoryPreference(context: PastoralServerContext, saveHistory: boolean, retentionDays = 30) {
+async function updateHistoryPreference(context: PastoralServerContext, saveHistory: boolean, retentionDays = 30, expectedVersion: number) {
   assertEmployeeContext(context);
   const safeRetention = Math.max(1, Math.min(90, Math.round(Number(retentionDays) || 30)));
-  const existing = await getPreference(context);
-  const row = { save_history: saveHistory, history_retention_days: safeRetention };
-  let preferenceId = existing?.id;
-  if (existing) {
-    await supabaseUpdate(requireConfig(), "levytate_pastoral_preferences", new URLSearchParams({
-      organisation_id: `eq.${context.organisation.id}`,
-      id: `eq.${existing.id}`,
-      owner_user_id: `eq.${context.user.id}`,
-    }).toString(), row);
-  } else {
-    preferenceId = randomUUID();
-    await supabaseInsert(requireConfig(), "levytate_pastoral_preferences", [{
-      id: preferenceId,
-      organisation_id: context.organisation.id,
-      employee_id: context.employee.id,
-      owner_user_id: context.user.id,
-      ...row,
-    }]);
-  }
-  await audit(context, "preference", preferenceId!, saveHistory ? "history_saving.enabled" : "history_saving.disabled", "completed");
-}
-
-async function createConversation(context: PastoralServerContext, retentionDays: number) {
-  assertEmployeeContext(context);
-  const id = randomUUID();
-  const retentionExpiresAt = new Date(Date.now() + Math.max(1, Math.min(90, retentionDays)) * 86_400_000).toISOString();
-  const [row] = await supabaseInsert<ConversationRow>(requireConfig(), "levytate_pastoral_conversations", [{
-    id,
-    organisation_id: context.organisation.id,
-    employee_id: context.employee.id,
-    owner_user_id: context.user.id,
-    policy_version: pastoralPolicyVersion,
-    history_saving_enabled: true,
-    status: "active",
-    retention_expires_at: retentionExpiresAt,
-  }]);
-  await audit(context, "conversation", id, "conversation.created", "completed");
-  return row;
+  if (!Number.isSafeInteger(expectedVersion) || expectedVersion < 0) throw new LevyTatePastoralError("Reload your privacy settings before changing them.", 409);
+  const command = { action: "preference", expected_version: expectedVersion, save_history: saveHistory, retention_days: safeRetention };
+  const result = await historyCommand(context, { ...command, request_hmac: historyHmac(context, command) });
+  if (result?.preferenceVersion !== expectedVersion + 1) throw new LevyTatePastoralError("Your privacy change could not be confirmed. Keep this page and retry.", 503);
 }
 
 async function listOwnedConversations(context: PastoralServerContext) {
@@ -465,13 +402,9 @@ function decryptMessageEnvelope(context: PastoralServerContext, row: MessageRow)
 }
 
 async function deleteConversation(context: PastoralServerContext, conversationId: string) {
-  const conversation = await getOwnedConversation(context, conversationId,true);
-  await supabaseDelete(requireConfig(), "levytate_pastoral_conversations", new URLSearchParams({
-    organisation_id: `eq.${context.organisation.id}`,
-    id: `eq.${conversation.id}`,
-    owner_user_id: `eq.${context.user.id}`,
-  }).toString());
-  await audit(context, "conversation", conversation.id, "conversation.deleted", "completed");
+  const command = { action: "delete", conversation_id: boundedId(conversationId) };
+  const result = await historyCommand(context, { ...command, request_hmac: historyHmac(context, command) });
+  if (result?.deleted !== true || result.conversationId !== conversationId) throw new LevyTatePastoralError("Deletion could not be confirmed. Keep this page and retry.", 503);
 }
 
 async function listRecipients(organisationId: string, employerUserId?: string, activeOnly = true) {
@@ -832,7 +765,10 @@ async function getLearnerContext(organisationId: string, employeeId: string): Pr
 function parseMutation(value: unknown): PastoralSupportMutation {
   if (!value || typeof value !== "object") throw new LevyTatePastoralError("A valid My Support action is required.");
   const mutation = value as Record<string, unknown>;
-  if (mutation.action === "set_history_preference") return { action: mutation.action, saveHistory: mutation.saveHistory === true, retentionDays: numberOrUndefined(mutation.retentionDays) };
+  if (mutation.action === "set_history_preference") {
+    if (Object.keys(mutation).some((key) => !["action", "saveHistory", "retentionDays", "expectedVersion"].includes(key)) || typeof mutation.saveHistory !== "boolean" || !Number.isSafeInteger(mutation.expectedVersion) || Number(mutation.expectedVersion) < 0) throw new LevyTatePastoralError("Reload your privacy settings before changing them.", 409);
+    return { action: mutation.action, saveHistory: mutation.saveHistory, retentionDays: numberOrUndefined(mutation.retentionDays), expectedVersion: Number(mutation.expectedVersion) };
+  }
   if (mutation.action === "delete_conversation") return { action: mutation.action, conversationId: String(mutation.conversationId ?? "") };
   if (mutation.action === "submit_support_request") return {
     action: mutation.action,
@@ -886,29 +822,36 @@ function parseMutation(value: unknown): PastoralSupportMutation {
   throw new LevyTatePastoralError("That My Support action is not recognised.");
 }
 
-async function audit(context: PastoralServerContext, entityType: string, entityId: string, action: string, outcome: string) {
-  await supabaseInsert(requireConfig(), "levytate_pastoral_audit_events", [{
-    id: randomUUID(),
-    organisation_id: context.organisation.id,
-    employee_id: context.employee?.id ?? null,
-    actor_user_id: context.user.id,
-    entity_type: entityType,
-    entity_id: entityId,
-    action,
-    outcome,
-    correlation_id: randomUUID(),
-  }], { prefer: "return=minimal" });
+function historyHmac(context: PastoralServerContext, command: unknown) {
+  assertEmployeeContext(context);
+  return authenticatePastoralHistoryCommand({ organisationId: context.organisation.id, employeeId: context.employee.id, ownerUserId: context.user.id, command });
 }
 
-function messageInsert(context: PastoralServerContext, conversationId: string, sequence: number, author: PastoralConversationMessage["author"], clientMessageId: string, encrypted: PastoralCiphertext) {
+function exchangeHmac(context: PastoralServerContext, conversationId: string | null | undefined, clientMessageId: string, message: string, requestDetails?: unknown) {
+  return historyHmac(context, { action: "exchange", conversationId: conversationId ?? null, clientMessageId, message, requestDetails: requestDetails ?? null });
+}
+
+type HistoryResult = { conversationId?: string; preferenceVersion?: number; deleted?: boolean; replayed: boolean; message?: MessageRow };
+async function historyCommand(context: PastoralServerContext, command: Record<string, unknown>) {
   assertEmployeeContext(context);
-  return {
-    id: randomUUID(), organisation_id: context.organisation.id, conversation_id: conversationId,
-    employee_id: context.employee.id, owner_user_id: context.user.id, sequence_number: sequence,
-    author_type: author, ciphertext: encrypted.ciphertext, nonce: encrypted.nonce,
-    authentication_tag: encrypted.authenticationTag, encryption_key_version: encrypted.keyVersion,
-    policy_version: pastoralPolicyVersion, client_message_id: clientMessageId,
-  };
+  try {
+    return await supabaseFetchJson<HistoryResult | null>(requireConfig(), "rpc/levytate_pastoral_history_command", { method: "POST", body: JSON.stringify({
+      p_organisation_id: context.organisation.id, p_owner_user_id: context.user.id, p_employee_id: context.employee.id, p_command: command,
+    }) });
+  } catch (error) {
+    const code = error instanceof Error ? error.message : "";
+    if (/^(PT403|42501)/.test(code)) throw new LevyTatePastoralError("My Support is no longer available for this identity.", 403);
+    if (code.startsWith("PT404")) throw new LevyTatePastoralError("That saved conversation is unavailable.", 404);
+    if (/^(PT409|23505|40001|40P01)/.test(code)) throw new LevyTatePastoralError("Your private history changed. Keep your message and reload before continuing.", 409);
+    if (/^(PT422|23514|23503|22)/.test(code)) throw new LevyTatePastoralError("The private history command could not be validated. No partial exchange was saved.", 422);
+    throw new LevyTatePastoralError("The private history save could not be confirmed. Keep your message and retry.", 503);
+  }
+}
+
+function savedExchange(context: PastoralServerContext, result: HistoryResult | null) {
+  if (!result?.message || result.message.conversation_id !== result.conversationId || result.message.author_type !== "assistant") throw new LevyTatePastoralError("The saved reply could not be confirmed. Keep your message and retry.", 503);
+  const envelope = decryptMessageEnvelope(context, result.message);
+  return { message: decryptMessage(context, result.message), response: envelope.assistantResponse ?? null, conversationId: result.message.conversation_id };
 }
 
 function assertEmployeeContext(context: PastoralServerContext): asserts context is PastoralServerContext & { employee: EmployeeRow } {
@@ -935,6 +878,7 @@ function bounded(value: unknown, max: number) { return String(value ?? "").trim(
 function boundedRequired(value: unknown, max: number, label: string) { const clean = bounded(value, max); if (!clean) throw new LevyTatePastoralError(`${label} is required.`); return clean; }
 function boundedId(value: string) { const clean = String(value ?? "").trim(); if (!/^[0-9a-f-]{36}$/i.test(clean)) throw new LevyTatePastoralError("A valid record identifier is required."); return clean; }
 function validIdempotencyKey(value: string) { const clean = String(value ?? "").trim(); if (!/^[a-zA-Z0-9:_-]{8,128}$/.test(clean)) throw new LevyTatePastoralError("A valid idempotency key is required."); return clean; }
+function validExchangeId(value: string) { const clean = String(value ?? "").trim(); if (!/^[a-zA-Z0-9:_-]{8,118}$/.test(clean)) throw new LevyTatePastoralError("A valid exchange identifier is required."); return clean; }
 function numberOrUndefined(value: unknown) { return value === undefined ? undefined : Number(value); }
 function contactMethod(value: unknown): PastoralSharedRequestPayload["preferredContactMethod"] { if (!["in_platform", "email", "phone", "meeting", "provider_route"].includes(String(value))) throw new LevyTatePastoralError("Choose a valid preferred contact method."); return value as PastoralSharedRequestPayload["preferredContactMethod"]; }
 function validDate(value: unknown, message: string) { const date = new Date(String(value ?? "")); if (Number.isNaN(date.getTime())) throw new LevyTatePastoralError(message); return date.toISOString(); }
@@ -943,7 +887,7 @@ function recipientIsSafeForPayload(recipient: RecipientRow, payload: PastoralSha
   return pastoralRecipientIsSafeForConcern(recipientView(recipient), combined);
 }
 
-const conversationSelect = "id,employee_id,owner_user_id,status,retention_expires_at,created_at,updated_at";
+const conversationSelect = "id,employee_id,owner_user_id,status,retention_expires_at,created_at,updated_at,last_sequence_number";
 const messageSelect = "id,conversation_id,employee_id,owner_user_id,sequence_number,author_type,ciphertext,nonce,authentication_tag,encryption_key_version,client_message_id,created_at";
 const supportRequestSelect = "id,employee_id,owner_user_id,recipient_id,assigned_recipient_id,topic_category,preferred_contact_method,urgency_route,payload_ciphertext,payload_nonce,payload_authentication_tag,encryption_key_version,idempotency_key,status,lock_version,submitted_at,acknowledged_at,resolved_at,agreed_follow_up_at,administratively_closed_at,employee_resolution_status,employee_responded_at,employee_confirmed_resolved_at";
 const eventSelect = "id,support_request_id,event_type,previous_state,new_state,note_ciphertext,note_nonce,note_authentication_tag,encryption_key_version,idempotency_key,created_at";

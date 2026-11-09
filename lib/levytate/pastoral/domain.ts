@@ -137,6 +137,7 @@ export type PastoralWorkspace = {
     name: string;
     historySavingEnabled: boolean;
     historyRetentionDays: number;
+    historyPreferenceVersion: number;
     learnerContext: PastoralLearnerContext | null;
   } | null;
   recipients: PastoralSupportRecipient[];
@@ -167,7 +168,7 @@ export type PastoralAssistantResponse = {
 };
 
 export type PastoralSupportMutation =
-  | { action: "set_history_preference"; saveHistory: boolean; retentionDays?: number }
+  | { action: "set_history_preference"; saveHistory: boolean; retentionDays?: number; expectedVersion: number }
   | { action: "delete_conversation"; conversationId: string }
   | {
       action: "submit_support_request";

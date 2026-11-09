@@ -36,6 +36,8 @@ export async function isPastoralSupportEnabledForOrganisation(organisationId: st
     // The excluded human-follow-up migration must never be silently assumed.
     // These zero-row schema probes read no content and do not activate anything.
     await Promise.all([
+      supabaseSelect(config,"levytate_pastoral_preferences",new URLSearchParams({select:"id,lock_version",organisation_id:`eq.${organisationId}`,limit:"0"})),
+      supabaseSelect(config,"levytate_pastoral_conversations",new URLSearchParams({select:"id,last_sequence_number",organisation_id:`eq.${organisationId}`,limit:"0"})),
       supabaseSelect(config,"levytate_pastoral_support_requests",new URLSearchParams({select:"id,agreed_follow_up_at,administratively_closed_at,employee_resolution_status,employee_responded_at,employee_confirmed_resolved_at",organisation_id:`eq.${organisationId}`,limit:"0"})),
       supabaseSelect(config,"levytate_pastoral_support_actions",new URLSearchParams({select:"id,support_request_id,responsible_recipient_id,lock_version",organisation_id:`eq.${organisationId}`,limit:"0"})),
       supabaseSelect(config,"levytate_pastoral_support_action_events",new URLSearchParams({select:"id,support_action_id,event_type",organisation_id:`eq.${organisationId}`,limit:"0"})),

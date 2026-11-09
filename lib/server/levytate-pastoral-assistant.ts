@@ -49,7 +49,7 @@ const pastoralModelOutput = z.object({
 export async function runPastoralAssistant(session: LevyTateBetaSession, input: unknown): Promise<PastoralAssistantResponse> {
   const request = parseRequest(input);
   const prepared = await getEmployeePastoralAssistantContext(session, request.conversationId);
-  const replay = await findPersistedAssistantReply(prepared.context, request.conversationId, request.clientMessageId);
+  const replay = await findPersistedAssistantReply(prepared.context, request.conversationId, request.clientMessageId, request.message, request);
   if (replay) return replay.response
     ? { ...replay.response, conversationId: replay.conversationId }
     : responseView(replay.message.content, replay.conversationId, request.message, prepared.recipients.length > 0);
@@ -57,12 +57,13 @@ export async function runPastoralAssistant(session: LevyTateBetaSession, input: 
   const safety = classifyPastoralSafety(request.message);
   if (safety === "emergency_guidance") {
     const reply = immediateRiskResponse();
-    const conversationId = await persistPastoralExchange({
+    const saved = await persistPastoralExchange({
       context: prepared.context,
       preference: prepared.preference,
       conversation: prepared.conversation,
       clientMessageId: request.clientMessageId,
       employeeMessage: request.message,
+      requestDetails: request,
       assistantMessage: reply,
       assistantResponse: {
         reply,
@@ -75,10 +76,11 @@ export async function runPastoralAssistant(session: LevyTateBetaSession, input: 
         supportRequestDraft: null,
       },
     });
+    if (saved) return saved.response ? { ...saved.response, conversationId: saved.conversationId } : responseView(saved.message.content, saved.conversationId, request.message, prepared.recipients.length > 0);
     return {
       reply,
       source: "safety_policy",
-      conversationId,
+      conversationId: null,
       supportOffer: prepared.recipients.length > 0,
       urgencyRoute: "emergency_guidance",
       suggestedTopicCategory: classifyPastoralTopic(request.message),
@@ -122,12 +124,12 @@ export async function runPastoralAssistant(session: LevyTateBetaSession, input: 
       policyVersion: pastoralPolicyVersion,
       supportRequestDraft: null,
     };
-    const conversationId = await persistPastoralExchange({
+    const saved = await persistPastoralExchange({
       context: prepared.context, preference: prepared.preference, conversation: prepared.conversation,
-      clientMessageId: request.clientMessageId, employeeMessage: request.message,
+      clientMessageId: request.clientMessageId, employeeMessage: request.message, requestDetails: request,
       assistantMessage: reply, assistantResponse,
     });
-    return { ...assistantResponse, conversationId };
+    return saved ? { ...(saved.response ?? responseView(saved.message.content, saved.conversationId, request.message, prepared.recipients.length > 0)), conversationId: saved.conversationId } : { ...assistantResponse, conversationId: null };
   }
   const urgencyRoute = safety === "prompt_human_support" ? "prompt_human_support" : parsed.data.urgencyRoute;
   const supportRequestDraft = draftRequested && parsed.data.supportRequestDraft
@@ -143,16 +145,17 @@ export async function runPastoralAssistant(session: LevyTateBetaSession, input: 
     policyVersion: pastoralPolicyVersion,
     supportRequestDraft,
   };
-  const conversationId = await persistPastoralExchange({
+  const saved = await persistPastoralExchange({
     context: prepared.context,
     preference: prepared.preference,
     conversation: prepared.conversation,
     clientMessageId: request.clientMessageId,
     employeeMessage: request.message,
+    requestDetails: request,
     assistantMessage: parsed.data.reply,
     assistantResponse,
   });
-  return { ...assistantResponse, conversationId };
+  return saved ? { ...(saved.response ?? responseView(saved.message.content, saved.conversationId, request.message, prepared.recipients.length > 0)), conversationId: saved.conversationId } : { ...assistantResponse, conversationId: null };
 }
 
 async function callPastoralModel(input: {

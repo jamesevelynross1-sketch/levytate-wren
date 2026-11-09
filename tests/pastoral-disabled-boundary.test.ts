@@ -1,7 +1,7 @@
 import {afterEach,beforeEach,describe,expect,it,vi} from "vitest";
-const transport=vi.hoisted(()=>({select:vi.fn(),decrypt:vi.fn(),env:vi.fn()}));
-vi.mock("@/lib/server/levytate-supabase",()=>({getLevyTateSupabaseConfig:()=>({}),supabaseSelect:transport.select,readRuntimeEnv:transport.env}));
-vi.mock("@/lib/server/levytate-pastoral-crypto",()=>({isPastoralEncryptionConfigured:()=>true,decryptPastoralJson:transport.decrypt}));
+const transport=vi.hoisted(()=>({select:vi.fn(),fetch:vi.fn(),decrypt:vi.fn(),env:vi.fn()}));
+vi.mock("@/lib/server/levytate-supabase",()=>({getLevyTateSupabaseConfig:()=>({}),supabaseSelect:transport.select,supabaseFetchJson:transport.fetch,readRuntimeEnv:transport.env}));
+vi.mock("@/lib/server/levytate-pastoral-crypto",()=>({isPastoralEncryptionConfigured:()=>true,decryptPastoralJson:transport.decrypt,authenticatePastoralHistoryCommand:()=>"a".repeat(64)}));
 vi.mock("@/lib/server/levytate-learner-lifecycle",()=>({getLearnerLifecycleServerContext:vi.fn()}));
 import {isPastoralSupportEnabledForOrganisation} from "@/lib/server/levytate-pastoral-capability";
 import {findPersistedAssistantReply,persistPastoralExchange} from "@/lib/server/levytate-pastoral";
@@ -22,12 +22,12 @@ describe("Disabled My Support technical boundaries; no live activation or model 
   transport.select.mockResolvedValue([]);expect(await isPastoralSupportEnabledForOrganisation("fictional-tenant")).toBe(false);
  });
  it("a lost-response lookup without conversation ID cannot decrypt expired history",async()=>{
-  transport.select.mockImplementation(async(_config:unknown,table:string)=>table==="levytate_pastoral_messages"?[{conversation_id:conversationId,owner_user_id:context.user.id,employee_id:context.employee!.id}]:[{id:conversationId,retention_expires_at:"2000-01-01T00:00:00Z"}]);
-  await expect(findPersistedAssistantReply(context,null,"fictional-message")).rejects.toMatchObject({status:404});expect(transport.decrypt).not.toHaveBeenCalled();
+  transport.fetch.mockRejectedValue(new Error("PT404: Saved conversation unavailable"));
+  await expect(findPersistedAssistantReply(context,null,"fictional-message","Fictional text")).rejects.toMatchObject({status:404});expect(transport.decrypt).not.toHaveBeenCalled();
  });
  it("mis-scoped ciphertext is rejected before decryption",async()=>{
-  transport.select.mockImplementation(async(_config:unknown,table:string)=>table==="levytate_pastoral_messages"?[{conversation_id:conversationId,owner_user_id:"another-owner",employee_id:context.employee!.id}]:[{id:conversationId,retention_expires_at:"2099-01-01T00:00:00Z"}]);
-  await expect(findPersistedAssistantReply(context,null,"fictional-message")).rejects.toMatchObject({status:404});expect(transport.decrypt).not.toHaveBeenCalled();
+  transport.fetch.mockResolvedValue({conversationId,replayed:true,message:{conversation_id:conversationId,author_type:"assistant",owner_user_id:"another-owner",employee_id:context.employee!.id}});
+  await expect(findPersistedAssistantReply(context,null,"fictional-message","Fictional text")).rejects.toMatchObject({status:404});expect(transport.decrypt).not.toHaveBeenCalled();
  });
  it("history-off does not write conversations or exchanges",async()=>{
   expect(await persistPastoralExchange({context,preference:null,conversation:null,clientMessageId:"fictional-message",employeeMessage:"Synthetic text",assistantMessage:"Synthetic text"})).toBeNull();expect(transport.select).not.toHaveBeenCalled();
