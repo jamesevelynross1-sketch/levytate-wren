@@ -27,6 +27,8 @@ select pg_temp.denied($q$select public.levytate_reactivation_command('52000000-0
 select public.levytate_reactivation_command('52000000-0000-4000-8000-000000000001',request) from react_state;
 select public.levytate_reactivation_command('52000000-0000-4000-8000-000000000001',request) from react_state;
 select pg_temp.check_test((select count(*)=1 from public.levytate_tenant_reactivation_requests),'request retry creates one approval record');
+select pg_temp.denied($q$select public.levytate_reactivation_command('52000000-0000-4000-8000-000000000001','{"requestId":"54000000-0000-4000-8000-000000000099","reactivationId":"55000000-0000-4000-8000-000000000001"}')$q$,'PT422','missing action cannot fall through into cancellation');
+select pg_temp.denied($q$select public.levytate_reactivation_command('52000000-0000-4000-8000-000000000001','{"action":null,"requestId":"54000000-0000-4000-8000-000000000099","reactivationId":"55000000-0000-4000-8000-000000000001"}')$q$,'PT422','null action cannot cancel a pending approval');
 select pg_temp.denied($q$select public.levytate_reactivation_command('52000000-0000-4000-8000-000000000001',(select approval from react_state))$q$,'PT403','requester cannot approve reactivation');
 savepoint stale_requester;
 update public.levytate_users set active=false where id='52000000-0000-4000-8000-000000000001';

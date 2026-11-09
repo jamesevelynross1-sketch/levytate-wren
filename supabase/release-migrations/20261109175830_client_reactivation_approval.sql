@@ -30,7 +30,8 @@ declare r public.levytate_tenant_reactivation_requests%rowtype;o public.levytate
 begin
  perform public.levytate_offboarding_actor(p_actor);
  select * into actor from public.levytate_users where id=p_actor;
- if request_id is null or case_id is null or jsonb_typeof(p_command) is distinct from 'object' then raise exception using errcode='PT422',message='Reactivation request required';end if;
+ if request_id is null or case_id is null or action is null or action not in('request_reactivation','approve_reactivation','cancel_reactivation')
+  or jsonb_typeof(p_command) is distinct from 'object' then raise exception using errcode='PT422',message='Reactivation request required';end if;
  allowed:=array['action','requestId','reactivationId'];
  if action='request_reactivation' then allowed:=allowed||array['organisationId','approvalReference','clientNoticeReference','supportHandoverReference','recoveryBoundaryReference'];
  elsif action='approve_reactivation' then allowed:=allowed||array['approvalReference'];
