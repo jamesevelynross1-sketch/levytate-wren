@@ -71,6 +71,10 @@ export async function verifyLifecycle({ app: value, mailpit: mailValue, browser,
       const callback = page.waitForResponse((response) => new URL(response.url()).pathname === "/levytate/auth/callback");
       await page.goto(link);
       const cookieHeaders = (await (await callback).headersArray()).filter((header) => header.name.toLowerCase() === "set-cookie" && !/Max-Age=0/i.test(header.value));
+      if(new URL(page.url()).pathname==="/levytate/login"){
+        const reason=new URL(page.url()).searchParams.get("auth");
+        console.log(JSON.stringify({diagnostic:"lifecycle-callback-returned-login",reason:["invalid-link","unavailable","rate-limited"].includes(reason)?reason:"unclassified"}));
+      }
       if (new URL(page.url()).pathname === "/levytate/accept-terms") {
         report("only the employer Lead accepts its synthetic terms", user.key === "member");
         await page.getByRole("checkbox").check(); await page.getByRole("button", { name: "Accept Early Access Terms", exact: true }).click();
