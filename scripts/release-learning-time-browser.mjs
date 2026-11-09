@@ -30,14 +30,21 @@ export async function verifyLearningTime({app,manifest,contexts,learnerId,backen
   check("Lead publishes plan explicitly",(await post(lead,publish)).status()===200);
   }
   const own=await workspace(employee);check("Employee sees only own connected learner",own.learners.length===1&&own.learners[0].learnerRecordId===learnerId&&own.learners[0].plan.versionId===draft.version.id);
+  const title=`Synthetic captured workshop ${manifest.run.slice(0,8)}`;
+  const retained=process.env.RELEASE_LEARNING_TIME_RESUME==="true"?own.learners[0].activities.filter(item=>item.title===title):[];
+  let activity;
+  if(retained.length){
+   check("resume finds exactly the retained genuinely submitted activity",retained.length===1&&retained[0].status==="submitted");
+   activity={id:retained[0].id,lock_version:retained[0].lockVersion};
+   check("retained Learning Time evidence remains the original sixty-minute activity",retained[0].durationMinutes===60);
+  }else{
   phase="open actual Learning Time activity form";
   await employee.page.goto(`${app}/levytate/app?module=Learning%20Time`);
   await employee.page.getByRole("button",{name:"Add learning activity",exact:true}).click();
   phase="fill actual activity fields";
   await employee.page.getByLabel("Activity date",{exact:true}).fill(today);
   await employee.page.getByLabel("Start",{exact:true}).fill("09:00");await employee.page.getByLabel("End",{exact:true}).fill("10:00");
-  await employee.page.getByLabel("Working-hours basis",{exact:true}).selectOption("within_normal_working_hours");
-  const title=`Synthetic captured workshop ${manifest.run.slice(0,8)}`;
+  await employee.page.getByRole("combobox",{name:"Working-hours basis",exact:true}).selectOption("within_normal_working_hours");
   for(const[label,value]of[["Title",title],["What did you do?","Synthetic workshop practising analysis, separate from productive work."],["What was genuinely new?","New techniques for interpreting data in a fictional training exercise."],["How did this relate to your standard or agreed priority?","Data analysis methods aligned to the agreed synthetic programme."],["Reflection","A fictional learning reflection, not actual learner evidence."]])await employee.page.getByLabel(label,{exact:true}).fill(value);
   await employee.page.getByLabel("This was separate from routine productive work.",{exact:true}).check();
   const savedResponse=employee.page.waitForResponse(r=>new URL(r.url()).pathname==="/api/levytate-learning-time"&&r.request().method()==="POST");
@@ -45,16 +52,19 @@ export async function verifyLearningTime({app,manifest,contexts,learnerId,backen
   await employee.page.getByRole("button",{name:"Save private draft",exact:true}).click();
   const saved=await savedResponse,savedBody=await saved.json(),savedPayload=saved.request().postDataJSON();
   check("real Employee UI saves a private draft",saved.status()===201&&savedBody.activity?.title===title&&savedBody.activity.status==="draft");
-  const activity=savedBody.activity;
-  check("lost-response UI payload replay preserves exact activity",(await(await post(employee,savedPayload)).json()).activity?.id===activity.id);
+  activity=savedBody.activity;
+  check("replaying the original UI payload preserves exact activity",(await(await post(employee,savedPayload)).json()).activity?.id===activity.id);
   await employee.page.reload();
   const fresh=await workspace(employee);check("draft survives browser reload",fresh.learners[0].activities.some(a=>a.id===activity.id&&a.title===title));
   const submit={action:"submit_activity",activityId:activity.id,lockVersion:activity.lock_version,idempotencyKey:randomUUID()};
   check("other tenant cannot submit this private draft",[403,404].includes((await post(other,submit)).status()));
   check("Employee submits exact activity revision",(await post(employee,submit)).status()===200);
+  }
   const submitted=(await workspace(employee)).learners[0].activities.find(a=>a.id===activity.id);
   const review={action:"transition_activity",activityId:activity.id,lockVersion:submitted.lockVersion,transitionAction:"employer_check",note:"Synthetic employer check; not provider confirmation",idempotencyKey:randomUUID()};
-  check("Employee cannot employer-check own activity",(await post(employee,review)).status()===403);
+  phase="deny own employer check and complete retained evidence";
+  const denied=await post(employee,review);console.log(`DIAGNOSTIC Learning Time own-employer-check HTTP ${denied.status()}`);
+  check("Employee cannot employer-check own activity",denied.status()===403);
   check("Lead employer-checks submitted evidence",(await post(lead,review)).status()===200);
   const confirm={action:"record_confirmation",activityId:activity.id,outcome:"confirmed",confirmedMinutes:60,sourceType:"provider_report",providerId:manifest.catalogue.providerId,sourceReference:"Synthetic attributable report; no actual provider delivery",sourceDate:today,note:"Fictional acceptance only",idempotencyKey:randomUUID()};
   check("Employee cannot fabricate provider confirmation",(await post(employee,confirm)).status()===403);
