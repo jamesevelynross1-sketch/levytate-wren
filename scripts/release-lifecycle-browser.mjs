@@ -218,6 +218,8 @@ export async function verifyLifecycle({ app: value, mailpit: mailValue, browser,
       phase = "fresh-session suspension and independent reactivation";
       await suspend(a);
       report("freshly invited member session is denied by ordinary suspension", (await context.request.get(`${app}/api/levytate-workspace`)).status() === 401);
+      await page.goto(`${app}/levytate/app`);
+      report("suspended member page returns to the same-origin sign-in screen", new URL(page.url()).origin === app && new URL(page.url()).pathname === "/levytate/login");
       await a.page.getByRole("button", { name: "Request reactivation", exact: true }).click();
       const secondDraft = a.page.getByRole("dialog");
       await secondDraft.getByRole("combobox", { name: "Suspended employer", exact: true }).selectOption(plan.target.id);
@@ -235,6 +237,8 @@ export async function verifyLifecycle({ app: value, mailpit: mailValue, browser,
       report("a separate genuine administrator approves the second reactivation", (await secondApproved).status() === 200); await (await secondApprovedDownload).delete();
       report("second approved reactivation is durably Active", (await backend(`rest/v1/levytate_organisations?id=eq.${plan.target.id}&select=status`))[0]?.status === "Active");
       report("the retained genuine member session stays denied after reactivation", (await context.request.get(`${app}/api/levytate-workspace`)).status() === 401);
+      await page.goto(`${app}/levytate/app`);
+      report("reactivation does not restore the retained member page", new URL(page.url()).origin === app && new URL(page.url()).pathname === "/levytate/login");
       report("provider refresh cannot revive access after reactivation", (await context.request.post(`${app}/api/levytate-auth/session`, { headers: headers(renewed) })).status() === 401);
       renewedSessionChecked = true;
     }
