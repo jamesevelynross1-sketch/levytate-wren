@@ -1,13 +1,17 @@
 /** Start an already prepared LOCAL generated worktree without printing keys. */
 import { spawn } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 
 const root = process.env.RELEASE_LOCAL_RUNTIME;
 if (!root?.startsWith("/private/tmp/levytate-release-runtime.")) {
   console.error("BLOCKED: dedicated temporary runtime required"); process.exit(2);
 }
+const secrets = JSON.parse(readFileSync(`${root}/private-app-secrets.json`, "utf8"));
+// Do not inherit hosted project/auth/database overrides into a new local stack.
+const env = Object.fromEntries(["PATH", "HOME", "TMPDIR", "USER", "LOGNAME", "LANG", "LC_ALL", "SSL_CERT_FILE", "NODE_EXTRA_CA_CERTS"].filter((name) => process.env[name]).map((name) => [name, process.env[name]]));
+Object.assign(env, { SUPABASE_HOME: `${root}/home`, SUPABASE_EXPERIMENTAL_STACK: "1", RELEASE_EMAIL_HOOK_SECRET: `v1,whsec_${secrets.hookSecret}` });
 const child = spawn(`${root}/supabase`, ["stack", "start", "--runtime", "native", "--preparation", "on-demand", "--output-format", "json", "--workdir", `${root}/project`], {
-  env: { ...process.env, SUPABASE_HOME: `${root}/home` }, stdio: ["ignore", "pipe", "pipe"],
+  env, stdio: ["ignore", "pipe", "pipe"],
 });
 let stdout = "", stderr = "";
 child.stdout.on("data", (data) => { stdout += data; });

@@ -3,11 +3,12 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { resolve } from "node:path";
+import { releaseRepository } from "./release-repository-path.mjs";
 
 const runtime = process.env.RELEASE_LOCAL_RUNTIME;
-const repository = process.env.RELEASE_CANDIDATE_REPOSITORY;
+const repository = releaseRepository(process.env.RELEASE_CANDIDATE_REPOSITORY);
 const name = process.env.RELEASE_TEST_DATABASE;
-if (!runtime?.startsWith("/private/tmp/levytate-release-runtime.") || !repository?.startsWith("/private/tmp/levytate-") || !/^levytate_release_[a-z0-9_]+$/.test(name ?? "")) throw new Error("Dedicated local runtime, candidate worktree and fresh verifier database required");
+if (!runtime?.startsWith("/private/tmp/levytate-release-runtime.") || !/^levytate_release_[a-z0-9_]+$/.test(name ?? "")) throw new Error("Dedicated local runtime, candidate worktree and fresh verifier database required");
 const state = JSON.parse(readFileSync(`${runtime}/private-stack-state.json`, "utf8"));
 const connection = new URL(state.env.DB_URL);
 if (connection.hostname !== "127.0.0.1") throw new Error("Loopback database required");
