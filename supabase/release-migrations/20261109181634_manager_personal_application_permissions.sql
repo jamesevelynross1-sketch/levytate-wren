@@ -1,7 +1,8 @@
 -- LOCAL REVIEW CANDIDATE ONLY. No hosted execution is authorised.
 -- Managers retain a personal employee journey, separately from direct-report review.
--- Existing catalogue, current-manager, workflow-version, CAS, receipt and audit
--- contracts remain unchanged. A manager cannot draft for or declare for a report,
+-- Availability now requires an active canonical catalogue, evidenced provider/
+-- programme, approved target standard and all approved linked standards. Current-
+-- manager, workflow-version, CAS, receipt and audit contracts remain unchanged. A manager cannot draft for or declare for a report,
 -- approve themselves, or bypass the one-active-application constraint.
 -- No tables, grants to browser roles, historical migrations or data are changed.
 
@@ -52,6 +53,7 @@ begin
   -- Catalogue writers take this same transaction lock before their row locks.
   -- Serialise eligibility reads with provider/programme archival and selection.
   perform pg_advisory_xact_lock(hashtextextended('levytate-catalogue-integrity',0));
+  if p_action in ('save_draft','save_and_submit','submit','resubmit') then perform 1 from public.levytate_organisations where slug='levytate-internal' and status='Active' for share; end if;
   select * into v_actor from public.levytate_users where id=p_actor_user_id and organisation_id=p_organisation_id and active for share;
   if not found or v_actor.role not in ('Employee','Line Manager','Apprenticeship Lead','Employer Admin') then
     raise exception using errcode='PT403',message='Active employer membership required';
@@ -104,12 +106,15 @@ begin
     end if;
     if not exists (select 1 from public.levytate_organisation_programmes s
       join public.levytate_provider_programmes p on p.id=s.programme_id and p.provider_id=s.provider_id
-      join public.levytate_organisations catalog on catalog.id=p.organisation_id and catalog.slug='levytate-internal'
-      join public.levytate_providers provider on provider.organisation_id=p.organisation_id and provider.provider_id=p.provider_id and provider.status='Active' and provider.verification_status='verified'
+      join public.levytate_organisations catalog on catalog.id=p.organisation_id and catalog.slug='levytate-internal' and catalog.status='Active'
+      join public.levytate_providers provider on provider.organisation_id=p.organisation_id and provider.provider_id=p.provider_id and provider.status='Active' and provider.verification_status='verified' and provider.last_verified is not null and jsonb_array_length(provider.source_urls)>0
       join public.levytate_organisation_providers r on r.organisation_id=s.organisation_id and r.provider_id=s.provider_id and r.status='Active'
       where s.organisation_id=p_organisation_id and s.status='Active' and p.status='Active' and p.record_status='Active'
       and p.verification_status in ('Verified from provider website','Provider confirmed','LevyTate reviewed')
-      and (p.linked_standard_id=v_standard_id or p.linked_standard_ids ? v_standard_id)) then
+      and nullif(btrim(p.source_url),'') is not null and jsonb_array_length(p.linked_standard_ids)>0
+        and not exists(select 1 from jsonb_array_elements_text(p.linked_standard_ids) standard_id where not exists(select 1 from public.levytate_apprenticeship_standards standard where standard.id=standard_id and standard.status='Approved for delivery'))
+        and exists(select 1 from public.levytate_apprenticeship_standards standard where standard.id=v_standard_id and standard.status='Approved for delivery')
+        and (p.linked_standard_id=v_standard_id or p.linked_standard_ids ? v_standard_id)) then
       raise exception using errcode='PT422',message='Choose an active programme published by the employer';
     end if;
     if v_new then
@@ -144,12 +149,15 @@ begin
         raise exception using errcode='PT422',message='Programme is no longer mapped to the employee role'; end if;
       if not exists (select 1 from public.levytate_organisation_programmes s
         join public.levytate_provider_programmes p on p.id=s.programme_id and p.provider_id=s.provider_id
-        join public.levytate_organisations catalog on catalog.id=p.organisation_id and catalog.slug='levytate-internal'
-        join public.levytate_providers provider on provider.organisation_id=p.organisation_id and provider.provider_id=p.provider_id and provider.status='Active' and provider.verification_status='verified'
+        join public.levytate_organisations catalog on catalog.id=p.organisation_id and catalog.slug='levytate-internal' and catalog.status='Active'
+        join public.levytate_providers provider on provider.organisation_id=p.organisation_id and provider.provider_id=p.provider_id and provider.status='Active' and provider.verification_status='verified' and provider.last_verified is not null and jsonb_array_length(provider.source_urls)>0
         join public.levytate_organisation_providers r on r.organisation_id=s.organisation_id and r.provider_id=s.provider_id and r.status='Active'
         where s.organisation_id=p_organisation_id and s.status='Active' and p.status='Active' and p.record_status='Active'
           and p.verification_status in ('Verified from provider website','Provider confirmed','LevyTate reviewed')
-          and (p.linked_standard_id=v_app.apprenticeship_standard_id or p.linked_standard_ids ? v_app.apprenticeship_standard_id)) then
+          and nullif(btrim(p.source_url),'') is not null and jsonb_array_length(p.linked_standard_ids)>0
+        and not exists(select 1 from jsonb_array_elements_text(p.linked_standard_ids) standard_id where not exists(select 1 from public.levytate_apprenticeship_standards standard where standard.id=standard_id and standard.status='Approved for delivery'))
+        and exists(select 1 from public.levytate_apprenticeship_standards standard where standard.id=v_app.apprenticeship_standard_id and standard.status='Approved for delivery')
+        and (p.linked_standard_id=v_app.apprenticeship_standard_id or p.linked_standard_ids ? v_app.apprenticeship_standard_id)) then
         raise exception using errcode='PT422',message='Programme or provider is no longer available'; end if;
       if v_event_action='submit' and v_instance.id is null then
         select ver.* into v_version from public.levytate_application_workflows w
@@ -292,6 +300,7 @@ begin
   if not found then raise exception using errcode='PT403',message='Workspace is not active'; end if;
   -- Same lock as catalogue selection/archive; take before employee/learner locks.
   perform pg_advisory_xact_lock(hashtextextended('levytate-catalogue-integrity',0));
+  if p_action in ('pre_enrolment','enrol') then perform 1 from public.levytate_organisations where slug='levytate-internal' and status='Active' for share; end if;
   select e.* into v_employee from public.levytate_employees e join public.levytate_learner_records r on r.organisation_id=e.organisation_id and r.employee_id=e.id
     where r.organisation_id=p_organisation_id and r.id=p_learner_id and e.status='Active' for update of e;
   if not found then raise exception using errcode='PT404',message='Active learner employee not found'; end if;
@@ -461,11 +470,14 @@ begin
     if not found or v_app.employee_id<>v_after.employee_id or v_app.status<>'Approved for Enrolment' or v_app.current_owner<>'Provider Partner' then raise exception using errcode='PT403',message='Final-approved matching application required'; end if;
     if not exists(select 1 from public.levytate_organisation_programmes s
       join public.levytate_provider_programmes p on p.id=s.programme_id and p.provider_id=s.provider_id
-      join public.levytate_organisations o on o.id=p.organisation_id and o.slug='levytate-internal'
-      join public.levytate_providers provider on provider.organisation_id=p.organisation_id and provider.provider_id=p.provider_id and provider.status='Active' and provider.verification_status='verified'
+      join public.levytate_organisations o on o.id=p.organisation_id and o.slug='levytate-internal' and o.status='Active'
+      join public.levytate_providers provider on provider.organisation_id=p.organisation_id and provider.provider_id=p.provider_id and provider.status='Active' and provider.verification_status='verified' and provider.last_verified is not null and jsonb_array_length(provider.source_urls)>0
       join public.levytate_organisation_providers selected on selected.organisation_id=s.organisation_id and selected.provider_id=s.provider_id and selected.status='Active'
       where s.organisation_id=p_organisation_id and s.programme_id=v_after.programme_id and s.provider_id=v_after.provider_id and s.status='Active'
         and p.status='Active' and p.record_status='Active' and p.verification_status in ('Verified from provider website','Provider confirmed','LevyTate reviewed')
+        and nullif(btrim(p.source_url),'') is not null and jsonb_array_length(p.linked_standard_ids)>0
+        and not exists(select 1 from jsonb_array_elements_text(p.linked_standard_ids) standard_id where not exists(select 1 from public.levytate_apprenticeship_standards standard where standard.id=standard_id and standard.status='Approved for delivery'))
+        and exists(select 1 from public.levytate_apprenticeship_standards standard where standard.id=v_app.apprenticeship_standard_id and standard.status='Approved for delivery')
         and (p.linked_standard_id=v_app.apprenticeship_standard_id or p.linked_standard_ids ? v_app.apprenticeship_standard_id)) then raise exception using errcode='PT422',message='Programme/provider no longer match approved employer selection'; end if;
     if v_after.expected_end_date is not null and coalesce(v_after.actual_start_date,v_after.expected_start_date)>=v_after.expected_end_date then raise exception using errcode='PT422',message='End date must follow start date'; end if;
   end if;
@@ -529,3 +541,86 @@ exception when invalid_datetime_format or datetime_field_overflow or check_viola
 end; $$;
 revoke all on function public.levytate_apply_learner_command(uuid,uuid,text,text,text,jsonb,integer,jsonb,jsonb,boolean) from public,anon,authenticated,service_role;
 grant execute on function public.levytate_apply_learner_command(uuid,uuid,text,text,text,jsonb,integer,jsonb,jsonb,boolean) to service_role;
+
+
+-- Handoff uses the same authoritative availability checks as new applications.
+create or replace function public.levytate_start_pre_enrolment(
+  p_organisation_id uuid,p_actor_user_id uuid,p_application_id text,p_expected_revision integer,
+  p_idempotency_key text,p_input jsonb
+) returns jsonb language plpgsql security definer set search_path=pg_catalog,public as $$
+declare
+  v_actor public.levytate_users%rowtype;
+  v_app public.levytate_applications%rowtype;
+  v_record public.levytate_learner_records%rowtype;
+  v_receipt public.levytate_application_command_receipts%rowtype;
+  v_command jsonb:=jsonb_build_object('action','start_pre_enrolment','revision',p_expected_revision,'fields',p_input);
+  v_employee_id text;
+  v_now timestamptz:=clock_timestamp();
+begin
+  if p_organisation_id is null or p_actor_user_id is null or p_application_id is null or p_idempotency_key is null
+    or p_application_id !~ '^[A-Za-z0-9][A-Za-z0-9:_-]{1,127}$'
+    or p_idempotency_key !~ '^[A-Za-z0-9:_-]{8,128}$' or p_expected_revision is null or p_expected_revision<0
+    or jsonb_typeof(p_input) is distinct from 'object' then
+    raise exception using errcode='PT422',message='Invalid pre-enrolment command'; end if;
+  if exists(select 1 from jsonb_object_keys(p_input) k where k not in
+      ('employeeId','programmeId','providerId','employmentRoute','expectedStartDate','expectedEndDate')) then
+    raise exception using errcode='PT422',message='Invalid pre-enrolment command'; end if;
+  if not (p_input ?& array['employeeId','programmeId','providerId','employmentRoute','expectedStartDate','expectedEndDate'])
+    or exists(select 1 from jsonb_each(p_input) f where jsonb_typeof(f.value)<>'string' or length(f.value#>>'{}')>128)
+    or p_input->>'expectedStartDate' !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+    or p_input->>'expectedEndDate' !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' then
+    raise exception using errcode='PT422',message='Pre-enrolment fields have invalid types'; end if;
+  perform pg_advisory_xact_lock(hashtextextended('levytate-catalogue-integrity',0));
+  perform 1 from public.levytate_organisations where slug='levytate-internal' and status='Active' for share;
+  select * into v_actor from public.levytate_users where organisation_id=p_organisation_id and id=p_actor_user_id and active for share;
+  if not found or v_actor.role not in ('Apprenticeship Lead','Employer Admin') then raise exception using errcode='PT403',message='Pre-enrolment requires an active authorised employer account'; end if;
+  perform 1 from public.levytate_organisations where id=p_organisation_id and status='Active' for share;
+  if not found then raise exception using errcode='PT403',message='Workspace is not active'; end if;
+  select employee_id into v_employee_id from public.levytate_applications where organisation_id=p_organisation_id and id=p_application_id;
+  perform 1 from public.levytate_employees where organisation_id=p_organisation_id and id=v_employee_id and status='Active' for update;
+  if not found then raise exception using errcode='PT403',message='Active application employee required'; end if;
+  select * into v_app from public.levytate_applications where organisation_id=p_organisation_id and id=p_application_id for update;
+  select * into v_receipt from public.levytate_application_command_receipts where organisation_id=p_organisation_id and application_id=p_application_id and idempotency_key=p_idempotency_key;
+  if found then
+    if v_receipt.actor_user_id<>p_actor_user_id or v_receipt.command<>v_command then raise exception using errcode='PT409',message='Idempotency key was already used'; end if;
+    return v_receipt.result;
+  end if;
+  if v_app.revision<>p_expected_revision then raise exception using errcode='PT409',message='Application changed; refresh before handoff'; end if;
+  if v_app.status<>'Approved for Enrolment' or v_app.current_owner<>'Provider Partner' or p_input->>'employeeId' is distinct from v_app.employee_id then
+    raise exception using errcode='PT403',message='Final-approved matching application required'; end if;
+  if exists(select 1 from public.levytate_application_workflow_instances where organisation_id=p_organisation_id and application_id=p_application_id and state<>'ready_for_provider') then
+    raise exception using errcode='PT403',message='The pinned approval workflow is not complete'; end if;
+  if not exists (select 1 from public.levytate_organisation_programmes s
+    join public.levytate_provider_programmes p on p.id=s.programme_id and p.provider_id=s.provider_id
+    join public.levytate_organisations catalog on catalog.id=p.organisation_id and catalog.slug='levytate-internal' and catalog.status='Active'
+    join public.levytate_providers provider on provider.organisation_id=p.organisation_id and provider.provider_id=p.provider_id and provider.status='Active' and provider.verification_status='verified' and provider.last_verified is not null and jsonb_array_length(provider.source_urls)>0
+    join public.levytate_organisation_providers r on r.organisation_id=s.organisation_id and r.provider_id=s.provider_id and r.status='Active'
+    where s.organisation_id=p_organisation_id and s.programme_id=p_input->>'programmeId' and s.provider_id=p_input->>'providerId'
+      and s.status='Active' and p.status='Active' and p.record_status='Active'
+      and p.verification_status in ('Verified from provider website','Provider confirmed','LevyTate reviewed')
+      and nullif(btrim(p.source_url),'') is not null and jsonb_array_length(p.linked_standard_ids)>0
+        and not exists(select 1 from jsonb_array_elements_text(p.linked_standard_ids) standard_id where not exists(select 1 from public.levytate_apprenticeship_standards standard where standard.id=standard_id and standard.status='Approved for delivery'))
+        and exists(select 1 from public.levytate_apprenticeship_standards standard where standard.id=v_app.apprenticeship_standard_id and standard.status='Approved for delivery')
+        and (p.linked_standard_id=v_app.apprenticeship_standard_id or p.linked_standard_ids ? v_app.apprenticeship_standard_id)) then
+    raise exception using errcode='PT422',message='Selected programme/provider must match the approved application'; end if;
+  if p_input->>'employmentRoute' not in ('not_confirmed','existing_employee_upskill','recruited_as_apprentice')
+    or nullif(p_input->>'expectedStartDate','') is null or nullif(p_input->>'expectedEndDate','') is null
+    or (p_input->>'expectedEndDate')::date<=(p_input->>'expectedStartDate')::date then
+    raise exception using errcode='PT422',message='Valid employment route and planned dates required'; end if;
+  insert into public.levytate_learner_records(organisation_id,id,employee_id,application_id,programme_id,provider_id,lifecycle_status,employment_route,
+      expected_start_date,expected_end_date,created_by,updated_by,record_status,demonstration_record)
+    values(p_organisation_id,'learner-'||gen_random_uuid(),v_app.employee_id,p_application_id,p_input->>'programmeId',p_input->>'providerId','pre_enrolment',
+      p_input->>'employmentRoute',(p_input->>'expectedStartDate')::date,(p_input->>'expectedEndDate')::date,v_actor.email,v_actor.email,'Active',false) returning * into v_record;
+  insert into public.levytate_learner_lifecycle_events(organisation_id,id,learner_record_id,event_type,previous_status,new_status,event_date,actor_user_id,actor_name,source,summary,metadata)
+    values(p_organisation_id,'event-'||gen_random_uuid(),v_record.id,'learner_record_created','','pre_enrolment',v_now,v_actor.id::text,v_actor.email,
+      'levytate_server','Final-approved application handed to pre-enrolment.',jsonb_build_object('applicationId',p_application_id,'applicationRevision',v_app.revision));
+  insert into public.levytate_audit_events(id,organisation_id,actor_email,actor_role,entity_type,entity_id,action,summary,metadata)
+    values(gen_random_uuid(),p_organisation_id,v_actor.email,v_actor.role,'learner',v_record.id,'learner.pre_enrolment_started','Approved application handed to pre-enrolment.',jsonb_build_object('applicationId',p_application_id,'idempotencyKey',p_idempotency_key));
+  insert into public.levytate_application_command_receipts(organisation_id,application_id,idempotency_key,actor_user_id,command,result)
+    values(p_organisation_id,p_application_id,p_idempotency_key,p_actor_user_id,v_command,to_jsonb(v_record));
+  return to_jsonb(v_record);
+exception when unique_violation then raise exception using errcode='PT409',message='A learner already exists for this application or employee; open the existing record';
+end;
+$$;
+revoke all on function public.levytate_start_pre_enrolment(uuid,uuid,text,integer,text,jsonb) from public,anon,authenticated,service_role;
+grant execute on function public.levytate_start_pre_enrolment(uuid,uuid,text,integer,text,jsonb) to service_role;
