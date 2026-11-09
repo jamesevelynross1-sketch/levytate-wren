@@ -101,7 +101,9 @@ export async function verifyManagerDevelopment({ app: value, mailpit: capture, b
     const start = (actor) => actor.context.request.post(`${app}/api/levytate-learners`, { headers: headers(actor), data: handoff });
     report("own manager cannot bypass the employer handoff role", (await start(applicant)).status() === 403);
     const initiated = await start(lead), initiatedBody = await initiated.json();
-    report("Lead creates a real personal pre-enrolment record", initiated.status() === 201 && initiatedBody.learner?.lifecycleStatus === "pre_enrolment"); learnerId = initiatedBody.learner.id;
+    report("Lead creates a real personal pre-enrolment record", initiated.status() === 201 && initiatedBody.learner?.lifecycleStatus === "pre_enrolment" && typeof initiatedBody.learner.learnerRecordId === "string" && initiatedBody.learner.learnerRecordId.length > 0 && initiatedBody.learner.learner?.id === applicant.user.personId && initiatedBody.learner.programme?.applicationReference === applicationId); learnerId = initiatedBody.learner.learnerRecordId;
+    const handedOff=await backend(`rest/v1/levytate_learner_records?organisation_id=eq.${tenant.id}&application_id=eq.${applicationId}&select=id,employee_id`);
+    report("handoff detail identifier matches the one durable own learner",handedOff.length===1&&handedOff[0].id===learnerId&&handedOff[0].employee_id===applicant.user.personId);
     report("handoff exact retry is durable", (await start(lead)).status() === 201);
     const learnerPath = `${app}/api/levytate-learners/${learnerId}`;
     const detail = async (actor) => { const response = await actor.context.request.get(learnerPath, { headers: headers(actor) }); report(`${actor.user.key} reads the allowed real learner detail`, response.status() === 200); return (await response.json()).learner; };
