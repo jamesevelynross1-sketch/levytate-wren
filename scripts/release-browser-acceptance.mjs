@@ -310,6 +310,11 @@ try {
     const replay = await item.context.request.get(item.consumedLink, { maxRedirects: 0 });
     check(`${key}: consumed magic link cannot replay`, replay.status() >= 300 && replay.status() < 400 && (replay.headers().location ?? "").includes("invalid-link"));
   }
+  if(process.env.RELEASE_DISCOVERY_JOURNEY==="true"){
+    phase="genuine personal programme discovery, saved options and comparison";
+    const{verifyDiscovery}=await import("./release-discovery-browser.mjs");
+    await independentJourney("personal programme discovery",()=>verifyDiscovery({app,manifest,contexts,backend,check}));
+  }
   await independentJourney("connected application and learner workflow",async()=>{
   if (manifest.catalogue&&!peopleUiOnly&&!exportOnly) {
     phase = "separate-role application and enrolment handoff";
