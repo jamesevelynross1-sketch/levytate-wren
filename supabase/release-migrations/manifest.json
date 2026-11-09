@@ -19,6 +19,8 @@
     { "path": "supabase/release-migrations/20261029221818_client_operational_action_integrity.sql", "sha256": "ef0adaf16608441575634909416c80dba984206c7587d3b98da5e9701f4e1d5f" },
     { "path": "supabase/release-migrations/20261109165014_client_admin_atomic_commands.sql", "sha256": "3d1a0fa63e34077b6b28d7249c6dc95e3f3c46ac044a28ebbdc82c173c74d5bb" },
     { "path": "supabase/release-migrations/20261109165018_client_private_history_integrity.sql", "sha256": "ea8c6ff565ce4fac0cb81a4632f8e2ff241aada8e119427cda1a1c624fe5e573" },
-    { "path": "supabase/release-migrations/20261109165542_client_invitation_atomic_attempts.sql", "sha256": "e79ac762ee3b63fa15aa0902f278456cc5b5e9c98d1580474541bcb180888632" }
+    { "path": "supabase/release-migrations/20261109165542_client_invitation_atomic_attempts.sql", "sha256": "e79ac762ee3b63fa15aa0902f278456cc5b5e9c98d1580474541bcb180888632" },
+    { "path": "supabase/release-migrations/20261109171755_client_offboarding_controls.sql", "sha256": "db1224635e2e3f2c12e15c32999d99cf23fd03802be7aee6da17755b4451bed0" },
+    { "path": "supabase/release-migrations/20261109175443_tenant_storage_lifecycle_boundary.sql", "sha256": "bbb3a2f1f2ce89b84ccecb53fddde0014baec945aea633a06dc1b97dc062032d" }
   ]
 }
