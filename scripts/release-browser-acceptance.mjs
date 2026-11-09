@@ -443,6 +443,11 @@ try {
     const {verifyRetainedAccountSwitch}=await import("./release-account-browser.mjs");
     await verifyRetainedAccountSwitch({app,mailpit,manifest,contexts,backend,waitForCapturedLink,check});
   }
+  if(process.env.RELEASE_EMPLOYEE_RECOVERY_JOURNEY==="true"){
+    phase="genuine Employee malformed-response and expired-session recovery";
+    const{verifyEmployeeRecovery}=await import("./release-employee-recovery-browser.mjs");
+    await independentJourney("Employee retained application recovery",()=>verifyEmployeeRecovery({app,mailpit,manifest,contexts,backend,waitForCapturedLink,check}));
+  }
   }
   if(lifecycleOnly||process.env.RELEASE_LIFECYCLE_JOURNEY==="true"){
     phase="genuine independent Platform Admin lifecycle journey";
