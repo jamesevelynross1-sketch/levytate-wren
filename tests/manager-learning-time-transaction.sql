@@ -99,16 +99,23 @@ begin
  update public.levytate_learner_records set actual_end_date=null where organisation_id=org and id='otj-learner';
  begin perform public.levytate_assert_learning_time_period(org,'otj-learner',(version->>'id')::uuid,current_date-4);raise exception 'Unknown terminal date allowed';exception when sqlstate 'PT422' then null;end;
  if public.levytate_apply_learning_time_command(org,emp,'save_activity',input,'{}',true)<>replayed then raise exception 'Lost-response probe changed after lifecycle transition';end if;
- -- Resolve uniqueness before a committed receipt is returned.
- insert into public.levytate_employees(organisation_id,id,employee_number,name,email,job_title,department,platform_role,status,start_date) values(org,'otj-duplicate','OTJ2','Fictional duplicate',' EMPLOYEE-OTJ@example.invalid ','Synthetic engineer','Synthetic','Employee','Active','2025-01-01');
- begin perform public.levytate_apply_learning_time_command(org,emp,'save_activity',input,'{}',true);raise exception 'Ambiguous manager receipt exposed';exception when sqlstate 'PT403' then null;end;
- delete from public.levytate_employees where organisation_id=org and id='otj-duplicate';
+ -- The current schema prevents normalized duplicates before they can affect
+ -- identity resolution; retain that constraint rather than constructing an
+ -- impossible fixture by disabling it. The service unit suite covers malformed
+ -- ambiguous transport as an additional fail-closed boundary.
+ begin
+  insert into public.levytate_employees(organisation_id,id,employee_number,name,email,job_title,department,platform_role,status,start_date) values(org,'otj-duplicate','OTJ2','Fictional duplicate',' EMPLOYEE-OTJ@example.invalid ','Synthetic engineer','Synthetic','Employee','Active','2025-01-01');
+  raise exception 'Normalized duplicate manager identity allowed';
+ exception when unique_violation then null;end;
+ update public.levytate_employees set status='Archived' where organisation_id=org and id='otj-employee';
+ begin perform public.levytate_apply_learning_time_command(org,emp,'save_activity',input,'{}',true);raise exception 'Archived manager receipt exposed';exception when sqlstate 'PT403' then null;end;
+ update public.levytate_employees set status='Active' where organisation_id=org and id='otj-employee';
  update public.levytate_users set active=false where id=emp;
  begin perform public.levytate_apply_learning_time_command(org,emp,'save_activity',input,'{}',true);raise exception 'Revoked manager receipt exposed';exception when sqlstate 'PT403' then null;end;
  update public.levytate_users set active=true,role='Apprenticeship Lead' where id=emp;
  begin perform public.levytate_apply_learning_time_command(org,emp,'save_activity',input,'{}',true);raise exception 'Changed role receipt exposed';exception when sqlstate 'PT403' then null;end;
  update public.levytate_users set role='Line Manager' where id=emp;
- raise notice 'PASS: ambiguous, revoked and changed-role receipts are denied';
+ raise notice 'PASS: duplicate identity and archived, revoked and changed-role receipts are denied';
 
  update public.levytate_users set email='different-employee@example.invalid' where id=emp;
  begin perform public.levytate_apply_learning_time_command(org,emp,'save_activity',input,'{}',true);raise exception 'Reassigned receipt leaked';exception when sqlstate 'PT403' then null;end;

@@ -31,7 +31,7 @@ beforeEach(() => {
   source.select.mockImplementation(async (_config, table: string, query: URLSearchParams) => {
     if (table === "levytate_organisations") return [{ id: "catalogue" }];
     if (table === "levytate_employees") return source.people;
-    if (table === "levytate_learner_records") return filtered(filtered([learner("manager"), learner("report"), learner("unrelated")], query, "employee_id"), query, "id");
+    if (table === "levytate_learner_records") return filtered(filtered([learner("report"), learner("manager"), learner("unrelated")], query, "employee_id"), query, "id");
     if (table === "levytate_otj_plans") return filtered(["manager", "report", "unrelated"].map(id => ({ id: `${id}-plan`, learner_record_id: `${id}-learner`, status: "published", current_published_version_id: `${id}-version` })), query, "learner_record_id");
     if (table === "levytate_otj_plan_versions") return filtered(filtered(["manager", "report", "unrelated"].map(version), query, "plan_id"), query, "id");
     if (table === "levytate_otj_activities") return filtered(activities, query, "learner_record_id");
@@ -85,5 +85,10 @@ describe("manager own Learning Time service and rendered permissions (fictional 
     source.rpc.mockResolvedValue({ id: "own-private-draft", status: "submitted" });
     await submitLearningTimeActivity(session, { idempotencyKey: "manager-own-submit", activityId: "own-private-draft", lockVersion: 0 });
     expect(JSON.parse(source.rpc.mock.calls[0][2].body)).toMatchObject({ p_actor_user_id: "manager-user", p_action: "submit_activity" });
+  });
+  it("does not use manager visibility to write a report's draft", async () => {
+    await expect(saveLearningTimeActivity(session, { idempotencyKey: "manager-report-save", learnerRecordId: "report-learner", activityDate: "2026-11-08", startedAt: "09:00", endedAt: "10:00", breakMinutes: 0, category: "provider_workshop", title: "Fictional", description: "Fictional", whatWasNew: "New", standardRelevance: "Relevant", reflection: "Synthetic", workingHoursBasis: "within_normal_working_hours", separateFromProductiveWork: true })).rejects.toMatchObject({ status: 404 });
+    expect(source.rpc).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(source.rpc.mock.calls[0][2].body)).toMatchObject({ p_probe: true });
   });
 });

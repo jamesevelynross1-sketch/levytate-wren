@@ -176,7 +176,7 @@ export async function getLearningTimeWorkspace(session: LevyTateBetaSession): Pr
       attention,
       lastActivityDate: learnerActivities.find((activity) => activity.status !== "draft")?.activityDate ?? null,
     }];
-  });
+  }).sort((left, right) => Number(right.canCreateActivities) - Number(left.canCreateActivities));
 
   return {
     generatedAt: new Date().toISOString(),
