@@ -164,6 +164,8 @@ export function EmployeesModule({ onStartDiscovery, onOpenDirectReport, initialE
   function openEmployee(employee?: MvpEmployee) {
     if (saving) return;
     setError("");
+    // Replace the detail dialog, so its focus trap cannot cover the editor.
+    setSelectedEmployeeId(null);
     const next = employee ? { ...employee } : blankEmployee();
     setDraft(next);
     setDraftRevision(meta?.mutationRevisions?.[`levytate_employees:${next.id}`] ?? 0);

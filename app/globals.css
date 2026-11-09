@@ -414,8 +414,26 @@ a {
     color: #0f2527 !important;
   }
 
-  body * {
+  body.assessment-report-printing *,
+  body.employer-intelligence-printing *,
+  body:has(.opportunity-review-report) * {
     visibility: hidden !important;
+  }
+
+  .levytate-workspace {
+    min-height: 0 !important;
+    background: #ffffff !important;
+  }
+
+  .levytate-workspace > header,
+  .levytate-workspace aside,
+  .levytate-workspace button,
+  .levytate-workspace [role="dialog"] {
+    display: none !important;
+  }
+
+  .levytate-workspace > div {
+    display: block !important;
   }
 
   body.assessment-report-printing > *:not(.assessment-campaign-report) {
@@ -527,11 +545,17 @@ a {
   }
 
   .employer-intelligence-report .print-break {
-    break-before: page;
+    break-before: auto;
+  }
+
+  .employer-intelligence-report h2,
+  .employer-intelligence-report h3 {
+    break-after: avoid;
   }
 
   .employer-intelligence-report li {
     margin-bottom: 2.5mm;
+    break-inside: avoid;
   }
 
   .opportunity-review-report h1,
