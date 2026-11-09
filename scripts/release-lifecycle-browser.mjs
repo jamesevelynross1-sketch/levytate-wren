@@ -82,6 +82,7 @@ export async function verifyLifecycle({ app: value, mailpit: mailValue, browser,
       const response = await context.request.get(`${app}/api/levytate-workspace`, { headers: headers(actor) }), payload = await response.json();
       report(`${user.key} resolves its distinct canonical role and tenant`, response.status() === 200 && payload.workspace?.meta?.userRole === user.role && payload.workspace.meta.organisationId === user.organisationId);
       await page.reload(); report(`${user.key} survives a browser refresh`, (await context.request.get(`${app}/api/levytate-workspace`, { headers: headers(actor) })).status() === 200);
+      report(`${user.key} refreshes its real provider session`, (await context.request.post(`${app}/api/levytate-auth/session`, { headers: headers(actor) })).status() === 200);
     }
     const a = actors.get("admin-a"), b = actors.get("admin-b"), member = actors.get("member");
     const initialMailCount = await fixtureMailCount();
