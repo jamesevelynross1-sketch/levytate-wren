@@ -670,8 +670,15 @@ export const confirmEmployeeEligibility = (...args: Parameters<typeof confirmEmp
 
 async function confirmEmployeeEligibilityPlan(session: LevyTateBetaSession, learnerId: string, input: EmployeeDeclarationInput) {
   const context = await contextForSession(session);
-  if (context.user.role !== "Employee") throw new LevyTateLearnerLifecyclePermissionError("Only the employee may make their own declaration.");
+  if (context.user.role !== "Employee" && context.user.role !== "Line Manager") throw new LevyTateLearnerLifecyclePermissionError("Only the employee may make their own declaration.");
   const learner = await getScopedLearnerRecord(context, learnerId, "read");
+  // A manager may read reports, but a personal declaration is always their own.
+  const employee = await selectOne<EmployeeRow>(employeesTable, new URLSearchParams({
+    organisation_id: `eq.${context.organisation.id}`, id: `eq.${learner.employeeId}`, status: "eq.Active", select: "*", limit: "1",
+  }));
+  if (!employee || employee.email.trim().toLowerCase() !== context.user.email.trim().toLowerCase()) {
+    throw new LevyTateLearnerLifecyclePermissionError("Only the employee may make their own declaration.");
+  }
   if (learner.lifecycleStatus !== "pre_enrolment" || input.confirmed !== true) throw new LevyTateLearnerLifecycleValidationError("Confirm your declaration during pre-enrolment.");
   const collections = await loadLearnerLifecycleCollectionsForRecord(session, learnerId);
   const current = collections.eligibilityDeclarations[0] ?? null;
@@ -723,7 +730,7 @@ async function atomicLifecycle<T extends object>(action: string, args: [LevyTate
     return (result.kind === "detail" ? learner : { ...(result.value as object), learner }) as T;
   }
   async function reconcile() {
-    if (context.user.role === "Employee") return;
+    if (context.user.role === "Employee" || action === "employee_declaration") return;
     try { await synchroniseLearnerOperationalActions(session, learnerId); }
     catch { throw new LearnerTransactionError("Learner evidence is saved, but its operational queue has not refreshed. Retry the same request to complete recovery without duplicating evidence.", 503); }
   }
