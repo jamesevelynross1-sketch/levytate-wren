@@ -161,6 +161,11 @@ try {
   }
   const failureWrites=failureBudgetWritesSince(failureBudgetStartedAt);
   if(failureWrites!==null)check(`${contexts.size} genuine successful callbacks do not consume failed-link budget`,failureWrites===0);
+  if(process.env.RELEASE_ACCOUNT_JOURNEY==="true"){
+    phase="genuine account preparation and lost-response retry";
+    const {verifyAccountPreparation}=await import("./release-account-browser.mjs");
+    await verifyAccountPreparation({app,manifest,contexts,backend,check});
+  }
   if(process.env.RELEASE_OPERATIONS_JOURNEY==="true"){
     phase="real operations read/write boundary";
     const lead=contexts.get("a:lead"),path=`${app}/api/levytate-operations`;
@@ -383,6 +388,11 @@ try {
   await backend(`rest/v1/levytate_users?id=eq.${manager.user.membershipId}`, "PATCH", { active: false });
   check("revoked Manager blocked on next authenticated API request", [401, 403].includes((await manager.context.request.get(`${app}/api/levytate-workspace`)).status()));
   check("revocation leaves second tenant unaffected", (await contexts.get("b:manager").context.request.get(`${app}/api/levytate-workspace`)).status() === 200);
+  }
+  if(process.env.RELEASE_ACCOUNT_JOURNEY==="true"){
+    phase="retained account form after genuine account switch";
+    const {verifyRetainedAccountSwitch}=await import("./release-account-browser.mjs");
+    await verifyRetainedAccountSwitch({app,mailpit,manifest,contexts,backend,waitForCapturedLink,check});
   }
   for (const { context, user, tenant } of contexts.values()) {
     const logout = await context.request.post(`${app}/api/levytate-beta-logout`, { headers: { Origin: app }, maxRedirects: 0 });
