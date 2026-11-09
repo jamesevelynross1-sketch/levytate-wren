@@ -4,9 +4,10 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ProviderCatalogueRecord, ProviderProgramme, RequestStatus } from "@/lib/levytate/domain";
 import type { LevyTateWorkspaceBootstrap, LevyTateWorkspaceMeta, LevyTateWorkspaceMutation } from "@/lib/levytate/mvp/api";
 import { hasMvpPermission, mvpMutationPermission, permissionsForMvpRole, type MvpPermission } from "@/lib/levytate/mvp/rbac";
-import { authenticatedClientFetch } from "@/lib/levytate/client-session";
+import { authenticatedClientFetch, type ClientIdentity } from "@/lib/levytate/client-session";
 import { levyTateEmployerSignInPath } from "@/lib/levytate/hosts";
 import { workspaceMutationEntity } from "@/lib/levytate/mvp/mutation-revisions";
+import { createApplicationReceiptRecovery, decodeWorkspaceResponse } from "@/lib/levytate/mvp/workspace-response";
 import {
   activeApplicationStatuses,
   applicationOwnerForStatus,
@@ -73,6 +74,10 @@ type WorkspaceResponse = {
   message?: string;
   code?: string;
 };
+
+function responseMessage(value: WorkspaceResponse | null, fallback: string) {
+  return typeof value?.message === "string" && value.message.trim() ? value.message : fallback;
+}
 
 const MvpWorkspaceContext = createContext<MvpWorkspaceStore | null>(null);
 
@@ -175,6 +180,9 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
   const [data, setData] = useState<MvpWorkspaceData>(initialWorkspace?.data ?? createEmptyMvpWorkspace());
   const [meta, setMeta] = useState<LevyTateWorkspaceMeta | null>(initialWorkspace?.meta ?? null);
   const [hydrated, setHydrated] = useState(Boolean(initialWorkspace));
+  const identity = useRef<ClientIdentity | null>(initialWorkspace?.meta.storageMode === "supabase"
+    ? { email: initialWorkspace.meta.userEmail, organisationId: initialWorkspace.meta.organisationId } : null);
+  const [applicationRecovery] = useState(createApplicationReceiptRecovery);
   const mutationQueue = useRef(Promise.resolve());
   const [recoveryMessage, setRecoveryMessage] = useState("");
   const [recovering, setRecovering] = useState(false);
@@ -189,16 +197,17 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
 
     async function load() {
       try {
-        const response = await authenticatedClientFetch("/api/levytate-workspace");
+        const response = await authenticatedClientFetch("/api/levytate-workspace", {}, identity.current ?? undefined);
         const payload = (await response.json()) as WorkspaceResponse;
+        const workspace = response.ok ? decodeWorkspaceResponse(payload, identity.current) : null;
 
-        if (!cancelled && response.ok && payload.workspace) {
-          setData(payload.workspace.data);
-          setMeta(payload.workspace.meta);
-          if (persistLocal && payload.workspace.meta.storageMode === "local_fallback") persistLocalWorkspace(payload.workspace.data);
+        if (!cancelled && workspace) {
+          identity.current ??= { email: workspace.meta.userEmail, organisationId: workspace.meta.organisationId };
+          setData(workspace.data);
+          setMeta(workspace.meta);
         }
 
-        if (!cancelled && (!response.ok || !payload.workspace)) {
+        if (!cancelled && !workspace) {
           const local = persistLocal ? readLocalWorkspace() : createEmptyMvpWorkspace();
           setData(local);
           if (!persistLocal) setRecoveryMessage(response.status === 401 ? "Your session has ended. Sign in in a new tab, then reconnect here. Any open forms stay in this tab." : "LevyTate could not load the workspace. Reconnect when the service is available.");
@@ -209,7 +218,7 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
             userRole: "Employee",
             permissions: [],
             storageMode: persistLocal ? "local_fallback" : "supabase",
-            warnings: [payload.message ?? "LevyTate workspace persistence is unavailable."],
+            warnings: [responseMessage(payload, "LevyTate workspace persistence is unavailable.")],
           });
         }
       } catch {
@@ -248,32 +257,41 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
 
 
   const syncMutation = useCallback((mutation: LevyTateWorkspaceMutation): Promise<WorkspaceMutationResult> => {
+    // Freeze nested values before waiting behind another write. A queued form
+    // edit must not change the command whose outcome its caller is awaiting.
+    const body = JSON.stringify(mutation);
+    const sentMutation = JSON.parse(body) as LevyTateWorkspaceMutation;
     const run = mutationQueue.current.then(async (): Promise<WorkspaceMutationResult> => {
       if (meta?.storageMode !== "supabase") return { ok: false, message: "This workspace is not connected to persistent storage." };
+      const expected = identity.current;
+      if (!expected) return { ok: false, message: "Reconnect to confirm this workspace before saving. Your input has been kept." };
 
       try {
+        applicationRecovery.remember(sentMutation);
         const response = await authenticatedClientFetch("/api/levytate-workspace", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "X-LevyTate-Account": meta.userEmail,
+              "X-LevyTate-Account": expected.email,
             },
-            body: JSON.stringify(mutation),
-          }, { email: meta.userEmail, organisationId: meta.organisationId });
+            body,
+          }, expected);
 
         const payload = (await response.json()) as WorkspaceResponse;
-        if (!response.ok || !payload.workspace) {
-          const message = payload.message ?? "LevyTate could not confirm the latest save. Your information is still in this form; please retry.";
+        if (!response.ok) {
+          const message = responseMessage(payload, "LevyTate could not confirm the latest save. Your information is still in this form; please retry.");
           setMeta((current) => appendWarning(current, message));
           if (response.status === 401) setRecoveryMessage("Your session has ended. Sign in in a new tab, then reconnect here. Your open forms have been kept.");
-          if (payload.code === "account_changed") setRecoveryMessage(message);
+          if (payload?.code === "account_changed") setRecoveryMessage(message);
           return { ok: false, message };
         }
 
-        setData(payload.workspace.data);
-        setMeta(payload.workspace.meta);
+        const workspace = decodeWorkspaceResponse(payload, expected);
+        setData(workspace.data);
+        setMeta(workspace.meta);
+        applicationRecovery.confirm(sentMutation);
         setRecoveryMessage("");
-        return { ok: true, workspace: payload.workspace };
+        return { ok: true, workspace };
       } catch {
         const message = "LevyTate could not confirm the latest save. Your information is still in this form; please retry.";
         setMeta((current) => appendWarning(current, message));
@@ -282,22 +300,21 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
     });
     mutationQueue.current = run.then(() => undefined, () => undefined);
     return run;
-  }, [meta?.storageMode, meta?.userEmail, meta?.organisationId]);
+  }, [meta?.storageMode, applicationRecovery]);
 
   const reconnect = useCallback(async () => {
     if (recovering) return;
     setRecovering(true);
     try {
-      const response = await authenticatedClientFetch("/api/levytate-workspace");
+      const response = await authenticatedClientFetch("/api/levytate-workspace", {}, identity.current ?? undefined);
       const payload = await response.json() as WorkspaceResponse;
-      if (!response.ok || !payload.workspace) { setRecoveryMessage(payload.message || "The workspace is still unavailable. Your open forms have been kept."); return; }
-      if (meta?.userEmail && (payload.workspace.meta.userEmail !== meta.userEmail || payload.workspace.meta.organisationId !== meta.organisationId)) {
-        setRecoveryMessage("A different account is signed in. Reload the page to switch accounts; do not submit this account's open forms."); return;
-      }
-      setData(payload.workspace.data); setMeta(payload.workspace.meta); setRecoveryMessage("");
+      if (!response.ok) { setRecoveryMessage(responseMessage(payload, "The workspace is still unavailable. Your open forms have been kept.")); return; }
+      const workspace = decodeWorkspaceResponse(payload, identity.current);
+      identity.current ??= { email: workspace.meta.userEmail, organisationId: workspace.meta.organisationId };
+      setData(workspace.data); setMeta(workspace.meta); setRecoveryMessage("");
     } catch { setRecoveryMessage("The workspace is still unavailable. Your open forms have been kept."); }
     finally { setRecovering(false); }
-  }, [recovering, meta?.userEmail, meta?.organisationId]);
+  }, [recovering]);
 
   const commitMutation = useCallback(async (mutation: LevyTateWorkspaceMutation, alreadyOptimistic = false): Promise<WorkspaceMutationResult> => {
     const entityKey = workspaceMutationEntity(mutation, meta?.organisationId ?? "");
@@ -313,6 +330,7 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
     }
 
     if (mutation.type === "saveApplication") {
+      const recoveringExactCommand = applicationRecovery.matches(mutation);
       const activeStatuses = activeApplicationStatuses();
       const anotherActiveApplication = data.applications.some((application) =>
         application.employeeId === mutation.application.employeeId &&
@@ -321,7 +339,7 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
         activeStatuses.includes(mutation.application.status)
       );
 
-      if (anotherActiveApplication) {
+      if (anotherActiveApplication && !recoveringExactCommand) {
         setMeta((current) => appendWarning(current, "This employee already has an active apprenticeship application."));
         return { ok: false, message: "This employee already has an active apprenticeship application." };
       }
@@ -336,7 +354,7 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
           return { ok: false, message: "Employees can save drafts or submit applications to their line manager only." };
         }
 
-        if (existing && !employeeEditableStatuses.includes(existing.status)) {
+        if (existing && !employeeEditableStatuses.includes(existing.status) && !recoveringExactCommand) {
           setMeta((current) => appendWarning(current, "Submitted applications cannot be edited unless more information has been requested."));
           return { ok: false, message: "Submitted applications cannot be edited unless more information has been requested." };
         }
@@ -353,7 +371,7 @@ export function MvpWorkspaceProvider({ children, initialWorkspace, persistLocal 
     }
 
     return syncMutation(mutation);
-  }, [data.applications, syncMutation, meta, persistLocal, recoveryMessage]);
+  }, [data.applications, syncMutation, meta, persistLocal, recoveryMessage, applicationRecovery]);
 
   const value = useMemo<MvpWorkspaceStore>(() => ({
     data,
