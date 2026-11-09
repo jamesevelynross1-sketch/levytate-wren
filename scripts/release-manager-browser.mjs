@@ -8,10 +8,10 @@ import { assertManagerManifest } from "./release-manager-fixtures.mjs";
 import { localUrl } from "./release-local-fixtures.mjs";
 const workspacePath = "/api/levytate-workspace";
 const questions = ["Why are you interested in this programme?", "How could it help your current role or future development?", "What support will you need from your manager?"];
-export async function verifyManagerDevelopment({ app: value, mailpit: capture, browser, manifest, extension, backend, waitForCapturedLink, check, challengeApplicant }) {
+export async function verifyManagerDevelopment({ app: value, mailpit: capture, browser, manifest, extension, backend, waitForCapturedLink, check, challengeApplicant, existingContexts }) {
   const app = localUrl(value, "manager journey app"), mailpit = localUrl(capture, "manager journey capture"), plan = assertManagerManifest(extension, manifest, true);
   const tenant = manifest.tenants.find((item) => item.key === "a"), other = manifest.tenants.find((item) => item.key === "b");
-  const actors = [], report = (label, condition) => check(`Manager development: ${label}`, condition);
+  const actors = [], ownedContexts = new Set(), report = (label, condition) => check(`Manager development: ${label}`, condition);
   const headers = (actor) => ({ Origin: app, "X-LevyTate-Account": actor.user.email, "X-LevyTate-Organisation": tenant.id });
   const workspace = async (actor) => { const response = await actor.context.request.get(`${app}${workspacePath}`, { headers: headers(actor) }); report(`${actor.user.key} reads current canonical workspace`, response.status() === 200); return (await response.json()).workspace; };
   const post = (actor, data) => actor.context.request.post(`${app}${workspacePath}`, { headers: headers(actor), data });
@@ -26,7 +26,18 @@ export async function verifyManagerDevelopment({ app: value, mailpit: capture, b
     report("reviewed superior is the current distinct manager", reviewerRow?.status === "Active" && reviewerRow.manager_id === plan.users[0].personId);
     const users = [tenant.users.find((user) => user.key === "manager"), plan.users[0], tenant.users.find((user) => user.key === "lead")];
     for (const user of users) {
+      const existing = user.key === "reviewer" ? undefined : existingContexts?.get(`a:${user.key}`);
+      if (existing) {
+        report(`${user.key} context belongs to the same bounded genuine run`, existing.user?.membershipId === user.membershipId && existing.user.personId === user.personId && existing.user.email === user.email && existing.user.role === user.role && existing.tenant?.id === tenant.id && new URL(existing.page.url()).origin === app);
+        const actor = { context: existing.context, page: existing.page, user, tenant }; actors.push(actor);
+        const member = (await backend(`rest/v1/levytate_users?id=eq.${user.membershipId}&select=id,organisation_id,email,role,active,auth_binding_status,auth_subject`))[0];
+        report(`${user.key} still has the exact active bound membership`, member?.id === user.membershipId && member.organisation_id === tenant.id && member.email === user.email && member.role === user.role && member.active === true && member.auth_binding_status === "bound" && typeof member.auth_subject === "string" && (user.key !== "manager" || member.auth_subject === plan.source.membership.auth_subject));
+        const actual = await workspace(actor);
+        report(`${user.key} existing real session freshly resolves the expected account and tenant`, actual.meta?.userRole === user.role && actual.meta.organisationId === tenant.id && actual.meta.userEmail === user.email && (user.key !== "manager" || actual.data.employees.some((person) => person.id === user.personId && person.email === user.email)));
+        continue;
+      }
       const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, timezoneId: "UTC" }), page = await context.newPage();
+      ownedContexts.add(context);
       page.setDefaultTimeout(20000); const actor = { context, page, user, tenant }; actors.push(actor);
       await page.goto(`${app}/levytate/login`); const after = Date.now();
       await page.getByLabel("Work email", { exact: true }).fill(user.email);
@@ -128,12 +139,13 @@ export async function verifyManagerDevelopment({ app: value, mailpit: capture, b
     report("own recorded journey renders enrolled status", await applicant.page.getByText("enrolled", { exact: true }).count() > 0);
     report("own application is durably Completed", (await workspace(applicant)).data.applications.some((item) => item.id === applicationId && item.status === "Completed"));
     report("second employer organisation remains unchanged", JSON.stringify(beforeOther) === JSON.stringify(await backend(`rest/v1/levytate_organisations?id=eq.${other.id}&select=id,status,updated_at`)));
-    return { fixtureRun: plan.run, applicationId, learnerId, result: "PASS", authentication: "three distinct public requests, local SMTP, application callbacks", adversarialChallenge: Boolean(challengeApplicant) };
+    return { fixtureRun: plan.run, applicationId, learnerId, result: "PASS", authentication: "distinct genuine public sign-in sessions; any existing contexts freshly verified within the same bounded run", newSignIns: ownedContexts.size, adversarialChallenge: Boolean(challengeApplicant) };
   } catch (error) {
     if (error.message === "BLOCKED: natural authentication rate budget not yet available") throw error;
     throw new Error(`Manager browser acceptance failed during ${phase}; private authentication state omitted`);
   } finally {
     for (const actor of actors) {
+      if (!ownedContexts.has(actor.context)) continue; // The orchestrator owns reused contexts and their final logout.
       try { await actor.context.request.post(`${app}/api/levytate-beta-logout`, { headers: headers(actor), maxRedirects: 0, timeout: 10000 }); } catch { /* No authentication state in diagnostics. */ }
       try { await actor.context.close(); } catch { /* Preserve the safe acceptance error. */ }
     }
