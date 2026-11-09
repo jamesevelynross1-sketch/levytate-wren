@@ -19,13 +19,15 @@ async function downloadJson(download) {
     return JSON.parse(Buffer.concat(chunks).toString("utf8"));
   } finally { await download.delete(); }
 }
-export async function verifyLifecycle({ app: value, mailpit: mailValue, browser, manifest, extension, backend, waitForCapturedLink, check, resumeSuspended = false, verifyBlankWorkspace = false, resumeBlankWorkspaceId = null }) {
+export async function verifyLifecycle({ app: value, mailpit: mailValue, browser, manifest, extension, backend, waitForCapturedLink, check, resumeSuspended = false, verifyBlankWorkspace = false, resumeBlankWorkspaceId = null, verifyReinvitedMemberSession = false }) {
   const app = localUrl(value, "lifecycle app"), mailpit = localUrl(mailValue, "lifecycle capture");
   if (typeof resumeSuspended !== "boolean" || typeof verifyBlankWorkspace !== "boolean") throw new Error("Explicit local lifecycle options required");
   if (resumeBlankWorkspaceId !== null && (!resumeSuspended || !verifyBlankWorkspace || typeof resumeBlankWorkspaceId !== "string" || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(resumeBlankWorkspaceId))) throw new Error("An explicit reviewed blank-workspace UUID is required for continuation");
+  if (typeof verifyReinvitedMemberSession !== "boolean" || (verifyReinvitedMemberSession && !resumeSuspended)) throw new Error("Explicit suspended continuation required for the new invitation journey");
   const plan = assertLifecycleManifest(extension, manifest.run, true), actors = new Map();
   let phase = "normal sign-in";
-  let blankWorkspace;
+  let blankWorkspace, renewedReactivationId;
+  let intentionalEmailCount = 0, renewedSessionChecked = false;
   const report = (label, condition) => check(`Lifecycle: ${label}`, condition);
   const headers = (actor) => ({ Origin: app, "X-LevyTate-Account": actor.user.email, "X-LevyTate-Organisation": actor.user.organisationId });
   const post = (actor, data) => actor.context.request.post(`${app}${endpoint}`, { headers: headers(actor), data });
@@ -188,6 +190,54 @@ export async function verifyLifecycle({ app: value, mailpit: mailValue, browser,
     const revoked = (await backend(`rest/v1/levytate_users?id=eq.${memberUser.membershipId}&select=active,auth_subject,auth_binding_status,invitation_status`))[0];
     report("reactivation does not restore old access or invitation credentials", revoked?.active === false && revoked.auth_subject === null && revoked.auth_binding_status === "pending" && revoked.invitation_status === "revoked");
     if (member) report("old genuine session remains denied after reactivation", (await member.context.request.get(`${app}/api/levytate-workspace`)).status() === 401);
+    if (verifyReinvitedMemberSession) {
+      phase = "genuine new invitation after controlled reactivation";
+      const originalAuth = await backend(`auth/v1/admin/users/${memberUser.authSubject}`);
+      report("reinvitation retains the existing exact fictional Auth identity", originalAuth.id === memberUser.authSubject && originalAuth.email === memberUser.email);
+      const current = (await backend(`rest/v1/levytate_users?id=eq.${memberUser.membershipId}&select=invitation_generation,active,auth_subject,invitation_status`))[0];
+      report("new invitation starts from current revoked generation", Number.isSafeInteger(current?.invitation_generation) && current.invitation_generation > 0 && current.active === false && current.auth_subject === null && current.invitation_status === "revoked");
+      await reload(a);
+      const employer = a.page.locator("article").filter({ hasText: plan.target.name }).filter({ has: a.page.getByRole("button", { name: "Suspend employer", exact: true }) });
+      report("one existing target account is offered a new invitation", await employer.getByRole("button", { name: "Send new invitation", exact: true }).count() === 1);
+      const sentAt = Date.now(), invited = a.page.waitForResponse((item) => new URL(item.url()).pathname === "/api/levytate-platform/workspaces" && item.request().method() === "POST" && item.request().postDataJSON()?.action === "invite_user");
+      await employer.getByRole("button", { name: "Send new invitation", exact: true }).click();
+      const invitedResponse = await invited, invitation = await invitedResponse.json(), inviteCommand = invitedResponse.request().postDataJSON();
+      report("real Admin UI requests exactly the current owned invitation generation", invitedResponse.status() === 200 && inviteCommand.userId === memberUser.membershipId && inviteCommand.expectedGeneration === current.invitation_generation && invitation.user?.invitationStatus === "accepted" && invitation.user.invitationGeneration === current.invitation_generation + 1);
+      intentionalEmailCount++;
+      const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, timezoneId: "UTC" }), page = await context.newPage();
+      page.setDefaultTimeout(20000); const renewed = { context, page, user: memberUser }; actors.set("renewed-member", renewed);
+      await page.goto(await waitForCapturedLink(mailpit, memberUser.email, app, sentAt));
+      report("newly invited member redeems the real application callback", new URL(page.url()).origin === app && new URL(page.url()).pathname.includes("/app"));
+      const cookies = (await context.cookies()).filter((cookie) => /^levytate_(beta_session|auth_access|auth_refresh)$/.test(cookie.name));
+      report("renewed member has genuine host-only HttpOnly cookies", cookies.length === 3 && cookies.every((cookie) => cookie.httpOnly && cookie.domain === new URL(app).hostname && cookie.path === "/"));
+      const workspace = await context.request.get(`${app}/api/levytate-workspace`), own = await workspace.json();
+      report("renewed invitation binds the original Lead and employer", workspace.status() === 200 && own.workspace?.meta?.userEmail === memberUser.email && own.workspace.meta.organisationId === plan.target.id && own.workspace.meta.userRole === memberUser.role);
+      report("renewed member refreshes the real provider session", (await context.request.post(`${app}/api/levytate-auth/session`, { headers: headers(renewed) })).status() === 200);
+      const rebound = (await backend(`rest/v1/levytate_users?id=eq.${memberUser.membershipId}&select=auth_subject,active,auth_binding_status`))[0];
+      report("new invitation restores only the explicitly invited existing identity", rebound?.active === true && rebound.auth_subject === memberUser.authSubject && rebound.auth_binding_status === "bound");
+      phase = "fresh-session suspension and independent reactivation";
+      await suspend(a);
+      report("freshly invited member session is denied by ordinary suspension", (await context.request.get(`${app}/api/levytate-workspace`)).status() === 401);
+      await a.page.getByRole("button", { name: "Request reactivation", exact: true }).click();
+      const secondDraft = a.page.getByRole("dialog");
+      await secondDraft.getByRole("combobox", { name: "Suspended employer", exact: true }).selectOption(plan.target.id);
+      for (const label of ["Approved reactivation reference", "Approved client notice reference", "Support handover reference", "Recovery boundary reference"]) await secondDraft.getByLabel(label, { exact: true }).fill(`synthetic-renewed-session-${plan.run}`);
+      const secondRequest = a.page.waitForResponse((item) => new URL(item.url()).pathname === endpoint && item.request().method() === "POST" && item.request().postDataJSON()?.action === "request_reactivation"), secondDownload = a.page.waitForEvent("download");
+      await secondDraft.getByRole("button", { name: "Record request", exact: true }).click();
+      const secondResponse = await secondRequest; renewedReactivationId = secondResponse.request().postDataJSON().reactivationId;
+      report("second ordinary reactivation records a distinct durable request", secondResponse.status() === 200 && renewedReactivationId !== reactivationId); await (await secondDownload).delete();
+      await reload(b);
+      const secondApproval = b.page.locator("article").filter({ hasText: plan.target.name }).filter({ has: b.page.getByRole("button", { name: "Independently approve", exact: true }) });
+      await secondApproval.getByRole("button", { name: "Independently approve", exact: true }).click();
+      await b.page.getByRole("dialog").getByLabel("Approved reactivation reference", { exact: true }).fill(`synthetic-renewed-independent-${plan.run}`);
+      const secondApproved = b.page.waitForResponse((item) => new URL(item.url()).pathname === endpoint && item.request().method() === "POST" && item.request().postDataJSON()?.action === "approve_reactivation"), secondApprovedDownload = b.page.waitForEvent("download");
+      await b.page.getByRole("button", { name: "Approve controlled reactivation", exact: true }).click();
+      report("a separate genuine administrator approves the second reactivation", (await secondApproved).status() === 200); await (await secondApprovedDownload).delete();
+      report("second approved reactivation is durably Active", (await backend(`rest/v1/levytate_organisations?id=eq.${plan.target.id}&select=status`))[0]?.status === "Active");
+      report("the retained genuine member session stays denied after reactivation", (await context.request.get(`${app}/api/levytate-workspace`)).status() === 401);
+      report("provider refresh cannot revive access after reactivation", (await context.request.post(`${app}/api/levytate-auth/session`, { headers: headers(renewed) })).status() === 401);
+      renewedSessionChecked = true;
+    }
     phase = "structured disposal request";
     await suspend(a);
     const keys = generateKeyPairSync("rsa", { modulusLength: 3072 });
@@ -240,10 +290,10 @@ export async function verifyLifecycle({ app: value, mailpit: mailValue, browser,
     report("exclusive target Auth identity is removed through provider API", removed);
     report("other employer remains unchanged", JSON.stringify(initialOther) === JSON.stringify(await backend(`rest/v1/levytate_organisations?id=eq.${manifest.tenants[1].id}&select=id,status,updated_at`)));
     report("deleted organisation cannot be reactivated", [403,404,409].includes((await post(a, { action: "request_reactivation", requestId: randomUUID(), reactivationId: randomUUID(), organisationId: plan.target.id, approvalReference: `synthetic-terminal-${plan.run}`, clientNoticeReference: "synthetic-notice", supportHandoverReference: "synthetic-support", recoveryBoundaryReference: "synthetic-terminal" })).status()));
-    report("lifecycle operations deliver no additional email", await fixtureMailCount() === initialMailCount);
+    report("lifecycle capture contains only explicitly requested fictional invitation email", await fixtureMailCount() === initialMailCount + intentionalEmailCount);
     phase = "administrator logout";
     for (const actor of [a,b]) { await actor.context.request.post(`${app}/api/levytate-beta-logout`, { headers: headers(actor), maxRedirects: 0 }); report(`${actor.user.key} logout ends its real session`, (await actor.context.request.get(`${app}/api/levytate-workspace`)).status() === 401); }
-    return { fixtureRun: plan.run, caseId, reactivationId, result: resumeSuspended ? "PARTIAL" : "PASS", scope: resumeSuspended ? "Continuation from previously verified suspension; no tenant reset" : "Full lifecycle journey", missingMandatoryChecks: resumeSuspended ? ["Old member browser session after reactivation: prior context closed; no session fabricated"] : [], blankWorkspace, authentication: "public request, local signed Auth email hook, SMTP capture, application callback", physicalStorageInspection: "separate native backend inspection required" };
+    return { fixtureRun: plan.run, caseId, reactivationId, renewedReactivationId, result: resumeSuspended && !renewedSessionChecked ? "PARTIAL" : "PASS", scope: renewedSessionChecked ? "Continuation, explicit reinvitation and a second ordinary suspension/reactivation with a retained genuine session; no reset" : resumeSuspended ? "Continuation from previously verified suspension; no tenant reset" : "Full lifecycle journey", missingMandatoryChecks: resumeSuspended && !renewedSessionChecked ? ["Old member browser session after reactivation: prior context closed; no session fabricated"] : [], blankWorkspace, authentication: "public request, local signed Auth email hook, SMTP capture, application callback", physicalStorageInspection: "separate native backend inspection required" };
   } catch (error) {
     if (error.message === "BLOCKED: natural authentication rate budget not yet available") throw error;
     throw new Error(`Lifecycle browser acceptance failed during ${phase}; private authentication state omitted`);
