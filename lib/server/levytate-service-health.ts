@@ -3,7 +3,7 @@ import "server-only";
 import { isInternalBetaLoginEnabled } from "@/lib/levytate/config/beta-access";
 import { levyTateAiEnabled } from "@/lib/levytate/ai/openai";
 import { getCurrentEarlyAccessTermsDocument } from "@/lib/server/levytate-early-access-terms";
-import { rateLimitKey } from "@/lib/server/levytate-auth-rate-limit";
+import { decodeAuthRateLimitResult, isValidAuthResetInstant, rateLimitKey } from "@/lib/server/levytate-auth-rate-limit";
 import { getLevyTateRateLimitEnvironment } from "@/lib/server/levytate-auth-rate-limit-config";
 import { getLevyTateSupabaseConfig, readRuntimeEnv, supabaseFetchJson, supabaseSelect } from "@/lib/server/levytate-supabase";
 import { createReadinessCache, evaluateReadinessChecks, ServiceHealthTimeoutError } from "@/lib/levytate/service-health-contract";
@@ -156,7 +156,7 @@ export function createSupabaseHealthAdapter(): HealthCheckAdapter {
             p_event_type: "health_readiness_rate_limited",
           }),
         });
-        if (rows[0]?.allowed !== true || !Number.isInteger(rows[0].request_count)) throw new Error("dependency");
+        if (!decodeAuthRateLimitResult(rows, 10_000).allowed) throw new Error("dependency");
         return;
       }
       if (input.kind === "auth-callback-budget") {
@@ -164,14 +164,23 @@ export function createSupabaseHealthAdapter(): HealthCheckAdapter {
           method: "POST", signal: controller.signal,
           body: JSON.stringify({ p_environment_namespace: getLevyTateRateLimitEnvironment(), p_key_hash: rateLimitKey("health_probe", "required-callback-budget-operation") }),
         });
-        if (!Array.isArray(rows) || rows.length !== 1 || rows[0].allowed !== true || !Number.isFinite(Date.parse(rows[0].reset_at))) throw new Error("dependency");
+        if (!Array.isArray(rows) || rows.length !== 1 || rows[0]?.allowed !== true || !isValidAuthResetInstant(rows[0].reset_at)) throw new Error("dependency");
         return;
       }
       if (input.kind === "auth-provider") {
         const response = await fetch(`${config.url}/auth/v1/health`, {
-          headers: { apikey: config.serviceRoleKey, Accept: "application/json" }, cache: "no-store", signal: controller.signal,
+          headers: { apikey: config.serviceRoleKey, Accept: "application/json" }, cache: "no-store", redirect: "error", signal: controller.signal,
         });
         if (!response.ok) throw new Error("dependency");
+        await response.body?.cancel();
+        // A live Auth process can still have email authentication disabled.
+        // Read public settings; never send a synthetic email from a health probe.
+        const settingsResponse = await fetch(`${config.url}/auth/v1/settings`, {
+          headers: { apikey: config.serviceRoleKey, Accept: "application/json" }, cache: "no-store", redirect: "error", signal: controller.signal,
+        });
+        if (!settingsResponse.ok) throw new Error("dependency");
+        const settings = await readBoundedJson(settingsResponse, 16 * 1024) as { external?: { email?: unknown }; disable_signup?: unknown } | null;
+        if (settings?.external?.email !== true || settings.disable_signup !== true) throw new Error("dependency");
         return;
       }
       const query = new URLSearchParams({ select: input.column, limit: "1" });

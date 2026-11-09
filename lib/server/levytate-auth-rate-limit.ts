@@ -8,7 +8,7 @@ type RateLimitCheck = { action: string; actorKey: string; route: string; eventTy
 
 // Accept PostgreSQL JSON timestamps and RFC 3339 without accepting Date.parse's
 // numeric shorthand, implicit local timezone or invalid-day rollover.
-function validResetInstant(value: unknown): value is string {
+export function isValidAuthResetInstant(value: unknown): value is string {
   if (typeof value !== "string") return false;
   const match = /^(\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])[T ](?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d{1,6})?(?:Z|[+-](?:[01]\d|2[0-3])(?::?[0-5]\d)?)$/.exec(value);
   if (!match || !Number.isFinite(Date.parse(value))) return false;
@@ -20,6 +20,16 @@ function validResetInstant(value: unknown): value is string {
 
 export class LevyTateRateLimitStoreError extends Error {
   constructor() { super("Authentication security controls are temporarily unavailable."); this.name = "LevyTateRateLimitStoreError"; }
+}
+
+export function decodeAuthRateLimitResult(value: unknown, limit: number): RateLimitResult {
+  if (!Array.isArray(value) || value.length !== 1 || !value[0] || typeof value[0] !== "object") throw new LevyTateRateLimitStoreError();
+  const row = value[0] as RateLimitResult;
+  if (typeof row.allowed !== "boolean" || !Number.isSafeInteger(row.request_count) || row.request_count < 1 || row.request_count > limit + 1
+    || row.allowed !== (row.request_count <= limit)
+    || !Number.isSafeInteger(row.remaining) || row.remaining !== Math.max(limit - row.request_count, 0)
+    || !isValidAuthResetInstant(row.reset_at)) throw new LevyTateRateLimitStoreError();
+  return row;
 }
 
 export async function checkMagicLinkRequestLimits(request: Request, email: string) {
@@ -50,7 +60,7 @@ export async function checkCallbackAttemptLimit(request: Request) {
     const rows = await supabaseFetchJson<Array<{ allowed: boolean; reset_at: string }>>(config, "rpc/levytate_check_auth_callback_failures", {
       method: "POST", body: JSON.stringify({ p_environment_namespace: getLevyTateRateLimitEnvironment(), p_key_hash: networkRateLimitKey(request) }),
     });
-    if (!Array.isArray(rows) || rows.length !== 1 || !rows[0] || typeof rows[0].allowed !== "boolean" || !validResetInstant(rows[0].reset_at)) throw new LevyTateRateLimitStoreError();
+    if (!Array.isArray(rows) || rows.length !== 1 || !rows[0] || typeof rows[0].allowed !== "boolean" || !isValidAuthResetInstant(rows[0].reset_at)) throw new LevyTateRateLimitStoreError();
     return { allowed: rows[0].allowed, resetAt: rows[0].reset_at };
   } catch { throw new LevyTateRateLimitStoreError(); }
 }
@@ -185,14 +195,7 @@ async function consumeWithRetry(item: RateLimitCheck) {
           p_event_type: item.eventType,
         }),
       });
-      if (!Array.isArray(rows) || rows.length !== 1 || !rows[0] || typeof rows[0].allowed !== "boolean"
-        || !Number.isSafeInteger(rows[0].request_count) || rows[0].request_count < 1 || rows[0].request_count > item.rule.limit + 1
-        || rows[0].allowed !== (rows[0].request_count <= item.rule.limit)
-        || !Number.isSafeInteger(rows[0].remaining) || rows[0].remaining !== Math.max(item.rule.limit - rows[0].request_count, 0)
-        || !validResetInstant(rows[0].reset_at)) {
-        throw new LevyTateRateLimitStoreError();
-      }
-      return rows[0];
+      return decodeAuthRateLimitResult(rows, item.rule.limit);
     } catch (error) {
       failure = error;
     }

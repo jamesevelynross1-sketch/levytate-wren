@@ -188,7 +188,7 @@ describe("authentication rate-limit readiness probe", () => {
 
   it("uses a bounded health-only bucket rather than a normal user bucket", async () => {
     stubRequiredEnvironment();
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify([{ allowed: true, request_count: 1 }]), {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify([{ allowed: true, request_count: 1, remaining: 9999, reset_at: checkedAt }]), {
       status: 200,
       headers: { "content-type": "application/json" },
     }));
@@ -214,6 +214,30 @@ describe("authentication rate-limit readiness probe", () => {
     });
     expect(body.p_key_hash).toMatch(/^[a-f0-9]{64}$/);
     expect(JSON.stringify(body)).not.toMatch(/email|network|callback|session_refresh/i);
+  });
+  it.each([
+    { external: { email: false }, disable_signup: true },
+    { external: { email: true }, disable_signup: false },
+    { external: { email: "true" }, disable_signup: true }, null, {},
+  ])("does not mistake a live Auth process for safe individual login settings", async (settings) => {
+    stubRequiredEnvironment();
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => url.endsWith("/health") ? Response.json({ version: "synthetic" }) : Response.json(settings)));
+    await expect(createSupabaseHealthAdapter()({ key: "auth-provider", kind: "auth-provider", label: "Individual authentication service", timeoutMs: 50 })).rejects.toThrow();
+  });
+  it("checks live email capability and invitation-only access without sending email", async () => {
+    stubRequiredEnvironment();
+    const transport = vi.fn(async (url: string) => url.endsWith("/health") ? Response.json({ version: "synthetic" }) : Response.json({ external: { email: true }, disable_signup: true }));
+    vi.stubGlobal("fetch", transport);
+    await createSupabaseHealthAdapter()({ key: "auth-provider", kind: "auth-provider", label: "Individual authentication service", timeoutMs: 50 });
+    expect(transport.mock.calls.map(([url]) => new URL(url).pathname)).toEqual(["/auth/v1/health", "/auth/v1/settings"]);
+  });
+  it.each([
+    [{ allowed: true, request_count: 10001, remaining: 0, reset_at: checkedAt }],
+    [{ allowed: true, request_count: 1, remaining: 9999, reset_at: "0" }],
+    [{ allowed: true, request_count: 1, remaining: 9999, reset_at: checkedAt }, { allowed: true }],
+  ].map((rows) => ({ rows })))("fails readiness on contradictory or ambiguous security operation results", async ({ rows }) => {
+    stubRequiredEnvironment(); vi.stubGlobal("fetch", vi.fn(async () => Response.json(rows)));
+    await expect(createSupabaseHealthAdapter()({ key: "rate-limit-operation", kind: "auth-rate-limit", label: "Authentication rate-limit operation", timeoutMs: 50 })).rejects.toThrow();
   });
 });
 
