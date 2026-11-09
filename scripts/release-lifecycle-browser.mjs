@@ -6,6 +6,7 @@
 import { createHash, randomUUID, generateKeyPairSync, privateDecrypt, constants, createDecipheriv } from "node:crypto";
 import { assertLifecycleManifest } from "./release-lifecycle-fixtures.mjs";
 import { localUrl } from "./release-local-fixtures.mjs";
+import { readLocalMailpitCapture } from "./release-mailpit-capture.mjs";
 const endpoint = "/api/levytate-platform/offboarding";
 const classes = ["Identity and access", "People", "Applications", "Learner records", "Finance", "Programmes and providers", "Uploaded files", "Assessments", "Lift", "Private support", "Audit evidence"];
 const hash = (value) => createHash("sha256").update(value).digest("hex");
@@ -29,7 +30,7 @@ export async function verifyLifecycle({ app: value, mailpit: mailValue, browser,
   const headers = (actor) => ({ Origin: app, "X-LevyTate-Account": actor.user.email, "X-LevyTate-Organisation": actor.user.organisationId });
   const post = (actor, data) => actor.context.request.post(`${app}${endpoint}`, { headers: headers(actor), data });
   const read = async (actor) => { const response = await actor.context.request.get(`${app}${endpoint}`, { headers: headers(actor) }); if (response.status() !== 200) throw new Error("Lifecycle state unavailable"); return response.json(); };
-  const fixtureMailCount = async () => { const list = await fetch(`${mailpit}/api/v1/messages`).then((response) => response.json()); return (list.messages ?? []).filter((item) => item.To?.some((to) => plan.users.some((user) => user.email === to.Address))).length; };
+  const fixtureMailCount = async () => { const list = await readLocalMailpitCapture(mailpit); return list.messages.filter((item) => item.To.some((to) => plan.users.some((user) => user.email === to.Address))).length; };
   async function reload(actor) {
     await actor.page.goto(`${app}/levytate/app?module=Home`);
     await actor.page.getByRole("heading", { name: "Employer workspace support", exact: true }).waitFor();
@@ -111,7 +112,7 @@ export async function verifyLifecycle({ app: value, mailpit: mailValue, browser,
         report("new blank employer fixture does not exist already", existing.length === 0);
         beforeAuth = await backend("auth/v1/admin/users?page=1&per_page=1000");
         report("bounded Auth observation covers the local identity directory", Array.isArray(beforeAuth.users) && beforeAuth.users.length < 1000 && beforeAuth.users.every((user) => user.email !== email));
-        mailBefore = await fetch(`${mailpit}/api/v1/messages`).then((response) => response.json());
+        mailBefore = await readLocalMailpitCapture(mailpit);
         report("local email observation has an exact message count", Number.isSafeInteger(mailBefore.total) && Array.isArray(mailBefore.messages));
         await reload(a); await a.page.getByRole("button", { name: "Create employer", exact: true }).click();
         const dialog = a.page.getByRole("dialog");
@@ -130,7 +131,7 @@ export async function verifyLifecycle({ app: value, mailpit: mailValue, browser,
       for (const table of ["levytate_employees", "levytate_employee_development_profiles", "levytate_roles", "levytate_applications", "levytate_enrolments", "levytate_learner_records", "levytate_organisation_providers", "levytate_organisation_programmes", "levytate_finance_imports", "levytate_finance_transactions", "levytate_finance_balances"]) {
         report(`blank employer has no seeded ${table.replace("levytate_", "")} records`, (await backend(`rest/v1/${table}?organisation_id=eq.${workspaceId}&select=organisation_id&limit=1`)).length === 0);
       }
-      const afterAuth = await backend("auth/v1/admin/users?page=1&per_page=1000"), mailAfter = await fetch(`${mailpit}/api/v1/messages`).then((response) => response.json());
+      const afterAuth = await backend("auth/v1/admin/users?page=1&per_page=1000"), mailAfter = await readLocalMailpitCapture(mailpit);
       if (resumeBlankWorkspaceId) {
         report("existing pending Lead has no Auth identity in the complete present directory", Array.isArray(afterAuth.users) && afterAuth.users.length < 1000 && afterAuth.users.every((user) => user.email !== email));
         report("existing pending Lead has no message in the complete present capture", Array.isArray(mailAfter.messages) && mailAfter.total === mailAfter.messages.length && !mailAfter.messages.some((item) => item.To?.some((to) => to.Address === email)));
