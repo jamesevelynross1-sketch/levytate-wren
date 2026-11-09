@@ -69,6 +69,8 @@ export async function prepareLifecycleFixtures({ runtime, approvedSha256 }) {
     return result.stdout.trim();
   }
   try {
+    if (sql("select count(*) from supabase_migrations.schema_migrations where version in ('20261109175443','20261109175830');") !== "2") throw new Error("Reviewed Storage boundary and reactivation migrations are required before fixtures");
+    sql("select public.levytate_offboarding_assert_inventory();");
     if (sql(`select count(*) from public.levytate_organisations where id in (${quote(plan.operator.id)},${quote(plan.target.id)});`) !== "0") throw new Error("Lifecycle target is not empty");
     plan.stage = "preparing"; persist();
     for (const user of plan.users) {
