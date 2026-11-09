@@ -1,13 +1,17 @@
 "use client";
 
 import { ArrowRight, BarChart3, CalendarClock, CheckCircle2, Download, Info, Printer, RefreshCw, ShieldCheck, TriangleAlert } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { EmployerExecutiveReport } from "@/components/levytate-mvp/EmployerExecutiveReport";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { formatGbp } from "@/lib/levytate/finance/calculations";
 import { buildEmployerExecutiveReportContract } from "@/lib/levytate/intelligence/executive-report";
 import type { EmployerIntelligenceResponse, IntelligencePriority, WorkforceIntelligenceReport } from "@/lib/levytate/intelligence/types";
+import { authenticatedClientFetch } from "@/lib/levytate/client-session";
+import { decodeEvidenceDownload } from "@/lib/levytate/client-module-responses";
+import { usePinnedClientMutation } from "@/components/levytate-mvp/usePinnedClientMutation";
+import { ClientMutationRecovery } from "@/components/levytate-mvp/ClientMutationRecovery";
 
 type View = "overview" | "workforce";
 
@@ -17,30 +21,29 @@ const button = "inline-flex min-h-11 items-center justify-center gap-2 rounded-x
 
 export function EmployerInsightsModule({ view }: { view: View }) {
   const { meta } = useMvpWorkspace();
+  const identity = useRef(meta ? { email: meta.userEmail, organisationId: meta.organisationId } : null);
+  const mutation = usePinnedClientMutation(identity.current, "/api/levytate-employer-insights/export", (value) => decodeEvidenceDownload(value, identity.current?.organisationId), (response) => response.text());
   const [data, setData] = useState<EmployerIntelligenceResponse | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [selectedCampaignId, setSelectedCampaignId] = useState("");
   const [printing, setPrinting] = useState(false);
-  const [exporting, setExporting] = useState(false);
+  const exporting = mutation.working;
   const [exportError, setExportError] = useState("");
 
   async function downloadEvidence() {
-    if (exporting) return;
-    setExporting(true); setExportError("");
+    if (mutation.locked) return;
+    setExportError("");
     try {
-      const response = await fetch("/api/levytate-employer-insights/export", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}", cache: "no-store" });
-      if (!response.ok) {
-        const payload = await response.json() as { message?: string };
-        throw new Error(payload.message || "Evidence export could not be prepared.");
-      }
-      const url = URL.createObjectURL(await response.blob());
-      const anchor = document.createElement("a");
-      anchor.href = url; anchor.download = "levytate-employer-evidence-v1.json";
-      document.body.appendChild(anchor); anchor.click(); anchor.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      await mutation.execute({}, (text) => {
+        const url = URL.createObjectURL(new Blob([text], { type: "application/json; charset=utf-8" }));
+        const anchor = document.createElement("a");
+        anchor.href = url; anchor.download = "levytate-employer-evidence-v1.json";
+        document.body.appendChild(anchor); anchor.click(); anchor.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+        setExportError("");
+      });
     } catch (failure) { setExportError(failure instanceof Error ? failure.message : "Evidence export could not be prepared."); }
-    finally { setExporting(false); }
   }
 
   async function load() {
@@ -48,9 +51,9 @@ export function EmployerInsightsModule({ view }: { view: View }) {
     setError("");
     setData(null);
     try {
-      const response = await fetch("/api/levytate-employer-insights", { cache: "no-store" });
+      const response = await authenticatedClientFetch("/api/levytate-employer-insights", {}, identity.current ?? undefined);
       const payload = await response.json() as { intelligence?: EmployerIntelligenceResponse; message?: string };
-      if (!response.ok || !payload.intelligence) throw new Error(payload.message || "Employer intelligence could not be loaded.");
+      if (!response.ok || !payload.intelligence || payload.intelligence.organisation.id !== identity.current?.organisationId) throw new Error(payload.message || "Employer intelligence could not be loaded for this account. Reload to reconnect.");
       setData(payload.intelligence);
       setSelectedCampaignId((current) => current && payload.intelligence!.workforce.reports.some((item) => item.campaignId === current) ? current : payload.intelligence!.workforce.reports[0]?.campaignId ?? "");
     } catch (loadError) {
@@ -74,7 +77,7 @@ export function EmployerInsightsModule({ view }: { view: View }) {
   if (error || !data) return <ErrorState message={error || "Employer intelligence is unavailable."} onRetry={() => void load()} />;
   const selected = data.workforce.reports.find((item) => item.campaignId === selectedCampaignId) ?? data.workforce.reports[0] ?? null;
 
-  return <div className="space-y-5" data-testid={`employer-insights-${view}`}>
+  return <div className="space-y-4"><ClientMutationRecovery mutation={mutation}/><fieldset disabled={mutation.locked} className="min-w-0 border-0 p-0"><div className="space-y-5" data-testid={`employer-insights-${view}`}>
     <section className={`${panel} overflow-hidden`}>
       <div className="border-b border-[#102c3d]/[0.07] bg-[linear-gradient(135deg,#102c3d_0%,#173e4d_60%,#0f6f68_120%)] px-5 py-6 text-white sm:px-7">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -108,7 +111,7 @@ export function EmployerInsightsModule({ view }: { view: View }) {
 
     <Definitions intelligence={data} />
     {printing ? <ExecutivePrintReport intelligence={data} campaign={selected} /> : null}
-  </div>;
+  </div></fieldset></div>;
 }
 
 function Overview({ intelligence, selectedCampaign }: { intelligence: EmployerIntelligenceResponse; selectedCampaign: WorkforceIntelligenceReport | null }) {

@@ -4,7 +4,8 @@ type Fetcher = typeof authenticatedClientFetch;
 
 /** One retained command per mounted form owner. Memory only; never browser storage. */
 export function createPinnedClientMutation<T>(identity: ClientIdentity | null, path: string,
-  decode: (value: unknown) => T, fetcher: Fetcher = authenticatedClientFetch) {
+  decode: (value: unknown) => T, fetcher: Fetcher = authenticatedClientFetch,
+  readResponse: (response: Response) => Promise<unknown> = (response) => response.json()) {
   const expected = identity ? { ...identity } : null;
   let pending: { body: string; confirmed?: (value: T) => void } | null = null;
   let busy = false;
@@ -21,12 +22,12 @@ export function createPinnedClientMutation<T>(identity: ClientIdentity | null, p
         method: "POST", headers: { "Content-Type": "application/json", "X-LevyTate-Account": expected.email },
         body: attempt.body, signal: AbortSignal.timeout(30_000),
       }, expected);
-      const result: unknown = await response.json().catch(() => null);
       if (!response.ok) {
+        const result: unknown = await response.json().catch(() => null);
         const message = result && typeof result === "object" && "message" in result && typeof result.message === "string" ? result.message : null;
         throw new Error(response.status === 401 ? "Your session has ended. Sign in again before retrying." : message || "The update could not be confirmed.");
       }
-      value = decode(result);
+      value = decode(await readResponse(response));
     } finally { busy = false; }
     // Only a valid success clears the original body/key. A callback failure must
     // not turn a confirmed durable command back into an uncertain mutation.

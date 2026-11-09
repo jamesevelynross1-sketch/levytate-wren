@@ -4,8 +4,8 @@ import { useCallback, useState } from "react";
 import type { ClientIdentity } from "@/lib/levytate/client-session";
 import { createPinnedClientMutation } from "@/lib/levytate/client-mutation-retry";
 
-export function usePinnedClientMutation<T>(identity: ClientIdentity | null, path: string, decode: (value: unknown) => T) {
-  const [controller] = useState(() => createPinnedClientMutation(identity, path, decode));
+export function usePinnedClientMutation<T>(identity: ClientIdentity | null, path: string, decode: (value: unknown) => T, readResponse?: (response: Response) => Promise<unknown>) {
+  const [controller] = useState(() => createPinnedClientMutation(identity, path, decode, undefined, readResponse));
   const [working, setWorking] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");

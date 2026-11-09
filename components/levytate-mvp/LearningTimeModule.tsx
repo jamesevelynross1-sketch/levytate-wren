@@ -1,5 +1,11 @@
 "use client";
 
+import { authenticatedClientFetch } from "@/lib/levytate/client-session";
+import { decodeLearningTimeMutationResponse } from "@/lib/levytate/client-module-responses";
+import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
+import { usePinnedClientMutation } from "@/components/levytate-mvp/usePinnedClientMutation";
+import { ClientMutationRecovery } from "@/components/levytate-mvp/ClientMutationRecovery";
+
 import { AlertCircle, CheckCircle2, LoaderCircle, Plus, Send, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import type {
@@ -48,16 +54,19 @@ export function LearningTimeModule() {
   const [workspace, setWorkspace] = useState<LearningTimeWorkspace | null>(null);
   const [selectedLearnerId, setSelectedLearnerId] = useState("");
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
+  const [needsReadback, setNeedsReadback] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const pendingKeys = useRef(new Map<string,string>());
-  const inFlight = useRef(false);
+  const { meta } = useMvpWorkspace();
+  const identity = useRef(meta ? { email: meta.userEmail, organisationId: meta.organisationId } : null);
+  const mutation = usePinnedClientMutation(identity.current, "/api/levytate-learning-time", (value) => decodeLearningTimeMutationResponse(value, identity.current?.organisationId));
+  const executeMutation = mutation.execute;
+  const busy = mutation.working || needsReadback || loading;
 
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try {
-      const response = await fetch("/api/levytate-learning-time", { cache: "no-store" });
+      const response = await authenticatedClientFetch("/api/levytate-learning-time", {}, identity.current ?? undefined);
       const payload = await response.json() as LearningTimeWorkspace & { message?: string };
       if (!response.ok) throw new Error(payload.message || "Learning Time is unavailable.");
       setWorkspace(payload);
@@ -74,32 +83,26 @@ export function LearningTimeModule() {
   const selectedLearner = useMemo(() => workspace?.learners.find((entry) => entry.learnerRecordId === selectedLearnerId) ?? workspace?.learners[0] ?? null, [selectedLearnerId, workspace]);
 
   const act = useCallback(async (body: JsonRecord, success: string) => {
-    if (inFlight.current) return false;
-    inFlight.current=true;
-    setBusy(true); setError(""); setNotice("");
+    setError(""); setNotice("");
     try {
       const fields = Object.fromEntries(Object.entries(body).filter(([key]) => key!=="idempotencyKey"));
-      const fingerprint=JSON.stringify(fields);
-      const idempotencyKey=pendingKeys.current.get(fingerprint) ?? clientKey("learning-time");
-      pendingKeys.current.set(fingerprint,idempotencyKey);
-      const response = await fetch("/api/levytate-learning-time", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({...fields,idempotencyKey}) });
-      const payload = await response.json() as { message?: string };
-      if (!response.ok) throw new Error(payload.message || "The Learning Time action could not be completed.");
-      setNotice(success);
-      if (!await load()) return false;
-      pendingKeys.current.delete(fingerprint);
+      await executeMutation({ ...fields, idempotencyKey: clientKey("learning-time") }, () => {
+        setNotice(success); setNeedsReadback(true);
+        // A confirmed command is never resent because its subsequent read failed.
+        void load().then((loaded) => setNeedsReadback(!loaded));
+      });
       return true;
     } catch (actionError) {
       setError(actionError instanceof Error ? actionError.message : "The Learning Time action could not be completed.");
       return false;
-    } finally { setBusy(false);inFlight.current=false; }
-  }, [load]);
+    }
+  }, [executeMutation, load]);
 
   if (loading && !workspace) return <LoadState />;
   if (error && !workspace) return <MessageState title="Learning Time is unavailable" copy={error} tone="error" onRetry={() => void load()} />;
   if (!workspace) return null;
 
-  return <div className="grid gap-5">
+  return <div className="grid gap-4"><ClientMutationRecovery mutation={mutation}/>{needsReadback ? <section role="status" className="rounded-xl bg-[#fffaf0] p-4 text-sm"><p>The update was saved. Waiting for the current workspace before another change.</p><button type="button" onClick={() => window.location.reload()} className={secondaryButton}>Reload saved state</button></section> : null}<fieldset disabled={mutation.locked || busy} key={mutation.reconciled} className="min-w-0 border-0 p-0"><div className="grid gap-5">
     <section className="rounded-[1.75rem] border border-[#102c3d]/[0.08] bg-[linear-gradient(135deg,#102c3d,#17475a)] p-6 text-white shadow-[0_18px_44px_rgba(16,44,61,0.12)] sm:p-8">
       <div className="flex flex-wrap items-start justify-between gap-5">
         <div><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#86d8ce]">Off-the-job training</p><h2 className="mt-2 text-2xl font-semibold tracking-[-0.025em]">Learning Time</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-white/65">Plan, prepare and review attributable learning evidence without confusing candidate records with provider-confirmed time.</p></div>
@@ -125,7 +128,7 @@ export function LearningTimeModule() {
       {selectedLearner && !workspace.canCreateActivities && !workspace.canManagePlans ? <ManagerLearningTime learner={selectedLearner} /> : null}
     </>}
     <p className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f6f9f7] px-4 py-3 text-xs leading-5 text-[#102c3d]/55">{workspace.regulatoryNotice}</p>
-  </div>;
+  </div></fieldset></div>;
 }
 
 function EmployeeLearningTime({ learner, busy, act }: { learner: LearningTimeLearnerView; busy: boolean; act: (body: JsonRecord, success: string) => Promise<boolean> }) {
@@ -247,6 +250,8 @@ function PlanForm({ learner, busy, act }: { learner: LearningTimeLearnerView; bu
 }
 
 function OffTheJobAssistant({ learner, onCreateDraft }: { learner: LearningTimeLearnerView; onCreateDraft?: (draft: AssistantPreparedDraft) => void }) {
+  const { meta } = useMvpWorkspace();
+  const identity = useRef(meta ? { email: meta.userEmail, organisationId: meta.organisationId } : null);
   const [mode, setMode] = useState<AssistantMode>("eligibility_check");
   const [prompt, setPrompt] = useState("");
   const [result, setResult] = useState<LearningTimeAssistantResponse | null>(null);
@@ -262,11 +267,12 @@ function OffTheJobAssistant({ learner, onCreateDraft }: { learner: LearningTimeL
     if (!clean) return;
     setBusy(true); setError("");
     try {
-      const response = await fetch("/api/levytate-learning-time/assistant", {
+      if (!identity.current) throw new Error("Reload to confirm the signed-in account before asking.");
+      const response = await authenticatedClientFetch("/api/levytate-learning-time/assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ learnerRecordId: learner.learnerRecordId, mode, prompt: clean, conversationState: result?.conversationState, answer }),
-      });
+      }, identity.current);
       const body = await response.json() as LearningTimeAssistantResponse & { message?: string };
       if (!response.ok) throw new Error(body.message || "The assistant is unavailable.");
       setResult(body);
@@ -312,7 +318,7 @@ function OffTheJobAssistant({ learner, onCreateDraft }: { learner: LearningTimeL
     result.conversationState.separateFromProductiveWork !== null,
   ].filter(Boolean).length : 0;
 
-  return <Section title="Off-the-Job Assistant"><div className="grid gap-4">
+  return <Section title="Off-the-Job Assistant"><fieldset disabled={busy} className="min-w-0 border-0 p-0"><div className="grid gap-4">
     <fieldset className="min-w-0">
       <legend className="text-xs font-semibold text-[#102c3d]/65">How can LevyTate help?</legend>
       <div className="mt-2 grid min-w-0 gap-2 sm:grid-cols-3 lg:grid-cols-1 2xl:grid-cols-3">
@@ -353,7 +359,7 @@ function OffTheJobAssistant({ learner, onCreateDraft }: { learner: LearningTimeL
       {draft.evidenceToCapture.length ? <div className="mt-4"><p className="text-xs font-semibold text-[#102c3d]/65">Evidence to retain</p><ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-[#102c3d]/60">{draft.evidenceToCapture.map((item) => <li key={item}>{item}</li>)}</ul></div> : null}
       {onCreateDraft ? <button type="button" onClick={prepareActivity} className={`${primaryButton} mt-4`}>Create draft activity</button> : null}
     </div> : null}
-  </div></Section>;
+  </div></fieldset></Section>;
 }
 
 function Priorities({ learner }: { learner: LearningTimeLearnerView }) { return <Section title="Learning priorities">{learner.priorities.length ? <div className="grid gap-2">{learner.priorities.map((priority) => <div key={priority.id} className="rounded-xl bg-[#f6f9f7] p-3"><p className="text-sm font-semibold">{priority.label}</p><p className="mt-1 text-xs leading-5 text-[#102c3d]/55">{priority.description}</p>{priority.ksbReferences.length ? <p className="mt-2 text-[10px] font-semibold text-[#0b8075]">{priority.ksbReferences.join(" · ")}</p> : null}</div>)}</div> : <p className="text-sm text-[#102c3d]/55">No current learning priorities have been recorded.</p>}</Section>; }

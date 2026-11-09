@@ -5,6 +5,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { LiftActionInput, LiftWorkspaceResponse } from "@/lib/levytate/lift/api";
 import { liftCapabilityLabels, liftWorkflowGroupLabels, type LiftAnswerMap, type LiftDecisionOption, type LiftOpportunity, type LiftWorkflowGroup, type LiftWorkspace } from "@/lib/levytate/lift/domain";
 import { calculateLiftCapacityValue } from "@/lib/levytate/lift/value";
+import { authenticatedClientFetch, type ClientIdentity } from "@/lib/levytate/client-session";
+import { decodeLiftMutationResponse } from "@/lib/levytate/client-module-responses";
+import { usePinnedClientMutation } from "@/components/levytate-mvp/usePinnedClientMutation";
+import { ClientMutationRecovery } from "@/components/levytate-mvp/ClientMutationRecovery";
 
 const panel = "rounded-2xl border border-[#102c3d]/[0.08] bg-white shadow-[0_14px_40px_rgba(16,44,61,0.055)]";
 const button = "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#102c3d] px-4 text-sm font-semibold text-white transition hover:bg-[#183f50] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/25 disabled:opacity-50";
@@ -13,19 +17,21 @@ const field = "w-full rounded-xl border border-[#102c3d]/15 bg-white px-3 py-3 t
 
 type LeaderView = "Opportunity" | "Decisions" | "Proof" | "Participation" | "Historical";
 
-export function LiftModule({ initialWorkspace = null, initialLeaderView = "Opportunity" }: { initialWorkspace?: LiftWorkspace | null; initialLeaderView?: LeaderView }) {
+export function LiftModule({ initialWorkspace = null, initialLeaderView = "Opportunity", identity = null }: { initialWorkspace?: LiftWorkspace | null; initialLeaderView?: LeaderView; identity?: ClientIdentity | null }) {
   const [workspace, setWorkspace] = useState<LiftWorkspace | null>(initialWorkspace);
   const [loading, setLoading] = useState(!initialWorkspace);
   const [message, setMessage] = useState("");
-  const actionInFlight = useRef(false);
+  const account = useRef(identity ? { ...identity } : null);
+  const mutation = usePinnedClientMutation(account.current, "/api/levytate-lift", decodeLiftMutationResponse);
+  const executeMutation = mutation.execute;
   const workspaceRevision = useRef(initialWorkspace?.mutationRevision);
-  const idempotencyKeys = useRef(new Map<string, { key: string; revision: number | undefined }>());
 
   const load = useCallback(async () => {
     setLoading(true);
     setMessage("");
     try {
-      const response = await fetch("/api/levytate-lift", { cache: "no-store" });
+      if (!account.current) { setMessage("This illustrative preview cannot save changes."); return; }
+      const response = await authenticatedClientFetch("/api/levytate-lift", {}, account.current);
       const payload = await response.json() as LiftWorkspaceResponse;
       if (!response.ok || (!("ok" in payload) || payload.ok !== true)) throw new Error("message" in payload ? payload.message : "Lift could not be loaded.");
       setWorkspace(payload.workspace);
@@ -38,37 +44,29 @@ export function LiftModule({ initialWorkspace = null, initialLeaderView = "Oppor
   useEffect(() => { if (!initialWorkspace) void load(); }, [initialWorkspace, load]);
 
   const action = useCallback(async (input: LiftActionInput) => {
-    if (actionInFlight.current) return false;
-    actionInFlight.current = true;
+    if (!account.current) { setMessage("This illustrative preview cannot save changes."); return false; }
     setMessage("");
     try {
-      const fingerprint = JSON.stringify(input);
-      const receipt = idempotencyKeys.current.get(fingerprint) ?? { key: `${input.action}:${crypto.randomUUID()}`, revision: workspaceRevision.current };
-      idempotencyKeys.current.set(fingerprint, receipt);
-      const response = await fetch("/api/levytate-lift", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...input, idempotencyKey: receipt.key, expectedWorkspaceRevision: receipt.revision }) });
-      const payload = await response.json() as LiftWorkspaceResponse;
-      if (!response.ok || (!("ok" in payload) || payload.ok !== true)) throw new Error("message" in payload ? payload.message : "The Lift action could not be completed.");
-      setWorkspace(payload.workspace);
-      workspaceRevision.current = payload.workspace.mutationRevision;
-      idempotencyKeys.current.delete(fingerprint);
-      setMessage("Saved successfully.");
+      await executeMutation({ ...input, idempotencyKey: `${input.action}:${crypto.randomUUID()}`, expectedWorkspaceRevision: workspaceRevision.current }, (next) => {
+        setWorkspace(next); workspaceRevision.current = next.mutationRevision; setMessage("Saved successfully.");
+      });
       return true;
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "The Lift action could not be completed.");
       return false;
-    } finally { actionInFlight.current = false; }
-  }, []);
+    }
+  }, [executeMutation]);
 
   if (loading) return <section className={`${panel} p-6`} role="status">Loading Lift…</section>;
   if (!workspace) return <section className={`${panel} p-6`} role="alert"><TriangleAlert size={20} className="text-[#c95568]"/><h2 className="mt-3 text-lg font-semibold">Lift is unavailable</h2><p className="mt-2 text-sm text-[#102c3d]/60">{message || "This workspace is not enabled for Lift."}</p><button className={`${secondary} mt-4`} onClick={() => void load()}><RefreshCw size={15}/>Try again</button></section>;
 
-  return <div className="space-y-5" data-testid="lift-module">
+  return <div className="space-y-4"><ClientMutationRecovery mutation={mutation}/><fieldset disabled={mutation.locked} key={mutation.reconciled} className="min-w-0 border-0 p-0"><div className="space-y-5" data-testid="lift-module">
     <LiftHeader workspace={workspace}/>
-    {message ? <div role="status" className="rounded-xl border border-[#159b8f]/20 bg-[#eef8f5] px-4 py-3 text-sm text-[#087c73]"><p>{message}</p>{message !== "Saved successfully." ? <button className={`${secondary} mt-2`} onClick={() => { idempotencyKeys.current.clear(); void load(); }}>Refresh workspace</button> : null}</div> : null}
+    {message ? <div role="status" className="rounded-xl border border-[#159b8f]/20 bg-[#eef8f5] px-4 py-3 text-sm text-[#087c73]"><p>{message}</p>{message !== "Saved successfully." && account.current ? <button className={`${secondary} mt-2`} onClick={() => { if (!mutation.locked) void load(); }}>Refresh workspace</button> : null}</div> : null}
     {workspace.role === "Employee" ? <EmployeeLift workspace={workspace} onAction={action}/> : null}
     {workspace.role === "Line Manager" ? <ManagerLift workspace={workspace} onAction={action}/> : null}
     {workspace.role === "Apprenticeship Lead" || workspace.role === "Employer Admin" ? <LeaderLift workspace={workspace} onAction={action} initialView={initialLeaderView}/> : null}
-  </div>;
+  </div></fieldset></div>;
 }
 
 function LiftHeader({ workspace }: { workspace: LiftWorkspace }) {
