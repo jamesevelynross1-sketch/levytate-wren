@@ -388,6 +388,11 @@ try {
     const{verifyRequests}=await import("./release-requests-browser.mjs");
     await verifyRequests({app,mailpit,manifest,contexts,browser,backend,check});
   }
+  if(process.env.RELEASE_USABILITY_JOURNEY==="true"){
+    phase="genuine Copilot scope, keyboard, zoom and print";
+    const{verifyUsability}=await import("./release-usability-browser.mjs");
+    await verifyUsability({app,manifest,contexts,check});
+  }
   if(process.env.RELEASE_STALE_PEOPLE_EDITOR==="true"){
     phase="two genuine sessions and stale People reconnect";
     const{verifyStalePeopleEditor}=await import("./release-people-stale-browser.mjs");
