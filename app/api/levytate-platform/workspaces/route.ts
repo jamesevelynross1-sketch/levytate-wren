@@ -9,8 +9,8 @@ import { applicationRequestUrl } from "@/lib/server/levytate-request-origin";
 import { suspendClientTenant } from "@/lib/server/levytate-tenant-lifecycle";
 
 async function session() { const store = await cookies(); return readAuthorisedLevyTateBetaSession(store.get(levytateBetaSessionCookie)?.value); }
-export async function GET(request?: Request) {
-  try { const current = await session(); if (!current) return reply({ message: "Unauthorised." }, 401); if (request) assertExpectedAccount(request, current.email); return reply({ ok: true, workspaces: await listClientWorkspaces(current) }); }
+export async function GET(request: Request) {
+  try { const current = await session(); if (!current) return reply({ message: "Unauthorised." }, 401); assertExpectedAccount(request, current.email); return reply({ ok: true, workspaces: await listClientWorkspaces(current) }); }
   catch (error) { return failure(error); }
 }
 export async function POST(request: Request) {

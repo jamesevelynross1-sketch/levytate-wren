@@ -33,14 +33,14 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-  const session = await getSession();
-  if (!session) {
-    return noStore({ message: "Unauthorised." }, 401);
-  }
-  const expectedAccount = request.headers.get("x-levytate-account");
-  if (expectedAccount !== null && expectedAccount.trim().toLowerCase() !== session.email.trim().toLowerCase()) {
-    return noStore({ code: "account_changed", message: "A different account is signed in. Reload to switch accounts; this form was not submitted." }, 409);
-  }
+    const session = await getSession();
+    if (!session) {
+      return noStore({ message: "Unauthorised." }, 401);
+    }
+    const expectedAccount = request.headers.get("x-levytate-account");
+    if (expectedAccount !== null && expectedAccount.trim().toLowerCase() !== session.email.trim().toLowerCase()) {
+      return noStore({ code: "account_changed", message: "A different account is signed in. Reload to switch accounts; this form was not submitted." }, 409);
+    }
 
     const mutation = parseWorkspaceMutation(await readAuthenticatedJson(request, session.email, 1024 * 1024));
     const workspace = await applyWorkspaceMutationForSession(session, mutation);

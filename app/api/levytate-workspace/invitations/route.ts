@@ -8,8 +8,8 @@ import { ClientRequestError, readBrowserJson, requireActionKeys, assertAuthentic
 import { applicationRequestUrl } from "@/lib/server/levytate-request-origin";
 
 async function session() { const store = await cookies(); return readAuthorisedLevyTateBetaSession(store.get(levytateBetaSessionCookie)?.value); }
-export async function GET(request?: Request) {
-  try { const current = await session(); if (!current) return reply({ message: "Unauthorised." }, 401); if (request) assertExpectedAccount(request, current.email); return reply({ ok: true, ...await listWorkspaceUsers(current) }); }
+export async function GET(request: Request) {
+  try { const current = await session(); if (!current) return reply({ message: "Unauthorised." }, 401); assertExpectedAccount(request, current.email); return reply({ ok: true, ...await listWorkspaceUsers(current) }); }
   catch (error) { return failure(error); }
 }
 export async function POST(request: Request) {
