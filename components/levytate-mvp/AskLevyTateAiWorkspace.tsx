@@ -18,7 +18,7 @@ import { updateEmployeeDiscovery } from "@/lib/levytate/mvp/progressive-profilin
 import { activeApplicationStatuses, createEmployeeDevelopmentProfile, nowIso, type MvpEmployee, type MvpRole, type MvpWorkspaceData } from "@/lib/levytate/mvp/workspace";
 import { copilotPlaceholderFor, copilotSuggestionsFor, type LevyTateCopilotContext } from "@/lib/levytate/copilot-context";
 import { answerLevyFinanceQuestion } from "@/lib/levytate/finance/copilot";
-import type { LevyFinanceState } from "@/lib/levytate/finance/types";
+import { financeCopilotUnavailable, loadFinanceCopilotEvidence } from "@/lib/levytate/finance/copilot-evidence";
 import { answerProviderIntelligenceQuestion } from "@/lib/levytate/provider-intelligence/copilot";
 import type { ProviderIntelligenceArticle } from "@/lib/levytate/provider-intelligence/domain";
 import type { IntelligenceSignal } from "@/lib/levytate/intelligence/progress-review";
@@ -477,6 +477,7 @@ function buildWorkspaceEmployeeResolution(
 
 export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, presentation = "standalone", context }: { initialEmployeeId?: string | null; onNavigate?: (target: string) => void; presentation?: "standalone" | "drawer"; context?: LevyTateCopilotContext }) {
   const { data, meta, saveEmployeeDevelopmentProfile } = useMvpWorkspace();
+  const financeIdentity = useRef(meta ? { email: meta.userEmail, organisationId: meta.organisationId } : null);
   const [role, setRole] = useState<AssistantRole>("Employee");
   const [conversations, setConversations] = useState<Record<AssistantRole, ChatMessage[]>>(initialConversations);
   const [profiles, setProfiles] = useState<Record<AssistantRole, LevyTateConversationProfile | null>>(initialProfiles);
@@ -705,18 +706,17 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
       setInput(""); setError(""); return;
     }
     if (context?.module === "Finance") {
-      let financeState: LevyFinanceState | null = null;
-      try {
-        const response = await fetch("/api/levytate-finance", { cache: "no-store" });
-        const payload = await response.json() as { state?: LevyFinanceState };
-        if (response.ok && payload.state) financeState = payload.state;
-      } catch {}
-      const answer = financeState
-        ? answerLevyFinanceQuestion(trimmed, financeState).message
-        : "Finance evidence is temporarily unavailable. Retry when the Finance source reconnects; no balance or transaction count can be confirmed.";
-      setConversations((current) => ({ ...current, [activeRole]: [...nextMessages, { id: messageId(), role: "assistant", content: answer }] }));
-      setInput("");
+      setLoading(true);
       setError("");
+      try {
+        const financeState = await loadFinanceCopilotEvidence(financeIdentity.current);
+        const answer = answerLevyFinanceQuestion(trimmed, financeState).message;
+        setConversations((current) => ({ ...current, [activeRole]: [...nextMessages, { id: messageId(), role: "assistant", content: answer }] }));
+        setInput("");
+      } catch (failure) {
+        // Keep the question and prior conversation until current evidence is confirmed.
+        setError(failure instanceof Error && /^(The signed-in account or employer changed\.|Reload your workspace)/.test(failure.message) ? failure.message : financeCopilotUnavailable);
+      } finally { setLoading(false); }
       return;
     }
     const conversationHistory: LevyTateConversationMessage[] = roleMessages
