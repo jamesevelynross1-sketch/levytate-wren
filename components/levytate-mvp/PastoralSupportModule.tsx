@@ -25,21 +25,25 @@ import type {
 } from "@/lib/levytate/pastoral/domain";
 import { pastoralRecipientIsSafeForConcern } from "@/lib/levytate/pastoral/domain";
 import { pastoralLocalDateToInstant } from "@/lib/levytate/pastoral/dates";
-import { createPastoralMutationRetry, postPastoralMutation } from "@/lib/levytate/pastoral/mutation-retry";
+import { createAccountPinnedPastoralPost, createPastoralMutationRetry } from "@/lib/levytate/pastoral/mutation-retry";
 import { MvpLoadingState, MvpPanel, StatusBadge } from "@/components/levytate-mvp/MvpUi";
+import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 
 type EmployeeView = "conversation" | "requests" | "privacy";
 
 function usePastoralMutation(onWorkspace: (workspace: PastoralWorkspace) => void) {
+  const { meta } = useMvpWorkspace();
+  const identity = useRef(meta ? { email: meta.userEmail, organisationId: meta.organisationId } : null);
   const [working, setWorking] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const workspaceCallback = useRef(onWorkspace);
   workspaceCallback.current = onWorkspace;
   const retry = useRef<ReturnType<typeof createPastoralMutationRetry> | null>(null);
-  if (!retry.current) retry.current = createPastoralMutationRetry(async (body) => {
-    workspaceCallback.current(await postPastoralMutation(body));
-  });
+  if (!retry.current) {
+    const post = createAccountPinnedPastoralPost(identity.current);
+    retry.current = createPastoralMutationRetry(async (body) => { workspaceCallback.current(await post(body)); });
+  }
   async function run(command?: PastoralSupportMutation, confirmed?: () => void) {
     const controller = retry.current!;
     if (controller.busy) return;

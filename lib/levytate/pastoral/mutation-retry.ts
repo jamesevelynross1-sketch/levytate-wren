@@ -1,8 +1,21 @@
 import type { PastoralWorkspace } from "@/lib/levytate/pastoral/domain";
+import { authenticatedClientFetch } from "@/lib/levytate/client-session";
 
 type Outcome = { status: "confirmed" | "busy" | "blocked" | "idle" } | { status: "pending"; error: unknown };
 
-export async function postPastoralMutation(body: string, fetcher: typeof fetch = fetch): Promise<PastoralWorkspace> {
+export function createAccountPinnedPastoralPost(identity: { email: string; organisationId: string } | null, fetcher = authenticatedClientFetch) {
+  const expected = identity ? { ...identity } : null;
+  return async (body: string) => {
+    if (!expected?.email || !expected.organisationId) throw new Error("Reload My Support to confirm the signed-in account before submitting.");
+    return postPastoralMutation(body, (path, init) => {
+      const headers = new Headers(init?.headers);
+      headers.set("X-LevyTate-Account", expected.email);
+      return fetcher(path, { ...init, headers }, expected);
+    });
+  };
+}
+
+export async function postPastoralMutation(body: string, fetcher: (path: string, init?: RequestInit) => Promise<Response> = fetch): Promise<PastoralWorkspace> {
   const response = await fetcher("/api/levytate-pastoral", { method: "POST", headers: { "Content-Type": "application/json" }, body, signal: AbortSignal.timeout(30_000) });
   const result = await response.json().catch(() => null) as { message?: unknown; workspace?: PastoralWorkspace } | null;
   const workspace = result?.workspace;

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { createPastoralMutationRetry, postPastoralMutation } from "@/lib/levytate/pastoral/mutation-retry";
+import { createAccountPinnedPastoralPost, createPastoralMutationRetry, postPastoralMutation } from "@/lib/levytate/pastoral/mutation-retry";
+import { createAuthenticatedClientFetch } from "@/lib/levytate/client-session";
 
 const command = () => ({ action: "create_support_action", requestId: "synthetic-request", idempotencyKey: "original-request-key", summary: "Fictional agreed action", expectedLockVersion: 4 });
 const workspace = { accessMode: "employee", generatedAt: "2026-11-09T18:00:00.000Z", requests: [], conversations: [], recipients: [] };
@@ -59,5 +60,34 @@ describe("support update retries (real client logic, injected transport; no live
     await retry.run({ ...command(), idempotencyKey: "deliberately-new-key" });
     expect(send).toHaveBeenCalledTimes(2);
     expect(send.mock.calls[0][0]).not.toBe(send.mock.calls[1][0]);
+  });
+  it("pins original account headers and retains the draft when the server detects another signed-in identity", async () => {
+    const expected = { email: "original@example.invalid", organisationId: "original-tenant" };
+    const transport = vi.fn<typeof fetch>().mockRejectedValueOnce(new Error("Synthetic lost response"))
+      .mockResolvedValueOnce(Response.json({ message: "A different account is signed in." }, { status: 409 }));
+    const post = createAccountPinnedPastoralPost(expected, createAuthenticatedClientFetch(transport));
+    const retry = createPastoralMutationRetry(async (body) => { await post(body); });
+    await retry.run(command());
+    expected.email = "changed@example.invalid"; expected.organisationId = "changed-tenant";
+    expect((await retry.run()).status).toBe("pending");
+    expect(retry.pending).toBe(true);
+    for (const [, init] of transport.mock.calls) expect(new Headers(init?.headers).get("X-LevyTate-Account")).toBe("original@example.invalid");
+    expect(transport.mock.calls[1][1]?.body).toBe(transport.mock.calls[0][1]?.body);
+  });
+  it("never replays a retained support command after refresh changes the account", async () => {
+    const transport = vi.fn<typeof fetch>().mockResolvedValueOnce(Response.json({}, { status: 401 }))
+      .mockResolvedValueOnce(Response.json({ identity: { email: "other@example.invalid", organisationId: "other-tenant" } }));
+    const post = createAccountPinnedPastoralPost({ email: "original@example.invalid", organisationId: "original-tenant" }, createAuthenticatedClientFetch(transport));
+    const retry = createPastoralMutationRetry(async (body) => { await post(body); });
+    expect((await retry.run(command())).status).toBe("pending");
+    expect(transport.mock.calls.map(([path]) => path)).toEqual(["/api/levytate-pastoral", "/api/levytate-auth/session"]);
+    expect(transport.mock.calls[1][1]?.body).toBeUndefined();
+    expect(retry.pending).toBe(true);
+  });
+  it("refuses to submit if the mounted workspace identity was unavailable", async () => {
+    const transport = vi.fn<typeof fetch>();
+    const post = createAccountPinnedPastoralPost(null, createAuthenticatedClientFetch(transport));
+    await expect(post(JSON.stringify(command()))).rejects.toThrow("confirm the signed-in account");
+    expect(transport).not.toHaveBeenCalled();
   });
 });
