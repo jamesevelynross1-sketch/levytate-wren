@@ -186,5 +186,10 @@ export async function verifyLifecycle({ app: value, mailpit: mailValue, browser,
   } catch (error) {
     if (error.message === "BLOCKED: natural authentication rate budget not yet available") throw error;
     throw new Error(`Lifecycle browser acceptance failed during ${phase}; private authentication state omitted`);
-  } finally { for (const actor of actors.values()) await actor.context.close(); }
+  } finally {
+    for (const actor of actors.values()) {
+      try { await actor.context.request.post(`${app}/api/levytate-beta-logout`, { headers: headers(actor), maxRedirects: 0, timeout: 10000 }); } catch { /* Best effort only; never disclose an authentication response or URL. */ }
+      try { await actor.context.close(); } catch { /* Cleanup must not replace the safely redacted acceptance failure. */ }
+    }
+  }
 }
