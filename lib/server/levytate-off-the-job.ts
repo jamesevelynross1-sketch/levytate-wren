@@ -304,6 +304,14 @@ export async function submitLearningTimeActivity(session: LevyTateBetaSession, i
 
 export async function transitionLearningTimeActivity(session: LevyTateBetaSession, input: { activityId: string; action: string; note: string; lockVersion: number; idempotencyKey: string }) {
   const { organisation, user } = await authorisedContext(session);
+  const role = normaliseMvpUserRole(user.role);
+  const mayWithdraw = role === "Employee" && input.action === "withdraw";
+  const mayReview = (role === "Apprenticeship Lead" || role === "Employer Admin")
+    && ["request_information", "employer_check", "mark_not_counted"].includes(input.action);
+  if (!mayWithdraw && !mayReview) throw new LevyTateLearningTimeError("This Learning Time action is not permitted for your current role.", 403);
+  // The transaction still checks current membership, learner ownership, activity
+  // state and revision. The legacy transition's generic state error is not an
+  // adequate permission response for a role that cannot perform this action.
   return learningTimeCommand<ActivityRow>(organisation.id,user.id,"transition_activity",input);
 }
 
