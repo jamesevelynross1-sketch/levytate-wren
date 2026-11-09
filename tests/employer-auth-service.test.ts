@@ -46,6 +46,26 @@ describe("employer authentication service boundary", () => {
     members[0].role = "Apprenticeship Lead"; people = [];
     expect((await verifyEmployerMagicLink("synthetic-token", "email")).membership.role).toBe("Apprenticeship Lead");
   });
+  it("binds a genuine canonical Platform Admin outside the internal beta email list", async () => {
+    members[0].role = "Platform Admin"; people = [];
+    const result = await verifyEmployerMagicLink("synthetic-admin-link", "email");
+    const session = await readLevyTateBetaSession(result.sessionToken);
+    expect(session).toMatchObject({ email: authIdentity.email, accessLevel: "beta_admin", authMode: "supabase_email", authSubject: authIdentity.id });
+    expect((await refreshEmployerAuth("synthetic-refresh", session!)).membership.role).toBe("Platform Admin");
+    expect(await revalidateEmployerSession(session!)).toMatchObject({ accessLevel: "beta_admin" });
+  });
+  it("rechecks canonical admin role and active membership after genuine sign-in", async () => {
+    members[0].role = "Platform Admin"; people = [];
+    const result = await verifyEmployerMagicLink("synthetic-admin-link", "email");
+    const session = await readLevyTateBetaSession(result.sessionToken);
+    members[0].role = "Apprenticeship Lead";
+    expect(await revalidateEmployerSession(session!)).toMatchObject({ accessLevel: "beta_user" });
+    const refreshed = await refreshEmployerAuth("synthetic-refresh", session!);
+    expect(await readLevyTateBetaSession(refreshed.sessionToken)).toMatchObject({ accessLevel: "beta_user" });
+    members[0].active = false;
+    expect(await revalidateEmployerSession(session!)).toBeNull();
+    await expect(refreshEmployerAuth("synthetic-refresh", session!)).rejects.toMatchObject({ code: "unauthorised" });
+  });
   it.each(["Department Head", "Unknown"])("denies unsupported role %s before binding", async (role) => {
     members[0].role = role;
     await expect(verifyEmployerMagicLink("synthetic-token", "email")).rejects.toMatchObject({ code: "unauthorised" });

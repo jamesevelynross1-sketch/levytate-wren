@@ -121,8 +121,14 @@ async function readSignedPayload(token: string | undefined | null) {
 
 export async function createLevyTateBetaSession(email: string, accessLevel: LevyTateBetaAccessLevel, identity?: { authMode: "internal_beta" | "supabase_email"; authSubject?: string }) {
   const normalisedEmail = normaliseBetaEmail(email);
+  const authMode = identity?.authMode ?? "internal_beta";
+  if (authMode !== "internal_beta" && authMode !== "supabase_email") throw new Error("Unsupported authentication mode.");
+  if (authMode === "supabase_email" && (typeof identity?.authSubject !== "string" || !identity.authSubject.trim())) throw new Error("Verified authentication subject is required.");
 
-  if (accessLevel === "beta_admin" && !isAdminBetaEmail(normalisedEmail)) {
+  // The internal beta gate has a fixed email list. Genuine Auth sessions are
+  // issued only after canonical membership validation, and each protected
+  // request revalidates that membership; the demo list is not its authority.
+  if (authMode === "internal_beta" && accessLevel === "beta_admin" && !isAdminBetaEmail(normalisedEmail)) {
     throw new Error("Email is not approved for beta admin access.");
   }
 
@@ -130,7 +136,7 @@ export async function createLevyTateBetaSession(email: string, accessLevel: Levy
   const session: LevyTateBetaSession = {
     email: normalisedEmail,
     accessLevel,
-    authMode: identity?.authMode ?? "internal_beta",
+    authMode,
     authSubject: identity?.authSubject,
     issuedAt,
     expiresAt: issuedAt + levytateBetaSessionMaxAge * 1000,
@@ -166,9 +172,10 @@ export async function readLevyTateBetaSession(token: string | undefined | null) 
       return null;
     }
 
-    if (session.authMode === "supabase_email" && typeof session.authSubject !== "string") return null;
+    if (session.authMode !== undefined && session.authMode !== "internal_beta" && session.authMode !== "supabase_email") return null;
+    if (session.authMode === "supabase_email" && (typeof session.authSubject !== "string" || !session.authSubject.trim())) return null;
 
-    if (session.accessLevel === "beta_admin" && !isAdminBetaEmail(session.email)) {
+    if (session.authMode !== "supabase_email" && session.accessLevel === "beta_admin" && !isAdminBetaEmail(session.email)) {
       return null;
     }
 
