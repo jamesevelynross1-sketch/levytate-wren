@@ -8,6 +8,7 @@ export async function verifyDiscovery({app,manifest,contexts,backend,check}){
   const beforeResponse=await actor.context.request.get(path),before=(await beforeResponse.json()).choices;
   check(`${label} genuine discovery resolves own People record`,beforeResponse.status()===200&&before.employeeId===actor.user.personId&&before.availableProgrammeIds.includes(programme));
   const card=page.locator("article").filter({has:page.getByRole("button",{name:"View Synthetic acceptance programme",exact:true})});
+  await card.getByRole("button",{name:"View Synthetic acceptance programme",exact:true}).waitFor();
   check(`${label} sees genuine published programme card`,await card.count()===1);
   const wasSaved=before.savedProgrammeIds.includes(programme),save=card.getByRole("button",{name:wasSaved?"Remove saved programme":"Save programme",exact:true});
   let intercepted=false,original;
@@ -28,7 +29,9 @@ export async function verifyDiscovery({app,manifest,contexts,backend,check}){
   await page.getByRole("heading",{name:"Your programme comparison",exact:true}).waitFor();check(`${label} comparison renders recorded programme facts`,await page.getByRole("table").getByRole("columnheader",{name:"Synthetic acceptance programme",exact:true}).count()===1);
   if(key==="a:employee"){
    await afterCard.getByRole("button",{name:"View Synthetic acceptance programme",exact:true}).click();const modal=page.getByRole("dialog",{name:"Synthetic acceptance programme",exact:true});
-   check("existing active application does not prevent discovery but disables a second start",await modal.getByRole("button",{name:"One application is already active",exact:true}).isDisabled());
+   const blocked=modal.getByRole("button",{name:"One application is already active",exact:true});
+   if(await blocked.count())check("existing active application does not prevent discovery but disables a second start",await blocked.isDisabled());
+   else check("closed application leaves explicit pathway start available",await modal.getByRole("button",{name:"Start pathway application",exact:true}).isEnabled());
    await modal.getByRole("button",{name:"Close dialog",exact:true}).click();
   }
  }

@@ -28,6 +28,8 @@ export async function verifyStalePeopleEditor({app,mailpit,manifest,lead,browser
   await create.getByRole("button",{name:"Save employee",exact:true}).click();await create.waitFor({state:"detached"});
   check("stale People scenario creates its own fixture through the real form",(await backend(`rest/v1/levytate_employees?organisation_id=eq.${lead.tenant.id}&email=eq.${encodeURIComponent(email)}&select=id`)).length===1);
  }
+ // Creating a new person intentionally opens their discovery journey.
+ await page.goto(`${app}/levytate/app?module=People`);
  step="open saved employee Details";
  await page.locator("article").filter({has:page.getByText(name,{exact:true})}).getByRole("button",{name:"Details",exact:true}).click();
  await page.getByRole("dialog",{name,exact:true}).getByRole("button",{name:"Edit",exact:true}).click();

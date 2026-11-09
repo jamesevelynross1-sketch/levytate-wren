@@ -81,10 +81,13 @@ try {
   const peopleUiOnly=process.env.RELEASE_PEOPLE_UI_ONLY==="true"||accountUiOnly;
   const exportOnly=process.env.RELEASE_EXPORT_ONLY==="true";
   const lifecycleOnly=process.env.RELEASE_LIFECYCLE_ONLY==="true";
+  const selectedKeys=process.env.RELEASE_AUTH_KEYS?.split(",");
+  if(selectedKeys&&(new Set(selectedKeys).size!==selectedKeys.length||selectedKeys.some(key=>!/^[ab]:(lead|manager|employee)$/.test(key))))throw new Error("Exact synthetic authentication roles required");
   if(!lifecycleOnly){
   const failureBudgetStartedAt=new Date().toISOString();
   for (const tenant of manifest.tenants) {
     for (const user of tenant.users) {
+      if(selectedKeys&&!selectedKeys.includes(`${tenant.key}:${user.key}`))continue;
       if(peopleUiOnly&&!accountUiOnly&&(tenant.key!=="a"||user.key!=="lead"))continue;
       if(accountUiOnly&&user.key!=="lead")continue;
       const label = `${tenant.key} ${user.role}`;
@@ -308,6 +311,7 @@ try {
   }
   // Exercise replay only after all real identities have independently signed in.
   for (const key of peopleUiOnly?[]:["a:employee", "b:manager"]) {
+    if(!contexts.has(key))continue;
     const item = contexts.get(key);
     const replay = await item.context.request.get(item.consumedLink, { maxRedirects: 0 });
     check(`${key}: consumed magic link cannot replay`, replay.status() >= 300 && replay.status() < 400 && (replay.headers().location ?? "").includes("invalid-link"));
@@ -318,7 +322,7 @@ try {
     await independentJourney("personal programme discovery",()=>verifyDiscovery({app,manifest,contexts,backend,check}));
   }
   await independentJourney("connected application and learner workflow",async()=>{
-  if (manifest.catalogue&&!peopleUiOnly&&!exportOnly) {
+  if (manifest.catalogue&&!peopleUiOnly&&!exportOnly&&process.env.RELEASE_SKIP_CORE!=="true") {
     phase = "separate-role application and enrolment handoff";
     const employeeA = contexts.get("a:employee"), managerA = contexts.get("a:manager"), leadA = contexts.get("a:lead"), leadB = contexts.get("b:lead");
     const post = (actor, data) => actor.context.request.post(`${app}/api/levytate-workspace`, { headers: { Origin: app }, data });
@@ -397,6 +401,11 @@ try {
     }
   }
   });
+  if(process.env.RELEASE_LEARNING_TIME_RESUME==="true"){
+    phase="resume persisted learner learning activity and outcome";
+    const{resumeLearner}=await import("./release-learner-resume-browser.mjs");
+    await independentJourney("retained learner completion",()=>resumeLearner({app,manifest,contexts,backend,check}));
+  }
   if(process.env.RELEASE_REQUESTS_JOURNEY==="true"){
     phase="genuine provider request, response and catalogue handoff";
     const{verifyRequests}=await import("./release-requests-browser.mjs");
@@ -412,7 +421,7 @@ try {
     const{verifyStalePeopleEditor}=await import("./release-people-stale-browser.mjs");
     await independentJourney("stale People editor",()=>verifyStalePeopleEditor({app,mailpit,manifest,lead:contexts.get("a:lead"),browser,backend,waitForCapturedLink,check}));
   }
-  if(!peopleUiOnly&&!exportOnly&&!results.some(item=>item.status==="FAIL"||item.status==="BLOCKED")){
+  if(!peopleUiOnly&&!exportOnly&&process.env.RELEASE_SKIP_CORE!=="true"&&!results.some(item=>item.status==="FAIL"||item.status==="BLOCKED")){
   const employee = contexts.get("a:employee");
   const forged = await employee.context.request.post(`${app}/api/levytate-workspace`, {
     headers: { Origin: app }, data: { type: "saveEmployeeDevelopmentProfile", profile: { employeeId: "b-employee" } },
