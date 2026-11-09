@@ -22,6 +22,10 @@ const command = z.discriminatedUnion("action", [
   z.strictObject({ action: z.literal("erase_expired_export"), ...versioned }),
   z.strictObject({ action: z.literal("download"), caseId: identifier }),
   z.strictObject({ action: z.literal("erase_evidence"), caseId: identifier, reference }),
+  z.strictObject({ action: z.literal("request_reactivation"), reactivationId: identifier, requestId: identifier, organisationId: identifier,
+    approvalReference: reference, clientNoticeReference: reference, supportHandoverReference: reference, recoveryBoundaryReference: reference }),
+  z.strictObject({ action: z.literal("approve_reactivation"), reactivationId: identifier, requestId: identifier, approvalReference: reference }),
+  z.strictObject({ action: z.literal("cancel_reactivation"), reactivationId: identifier, requestId: identifier }),
 ]);
 type Config = NonNullable<ReturnType<typeof getLevyTateSupabaseConfig>>;
 type CaseResult = { id: string; status: string; revision: number };
@@ -39,6 +43,10 @@ export type OffboardingCase = {
   created_at: string; completed_at: string | null;
   retention: ReturnType<typeof retentionExceptions>;
 };
+export type TenantReactivationRequest = { id: string; organisation_id: string; requester_id: string; approver_id: string | null;
+  status: "requested" | "approved" | "cancelled"; requested_at: string; completed_at: string | null;
+  request_evidence: { approvalReference: string; clientNoticeReference: string; supportHandoverReference: string; recoveryBoundaryReference: string };
+  approval_reference: string | null };
 const errorMessage = "The offboarding step could not be confirmed. The employer stays suspended. Retry the same request or inspect its recorded state.";
 
 async function authorised(session: LevyTateBetaSession) {
@@ -62,6 +70,17 @@ export async function listTenantOffboarding(session: LevyTateBetaSession, caseId
   const rows = await rpc<OffboardingCase[]>(config, "levytate_offboarding_status", { p_actor: actorId, p_case: caseId ?? null });
   if (!Array.isArray(rows)) throw new ClientRequestError(errorMessage, 503);
   return rows.map((row) => ({ ...row, policy: parseTenantRetentionPolicy(row.policy), retention: retentionExceptions(parseTenantRetentionPolicy(row.policy), row.legal_hold, new Date()) }));
+}
+export async function tenantLifecycleControls(session: LevyTateBetaSession) {
+  const { actorId, config } = await authorised(session);
+  const [reactivations, organisations, members] = await Promise.all([
+    rpc<TenantReactivationRequest[]>(config, "levytate_reactivation_status", { p_actor: actorId }),
+    supabaseFetchJson<Array<{ id: string }>>(config, "levytate_organisations?select=id&status=eq.Active"),
+    supabaseFetchJson<Array<{ id: string; display_name: string; email: string; organisation_id: string }>>(config,
+      "levytate_users?select=id,display_name,email,organisation_id&role=eq.Platform%20Admin&active=eq.true&auth_binding_status=eq.bound&auth_subject=not.is.null"),
+  ]);
+  const active = new Set(organisations.map((item) => item.id));
+  return { reactivations, owners: members.filter((item) => active.has(item.organisation_id)).map((item) => ({ id: item.id, label: item.display_name || item.email })) };
 }
 function result(value: CaseResult, caseId: string) {
   if (value?.id !== caseId || !Number.isSafeInteger(value.revision) || !["requested", "approved", "exported", "deleting", "completed", "cancelled"].includes(value.status)) throw new ClientRequestError(errorMessage, 503);
@@ -122,6 +141,11 @@ export async function runTenantOffboarding(session: LevyTateBetaSession, input: 
     if (ttl <= 0 || ttl > 7 * 86_400_000) throw new ClientRequestError("Export availability must expire within seven days.", 422);
   }
   const { actorId, config } = await authorised(session);
+  if (data.action === "request_reactivation" || data.action === "approve_reactivation" || data.action === "cancel_reactivation") {
+    const value = await rpc<{ id: string; status: string }>(config, "levytate_reactivation_command", { p_actor: actorId, p_command: data });
+    if (value.id !== data.reactivationId || !["requested", "approved", "cancelled"].includes(value.status)) throw new ClientRequestError(errorMessage, 503);
+    return { reactivation: signedEvidence(value) };
+  }
   if (data.action === "download") return { download: await rpc<EncryptedTenantExport>(config, "levytate_offboarding_download", { p_actor: actorId, p_case: data.caseId }) };
   if (data.action === "erase_evidence") return { erasure: await rpc(config, "levytate_offboarding_erase_evidence", { p_actor: actorId, p_case: data.caseId, p_reference: data.reference }) };
   if (data.action === "export") {

@@ -3,11 +3,12 @@ import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
 import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
 import { ClientRequestError, assertAuthenticatedWrite, readBrowserJson } from "@/lib/server/levytate-request-boundary";
-import { listTenantOffboarding, runTenantOffboarding } from "@/lib/server/levytate-tenant-offboarding";
+import { listTenantOffboarding, runTenantOffboarding, tenantLifecycleControls } from "@/lib/server/levytate-tenant-offboarding";
 
 async function currentSession() { const store = await cookies(); return readAuthorisedLevyTateBetaSession(store.get(levytateBetaSessionCookie)?.value); }
 export async function GET() {
-  try { const session = await currentSession(); if (!session) return reply({ message: "Unauthorised." }, 401); return reply({ cases: await listTenantOffboarding(session) }); }
+  try { const session = await currentSession(); if (!session) return reply({ message: "Unauthorised." }, 401);
+    const [cases, controls] = await Promise.all([listTenantOffboarding(session), tenantLifecycleControls(session)]); return reply({ cases, ...controls }); }
   catch (error) { return failure(error); }
 }
 export async function POST(request: Request) {

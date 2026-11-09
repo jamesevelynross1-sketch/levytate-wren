@@ -50,7 +50,7 @@ const tableGroups: Record<TenantDataClass, readonly string[]> = {
   assessments: ["assessment_campaigns", "assessment_participants", "workforce_assessments", "assessment_revisions", "assessment_results", "assessment_shares", "assessment_reviews", "assessment_actions", "assessment_application_links", "assessment_events"],
   lift: ["lift_campaigns", "lift_participants", "lift_assessments", "lift_assessment_revisions", "lift_evidence_records", "lift_interpretations", "lift_manager_observations", "lift_manager_observation_revisions", "lift_employee_observation_contexts", "lift_team_context_revisions", "lift_opportunities", "lift_opportunity_candidates", "lift_opportunity_evidence", "lift_opportunity_route_members", "lift_decisions", "lift_decision_assumptions", "lift_proof_records", "lift_proof_events", "lift_workspace_revisions", "lift_command_receipts"],
   support: ["pastoral_access_eligibility", "pastoral_preferences", "pastoral_conversations", "pastoral_messages", "pastoral_audit_events", "pastoral_support_recipients", "pastoral_support_requests", "pastoral_support_request_events", "pastoral_history_receipts"],
-  audit: ["audit_events", "early_access_terms_acceptances", "external_connector_events"],
+  audit: ["audit_events", "early_access_terms_acceptances", "external_connector_events", "tenant_reactivation_requests"],
 };
 export const tenantTableInventory = Object.fromEntries(Object.entries(tableGroups).flatMap(([dataClass, tables]) => tables.map((table) => [`levytate_${table}`, dataClass]))) as Record<string, TenantDataClass>;
 export const tenantInventoryVersion = "levytate-tenant-data-v1";
