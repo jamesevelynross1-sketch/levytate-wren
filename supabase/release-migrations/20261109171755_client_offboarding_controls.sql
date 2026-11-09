@@ -116,7 +116,7 @@ begin
    if not(p_command->>'active')::boolean and (not c.legal_hold or c.hold_actor_id=p_actor) then raise exception using errcode='PT403',message='Another authorised person must release a hold';end if;
    update public.levytate_tenant_offboarding_cases set legal_hold=(p_command->>'active')::boolean,hold_actor_id=case when (p_command->>'active')::boolean then p_actor else hold_actor_id end,hold_reference=p_command->>'reference' where levytate_tenant_offboarding_cases.id=c.id;
   elsif action='cancel' then
-   if c.status in('deleting','completed') then raise exception using errcode='PT409',message='Irreversible work has started';end if;
+   if c.status in('deleting','completed') or c.legal_hold then raise exception using errcode='PT409',message='Irreversible work or a hold prevents cancellation';end if;
    update public.levytate_tenant_offboarding_cases set status='cancelled',encrypted_package=null where levytate_tenant_offboarding_cases.id=c.id;
   elsif action='record_export' then
    if c.status<>'approved' or c.export_expires_at<=stamp or p_actor not in(c.requester_id,c.approver_id)
@@ -155,6 +155,9 @@ begin
  result:=jsonb_build_object('id',c.id,'status',c.status,'revision',c.revision);
  insert into public.levytate_tenant_offboarding_events(case_id,actor_id,action,revision) values(c.id,p_actor,action,c.revision);
  insert into public.levytate_tenant_offboarding_commands(request_id,case_id,actor_id,payload,result) values(v_request_id,c.id,p_actor,coalesce(p_command->'clientCommand',p_command),result);
+ if action in('request','record_export','record_delivery') and c.export_expires_at<=clock_timestamp() then
+  raise exception using errcode='PT409',message='Export expired before the command completed';end if;
+ if action='begin_delete' then perform public.levytate_offboarding_due(c.id);end if;
  return result;
 exception when invalid_text_representation or datetime_field_overflow or invalid_datetime_format then
  raise exception using errcode='PT422',message='Invalid lifecycle identifiers or schedule';
@@ -162,7 +165,7 @@ end; $$;
 
 create function public.levytate_offboarding_snapshot(p_actor uuid,p_case uuid) returns jsonb
 language plpgsql security definer set search_path=pg_catalog,public as $$
-declare c public.levytate_tenant_offboarding_cases%rowtype;data jsonb;
+declare c public.levytate_tenant_offboarding_cases%rowtype;data jsonb;result jsonb;
 begin
  perform public.levytate_offboarding_actor(p_actor);
  select * into c from public.levytate_tenant_offboarding_cases where id=p_case;
@@ -173,9 +176,11 @@ begin
  perform 1 from public.levytate_organisations where id=c.tenant_id and status='Suspended' for share;
  if not found then raise exception using errcode='PT409',message='Export requires a suspended tenant';end if;
  data:=public.levytate_offboarding_data(c.tenant_id);
- return data||jsonb_build_object('organisationId',c.tenant_id,'snapshotId',c.id,'generatedAt',c.approved_at,
+ result:=data||jsonb_build_object('organisationId',c.tenant_id,'snapshotId',c.id,'generatedAt',c.approved_at,
   'storageObjects',public.levytate_offboarding_storage_inventory(c.tenant_id),'recipientPublicKey',c.recipient_public_key,
   'snapshotHash',encode(sha256(convert_to(data::text,'UTF8')),'hex'),'expiresAt',c.export_expires_at,'revision',c.revision);
+ if c.export_expires_at<=clock_timestamp() then raise exception using errcode='PT409',message='Export expired during snapshot';end if;
+ return result;
 end; $$;
 
 create function public.levytate_offboarding_download(p_actor uuid,p_case uuid) returns jsonb
@@ -188,6 +193,7 @@ begin
   or p_actor not in(c.requester_id,c.approver_id) then raise exception using errcode='PT403',message='Export delivery is unavailable';end if;
  update public.levytate_tenant_offboarding_cases set issued_at=clock_timestamp() where id=p_case;
  insert into public.levytate_tenant_offboarding_events(case_id,actor_id,action,revision) values(p_case,p_actor,'encrypted_package_issued',c.revision);
+ if c.export_expires_at<=clock_timestamp() then raise exception using errcode='PT409',message='Export expired before delivery completed';end if;
  return c.encrypted_package;
 end; $$;
 
@@ -412,6 +418,9 @@ end; $install$;
 create function public.levytate_offboarding_assert_inventory() returns void
 language plpgsql security definer set search_path=pg_catalog,public as $$
 begin
+ if to_regprocedure('public.levytate_offboarding_assert_storage_boundary()') is null then
+  raise exception using errcode='PT409',message='Storage lifecycle boundary has not been independently installed';end if;
+ perform public.levytate_offboarding_assert_storage_boundary();
  if exists(select 1 from pg_class c join pg_namespace n on n.oid=c.relnamespace
   join pg_attribute a on a.attrelid=c.oid and a.attname='organisation_id' and not a.attisdropped
   where n.nspname='public' and c.relkind in('r','p') and
@@ -449,6 +458,9 @@ create function public.levytate_offboarding_storage_inventory(p_tenant uuid) ret
 language plpgsql stable security definer set search_path=pg_catalog,public as $$
 declare objects jsonb;
 begin
+ if exists(select 1 from public.levytate_file_assets where organisation_id=p_tenant
+  and bucket_name not in('levytate-organisations','levytate-provider-documents','levytate-uploads','levytate-guidance-sources')) then
+  raise exception using errcode='PT409',message='Storage bucket is outside the reviewed lifecycle boundary';end if;
  if exists(select 1 from public.levytate_file_assets a join public.levytate_file_assets b using(bucket_name,object_path)
   where a.organisation_id=p_tenant and b.organisation_id<>p_tenant) then
   raise exception using errcode='PT409',message='Storage ownership is ambiguous';end if;
@@ -492,12 +504,13 @@ language plpgsql stable security definer set search_path=pg_catalog,public as $$
 declare c public.levytate_tenant_offboarding_cases%rowtype;
 begin
  select * into c from public.levytate_tenant_offboarding_cases where id=p_case;
+ if not found then raise exception using errcode='PT409',message='Disposal case is unavailable';end if;
+ perform public.levytate_offboarding_actor(c.requester_id);
+ perform public.levytate_offboarding_actor(c.approver_id);
  if not found or c.purpose<>'delete' or c.legal_hold or c.approver_id is null or c.approver_id=c.requester_id
   or c.client_delivery_reference is null or c.evidence_retain_until<=clock_timestamp()
   or exists(select 1 from jsonb_array_elements(c.policy->'schedules') s where s->>'action'<>'delete' or (s->>'retainUntil')::timestamptz>clock_timestamp()) then
   raise exception using errcode='PT409',message='Hold, schedule, delivery or independent approval blocks disposal';end if;
- perform public.levytate_offboarding_actor(c.requester_id);
- perform public.levytate_offboarding_actor(c.approver_id);
 end; $$;
 
 -- Inspection only. Expiry blocks delivery even if scheduled erasure is delayed.
