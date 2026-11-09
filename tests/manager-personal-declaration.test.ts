@@ -19,7 +19,7 @@ function fixture(role = "Line Manager", target = "manager", targetEmail = `${tar
     if (table === "levytate_organisations") return [{ id: "synthetic-org", name: "Synthetic employer" }];
     if (table === "levytate_learner_records") return [{ id: "synthetic-learner", organisation_id: "synthetic-org", employee_id: target, lifecycle_status: "pre_enrolment", record_status: "Active" }];
     if (table === "levytate_employees") {
-      if (query.has("id")) return [{ id: target, email: targetEmail, status: "Active", manager_id: "manager" }];
+      if (query.get("select") === "id,email") return [{ id: target, email: targetEmail }];
       return [{ id: "manager", email: session.email, status: "Active", manager_id: "senior" }, { id: "report", email: "report@example.test", status: "Active", manager_id: "manager" }];
     }
     throw new Error(`Unexpected test read: ${table}`);
@@ -40,9 +40,17 @@ describe("personal learner declaration service authority (transport isolated)", 
   it("rechecks the target People email rather than trusting its prior read result", async () => {
     fixture("Line Manager", "manager", "changed@example.test");
     await expect(confirmEmployeeEligibility(session, "synthetic-learner", input)).rejects.toThrow("Only the employee may make their own declaration");
-    const targetRead = transport.select.mock.calls.find(([, table, query]) => table === "levytate_employees" && query.has("id"));
+    const targetRead = transport.select.mock.calls.find(([, table, query]) => table === "levytate_employees" && query.get("select") === "id,email");
     expect(targetRead?.[2].get("organisation_id")).toBe("eq.synthetic-org");
     expect(targetRead?.[2].get("status")).toBe("eq.Active");
+  });
+  it("denies ambiguous active People identity instead of selecting the first row", async () => {
+    const select = transport.select.getMockImplementation()!;
+    transport.select.mockImplementation(async (config, table, query) => query.get("select") === "id,email"
+      ? [{ id: "manager", email: session.email }, { id: "duplicate", email: session.email.toUpperCase() }]
+      : select(config, table, query));
+    await expect(confirmEmployeeEligibility(session, "synthetic-learner", input)).rejects.toThrow("Only the employee may make their own declaration");
+    expect(transport.apply).toHaveBeenCalledTimes(1);
   });
   it("does not extend personal declaration authority to the Apprenticeship Lead", async () => {
     fixture("Apprenticeship Lead");

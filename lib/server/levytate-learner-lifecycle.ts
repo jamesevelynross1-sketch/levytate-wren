@@ -673,10 +673,11 @@ async function confirmEmployeeEligibilityPlan(session: LevyTateBetaSession, lear
   if (context.user.role !== "Employee" && context.user.role !== "Line Manager") throw new LevyTateLearnerLifecyclePermissionError("Only the employee may make their own declaration.");
   const learner = await getScopedLearnerRecord(context, learnerId, "read");
   // A manager may read reports, but a personal declaration is always their own.
-  const employee = await selectOne<EmployeeRow>(employeesTable, new URLSearchParams({
-    organisation_id: `eq.${context.organisation.id}`, id: `eq.${learner.employeeId}`, status: "eq.Active", select: "*", limit: "1",
+  const employees = await supabaseSelectAll<EmployeeRow>(assertSupabase(), employeesTable, new URLSearchParams({
+    organisation_id: `eq.${context.organisation.id}`, status: "eq.Active", select: "id,email", order: "id.asc",
   }));
-  if (!employee || employee.email.trim().toLowerCase() !== context.user.email.trim().toLowerCase()) {
+  const ownEmployees = employees.filter((employee) => employee.email.trim().toLowerCase() === context.user.email.trim().toLowerCase());
+  if (ownEmployees.length !== 1 || ownEmployees[0]?.id !== learner.employeeId) {
     throw new LevyTateLearnerLifecyclePermissionError("Only the employee may make their own declaration.");
   }
   if (learner.lifecycleStatus !== "pre_enrolment" || input.confirmed !== true) throw new LevyTateLearnerLifecycleValidationError("Confirm your declaration during pre-enrolment.");

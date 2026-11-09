@@ -299,6 +299,7 @@ begin
   if not found then raise exception using errcode='PT404',message='Active learner not found'; end if;
   if p_action='employee_declaration' then
     if v_actor.role not in ('Employee','Line Manager') or lower(btrim(v_actor.email))<>lower(btrim(v_employee.email)) then raise exception using errcode='PT403',message='Only the employee may make their declaration'; end if;
+    if (select count(*) from public.levytate_employees where organisation_id=p_organisation_id and status='Active' and lower(btrim(email))=lower(btrim(v_actor.email)))<>1 then raise exception using errcode='PT403',message='Ambiguous employee identity'; end if;
   elsif p_action='manager_checkin' then
     if v_actor.role<>'Line Manager' or lower(btrim(v_actor.email))=lower(btrim(v_employee.email)) or not exists(
       select 1 from public.levytate_employees m where m.organisation_id=p_organisation_id and m.id=v_employee.manager_id and m.status='Active'
