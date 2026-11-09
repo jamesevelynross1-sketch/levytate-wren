@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     if (!current) return reply({ message: "Unauthorised." }, 401);
     await assertAuthenticatedWrite(request, current.email);
     if (body.action === "provision_user") {
-      requireActionKeys(body, ["action", "email", "displayName", "role"]);
+      requireActionKeys(body, ["action", "requestId", "email", "displayName", "role"]);
       const scope = await listWorkspaceUsers(current);
       return reply({ ok: true, user: await provisionClientWorkspaceUser(current, { ...body, organisationId: scope.organisationId }) }, 201);
     }
@@ -28,8 +28,8 @@ export async function POST(request: Request) {
       return reply({ ok: true, user: await inviteClientWorkspaceUser(current, body, levyTateAuthCallbackUrl(applicationRequestUrl(request).href, "/levytate/auth/callback"), request) });
     }
     if (body.action === "revoke_user") {
-      requireActionKeys(body, ["action", "userId"]);
-      return reply({ ok: true, user: await updateClientWorkspaceUser(current, { userId: body.userId, active: false }) });
+      requireActionKeys(body, ["action", "requestId", "expectedGeneration", "userId", "role"]);
+      return reply({ ok: true, user: await updateClientWorkspaceUser(current, { userId: body.userId, role: body.role, active: false, requestId: body.requestId, expectedGeneration: body.expectedGeneration }) });
     }
     return reply({ message: "Choose a supported invitation action." }, 400);
   } catch (error) { return failure(error); }

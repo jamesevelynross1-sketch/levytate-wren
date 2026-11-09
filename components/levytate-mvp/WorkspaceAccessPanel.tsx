@@ -38,6 +38,8 @@ export function WorkspaceAccessPanel() {
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [draft, setDraft] = useState({ displayName: "", email: "", role: "Employee" });
+  const prepareRetry = useRef<{ fingerprint: string; requestId: string } | null>(null);
+  const revokeRetry = useRef(new Map<string, { requestId: string; expectedGeneration: number; role: MvpUserRole }>());
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try {
@@ -52,20 +54,28 @@ export function WorkspaceAccessPanel() {
   const changed = (user: ClientWorkspaceUser) => setUsers((current) => current.map((candidate) => candidate.id === user.id ? user : candidate));
   async function prepare(event: FormEvent) {
     event.preventDefault(); if (busy) return; setBusy("prepare"); setError("");
+    const fingerprint = JSON.stringify(draft);
+    if (prepareRetry.current?.fingerprint !== fingerprint) prepareRetry.current = { fingerprint, requestId: crypto.randomUUID() };
     try {
-      const response = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "provision_user", ...draft }) });
+      const response = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "provision_user", ...draft, requestId: prepareRetry.current.requestId }) });
       const payload = await response.json() as { user?: ClientWorkspaceUser; message?: string };
       if (!response.ok || !payload.user) throw new Error(payload.message || "Access could not be prepared.");
-      setUsers((current) => [...current, payload.user!]); setDraft({ displayName: "", email: "", role: "Employee" });
+      setUsers((current) => [...current.filter((user) => user.id !== payload.user!.id), payload.user!]); setDraft({ displayName: "", email: "", role: "Employee" }); prepareRetry.current = null;
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Access could not be prepared."); }
     finally { setBusy(""); }
   }
   async function revoke(user: ClientWorkspaceUser) {
+    if (busy) return;
     setBusy(user.id); setError("");
+    if (!revokeRetry.current.has(user.id)) revokeRetry.current.set(user.id, { requestId: crypto.randomUUID(), expectedGeneration: user.invitationGeneration, role: user.role });
     try {
-      const response = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "revoke_user", userId: user.id }) });
+      const response = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "revoke_user", userId: user.id, ...revokeRetry.current.get(user.id) }) });
       const payload = await response.json() as { user?: ClientWorkspaceUser; message?: string };
-      if (!response.ok || !payload.user) throw new Error(payload.message || "Access revocation could not be confirmed.");
+      if (!response.ok || !payload.user) {
+        if (response.status === 409) revokeRetry.current.delete(user.id);
+        throw new Error(payload.message || "Access revocation could not be confirmed. Retry the same request.");
+      }
+      revokeRetry.current.delete(user.id);
       changed(payload.user);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Access revocation could not be confirmed."); }
     finally { setBusy(""); }

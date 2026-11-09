@@ -8,7 +8,7 @@ import { invitationDisplayState, type ClientInvitationFields } from "@/lib/levyt
 import { getAuthenticationDeliveryStatus, recordAuthenticationEmailAccepted, recordAuthenticationEmailRequest, shouldSuppressAuthenticationEmail } from "@/lib/server/levytate-auth-email-delivery";
 import { checkMagicLinkRequestLimits } from "@/lib/server/levytate-auth-rate-limit";
 import { getLearnerLifecycleServerContext } from "@/lib/server/levytate-learner-lifecycle";
-import { getLevyTateSupabaseConfig, supabaseDelete, supabaseInsert, supabaseSelect, supabaseSelectAll, supabaseUpdate } from "@/lib/server/levytate-supabase";
+import { getLevyTateSupabaseConfig, supabaseFetchJson, supabaseInsert, supabaseSelect, supabaseSelectAll, supabaseUpdate } from "@/lib/server/levytate-supabase";
 
 const organisationsTable = "levytate_organisations";
 const usersTable = "levytate_users";
@@ -41,104 +41,72 @@ export async function listClientWorkspaces(session: LevyTateBetaSession) {
   return Promise.all(organisations.map((organisation) => toSummary(organisation, users.filter((user) => user.organisation_id === organisation.id))));
 }
 
-export async function createClientWorkspace(session: LevyTateBetaSession, input: { name?: unknown; workspaceName?: unknown; primaryContact?: unknown; contactEmail?: unknown; initialRole?: unknown }) {
+export async function createClientWorkspace(session: LevyTateBetaSession, input: { requestId?: unknown; name?: unknown; workspaceName?: unknown; primaryContact?: unknown; contactEmail?: unknown; initialRole?: unknown }) {
   const actor = await requireWorkspaceManager(session);
   const name = requiredText(input.name, "Organisation name", 160);
-  const workspaceName = optionalText(input.workspaceName, 160) || `${name} Apprenticeship Workspace`;
+  const workspaceName = optionalText(input.workspaceName, 160) || `${name} Apprenticeship Workspace`.slice(0, 160);
   const primaryContact = requiredText(input.primaryContact, "Primary contact", 160);
   const email = validEmail(input.contactEmail);
   if (actor.user.role !== "Platform Admin") throw new ClientWorkspaceAdminError("Only Platform Admin can create client workspaces.", 403);
   const initialRole = employerRole(input.initialRole, "Apprenticeship Lead");
   if (initialRole !== "Employer Admin" && initialRole !== "Apprenticeship Lead") throw new ClientWorkspaceAdminError("The initial user must be an Apprenticeship Lead or Employer Admin.");
   const slug = slugify(name);
-  const existingOrganisation = await supabaseSelect<OrganisationRow>(config(), organisationsTable, new URLSearchParams({ select: "id", slug: `eq.${slug}`, limit: "1" }));
-  if (existingOrganisation.length) throw new ClientWorkspaceAdminError("An employer workspace already uses this organisation name.", 409);
-  const existingMembership = await findMembership(email);
-  if (existingMembership) throw new ClientWorkspaceAdminError("This email already has LevyTate organisation access.", 409);
-
-  const now = new Date().toISOString();
-  const organisation: OrganisationRow & { workspace_template: string; sites: string[]; departments: string[]; priorities: never[]; default_site: string } = {
-    id: randomUUID(), name, slug, workspace_name: workspaceName, primary_contact: primaryContact, contact_email: email,
-    default_site: "", sites: [], departments: [], priorities: [], workspace_template: "levytate-client-v1", status: "Active", created_at: now, updated_at: now,
-  };
-  let auth: { user: AuthUser; created: boolean } | null = null;
-  try {
-    await supabaseInsert(config(), organisationsTable, [organisation]);
-    auth = await ensureAuthUser(email);
-    await supabaseInsert<UserRow>(config(), usersTable, [membershipRow(organisation.id, email, primaryContact, initialRole, now)]);
-    await audit(organisation.id, actor.user.email, "client_workspace.created", organisation.id, "Blank Client V1 employer workspace created.");
-    const user = await findMembership(email);
-    return toSummary(organisation, user ? [user] : []);
-  } catch (error) {
-    await supabaseDelete(config(), usersTable, `organisation_id=eq.${organisation.id}`).catch(() => undefined);
-    if (auth?.created) await authRequest(`admin/users/${encodeURIComponent(auth.user.id)}`, { method: "DELETE" }).catch(() => undefined);
-    await supabaseDelete(config(), organisationsTable, `id=eq.${organisation.id}`).catch(() => undefined);
-    throw error;
-  }
+  const receipt = await accountCommand(actor.user.id, input.requestId, "create_workspace", { name, workspaceName, primaryContact, email, role: initialRole, slug });
+  if (!receipt.organisation?.id || receipt.organisation.id !== receipt.user.organisation_id) throw new ClientWorkspaceAdminError("Workspace creation could not be confirmed. Retry the same request.", 503);
+  return toSummary(receipt.organisation, [receipt.user]);
 }
 
-export async function provisionClientWorkspaceUser(session: LevyTateBetaSession, input: { organisationId?: unknown; email?: unknown; displayName?: unknown; role?: unknown }) {
+export async function provisionClientWorkspaceUser(session: LevyTateBetaSession, input: { requestId?: unknown; organisationId?: unknown; email?: unknown; displayName?: unknown; role?: unknown }) {
   const actor = await requireWorkspaceManager(session);
   const organisationId = requiredText(input.organisationId, "Organisation", 80);
   const email = validEmail(input.email);
   const displayName = requiredText(input.displayName, "Display name", 160);
   const role = employerRole(input.role, "Employee");
   assertManagedScope(actor, organisationId, role);
-  const organisation = (await supabaseSelect<OrganisationRow>(config(), organisationsTable, new URLSearchParams({ select: "id,name,slug,workspace_name,primary_contact,contact_email,status,created_at,updated_at", id: `eq.${organisationId}`, workspace_template: "eq.levytate-client-v1", status: "eq.Active", limit: "1" })))[0];
-  if (!organisation) throw new ClientWorkspaceAdminError("The active client workspace was not found.", 404);
-  if (await findMembership(email)) throw new ClientWorkspaceAdminError("This email already has LevyTate organisation access.", 409);
-  if (!(await validateIdentityMembership({ id: "pending", organisation_id: organisationId, email, role, active: true }))) {
-    throw new ClientWorkspaceAdminError("Create exactly one active People record with the same email and role before provisioning Employee or Line Manager access.", 409);
-  }
-  const now = new Date().toISOString();
-  const auth = await ensureAuthUser(email);
-  try {
-    const row = membershipRow(organisation.id, email, displayName, role, now);
-    await supabaseInsert<UserRow>(config(), usersTable, [row]);
-    await audit(organisation.id, actor.user.email, "client_workspace.user_provisioned", row.id, `Client workspace user provisioned as ${role}.`, actor.user.role);
-    return summariseUser(row);
-  } catch (error) {
-    if (auth.created) await authRequest(`admin/users/${encodeURIComponent(auth.user.id)}`, { method: "DELETE" }).catch(() => undefined);
-    throw error;
-  }
+  const receipt = await accountCommand(actor.user.id, input.requestId, "provision_user", { organisationId, email, displayName, role });
+  return summariseUser(receipt.user);
 }
 
-export async function updateClientWorkspaceUser(session: LevyTateBetaSession, input: { userId?: unknown; role?: unknown; active?: unknown }) {
+export async function updateClientWorkspaceUser(session: LevyTateBetaSession, input: { requestId?: unknown; expectedGeneration?: unknown; userId?: unknown; role?: unknown; active?: unknown }) {
   const actor = await requireWorkspaceManager(session);
   const userId = requiredText(input.userId, "User", 80);
   const current = await managedUser(actor, userId);
   if (!current) throw new ClientWorkspaceAdminError("The client workspace user was not found.", 404);
-  const organisation = (await supabaseSelect<{ id: string }>(config(), organisationsTable, new URLSearchParams({ select: "id", id: `eq.${current.organisation_id}`, workspace_template: "eq.levytate-client-v1", limit: "1" })))[0];
-  if (!organisation) throw new ClientWorkspaceAdminError("The client workspace user was not found.", 404);
   const role = input.role === undefined ? current.role : employerRole(input.role, current.role);
   assertManagedScope(actor, current.organisation_id, role);
   if (current.id === actor.user.id && (role !== current.role || input.active === false)) throw new ClientWorkspaceAdminError("Ask another authorised administrator to change your own access.", 409);
   if (input.active !== undefined && typeof input.active !== "boolean") throw new ClientWorkspaceAdminError("Active must be true or false.");
   const active = typeof input.active === "boolean" ? input.active : current.active;
-  if (active && !current.active) throw new ClientWorkspaceAdminError("Send a new invitation to reactivate this account.", 409);
-  if (active && !(await validateIdentityMembership({ ...current, role, active }))) throw new ClientWorkspaceAdminError("This role requires exactly one matching active People record.", 409);
-  const updated = (await supabaseUpdate<UserRow>(config(), usersTable, new URLSearchParams({ id: `eq.${userId}`, organisation_id: `eq.${current.organisation_id}`, invitation_generation: `eq.${current.invitation_generation}` }).toString(), {
-    role, active, invitation_generation: current.invitation_generation + 1, ...(!active ? { auth_subject: null, auth_binding_status: "pending", auth_bound_at: null, invitation_status: "revoked", invitation_expires_at: null } : {}), updated_at: new Date().toISOString(),
-  }))[0];
-  if (!updated) throw new ClientWorkspaceAdminError("The client workspace user could not be updated.", 409);
-  await audit(current.organisation_id, actor.user.email, active ? "client_workspace.user_updated" : "client_workspace.user_revoked", userId, `Client workspace user set to ${role} and ${active ? "active" : "inactive"}.`, actor.user.role);
-  return summariseUser(updated);
+  if (!Number.isSafeInteger(input.expectedGeneration) || (input.expectedGeneration as number) < 0) throw new ClientWorkspaceAdminError("Refresh account access before editing. Your input has been kept.", 409);
+  // Do not reject the old generation here: a lost successful response must reach
+  // the database receipt before the compare-and-swap is evaluated.
+  const receipt = await accountCommand(actor.user.id, input.requestId, "update_user", { userId, role, active, expectedGeneration: input.expectedGeneration });
+  return summariseUser(receipt.user);
 }
 
-function membershipRow(organisationId: string, email: string, displayName: string, role: MvpUserRole, now: string): UserRow {
-  return { id: randomUUID(), organisation_id: organisationId, email, role, access_level: "beta_user", display_name: displayName, active: false, auth_subject: null, auth_binding_status: "pending", created_at: now, updated_at: now, invitation_status: "not_requested", invitation_generation: 0, invitation_request_reference: null, invitation_expires_at: null, invitation_requested_at: null };
+type AccountCommandReceipt = { requestId: string; command: string; organisation?: OrganisationRow; user: UserRow };
+async function accountCommand(actorId: string, request: unknown, command: string, payload: Record<string, unknown>) {
+  const requestId = requiredText(request, "Request identifier", 80);
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId)) throw new ClientWorkspaceAdminError("A valid request identifier is required.");
+  try {
+    const receipt = await supabaseFetchJson<AccountCommandReceipt>(config(), "rpc/levytate_client_admin_command", { method: "POST", body: JSON.stringify({ p_actor_user_id: actorId, p_request_id: requestId, p_command: command, p_payload: payload }) });
+    if (receipt?.requestId !== requestId || receipt.command !== command || !receipt.user?.id || !parseMvpUserRole(receipt.user.role)) throw new ClientWorkspaceAdminError("The account save could not be confirmed. Retry the same request.", 503);
+    return receipt;
+  } catch (error) {
+    if (error instanceof ClientWorkspaceAdminError) throw error;
+    const code = error instanceof Error ? error.message : "";
+    if (/^(PT403|42501)/.test(code)) throw new ClientWorkspaceAdminError("You cannot make this account change.", 403);
+    if (code.startsWith("PT404")) throw new ClientWorkspaceAdminError("The active workspace account was not found.", 404);
+    if (/^(PT409|23505|40001|40P01)/.test(code)) throw new ClientWorkspaceAdminError("Account access changed, the address is already in use, or the People linkage does not match. Refresh before changing the request.", 409);
+    if (/^(PT422|23514|23503|22)/.test(code)) throw new ClientWorkspaceAdminError("Check the account details. No partial account change was applied.", 422);
+    throw new ClientWorkspaceAdminError("The account save could not be confirmed. Keep your input and retry the same request.", 503);
+  }
 }
 
 async function requirePlatformAdmin(session: LevyTateBetaSession) {
   const context = await getLearnerLifecycleServerContext(session);
   if (normaliseMvpUserRole(context.user.role) !== "Platform Admin") throw new ClientWorkspaceAdminError("Only Platform Admin can manage client workspaces.", 403);
   return context;
-}
-
-async function findMembership(email: string) {
-  const rows = await supabaseSelect<UserRow>(config(), usersTable, new URLSearchParams({ select: userColumns, email: `eq.${email}`, limit: "2" }));
-  if (rows.length > 1) throw new ClientWorkspaceAdminError("This email has conflicting LevyTate memberships. Resolve access before continuing.", 409);
-  return rows[0] ?? null;
 }
 
 async function ensureAuthUser(email: string) {

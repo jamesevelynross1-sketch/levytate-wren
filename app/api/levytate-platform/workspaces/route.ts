@@ -21,11 +21,11 @@ export async function POST(request: Request) {
     await assertAuthenticatedWrite(request, current.email);
     if (body.action === "suspend_workspace") return reply({ ok: true, suspension: await suspendClientTenant(current, body) });
     if (body.action === "create_workspace") {
-      requireActionKeys(body, ["action", "name", "workspaceName", "primaryContact", "contactEmail", "initialRole"]);
+      requireActionKeys(body, ["action", "requestId", "name", "workspaceName", "primaryContact", "contactEmail", "initialRole"]);
       return reply({ ok: true, workspace: await createClientWorkspace(current, body) }, 201);
     }
     if (body.action === "provision_user") {
-      requireActionKeys(body, ["action", "organisationId", "email", "displayName", "role"]);
+      requireActionKeys(body, ["action", "requestId", "organisationId", "email", "displayName", "role"]);
       return reply({ ok: true, user: await provisionClientWorkspaceUser(current, body) }, 201);
     }
     if (body.action === "invite_user") {
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
   } catch (error) { return failure(error); }
 }
 export async function PATCH(request: Request) {
-  try { const body = await readBrowserJson(request, 4096); requireActionKeys(body, ["userId", "role", "active"]); const current = await session(); if (!current) return reply({ message: "Unauthorised." }, 401); await assertAuthenticatedWrite(request, current.email); return reply({ ok: true, user: await updateClientWorkspaceUser(current, body) }); }
+  try { const body = await readBrowserJson(request, 4096); requireActionKeys(body, ["requestId", "expectedGeneration", "userId", "role", "active"]); const current = await session(); if (!current) return reply({ message: "Unauthorised." }, 401); await assertAuthenticatedWrite(request, current.email); return reply({ ok: true, user: await updateClientWorkspaceUser(current, body) }); }
   catch (error) { return failure(error); }
 }
 function failure(error: unknown) { const known = error instanceof ClientWorkspaceAdminError || error instanceof ClientRequestError; return reply({ message: known ? error.message : "Client workspace administration is temporarily unavailable." }, known ? error.status : 503); }

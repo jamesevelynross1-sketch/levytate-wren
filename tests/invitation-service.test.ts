@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-const fake = vi.hoisted(() => ({ select: vi.fn(), update: vi.fn(), insert: vi.fn(), remove: vi.fn(), actor: vi.fn(), policy: vi.fn(), delivery: vi.fn(), suppress: vi.fn(), request: vi.fn(), accepted: vi.fn(), limit: vi.fn() }));
-vi.mock("@/lib/server/levytate-supabase", () => ({ getLevyTateSupabaseConfig: () => ({ url: "http://127.0.0.1:54321", serviceRoleKey: "synthetic-unit-test" }), supabaseSelect: fake.select, supabaseSelectAll: fake.select, supabaseInsert: fake.insert, supabaseUpdate: fake.update, supabaseDelete: fake.remove }));
+const fake = vi.hoisted(() => ({ select: vi.fn(), update: vi.fn(), insert: vi.fn(), remove: vi.fn(), rpc: vi.fn(), actor: vi.fn(), policy: vi.fn(), delivery: vi.fn(), suppress: vi.fn(), request: vi.fn(), accepted: vi.fn(), limit: vi.fn() }));
+vi.mock("@/lib/server/levytate-supabase", () => ({ getLevyTateSupabaseConfig: () => ({ url: "http://127.0.0.1:54321", serviceRoleKey: "synthetic-unit-test" }), supabaseSelect: fake.select, supabaseSelectAll: fake.select, supabaseInsert: fake.insert, supabaseUpdate: fake.update, supabaseDelete: fake.remove, supabaseFetchJson: fake.rpc }));
 vi.mock("@/lib/server/levytate-learner-lifecycle", () => ({ getLearnerLifecycleServerContext: fake.actor }));
 vi.mock("@/lib/server/levytate-identity-policy", () => ({ validateIdentityMembership: fake.policy }));
 vi.mock("@/lib/server/levytate-auth-rate-limit", () => ({ checkMagicLinkRequestLimits: fake.limit }));
@@ -31,6 +31,12 @@ beforeEach(() => {
   fake.update.mockImplementation(async (_config, _table, query: string, patch) => {
     if ([...new URLSearchParams(query)].some(([key, value]) => value.startsWith("eq.") && String(user[key]) !== value.slice(3))) return [];
     user = { ...user, ...patch }; return [{ ...user }];
+  });
+  fake.rpc.mockImplementation(async (_config, _path, init) => {
+    const command = JSON.parse(init.body);
+    if (command.p_payload.expectedGeneration !== user.invitation_generation) throw new Error("PT409: stale account");
+    user = { ...user, active: false, auth_subject: null, auth_binding_status: "pending", invitation_status: "revoked", invitation_generation: Number(user.invitation_generation) + 1 };
+    return { requestId: command.p_request_id, command: command.p_command, user: { ...user } };
   });
   send = vi.fn(async (url: string) => new Response(JSON.stringify(url.includes("admin/users") ? { users: [{ id: "auth-employee", email: user.email }] } : {})));
   vi.stubGlobal("fetch", send);
@@ -83,7 +89,7 @@ describe("controlled individual invitations (service boundary)", () => {
     });
     const invitation = inviteClientWorkspaceUser(session, { userId: "member", requestId, expectedGeneration: 0 }, callback, request);
     await started;
-    await updateClientWorkspaceUser(session, { userId: "member", active: false });
+    await updateClientWorkspaceUser(session, { userId: "member", role: "Employee", active: false, requestId: "00000000-0000-4000-8000-000000000003", expectedGeneration: 1 });
     finish(new Response("{}"));
     await expect(invitation).rejects.toMatchObject({ status: 409 });
     expect(user).toMatchObject({ active: false, invitation_status: "revoked", auth_subject: null });
