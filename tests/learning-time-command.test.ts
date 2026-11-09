@@ -38,7 +38,7 @@ describe("Learning Time service transition permissions (not hosted or real-auth 
   });
   it.each([
     ["Employee","employer_check"],["Employee","request_information"],["Employee","mark_not_counted"],
-    ["Line Manager","withdraw"],["Line Manager","employer_check"],["Line Manager","request_information"],["Line Manager","mark_not_counted"],
+    ["Line Manager","employer_check"],["Line Manager","request_information"],["Line Manager","mark_not_counted"],
     ["Apprenticeship Lead","withdraw"],["Employer Admin","withdraw"],
   ])("denies %s %s before a legacy state error can disguise the permission denial",async(role,action)=>{
     transport.context.mockResolvedValue({organisation:{id:"tenant"},user:{id:"actor",role}});
@@ -46,7 +46,7 @@ describe("Learning Time service transition permissions (not hosted or real-auth 
     expect(transport.rpc).not.toHaveBeenCalled();
   });
   it.each([
-    ["Employee","withdraw"],["Apprenticeship Lead","employer_check"],["Apprenticeship Lead","request_information"],["Apprenticeship Lead","mark_not_counted"],
+    ["Employee","withdraw"],["Line Manager","withdraw"],["Apprenticeship Lead","employer_check"],["Apprenticeship Lead","request_information"],["Apprenticeship Lead","mark_not_counted"],
     ["Employer Admin","employer_check"],["Employer Admin","request_information"],["Employer Admin","mark_not_counted"],
   ])("keeps %s %s subject to the transactional ownership and state checks",async(role,action)=>{
     transport.context.mockResolvedValue({organisation:{id:"tenant"},user:{id:"actor",role}});

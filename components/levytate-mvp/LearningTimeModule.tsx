@@ -122,15 +122,19 @@ export function LearningTimeModule() {
     {notice ? <MessageState title="Learning Time updated" copy={notice} tone="success" /> : null}
     {!workspace.learners.length ? <EmptyState role={workspace.role} /> : <>
       {workspace.learners.length > 1 ? <label htmlFor="learning-time-learner" className="grid max-w-xl gap-2 text-xs font-semibold text-[#102c3d]/65">Learner
-        <select id="learning-time-learner" value={selectedLearner?.learnerRecordId ?? ""} onChange={(event) => setSelectedLearnerId(event.target.value)} className={inputClass}><option value="">Choose learner</option>{workspace.learners.map((learner) => <option key={learner.learnerRecordId} value={learner.learnerRecordId}>{learner.learnerName} · {learner.programmeName}</option>)}</select>
+        <select id="learning-time-learner" value={selectedLearner?.learnerRecordId ?? ""} onChange={(event) => setSelectedLearnerId(event.target.value)} className={inputClass}><option value="">Choose learner</option>{workspace.learners.map((learner) => <option key={learner.learnerRecordId} value={learner.learnerRecordId}>{learner.canCreateActivities ? "My learning · " : ""}{learner.learnerName} · {learner.programmeName}</option>)}</select>
       </label> : null}
       {selectedLearner ? <LearnerSummary learner={selectedLearner} /> : null}
-      {selectedLearner && workspace.canCreateActivities ? <EmployeeLearningTime learner={selectedLearner} busy={busy} act={act} /> : null}
-      {selectedLearner && workspace.canManagePlans ? <EmployerLearningTime learner={selectedLearner} busy={busy} act={act} /> : null}
-      {selectedLearner && !workspace.canCreateActivities && !workspace.canManagePlans ? <ManagerLearningTime learner={selectedLearner} /> : null}
+      {selectedLearner ? <LearningTimeLearnerContent key={selectedLearner.learnerRecordId} workspace={workspace} learner={selectedLearner} busy={busy} act={act} /> : null}
     </>}
     <p className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f6f9f7] px-4 py-3 text-xs leading-5 text-[#102c3d]/55">{workspace.regulatoryNotice}</p>
   </div></fieldset></div>;
+}
+
+export function LearningTimeLearnerContent({ workspace, learner, busy, act }: { workspace: LearningTimeWorkspace; learner: LearningTimeLearnerView; busy: boolean; act: (body: JsonRecord, success: string) => Promise<boolean> }) {
+  if (learner.canCreateActivities) return <EmployeeLearningTime learner={learner} busy={busy} act={act} />;
+  if (workspace.canManagePlans) return <EmployerLearningTime learner={learner} busy={busy} act={act} />;
+  return <ManagerLearningTime learner={learner} />;
 }
 
 function EmployeeLearningTime({ learner, busy, act }: { learner: LearningTimeLearnerView; busy: boolean; act: (body: JsonRecord, success: string) => Promise<boolean> }) {

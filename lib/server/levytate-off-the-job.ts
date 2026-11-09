@@ -84,6 +84,7 @@ export async function getLearningTimeWorkspace(session: LevyTateBetaSession): Pr
     order: "name.asc,id.asc",
   }));
   const visibleEmployees = scopedEmployees(role, user.email, employees);
+  const ownEmployee = ownLearningEmployee(user.email, employees);
   const employeeIds = visibleEmployees.map((employee) => employee.id);
   if (!employeeIds.length) return emptyWorkspace(role);
 
@@ -108,7 +109,9 @@ export async function getLearningTimeWorkspace(session: LevyTateBetaSession): Pr
   const planVersions = await selectByIds<PlanVersionRow>("levytate_otj_plan_versions", "plan_id", planIds, planVersionSelect, organisation.id);
   const versionIds = planVersions.map((version) => version.id);
   const priorities = await selectByIds<PriorityRow>("levytate_otj_learning_priorities", "plan_version_id", versionIds, prioritySelect, organisation.id);
-  const visibleActivities = activities.filter((activity) => role === "Employee" || activity.status !== "draft");
+  const ownLearnerIds = new Set(learnerRows.filter((learner) => learner.employee_id === ownEmployee?.id).map((learner) => learner.id));
+  const visibleActivities = activities.filter((activity) => activity.status !== "draft"
+    || ((role === "Employee" || role === "Line Manager") && ownLearnerIds.has(activity.learner_record_id) && activity.created_by_user_id === user.id));
   const confirmations = await selectByIds<ConfirmationRow>("levytate_otj_activity_confirmations", "activity_id", visibleActivities.map((activity) => activity.id), confirmationSelect, organisation.id);
   const recorderIds = [...new Set(confirmations.map((confirmation) => confirmation.recorded_by))];
   const recorderLabels = await selectByIds<UserLabelRow>("levytate_users", "id", recorderIds, "id,display_name,email", organisation.id);
@@ -154,6 +157,7 @@ export async function getLearningTimeWorkspace(session: LevyTateBetaSession): Pr
     return [{
       learnerRecordId: learner.id,
       employeeId: learner.employee_id,
+      canCreateActivities: (role === "Employee" || role === "Line Manager") && ownLearnerIds.has(learner.id),
       learnerName: employee.name,
       jobTitle: employee.job_title,
       department: employee.department,
@@ -180,7 +184,7 @@ export async function getLearningTimeWorkspace(session: LevyTateBetaSession): Pr
     capabilityEnabled: true,
     canManagePlans: role === "Apprenticeship Lead" || role === "Employer Admin",
     canReviewActivities: role === "Apprenticeship Lead" || role === "Employer Admin",
-    canCreateActivities: role === "Employee",
+    canCreateActivities: learners.some((learner) => learner.canCreateActivities),
     learners,
     portfolio: {
       activeLearnerPlans: learners.filter((learner) => learner.plan?.status === "published").length,
@@ -196,16 +200,16 @@ export async function getLearningTimeWorkspace(session: LevyTateBetaSession): Pr
 
 export async function saveLearningTimeActivity(session: LevyTateBetaSession, input: LearningTimeActivityInput) {
   const { organisation, user } = await authorisedContext(session);
-  if (normaliseMvpUserRole(user.role) !== "Employee") throw new LevyTateLearningTimeError("Only an employee may create their own learning-time activity.", 403);
+  assertPersonalEvidenceRole(user.role);
   assertActivityInput(input);
+  const config = requireConfig();
+  const employee = ownLearningEmployee(user.email, await supabaseSelectAll<EmployeeRow>(config, "levytate_employees", new URLSearchParams({
+    select: "id,name,email,job_title,department,site,manager_id,status", organisation_id: `eq.${organisation.id}`,
+    status: "eq.Active", order: "id.asc",
+  })));
+  if (!employee) throw new LevyTateLearningTimeError("Your unique active employee record could not be found.", 403);
   const previous = await probeLearningTimeCommand<ActivityRow>(organisation.id,user.id,"save_activity",input as unknown as Record<string,unknown>);
   if (previous) return { activity: previous, assessment: { outcome: previous.deterministic_outcome, durationMinutes: previous.duration_minutes, reasons: stringArray(previous.deterministic_reasons), passedTests: [], failedTests: [], clarificationItems: [], warnings: [] } };
-  const config = requireConfig();
-  const employee = (await supabaseSelect<EmployeeRow>(config, "levytate_employees", new URLSearchParams({
-    select: "id,name,email,job_title,department,site,manager_id,status", organisation_id: `eq.${organisation.id}`,
-    email: `eq.${user.email.toLowerCase()}`, status: "eq.Active", limit: "1",
-  })))[0];
-  if (!employee) throw new LevyTateLearningTimeError("Your active employee record could not be found.", 403);
   const learner = (await supabaseSelect<LearnerRow>(config, "levytate_learner_records", new URLSearchParams({
     select: "id,employee_id,programme_id,provider_id,lifecycle_status,actual_start_date,expected_start_date,expected_end_date,record_status",
     organisation_id: `eq.${organisation.id}`, id: `eq.${input.learnerRecordId}`, employee_id: `eq.${employee.id}`, record_status: "eq.Active", limit: "1",
@@ -284,6 +288,7 @@ export async function saveLearningTimeActivity(session: LevyTateBetaSession, inp
 
 export async function submitLearningTimeActivity(session: LevyTateBetaSession, input: { activityId: string; lockVersion: number; idempotencyKey: string }) {
   const { organisation, user } = await authorisedContext(session);
+  assertPersonalEvidenceRole(user.role);
   const [activity] = await supabaseSelect<Pick<ActivityRow, "id" | "lock_version" | "deterministic_reasons">>(
     requireConfig(),
     "levytate_otj_activities",
@@ -305,7 +310,7 @@ export async function submitLearningTimeActivity(session: LevyTateBetaSession, i
 export async function transitionLearningTimeActivity(session: LevyTateBetaSession, input: { activityId: string; action: string; note: string; lockVersion: number; idempotencyKey: string }) {
   const { organisation, user } = await authorisedContext(session);
   const role = normaliseMvpUserRole(user.role);
-  const mayWithdraw = role === "Employee" && input.action === "withdraw";
+  const mayWithdraw = (role === "Employee" || role === "Line Manager") && input.action === "withdraw";
   const mayReview = (role === "Apprenticeship Lead" || role === "Employer Admin")
     && ["request_information", "employer_check", "mark_not_counted"].includes(input.action);
   if (!mayWithdraw && !mayReview) throw new LevyTateLearningTimeError("This Learning Time action is not permitted for your current role.", 403);
@@ -416,10 +421,19 @@ async function authorisedContext(session: LevyTateBetaSession) {
 
 function scopedEmployees(role: MvpUserRole, email: string, employees: EmployeeRow[]) {
   if (role === "Apprenticeship Lead" || role === "Employer Admin") return employees;
-  const current = employees.find((employee) => employee.email.trim().toLowerCase() === email.trim().toLowerCase());
+  const current = ownLearningEmployee(email, employees);
   if (!current) return [];
-  if (role === "Line Manager") return employees.filter((employee) => employee.manager_id === current.id);
+  if (role === "Line Manager") return [current, ...employees.filter((employee) => employee.id !== current.id && employee.manager_id === current.id)];
   return [current];
+}
+
+function ownLearningEmployee(email: string, employees: EmployeeRow[]) {
+  const current = employees.filter((employee) => employee.status === "Active" && employee.email.trim().toLowerCase() === email.trim().toLowerCase());
+  return email.trim() && current.length === 1 ? current[0] : null;
+}
+
+function assertPersonalEvidenceRole(role: string) {
+  if (!["Employee", "Line Manager"].includes(normaliseMvpUserRole(role))) throw new LevyTateLearningTimeError("Only the individual may create or submit their own learning-time activity.", 403);
 }
 
 function emptyWorkspace(role: MvpUserRole): LearningTimeWorkspace {
@@ -427,7 +441,7 @@ function emptyWorkspace(role: MvpUserRole): LearningTimeWorkspace {
     generatedAt: new Date().toISOString(), role, capabilityEnabled: true,
     canManagePlans: role === "Apprenticeship Lead" || role === "Employer Admin",
     canReviewActivities: role === "Apprenticeship Lead" || role === "Employer Admin",
-    canCreateActivities: role === "Employee", learners: [],
+    canCreateActivities: false, learners: [],
     portfolio: { activeLearnerPlans: 0, providerConfirmedMinutes: 0, candidateMinutesAwaitingCheck: 0, activitiesAwaitingProviderConfirmation: 0, plansNeedingSetup: 0, operationalAttention: 0 },
     regulatoryNotice,
   };

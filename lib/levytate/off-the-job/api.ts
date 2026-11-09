@@ -89,6 +89,7 @@ export type LearningTimeActivityView = {
 export type LearningTimeLearnerView = {
   learnerRecordId: string;
   employeeId: string;
+  canCreateActivities: boolean;
   learnerName: string;
   jobTitle: string;
   department: string;
