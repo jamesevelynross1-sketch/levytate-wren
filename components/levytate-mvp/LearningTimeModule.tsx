@@ -5,6 +5,7 @@ import { decodeLearningTimeMutationResponse } from "@/lib/levytate/client-module
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { usePinnedClientMutation } from "@/components/levytate-mvp/usePinnedClientMutation";
 import { ClientMutationRecovery } from "@/components/levytate-mvp/ClientMutationRecovery";
+import { decodeLearningTimeReadResponse } from "@/lib/levytate/client-module-reads";
 
 import { AlertCircle, CheckCircle2, LoaderCircle, Plus, Send, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
@@ -67,8 +68,9 @@ export function LearningTimeModule() {
     setLoading(true); setError("");
     try {
       const response = await authenticatedClientFetch("/api/levytate-learning-time", {}, identity.current ?? undefined);
-      const payload = await response.json() as LearningTimeWorkspace & { message?: string };
-      if (!response.ok) throw new Error(payload.message || "Learning Time is unavailable.");
+      const body: unknown = await response.json();
+      if (!response.ok) throw new Error("Learning Time is unavailable. Retry to load the current workspace.");
+      const payload = decodeLearningTimeReadResponse(body);
       setWorkspace(payload);
       const requested = new URLSearchParams(window.location.search).get("learner") ?? "";
       setSelectedLearnerId((current) => current || (payload.learners.some((entry) => entry.learnerRecordId === requested) ? requested : payload.learners[0]?.learnerRecordId || ""));

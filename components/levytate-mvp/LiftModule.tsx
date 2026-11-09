@@ -2,13 +2,14 @@
 
 import { ArrowRight, CheckCircle2, CircleDashed, ClipboardCheck, Info, LockKeyhole, Printer, RefreshCw, ShieldCheck, TriangleAlert, Users } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { LiftActionInput, LiftWorkspaceResponse } from "@/lib/levytate/lift/api";
+import type { LiftActionInput } from "@/lib/levytate/lift/api";
 import { liftCapabilityLabels, liftWorkflowGroupLabels, type LiftAnswerMap, type LiftDecisionOption, type LiftOpportunity, type LiftWorkflowGroup, type LiftWorkspace } from "@/lib/levytate/lift/domain";
 import { calculateLiftCapacityValue } from "@/lib/levytate/lift/value";
 import { authenticatedClientFetch, type ClientIdentity } from "@/lib/levytate/client-session";
 import { decodeLiftMutationResponse } from "@/lib/levytate/client-module-responses";
 import { usePinnedClientMutation } from "@/components/levytate-mvp/usePinnedClientMutation";
 import { ClientMutationRecovery } from "@/components/levytate-mvp/ClientMutationRecovery";
+import { decodeLiftReadResponse } from "@/lib/levytate/client-module-reads";
 
 const panel = "rounded-2xl border border-[#102c3d]/[0.08] bg-white shadow-[0_14px_40px_rgba(16,44,61,0.055)]";
 const button = "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#102c3d] px-4 text-sm font-semibold text-white transition hover:bg-[#183f50] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/25 disabled:opacity-50";
@@ -32,10 +33,11 @@ export function LiftModule({ initialWorkspace = null, initialLeaderView = "Oppor
     try {
       if (!account.current) { setMessage("This illustrative preview cannot save changes."); return; }
       const response = await authenticatedClientFetch("/api/levytate-lift", {}, account.current);
-      const payload = await response.json() as LiftWorkspaceResponse;
-      if (!response.ok || (!("ok" in payload) || payload.ok !== true)) throw new Error("message" in payload ? payload.message : "Lift could not be loaded.");
-      setWorkspace(payload.workspace);
-      workspaceRevision.current = payload.workspace.mutationRevision;
+      const body: unknown = await response.json();
+      if (!response.ok) throw new Error("Lift could not be loaded. Retry to load the current workspace.");
+      const next = decodeLiftReadResponse(body);
+      setWorkspace(next);
+      workspaceRevision.current = next.mutationRevision;
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Lift could not be loaded.");
     } finally { setLoading(false); }
