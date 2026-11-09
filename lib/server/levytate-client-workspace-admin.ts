@@ -1,14 +1,13 @@
-import { randomUUID } from "node:crypto";
 import type { LevyTateBetaSession } from "@/lib/levytate/config/beta-access";
 import { normaliseBetaEmail } from "@/lib/levytate/config/beta-access";
 import { normaliseMvpUserRole, parseMvpUserRole, type MvpUserRole } from "@/lib/levytate/mvp/rbac";
 import { findAuthIdentityByEmail } from "@/lib/server/levytate-auth-directory";
 import { validateIdentityMembership } from "@/lib/server/levytate-identity-policy";
 import { invitationDisplayState, type ClientInvitationFields } from "@/lib/levytate/mvp/invitations";
-import { getAuthenticationDeliveryStatus, recordAuthenticationEmailAccepted, recordAuthenticationEmailRequest, shouldSuppressAuthenticationEmail } from "@/lib/server/levytate-auth-email-delivery";
+import { getAuthenticationDeliveryStatus, getAuthenticationSendOutcome, recordAuthenticationEmailAccepted, recordAuthenticationEmailRequest, shouldSuppressAuthenticationEmail } from "@/lib/server/levytate-auth-email-delivery";
 import { checkMagicLinkRequestLimits } from "@/lib/server/levytate-auth-rate-limit";
 import { getLearnerLifecycleServerContext } from "@/lib/server/levytate-learner-lifecycle";
-import { getLevyTateSupabaseConfig, supabaseFetchJson, supabaseInsert, supabaseSelect, supabaseSelectAll, supabaseUpdate } from "@/lib/server/levytate-supabase";
+import { getLevyTateSupabaseConfig, supabaseFetchJson, supabaseSelect, supabaseSelectAll } from "@/lib/server/levytate-supabase";
 
 const organisationsTable = "levytate_organisations";
 const usersTable = "levytate_users";
@@ -124,10 +123,6 @@ async function authRequest(path: string, init: RequestInit = {}) {
   return fetch(`${value.url}/auth/v1/${path}`, { ...init, headers: { apikey: value.serviceRoleKey, Authorization: `Bearer ${value.serviceRoleKey}`, "Content-Type": "application/json", ...(init.headers ?? {}) }, cache: "no-store" });
 }
 
-async function audit(organisationId: string, actorEmail: string, action: string, entityId: string, summary: string, actorRole = "Platform Admin") {
-  await supabaseInsert(config(), "levytate_audit_events", [{ id: randomUUID(), organisation_id: organisationId, actor_email: actorEmail, actor_role: actorRole, entity_type: "client_workspace", entity_id: entityId, action, summary, metadata: {}, created_at: new Date().toISOString() }]);
-}
-
 async function toSummary(organisation: OrganisationRow, users: UserRow[]): Promise<ClientWorkspaceSummary> {
   return { id: organisation.id, name: organisation.name, slug: organisation.slug, workspaceName: organisation.workspace_name, status: organisation.status, createdAt: organisation.created_at, users: await Promise.all(users.map(summariseUser)) };
 }
@@ -179,25 +174,24 @@ export async function inviteClientWorkspaceUser(session: LevyTateBetaSession, in
   const requestId = requiredText(input.requestId, "Invitation request", 80);
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId)) throw new ClientWorkspaceAdminError("A valid invitation request is required.");
   const current = await managedUser(actor, userId);
-  if (current.invitation_request_reference === requestId) return summariseUser(current);
+  if (current.invitation_request_reference === requestId) {
+    if (current.invitation_status === "sending") {
+      const outcome = await getAuthenticationSendOutcome(current.email, requestId);
+      if (outcome !== null) return summariseUser((await invitationCommand(actor.user.id, current.id, requestId, current.invitation_generation, "finish", outcome)).user);
+    }
+    return summariseUser(current);
+  }
   if (!Number.isSafeInteger(input.expectedGeneration) || input.expectedGeneration !== current.invitation_generation) throw new ClientWorkspaceAdminError("Access changed. Refresh the users before sending an invitation.", 409);
   if (current.invitation_status === "sending" && Date.parse(current.invitation_requested_at ?? "") > Date.now() - 120_000) throw new ClientWorkspaceAdminError("An invitation is already being sent. Refresh to check its outcome.", 409);
   if (!(await validateIdentityMembership({ ...current, active: true }))) throw new ClientWorkspaceAdminError("Create exactly one matching active People record before inviting this user.", 409);
   if (!(await checkMagicLinkRequestLimits(request, current.email)).allowed) throw new ClientWorkspaceAdminError("Please wait before sending another invitation.", 429);
   if (await shouldSuppressAuthenticationEmail(current.email)) throw new ClientWorkspaceAdminError("Delivery is suppressed for this address. Resolve the delivery failure before reinviting.", 409);
-  const auth = await ensureAuthUser(current.email);
-  const now = new Date().toISOString();
-  const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-  const generation = current.invitation_generation + 1;
-  const claim = await supabaseUpdate<UserRow>(config(), usersTable, new URLSearchParams({ id: `eq.${current.id}`, organisation_id: `eq.${current.organisation_id}`, invitation_generation: `eq.${current.invitation_generation}` }).toString(), {
-    invitation_generation: generation, invitation_status: "sending", invitation_request_reference: requestId,
-    invitation_requested_at: now, invitation_expires_at: expiresAt, updated_at: now,
-  });
-  if (claim.length !== 1) throw new ClientWorkspaceAdminError("Another access change completed first. Refresh before retrying.", 409);
+  const claim = await invitationCommand(actor.user.id, current.id, requestId, current.invitation_generation, "reserve");
+  if (!claim.sendAllowed) return summariseUser(claim.user);
   let accepted = false;
   try {
+    const auth = await ensureAuthUser(current.email);
     await recordAuthenticationEmailRequest(current.email, requestId);
-    await audit(current.organisation_id, actor.user.email, "client_workspace.invitation_requested", current.id, "A controlled individual invitation was requested.", actor.user.role);
     // Closed registration must stay closed. GoTrue's public OTP route treats an
     // unconfirmed identity as signup even when create_user=false; the admin invite
     // route is the supported way to verify that invited identity's first email.
@@ -210,12 +204,23 @@ export async function inviteClientWorkspaceUser(session: LevyTateBetaSession, in
     // An unknown transport/evidence outcome must never be labelled delivered or retried automatically.
     await recordAuthenticationEmailAccepted(current.email, requestId, false).catch(() => undefined);
   }
-  const saved = await supabaseUpdate<UserRow>(config(), usersTable, new URLSearchParams({ id: `eq.${current.id}`, organisation_id: `eq.${current.organisation_id}`, invitation_generation: `eq.${generation}`, invitation_request_reference: `eq.${requestId}`, invitation_status: "eq.sending" }).toString(), {
-    invitation_status: accepted ? "accepted" : "failed", active: accepted || current.active, updated_at: new Date().toISOString(),
-  });
-  if (saved.length !== 1) throw new ClientWorkspaceAdminError("Access changed while the invitation was sending. Refresh to check its recorded outcome.", 409);
-  await audit(current.organisation_id, actor.user.email, accepted ? "client_workspace.invitation_accepted" : "client_workspace.invitation_failed", current.id, accepted ? "Invitation accepted by authentication provider; inbox delivery is not yet confirmed." : "Invitation delivery could not be confirmed. No automatic resend was attempted.", actor.user.role);
-  return summariseUser(saved[0]);
+  const saved = await invitationCommand(actor.user.id, current.id, requestId, claim.user.invitation_generation, "finish", accepted);
+  return summariseUser(saved.user);
+}
+
+async function invitationCommand(actorId: string, userId: string, requestId: string, generation: number, phase: "reserve" | "finish", accepted: boolean | null = null) {
+  try {
+    const result = await supabaseFetchJson<{ user: UserRow; sendAllowed: boolean }>(config(), "rpc/levytate_client_invitation_command", { method: "POST", body: JSON.stringify({ p_actor_user_id: actorId, p_user_id: userId, p_request_id: requestId, p_expected_generation: generation, p_phase: phase, p_accepted: accepted }) });
+    if (result?.user?.id !== userId || result.user.invitation_request_reference !== requestId || typeof result.sendAllowed !== "boolean") throw new ClientWorkspaceAdminError("Invitation outcome could not be confirmed. Retry the same request; do not send another automatically.", 503);
+    return result;
+  } catch (error) {
+    if (error instanceof ClientWorkspaceAdminError) throw error;
+    const code = error instanceof Error ? error.message : "";
+    if (/^(PT403|42501)/.test(code)) throw new ClientWorkspaceAdminError("You cannot manage this invitation.", 403);
+    if (code.startsWith("PT404")) throw new ClientWorkspaceAdminError("The invitation account was not found.", 404);
+    if (/^(PT409|23505|40001|40P01)/.test(code)) throw new ClientWorkspaceAdminError("Access changed while this invitation was being processed. Refresh to check its recorded outcome.", 409);
+    throw new ClientWorkspaceAdminError("Invitation outcome could not be confirmed. Retry the same request; no automatic resend will occur.", 503);
+  }
 }
 
 function config() { const value = getLevyTateSupabaseConfig(); if (!value) throw new ClientWorkspaceAdminError("Client workspace administration is unavailable.", 503); return value; }

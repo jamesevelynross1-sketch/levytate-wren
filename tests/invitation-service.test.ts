@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-const fake = vi.hoisted(() => ({ select: vi.fn(), update: vi.fn(), insert: vi.fn(), remove: vi.fn(), rpc: vi.fn(), actor: vi.fn(), policy: vi.fn(), delivery: vi.fn(), suppress: vi.fn(), request: vi.fn(), accepted: vi.fn(), limit: vi.fn() }));
+const fake = vi.hoisted(() => ({ select: vi.fn(), update: vi.fn(), insert: vi.fn(), remove: vi.fn(), rpc: vi.fn(), actor: vi.fn(), policy: vi.fn(), delivery: vi.fn(), outcome: vi.fn(), suppress: vi.fn(), request: vi.fn(), accepted: vi.fn(), limit: vi.fn() }));
 vi.mock("@/lib/server/levytate-supabase", () => ({ getLevyTateSupabaseConfig: () => ({ url: "http://127.0.0.1:54321", serviceRoleKey: "synthetic-unit-test" }), supabaseSelect: fake.select, supabaseSelectAll: fake.select, supabaseInsert: fake.insert, supabaseUpdate: fake.update, supabaseDelete: fake.remove, supabaseFetchJson: fake.rpc }));
 vi.mock("@/lib/server/levytate-learner-lifecycle", () => ({ getLearnerLifecycleServerContext: fake.actor }));
 vi.mock("@/lib/server/levytate-identity-policy", () => ({ validateIdentityMembership: fake.policy }));
 vi.mock("@/lib/server/levytate-auth-rate-limit", () => ({ checkMagicLinkRequestLimits: fake.limit }));
-vi.mock("@/lib/server/levytate-auth-email-delivery", () => ({ getAuthenticationDeliveryStatus: fake.delivery, shouldSuppressAuthenticationEmail: fake.suppress, recordAuthenticationEmailRequest: fake.request, recordAuthenticationEmailAccepted: fake.accepted }));
+vi.mock("@/lib/server/levytate-auth-email-delivery", () => ({ getAuthenticationDeliveryStatus: fake.delivery, getAuthenticationSendOutcome: fake.outcome, shouldSuppressAuthenticationEmail: fake.suppress, recordAuthenticationEmailRequest: fake.request, recordAuthenticationEmailAccepted: fake.accepted }));
 import { inviteClientWorkspaceUser, provisionClientWorkspaceUser, updateClientWorkspaceUser } from "../lib/server/levytate-client-workspace-admin";
 import { invitationAllowsActivation, invitationDisplayState } from "../lib/levytate/mvp/invitations";
 import type { LevyTateBetaSession } from "../lib/levytate/config/beta-access";
@@ -22,6 +22,7 @@ beforeEach(() => {
   fake.policy.mockResolvedValue({ role: "Employee", employeeId: "person" });
   fake.suppress.mockResolvedValue(false); fake.limit.mockResolvedValue({ allowed: true });
   fake.delivery.mockResolvedValue({ status: "accepted" }); fake.request.mockResolvedValue(requestId); fake.accepted.mockResolvedValue(undefined);
+  fake.outcome.mockResolvedValue(null);
   fake.insert.mockImplementation(async (_config, _table, rows) => rows);
   fake.select.mockImplementation(async (_config, table, query: URLSearchParams) => {
     if (table === "levytate_organisations") return [{ id: "tenant-a", status: "Active" }];
@@ -34,6 +35,16 @@ beforeEach(() => {
   });
   fake.rpc.mockImplementation(async (_config, _path, init) => {
     const command = JSON.parse(init.body);
+    if (_path.endsWith("levytate_client_invitation_command")) {
+      if (command.p_expected_generation !== user.invitation_generation) throw new Error("PT409: stale invitation");
+      if (command.p_phase === "reserve") {
+        user = { ...user, invitation_status: "sending", invitation_generation: Number(user.invitation_generation) + 1, invitation_request_reference: command.p_request_id, invitation_requested_at: new Date().toISOString(), invitation_expires_at: new Date(Date.now() + 3600000).toISOString() };
+        return { user: { ...user }, sendAllowed: true };
+      }
+      if (user.invitation_status !== "sending") throw new Error("PT409: not pending");
+      user = { ...user, invitation_status: command.p_accepted ? "accepted" : "failed", active: command.p_accepted || user.active };
+      return { user: { ...user }, sendAllowed: false };
+    }
     if (command.p_payload.expectedGeneration !== user.invitation_generation) throw new Error("PT409: stale account");
     user = { ...user, active: false, auth_subject: null, auth_binding_status: "pending", invitation_status: "revoked", invitation_generation: Number(user.invitation_generation) + 1 };
     return { requestId: command.p_request_id, command: command.p_command, user: { ...user } };
@@ -63,6 +74,30 @@ describe("controlled individual invitations (service boundary)", () => {
     const result = await inviteClientWorkspaceUser(session, { userId: "member", requestId, expectedGeneration: 0 }, callback, request);
     expect(result).toMatchObject({ active: false, invitationStatus: "failed" });
     expect(invitationAllowsActivation(user)).toBe(false);
+  });
+  it("does not touch Auth when atomic reservation/audit is unavailable", async () => {
+    fake.rpc.mockRejectedValueOnce(new Error("55000: audit unavailable"));
+    await expect(inviteClientWorkspaceUser(session, { userId: "member", requestId, expectedGeneration: 0 }, callback, request)).rejects.toMatchObject({ status: 503 });
+    expect(send).not.toHaveBeenCalled(); expect(fake.request).not.toHaveBeenCalled();
+  });
+  it("reconciles known provider acceptance after an interrupted final commit without resending", async () => {
+    const implementation = fake.rpc.getMockImplementation()!;
+    let fail = true;
+    fake.rpc.mockImplementation(async (...args) => {
+      if (JSON.parse(args[2].body).p_phase === "finish" && fail) { fail = false; throw new Error("55000: audit unavailable"); }
+      return implementation(...args);
+    });
+    const input = { userId: "member", requestId, expectedGeneration: 0 };
+    await expect(inviteClientWorkspaceUser(session, input, callback, request)).rejects.toMatchObject({ status: 503 });
+    expect(user.invitation_status).toBe("sending");
+    fake.outcome.mockResolvedValueOnce(true);
+    expect(await inviteClientWorkspaceUser(session, input, callback, request)).toMatchObject({ active: true, invitationStatus: "accepted" });
+    expect(send.mock.calls.filter(([url]) => url.includes("/invite?"))).toHaveLength(1);
+  });
+  it("keeps an unknown in-flight outcome pending and never sends on replay", async () => {
+    user = { ...user, invitation_request_reference: requestId, invitation_status: "sending", invitation_generation: 1 };
+    expect(await inviteClientWorkspaceUser(session, { userId: "member", requestId, expectedGeneration: 0 }, callback, request)).toMatchObject({ invitationStatus: "sending" });
+    expect(send).not.toHaveBeenCalled(); expect(fake.rpc).not.toHaveBeenCalled();
   });
   it("does not send when People linkage is absent or delivery is suppressed", async () => {
     fake.policy.mockResolvedValueOnce(null);

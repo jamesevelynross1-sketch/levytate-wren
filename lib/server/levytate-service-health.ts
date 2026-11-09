@@ -27,7 +27,7 @@ export const LEVYTATE_READINESS_CACHE_MS = 10_000;
 export const LEVYTATE_MIGRATION_BASELINE = "039 (038 intentionally unapplied)";
 
 const criticalChecks = [
-  { key: "membership", kind: "table", table: "levytate_users", column: "id,active,auth_binding_status,invitation_generation", label: "Membership and invitation schema" },
+  { key: "membership", kind: "table", table: "levytate_users", column: "id,active,auth_binding_status,invitation_generation,invitation_actor_user_id", label: "Membership and invitation schema" },
   { key: "terms", kind: "table", table: "levytate_early_access_terms_acceptances", column: "id", label: "Terms acceptance schema" },
   { key: "security", kind: "table", table: "levytate_audit_events", column: "id", label: "Authentication security events" },
   { key: "rate-limit-operation", kind: "auth-rate-limit", label: "Authentication rate-limit operation" },
