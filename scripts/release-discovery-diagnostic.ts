@@ -1,0 +1,21 @@
+/** Service diagnosis after a genuine browser failure; not Auth proof.
+ * This diagnosis is read-only and never replays an application command. */
+import{readFileSync}from"node:fs";
+import{createHash}from"node:crypto";
+async function main(){
+ const root=process.env.RELEASE_LOCAL_RUNTIME;if(!root?.startsWith("/private/tmp/levytate-release-runtime."))throw new Error("Dedicated local runtime required");
+ const state=JSON.parse(readFileSync(`${root}/private-stack-state.json`,"utf8")),fixture=JSON.parse(readFileSync(`${root}/fixture-manifest.json`,"utf8"));
+ if(new URL(state.env.API_URL).hostname!=="127.0.0.1"||!fixture.synthetic||fixture.environment!=="local")throw new Error("Local fixture only");
+ process.env.NEXT_PUBLIC_SUPABASE_URL=state.env.API_URL;process.env.SUPABASE_SERVICE_ROLE_KEY=state.env.SERVICE_ROLE_KEY;
+ const transport=globalThis.fetch.bind(globalThis);
+ globalThis.fetch=async(input,init)=>{const response=await transport(input,init),url=new URL(input instanceof Request?input.url:String(input));if(url.origin===new URL(state.env.API_URL).origin&&url.pathname==="/rest/v1/rpc/levytate_apply_operational_action"&&!response.ok){const payload=await response.clone().json().catch(()=>null);console.log(JSON.stringify({diagnostic:"operational-rpc-error",status:response.status,code:typeof payload?.code==="string"&&/^[A-Z0-9]{5}$/.test(payload.code)?payload.code:"unclassified"}));}return response;};
+ const selected=process.env.RELEASE_DIAGNOSTIC_USER??"a:employee";if(!/^[ab]:(employee|manager|lead)$/.test(selected))throw new Error("Exact synthetic role required");const [tenantKey,userKey]=selected.split(":");const tenant=fixture.tenants.find((t:{key:string})=>t.key===tenantKey);const user=tenant.users.find((u:{key:string})=>u.key===userKey),r=await fetch(`${state.env.API_URL}/rest/v1/levytate_users?id=eq.${user.membershipId}&select=auth_subject`,{headers:{apikey:state.env.SERVICE_ROLE_KEY,Authorization:`Bearer ${state.env.SERVICE_ROLE_KEY}`}}),rows=await r.json();
+ const {getWorkspaceBootstrapForSession}=await import("../lib/server/levytate-workspace");
+ const {decodeWorkspaceResponse}=await import("../lib/levytate/mvp/workspace-response");
+ const session={email:user.email,authSubject:rows[0].auth_subject,authMode:"supabase_email" as const,accessLevel:"beta_user" as const,issuedAt:Math.floor(Date.now()/1000),expiresAt:Math.floor(Date.now()/1000)+300};
+ try{const data=await getWorkspaceBootstrapForSession(session);decodeWorkspaceResponse({ok:true,workspace:data},{email:user.email,organisationId:tenant.id});
+ const {availablePersonalProgrammes}=await import("../lib/levytate/mvp/programme-discovery");
+ console.log(JSON.stringify({diagnostic:"read-only-fictional-projection",selected,availableClient:availablePersonalProgrammes(data.data,user.email).map(x=>x.programme.id),programmes:data.data.providerProgrammes.map(p=>({id:p.id,providerId:p.providerId,status:p.status,recordStatus:p.recordStatus,verificationStatus:p.verificationStatus,sourcePresent:Boolean(p.sourceUrl),linkedStandardIds:p.linkedStandardIds})),providers:data.data.providers.map(p=>({id:p.providerId,status:p.status,verificationStatus:p.verificationStatus,lastVerifiedPresent:Boolean(p.lastVerified),sources:p.sourceUrls.length})),organisationProgrammes:data.data.organisationProgrammes,organisationProviders:data.data.organisationProviders}));console.log(JSON.stringify({wireDecoder:"PASS",diagnostic:"read-only-service-context-not-auth-proof",ok:true,applications:data.data.applications.length}));}
+ catch(error){const message=error instanceof Error?error.message:"unknown",safe=message.match(/Cannot read properties of (?:undefined|null) \(reading '[A-Za-z_]+'\)|[A-Za-z_]+ is not (?:a function|defined)|[A-Za-z_]+ is not iterable|invalid input syntax for type [a-z]+/g);console.log(JSON.stringify({diagnostic:"read-only-service-context-not-auth-proof",ok:false,type:error instanceof Error?error.name:"unknown",safeCategory:safe,code:message.match(/\b(?:PGRST\d{3}|PT\d{3}|[0-9]{5})\b/g),messageSha256:createHash("sha256").update(message).digest("hex")}));process.exitCode=1;}
+}
+void main();

@@ -1,5 +1,11 @@
 /** Independent real-session Copilot boundaries and local browser presentation. */
 import {writeFileSync} from "node:fs";
+import {spawnSync} from "node:child_process";
+function pdfText(path){
+ const result=spawnSync(process.env.RELEASE_PDFTOTEXT??"/Users/jamesross/.cache/codex-runtimes/codex-primary-runtime/dependencies/native/poppler/poppler/bin/pdftotext",[path,"-"],{encoding:"utf8"});
+ if(result.status!==0||typeof result.stdout!=="string")throw new Error("PDF content verification unavailable");
+ return result.stdout;
+}
 export async function verifyUsability({app,manifest,contexts,check}){
  const root=process.env.RELEASE_LOCAL_RUNTIME;if(!root?.startsWith("/private/tmp/levytate-release-runtime.")||!manifest.synthetic)throw new Error("Synthetic local browser required");
  for(const key of["a:employee","a:manager","b:lead"]){
@@ -14,16 +20,21 @@ export async function verifyUsability({app,manifest,contexts,check}){
  const buttons=employee.page.getByRole("button");check("Employee application exposes accessible named controls",await buttons.count()>3);
  await employee.page.keyboard.press("Tab");const active=await employee.page.evaluate(()=>({tag:document.activeElement?.tagName,label:document.activeElement?.getAttribute("aria-label")||document.activeElement?.textContent?.trim()}));
  check("keyboard Tab reaches a labelled application control",["BUTTON","A","INPUT","TEXTAREA","SELECT"].includes(active.tag)&&Boolean(active.label));
- await employee.page.evaluate(()=>{document.documentElement.style.zoom="200%";});await employee.page.waitForTimeout(100);
+ // A 640 CSS-pixel viewport exercises the breakpoints of a 1280px desktop at
+ // 200% effective zoom. This is not a claim of native browser zoom control.
+ await employee.page.setViewportSize({width:640,height:450});
  const fit=await employee.page.evaluate(()=>({width:document.documentElement.clientWidth,scroll:document.documentElement.scrollWidth}));
- check("Employee home reflows at 200 percent CSS zoom",fit.scroll<=fit.width+2);
+ check("Employee home has no overflow at the 640px effective 200-percent viewport",fit.width===640&&fit.scroll<=fit.width+2);
  if(new URL(employee.page.url()).pathname!=="/levytate/app"||new URL(employee.page.url()).searchParams.has("token_hash"))throw new Error("Synthetic authenticated application page required for capture");
- await employee.page.screenshot({path:`${root}/synthetic-employee-zoom-${Date.now()}.png`,fullPage:true});
- await employee.page.evaluate(()=>{document.documentElement.style.zoom="";});
+ await employee.page.screenshot({path:`${root}/synthetic-employee-effective-200-${Date.now()}.png`,fullPage:true});
+ await employee.page.setViewportSize({width:1280,height:900});
  await employee.page.screenshot({path:`${root}/synthetic-employee-desktop-${Date.now()}.png`,fullPage:true});
  await employee.page.emulateMedia({media:"print"});const pdf=await employee.page.pdf({format:"A4",printBackground:true});
- check("Employee print rendering produces a real PDF",pdf.subarray(0,4).toString()==="%PDF"&&pdf.length>1000);
- writeFileSync(`${root}/synthetic-employee-print-${Date.now()}.pdf`,pdf,{mode:0o600,flag:"wx"});await employee.page.emulateMedia({media:"screen"});
+ const employeePdf=`${root}/synthetic-employee-print-${Date.now()}.pdf`;
+ writeFileSync(employeePdf,pdf,{mode:0o600,flag:"wx"});
+ const employeeText=pdfText(employeePdf);
+ check("Employee print contains actual visible journey text",pdf.subarray(0,4).toString()==="%PDF"&&employeeText.includes("Your next step")&&employeeText.includes("Good to see you")&&employeeText.trim().length>100);
+ await employee.page.emulateMedia({media:"screen"});
  const lead=contexts.get("b:lead")??contexts.get("a:lead");await lead.page.goto(`${app}/levytate/app?module=Insights`);
  await lead.page.getByRole("button",{name:"Print executive report",exact:true}).waitFor();
  if(new URL(lead.page.url()).pathname!=="/levytate/app")throw new Error("Authenticated report application required");
@@ -35,7 +46,9 @@ export async function verifyUsability({app,manifest,contexts,check}){
  await lead.page.locator(".employer-intelligence-report").waitFor({state:"attached"});
  await lead.page.emulateMedia({media:"print"});
  const executive=await lead.page.pdf({format:"A4",printBackground:true});
- check("Lead executive print renders actual aggregate employer report",executive.subarray(0,4).toString()==="%PDF"&&executive.length>1000);
- writeFileSync(`${root}/synthetic-employer-executive-${Date.now()}.pdf`,executive,{mode:0o600,flag:"wx"});
+ const employerPdf=`${root}/synthetic-employer-executive-${Date.now()}.pdf`;
+ writeFileSync(employerPdf,executive,{mode:0o600,flag:"wx"});
+ const employerText=pdfText(employerPdf);
+ check("Lead executive print contains actual operating and financial evidence",executive.subarray(0,4).toString()==="%PDF"&&employerText.includes("Executive operating brief")&&employerText.includes("Levy financial position")&&employerText.includes("Evidence definitions and material limitations"));
  await lead.page.evaluate(()=>window.dispatchEvent(new Event("afterprint")));await lead.page.emulateMedia({media:"screen"});
 }
