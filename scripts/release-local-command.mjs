@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { captureCredential } from "./release-local-email-capture.mjs";
 
 const root = process.env.RELEASE_LOCAL_RUNTIME;
 if (!root?.startsWith("/private/tmp/levytate-release-runtime.")) throw new Error("Dedicated local runtime required");
@@ -46,6 +47,13 @@ if(process.env.RELEASE_ENABLE_SYNTHETIC_LEARNING_TIME==="true"){
   if(!fixture.synthetic||fixture.environment!=="local"||!fixture.tenants?.[0]?.id||process.env.VERCEL_ENV)throw new Error("Local synthetic Learning Time scope required");
   Object.assign(env,{LEVYTATE_OFF_THE_JOB_ASSISTANT_ENABLED:"true"});
 }
+const captureRequests = process.env.RELEASE_ENABLE_SYNTHETIC_REQUESTS === "true";
+if (captureRequests) {
+  const fixture = JSON.parse(readFileSync(env.RELEASE_FIXTURE_MANIFEST, "utf8"));
+  if (!fixture.synthetic || fixture.environment !== "local" || fixture.tenants?.length !== 2 || process.env.VERCEL_ENV || process.env.NODE_ENV === "production") throw new Error("Local synthetic Requests scope required");
+  Object.assign(env, { LEVYTATE_REQUESTS_ENABLED: "true", LEVYTATE_REQUESTS_LOCAL_ORGANISATIONS: "", RELEASE_CAPTURE_RESEND: "true", RESEND_API_KEY: captureCredential });
+  // Tenant capability remains a real database check owned by the verifier.
+}
 const mode = process.argv[2];
 const commands = {
   hook: [process.execPath, [resolve(scriptDir, "release-local-email-hook.mjs")]],
@@ -67,7 +75,7 @@ const commands = {
   stop: [`${root}/supabase`, ["stack", "stop", "--workdir", `${root}/project`, "--output-format", "json"]],
   "bootstrap-dry-run": [`${root}/supabase`, ["db", "push", "--local", "--dry-run", "--workdir", `${root}/project`]],
   bootstrap: [`${root}/supabase`, ["db", "push", "--local", "--workdir", `${root}/project`, "--yes"]],
-  app: [process.execPath, [resolve(process.cwd(), "node_modules/next/dist/bin/next"), "dev", "--hostname", "127.0.0.1", "--port", "3107"]],
+  app: [process.execPath, [...(captureRequests ? ["--import", resolve(scriptDir, "release-local-email-preload.mjs")] : []), resolve(process.cwd(), "node_modules/next/dist/bin/next"), "dev", "--hostname", "127.0.0.1", "--port", "3107"]],
 };
 if (!commands[mode]) throw new Error("Unsupported local acceptance command");
 const [command, args] = commands[mode];
