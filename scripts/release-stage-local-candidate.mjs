@@ -3,7 +3,7 @@ import{readFileSync,existsSync,copyFileSync}from"node:fs";
 import{createHash}from"node:crypto";
 import { releaseRepository } from "./release-repository-path.mjs";
 const root=process.env.RELEASE_LOCAL_RUNTIME,repository=releaseRepository(process.env.RELEASE_CANDIDATE_REPOSITORY),name=process.argv[2];
-if(!root?.startsWith("/private/tmp/levytate-release-runtime.")||!/^\d{14}_client_[a-z_]+\.sql$/.test(name??""))throw new Error("Generated local runtime and explicit candidate required");
+if(!root?.startsWith("/private/tmp/levytate-release-runtime.")||!/^\d{14}_(?:client|tenant)_[a-z_]+\.sql$/.test(name??""))throw new Error("Generated local runtime and explicit candidate required");
 const state=JSON.parse(readFileSync(`${root}/private-stack-state.json`,"utf8"));
 if(new URL(state.env.DB_URL).hostname!=="127.0.0.1")throw new Error("Loopback only");
 const manifest=JSON.parse(readFileSync(`${repository}/supabase/release-migrations/manifest.json`,"utf8"));
