@@ -23,6 +23,7 @@ import type {
   PastoralWorkspace,
 } from "@/lib/levytate/pastoral/domain";
 import { pastoralRecipientIsSafeForConcern } from "@/lib/levytate/pastoral/domain";
+import { pastoralLocalDateToInstant } from "@/lib/levytate/pastoral/dates";
 import { MvpLoadingState, MvpPanel, StatusBadge } from "@/components/levytate-mvp/MvpUi";
 
 type EmployeeView = "conversation" | "requests" | "privacy";
@@ -410,14 +411,18 @@ function SupportInbox({ workspace, onWorkspace }: { workspace: PastoralWorkspace
 
   async function recordFollowUp() {
     if (!selected || !followUpAt) return;
-    const ok = await mutate({ action: "record_follow_up", requestId: selected.id, expectedLockVersion: selected.lockVersion, agreedFollowUpAt: followUpAt, idempotencyKey: crypto.randomUUID(), note }, "The agreed follow-up date was recorded.");
+    const agreedFollowUpAt = pastoralLocalDateToInstant(followUpAt);
+    if (!agreedFollowUpAt) { setMessage("Choose a valid follow-up date and local time."); return; }
+    const ok = await mutate({ action: "record_follow_up", requestId: selected.id, expectedLockVersion: selected.lockVersion, agreedFollowUpAt, idempotencyKey: crypto.randomUUID(), note }, "The agreed follow-up date was recorded.");
     if (ok) { setFollowUpAt(""); setNote(""); }
   }
 
   async function createAction() {
     if (!selected || !actionSummary.trim()) return;
     const ownerId = actionOwnerId || selected.recipientId;
-    const ok = await mutate({ action: "create_support_action", requestId: selected.id, responsibleRecipientId: ownerId, dueAt: actionDueAt || null, summary: actionSummary, idempotencyKey: crypto.randomUUID() }, "The agreed support action was recorded.");
+    const dueAt = actionDueAt ? pastoralLocalDateToInstant(actionDueAt) : null;
+    if (actionDueAt && !dueAt) { setMessage("Choose a valid action due date."); return; }
+    const ok = await mutate({ action: "create_support_action", requestId: selected.id, responsibleRecipientId: ownerId, dueAt, summary: actionSummary, idempotencyKey: crypto.randomUUID() }, "The agreed support action was recorded.");
     if (ok) { setActionSummary(""); setActionDueAt(""); setActionOwnerId(""); }
   }
 

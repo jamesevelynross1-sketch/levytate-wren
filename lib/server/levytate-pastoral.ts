@@ -19,6 +19,7 @@ import {
 import { normaliseMvpUserRole } from "@/lib/levytate/mvp/rbac";
 import { getLearnerLifecycleServerContext } from "@/lib/server/levytate-learner-lifecycle";
 import { getPastoralNavigationAccess } from "@/lib/server/levytate-pastoral-capability";
+import { pastoralCaseMutationSchema } from "@/lib/server/levytate-pastoral-input";
 import {
   decryptPastoralJson,
   digestPastoralPayload,
@@ -764,7 +765,7 @@ async function getLearnerContext(organisationId: string, employeeId: string): Pr
 }
 
 function parseMutation(value: unknown): PastoralSupportMutation {
-  if (!value || typeof value !== "object") throw new LevyTatePastoralError("A valid My Support action is required.");
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new LevyTatePastoralError("A valid My Support action is required.");
   const mutation = value as Record<string, unknown>;
   if (mutation.action === "set_history_preference") {
     if (Object.keys(mutation).some((key) => !["action", "saveHistory", "retentionDays", "expectedVersion"].includes(key)) || typeof mutation.saveHistory !== "boolean" || !Number.isSafeInteger(mutation.expectedVersion) || Number(mutation.expectedVersion) < 0) throw new LevyTatePastoralError("Reload your privacy settings before changing them.", 409);
@@ -775,56 +776,9 @@ function parseMutation(value: unknown): PastoralSupportMutation {
     if (Object.keys(mutation).some((key) => !["action", "conversationId"].includes(key)) || typeof mutation.conversationId !== "string") throw new LevyTatePastoralError("A valid conversation deletion is required.");
     return { action: mutation.action, conversationId: mutation.conversationId };
   }
-  if (mutation.action === "submit_support_request") return {
-    action: mutation.action,
-    recipientId: String(mutation.recipientId ?? ""),
-    topicCategory: mutation.topicCategory as never,
-    urgencyRoute: mutation.urgencyRoute as never,
-    idempotencyKey: String(mutation.idempotencyKey ?? ""),
-    payload: (mutation.payload && typeof mutation.payload === "object" ? mutation.payload : {}) as never,
-  };
-  if (mutation.action === "transition_support_request") return {
-    action: mutation.action,
-    requestId: String(mutation.requestId ?? ""),
-    transition: mutation.transition as never,
-    expectedLockVersion: Number(mutation.expectedLockVersion),
-    idempotencyKey: String(mutation.idempotencyKey ?? ""),
-    note: typeof mutation.note === "string" ? mutation.note : undefined,
-  };
-  if (mutation.action === "record_follow_up") return {
-    action: mutation.action,
-    requestId: String(mutation.requestId ?? ""),
-    expectedLockVersion: Number(mutation.expectedLockVersion),
-    agreedFollowUpAt: String(mutation.agreedFollowUpAt ?? ""),
-    idempotencyKey: String(mutation.idempotencyKey ?? ""),
-    note: typeof mutation.note === "string" ? mutation.note : undefined,
-  };
-  if (mutation.action === "create_support_action") return {
-    action: mutation.action,
-    requestId: String(mutation.requestId ?? ""),
-    responsibleRecipientId: String(mutation.responsibleRecipientId ?? ""),
-    dueAt: mutation.dueAt == null ? null : String(mutation.dueAt),
-    summary: String(mutation.summary ?? ""),
-    idempotencyKey: String(mutation.idempotencyKey ?? ""),
-  };
-  if (mutation.action === "transition_support_action") return {
-    action: mutation.action,
-    supportActionId: String(mutation.supportActionId ?? ""),
-    transition: mutation.transition as never,
-    expectedLockVersion: Number(mutation.expectedLockVersion),
-    idempotencyKey: String(mutation.idempotencyKey ?? ""),
-    newResponsibleRecipientId: typeof mutation.newResponsibleRecipientId === "string" ? mutation.newResponsibleRecipientId : undefined,
-    note: typeof mutation.note === "string" ? mutation.note : undefined,
-  };
-  if (mutation.action === "record_employee_outcome") return {
-    action: mutation.action,
-    requestId: String(mutation.requestId ?? ""),
-    outcome: mutation.outcome as never,
-    expectedLockVersion: Number(mutation.expectedLockVersion),
-    idempotencyKey: String(mutation.idempotencyKey ?? ""),
-    note: typeof mutation.note === "string" ? mutation.note : undefined,
-  };
-  throw new LevyTatePastoralError("That My Support action is not recognised.");
+  const parsed = pastoralCaseMutationSchema.safeParse(value);
+  if (!parsed.success) throw new LevyTatePastoralError("The My Support action contains invalid or unsupported fields. Check your entries and retry.", 422);
+  return parsed.data;
 }
 
 function historyHmac(context: PastoralServerContext, command: unknown) {
