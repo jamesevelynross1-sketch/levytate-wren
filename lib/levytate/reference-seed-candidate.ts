@@ -48,9 +48,11 @@ export function buildReferenceSeedCandidate(standardsBytes: string, providersByt
       || !Number.isInteger(row.level) || Number(row.level) < 2 || Number(row.level) > 8 || !text(row.version)
       || (row.fundingBand !== null && (!Number.isSafeInteger(row.fundingBand) || Number(row.fundingBand) < 0))) throw new Error("Invalid standard identity, status or numeric evidence");
     https(row.officialUrl, true); date(row.lastVerified);
+    if (!new RegExp(`^/apprenticeships/${text(row.id).toLowerCase()}(?:-|/|$)`).test(new URL(text(row.officialUrl)).pathname.toLowerCase())) throw new Error("Official source URL must identify its standard");
     if (row.lastVerified !== standardsDate) throw new Error("Standard source date differs from the declared snapshot");
   }
   const providers = records(providerSource.providers), programmes = records(providerSource.programmes);
+  if (!standards.length || !providers.length || !programmes.length) throw new Error("A populated reference candidate is required");
   unique(providers, "providerId"); unique(programmes, "id");
   for (const row of providers) { if (!text(row.providerName)) throw new Error("Provider name required"); https(row.providerCatalogueUrl); }
   const providerIds = new Set(providers.map((row) => row.providerId)), byStandard = new Map(standards.map((row) => [row.id, row]));
