@@ -15,6 +15,7 @@ const commitRead=spawnSync("git",["rev-parse","HEAD"],{encoding:"utf8"});
 const candidateCommit=commitRead.status===0&&/^[a-f0-9]{40}$/.test(commitRead.stdout.trim())?commitRead.stdout.trim():null;
 let browser;
 let browserEngineVersion;
+let browserDistribution="bundled-chromium";
 let app;
 const contexts = new Map();
 let phase = "initialisation";
@@ -80,10 +81,12 @@ try {
   const { chromium } = await import(modulePath ? pathToFileURL(modulePath).href : "playwright");
   const browserExecutable=process.env.RELEASE_BROWSER_EXECUTABLE;
   const verifiedEdge="/private/tmp/levytate-current-browser-20261109/edge-extracted/MicrosoftEdge-157.0.4341.42.pkg/Payload/Microsoft Edge.app/Contents/MacOS/Microsoft Edge";
-  if(browserExecutable&&(browserExecutable!==verifiedEdge||!existsSync(browserExecutable)))throw new Error("Exact independently signature-verified isolated browser required");
+  const verifiedChrome="/private/tmp/levytate-current-browser-20261109/chrome-extracted/GoogleChrome.pkg/Payload/Google Chrome.app/Contents/MacOS/Google Chrome";
+  if(browserExecutable&&(![verifiedEdge,verifiedChrome].includes(browserExecutable)||!existsSync(browserExecutable)))throw new Error("Exact independently signature-verified isolated browser required");
+  browserDistribution=browserExecutable===verifiedEdge?"isolated-verified-edge":browserExecutable===verifiedChrome?"isolated-verified-chrome":"bundled-chromium";
   browser = await chromium.launch({ headless: true,...(browserExecutable?{executablePath:browserExecutable}:{}) });
   browserEngineVersion=browser.version();
-  console.log(`Browser engine: ${browserExecutable?"isolated verified Edge":"bundled Chromium"} ${browserEngineVersion}`);
+  console.log(`Browser engine: ${browserDistribution} ${browserEngineVersion}`);
   const backend = releaseBackend();
   const accountUiOnly=process.env.RELEASE_ACCOUNT_UI_ONLY==="true";
   const peopleUiOnly=process.env.RELEASE_PEOPLE_UI_ONLY==="true"||accountUiOnly;
@@ -502,7 +505,7 @@ try {
   if(app&&contexts.size){let loggedOut=0;for(const{context}of contexts.values()){try{const r=await context.request.post(`${app}/api/levytate-beta-logout`,{headers:{Origin:app},maxRedirects:0});if(r.status()===303)loggedOut++;}catch{/* Raw transport errors may carry Auth details. */}}console.log(`Local failed-run cleanup: ${loggedOut}/${contexts.size} logout responses confirmed; all browser contexts closing`);}
   await browser?.close();
   releaseRuntime?.();
-  const evidence = { schemaVersion: 1, environment: "local", candidateCommit, browserEngineVersion, browserDistribution:process.env.RELEASE_BROWSER_EXECUTABLE?"isolated-verified-edge":"bundled-chromium", authenticationMethod: "requested-sign-in-link-through-local-smtp", authenticatedRolesVerified: results.filter((item) => item.name.endsWith("canonical role and tenant resolved") && item.status === "PASS").length, emailEvidence: "local-smtp-capture-only", results };
+  const evidence = { schemaVersion: 1, environment: "local", candidateCommit, browserEngineVersion, browserDistribution, authenticationMethod: "requested-sign-in-link-through-local-smtp", authenticatedRolesVerified: results.filter((item) => item.name.endsWith("canonical role and tenant resolved") && item.status === "PASS").length, emailEvidence: "local-smtp-capture-only", results };
   if (process.env.RELEASE_EVIDENCE_PATH?.startsWith("/private/tmp/")) {
     const requested = process.env.RELEASE_EVIDENCE_PATH;
     const path = existsSync(requested) ? requested.replace(/\.json$/, `-${Date.now()}.json`) : requested;
