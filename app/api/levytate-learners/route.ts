@@ -1,4 +1,4 @@
-import { readAuthenticatedJson, ClientRequestError } from "@/lib/server/levytate-request-boundary";
+import { assertExpectedWorkspace, readAuthenticatedJson, ClientRequestError } from "@/lib/server/levytate-request-boundary";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
@@ -41,6 +41,7 @@ export async function GET(request: Request) {
   try {
     const session = await getSession();
     if (!session) return NextResponse.json({ message: "Unauthorised." }, { status: 401, headers });
+    await assertExpectedWorkspace(request, session.email);
     const learnerRecordId = new URL(request.url).searchParams.get("learnerRecordId")?.trim();
     if (learnerRecordId) {
       const learner = await getOrganisationLearnerLifecycleRecordDetail(session, learnerRecordId);
@@ -55,6 +56,7 @@ export async function GET(request: Request) {
       learners,
     }, { headers });
   } catch (error) {
+    if (error instanceof ClientRequestError) return NextResponse.json({ message: error.message }, { status: error.status, headers });
     const status = error instanceof LevyTateLearnerLifecyclePermissionError
       ? 403
       : error instanceof LevyTateLearnerLifecycleError

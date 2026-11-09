@@ -1,10 +1,12 @@
 "use client";
 
+import { useRetainedWorkspaceRequest } from "@/components/levytate-mvp/useRetainedWorkspaceRequest";
 import { useState, type FormEvent } from "react";
 import { FormField, FormGrid, FormSelect, FormTextArea } from "@/components/levytate-mvp/MvpUi";
 import type { LearnerRecordDetail } from "@/lib/levytate/mvp/learner-record-view";
 
 export function LearnerOutcomePanel({ detail, onSaved }: { detail: LearnerRecordDetail; onSaved: (detail: LearnerRecordDetail) => void }) {
+  const request = useRetainedWorkspaceRequest();
   const [outcome, setOutcome] = useState("withdrawal");
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -18,7 +20,7 @@ export function LearnerOutcomePanel({ detail, onSaved }: { detail: LearnerRecord
     if (busy) return;
     setBusy(true); setError("");
     try {
-      const response = await fetch(`/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/outcome`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, outcome, idempotencyKey: key, expectedActivityVersion: detail.activityVersion, providerNotified: Boolean(form.providerNotifiedDate), employeeNotified: Boolean(form.employeeNotifiedDate), certificateReceived: Boolean(form.certificateReceivedDate) }) });
+      const response = await request(`/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/outcome`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, outcome, idempotencyKey: key, expectedActivityVersion: detail.activityVersion, providerNotified: Boolean(form.providerNotifiedDate), employeeNotified: Boolean(form.employeeNotifiedDate), certificateReceived: Boolean(form.certificateReceivedDate) }) });
       const result = await response.json() as { learner?: LearnerRecordDetail; message?: string };
       if (!response.ok || !result.learner) throw new Error(result.message || "The outcome could not be confirmed. Your input is retained.");
       onSaved(result.learner); setOpen(false); setKey(`outcome-${crypto.randomUUID()}`);

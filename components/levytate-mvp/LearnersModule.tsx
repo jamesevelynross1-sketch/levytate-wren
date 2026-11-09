@@ -4,6 +4,7 @@ import { ArrowLeft, CalendarClock, CheckCircle2, ChevronDown, Plus, Search, XCir
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { EmptyState, FormField, FormGrid, FormSection, FormSelect, FormTagInput, FormTextArea, MvpModal, MvpPanel, StatusBadge, TableAction, TableBody, TableHead, TableShell } from "@/components/levytate-mvp/MvpUi";
 import { OperationalMetricRail, ProgressTrack, StageTracker } from "@/components/levytate-mvp/OperationalVisuals";
+import { useRetainedWorkspaceRequest } from "@/components/levytate-mvp/useRetainedWorkspaceRequest";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { ApplicationPreEnrolmentModal } from "@/components/levytate-mvp/ApplicationPreEnrolmentModal";
 import { LearnerOutcomePanel } from "@/components/levytate-mvp/LearnerOutcomePanel";
@@ -82,6 +83,7 @@ const progressOptions: Array<LearnerProgressPosition | typeof allOption> = [
 type LearnerDeepLinkAction = "open_learner" | "complete_pre_enrolment" | "complete_enrolment" | "record_review" | "add_progress" | "manage_break" | "return_learner" | "manage_assessment";
 
 export function LearnersModule({ initialLearnerRecordId = "", initialAction = "open_learner", onDeepLinkConsumed, onLearnerSelectionChange }: { initialLearnerRecordId?: string; initialAction?: LearnerDeepLinkAction; onDeepLinkConsumed?: () => void; onLearnerSelectionChange?: (learnerRecordId: string | null, learnerName?: string) => void }) {
+  const request = useRetainedWorkspaceRequest();
   const { can, meta } = useMvpWorkspace();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -126,7 +128,7 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
       setLoading(true);
       setError("");
       try {
-        const response = await fetch("/api/levytate-learners", { cache: "no-store" });
+        const response = await request("/api/levytate-learners", { cache: "no-store" });
         const payload = (await response.json()) as LearnerListResponse;
         if (!response.ok || !payload.learners || !payload.summary) {
           throw new Error(payload.message ?? "Learner lifecycle records are unavailable.");
@@ -146,7 +148,7 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
     return () => {
       cancelled = true;
     };
-  }, [mayReadOrganisationLearners]);
+  }, [mayReadOrganisationLearners, request]);
 
   useEffect(() => {
     if (!selectedId) {
@@ -159,7 +161,7 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
       setDetailLoading(true);
       setError("");
       try {
-        const response = await fetch(`/api/levytate-learners?learnerRecordId=${encodeURIComponent(selectedId)}`, { cache: "no-store" });
+        const response = await request(`/api/levytate-learners?learnerRecordId=${encodeURIComponent(selectedId)}`, { cache: "no-store" });
         const payload = (await response.json()) as LearnerDetailResponse;
         if (!response.ok || !payload.learner) {
           throw new Error(payload.message ?? "Learner record was not found.");
@@ -176,7 +178,7 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
     return () => {
       cancelled = true;
     };
-  }, [selectedId]);
+  }, [selectedId, request]);
 
   const filters = useMemo(() => {
     const unique = (values: string[]) => [allOption, ...Array.from(new Set(values.filter(Boolean))).sort((a, b) => a.localeCompare(b))];
@@ -665,6 +667,7 @@ function LearnerRecordView({ detail, loading, error, onBack, mayMutatePreEnrolme
 }
 
 function AssessmentReadinessSection({ detail, mayMutate, onManage, onSaved }: { detail: LearnerRecordDetail; mayMutate: boolean; onManage: () => void; onSaved: (detail: LearnerRecordDetail, message: string) => void }) {
+  const request = useRetainedWorkspaceRequest();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const readiness = detail.assessmentReadiness;
@@ -687,7 +690,7 @@ function AssessmentReadinessSection({ detail, mayMutate, onManage, onSaved }: { 
         body.gatewayDate = readiness?.gatewayDate ?? "";
       }
       if (route === "start-assessment") body.assessmentStartDate = readiness?.expectedAssessmentStartDate || todayDate();
-      const response = await fetch(`/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/${route}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      const response = await request(`/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/${route}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
       const payload = await response.json() as LearnerMutationResponse;
       if (!response.ok || !payload.learner) throw new Error(payload.message || "Assessment readiness could not be updated.");
       onSaved(payload.learner, payload.message || "Assessment readiness updated.");
@@ -767,6 +770,7 @@ type AssessmentReadinessFormState = {
 };
 
 function AssessmentReadinessWorkflow({ detail, onClose, onSaved }: { detail: LearnerRecordDetail; onClose: () => void; onSaved: (detail: LearnerRecordDetail, message: string) => void }) {
+  const request = useRetainedWorkspaceRequest();
   const readiness = detail.assessmentReadiness;
   const empty = emptyAssessmentReadinessConfirmations();
   const [form, setForm] = useState<AssessmentReadinessFormState>({
@@ -799,7 +803,7 @@ function AssessmentReadinessWorkflow({ detail, onClose, onSaved }: { detail: Lea
     setSaving(true);
     setError("");
     try {
-      const response = await fetch(`/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/assessment-readiness`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...form, expectedActivityVersion: detail.activityVersion }) });
+      const response = await request(`/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/assessment-readiness`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...form, expectedActivityVersion: detail.activityVersion }) });
       const payload = await response.json() as LearnerMutationResponse;
       if (!response.ok || !payload.learner) throw new Error(payload.message || "Assessment readiness could not be saved.");
       onSaved(payload.learner, payload.message || "Assessment readiness record saved.");
@@ -863,6 +867,7 @@ type ProgressFormState = {
 };
 
 function ProgressUpdateForm({ detail, onClose, onSaved }: { detail: LearnerRecordDetail; onClose: () => void; onSaved: (detail: LearnerRecordDetail, message: string) => void }) {
+  const request = useRetainedWorkspaceRequest();
   const [idempotencyKey] = useState(activityKey);
   const [form, setForm] = useState<ProgressFormState>({
     updateDate: todayDate(),
@@ -894,7 +899,7 @@ function ProgressUpdateForm({ detail, onClose, onSaved }: { detail: LearnerRecor
       const supportAction = form.supportType === "no_support_required"
         ? learnerSupportActionLabels.no_support_required
         : `${learnerSupportActionLabels[form.supportType]}${form.supportSummary.trim() ? `: ${form.supportSummary.trim()}` : ""}`;
-      const response = await fetch(`/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/progress`, {
+      const response = await request(`/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/progress`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -966,6 +971,7 @@ type ReviewFormState = {
 };
 
 function ReviewEntryForm({ detail, onClose, onSaved }: { detail: LearnerRecordDetail; onClose: () => void; onSaved: (detail: LearnerRecordDetail, message: string) => void }) {
+  const request = useRetainedWorkspaceRequest();
   const [idempotencyKey] = useState(activityKey);
   const onBreak = detail.lifecycleStatus === "break_in_learning";
   const [form, setForm] = useState<ReviewFormState>({
@@ -996,7 +1002,7 @@ function ReviewEntryForm({ detail, onClose, onSaved }: { detail: LearnerRecordDe
     setSaving(true);
     setError("");
     try {
-      const response = await fetch(`/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/reviews`, {
+      const response = await request(`/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/reviews`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ ...form, expectedActivityVersion: detail.activityVersion, idempotencyKey }),
@@ -1079,6 +1085,7 @@ type BreakDetailsState = {
 };
 
 function BreakDetailsForm({ detail, update: updating, onBack, onSaved }: { detail: LearnerRecordDetail; update: boolean; onBack: () => void; onSaved: (detail: LearnerRecordDetail, message: string) => void }) {
+  const request = useRetainedWorkspaceRequest();
   const active = detail.activeBreak;
   const [idempotencyKey] = useState(activityKey);
   const [form, setForm] = useState<BreakDetailsState>({
@@ -1095,7 +1102,7 @@ function BreakDetailsForm({ detail, update: updating, onBack, onSaved }: { detai
     try {
       const url = updating && active ? `/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/breaks/${encodeURIComponent(active.id)}` : `/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/breaks`;
       const body = updating ? { ...form, startDate: undefined, reasonCategory: undefined, effectiveLifecycleDate: undefined, expectedActivityVersion: detail.activityVersion } : { ...form, correctedStartDate: undefined, startDateCorrectionReason: undefined, expectedActivityVersion: detail.activityVersion, idempotencyKey };
-      const response = await fetch(url, { method: updating ? "PATCH" : "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      const response = await request(url, { method: updating ? "PATCH" : "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
       const payload = await response.json() as LearnerMutationResponse;
       if (!response.ok || !payload.learner) throw new Error(payload.message || "Break in learning could not be saved.");
       onSaved(payload.learner, payload.message || (updating ? "Break in learning details updated." : "Break in learning started."));
@@ -1135,18 +1142,20 @@ function BreakDetailsForm({ detail, update: updating, onBack, onSaved }: { detai
 }
 
 function ReturnFromBreakForm({ detail, onBack, onSaved }: { detail: LearnerRecordDetail; onBack: () => void; onSaved: (detail: LearnerRecordDetail, message: string) => void }) {
+  const request = useRetainedWorkspaceRequest();
   const active = detail.activeBreak!;
   const [idempotencyKey] = useState(activityKey);
   const [form, setForm] = useState({ actualReturnDate: todayDate(), returnConfirmationNote: "", programmeStillValidConfirmed: false, providerReturnConfirmed: false, managerReturnConfirmed: false, learnerReturnConfirmed: false, revisedExpectedEndDate: "", revisedReviewDate: "", immediateSupportAction: "", progressResetNote: "", firstCheckInDate: "" });
   const [saving, setSaving] = useState(false); const [error, setError] = useState("");
   function set(key: keyof typeof form, value: string | boolean) { setForm((current) => ({ ...current, [key]: value })); }
-  async function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setSaving(true); setError(""); try { const response = await fetch(`/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/breaks/${encodeURIComponent(active.id)}/return`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...form, expectedActivityVersion: detail.activityVersion, idempotencyKey }) }); const payload = await response.json() as LearnerMutationResponse; if (!response.ok || !payload.learner) throw new Error(payload.message || "Learner could not be returned to active learning."); onSaved(payload.learner, payload.message || "Learner returned to active learning."); } catch (caught) { setError(caught instanceof Error ? caught.message : "Learner could not be returned to active learning."); } finally { setSaving(false); } }
+  async function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setSaving(true); setError(""); try { const response = await request(`/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/breaks/${encodeURIComponent(active.id)}/return`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...form, expectedActivityVersion: detail.activityVersion, idempotencyKey }) }); const payload = await response.json() as LearnerMutationResponse; if (!response.ok || !payload.learner) throw new Error(payload.message || "Learner could not be returned to active learning."); onSaved(payload.learner, payload.message || "Learner returned to active learning."); } catch (caught) { setError(caught instanceof Error ? caught.message : "Learner could not be returned to active learning."); } finally { setSaving(false); } }
   return <MvpModal title="Return learner to active learning" eyebrow="Break in learning" onClose={onBack}><form onSubmit={submit} className="grid gap-4"><FormSection title="Return confirmation"><FormGrid><FormField label="Actual return date" type="date" value={form.actualReturnDate} onChange={(value) => set("actualReturnDate", value)} required /><FormTextArea label="Return confirmation note" value={form.returnConfirmationNote} onChange={(value) => set("returnConfirmationNote", value)} wide rows={3} required /><BreakCheckbox label="Current programme remains valid" checked={form.programmeStillValidConfirmed} onChange={(value) => set("programmeStillValidConfirmed", value)} /><BreakCheckbox label="Provider return confirmed" checked={form.providerReturnConfirmed} onChange={(value) => set("providerReturnConfirmed", value)} /><BreakCheckbox label="Manager informed" checked={form.managerReturnConfirmed} onChange={(value) => set("managerReturnConfirmed", value)} /><BreakCheckbox label="Learner informed" checked={form.learnerReturnConfirmed} onChange={(value) => set("learnerReturnConfirmed", value)} /></FormGrid></FormSection><FormSection title="Revised plan"><FormGrid><FormField label="Revised expected end date" type="date" value={form.revisedExpectedEndDate} onChange={(value) => set("revisedExpectedEndDate", value)} /><FormField label="Revised review date" type="date" value={form.revisedReviewDate} onChange={(value) => set("revisedReviewDate", value)} /><FormField label="First check-in after return" type="date" value={form.firstCheckInDate} onChange={(value) => set("firstCheckInDate", value)} /><FormTextArea label="Immediate support action" value={form.immediateSupportAction} onChange={(value) => set("immediateSupportAction", value)} wide rows={2} /><FormTextArea label="Progress reset note" value={form.progressResetNote} onChange={(value) => set("progressResetNote", value)} wide rows={2} /></FormGrid></FormSection><FormActions error={error} saving={saving} submit="Return learner to active learning" onCancel={onBack} /></form></MvpModal>;
 }
 
 function CancelBreakForm({ detail, onBack, onSaved }: { detail: LearnerRecordDetail; onBack: () => void; onSaved: (detail: LearnerRecordDetail, message: string) => void }) {
+  const request = useRetainedWorkspaceRequest();
   const active = detail.activeBreak!; const [reason, setReason] = useState(""); const [idempotencyKey] = useState(activityKey); const [saving, setSaving] = useState(false); const [error, setError] = useState("");
-  async function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setSaving(true); setError(""); try { const response = await fetch(`/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/breaks/${encodeURIComponent(active.id)}/cancel`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ cancellationReason: reason, expectedActivityVersion: detail.activityVersion, idempotencyKey }) }); const payload = await response.json() as LearnerMutationResponse; if (!response.ok || !payload.learner) throw new Error(payload.message || "Break record could not be cancelled."); onSaved(payload.learner, payload.message || "Break in learning record cancelled."); } catch (caught) { setError(caught instanceof Error ? caught.message : "Break record could not be cancelled."); } finally { setSaving(false); } }
+  async function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setSaving(true); setError(""); try { const response = await request(`/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/breaks/${encodeURIComponent(active.id)}/cancel`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ cancellationReason: reason, expectedActivityVersion: detail.activityVersion, idempotencyKey }) }); const payload = await response.json() as LearnerMutationResponse; if (!response.ok || !payload.learner) throw new Error(payload.message || "Break record could not be cancelled."); onSaved(payload.learner, payload.message || "Break in learning record cancelled."); } catch (caught) { setError(caught instanceof Error ? caught.message : "Break record could not be cancelled."); } finally { setSaving(false); } }
   return <MvpModal title="Cancel break record" eyebrow="Incorrect record only" onClose={onBack}><form onSubmit={submit} className="grid gap-4"><p className="rounded-xl border border-[#b13b51]/[0.15] bg-[#fff0f2] p-4 text-sm leading-6 text-[#8f3043]">Use this only when the learner did not genuinely pause learning. The cancelled record remains in the lifecycle history.</p><FormTextArea label="Cancellation reason" value={reason} onChange={setReason} rows={4} required /><FormActions error={error} saving={saving} submit="Cancel break record" onCancel={onBack} danger /></form></MvpModal>;
 }
 
@@ -1185,6 +1194,7 @@ type PreEnrolmentForm = {
 };
 
 function PreEnrolmentWorkflow({ detail, onCancel, onSaved, onEnrolled }: { detail: LearnerRecordDetail; onCancel: () => void; onSaved: (detail: LearnerRecordDetail, message: string) => void; onEnrolled: (detail: LearnerRecordDetail) => void }) {
+  const request = useRetainedWorkspaceRequest();
   const [form, setForm] = useState<PreEnrolmentForm>(() => ({
     employmentRoute: detail.employmentRoute === "not_confirmed" ? "existing_employee_upskill" : detail.employmentRoute,
     eligibilityVerificationStatus: detail.eligibilityDeclaration?.verificationStatus === "employer_verified" ? "employer_verified" : detail.eligibilityDeclaration?.verificationStatus === "not_eligible" ? "not_eligible" : detail.eligibilityDeclaration?.verificationStatus === "needs_review" ? "needs_review" : "employer_verified",
@@ -1223,7 +1233,7 @@ function PreEnrolmentWorkflow({ detail, onCancel, onSaved, onEnrolled }: { detai
     setSaving(true);
     setError("");
     try {
-      const response = await fetch(`/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/pre-enrolment`, {
+      const response = await request(`/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/pre-enrolment`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -1278,7 +1288,7 @@ function PreEnrolmentWorkflow({ detail, onCancel, onSaved, onEnrolled }: { detai
     setEnrolling(true);
     setError("");
     try {
-      const response = await fetch(`/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/enrol`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+      const response = await request(`/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/enrol`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
         idempotencyKey: enrolmentKey, expectedActivityVersion: detail.activityVersion,
         initialProgress: { updateDate: initialEvidence.updateDate, targetProgressPercentage: Number(initialEvidence.target), actualProgressPercentage: Number(initialEvidence.actual), summary: initialEvidence.summary },
         firstReviewDate: initialEvidence.firstReviewDate, firstReviewerName: initialEvidence.firstReviewerName,
