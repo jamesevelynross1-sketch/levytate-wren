@@ -47,7 +47,7 @@ begin
   else
     if v_user.invitation_request_reference is distinct from p_request_id or v_user.invitation_actor_user_id is distinct from p_actor_user_id
       or v_user.invitation_generation<>p_expected_generation then raise exception using errcode='PT409',message='Access changed while invitation was sending'; end if;
-    if v_user.invitation_status=case when p_accepted then 'accepted' else 'failed' end then
+    if v_user.invitation_status=(case when p_accepted then 'accepted' else 'failed' end) then
       return jsonb_build_object('user',to_jsonb(v_user)-array['auth_subject','auth_bound_at','last_login_at'],'sendAllowed',false);
     end if;
     if v_user.invitation_status<>'sending' then raise exception using errcode='PT409',message='Invitation is no longer pending'; end if;

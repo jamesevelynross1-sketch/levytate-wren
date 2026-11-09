@@ -84,12 +84,12 @@ export function WorkspaceAccessPanel() {
     <p className="mb-4 text-sm leading-6 text-[#102c3d]/70">Create People records first for Employees and Line Managers. Preparing access sends no email; use Send invitation to request an individual secure sign-in link. Provider acceptance is separate from inbox delivery.</p>
     {error ? <p role="alert" className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-800">{error}</p> : null}
     {loading ? <p role="status">Loading account access…</p> : <>
-      <form onSubmit={(event) => void prepare(event)} className="mb-5 grid gap-3 rounded-xl border p-4 sm:grid-cols-2">
+      <form onSubmit={(event) => void prepare(event)}><fieldset disabled={Boolean(busy)} className="mb-5 grid gap-3 rounded-xl border p-4 sm:grid-cols-2">
         <label className="text-sm">Name<input required maxLength={160} value={draft.displayName} onChange={(event) => setDraft({ ...draft, displayName: event.target.value })} className="mt-1 min-h-11 w-full rounded-lg border px-3" /></label>
         <label className="text-sm">Work email<input required type="email" maxLength={254} value={draft.email} onChange={(event) => setDraft({ ...draft, email: event.target.value })} className="mt-1 min-h-11 w-full rounded-lg border px-3" /></label>
         <label className="text-sm">Account role<select value={draft.role} onChange={(event) => setDraft({ ...draft, role: event.target.value })} className="mt-1 min-h-11 w-full rounded-lg border px-3">{roles.map((role) => <option key={role}>{role}</option>)}</select></label>
         <button type="submit" disabled={Boolean(busy)} className="min-h-11 self-end rounded-full bg-[#102c3d] px-4 text-sm font-semibold text-white disabled:opacity-50">{busy === "prepare" ? "Preparing…" : "Prepare account"}</button>
-      </form>
+      </fieldset></form>
       <div className="grid gap-3">{users.map((user) => <article key={user.id} className="grid gap-3 rounded-xl border p-4">
         <div><p className="font-semibold">{user.displayName || user.email}</p><p className="break-all text-sm text-[#102c3d]/70">{user.email} · {user.role} · {user.active ? "Access active" : "Access inactive"}</p></div>
         <InvitationControls user={user} endpoint={endpoint} onChanged={changed} onError={setError} />

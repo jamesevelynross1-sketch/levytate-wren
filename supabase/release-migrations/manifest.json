@@ -16,6 +16,8 @@
     { "path": "supabase/release-migrations/20261029162529_client_learning_time_integrity.sql", "sha256": "f8c1b4af652784f12f8d4222b1cd020b04c8cf42059237a81d858918b36a0197" },
     { "path": "supabase/release-migrations/20261029162929_client_workspace_atomic_writes.sql", "sha256": "4c0978c8cdc5cd860e865152e4cb0b96d401a43fb4933b4d3affa7ab3994015d" },
     { "path": "supabase/release-migrations/20261029220936_client_request_actor_integrity.sql", "sha256": "210c6f082144baf89a56aca6db3e382ee9f3c77fdb58669f0cf766afddc4665e" },
-    { "path": "supabase/release-migrations/20261029221818_client_operational_action_integrity.sql", "sha256": "ef0adaf16608441575634909416c80dba984206c7587d3b98da5e9701f4e1d5f" }
+    { "path": "supabase/release-migrations/20261029221818_client_operational_action_integrity.sql", "sha256": "ef0adaf16608441575634909416c80dba984206c7587d3b98da5e9701f4e1d5f" },
+    { "path": "supabase/release-migrations/20261109165014_client_admin_atomic_commands.sql", "sha256": "3d1a0fa63e34077b6b28d7249c6dc95e3f3c46ac044a28ebbdc82c173c74d5bb" },
+    { "path": "supabase/release-migrations/20261109165542_client_invitation_atomic_attempts.sql", "sha256": "e79ac762ee3b63fa15aa0902f278456cc5b5e9c98d1580474541bcb180888632" }
   ]
 }

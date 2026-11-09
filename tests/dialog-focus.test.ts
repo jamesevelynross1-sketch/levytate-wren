@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dialogTabBoundary, dialogTabStops, isTopmostDialog } from "../lib/levytate/dialog-focus";
+import { dialogTabBoundary, dialogTabStops, isTopmostDialog, topmostModalDialog } from "../lib/levytate/dialog-focus";
 
 // Unit model for ordering/filtering only. Actual keyboard behaviour is separately
 // exercised in the genuine-auth browser acceptance suite.
@@ -47,6 +47,12 @@ describe("shared dialog focus contract", () => {
     dialog([], false);
     expect(isTopmostDialog(outer)).toBe(false);
     expect(isTopmostDialog(inner)).toBe(true);
+    expect(topmostModalDialog(inner.ownerDocument)).toBe(inner);
+  });
+  it("does not block non-modal Escape when only hidden modals remain", () => {
+    const { dialog } = fixture();
+    const hidden = dialog([], false);
+    expect(topmostModalDialog(hidden.ownerDocument)).toBeNull();
   });
   it("wraps only the visible first and last controls", () => {
     const { element, dialog } = fixture();

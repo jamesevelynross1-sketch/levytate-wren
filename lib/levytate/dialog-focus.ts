@@ -6,8 +6,11 @@ function isVisible(element: HTMLElement) {
 
 /** Only the front-most modal owns document-level keyboard/focus events. */
 export function isTopmostDialog(dialog: HTMLElement) {
-  const dialogs = Array.from(dialog.ownerDocument.querySelectorAll<HTMLElement>('[role="dialog"][aria-modal="true"]')).filter(isVisible);
-  return dialogs.at(-1) === dialog;
+  return topmostModalDialog(dialog.ownerDocument) === dialog;
+}
+
+export function topmostModalDialog(document: Document) {
+  return Array.from(document.querySelectorAll<HTMLElement>('[role="dialog"][aria-modal="true"]')).filter(isVisible).at(-1) ?? null;
 }
 
 export function dialogTabStops(dialog: HTMLElement) {

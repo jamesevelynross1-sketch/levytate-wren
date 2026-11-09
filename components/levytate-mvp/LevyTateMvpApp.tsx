@@ -1,4 +1,5 @@
 "use client";
+import { dialogTabBoundary, dialogTabStops, isTopmostDialog, topmostModalDialog } from "@/lib/levytate/dialog-focus";
 
 import type { LucideIcon } from "lucide-react";
 import dynamic from "next/dynamic";
@@ -293,30 +294,25 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
   useEffect(() => {
     if (!mobileMenuOpen) return;
     const drawer = mobileDrawerRef.current;
+    if (!drawer) return;
     const trigger = mobileMenuButtonRef.current;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const focusable = () => drawer ? Array.from(drawer.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), [tabindex]:not([tabindex="-1"])')) : [];
-    focusable()[0]?.focus();
-    function onKeyDown(event: globalThis.KeyboardEvent) {
+    dialogTabStops(drawer)[0]?.focus();
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.defaultPrevented || !isTopmostDialog(drawer)) return;
       if (event.key === "Escape") {
         event.preventDefault();
         setMobileMenuOpen(false);
         return;
       }
       if (event.key !== "Tab") return;
-      const elements = focusable();
-      if (!elements.length) return;
-      const first = elements[0];
-      const last = elements[elements.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
+      const target = dialogTabBoundary(drawer, document.activeElement, event.shiftKey);
+      if (target) {
         event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
+        target.focus();
       }
-    }
+    };
     document.addEventListener("keydown", onKeyDown);
     return () => {
       document.removeEventListener("keydown", onKeyDown);
@@ -333,7 +329,8 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
       setAccountMenuOpen(false);
     }
     function closeOnEscape(event: globalThis.KeyboardEvent) {
-      if (event.key !== "Escape") return;
+      if (event.key !== "Escape" || event.defaultPrevented || topmostModalDialog(document)) return;
+      event.preventDefault();
       setAccountMenuOpen(false);
       accountButtonRef.current?.focus();
     }
