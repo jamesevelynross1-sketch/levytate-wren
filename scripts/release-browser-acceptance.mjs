@@ -419,6 +419,11 @@ try {
     const{verifyRequests}=await import("./release-requests-browser.mjs");
     await independentJourney("provider Requests workflow",()=>verifyRequests({app,mailpit,manifest,contexts,browser,backend,check}));
   }
+  if(process.env.RELEASE_FINANCE_JOURNEY==="true"){
+    phase="genuine Finance CSV preview import retry and aggregate evidence";
+    const{verifyFinance}=await import("./release-finance-browser.mjs");
+    await independentJourney("Finance import and report evidence",()=>verifyFinance({app,manifest,contexts,backend,check}));
+  }
   if(process.env.RELEASE_USABILITY_JOURNEY==="true"){
     phase="genuine Copilot scope, keyboard, zoom and print";
     const{verifyUsability}=await import("./release-usability-browser.mjs");
