@@ -181,12 +181,12 @@ export async function verifyLifecycle({ app: value, mailpit: mailValue, browser,
     await requestDialog.getByRole("combobox", { name: "Suspended employer", exact: true }).selectOption(plan.target.id);
     await requestDialog.getByRole("combobox", { name: "Purpose", exact: true }).selectOption("delete");
     await requestDialog.getByLabel("Export expiry (your local time, within seven days)", { exact: true }).fill(localMinute(3600_000));
-    await requestDialog.getByLabel("Data owner", { exact: true }).selectOption(a.user.membershipId);
-    await requestDialog.getByLabel("Service owner", { exact: true }).selectOption(b.user.membershipId);
+    await requestDialog.getByRole("combobox", { name: "Data owner", exact: true }).selectOption(a.user.membershipId);
+    await requestDialog.getByRole("combobox", { name: "Service owner", exact: true }).selectOption(b.user.membershipId);
     for (const label of ["Retention policy approval reference", "Approved client notice reference", "Support handover reference", "Recovery and irreversibility boundary reference"]) await requestDialog.getByLabel(label, { exact: true }).fill(`synthetic-approved-${plan.run}`);
     await requestDialog.getByLabel("Retain lifecycle evidence until (your local time)", { exact: true }).fill(localMinute(86400_000));
     for (const label of classes) {
-      await requestDialog.getByLabel(`${label} action`, { exact: true }).selectOption("delete");
+      await requestDialog.getByRole("combobox", { name: `${label} action`, exact: true }).selectOption("delete");
       await requestDialog.getByLabel(`${label} retain until (local time)`, { exact: true }).fill(localMinute(-86400_000));
       await requestDialog.getByLabel(`${label} schedule approval reference`, { exact: true }).fill(`synthetic-schedule-${plan.run}`);
     }
