@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { localUrl } from "./release-local-fixtures.mjs";
 
-export async function verifyManagerLearningTime({ app: origin, manifest, contexts, learnerId, backend, check }) {
+export async function verifyManagerLearningTime({ app: origin, manifest, contexts, learnerId, existingPlanId, backend, check }) {
   const app = localUrl(origin, "manager learning app"), runtime = process.env.RELEASE_LOCAL_RUNTIME;
   const manager = contexts.get("a:manager"), lead = contexts.get("a:lead"), employee = contexts.get("a:employee"), other = contexts.get("b:employee"), tenant = manifest.tenants.find(item => item.key === "a");
   if (!runtime?.startsWith("/private/tmp/levytate-release-runtime.") || !manifest.synthetic || manifest.environment !== "local" || !/^[a-f0-9-]{36}$/.test(manifest.run) || !/^[a-f0-9-]{36}$/.test(tenant?.id ?? "") || manifest.catalogue.standardId !== "ST0118" || ![manager, lead, employee, other].every(actor => actor?.context && actor?.page) || !learnerId) throw Error("Reviewed fictional local learner and existing genuine contexts required");
@@ -28,10 +28,12 @@ export async function verifyManagerLearningTime({ app: origin, manifest, context
       backend(`rest/v1/levytate_audit_events?organisation_id=eq.${tenant.id}&entity_type=eq.learning_time&entity_id=eq.${encodeURIComponent(learnerId)}&select=id&order=id`),
     ]); return { rows, events, receipts, audits };
   };
-  let phase = "verify exact own enrolled learner", badGet, dropped, originalBody, savedActivity, upstreamFailed = false;
+  let phase = "verify exact own enrolled learner", badGet = 0, dropped, originalBody, savedActivity, upstreamFailed = false;
   const malformed = async route => {
-    if (!badGet && route.request().method() === "GET") {
-      badGet = true; const response = await route.fetch();
+    // Keep the bounded read fault active until asserted. StrictMode may perform
+    // two initial GETs; corrupting only the first lets a healthy second read win.
+    if (route.request().method() === "GET") {
+      badGet++; const response = await route.fetch();
       if (response.status() !== 200) { upstreamFailed = true; await route.fulfill({ response }); return; }
       const headers = response.headers(); delete headers["content-length"]; delete headers["content-encoding"];
       await route.fulfill({ response, body: "{}", headers: { ...headers, "content-type": "application/json" } });
@@ -53,30 +55,45 @@ export async function verifyManagerLearningTime({ app: origin, manifest, context
     report("other tenant remains disabled", (await other.context.request.get(path, { headers: headers(other) })).status() === 404);
     const before = await workspace(manager), current = own(before);
     report("own current learner is distinct from report controls", current?.employeeId === manager.user.personId && current.canCreateActivities === true && before.learners[0].learnerRecordId === learnerId && before.canReviewActivities === false && before.canManagePlans === false && before.learners.filter(item => item.employeeId !== manager.user.personId).every(item => item.canCreateActivities === false));
-    report("new own learner has no fabricated plan or activity", current.plan === null && current.activities.length === 0);
+    if (existingPlanId) {
+      const matches = /^[a-f0-9-]{36}$/.test(existingPlanId) && current?.plan?.planId === existingPlanId && current.plan.status === "published" && current.activities.length === 0;
+      report("explicit continuation uses the existing published own plan with no activities", matches);
+      if (!matches) throw Error("Existing published plan does not match bounded continuation");
+    } else {
+      const empty = current?.plan === null && current.activities.length === 0;
+      report("new own learner has no fabricated plan or activity", empty);
+      if (!empty) throw Error("First-time plan creation requires empty existing learning state");
+    }
     const plan = { action: "create_plan_draft", idempotencyKey: randomUUID(), learnerRecordId: learnerId, originalStartDate: today, practicalStartDate: today, practicalEndDate: "2028-01-01", standardId: "ST0118", standardVersion: "1.1", priorLearningReductionMinutes: 0, individualMinimumMinutes: 22200, plannedDeliveryMinutes: 22200, providerId: manifest.catalogue.providerId, trainingPlanReference: "Synthetic own-manager acceptance; no funding claim", sourceType: "provider_training_plan", sourceDate: today };
     report("Manager cannot author their own plan", (await post(manager, plan)).status() === 403);
-    const draftResponse = await post(lead, plan), draft = await draftResponse.json();
-    report("Lead creates the actual own-Manager plan", draftResponse.status() === 201 && draft.version?.standard_version === "1.1");
-    report("Lead publishes the exact plan", (await post(lead, { action: "publish_plan", versionId: draft.version.id, idempotencyKey: randomUUID() })).status() === 200);
+    if (!existingPlanId) {
+      const draftResponse = await post(lead, plan), draft = await draftResponse.json();
+      const created = draftResponse.status() === 201 && draft.version?.standard_version === "1.1";
+      report("Lead creates the actual own-Manager plan", created);
+      if (!created) throw Error("Plan creation unconfirmed");
+      const published = (await post(lead, { action: "publish_plan", versionId: draft.version.id, idempotencyKey: randomUUID() })).status() === 200;
+      report("Lead publishes the exact plan", published);
+      if (!published) throw Error("Plan publication unconfirmed");
+    }
     phase = "malformed successful read";
     await page.route("**/api/levytate-learning-time", malformed);
     try { await page.goto(`${app}/levytate/app?module=Learning%20Time`); await page.getByText("Learning Time is unavailable", { exact: true }).waitFor(); }
     finally { await page.unroute("**/api/levytate-learning-time", malformed); }
-    report("malformed actual200 is rejected without rendering a partial workspace", badGet && !upstreamFailed && await page.getByRole("button", { name: "Add learning activity", exact: true }).count() === 0);
+    report("malformed actual200 is rejected without rendering a partial workspace", badGet > 0 && !upstreamFailed && await page.getByRole("button", { name: "Add learning activity", exact: true }).count() === 0);
     await page.getByRole("button", { name: "Try again", exact: true }).click();
     await page.getByRole("button", { name: "Add learning activity", exact: true }).click();
     phase = "real save then lost response";
     const title = `Synthetic manager workshop ${manifest.run.slice(0, 8)}`;
     await page.getByLabel("Activity date", { exact: true }).fill(today); await page.getByLabel("Start", { exact: true }).fill("11:00"); await page.getByLabel("End", { exact: true }).fill("12:00");
     await page.getByRole("combobox", { name: "Working-hours basis", exact: true }).selectOption("within_normal_working_hours");
-    for (const [label, value] of [["Title", title], ["What did you do?", "Synthetic individual workshop, separate from productive work."], ["What was genuinely new?", "New data interpretation methods."], ["How did this relate to your standard or agreed priority?", "Data analysis skills within the synthetic plan."], ["Reflection", "Fictional acceptance evidence only."]]) await page.getByLabel(label, { exact: true }).fill(value);
+    for (const [label, value] of [["Title", title], ["What did you do?", "Synthetic individual workshop, separate from productive work."], ["What was genuinely new?", "New data interpretation methods."], ["How did this relate to your standard or agreed priority?", "Data analysis skills within the synthetic plan."], ["Reflection", "Fictional acceptance evidence only."]]) await page.getByRole("textbox", { name: label, exact: true }).fill(value);
     await page.getByLabel("This was separate from routine productive work.", { exact: true }).check();
     await page.route("**/api/levytate-learning-time", loseSave);
     try { await page.getByRole("button", { name: "Save private draft", exact: true }).click(); await page.getByRole("dialog", { name: "Update awaiting confirmation", exact: true }).waitFor(); }
     finally { await page.unroute("**/api/levytate-learning-time", loseSave); }
     report("real upstream commit precedes lost response and visible recovery", dropped && !upstreamFailed && Boolean(savedActivity?.id) && typeof originalBody === "string");
-    report("uncertain original input stays frozen", await page.getByLabel("Title", { exact: true }).inputValue() === title && await page.getByLabel("Title", { exact: true }).isDisabled());
+    const retainedTitle = page.getByRole("textbox", { name: "Title", exact: true, includeHidden: true });
+    report("uncertain original input stays frozen", await retainedTitle.inputValue() === title && await retainedTitle.isDisabled());
     const committed = await counts(savedActivity.id), retry = page.waitForResponse(matchPost);
     await page.getByRole("dialog", { name: "Update awaiting confirmation", exact: true }).getByRole("button", { name: "Retry original update", exact: true }).click();
     const retried = await retry;
@@ -106,6 +123,6 @@ export async function verifyManagerLearningTime({ app: origin, manifest, context
       report("selecting a report does not retain own capture or review controls", await page.getByRole("button", { name: "Add learning activity", exact: true }).count() === 0 && await page.getByRole("button", { name: "Employer check", exact: true }).count() === 0 && await page.getByRole("button", { name: "Withdraw activity", exact: true }).count() === 0);
     }
     return { learnerId, activityId: savedActivity.id, result: "PASS", lostResponseAfterRealCommit: true, newSignIns: 0 };
-  } catch { throw Error(`Manager Learning Time acceptance failed during ${phase}; private state omitted`); }
+  } catch (error) { throw Error(`Manager Learning Time acceptance failed during ${phase}; safeErrorClass=${["TimeoutError", "TypeError"].includes(error?.name) ? error.name : "Error"}; malformedReads=${badGet}; upstreamFailed=${upstreamFailed}; private state omitted`); }
   finally { await page.unroute("**/api/levytate-learning-time", malformed); await page.unroute("**/api/levytate-learning-time", loseSave); capability(false); report("optional capability restored disabled", (await manager.context.request.get(path, { headers: headers(manager) })).status() === 404); }
 }
