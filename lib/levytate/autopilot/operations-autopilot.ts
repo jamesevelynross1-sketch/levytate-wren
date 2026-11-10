@@ -84,6 +84,24 @@ export type AutopilotPersistedSignal = DetectedAutopilotSignal & {
   dismissalReason?: string;
 };
 
+/** These application stages belong to the canonical approval/handoff workflow.
+ * A generic Operations task cannot perform or replace that transition.
+ */
+export function autopilotApplicationDestination(signal: Pick<DetectedAutopilotSignal, "entityType" | "entityId" | "signalType" | "applicationId" | "evidence">) {
+  const id = signal.entityId;
+  if (signal.entityType !== "application" || !["application_stalled", "application_awaiting_provider"].includes(signal.signalType)
+    || typeof id !== "string" || id.length < 1 || id.length > 160 || id.trim() !== id || /[\u0000-\u001f\u007f]/.test(id)
+    || (signal.applicationId !== undefined && signal.applicationId !== id)
+    || !signal.evidence.some(item => item.sourceType === "application" && item.sourceId === id)) return null;
+  const handoff = signal.signalType === "application_awaiting_provider";
+  return {
+    applicationId: id,
+    href: `/levytate/app?module=Applications&application=${encodeURIComponent(id)}`,
+    label: handoff ? "Open enrolment handoff" : "Review application",
+    instruction: handoff ? "Open the application to continue its approved pre-enrolment handoff." : "Open the application to review its current workflow and next responsible owner.",
+  };
+}
+
 export type AutopilotReviewInput = {
   id: string;
   type: "provider_review" | "l_and_d_check_in" | "manager_check_in";
@@ -233,15 +251,15 @@ export function analyseOperationsAutopilot(input: AutopilotAnalysisInput) {
       signals.push(buildSignal(input, {
         key: `application:${application.id}:awaiting-provider`, type: "application_awaiting_provider", category: "applications", lane: "waiting_externally", priority: age >= 14 ? "action_now" : "this_week",
         entityType: "application", entityId: application.id, application, subjectLabel: application.employeeName, title: "Application awaiting provider",
-        summary: `${application.employeeName}'s application has awaited provider progress for ${age} days.`, recommendedAction: "Confirm the outstanding provider dependency and agree a response date.",
-        ownerType: "Provider", dueDate: today, actionType: "confirm_provider", evidence, payload: { rule: "application_awaiting_provider", daysInState: age, status: application.status }, linkedOperationalActionId: matchingApplicationAction?.id,
+        summary: `${application.employeeName}'s application has awaited provider progress for ${age} days.`, recommendedAction: "Open the application to continue its approved pre-enrolment handoff.",
+        ownerType: "Provider", dueDate: today, actionType: "", evidence, payload: { rule: "application_awaiting_provider", daysInState: age, status: application.status },
       }));
     } else if (age >= 7) {
       signals.push(buildSignal(input, {
         key: `application:${application.id}:stalled`, type: "application_stalled", category: "applications", lane: "needs_your_decision", priority: age >= 14 ? "action_now" : "this_week",
         entityType: "application", entityId: application.id, application, subjectLabel: application.employeeName, title: "Application has not progressed",
-        summary: `${application.employeeName}'s application has remained at ${application.currentStepLabel ?? application.status} for ${age} days.`, recommendedAction: "Review the application state and confirm the next responsible owner.",
-        ownerType: "Apprenticeship Lead", dueDate: today, actionType: "review_application", evidence, payload: { rule: "application_stalled", daysInState: age, status: application.status, currentOwner: application.currentOwner, currentStepLabel: application.currentStepLabel }, linkedOperationalActionId: matchingApplicationAction?.id,
+        summary: `${application.employeeName}'s application has remained at ${application.currentStepLabel ?? application.status} for ${age} days.`, recommendedAction: "Open the application to review its current workflow and next responsible owner.",
+        ownerType: "Apprenticeship Lead", dueDate: today, actionType: "", evidence, payload: { rule: "application_stalled", daysInState: age, status: application.status, currentOwner: application.currentOwner, currentStepLabel: application.currentStepLabel },
       }));
     }
   }
@@ -309,7 +327,7 @@ export function buildOperationsBrief(signals: AutopilotPersistedSignal[]) {
     thisWeek: active.filter((signal) => signal.priority === "this_week").length,
     upcoming: active.filter((signal) => signal.priority === "upcoming").length,
     waitingExternally: active.filter((signal) => signal.lane === "waiting_externally").length,
-    preparedNextActions: active.filter((signal) => !signal.linkedOperationalActionId).length,
+    preparedNextActions: active.filter((signal) => !signal.linkedOperationalActionId && Boolean(signal.suggestedActionType)).length,
     total: active.length,
   };
 }
