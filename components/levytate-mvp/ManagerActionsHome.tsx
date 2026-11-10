@@ -1,8 +1,9 @@
 "use client";
 
 import { ArrowRight, Clock3, LoaderCircle } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { FormTextArea, MvpModal, MvpPanel, StatusBadge } from "@/components/levytate-mvp/MvpUi";
+import { OperationsReadbackRecovery } from "@/components/levytate-mvp/OperationsReadbackRecovery";
 import { ClientMutationRecovery } from "@/components/levytate-mvp/ClientMutationRecovery";
 import { useOperationsClientCommand } from "@/components/levytate-mvp/useOperationsClientCommand";
 import { decodeManagerAction, decodeManagerActions, decodeManagerMutation } from "@/lib/levytate/operations-client-response";
@@ -31,7 +32,9 @@ export function ManagerActionsHome({ kind = "manager_support" }: { kind?: Manage
   const [startNote, setStartNote] = useState("");
   const [loading, setLoading] = useState(true);
   const mutation = useOperationsClientCommand();
-  const mutating = mutation.locked;
+  const [readbackRequired, setReadbackRequired] = useState(false);
+  const confirmedVersions = useRef(new Map<string, number>());
+  const mutating = mutation.locked || readbackRequired;
   const scope = mutation.scope;
   const [error, setError] = useState("");
   const [confirmation, setConfirmation] = useState("");
@@ -42,7 +45,9 @@ export function ManagerActionsHome({ kind = "manager_support" }: { kind?: Manage
     try {
       const request = await retainedRequest(`/api/levytate-manager/actions?status=${encodeURIComponent(nextFilter)}&kind=${encodeURIComponent(kind)}`, { cache: "no-store" });
       if (!request.ok) throw new Error("Your actions could not be loaded.");
-      setResponse(decodeManagerActions(await request.json(), scope));
+      const next = decodeManagerActions(await request.json(), scope);
+      if (next.actions.some(action => action.version < (confirmedVersions.current.get(action.actionId) ?? 0))) throw new Error("The latest saved actions have not been returned yet.");
+      setResponse(next); setReadbackRequired(false);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Your actions could not be loaded.");
     } finally {
@@ -72,7 +77,7 @@ export function ManagerActionsHome({ kind = "manager_support" }: { kind?: Manage
   }, [openAction]);
 
   function closeAction() {
-    if (mutation.locked) return;
+    if (mutating) return;
     setSelected(null);
     setStartNote("");
     setConfirmation("");
@@ -87,6 +92,7 @@ export function ManagerActionsHome({ kind = "manager_support" }: { kind?: Manage
         { expectedVersion: action.version, ...(command === "start" && note.trim() ? { note: note.trim() } : {}) },
         value => decodeManagerMutation(value, scope, original),
         next => {
+          confirmedVersions.current.set(action.actionId, next.version); setReadbackRequired(true);
           setSelected(current => current?.actionId === action.actionId ? next : current);
           setStartNote(""); setConfirmation(command === "acknowledge" ? "Action acknowledged." : "Action marked as in progress.");
           void load(filter);
@@ -185,6 +191,7 @@ export function ManagerActionsHome({ kind = "manager_support" }: { kind?: Manage
     </MvpPanel>
     </fieldset>
     <ClientMutationRecovery mutation={mutation} />
+    <OperationsReadbackRecovery required={readbackRequired} loading={loading} retry={() => void load(filter)} />
     </>
   );
 }

@@ -1,8 +1,9 @@
 "use client";
 
 import { ArrowLeft, ArrowRight, CalendarClock, CheckCircle2, CircleDot, Clock3, History, UserRound } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StatusBadge } from "@/components/levytate-mvp/MvpUi";
+import { OperationsReadbackRecovery } from "@/components/levytate-mvp/OperationsReadbackRecovery";
 import { ClientMutationRecovery } from "@/components/levytate-mvp/ClientMutationRecovery";
 import { useOperationsClientCommand } from "@/components/levytate-mvp/useOperationsClientCommand";
 import { decodeOperationalDetail, decodeOperationalMutation } from "@/lib/levytate/operations-client-response";
@@ -19,7 +20,9 @@ export function OperationalActionDetail({ actionId, onBack, onOpenAction, onOpen
   const [detail, setDetail] = useState<OperationalActionManagementDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const mutation = useOperationsClientCommand();
-  const saving = mutation.locked;
+  const [readbackRequired, setReadbackRequired] = useState(false);
+  const confirmedVersion = useRef(0);
+  const saving = mutation.locked || readbackRequired;
   const organisationId = mutation.identity?.organisationId ?? "";
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -30,7 +33,9 @@ export function OperationalActionDetail({ actionId, onBack, onOpenAction, onOpen
     try {
       const response = await request(`/api/levytate-operational-actions/${encodeURIComponent(actionId)}?management=true`, { cache: "no-store" });
       if (!response.ok) throw new Error("The action could not be loaded.");
-      setDetail(decodeOperationalDetail(await response.json(), { actionId, organisationId }));
+      const next = decodeOperationalDetail(await response.json(), { actionId, organisationId });
+      if (next.action.version < confirmedVersion.current) throw new Error("The latest saved action has not been returned yet.");
+      setDetail(next); setReadbackRequired(false);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "The action could not be loaded.");
     } finally {
@@ -49,7 +54,7 @@ export function OperationalActionDetail({ actionId, onBack, onOpenAction, onOpen
       await mutation.execute(`/api/levytate-operational-actions/${encodeURIComponent(actionId)}`,
         { command, expectedVersion: detail.action.version, ...payload },
         value => decodeOperationalMutation(value, original),
-        () => { setNotice(success); void load(); onChanged(); }, "PATCH");
+        confirmed => { confirmedVersion.current = confirmed.version; setReadbackRequired(true); setNotice(success); void load(); onChanged(); }, "PATCH");
     } catch { /* The original command remains available in the recovery dialog. */ }
   }
 
@@ -139,6 +144,7 @@ export function OperationalActionDetail({ actionId, onBack, onOpenAction, onOpen
     </div>
     </fieldset>
     <ClientMutationRecovery mutation={mutation} />
+    <OperationsReadbackRecovery required={readbackRequired} loading={loading} retry={() => void load()} />
     </>
   );
 }
