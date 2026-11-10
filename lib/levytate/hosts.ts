@@ -187,38 +187,48 @@ export function levyTatePublicSitemap(host: string) {
   return publicSitemapPaths.map((path) => new URL(path, origin).toString());
 }
 
-export function levytateSessionCookieDomain(hostHeader: string | null | undefined) {
+export function isLevyTateAuthCookieHost(hostHeader: string | null | undefined) {
   const host = requestHostname(hostHeader);
-  if (!host || host === "localhost" || host === "127.0.0.1") return undefined;
+  if (!host) return false;
+  if (host === "localhost" || host === "127.0.0.1") return true;
+  if (isLevyTateMarketingHost(host)) return false;
+  if (isLevyTatePlatformHost(host)) return true;
 
-  const configured = process.env.LEVYTATE_SESSION_COOKIE_DOMAIN?.trim().toLowerCase().replace(/^\./, "");
-  if (configured) {
-    const platformHost = getLevyTatePlatformHost();
-    const websiteHost = new URL(getLevyTateWebsiteOrigin()).hostname;
-    const coversWebsite = websiteHost === configured || websiteHost.endsWith(`.${configured}`);
-    if (coversWebsite && configured !== platformHost) return undefined;
-    if (host === configured || host.endsWith(`.${configured}`)) return configured;
+  if (process.env.VERCEL_ENV !== "preview") return false;
+  return [process.env.VERCEL_BRANCH_URL, process.env.VERCEL_URL]
+    .map(vercelDeploymentHostname)
+    .filter(Boolean)
+    .includes(host);
+}
+
+export function levytateLegacySessionCookieDomain(hostHeader: string | null | undefined) {
+  const host = requestHostname(hostHeader);
+  if (!host || host === "localhost" || host === "127.0.0.1" || !isLevyTateAuthCookieHost(host)) {
     return undefined;
   }
 
-  if (isLevyTatePlatformHost(host)) return getLevyTatePlatformHost();
+  const configured = process.env.LEVYTATE_SESSION_COOKIE_DOMAIN?.trim().toLowerCase().replace(/^\./, "");
+  if (configured === host) return host;
+  if (host === getLevyTatePlatformHost()) return host;
   return undefined;
 }
 
 export function levytateAuthCookieOptions(
   maxAge: number,
-  hostHeader: string | null | undefined,
+  _hostHeader: string | null | undefined,
   sameSite: "lax" | "strict" = "lax",
 ) {
-  const domain = levytateSessionCookieDomain(hostHeader);
   return {
     httpOnly: true as const,
     sameSite,
     secure: process.env.NODE_ENV === "production",
     path: "/",
     maxAge,
-    ...(domain ? { domain } : {}),
   };
+}
+
+function vercelDeploymentHostname(value: string | undefined) {
+  return requestHostname(value?.replace(/^https?:\/\//, "").split("/")[0]);
 }
 
 export function applyLevyTatePublicCors<T extends Response>(request: Request, response: T) {

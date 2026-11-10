@@ -1,17 +1,22 @@
 import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie, levytateBetaSessionMaxAge, readLevyTateBetaSession } from "@/lib/levytate/config/beta-access";
-import { levyTateAppHomePath, levyTateEmployerSignInPath, levytateAuthCookieOptions, requestHostname } from "@/lib/levytate/hosts";
-import { levytateAuthCookieMaxAge, levytateSupabaseAccessCookie, levytateSupabaseRefreshCookie, verifyEmployerMagicLink } from "@/lib/server/levytate-auth";
-import { checkCallbackAttemptLimit } from "@/lib/server/levytate-auth-rate-limit";
+import { levyTateAppHomePath, levyTateEmployerSignInPath, requestHostname } from "@/lib/levytate/hosts";
+import { levytateAuthCookieMaxAge, levytateSupabaseAccessCookie, levytateSupabaseRefreshCookie, verifyEmployerMagicLink, LevyTateAuthError } from "@/lib/server/levytate-auth";
+import { setLevyTateAuthCookies } from "@/lib/server/levytate-auth-cookies";
+import { checkCallbackAttemptLimit, recordInvalidCallback } from "@/lib/server/levytate-auth-rate-limit";
+import { AuthenticationDependencyError } from "@/lib/server/levytate-auth-provider-request";
 import { getCoreEarlyAccessPolicy } from "@/lib/levytate/core-early-access-policy";
 import { normaliseMvpUserRole } from "@/lib/levytate/mvp/rbac";
 import { getTermsGateState } from "@/lib/server/levytate-early-access-terms";
+import { applicationRequestUrl } from "@/lib/server/levytate-request-origin";
 
 export async function GET(request: Request) {
-  const url = new URL(request.url);
+  let url: URL;
+  try { url = applicationRequestUrl(request); }
+  catch { return NextResponse.json({ message: "Unrecognised application host." }, { status: 403 }); }
   try {
     const rateLimit = await checkCallbackAttemptLimit(request);
-    if (!rateLimit.allowed) return failed(url, request, "invalid-link");
+    if (!rateLimit.allowed) return failed(url, request, "rate-limited");
     const result = await verifyEmployerMagicLink(url.searchParams.get("token_hash") ?? "", url.searchParams.get("type") ?? "email");
     const role = normaliseMvpUserRole(result.membership.role);
     const first = getCoreEarlyAccessPolicy(role).modules.find((module) => module.availability === "enabled")?.moduleKey;
@@ -23,19 +28,26 @@ export async function GET(request: Request) {
     const termsGate = await getTermsGateState(session);
     if (!termsGate.bypass && !termsGate.accepted) destination.pathname = termsGate.authorisedAcceptor ? "/levytate/accept-terms" : homePath;
     const response = NextResponse.redirect(destination);
-    setCookie(response, request, levytateBetaSessionCookie, result.sessionToken, levytateBetaSessionMaxAge);
-    setCookie(response, request, levytateSupabaseAccessCookie, result.access_token, Math.min(result.expires_in ?? 3600, levytateAuthCookieMaxAge));
-    setCookie(response, request, levytateSupabaseRefreshCookie, result.refresh_token, levytateAuthCookieMaxAge);
+    setLevyTateAuthCookies(response, request.headers.get("host"), [
+      { name: levytateBetaSessionCookie, value: result.sessionToken, maxAge: levytateBetaSessionMaxAge },
+      { name: levytateSupabaseAccessCookie, value: result.access_token, maxAge: Math.min(result.expires_in ?? 3600, levytateAuthCookieMaxAge) },
+      { name: levytateSupabaseRefreshCookie, value: result.refresh_token, maxAge: levytateAuthCookieMaxAge },
+    ]);
     return response;
-  } catch {
-    return failed(url, request, "invalid-link");
+  } catch (error) {
+    if (error instanceof LevyTateAuthError && error.code !== "configuration") {
+      if (error.code === "invalid_link") {
+        try { if (!(await recordInvalidCallback(request)).allowed) return failed(url, request, "rate-limited"); }
+        catch { return failed(url, request, "unavailable"); }
+      }
+      return failed(url, request, "invalid-link");
+    }
+    return failed(url, request, error instanceof AuthenticationDependencyError && error.status === 429 ? "rate-limited" : "unavailable");
   }
-}
-
-function setCookie(response: NextResponse, request: Request, name: string, value: string, maxAge: number) {
-  response.cookies.set(name, value, levytateAuthCookieOptions(maxAge, request.headers.get("host")));
 }
 function failed(url: URL, request: Request, reason: string) {
   const path = levyTateEmployerSignInPath(requestHostname(request.headers.get("host") || url.host));
-  return NextResponse.redirect(new URL(`${path}?auth=${reason}`, url.origin));
+  const response = NextResponse.redirect(new URL(`${path}?auth=${reason}`, url.origin));
+  response.headers.set("Cache-Control", "private, no-store, max-age=0");
+  return response;
 }

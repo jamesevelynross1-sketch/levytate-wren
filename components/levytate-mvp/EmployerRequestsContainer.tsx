@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { authenticatedClientFetch } from "@/lib/levytate/client-session";
+import { decodeRequestsMutationResponse } from "@/lib/levytate/client-module-responses";
+import { decodeRequestsReadResponse } from "@/lib/levytate/client-employer-module-reads";
+import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
+import { usePinnedClientMutation } from "@/components/levytate-mvp/usePinnedClientMutation";
+import { ClientMutationRecovery } from "@/components/levytate-mvp/ClientMutationRecovery";
 import {
   EmployerRequestsModule,
   type EmployerRequestAgreementSnapshot,
@@ -30,6 +36,10 @@ export function EmployerRequestsContainer({
 }: Pick<EmployerRequestsModuleProps, "onOpenMarketplace" | "onOpenMyProviders" | "onOpenMyProgrammes">) {
   const [workspace, setWorkspace] = useState<EmployerRequestsWorkspaceBootstrap | null>(null);
   const [error, setError] = useState("");
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const { meta } = useMvpWorkspace();
+  const identity = useRef(meta ? { email: meta.userEmail, organisationId: meta.organisationId } : null);
+  const mutation = usePinnedClientMutation(identity.current, "/api/levytate-requests", (value) => decodeRequestsMutationResponse(value, identity.current?.organisationId));
   const initialContext = useMemo(() => {
     if (typeof window === "undefined") return undefined;
     const params = new URLSearchParams(window.location.search);
@@ -40,30 +50,22 @@ export function EmployerRequestsContainer({
 
   useEffect(() => {
     let live = true;
-    void fetch("/api/levytate-requests", { credentials: "same-origin", cache: "no-store" })
+    void authenticatedClientFetch("/api/levytate-requests", {}, identity.current ?? undefined)
       .then(async (response) => {
-        const body = await response.json() as { workspace?: EmployerRequestsWorkspaceBootstrap; message?: string };
-        if (!response.ok || !body.workspace) throw new Error(body.message ?? "Requests could not be loaded.");
-        if (live) setWorkspace(body.workspace);
+        const body: unknown = await response.json();
+        if (!response.ok) throw new Error("Requests could not be loaded for this account. Reload to reconnect.");
+        const next = decodeRequestsReadResponse(body, identity.current?.organisationId);
+        if (live) setWorkspace(next);
       })
       .catch((caught) => { if (live) setError(message(caught)); });
     return () => { live = false; };
-  }, []);
+  }, [loadAttempt]);
 
   async function mutate(action: EmployerRequestAction) {
-    const response = await fetch("/api/levytate-requests", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(action),
-    });
-    const body = await response.json().catch(() => null) as { workspace?: EmployerRequestsWorkspaceBootstrap; message?: string } | null;
-    if (!response.ok || !body?.workspace) throw new Error(body?.message ?? "We couldn’t save this Request. Please try again.");
-    setWorkspace(body.workspace);
-    return body.workspace;
+    return mutation.execute(action, setWorkspace);
   }
 
-  if (error) return <RequestLoadState title="Requests are unavailable" copy={error} />;
+  if (error) return <RequestLoadState title="Requests are unavailable" copy={error} onRetry={() => { setError(""); setLoadAttempt(attempt => attempt + 1); }} />;
   if (!workspace) return <RequestLoadState title="Loading Requests" copy="Preparing this employer workspace…" />;
 
   const providers = providerOptions(workspace);
@@ -71,7 +73,7 @@ export function EmployerRequestsContainer({
   const requests = workspace.requests.map((request) => requestView(request, workspace));
   const convert = (brief: EmployerRequestBrief, responseDeadline?: string) => contentFromBrief(brief, responseDeadline, workspace);
 
-  return (
+  return (<div className="grid gap-4"><ClientMutationRecovery mutation={mutation}/><fieldset disabled={mutation.locked} key={mutation.reconciled} className="min-w-0 border-0 p-0">
     <EmployerRequestsModule
       organisationName={workspace.organisation.name}
       requests={requests}
@@ -117,11 +119,11 @@ export function EmployerRequestsContainer({
       onConfirmAgreement={(requestId, responseId, handover) => mutate({ action: "confirm_and_handover", requestId, responseId, ...handover, idempotencyKey: crypto.randomUUID() }).then(() => undefined)}
       onRecordDidNotProceed={(requestId, responseId, privateDecisionNote) => mutate({ action: "not_proceeded", requestId, responseId, privateDecisionNote, idempotencyKey: crypto.randomUUID() }).then(() => undefined)}
     />
-  );
+  </fieldset></div>);
 }
 
-function RequestLoadState({ title, copy }: { title: string; copy: string }) {
-  return <section role="status" className="rounded-2xl border border-[#27456a]/[0.09] bg-white p-6"><h2 className="text-lg font-semibold text-[#27456a]">{title}</h2><p className="mt-2 text-sm leading-6 text-[#52677d]">{copy}</p></section>;
+function RequestLoadState({ title, copy, onRetry }: { title: string; copy: string; onRetry?: () => void }) {
+  return <section role={onRetry ? "alert" : "status"} className="rounded-2xl border border-[#27456a]/[0.09] bg-white p-6"><h2 className="text-lg font-semibold text-[#27456a]">{title}</h2><p className="mt-2 text-sm leading-6 text-[#52677d]">{copy}</p>{onRetry ? <button type="button" onClick={onRetry} className="mt-3 text-sm font-semibold text-[#27456a] underline">Try again</button> : null}</section>;
 }
 
 function providerOptions(workspace: EmployerRequestsWorkspaceBootstrap): EmployerRequestProviderOption[] {

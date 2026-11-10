@@ -11,5 +11,5 @@ export const revalidate = 0;
 
 export default async function LevyTateLoginPage({ searchParams }: { searchParams: Promise<{ auth?: string; logout?: string }> }) {
   const { auth, logout } = await searchParams;
-  return <LevyTateLoginClient internalLoginEnabled={isInternalBetaLoginEnabled()} invalidLink={auth === "invalid-link"} providerLogoutWarning={logout === "local-only"} />;
+  return <LevyTateLoginClient internalLoginEnabled={isInternalBetaLoginEnabled()} invalidLink={auth === "invalid-link"} authIssue={auth === "rate-limited" || auth === "unavailable" ? auth : undefined} providerLogoutWarning={logout === "local-only"} />;
 }

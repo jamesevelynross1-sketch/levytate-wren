@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
+import { assertBrowserOrigin, readBrowserJson } from "../lib/server/levytate-request-boundary.ts";
 import {
   addProviderMembershipForTest,
   answerClarification,
@@ -471,6 +472,7 @@ check("80 event idempotency keys are unique per Request", new Set(store.events.m
 check("81 event metadata has no private employer notes", !JSON.stringify(store.events).includes("Private decision note") && !JSON.stringify(store.events).includes("private-employee"));
 
 const migration = await fs.readFile("supabase/migrations/028_create_service_requests.sql", "utf8");
+const commandMigration = await fs.readFile("supabase/release-migrations/20261029220936_client_request_actor_integrity.sql", "utf8");
 const correctiveMigration = await fs.readFile("supabase/migrations/029_correct_service_request_privileges.sql", "utf8");
 const requestPrivilegeMigrationHistory = (
   await Promise.all(
@@ -772,7 +774,11 @@ check(
 check("145 Request expiry has a database-compatible audit event type", migration.includes("'request_expired','request_cancelled'"));
 check(
   "146 each logical Request action is persisted through one database transaction",
-  service.includes('"rpc/levytate_persist_service_request_action"') &&
+  service.includes('"rpc/levytate_apply_request_command"') &&
+    commandMigration.includes("perform public.levytate_persist_service_request_action(p_organisation_id,p_changes,p_expected)") &&
+    commandMigration.includes("revoke all on function public.levytate_persist_service_request_action") &&
+    commandMigration.includes("insert into public.levytate_request_command_receipts") &&
+    commandMigration.includes("insert into public.levytate_audit_events") &&
     migration.includes("create function public.levytate_persist_service_request_action"),
 );
 check(
@@ -789,7 +795,7 @@ check(
   "149 agreement and portfolio handover share the same transaction",
   migration.indexOf("insert into public.levytate_service_request_handovers") <
     migration.indexOf("insert into public.levytate_organisation_providers") &&
-    service.includes("selectionActorEmail: actor.email"),
+    service.includes("selectionActorEmail:actor.email"),
 );
 check(
   "150 provider access membership and audit mutations share a service-role-only transaction",
@@ -830,9 +836,12 @@ check(
 );
 check(
   "156 Platform Admin provider-access mutation bodies are bounded",
-  providerAccessAdminRoute.includes("maximumRequestBodyBytes") &&
-    providerAccessAdminRoute.includes("readBoundedJson(request, maximumRequestBodyBytes)"),
+  providerAccessAdminRoute.includes("const maximumRequestBodyBytes = 16 * 1024") &&
+    providerAccessAdminRoute.includes("readAuthenticatedJson(request, session.email, maximumRequestBodyBytes)"),
 );
+await assert.rejects(() => readBrowserJson(new Request("http://localhost:3107/api/levytate-platform/provider-access", {
+  method: "POST", headers: { origin: "http://localhost:3107", "content-type": "application/json" }, body: JSON.stringify({ displayName: "界".repeat(6000) }),
+}), 16 * 1024), (error) => error.status === 413);
 
 check(
   "157 strict employer payload validation accepts a complete closed action",
@@ -966,9 +975,13 @@ check(
 );
 check(
   "166 every new browser mutation route requires an explicit matching Origin",
-  [employerRoute, providerRoute, providerAuthRoute, providerLogoutRoute, providerAccessAdminRoute]
-    .every((source) => source.includes('origin === new URL(request.url).origin') && !source.includes("!origin ||")),
+  [employerRoute, providerRoute, providerAccessAdminRoute].every((source) => source.includes("await readAuthenticatedJson(request, session.email"))
+    && providerAuthRoute.includes("await readBrowserJson(request,")
+    && providerLogoutRoute.includes("assertBrowserOrigin(request)"),
 );
+for (const origin of [null, "http://other.localhost:3107", "https://untrusted.invalid"]) {
+  assert.throws(() => assertBrowserOrigin(new Request("http://localhost:3107/api/levytate-requests", { headers: origin ? { origin } : {} })), (error) => error.status === 403);
+}
 check(
   "167 provider logout clears browser caches and revalidates BFCache restores",
   providerLogoutRoute.includes('Clear-Site-Data')
@@ -1426,8 +1439,8 @@ check(
   "198 every Requests browser JSON endpoint uses a streaming byte-bounded parser",
   boundedJson.includes("request.body.getReader()")
     && boundedJson.includes("received > maximumBytes")
-    && [employerRoute, providerRoute, providerAuthRoute, providerAccessAdminRoute]
-      .every((source) => source.includes("readBoundedJson(")),
+    && [employerRoute, providerRoute, providerAccessAdminRoute].every((source) => source.includes("await readAuthenticatedJson(request, session.email"))
+    && providerAuthRoute.includes("await readBrowserJson(request,"),
 );
 check(
   "199 provider reactivation invalidates old sessions and requires a fresh bound callback",

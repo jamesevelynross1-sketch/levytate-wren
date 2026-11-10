@@ -59,8 +59,7 @@ export function recipientDeliveryHash(email: string) {
     .digest("hex");
 }
 
-export async function recordAuthenticationEmailRequest(email: string) {
-  const requestReference = randomUUID();
+export async function recordAuthenticationEmailRequest(email: string, requestReference: string = randomUUID()) {
   const occurredAt = new Date().toISOString();
   await persistDeliveryEvent({
     environment_namespace: getLevyTateRateLimitEnvironment(),
@@ -99,6 +98,21 @@ export async function recordAuthenticationEmailAccepted(email: string, requestRe
   });
 }
 
+/** Exact server-written send evidence only; inferred webhook correlation is not
+ * enough to activate an account after an interrupted invitation finalisation. */
+export async function getAuthenticationSendOutcome(email: string, requestReference: string): Promise<boolean | null> {
+  const config = getLevyTateSupabaseConfig();
+  if (!config) throw new AuthenticationEmailDeliveryError("storage_unavailable", "Delivery evidence is unavailable.");
+  const rows = await supabaseSelect<Pick<DeliveryEventRow, "provider_event_id" | "canonical_status">>(config, "levytate_auth_email_delivery_events", new URLSearchParams({
+    select: "provider_event_id,canonical_status", environment_namespace: `eq.${getLevyTateRateLimitEnvironment()}`,
+    provider: "eq.supabase", authentication_request_reference: `eq.${requestReference}`,
+    recipient_hash: `eq.${recipientDeliveryHash(email)}`, correlation_confidence: "eq.exact", processing_status: "eq.processed", limit: "3",
+  }));
+  if (rows.some((row) => row.provider_event_id === `accepted:${requestReference}` && row.canonical_status === "accepted")) return true;
+  if (rows.some((row) => row.provider_event_id === `failed:${requestReference}` && row.canonical_status === "failed")) return false;
+  return null;
+}
+
 export async function shouldSuppressAuthenticationEmail(email: string) {
   const config = getLevyTateSupabaseConfig();
   if (!config) return false;
@@ -115,7 +129,7 @@ export async function shouldSuppressAuthenticationEmail(email: string) {
     return rows.length > 0;
   } catch {
     console.error("LevyTate authentication delivery suppression check unavailable", { outcome: "suppression_check_failed" });
-    return false;
+    throw new AuthenticationEmailDeliveryError("storage_unavailable", "Delivery controls are temporarily unavailable.");
   }
 }
 

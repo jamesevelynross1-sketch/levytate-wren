@@ -20,11 +20,11 @@ import {
 } from "@/components/levytate-mvp/MvpUi";
 import { OperationalMetricRail, StageTracker } from "@/components/levytate-mvp/OperationalVisuals";
 import { useMvpWorkspace, type WorkspaceMutationResult } from "@/components/levytate-mvp/MvpWorkspaceStore";
+import { ApplicationPreEnrolmentModal } from "@/components/levytate-mvp/ApplicationPreEnrolmentModal";
 import { displayEmployee, includesSearch, statusTone } from "@/components/levytate-mvp/module-utils";
 import { managerName } from "@/lib/levytate/mvp/workspace-insights";
 
 import {
-  applicationOwnerForStatus,
   buildApplicationHistoryEntry,
   activeApplicationStatuses,
   createMvpId,
@@ -62,7 +62,7 @@ export function ApplicationsModule({
   initialApplicationId = null,
   onApplicationSelectionChange,
 }: ApplicationsModuleProps = {}) {
-  const { data, saveApplication, updateApplicationStatus, meta } = useMvpWorkspace();
+  const { data, saveApplication, meta } = useMvpWorkspace();
   const configurableWorkflowPublished = meta?.applicationWorkflowPublished === true;
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("All");
@@ -71,6 +71,8 @@ export function ApplicationsModule({
   const [selectedId, setSelectedId] = useState<string | null>(initialApplicationId ?? null);
   const [error, setError] = useState("");
   const [savingDraft, setSavingDraft] = useState(false);
+  const [handoff, setHandoff] = useState<MvpApplication | null>(null);
+  const [handoffConfirmation, setHandoffConfirmation] = useState("");
 
   useEffect(() => {
     setSelectedId(initialApplicationId ?? null);
@@ -161,8 +163,8 @@ export function ApplicationsModule({
     setError("");
     const result = await saveApplication({
       ...draft,
-      status: draftUsesConfigurableWorkflow ? "Draft" : draft.status,
-      currentOwner: draftUsesConfigurableWorkflow ? "Employee" : applicationOwnerForStatus(draft.status),
+      status: "Draft",
+      currentOwner: "Employee",
       updatedAt: nowIso(),
     });
     setSavingDraft(false);
@@ -173,28 +175,9 @@ export function ApplicationsModule({
     setDraft(null);
   }
 
-  function submitToManager(application: MvpApplication) {
-    updateApplicationStatus(application.id, "Submitted to Line Manager", "Application submitted for line manager review.");
-  }
-
-  function approveManager(application: MvpApplication) {
-    updateApplicationStatus(application.id, "Submitted to Apprenticeship Lead", "Line manager approved. Sent to apprenticeship lead for final review.");
-  }
-
-  function declineManager(application: MvpApplication) {
-    updateApplicationStatus(application.id, "Declined by Line Manager", "Line manager declined the request.");
-  }
-
-  function approveLead(application: MvpApplication) {
-    updateApplicationStatus(application.id, "Approved for Enrolment", "Apprenticeship lead approved the request for provider allocation and enrolment.");
-  }
-
-  function declineLead(application: MvpApplication) {
-    updateApplicationStatus(application.id, "Declined by Apprenticeship Lead", "Apprenticeship lead declined the request.");
-  }
-
   return (
     <div className="grid min-w-0 gap-5">
+      {handoffConfirmation ? <p role="status" className="rounded-xl bg-[#eef7f5] p-4 text-sm text-[#0b6f63]">{handoffConfirmation}</p> : null}
       <OperationalMetricRail items={[
         { label: "Active applications", value: queueSummary.total },
         { label: "Manager review", value: queueSummary.manager, tone: "watch" },
@@ -250,21 +233,9 @@ export function ApplicationsModule({
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-2">
                         <TableAction onClick={() => setSelectedId(application.id)}>View</TableAction>
-                        {!application.workflow && (!application.workflowPreview || application.status === "Draft") ? <TableAction onClick={() => setDraft({ ...application })}>Edit</TableAction> : null}
-                        {application.status === "Draft" && application.workflowPreview ? <span className="self-center text-xs font-semibold text-[#102c3d]/45">Awaiting employee submission</span> : null}
-                        {application.status === "Draft" && !application.workflow && !application.workflowPreview ? <TableAction onClick={() => submitToManager(application)}>Submit</TableAction> : null}
-                        {!application.workflow && !application.workflowPreview && reviewableManagerStatuses.includes(application.status) ? (
-                          <>
-                            <TableAction onClick={() => approveManager(application)}>Approve</TableAction>
-                            <TableAction onClick={() => declineManager(application)} danger>Decline</TableAction>
-                          </>
-                        ) : null}
-                        {!application.workflow && !application.workflowPreview && reviewableLeadStatuses.includes(application.status) ? (
-                          <>
-                            <TableAction onClick={() => approveLead(application)}>Final approve</TableAction>
-                            <TableAction onClick={() => declineLead(application)} danger>Decline</TableAction>
-                          </>
-                        ) : null}
+                        {application.status === "Draft" && !application.workflow ? <TableAction onClick={() => setDraft({ ...application })}>Edit draft</TableAction> : null}
+                        {application.status === "Draft" ? <span className="self-center text-xs font-semibold text-[#102c3d]/45">Awaiting employee submission</span> : null}
+                        {application.status === "Approved for Enrolment" && ["Apprenticeship Lead", "Employer Admin"].includes(meta?.userRole ?? "") && !data.learnerRecords.some((learner) => learner.applicationId === application.id && learner.recordStatus === "Active") ? <TableAction onClick={() => setHandoff(application)}>Start pre-enrolment</TableAction> : null}
                       </div>
                     </td>
                   </tr>
@@ -302,12 +273,12 @@ export function ApplicationsModule({
                 required
                 options={[{ value: "", label: "Select employee" }, ...data.employees.filter((item) => item.status === "Active").map((item) => ({ value: item.id, label: item.name }))]}
               />
-              {draftUsesConfigurableWorkflow ? (
+              {(
                 <div className="grid gap-1.5 text-xs font-semibold text-[#102c3d]/58">
                   Status
                   <div className="min-h-11 rounded-lg border border-[#102c3d]/[0.07] bg-[#f8fbfa] px-3 py-3 text-sm font-medium text-[#102c3d]">Draft · Owner: Employee</div>
                 </div>
-              ) : <FormSelect label="Status" value={draft.status} onChange={(value) => setDraft({ ...draft, status: value as RequestStatus })} options={requestStatuses} />}
+              )}
               <FormSelect
                 label="Apprenticeship standard"
                 value={draft.apprenticeshipStandardId}
@@ -330,7 +301,6 @@ export function ApplicationsModule({
               <FormTextArea label="Reason for interest" value={draft.reason} onChange={(value) => setDraft({ ...draft, reason: value })} wide />
               <FormTextArea label="Career goal" value={draft.careerGoal} onChange={(value) => setDraft({ ...draft, careerGoal: value })} wide />
               <FormTextArea label="Support required" value={draft.supportRequired} onChange={(value) => setDraft({ ...draft, supportRequired: value })} wide />
-              <FormTextArea label="Decision note" value={draft.managerNote} onChange={(value) => setDraft({ ...draft, managerNote: value })} wide />
             </FormGrid>
             {draftUsesConfigurableWorkflow ? <p className="mt-4 rounded-xl bg-[#eef7f5] px-4 py-3 text-xs font-semibold leading-5 text-[#0b6f63]">Application draft created for the employee. The employee needs to review and submit it before the approval workflow begins.</p> : null}
             <FormActions onCancel={() => setDraft(null)} label={savingDraft ? "Saving…" : draftUsesConfigurableWorkflow ? "Save draft" : "Save application"} error={error} disabled={savingDraft} />
@@ -343,6 +313,7 @@ export function ApplicationsModule({
       ) : (
         <ApplicationDetailModal application={selectedApplication} onClose={() => setSelectedId(null)} />
       ) : null}
+      {handoff ? <ApplicationPreEnrolmentModal application={handoff} onClose={() => setHandoff(null)} onComplete={() => { setHandoff(null); setHandoffConfirmation("Pre-enrolment has been created. Open Learners to complete eligibility and employer checks."); }} /> : null}
     </div>
   );
 }
@@ -669,14 +640,16 @@ function ManagerReviewModal({ application, managerName: reviewerName, onClose, o
 }
 
 function ConfigurableWorkflowDecisionModal({ application, onClose }: { application: MvpApplication; onClose: () => void }) {
-  const { meta } = useMvpWorkspace();
+  const { meta, data } = useMvpWorkspace();
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const workflow = application.workflow;
   if (!workflow) return null;
   const step = workflow.version.steps.find((item) => item.id === workflow.instance.currentStepId);
-  const authorised = step?.responsibleRole === meta?.userRole;
+  const applicant = data.employees.find((employee) => employee.id === application.employeeId);
+  const ownApplication = applicant?.email.toLowerCase() === meta?.userEmail.toLowerCase();
+  const authorised = workflow.instance.state === "active" && !ownApplication && step?.responsibleRole === meta?.userRole;
   const actions = step?.type === "role_review" ? [{ action: "continue", label: "Continue" }] : step?.type === "role_approval" ? [{ action: "approve", label: "Approve" }] : [];
   if (step?.allowDecline) actions.push({ action: "decline", label: "Decline" });
   if (["role_review", "role_approval"].includes(step?.type ?? "")) actions.splice(actions.length - (step?.allowDecline ? 1 : 0), 0, { action: "request_information", label: "Request information" });
@@ -685,7 +658,10 @@ function ConfigurableWorkflowDecisionModal({ application, onClose }: { applicati
     if (!authorised || busy) return;
     setBusy(true); setError("");
     try {
-      const response = await fetch("/api/levytate-application-workflows", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "transition", transitionAction: action, applicationId: application.id, note, idempotencyKey: crypto.randomUUID(), expectedLockVersion: workflow!.instance.lockVersion }) });
+      if (!note.trim()) throw new Error("A decision note is required.");
+      const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify([application.id, application.revision, action, note, meta?.userEmail])));
+      const idempotencyKey = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+      const response = await fetch("/api/levytate-application-workflows", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "transition", transitionAction: action, applicationId: application.id, note, idempotencyKey, expectedLockVersion: workflow!.instance.lockVersion, expectedRevision: application.revision }) });
       const body = await response.json() as { message?: string };
       if (!response.ok) throw new Error(body.message ?? "The workflow decision could not be recorded.");
       window.location.reload();
@@ -763,6 +739,35 @@ function DecisionButton({ active, onClick, danger = false, disabled = false, chi
   );
 }
 
+function LeadDecisionControls({ application }: { application: MvpApplication }) {
+  const { meta, data, updateApplicationStatus } = useMvpWorkspace();
+  const [note, setNote] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const applicant = data.employees.find((employee) => employee.id === application.employeeId);
+  const canDecide = meta?.userRole === "Apprenticeship Lead" && application.currentOwner === "Apprenticeship Lead"
+    && reviewableLeadStatuses.includes(application.status) && applicant?.email.toLowerCase() !== meta.userEmail.toLowerCase();
+  async function decide(status: RequestStatus) {
+    if (busy || !canDecide) return;
+    if (!note.trim()) { setError("A decision note is required."); return; }
+    setBusy(true); setError("");
+    try {
+      const result = await updateApplicationStatus(application.id, status, note.trim());
+      if (!result.ok) { setError(result.message); return; }
+      setSaved(true);
+    } catch { setError("The decision could not be confirmed. Your note has been retained; retry the same action."); }
+    finally { setBusy(false); }
+  }
+  if (saved) return <p role="status" className="mb-4 rounded-xl bg-[#eef7f5] p-4 text-sm text-[#0b6f63]">Decision saved.</p>;
+  if (!canDecide) return null;
+  return <section className="mb-5 rounded-xl border border-[#102c3d]/10 p-4"><h3 className="text-sm font-semibold">Final application review</h3>
+    <label className="mt-3 block text-sm">Decision note<textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={2000} className="mt-2 min-h-24 w-full rounded-lg border border-[#102c3d]/15 p-3" /></label>
+    <div className="mt-3 flex flex-wrap gap-2">{[["Approved for Enrolment", "Final approve"], ["More information requested", "Request information"], ["Declined by Apprenticeship Lead", "Decline"]].map(([status, label]) => <button key={status} type="button" disabled={busy} onClick={() => void decide(status as RequestStatus)} className="min-h-11 rounded-full bg-[#102c3d] px-4 text-sm font-semibold text-white disabled:opacity-50">{label}</button>)}</div>
+    {error ? <p role="alert" className="mt-3 text-sm text-red-700">{error}</p> : null}
+  </section>;
+}
+
 function ApplicationDetailModal({ application, onClose }: { application: MvpApplication; onClose: () => void }) {
   const { data } = useMvpWorkspace();
   const employee = data.employees.find((item) => item.id === application.employeeId);
@@ -770,6 +775,7 @@ function ApplicationDetailModal({ application, onClose }: { application: MvpAppl
 
   return (
     <MvpModal title={displayEmployee(employee)} eyebrow="Application record" onClose={onClose} wide>
+      <LeadDecisionControls application={application} />
       <div className="mb-5 border-y border-[#102c3d]/[0.07] py-4"><StageTracker {...applicationTracker(application)} tone={application.status === "More information requested" ? "watch" : "info"} exceptionalStatus={application.status.startsWith("Declined") || application.status === "Withdrawn" || application.status === "Cancelled" ? { label: application.status, tone: "risk" } : undefined} /></div>
       <div className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <div className="space-y-4 rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4">

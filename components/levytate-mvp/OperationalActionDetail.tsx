@@ -3,6 +3,7 @@
 import { ArrowLeft, ArrowRight, CalendarClock, CheckCircle2, CircleDot, Clock3, History, UserRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { StatusBadge } from "@/components/levytate-mvp/MvpUi";
+import { useRetainedWorkspaceRequest } from "@/components/levytate-mvp/useRetainedWorkspaceRequest";
 import { operationalActionStatusLabels, type OperationalActionEvent, type PersistentOperationalAction } from "@/lib/levytate/mvp/operational-actions";
 import type { OperationalActionType } from "@/lib/levytate/mvp/operations-centre";
 import type { OperationalActionManagementDetail, OperationalActionOwnerOption } from "@/lib/server/levytate-operational-actions";
@@ -11,6 +12,7 @@ type ActionDetailResponse = Partial<OperationalActionManagementDetail> & { ok?: 
 type LearnerTarget = { learnerRecordId: string; actionType: OperationalActionType };
 
 export function OperationalActionDetail({ actionId, onBack, onOpenAction, onOpenLearner, onChanged }: { actionId: string; onBack: () => void; onOpenAction: (actionId: string) => void; onOpenLearner: (target: LearnerTarget) => void; onChanged: () => void }) {
+  const request = useRetainedWorkspaceRequest();
   const [detail, setDetail] = useState<OperationalActionManagementDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -21,7 +23,7 @@ export function OperationalActionDetail({ actionId, onBack, onOpenAction, onOpen
     setLoading(true);
     setError("");
     try {
-      const response = await fetch(`/api/levytate-operational-actions/${encodeURIComponent(actionId)}?management=true`, { cache: "no-store" });
+      const response = await request(`/api/levytate-operational-actions/${encodeURIComponent(actionId)}?management=true`, { cache: "no-store" });
       const payload = await response.json() as ActionDetailResponse;
       if (!response.ok || !payload.action || !payload.context || !payload.history || !payload.previousOccurrences || !payload.ownerOptions) throw new Error(payload.message ?? "The action could not be loaded.");
       setDetail(payload as OperationalActionManagementDetail);
@@ -30,7 +32,7 @@ export function OperationalActionDetail({ actionId, onBack, onOpenAction, onOpen
     } finally {
       setLoading(false);
     }
-  }, [actionId]);
+  }, [actionId, request]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -40,7 +42,7 @@ export function OperationalActionDetail({ actionId, onBack, onOpenAction, onOpen
     setError("");
     setNotice("");
     try {
-      const response = await fetch(`/api/levytate-operational-actions/${encodeURIComponent(actionId)}`, {
+      const response = await request(`/api/levytate-operational-actions/${encodeURIComponent(actionId)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ command, expectedVersion: detail.action.version, ...payload }),

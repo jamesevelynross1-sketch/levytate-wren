@@ -17,6 +17,7 @@ import {
   isPastoralEncryptionConfigured,
 } from "../lib/server/levytate-pastoral-crypto";
 import { isPastoralSupportEnvironmentEnabled } from "../lib/server/levytate-pastoral-capability";
+import { readBrowserJson } from "../lib/server/levytate-request-boundary";
 
 let passed = 0;
 function check(label: string, condition: unknown) {
@@ -94,8 +95,7 @@ const copilotServer = [
   readFileSync("lib/levytate/copilot-context.ts", "utf8"),
 ].join("\n");
 const ui = readFileSync("components/levytate-mvp/PastoralSupportModule.tsx", "utf8");
-check("assistant endpoint uses bounded JSON", assistantRoute.includes("readBoundedJson(request, 32 * 1024)"));
-check("assistant endpoint enforces same origin", assistantRoute.includes("origin") && assistantRoute.includes("Forbidden"));
+check("assistant endpoint uses shared bounded JSON and authenticated write guard", assistantRoute.includes("readAuthenticatedJson(request, session.email, 32 * 1024)"));
 check("OpenAI Responses calls explicitly disable storage", assistantServer.includes("store: false"));
 check("model receives only bounded recent history", assistantServer.includes("slice(-8)") && assistantServer.includes("employeeVisibleApprenticeshipContext"));
 check("structured drafting requires an explicit employee request", assistantServer.includes("draftSupportRequest") && assistantServer.includes("isExplicitPastoralDraftRequest"));
@@ -127,4 +127,17 @@ check("assistant network timeout restores controls", ui.includes("AbortControlle
 check("persisted retry lookup is not dependent on receiving the conversation ID", pastoralServer.includes("client_message_id") && pastoralServer.includes("conversationId: string | null | undefined"));
 check("human loop exposes follow-up, action progress and employee outcome", ["record_follow_up", "create_support_action", "transition_support_action", "record_employee_outcome"].every((action) => pastoralServer.includes(action)));
 
-console.log(`\nPastoral support validation: ${passed} passed, 0 failed.`);
+async function verifyBrowserBoundary() {
+  const origin = "http://localhost:3107";
+  const request = (body: string, suppliedOrigin?: string) => new Request(`${origin}/api/levytate-pastoral/assistant`, { method: "POST", headers: { "content-type": "application/json", ...(suppliedOrigin ? { origin: suppliedOrigin } : {}) }, body });
+  await assert.rejects(readBrowserJson(request(JSON.stringify({ message: "🙂".repeat(9000) }), origin), 32 * 1024), { status: 413 });
+  check("shared guard rejects a body exceeding byte budget with Unicode", true);
+  await assert.rejects(readBrowserJson(request("{}"), 32 * 1024), { status: 403 });
+  check("shared guard rejects absent browser origin", true);
+  await assert.rejects(readBrowserJson(request("{}", "http://sibling.localhost:3107"), 32 * 1024), { status: 403 });
+  check("shared guard rejects sibling origin", true);
+  assert.deepEqual(await readBrowserJson(request('{"message":"Synthetic bounded text"}', origin), 32 * 1024), { message: "Synthetic bounded text" });
+  check("shared guard accepts exact-origin bounded object", true);
+  console.log(`\nPastoral support validation: ${passed} passed, 0 failed.`);
+}
+void verifyBrowserBoundary().catch((error: unknown) => { console.error(error instanceof Error ? error.message : "Pastoral boundary validation failed"); process.exitCode = 1; });

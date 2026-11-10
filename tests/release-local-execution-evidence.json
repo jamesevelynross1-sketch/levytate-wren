@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "environment": "local-only",
+  "hostedAcceptance": "not performed",
+  "realClientReleaseApproval": "not granted",
+  "runtime": {"postgresql": "17.11", "auth": "GoTrue 2.197.0", "supabaseCli": "2.122.0", "email": "signed test hook to loopback SMTP capture only"},
+  "runs": [
+    {"name": "Fresh full-chain genuine authentication and connected learner journey", "pass": 168, "fail": 0, "blocked": 1, "evidence": "/private/tmp/levytate-release-runtime.ttcCFL/browser-evidence-1793311701332.json"},
+    {"name": "Separate-role Lift API journey and aggregate export", "pass": 149, "fail": 0, "blocked": 1, "evidence": "/private/tmp/levytate-release-runtime.ttcCFL/browser-evidence-1793311895820.json"},
+    {"name": "Independent Lift PostgreSQL integrity", "pass": 26, "fail": 0, "migrationSha256": "93d009f901e84ef588a5cc85e532a0115654b8502384a20dd2605615560fcd15", "database": "levytate_release_combined17c"},
+    {"name": "Independent Learning Time PostgreSQL integrity after ownership fix", "pass": 35, "fail": 0, "migrationSha256": "f8c1b4af652784f12f8d4222b1cd020b04c8cf42059237a81d858918b36a0197", "database": "levytate_release_combined17d"},
+    {"name": "Workspace atomic worker rollback suite on PG17", "pass": 34, "fail": 0, "migrationSha256": "4c0978c8cdc5cd860e865152e4cb0b96d401a43fb4933b4d3affa7ab3994015d", "database": "levytate_release_combined17e"},
+    {"name": "Independent workspace two-writer race, audit rollback and revoked receipt", "pass": 17, "fail": 0, "database": "levytate_release_combined17e"},
+    {"name": "Real People form session recovery after atomic fix", "pass": 25, "fail": 0, "blocked": 1, "evidence": "/private/tmp/levytate-release-runtime.ttcCFL/browser-evidence-1793312375714.json", "additionalDatabaseReconciliation": "exactly one synthetic employee and one employee.saved audit"},
+    {"name": "Real readiness callback-inspection outage and recovery", "pass": 6, "fail": 0, "runtime": "ttcCFL through atomic workspace"},
+    {"name": "Real readiness rate-limit dependency outage and recovery", "pass": 8, "fail": 0, "runtime": "ttcCFL through atomic workspace"},
+    {"name": "Independent Requests required effects, races and provider scope", "pass": 16, "fail": 0, "migrationSha256": "68551ce00c53d45e216b26e95d134b65c99aec646748008624d65be4c950a393", "database": "levytate_release_combined17f"}
+  ],
+  "retainedFailures": [
+    {"name": "Learning Time receipt replay after membership email reassignment", "pass": 34, "fail": 1, "migrationSha256": "c3bb9cbd374e9407d5ff4555e6ec3889b680f7f7c746e412342b16d3d2ba6d8e", "database": "levytate_release_combined17c", "resolution": "Current-ownership guard passed on fresh corrected candidate"},
+    {"name": "People real UI save committed Employee but failed audit", "pass": 21, "fail": 1, "durableState": "one synthetic Employee, zero corresponding audit rows", "resolution": "Atomic workspace candidate passed independent PostgreSQL checks and real People recovery; original failed fixture preserved"},
+    {"name": "Concurrent readiness fault injection interrupted login", "classification": "harness interference, not product defect", "resolution": "Exclusive local acceptance lock added; repeated sequentially"},
+    {"name": "Manager private Lift data was correctly hidden as 404", "classification": "test expected 403 only", "resolution": "Accept 403 or non-disclosing 404, with additional unchanged-database assertion"},
+    {"name": "Local migration command syntax prevented apply before test", "classification": "harness invocation error; missing RPC, no migration executed", "resolution": "Corrected command applied exact reviewed hash once; 35 checks passed"},
+    {"name": "Requests empty create and publish without immutable snapshot", "pass": 14, "fail": 2, "migrationSha256": "099597d742802cb2f63fbbdbe452bc406c77eb5f1a1d2f29755d0de601386891", "database": "levytate_release_combined17e", "resolution": "Required write sets added; final68551 passed in fresh17f"},
+    {"name": "Repeated local browser runs exhausted actual shared-network login cap", "classification": "expected security limiter429, not disabled or bypassed", "evidence": "/private/tmp/levytate-release-runtime.ttcCFL/browser-evidence-1793312433953.json", "aggregateObservation": "21 requests against20/hour network cap; maximum individual3 against5/hour; expires2026-10-29T23:00:00Z", "resolution": "Further sign-ins wait for expiry; other native tests continue"},
+    {"name": "Requests synthetic fixture normalization and immutable FK", "classification": "harness-only fixture errors", "resolution": "Provider email normalized lowercase; historical member FK correctly prevents provider reassignment, now asserted before revocation test"}
+  ],
+  "limitations": [
+    "Local capture is not proof of external inbox delivery.",
+    "Lift one-participant suppression is verified; minimum-cohort full findings and operational proof acceptance are not claimed.",
+    "Learning Time and Operations connected browser journey plus two-session stale People editor harness await real login budget expiry; database tests are separate evidence.",
+    "No real customer records, Production change, hosted migration, or paid infrastructure was used."
+  ]
+}

@@ -8,9 +8,9 @@ import {
   isLevyTatePlatformHost,
   isLevyTatePublicPagePath,
   levyTatePublicStoryRewrites,
-  levytateAuthCookieOptions,
   requestHostname,
 } from "@/lib/levytate/hosts";
+import { expireLevyTateAuthCookies } from "@/lib/server/levytate-auth-cookies";
 import {
   isAllowedLevyTateMcpStagingRequest,
   isLevyTateMcpStagingOnly,
@@ -18,13 +18,10 @@ import {
 } from "@/lib/server/levytate-mcp-staging";
 
 const legacyDemoPathPrefixes = ["/portakabin-apprenticeship-hub", "/future-talent-portal", "/levytate-mvp", "/levytate/ground-control"];
-const marketingTrustPaths = new Set(["/privacy", "/early-access-terms", "/data-processing", "/support", "/account-help", "/data-rights"]);
+const marketingTrustPaths = new Set(["/privacy", "/early-access-terms", "/data-processing", "/support", "/account-help", "/data-rights", "/status"]);
 
 function clearInvalidBetaSession(response: NextResponse, request: NextRequest) {
-  response.cookies.set(levytateBetaSessionCookie, "", {
-    ...levytateAuthCookieOptions(0, request.headers.get("host")),
-    expires: new Date(0),
-  });
+  expireLevyTateAuthCookies(response, request.headers.get("host"), [levytateBetaSessionCookie]);
   return response;
 }
 

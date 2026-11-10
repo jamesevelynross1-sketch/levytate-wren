@@ -6,9 +6,11 @@ import { LevyTateLogo } from "@/components/levytate-demo/PlatformShell";
 
 export function ProviderLoginClient({
   invalidLink = false,
+  authIssue,
   providerLogoutWarning = false,
 }: {
   invalidLink?: boolean;
+  authIssue?: "rate-limited" | "unavailable";
   providerLogoutWarning?: boolean;
 }) {
   const [email, setEmail] = useState("");
@@ -77,6 +79,7 @@ export function ProviderLoginClient({
             You are signed out locally. Provider sign-out could not be confirmed, so close shared browsers before leaving.
           </p>
         ) : null}
+        {authIssue ? <p role="alert" className="mt-5 rounded-2xl bg-[#fff4f5] px-4 py-3 text-sm text-[#ad344e]">{authIssue === "rate-limited" ? "Too many sign-in attempts. Wait a few minutes before trying again." : "Secure sign-in is temporarily unavailable. Please try again shortly."}</p> : null}
 
         {sent ? (
           <div aria-live="polite" className="mt-6 rounded-2xl bg-[#eef9f5] p-5 ring-1 ring-[#159b8f]/15">

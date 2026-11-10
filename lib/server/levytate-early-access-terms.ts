@@ -108,7 +108,7 @@ export async function listTermsAcceptanceStatusForAdmin() {
 async function resolveMembership(session: LevyTateBetaSession) {
   const rows = await supabaseSelect<MembershipRow>(requireConfig(), "levytate_users", new URLSearchParams({ select: "id,organisation_id,email,display_name,role,active,auth_subject", auth_subject: `eq.${session.authSubject ?? ""}`, limit: "2" }));
   const membership = rows[0];
-  if (!membership || membership.email.trim().toLowerCase() !== session.email) throw new EarlyAccessTermsError("unauthorised", "Your authenticated LevyTate membership could not be resolved.", 401);
+  if (rows.length !== 1 || !membership || membership.email.trim().toLowerCase() !== session.email) throw new EarlyAccessTermsError("unauthorised", "Your authenticated LevyTate membership could not be resolved.", 401);
   if (!membership.active) throw new EarlyAccessTermsError("inactive", "Your LevyTate membership is not active.");
   return membership;
 }

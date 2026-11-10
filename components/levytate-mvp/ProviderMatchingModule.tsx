@@ -1,4 +1,5 @@
 "use client";
+import { useCatalogueAction } from "@/components/levytate-mvp/useCatalogueAction";
 
 import {
   ArrowUpRight,
@@ -100,15 +101,17 @@ function buildShortlist(
 }
 
 export function ProviderMatchingModule() {
-  const { data, saveProviderRelationship, saveMatchingRequest, updateMatchingStatus } = useMvpWorkspace();
+  const { data, meta, saveProviderRelationship, saveMatchingRequest, updateMatchingStatus } = useMvpWorkspace();
   const { selectableStandards } = useLevyTateStandards();
   const [search, setSearch] = useState("");
   const [relationshipDraft, setRelationshipDraft] = useState<MvpProviderRelationship | null>(null);
   const [requestDraft, setRequestDraft] = useState<MvpMatchingRequest | null>(null);
+  const [draftRevision, setDraftRevision] = useState(0);
   const [selectedRelationshipProviders, setSelectedRelationshipProviders] = useState<string[]>([]);
   const [selectedRelationshipProgrammes, setSelectedRelationshipProgrammes] = useState<string[]>([]);
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const { saving, perform } = useCatalogueAction(setError);
 
   const activeProviders = useMemo(
     () => data.providers.filter((provider) => provider.status === "Active").sort((a, b) => a.providerName.localeCompare(b.providerName)),
@@ -206,7 +209,7 @@ export function ProviderMatchingModule() {
       status: "Preferred",
       notes: "",
       reviewDate: todayIso(),
-      lastUsedDate: todayIso(),
+      lastUsedDate: "",
     });
   }
 
@@ -238,10 +241,10 @@ export function ProviderMatchingModule() {
 
   function openRelationship(relationship?: MvpProviderRelationship) {
     const next = relationship ? structuredClone(relationship) : blankRelationship();
-    const validProgrammeIds = new Set(activeProgrammes.filter((programme) => programme.providerId === next.preferredProviderId).map((programme) => programme.id));
     setRelationshipDraft(next);
+    setDraftRevision(meta?.mutationRevisions?.[`levytate_provider_relationships:${next.id}`] ?? 0);
     setSelectedRelationshipProviders(Array.from(new Set(next.backupProviderIds.filter((id) => id && id !== next.preferredProviderId))));
-    setSelectedRelationshipProgrammes(Array.from(new Set(next.programmeIds.filter((id) => validProgrammeIds.has(id)))));
+    setSelectedRelationshipProgrammes(Array.from(new Set(next.programmeIds)));
     setRequestDraft(null);
     setError("");
   }
@@ -256,13 +259,14 @@ export function ProviderMatchingModule() {
 
   function openRequest(request?: MvpMatchingRequest) {
     setRequestDraft(request ? structuredClone(request) : blankRequest());
+    setDraftRevision(request ? meta?.mutationRevisions?.[`levytate_matching_requests:${request.id}`] ?? 0 : 0);
     setRelationshipDraft(null);
     setSelectedRelationshipProviders([]);
     setSelectedRelationshipProgrammes([]);
     setError("");
   }
 
-  function submitRelationship(event: FormEvent) {
+  async function submitRelationship(event: FormEvent) {
     event.preventDefault();
     if (!relationshipDraft) return;
     if (!relationshipDraft.category || !relationshipDraft.preferredProviderId) {
@@ -270,20 +274,23 @@ export function ProviderMatchingModule() {
       return;
     }
     const validProgrammeIds = new Set(activeProgrammes.filter((programme) => programme.providerId === relationshipDraft.preferredProviderId).map((programme) => programme.id));
-    saveProviderRelationship(
+    if (selectedRelationshipProgrammes.some((id) => !validProgrammeIds.has(id))) { setError("A selected programme is no longer available for this provider. Review the selection before saving."); return; }
+    const saved = await perform(() => saveProviderRelationship(
       normaliseProviderRelationship({
         ...relationshipDraft,
         backupProviderIds: Array.from(new Set(selectedRelationshipProviders.filter((id) => id && id !== relationshipDraft.preferredProviderId))),
-        programmeIds: Array.from(new Set(selectedRelationshipProgrammes.filter((id) => validProgrammeIds.has(id)))),
+        programmeIds: Array.from(new Set(selectedRelationshipProgrammes)),
       }),
-    );
+      draftRevision,
+    ));
+    if (!saved) return;
     setRelationshipDraft(null);
     setSelectedRelationshipProviders([]);
     setSelectedRelationshipProgrammes([]);
     setError("");
   }
 
-  function submitRequest(event: FormEvent) {
+  async function submitRequest(event: FormEvent) {
     event.preventDefault();
     if (!requestDraft) return;
     if (!requestDraft.roleNeed.trim()) {
@@ -294,21 +301,24 @@ export function ProviderMatchingModule() {
       .filter((item) => item.verified)
       .slice(0, 3)
       .map((item) => item.provider.providerId);
-    saveMatchingRequest(
+    const saved = await perform(() => saveMatchingRequest(
       normaliseMatchingRequest({
         ...requestDraft,
         roleNeed: requestDraft.roleNeed.trim(),
-        linkedStandardId: requestDraft.linkedStandardId || requestShortlist[0]?.standards[0]?.id || "",
+        linkedStandardId: requestDraft.linkedStandardId,
         shortlistProviderIds,
         updatedAt: nowIso(),
       }),
-    );
+      draftRevision,
+    ));
+    if (!saved) return;
     setRequestDraft(null);
     setError("");
   }
 
   return (
     <div className="grid gap-5">
+      {error && !relationshipDraft && !requestDraft ? <p role="alert" className="text-sm text-red-700">{error}</p> : null}
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <SummaryCard
           label="Covered categories"
@@ -433,7 +443,7 @@ export function ProviderMatchingModule() {
                     selected={featuredRequest?.id === request.id}
                     onSelect={() => setSelectedRequestId(request.id)}
                     onReview={() => openRequest(request)}
-                    onStatusChange={(value) => updateMatchingStatus(request.id, value)}
+                    onStatusChange={(value) => { void perform(() => updateMatchingStatus(request.id, value)); }}
                   />
                 );
               })}
@@ -498,7 +508,7 @@ export function ProviderMatchingModule() {
       </div>
 
       {relationshipDraft ? (
-        <MvpModal title="Provider relationship" eyebrow="Preferred programme setup" onClose={() => setRelationshipDraft(null)} wide>
+        <MvpModal title="Provider relationship" eyebrow="Preferred programme setup" onClose={() => { if (!saving) setRelationshipDraft(null); }} wide><fieldset disabled={saving}>
           <form onSubmit={submitRelationship} className="grid gap-4">
             <FormSection title="Relationship settings" copy="Define the capability area, preferred provider, programme coverage and review cadence.">
               <FormGrid>
@@ -621,13 +631,13 @@ export function ProviderMatchingModule() {
               </FormSection>
             </div>
 
-            <FormActions onCancel={() => setRelationshipDraft(null)} label="Save relationship" error={error} />
-          </form>
+            <FormActions onCancel={() => setRelationshipDraft(null)} label={saving ? "Saving…" : "Save relationship"} error={error} />
+          </form></fieldset>
         </MvpModal>
       ) : null}
 
       {requestDraft ? (
-        <MvpModal title="Programme sourcing request" eyebrow="LevyTate matching workflow" onClose={() => setRequestDraft(null)} wide>
+        <MvpModal title="Programme sourcing request" eyebrow="LevyTate matching workflow" onClose={() => { if (!saving) setRequestDraft(null); }} wide><fieldset disabled={saving}>
           <form onSubmit={submitRequest} className="grid gap-4">
             <FormSection title="Workforce requirement" copy="Describe the business challenge and the programme proposition LevyTate should match against.">
               <FormGrid>
@@ -731,8 +741,8 @@ export function ProviderMatchingModule() {
               )}
             </FormSection>
 
-            <FormActions onCancel={() => setRequestDraft(null)} label="Save request" error={error} />
-          </form>
+            <FormActions onCancel={() => setRequestDraft(null)} label={saving ? "Saving…" : "Save request"} error={error} />
+          </form></fieldset>
         </MvpModal>
       ) : null}
     </div>

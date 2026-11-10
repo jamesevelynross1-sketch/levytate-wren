@@ -14,14 +14,19 @@ import {
   getOperationalActionHistory,
   LevyTateOperationalActionConflictError,
   LevyTateOperationalActionError,
+  LevyTateManagerOperationalActionAccessError,
   startOperationalAction,
   updateOperationalActionDueDate,
-  type OperationalActionCancellationKind,
-  type OperationalActionDismissalKind,
 } from "@/lib/server/levytate-operational-actions";
 import { logLevyTateServerError } from "@/lib/server/levytate-safe-api-error";
+import { assertExpectedWorkspace, ClientRequestError, readAuthenticatedJson } from "@/lib/server/levytate-request-boundary";
+import { operationalActionInput, parseAction } from "@/lib/server/levytate-operational-input";
 
 type RouteContext = { params: Promise<{ actionId: string }> };
+const responseHeaders = { "Cache-Control": "private, no-store, max-age=0" };
+function reply(body: unknown, status = 200) {
+  return NextResponse.json(body, { status, headers: responseHeaders });
+}
 
 async function sessionFromCookie() {
   const cookieStore = await cookies();
@@ -29,45 +34,29 @@ async function sessionFromCookie() {
 }
 
 export async function GET(request: Request, context: RouteContext) {
-  const session = await sessionFromCookie();
-  if (!session) return NextResponse.json({ message: "Unauthorised." }, { status: 401 });
-  const { actionId } = await context.params;
   try {
+    const session = await sessionFromCookie();
+    if (!session) return reply({ message: "Unauthorised." }, 401);
+    await assertExpectedWorkspace(request, session.email);
+    const { actionId } = await context.params;
     if (new URL(request.url).searchParams.get("management") === "true") {
       const detail = await getOperationalActionManagementDetail(session, actionId);
-      return NextResponse.json({ ok: true, ...detail });
+      return reply({ ok: true, ...detail });
     }
     const action = await getOperationalAction(session, actionId);
     const history = new URL(request.url).searchParams.get("history") === "true" ? await getOperationalActionHistory(session, actionId) : undefined;
-    return NextResponse.json({ ok: true, action, ...(history ? { history } : {}) });
+    return reply({ ok: true, action, ...(history ? { history } : {}) });
   } catch (error) {
     return actionErrorResponse(error);
   }
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
-  const session = await sessionFromCookie();
-  if (!session) return NextResponse.json({ message: "Unauthorised." }, { status: 401 });
-  const { actionId } = await context.params;
   try {
-    const body = await request.json() as {
-      command?: "acknowledge" | "start" | "complete" | "dismiss" | "assign" | "due_date" | "cancel";
-      expectedVersion?: number;
-      completionNote?: string;
-      resolvedOutsideLevyTate?: boolean;
-      dismissalReason?: string;
-      dismissalKind?: OperationalActionDismissalKind;
-      organisationId?: string;
-      actorUserId?: string;
-      ownerType?: "Employee" | "Line Manager" | "Apprenticeship Lead" | "HR" | "Provider" | "Shared";
-      ownerUserId?: string;
-      ownerDisplayName?: string;
-      dueDate?: string;
-      dueDateReason?: string;
-      cancellationReason?: string;
-      cancellationKind?: OperationalActionCancellationKind;
-    };
-    if (!Number.isInteger(body.expectedVersion)) throw new LevyTateOperationalActionError("A valid expectedVersion is required.");
+    const session = await sessionFromCookie();
+    if (!session) return reply({ message: "Unauthorised." }, 401);
+    const { actionId } = await context.params;
+    const body = parseAction(operationalActionInput, await readAuthenticatedJson(request, session.email));
     let action;
     if (body.command === "acknowledge") action = await acknowledgeOperationalAction(session, actionId, body.expectedVersion!);
     else if (body.command === "start") action = await startOperationalAction(session, actionId, body.expectedVersion!);
@@ -77,28 +66,29 @@ export async function PATCH(request: Request, context: RouteContext) {
     else if (body.command === "due_date") action = await updateOperationalActionDueDate(session, actionId, body.expectedVersion!, body.dueDate ?? "", body.dueDateReason);
     else if (body.command === "cancel" && body.cancellationKind) action = await cancelOperationalAction(session, actionId, body.expectedVersion!, body.cancellationReason ?? "", body.cancellationKind);
     else throw new LevyTateOperationalActionError("A supported action command is required.");
-    return NextResponse.json({ ok: true, action });
+    return reply({ ok: true, action });
   } catch (error) {
     return actionErrorResponse(error);
   }
 }
 
 function actionErrorResponse(error: unknown) {
-  const status = error instanceof LevyTateLearnerLifecyclePermissionError
+  if (error instanceof ClientRequestError) return reply({ message: error.message }, error.status);
+  const status = error instanceof LevyTateLearnerLifecyclePermissionError || error instanceof LevyTateManagerOperationalActionAccessError
     ? 403
     : error instanceof LevyTateOperationalActionConflictError
       ? 409
       : error instanceof LevyTateOperationalActionError
         ? 400
-        : 500;
-  if (status === 500) {
+        : 503;
+  if (status === 503) {
     logLevyTateServerError("operational-action-detail", error);
-    return NextResponse.json({ error: "operational_action_update_failed", message: "The operational action could not be updated. Please try again." }, { status });
+    return reply({ error: "operational_action_unavailable", message: "Operational actions are temporarily unavailable. Please try again." }, status);
   }
   const message = status === 403
     ? "You do not have access to that operational action."
     : error instanceof Error
       ? error.message
       : "Operational action update failed.";
-  return NextResponse.json({ message }, { status });
+  return reply({ message }, status);
 }

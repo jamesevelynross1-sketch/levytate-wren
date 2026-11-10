@@ -45,9 +45,9 @@ import {
 import {
   getLevyTateSupabaseConfig,
   LevyTateSupabaseError,
-  supabaseInsert,
+  supabaseFetchJson,
   supabaseSelect,
-  supabaseUpdate,
+  supabaseSelectAll,
 } from "@/lib/server/levytate-supabase";
 
 const actionsTable = "levytate_operational_actions";
@@ -152,7 +152,11 @@ type OperationalActionEventRow = {
   created_at: string;
 };
 
-type ActionContext = Awaited<ReturnType<typeof getLearnerLifecycleServerContext>> & { actorDisplayName: string };
+type ActionContext = Awaited<ReturnType<typeof getLearnerLifecycleServerContext>> & { actorDisplayName: string; sourceVersions?: Record<string,string>; originalRequest?:Record<string,unknown> };
+
+function rememberLearnerSources(context: ActionContext, details: LearnerRecordDetail[]) {
+  context.sourceVersions={...context.sourceVersions,...Object.fromEntries(details.map(item=>[`learner:${item.learnerRecordId}`,item.updatedAt]))};
+}
 
 export class LevyTateOperationalActionError extends Error {
   constructor(message: string) {
@@ -230,6 +234,7 @@ export async function synchroniseOrganisationOperationalActions(
     listOrganisationLearnerLifecycleDetails(session),
   ]);
   const organisationId = context.organisation.id;
+  rememberLearnerSources(context,details);
   const now = new Date().toISOString();
   const derived = buildOrganisationOperationalItems(details, new Date(now));
   const currentItems = uniqueSourceItems(derived.items);
@@ -312,6 +317,7 @@ export async function synchroniseManagerDirectReportOperationalActions(
 ): Promise<ManagerOperationalActionScopeResult> {
   const context = await managerOperationalActionContext(session);
   const { scope, details, applications } = context;
+  rememberLearnerSources(context,details);
   const now = new Date().toISOString();
   const applicationReviews = await synchroniseApplicationReviewActionsForContext(context, applications);
   const currentItems = uniqueSourceItems(buildOrganisationOperationalItems(details, new Date(now)).items.filter(isManagerRelevantOperationalItem));
@@ -393,7 +399,7 @@ export async function acknowledgeManagerDirectReportOperationalAction(
   const context = await managerOperationalActionContext(session);
   const action = await requireManagerScopedAction(context, actionId);
   requireManagerActionAccess(context, action);
-  if (action.status === "acknowledged") return action;
+  const replay=await prepareOperationalRequest(context,action,expectedVersion,"transition",{action:"acknowledge"});if(replay)return replay;
   if (isOperationalActionTerminal(action.status)) throw new LevyTateOperationalActionConflictError("This action is already closed.");
   if (action.status !== "open") throw new LevyTateOperationalActionError("Only open actions can be acknowledged.");
   assertVersion(action, expectedVersion);
@@ -409,7 +415,7 @@ export async function startManagerDirectReportOperationalAction(
   const context = await managerOperationalActionContext(session);
   const action = await requireManagerScopedAction(context, actionId);
   requireManagerActionAccess(context, action);
-  if (action.status === "in_progress") return action;
+  const replay=await prepareOperationalRequest(context,action,expectedVersion,"transition",{action:"start",note});if(replay)return replay;
   if (isOperationalActionTerminal(action.status)) throw new LevyTateOperationalActionConflictError("This action is already closed.");
   if (action.status !== "open" && action.status !== "acknowledged") {
     throw new LevyTateOperationalActionError("Only open or acknowledged actions can be started.");
@@ -448,6 +454,7 @@ async function synchroniseApplicationReviewActionsForContext(
   applicationIds?: string[],
 ): Promise<ApplicationReviewSynchronisationResult> {
   const applications = providedApplications ?? await loadOrganisationApplicationReviewApplications(context.organisation.id, applicationIds);
+  context.sourceVersions={...context.sourceVersions,...Object.fromEntries(applications.map(item=>[`application:${item.id}`,item.updatedAt]))};
   const scopedIds = new Set(applications.map((application) => application.id));
   const sources = applicationReviewSources(applications, context);
   const existing = (await selectActions(context.organisation.id, { includeTerminal: true }))
@@ -611,7 +618,6 @@ function applicationHistoryFromRow(row: ApplicationReviewHistoryRow): MvpApplica
 }
 
 async function createApplicationReviewAction(context: ActionContext, source: ApplicationReviewActionSource, priorActionId?: string) {
-  const config = requireConfig();
   const now = new Date().toISOString();
   const id = createMvpId("operational-action");
   const row = {
@@ -644,22 +650,7 @@ async function createApplicationReviewAction(context: ActionContext, source: App
     },
     version: 1,
   };
-  let inserted: OperationalActionRow[];
-  try {
-    inserted = await supabaseInsert<OperationalActionRow>(config, actionsTable, row);
-  } catch (error) {
-    if (!(error instanceof LevyTateSupabaseError) || !/duplicate|23505/i.test(error.message)) throw error;
-    const concurrent = await selectActions(context.organisation.id, { sourceKey: source.sourceKey });
-    const active = concurrent.find((action) => !isOperationalActionTerminal(action.status));
-    if (!active) throw error;
-    return active;
-  }
-  const created = actionFromRow(inserted[0]);
-  await recordEvent(context, created, "detected", "", "open", "Application submitted for Line Manager review.");
-  if (priorActionId) {
-    await recordEvent(context, created, "regenerated", "", "open", "A new application review occurrence was created after employee resubmission.", { priorActionId });
-  }
-  return created;
+  return atomicOperationalActionWrite(context,id,0,"create",row,context.sourceVersions?.[`application:${source.application.id}`],"Application submitted for Line Manager review.");
 }
 
 async function updateApplicationReviewAction(context: ActionContext, action: PersistentOperationalAction, source: ApplicationReviewActionSource) {
@@ -674,10 +665,7 @@ async function updateApplicationReviewAction(context: ActionContext, action: Per
   if (action.sourceUrl !== nextUrl) changes.source_url = nextUrl;
   if (action.description !== source.application.reason) changes.description = source.application.reason;
   if (!Object.keys(changes).length) return { action, changed: false };
-  const updated = await versionedUpdate(context, action, changes);
-  if ("owner_user_id" in changes) {
-    await recordEvent(context, updated, "owner_changed", action.status, updated.status, `Owner updated to ${source.manager.name}, the employee's current Line Manager.`);
-  }
+  const updated = await versionedUpdate(context, action, changes,"sync");
   return { action: updated, changed: true };
 }
 
@@ -803,10 +791,11 @@ export async function completeOperationalAction(
 ) {
   const context = await requireOperationalActionContext(session, "write");
   const action = await requireScopedAction(context, actionId);
-  if (action.status === "completed") return action;
+  const replay=await prepareOperationalRequest(context,action,expectedVersion,"transition",{action:"complete",completionNote,resolvedOutsideLevyTate});if(replay)return replay;
   assertNotApplicationSourceManaged(action);
   assertVersion(action, expectedVersion);
   const details = await listOrganisationLearnerLifecycleDetails(session);
+  rememberLearnerSources(context,details);
   const currentKeys = new Set(uniqueSourceItems(buildOrganisationOperationalItems(details).items).map((item) => item.sourceKey));
   if (currentKeys.has(action.sourceKey)) {
     throw new LevyTateOperationalActionError("The underlying learner condition is still active. Resolve it in the learner workflow before completing this action.");
@@ -833,6 +822,7 @@ export async function assignOperationalActionOwner(
 ) {
   const context = await requireOperationalActionContext(session, "write");
   const action = await requireScopedAction(context, actionId);
+  const replay=await prepareOperationalRequest(context,action,expectedVersion,"owner",{action:"assign_owner",owner});if(replay)return replay;
   assertNotApplicationSourceManaged(action);
   assertVersion(action, expectedVersion);
   if (isOperationalActionTerminal(action.status)) throw new LevyTateOperationalActionError("Terminal actions cannot be reassigned.");
@@ -859,8 +849,7 @@ export async function assignOperationalActionOwner(
         assignedBy: context.user.id,
       },
     },
-  });
-  await recordEvent(context, updated, "owner_changed", action.status, action.status, `Action reassigned to ${ownerDisplayName}.`);
+  },"owner",`Action reassigned to ${ownerDisplayName}.`);
   return updated;
 }
 
@@ -873,12 +862,14 @@ export async function updateOperationalActionDueDate(
 ) {
   const context = await requireOperationalActionContext(session, "write");
   const action = await requireScopedAction(context, actionId);
+  const replay=await prepareOperationalRequest(context,action,expectedVersion,"due",{action:"due_date",dueDate,reason});if(replay)return replay;
   assertNotApplicationSourceManaged(action);
   assertVersion(action, expectedVersion);
   if (isOperationalActionTerminal(action.status)) throw new LevyTateOperationalActionError("Terminal actions cannot have their due date changed.");
   const cleanDate = dueDate.trim();
   if (cleanDate && !/^\d{4}-\d{2}-\d{2}$/.test(cleanDate)) throw new LevyTateOperationalActionError("Enter a valid due date.");
   const details = await listOrganisationLearnerLifecycleDetails(session);
+  rememberLearnerSources(context,details);
   const derived = buildOrganisationOperationalItems(details).items.find((item) => item.sourceKey === action.sourceKey);
   const sourceDate = derived?.dueDate ?? "";
   const cleanReason = reason.trim();
@@ -896,15 +887,7 @@ export async function updateOperationalActionDueDate(
   } else {
     delete metadata.dueDateOverride;
   }
-  const updated = await versionedUpdate(context, action, { due_date: cleanDate || null, metadata });
-  await recordEvent(
-    context,
-    updated,
-    "due_date_changed",
-    action.status,
-    action.status,
-    cleanDate ? `Due date changed to ${cleanDate}${cleanReason ? `: ${cleanReason}` : "."}` : "Manual due date removed.",
-  );
+  const updated = await versionedUpdate(context, action, { due_date: cleanDate || null, metadata },"due",cleanDate ? `Due date changed to ${cleanDate}${cleanReason ? `: ${cleanReason}` : "."}` : "Manual due date removed.");
   return updated;
 }
 
@@ -918,7 +901,7 @@ export async function cancelOperationalAction(
   const context = await requireOperationalActionContext(session, "write");
   const action = await requireScopedAction(context, actionId);
   assertNotApplicationSourceManaged(action);
-  if (action.status === "cancelled") return action;
+  const replay=await prepareOperationalRequest(context,action,expectedVersion,"transition",{action:"cancel",reason,category});if(replay)return replay;
   assertVersion(action, expectedVersion);
   if (!operationalActionCancellationKinds.includes(category)) throw new LevyTateOperationalActionError("A supported cancellation category is required.");
   const cleanReason = reason.trim();
@@ -949,7 +932,7 @@ export async function dismissOperationalAction(
   const context = await requireOperationalActionContext(session, "write");
   const action = await requireScopedAction(context, actionId);
   assertNotApplicationSourceManaged(action);
-  if (action.status === "dismissed") return action;
+  const replay=await prepareOperationalRequest(context,action,expectedVersion,"transition",{action:"dismiss",reason,dismissalKind});if(replay)return replay;
   assertVersion(action, expectedVersion);
   if (!operationalActionDismissalKinds.includes(dismissalKind)) throw new LevyTateOperationalActionError("A supported dismissal category is required.");
   const cleanReason = reason.trim();
@@ -972,11 +955,11 @@ export async function getOperationalActionHistory(session: LevyTateBetaSession, 
 
 async function selectActionHistory(organisationId: string, actionId: string) {
   const config = requireConfig();
-  const rows = await supabaseSelect<OperationalActionEventRow>(config, eventsTable, new URLSearchParams({
+  const rows = await supabaseSelectAll<OperationalActionEventRow>(config, eventsTable, new URLSearchParams({
     select: "*",
     organisation_id: `eq.${organisationId}`,
     operational_action_id: `eq.${actionId}`,
-    order: "event_date.asc",
+    order: "event_date.asc,id.asc",
   }));
   return rows.map(eventFromRow);
 }
@@ -1010,6 +993,7 @@ export async function resolveManagerCheckInActionsForDirectReport(
   );
   const actions = await selectActions(scope.organisation.id, { learnerRecordId, includeTerminal: true });
   const context: ActionContext = { ...lifecycleContext, actorDisplayName: scope.manager.name };
+  rememberLearnerSources(context,details);
   const now = new Date().toISOString();
   const resolved: PersistentOperationalAction[] = [];
 
@@ -1032,7 +1016,7 @@ async function transitionAction(
   const context = await requireOperationalActionContext(session, "write");
   const action = await requireScopedAction(context, actionId);
   assertNotApplicationSourceManaged(action);
-  if (action.status === target) return action;
+  const replay=await prepareOperationalRequest(context,action,expectedVersion,"transition",{action:target==="acknowledged"?"acknowledge":"start",...(target==="in_progress"?{note:""}:{})});if(replay)return replay;
   assertVersion(action, expectedVersion);
   return transitionScopedAction(context, action, target, extra);
 }
@@ -1058,24 +1042,20 @@ async function transitionScopedAction(
         : target === "dismissed"
           ? { dismissed_at: now, dismissed_by: context.user.id }
           : {};
-  const updated = await versionedUpdate(context, action, { status: target, ...timestamps, ...extra });
-  await recordEvent(context, updated, eventTypeForStatus(target), action.status, target, eventSummary ?? `${actor} marked the action ${target.replace("_", " ")}.`);
-  return updated;
+  const sourceManaged=extra.completion_method==="source_condition_resolved" || (action.actionType==="review_application" && ["completed","cancelled"].includes(target));
+  return versionedUpdate(context, action, { status: target, ...timestamps, ...extra },sourceManaged?"source_resolve":"transition",eventSummary ?? `${actor} marked the action ${target.replace("_", " ")}.`);
 }
 
 async function updateActionFromDerivedCondition(context: ActionContext, action: PersistentOperationalAction, item: OperationalItem) {
   const changes: Record<string, unknown> = {};
-  const events: Array<{ type: OperationalActionEventType; summary: string }> = [];
   if (action.priority !== item.priorityLevel || action.priorityRank !== item.priorityRank) {
     changes.priority = item.priorityLevel;
     changes.priority_rank = item.priorityRank;
-    events.push({ type: "priority_changed", summary: `Priority updated from ${action.priority} to ${item.priorityLevel}.` });
   }
   if (!action.metadata.ownershipOverride && action.ownerType !== item.ownerType) {
     changes.owner_type = item.ownerType;
     changes.owner_display_name = item.ownerType;
     changes.owner_user_id = "";
-    events.push({ type: "owner_changed", summary: `Owner updated from ${action.ownerType} to ${item.ownerType}.` });
   }
   const sourceDueDate = persistentDueDate(item, action.detectedAt);
   const override = action.metadata.dueDateOverride;
@@ -1083,7 +1063,6 @@ async function updateActionFromDerivedCondition(context: ActionContext, action: 
   const dueDate = overrideRemainsValid ? override!.date : sourceDueDate;
   if ((action.dueDate || null) !== dueDate) {
     changes.due_date = dueDate;
-    events.push({ type: "due_date_changed", summary: dueDate ? `Due date updated to ${dueDate}.` : "Due date removed because the source workflow no longer supplies one." });
   }
   if (override && !overrideRemainsValid) {
     const metadata = { ...action.metadata };
@@ -1101,12 +1080,11 @@ async function updateActionFromDerivedCondition(context: ActionContext, action: 
   if (!Object.keys(changes).length) return { action, changed: false };
   let updated: PersistentOperationalAction;
   try {
-    updated = await versionedUpdate(context, action, changes);
+    updated = await versionedUpdate(context, action, changes,"sync");
   } catch (error) {
     if (!(error instanceof LevyTateOperationalActionConflictError)) throw error;
     return { action: await requireScopedAction(context, action.id), changed: false };
   }
-  for (const event of events) await recordEvent(context, updated, event.type, action.status, updated.status, event.summary);
   return { action: updated, changed: true };
 }
 
@@ -1115,7 +1093,6 @@ async function createActionForCondition(
   item: OperationalItem,
   references: { applicationId: string; employeeId: string; priorActionId?: string },
 ) {
-  const config = requireConfig();
   const now = new Date().toISOString();
   const id = createMvpId("operational-action");
   const metadata: OperationalActionMetadata = {
@@ -1145,22 +1122,7 @@ async function createActionForCondition(
     metadata,
     version: 1,
   };
-  let inserted: OperationalActionRow[];
-  try {
-    inserted = await supabaseInsert<OperationalActionRow>(config, actionsTable, row);
-  } catch (error) {
-    if (!(error instanceof LevyTateSupabaseError) || !/duplicate|23505/i.test(error.message)) throw error;
-    const concurrent = await selectActions(context.organisation.id, { sourceKey: item.sourceKey });
-    const active = concurrent.find((action) => !isOperationalActionTerminal(action.status));
-    if (!active) throw error;
-    return active;
-  }
-  const created = actionFromRow(inserted[0]);
-  await recordEvent(context, created, "detected", "", "open", "Operational condition detected.");
-  if (references.priorActionId) {
-    await recordEvent(context, created, "regenerated", "", "open", "A new occurrence was created after the previous condition had resolved.", { priorActionId: references.priorActionId });
-  }
-  return created;
+  return atomicOperationalActionWrite(context,id,0,"create",row,context.sourceVersions?.[`learner:${item.learnerRecordId}`],"Operational condition detected.");
 }
 
 async function transitionSystemResolvedAction(context: ActionContext, action: PersistentOperationalAction, now: string) {
@@ -1173,35 +1135,52 @@ async function transitionSystemResolvedAction(context: ActionContext, action: Pe
       completed_by: "system",
       completion_method: "source_condition_resolved",
       completion_note: "The underlying lifecycle condition no longer applies.",
-    });
+    },"source_resolve","Underlying learner condition resolved automatically.");
   } catch (error) {
     if (!(error instanceof LevyTateOperationalActionConflictError)) throw error;
     const concurrent = await requireScopedAction(context, action.id);
     if (isOperationalActionTerminal(concurrent.status)) return concurrent;
     throw error;
   }
-  await recordEvent(context, updated, "completed", action.status, "completed", "Underlying learner condition resolved automatically.");
   return updated;
 }
 
 async function markDismissedConditionCleared(context: ActionContext, action: PersistentOperationalAction, now: string) {
   try {
-    await versionedUpdate(context, action, { metadata: { ...action.metadata, conditionClearedAt: now } });
+    await versionedUpdate(context, action, { metadata: { ...action.metadata, conditionClearedAt: now } },"clear");
   } catch (error) {
     if (!(error instanceof LevyTateOperationalActionConflictError)) throw error;
   }
 }
 
-async function versionedUpdate(context: ActionContext, action: PersistentOperationalAction, changes: Record<string, unknown>) {
-  const config = requireConfig();
-  const query = new URLSearchParams({
-    organisation_id: `eq.${context.organisation.id}`,
-    id: `eq.${action.id}`,
-    version: `eq.${action.version}`,
-  }).toString();
-  const rows = await supabaseUpdate<OperationalActionRow>(config, actionsTable, query, { ...changes, version: action.version + 1 });
-  if (!rows.length) throw new LevyTateOperationalActionConflictError("The action changed in another session. Refresh and try again.");
-  return actionFromRow(rows[0]);
+type OperationWrite = "create"|"sync"|"transition"|"source_resolve"|"owner"|"due"|"clear";
+async function prepareOperationalRequest(context:ActionContext,action:PersistentOperationalAction,expectedVersion:number,operation:OperationWrite,request:Record<string,unknown>) {
+  if(!Number.isInteger(expectedVersion)||expectedVersion<1)throw new LevyTateOperationalActionConflictError("A valid action revision is required.");
+  context.originalRequest=request;
+  const row=await operationalActionRpc(context,action.id,expectedVersion,operation,{},undefined,"",true);
+  return row? actionFromRow(row):null;
+}
+async function versionedUpdate(context: ActionContext, action: PersistentOperationalAction, changes: Record<string, unknown>,operation:OperationWrite="transition",summary="Operational source refreshed.") {
+  const sourceKey=action.actionType==="review_application"?`application:${action.applicationId}`:`learner:${action.learnerRecordId}`;
+  return atomicOperationalActionWrite(context,action.id,action.version,operation,changes,context.sourceVersions?.[sourceKey],summary);
+}
+
+export async function atomicOperationalActionWrite(context: ActionContext,actionId:string,expectedVersion:number,operation:OperationWrite,changes:Record<string,unknown>,sourceVersion?:string,summary="Operational condition detected.") {
+  const row=await operationalActionRpc(context,actionId,expectedVersion,operation,changes,sourceVersion,summary,false);
+  if (!row?.id) throw new LevyTateOperationalActionError("The Operations write could not be confirmed. Refresh before retrying.");
+  return actionFromRow(row);
+}
+async function operationalActionRpc(context:ActionContext,actionId:string,expectedVersion:number,operation:OperationWrite,changes:Record<string,unknown>,sourceVersion:string|undefined,summary:string,probe:boolean) {
+  try {
+    return await supabaseFetchJson<OperationalActionRow|null>(requireConfig(),"rpc/levytate_apply_operational_action",{method:"POST",body:JSON.stringify({p_organisation_id:context.organisation.id,p_actor_user_id:context.user.id,p_action_id:actionId,p_expected_version:expectedVersion,p_operation:operation,p_changes:changes,p_source_version:sourceVersion??null,p_summary:summary,p_request:context.originalRequest??null,p_probe:probe})});
+  } catch(error) {
+    if(error instanceof LevyTateSupabaseError){
+      if(/PT409|40001|23505/.test(error.message)) throw new LevyTateOperationalActionConflictError("The action or its source changed. Refresh and try again.");
+      if(/PT403|PT404/.test(error.message)) throw new LevyTateManagerOperationalActionAccessError();
+      throw new LevyTateOperationalActionError("The Operations change was not committed. Refresh and check the action.");
+    }
+    throw error;
+  }
 }
 
 async function requireScopedAction(context: ActionContext, actionId: string) {
@@ -1221,42 +1200,14 @@ async function selectActions(organisationId: string, query: OperationalActionLis
   const params = new URLSearchParams({
     select: "*",
     organisation_id: `eq.${organisationId}`,
-    order: "created_at.desc",
-    limit: "5000",
+    order: "created_at.desc,id.asc",
   });
   if (query.learnerRecordId) params.set("learner_record_id", `eq.${query.learnerRecordId}`);
   if (query.sourceKey) params.set("source_key", `eq.${query.sourceKey}`);
   if (query.status) params.set("status", `eq.${query.status}`);
   else if (!query.includeTerminal) params.set("status", `in.(${nonTerminalOperationalActionStatuses.join(",")})`);
-  const rows = await supabaseSelect<OperationalActionRow>(config, actionsTable, params);
+  const rows = await supabaseSelectAll<OperationalActionRow>(config, actionsTable, params);
   return rows.map(actionFromRow);
-}
-
-async function recordEvent(
-  context: ActionContext,
-  action: PersistentOperationalAction,
-  eventType: OperationalActionEventType,
-  previousStatus: OperationalActionStatus | "",
-  newStatus: OperationalActionStatus | "",
-  summary: string,
-  metadata: Record<string, unknown> = {},
-) {
-  const config = requireConfig();
-  const now = new Date().toISOString();
-  await supabaseInsert<OperationalActionEventRow>(config, eventsTable, {
-    organisation_id: context.organisation.id,
-    id: `${action.id}:${action.version}:${eventType}`,
-    operational_action_id: action.id,
-    event_type: eventType,
-    previous_status: previousStatus,
-    new_status: newStatus,
-    actor_user_id: eventType === "detected" || eventType === "regenerated" ? "system" : context.user.id,
-    actor_name: eventType === "detected" || eventType === "regenerated" ? "LevyTate" : actorName(context),
-    event_date: now,
-    summary,
-    metadata,
-    created_at: now,
-  }, { prefer: "resolution=ignore-duplicates,return=representation" });
 }
 
 async function requireOperationalActionContext(session: LevyTateBetaSession, access: "read" | "write") {
@@ -1502,12 +1453,6 @@ function persistentDueDate(item: OperationalItem, detectedAt: string) {
   const due = new Date(detectedAt);
   due.setUTCDate(due.getUTCDate() + operationsPolicy.enrolmentReadyHighPriorityAfterDays);
   return due.toISOString().slice(0, 10);
-}
-
-function eventTypeForStatus(status: OperationalActionStatus): OperationalActionEventType {
-  if (status === "acknowledged") return "acknowledged";
-  if (status === "in_progress") return "started";
-  return status as Extract<OperationalActionEventType, "completed" | "dismissed" | "cancelled">;
 }
 
 function assertVersion(action: PersistentOperationalAction, expectedVersion: number) {

@@ -4,7 +4,13 @@ import { ArrowLeft, CalendarClock, CheckCircle2, ChevronDown, Plus, Search, XCir
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { EmptyState, FormField, FormGrid, FormSection, FormSelect, FormTagInput, FormTextArea, MvpModal, MvpPanel, StatusBadge, TableAction, TableBody, TableHead, TableShell } from "@/components/levytate-mvp/MvpUi";
 import { OperationalMetricRail, ProgressTrack, StageTracker } from "@/components/levytate-mvp/OperationalVisuals";
+import { ClientMutationRecovery } from "@/components/levytate-mvp/ClientMutationRecovery";
+import { useLearnerCommand } from "@/components/levytate-mvp/useLearnerCommand";
+import { useRetainedWorkspaceRequest } from "@/components/levytate-mvp/useRetainedWorkspaceRequest";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
+import { ApplicationPreEnrolmentModal } from "@/components/levytate-mvp/ApplicationPreEnrolmentModal";
+import { LearnerOutcomePanel } from "@/components/levytate-mvp/LearnerOutcomePanel";
+import { decodeLearnerDetailResponse, decodeLearnerListResponse } from "@/lib/levytate/learner-command-response";
 import { includesSearch, statusTone } from "@/components/levytate-mvp/module-utils";
 import {
   assessmentConfirmationStatusLabels,
@@ -18,7 +24,6 @@ import {
 } from "@/lib/levytate/mvp/assessment-readiness";
 import {
   formatProgressVariance,
-  buildLearnerListSummary,
   deriveProgressPositionFromVariance,
   operationalActionLabel,
   type LearnerListSummary,
@@ -41,32 +46,7 @@ import {
   type LearnerSupportActionType,
   type LearnerBreakReasonCategory,
   type LearnerAssessmentModel,
-  type LearnerEmploymentRoute,
-  type LearnerLifecycleStatus,
 } from "@/lib/levytate/mvp/learner-lifecycle";
-
-type LearnerListResponse = {
-  ok?: boolean;
-  source?: string;
-  summary?: LearnerListSummary;
-  learners?: LearnerOperationalSummary[];
-  message?: string;
-};
-
-type LearnerDetailResponse = {
-  ok?: boolean;
-  source?: string;
-  learner?: LearnerRecordDetail;
-  readiness?: LearnerRecordDetail["enrolmentReadiness"];
-  message?: string;
-};
-
-type LearnerMutationResponse = {
-  ok?: boolean;
-  source?: string;
-  learner?: LearnerRecordDetail;
-  message?: string;
-};
 
 type SortMode = "Operational priority" | "Learner name" | "Lifecycle status";
 
@@ -83,9 +63,12 @@ const progressOptions: Array<LearnerProgressPosition | typeof allOption> = [
 type LearnerDeepLinkAction = "open_learner" | "complete_pre_enrolment" | "complete_enrolment" | "record_review" | "add_progress" | "manage_break" | "return_learner" | "manage_assessment";
 
 export function LearnersModule({ initialLearnerRecordId = "", initialAction = "open_learner", onDeepLinkConsumed, onLearnerSelectionChange }: { initialLearnerRecordId?: string; initialAction?: LearnerDeepLinkAction; onDeepLinkConsumed?: () => void; onLearnerSelectionChange?: (learnerRecordId: string | null, learnerName?: string) => void }) {
-  const { can, meta, data } = useMvpWorkspace();
+  const request = useRetainedWorkspaceRequest();
+  const { can, meta } = useMvpWorkspace();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [readAttempt, setReadAttempt] = useState(0);
+  const [detailReadAttempt, setDetailReadAttempt] = useState(0);
   const [learners, setLearners] = useState<LearnerOperationalSummary[]>([]);
   const [summary, setSummary] = useState<LearnerListSummary | null>(null);
   const [selectedId, setSelectedId] = useState("");
@@ -102,17 +85,11 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
   const [attentionOnly, setAttentionOnly] = useState(false);
   const [sortMode, setSortMode] = useState<SortMode>("Operational priority");
   const [moreFilters, setMoreFilters] = useState(false);
-  const [onboarding, setOnboarding] = useState<{ employeeId: string; programmeId: string; lifecycleStatus: LearnerLifecycleStatus; employmentRoute: LearnerEmploymentRoute; expectedStartDate: string; actualStartDate: string; expectedEndDate: string; latestProgressDate: string; targetProgress: string; actualProgress: string; nextReviewDate: string } | null>(null);
+  const [onboarding, setOnboarding] = useState(false);
 
   const mayReadOrganisationLearners = can("learnerLifecycle:read") && (meta?.userRole === "Apprenticeship Lead" || meta?.userRole === "Employer Admin");
   const mayMutatePreEnrolment = can("learnerLifecycle:write") && can("learnerLifecycle:status") && (meta?.userRole === "Apprenticeship Lead" || meta?.userRole === "Employer Admin");
   const mayMutateLearnerActivity = can("learnerLifecycle:write") && (meta?.userRole === "Apprenticeship Lead" || meta?.userRole === "Employer Admin");
-  const activeProgrammes = data.organisationProgrammes.filter((selection) => selection.status === "Active").flatMap((selection) => {
-    const programme = data.providerProgrammes.find((item) => item.id === selection.programmeId && item.recordStatus === "Active" && item.status === "Active");
-    return programme ? [programme] : [];
-  });
-  const learnerEmployeeIds = new Set(data.learnerRecords.filter((record) => record.recordStatus === "Active").map((record) => record.employeeId));
-  const eligibleEmployees = data.employees.filter((employee) => employee.status === "Active" && !learnerEmployeeIds.has(employee.id));
 
   useEffect(() => {
     if (initialLearnerRecordId) setSelectedId(initialLearnerRecordId);
@@ -133,11 +110,9 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
       setLoading(true);
       setError("");
       try {
-        const response = await fetch("/api/levytate-learners", { cache: "no-store" });
-        const payload = (await response.json()) as LearnerListResponse;
-        if (!response.ok || !payload.learners || !payload.summary) {
-          throw new Error(payload.message ?? "Learner lifecycle records are unavailable.");
-        }
+        const response = await request("/api/levytate-learners", { cache: "no-store" });
+        if (!response.ok) throw new Error("Learner lifecycle records are unavailable.");
+        const payload = decodeLearnerListResponse(await response.json());
         if (!cancelled) {
           setLearners(payload.learners);
           setSummary(payload.summary);
@@ -153,7 +128,7 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
     return () => {
       cancelled = true;
     };
-  }, [mayReadOrganisationLearners]);
+  }, [mayReadOrganisationLearners, request, readAttempt]);
 
   useEffect(() => {
     if (!selectedId) {
@@ -166,12 +141,10 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
       setDetailLoading(true);
       setError("");
       try {
-        const response = await fetch(`/api/levytate-learners?learnerRecordId=${encodeURIComponent(selectedId)}`, { cache: "no-store" });
-        const payload = (await response.json()) as LearnerDetailResponse;
-        if (!response.ok || !payload.learner) {
-          throw new Error(payload.message ?? "Learner record was not found.");
-        }
-        if (!cancelled) setDetail(payload.learner);
+        const response = await request(`/api/levytate-learners?learnerRecordId=${encodeURIComponent(selectedId)}`, { cache: "no-store" });
+        if (!response.ok) throw new Error("Learner record was not found.");
+        const learner = decodeLearnerDetailResponse(await response.json(), selectedId);
+        if (!cancelled) setDetail(learner);
       } catch (loadError) {
         if (!cancelled) setError(loadError instanceof Error ? loadError.message : "Learner record was not found.");
       } finally {
@@ -183,7 +156,7 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
     return () => {
       cancelled = true;
     };
-  }, [selectedId]);
+  }, [selectedId, request, detailReadAttempt]);
 
   const filters = useMemo(() => {
     const unique = (values: string[]) => [allOption, ...Array.from(new Set(values.filter(Boolean))).sort((a, b) => a.localeCompare(b))];
@@ -223,53 +196,19 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
       return 0;
     }), [attentionOnly, departmentFilter, learners, progressFilter, programmeFilter, providerFilter, routeFilter, search, siteFilter, sortMode, statusFilter]);
 
-  function beginOnboarding() {
-    setError("");
-    setOnboarding({ employeeId: eligibleEmployees[0]?.id ?? "", programmeId: activeProgrammes[0]?.id ?? "", lifecycleStatus: "enrolled", employmentRoute: "existing_employee_upskill", expectedStartDate: "", actualStartDate: "", expectedEndDate: "", latestProgressDate: "", targetProgress: "", actualProgress: "", nextReviewDate: "" });
-  }
-
-  async function createExistingLearner(event: FormEvent) {
-    event.preventDefault();
-    if (!onboarding?.employeeId || !onboarding.programmeId) { setError("Select an employee and an active My Programme."); return; }
-    const progressSupplied = Boolean(onboarding.latestProgressDate || onboarding.targetProgress || onboarding.actualProgress);
-    const target = onboarding.targetProgress === "" ? null : Number(onboarding.targetProgress);
-    const actual = onboarding.actualProgress === "" ? null : Number(onboarding.actualProgress);
-    if (progressSupplied && (!onboarding.latestProgressDate || target === null || actual === null || !Number.isFinite(target) || !Number.isFinite(actual) || target < 0 || target > 100 || actual < 0 || actual > 100)) { setError("Supply a progress date and target and actual percentages between 0 and 100."); return; }
-    const programme = activeProgrammes.find((item) => item.id === onboarding.programmeId);
-    if (!programme) { setError("The selected programme is no longer active."); return; }
-    const application = data.applications.find((item) => item.employeeId === onboarding.employeeId && (programme.linkedStandardId === item.apprenticeshipStandardId || programme.linkedStandardIds.includes(item.apprenticeshipStandardId)));
-    const enrolment = data.enrolments.find((item) => item.employeeId === onboarding.employeeId && item.providerId === programme.providerId);
-    const response = await fetch("/api/levytate-learners", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ employeeId: onboarding.employeeId, applicationId: application?.id ?? "", programmeId: programme.id, providerId: programme.providerId, enrolmentId: enrolment?.id ?? "", lifecycleStatus: onboarding.lifecycleStatus, employmentRoute: onboarding.employmentRoute, expectedStartDate: onboarding.expectedStartDate, actualStartDate: onboarding.actualStartDate, expectedEndDate: onboarding.expectedEndDate, actualEndDate: "" }) });
-    const payload = await response.json() as LearnerMutationResponse;
-    if (!response.ok || !payload.learner) { setError(payload.message ?? "The learner record could not be created."); return; }
-    let learner = payload.learner;
-    if (onboarding.latestProgressDate && target !== null && actual !== null) {
-      const progressResponse = await fetch(`/api/levytate-learners/${encodeURIComponent(learner.learnerRecordId)}/progress`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expectedActivityVersion: learner.activityVersion, idempotencyKey: activityKey(), updateDate: onboarding.latestProgressDate, targetProgressPercentage: target, actualProgressPercentage: actual, progressSource: "manual", sourceReference: "Client onboarding import", summary: "Latest progress position supplied during learner onboarding.", supportAction: "" }) });
-      const progressPayload = await progressResponse.json() as LearnerMutationResponse;
-      if (!progressResponse.ok || !progressPayload.learner) { setError(progressPayload.message ?? "The learner was created, but the supplied progress update could not be recorded."); return; }
-      learner = progressPayload.learner;
-    }
-    if (onboarding.nextReviewDate) {
-      const breakReview = onboarding.lifecycleStatus === "break_in_learning";
-      const reviewResponse = await fetch(`/api/levytate-learners/${encodeURIComponent(learner.learnerRecordId)}/reviews`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expectedActivityVersion: learner.activityVersion, idempotencyKey: activityKey(), reviewType: breakReview ? "l_and_d_check_in" : "provider_review", reviewDate: todayDate(), nextReviewDate: onboarding.nextReviewDate, reviewerName: breakReview ? "L&D review schedule" : "Provider review schedule", providerId: breakReview ? "" : programme.providerId, summary: "Next review date supplied during learner onboarding.", actions: [], supportRequired: "", status: "scheduled" }) });
-      const reviewPayload = await reviewResponse.json() as LearnerMutationResponse;
-      if (!reviewResponse.ok || !reviewPayload.learner) { setError(reviewPayload.message ?? "The learner was created, but the supplied review date could not be recorded."); return; }
-      learner = reviewPayload.learner;
-    }
-    setLearners((current) => { const next = [learner, ...current]; setSummary(buildLearnerListSummary(next)); return next; });
-    setOnboarding(null); setError("");
-  }
 
   if (!mayReadOrganisationLearners) {
-    return <EmptyState title="Learners is not available for this role" copy="Organisation-wide learner lifecycle records are available to Apprenticeship Leads and platform administrators only." actionLabel="Return home" onAction={() => window.scrollTo({ top: 0, behavior: "smooth" })} />;
+    return <EmptyState title="Learners is not available for this role" copy="Organisation-wide learner lifecycle records are available to Apprenticeship Leads and Employer Admins only." actionLabel="Return home" onAction={() => window.scrollTo({ top: 0, behavior: "smooth" })} />;
   }
 
   if (selectedId) {
     return (
       <LearnerRecordView
+        key={selectedId}
         detail={detail}
         loading={detailLoading}
         error={error}
+        onRetry={() => setDetailReadAttempt(value => value + 1)}
         onBack={() => {
           setSelectedId("");
           setError("");
@@ -288,18 +227,18 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
 
   return (
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5">
-      <OperationalMetricRail items={[
-        { label: "Total records", value: summary?.total ?? 0 },
-        { label: "Pre-enrolment", value: summary?.preEnrolment ?? 0, tone: "neutral" },
-        { label: "Active learners", value: summary?.activeLearners ?? 0, tone: "healthy" },
-        { label: "Break in learning", value: summary?.breakInLearning ?? 0, tone: "watch" },
-        { label: "Assessment stage", value: summary?.assessmentStage ?? 0, tone: "info" },
-        { label: "Achieved", value: summary?.achieved ?? 0, tone: "healthy" },
-        { label: "Need attention", value: summary?.needingAttention ?? 0, tone: "risk" },
-      ]} />
+      {summary && !error ? <OperationalMetricRail items={[
+        { label: "Total records", value: summary.total },
+        { label: "Pre-enrolment", value: summary.preEnrolment, tone: "neutral" },
+        { label: "Active learners", value: summary.activeLearners, tone: "healthy" },
+        { label: "Break in learning", value: summary.breakInLearning, tone: "watch" },
+        { label: "Assessment stage", value: summary.assessmentStage, tone: "info" },
+        { label: "Achieved", value: summary.achieved, tone: "healthy" },
+        { label: "Need attention", value: summary.needingAttention, tone: "risk" },
+      ]} /> : null}
 
       <MvpPanel title="Learners" eyebrow="Lifecycle operations">
-        {mayMutatePreEnrolment ? <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[#102c3d]/[0.07] pb-4"><p className="text-xs leading-5 text-[#102c3d]/[0.52]">Bring existing apprentices into the same organisation-scoped lifecycle record.</p><button type="button" onClick={beginOnboarding} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white"><Plus size={15} />Import existing learner</button></div> : null}
+        {mayMutatePreEnrolment ? <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[#102c3d]/[0.07] pb-4"><p className="text-xs leading-5 text-[#102c3d]/[0.52]">Start pre-enrolment from a final-approved application. Historical learner import is not enabled.</p><button type="button" onClick={() => setOnboarding(true)} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white"><Plus size={15} />Start pre-enrolment</button></div> : null}
         <div className="mb-4 grid gap-3 xl:grid-cols-[minmax(260px,1fr)_minmax(0,1.4fr)]">
           <label className="flex h-11 min-w-0 items-center gap-2 rounded-lg border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 focus-within:border-[#159b8f] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#159b8f]/[0.10]">
             <Search size={16} strokeWidth={1.8} className="shrink-0 text-[#102c3d]/[0.38]" aria-hidden="true" />
@@ -320,11 +259,11 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
           Attention required only
         </label>
 
-        {error ? <p className="mb-4 rounded-xl bg-[#fff0f2] px-4 py-3 text-sm font-semibold text-[#b13b51]">{error}</p> : null}
+        {error ? <div role="alert" className="mb-4 rounded-xl bg-[#fff0f2] px-4 py-3 text-sm font-semibold text-[#b13b51]"><p>{error}</p><button type="button" disabled={loading} onClick={() => setReadAttempt(value => value + 1)} className="mt-2 min-h-10 rounded-lg border border-current px-3">Retry loading learners</button></div> : null}
 
         {loading ? (
           <div className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] px-5 py-10 text-center text-sm font-semibold text-[#102c3d]/[0.54]">Loading learner lifecycle records.</div>
-        ) : visible.length ? (
+        ) : error ? null : visible.length ? (
           <>
             <div className="hidden min-w-0 md:block">
               <TableShell testId="learners-table-scroll" minimumWidthClass="min-w-[1040px]" tableClassName="table-fixed">
@@ -395,12 +334,12 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
           </div>
         )}
       </MvpPanel>
-      {onboarding ? <MvpModal title="Import existing learner" eyebrow="Organisation lifecycle record" onClose={() => setOnboarding(null)}><form onSubmit={(event) => void createExistingLearner(event)}><FormGrid><FormSelect label="Employee" value={onboarding.employeeId} onChange={(value) => setOnboarding({ ...onboarding, employeeId: value })} options={[{ value: "", label: eligibleEmployees.length ? "Select employee" : "Add an eligible employee first" }, ...eligibleEmployees.map((employee) => ({ value: employee.id, label: `${employee.name} — ${employee.jobTitle}` }))]} /><FormSelect label="My Programme" value={onboarding.programmeId} onChange={(value) => setOnboarding({ ...onboarding, programmeId: value })} options={[{ value: "", label: activeProgrammes.length ? "Select programme" : "Publish a programme first" }, ...activeProgrammes.map((programme) => ({ value: programme.id, label: programme.programmeName }))]} /><FormSelect label="Lifecycle status" value={onboarding.lifecycleStatus} onChange={(value) => setOnboarding({ ...onboarding, lifecycleStatus: value as LearnerLifecycleStatus })} options={[{ value: "pre_enrolment", label: "Pre-enrolment" }, { value: "enrolled", label: "Enrolled" }, { value: "break_in_learning", label: "Break in learning" }, { value: "assessment_preparation", label: "Assessment preparation" }, { value: "in_assessment", label: "In assessment" }]} /><FormSelect label="Employment route" value={onboarding.employmentRoute} onChange={(value) => setOnboarding({ ...onboarding, employmentRoute: value as LearnerEmploymentRoute })} options={[{ value: "existing_employee_upskill", label: "Existing employee — upskill" }, { value: "recruited_as_apprentice", label: "Recruited as apprentice" }, { value: "not_confirmed", label: "Not yet confirmed" }]} /><FormField label="Expected start" type="date" value={onboarding.expectedStartDate} onChange={(value) => setOnboarding({ ...onboarding, expectedStartDate: value })} /><FormField label="Actual start" type="date" value={onboarding.actualStartDate} onChange={(value) => setOnboarding({ ...onboarding, actualStartDate: value })} /><FormField label="Expected end" type="date" value={onboarding.expectedEndDate} onChange={(value) => setOnboarding({ ...onboarding, expectedEndDate: value })} />{onboarding.lifecycleStatus !== "pre_enrolment" ? <><FormField label="Latest progress date" type="date" value={onboarding.latestProgressDate} onChange={(value) => setOnboarding({ ...onboarding, latestProgressDate: value })} /><FormField label="Target progress %" type="number" value={onboarding.targetProgress} onChange={(value) => setOnboarding({ ...onboarding, targetProgress: value })} /><FormField label="Actual progress %" type="number" value={onboarding.actualProgress} onChange={(value) => setOnboarding({ ...onboarding, actualProgress: value })} /><FormField label="Next provider review" type="date" value={onboarding.nextReviewDate} onChange={(value) => setOnboarding({ ...onboarding, nextReviewDate: value })} /></> : null}</FormGrid><FormActions onCancel={() => setOnboarding(null)} submit="Create learner record" saving={false} error={error} /></form></MvpModal> : null}
+      {onboarding ? <ApplicationPreEnrolmentModal onClose={() => setOnboarding(false)} onComplete={(learner) => { setOnboarding(false); setSelectedId(learner.learnerRecordId); setDetail(learner); }} /> : null}
     </div>
   );
 }
 
-function LearnerRecordView({ detail, loading, error, onBack, mayMutatePreEnrolment, mayMutateLearnerActivity, initialAction, onDeepLinkConsumed, onDetailUpdated }: { detail: LearnerRecordDetail | null; loading: boolean; error: string; onBack: () => void; mayMutatePreEnrolment: boolean; mayMutateLearnerActivity: boolean; initialAction: LearnerDeepLinkAction; onDeepLinkConsumed?: () => void; onDetailUpdated: (detail: LearnerRecordDetail) => void }) {
+function LearnerRecordView({ detail, loading, error, onRetry, onBack, mayMutatePreEnrolment, mayMutateLearnerActivity, initialAction, onDeepLinkConsumed, onDetailUpdated }: { detail: LearnerRecordDetail | null; loading: boolean; error: string; onRetry: () => void; onBack: () => void; mayMutatePreEnrolment: boolean; mayMutateLearnerActivity: boolean; initialAction: LearnerDeepLinkAction; onDeepLinkConsumed?: () => void; onDetailUpdated: (detail: LearnerRecordDetail) => void }) {
   const [workflowOpen, setWorkflowOpen] = useState(false);
   const [activityMode, setActivityMode] = useState<"progress" | "review" | "">("");
   const [reviewFilter, setReviewFilter] = useState<LearnerReviewType | "all">("all");
@@ -429,7 +368,7 @@ function LearnerRecordView({ detail, loading, error, onBack, mayMutatePreEnrolme
         <button type="button" onClick={onBack} className="inline-flex w-fit items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-semibold text-[#102c3d]/[0.68] ring-1 ring-[#102c3d]/[0.08]">
           <ArrowLeft size={15} /> Back to learners
         </button>
-        <div className="rounded-xl border border-[#b13b51]/[0.10] bg-[#fff0f2] p-5 text-sm font-semibold text-[#b13b51]">{error || "Learner record was not found."}</div>
+        <div role="alert" className="rounded-xl border border-[#b13b51]/[0.10] bg-[#fff0f2] p-5 text-sm font-semibold text-[#b13b51]"><p>{error || "Learner record was not found."}</p><button type="button" onClick={onRetry} className="mt-2 min-h-10 rounded-lg border border-current px-3">Retry loading learner</button></div>
       </div>
     );
   }
@@ -671,6 +610,8 @@ function LearnerRecordView({ detail, loading, error, onBack, mayMutatePreEnrolme
 
       {assessmentOpen ? <AssessmentReadinessWorkflow detail={detail} onClose={() => setAssessmentOpen(false)} onSaved={(next, message) => { onDetailUpdated(next); setSuccess(message); setAssessmentOpen(false); }} /> : null}
 
+      {mayMutatePreEnrolment ? <LearnerOutcomePanel key={detail.learnerRecordId} detail={detail} onSaved={(next) => { onDetailUpdated(next); setSuccess("Final outcome and lifecycle evidence saved."); }} /> : null}
+
       <RecordSection title="Operational actions" eyebrow="Communications">
         {detail.operationalActions.length ? (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -706,6 +647,10 @@ function LearnerRecordView({ detail, loading, error, onBack, mayMutatePreEnrolme
 }
 
 function AssessmentReadinessSection({ detail, mayMutate, onManage, onSaved }: { detail: LearnerRecordDetail; mayMutate: boolean; onManage: () => void; onSaved: (detail: LearnerRecordDetail, message: string) => void }) {
+  const preparation = useLearnerCommand(detail, "assessment-preparation");
+  const confirmation = useLearnerCommand(detail, "confirm-assessment-readiness");
+  const startAssessment = useLearnerCommand(detail, "start-assessment");
+  const locked = preparation.locked || confirmation.locked || startAssessment.locked;
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const readiness = detail.assessmentReadiness;
@@ -720,6 +665,8 @@ function AssessmentReadinessSection({ detail, mayMutate, onManage, onSaved }: { 
         : null;
 
   async function runAction(route: string) {
+    if (locked) return;
+    const mutation = route === "assessment-preparation" ? preparation : route === "confirm-assessment-readiness" ? confirmation : startAssessment;
     setSaving(true);
     setError("");
     try {
@@ -728,10 +675,7 @@ function AssessmentReadinessSection({ detail, mayMutate, onManage, onSaved }: { 
         body.gatewayDate = readiness?.gatewayDate ?? "";
       }
       if (route === "start-assessment") body.assessmentStartDate = readiness?.expectedAssessmentStartDate || todayDate();
-      const response = await fetch(`/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/${route}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-      const payload = await response.json() as LearnerMutationResponse;
-      if (!response.ok || !payload.learner) throw new Error(payload.message || "Assessment readiness could not be updated.");
-      onSaved(payload.learner, payload.message || "Assessment readiness updated.");
+      await mutation.execute(body, (saved) => onSaved(saved, "Assessment readiness updated."));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Assessment readiness could not be updated.");
     } finally {
@@ -741,6 +685,7 @@ function AssessmentReadinessSection({ detail, mayMutate, onManage, onSaved }: { 
 
   return (
     <RecordSection title="Assessment and gateway" eyebrow="Completion path">
+      <ClientMutationRecovery mutation={preparation} /><ClientMutationRecovery mutation={confirmation} /><ClientMutationRecovery mutation={startAssessment} /><fieldset disabled={locked} className="min-w-0 border-0 p-0">
       <div className="grid gap-4 xl:grid-cols-[minmax(0,0.72fr)_minmax(0,1.28fr)]">
         <div className="grid content-start gap-3">
           <div className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4">
@@ -789,7 +734,7 @@ function AssessmentReadinessSection({ detail, mayMutate, onManage, onSaved }: { 
           ) : null}
         </div>
       </div>
-    </RecordSection>
+    </fieldset></RecordSection>
   );
 }
 
@@ -808,6 +753,7 @@ type AssessmentReadinessFormState = {
 };
 
 function AssessmentReadinessWorkflow({ detail, onClose, onSaved }: { detail: LearnerRecordDetail; onClose: () => void; onSaved: (detail: LearnerRecordDetail, message: string) => void }) {
+  const mutation = useLearnerCommand(detail, "assessment-readiness", "PATCH");
   const readiness = detail.assessmentReadiness;
   const empty = emptyAssessmentReadinessConfirmations();
   const [form, setForm] = useState<AssessmentReadinessFormState>({
@@ -836,14 +782,11 @@ function AssessmentReadinessWorkflow({ detail, onClose, onSaved }: { detail: Lea
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+    event.preventDefault(); if (mutation.locked) return;
     setSaving(true);
     setError("");
     try {
-      const response = await fetch(`/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/assessment-readiness`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...form, expectedActivityVersion: detail.activityVersion }) });
-      const payload = await response.json() as LearnerMutationResponse;
-      if (!response.ok || !payload.learner) throw new Error(payload.message || "Assessment readiness could not be saved.");
-      onSaved(payload.learner, payload.message || "Assessment readiness record saved.");
+      await mutation.execute({ ...form, expectedActivityVersion: detail.activityVersion }, (saved) => onSaved(saved, "Assessment readiness record saved."));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Assessment readiness could not be saved.");
     } finally {
@@ -852,8 +795,8 @@ function AssessmentReadinessWorkflow({ detail, onClose, onSaved }: { detail: Lea
   }
 
   return (
-    <MvpModal title="Manage assessment readiness" eyebrow="Assessment and gateway" onClose={onClose} wide>
-      <form onSubmit={submit} className="grid gap-4">
+    <MvpModal title="Manage assessment readiness" eyebrow="Assessment and gateway" onClose={() => { if (!mutation.locked) onClose(); }} wide>
+      <ClientMutationRecovery mutation={mutation} /><form onSubmit={submit}><fieldset disabled={mutation.locked} className="grid gap-4">
         <FormSection title="Assessment route" copy="Confirm the assessment model, organisation and readiness plan. Gateway is required only for end-point assessment.">
           <FormGrid>
             <FormSelect label="Assessment model" value={form.assessmentModel} onChange={(value) => update("assessmentModel", value as LearnerAssessmentModel)} options={Object.entries(assessmentModelLabels).map(([value, label]) => ({ value, label }))} required />
@@ -876,7 +819,7 @@ function AssessmentReadinessWorkflow({ detail, onClose, onSaved }: { detail: Lea
           </div>
         </FormSection>
         <FormActions error={error} saving={saving} submit="Save readiness record" onCancel={onClose} />
-      </form>
+      </fieldset></form>
     </MvpModal>
   );
 }
@@ -904,6 +847,7 @@ type ProgressFormState = {
 };
 
 function ProgressUpdateForm({ detail, onClose, onSaved }: { detail: LearnerRecordDetail; onClose: () => void; onSaved: (detail: LearnerRecordDetail, message: string) => void }) {
+  const mutation = useLearnerCommand(detail, "progress");
   const [idempotencyKey] = useState(activityKey);
   const [form, setForm] = useState<ProgressFormState>({
     updateDate: todayDate(),
@@ -928,31 +872,14 @@ function ProgressUpdateForm({ detail, onClose, onSaved }: { detail: LearnerRecor
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+    event.preventDefault(); if (mutation.locked) return;
     setSaving(true);
     setError("");
     try {
       const supportAction = form.supportType === "no_support_required"
         ? learnerSupportActionLabels.no_support_required
         : `${learnerSupportActionLabels[form.supportType]}${form.supportSummary.trim() ? `: ${form.supportSummary.trim()}` : ""}`;
-      const response = await fetch(`/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/progress`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          expectedActivityVersion: detail.activityVersion,
-          idempotencyKey,
-          updateDate: form.updateDate,
-          targetProgressPercentage: target,
-          actualProgressPercentage: actual,
-          progressSource: form.source,
-          sourceReference: form.sourceReference,
-          summary: form.summary,
-          supportAction,
-        }),
-      });
-      const payload = await response.json() as LearnerMutationResponse;
-      if (!response.ok || !payload.learner) throw new Error(payload.message ?? "Progress update could not be recorded.");
-      onSaved(payload.learner, payload.message ?? "Progress update recorded.");
+      await mutation.execute({ expectedActivityVersion: detail.activityVersion, idempotencyKey, updateDate: form.updateDate, targetProgressPercentage: target, actualProgressPercentage: actual, progressSource: form.source, sourceReference: form.sourceReference, summary: form.summary, supportAction }, (saved) => onSaved(saved, "Progress update recorded."));
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Progress update could not be recorded.");
     } finally {
@@ -961,8 +888,8 @@ function ProgressUpdateForm({ detail, onClose, onSaved }: { detail: LearnerRecor
   }
 
   return (
-    <MvpModal title="Add progress update" eyebrow="Progress and reviews" onClose={onClose}>
-      <form onSubmit={submit} className="grid gap-4">
+    <MvpModal title="Add progress update" eyebrow="Progress and reviews" onClose={() => { if (!mutation.locked) onClose(); }}>
+      <ClientMutationRecovery mutation={mutation} /><form onSubmit={submit}><fieldset disabled={mutation.locked} className="grid gap-4">
         <FormSection title="Progress position" copy="Variance and position are recalculated by the server when this update is saved.">
           <FormGrid>
             <FormField label="Update date" type="date" value={form.updateDate} onChange={(value) => update("updateDate", value)} required />
@@ -989,7 +916,7 @@ function ProgressUpdateForm({ detail, onClose, onSaved }: { detail: LearnerRecor
           <button type="button" onClick={onClose} className="h-10 rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/[0.62] ring-1 ring-[#102c3d]/[0.1]">Cancel</button>
           <button disabled={saving} className="h-10 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white disabled:opacity-55">{saving ? "Recording update" : "Record progress update"}</button>
         </div>
-      </form>
+      </fieldset></form>
     </MvpModal>
   );
 }
@@ -1007,13 +934,14 @@ type ReviewFormState = {
 };
 
 function ReviewEntryForm({ detail, onClose, onSaved }: { detail: LearnerRecordDetail; onClose: () => void; onSaved: (detail: LearnerRecordDetail, message: string) => void }) {
+  const mutation = useLearnerCommand(detail, "reviews");
   const [idempotencyKey] = useState(activityKey);
   const onBreak = detail.lifecycleStatus === "break_in_learning";
   const [form, setForm] = useState<ReviewFormState>({
     reviewType: onBreak ? "l_and_d_check_in" : "provider_review",
     reviewDate: todayDate(),
     nextReviewDate: "",
-    reviewerName: onBreak ? "Priya Shah" : "Provider Skills Coach",
+    reviewerName: "",
     providerId: onBreak ? "" : detail.programme.providerId,
     summary: "",
     actions: [],
@@ -1028,23 +956,16 @@ function ReviewEntryForm({ detail, onClose, onSaved }: { detail: LearnerRecordDe
   }
 
   function changeReviewType(value: LearnerReviewType) {
-    const reviewerName = value === "provider_review" ? "Provider Skills Coach" : value === "manager_check_in" ? detail.learner.managerName : value === "l_and_d_check_in" ? "Priya Shah" : "";
+    const reviewerName = value === "manager_check_in" ? detail.learner.managerName : "";
     setForm((current) => ({ ...current, reviewType: value, reviewerName, providerId: value === "provider_review" ? detail.programme.providerId : "" }));
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+    event.preventDefault(); if (mutation.locked) return;
     setSaving(true);
     setError("");
     try {
-      const response = await fetch(`/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/reviews`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ...form, expectedActivityVersion: detail.activityVersion, idempotencyKey }),
-      });
-      const payload = await response.json() as LearnerMutationResponse;
-      if (!response.ok || !payload.learner) throw new Error(payload.message ?? "Review or check-in could not be recorded.");
-      onSaved(payload.learner, payload.message ?? `${learnerReviewTypeLabels[form.reviewType]} recorded.`);
+      await mutation.execute({ ...form, expectedActivityVersion: detail.activityVersion, idempotencyKey }, (saved) => onSaved(saved, `${learnerReviewTypeLabels[form.reviewType]} recorded.`));
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Review or check-in could not be recorded.");
     } finally {
@@ -1053,8 +974,8 @@ function ReviewEntryForm({ detail, onClose, onSaved }: { detail: LearnerRecordDe
   }
 
   return (
-    <MvpModal title="Record review or check-in" eyebrow="Progress and reviews" onClose={onClose}>
-      <form onSubmit={submit} className="grid gap-4">
+    <MvpModal title="Record review or check-in" eyebrow="Progress and reviews" onClose={() => { if (!mutation.locked) onClose(); }}>
+      <ClientMutationRecovery mutation={mutation} /><form onSubmit={submit}><fieldset disabled={mutation.locked} className="grid gap-4">
         <FormSection title="Review details">
           <FormGrid>
             <FormSelect label="Review type" value={form.reviewType} onChange={(value) => changeReviewType(value as LearnerReviewType)} options={Object.entries(learnerReviewTypeLabels).filter(([value]) => !onBreak || value === "l_and_d_check_in" || value === "manager_check_in").map(([value, label]) => ({ value, label }))} required />
@@ -1078,7 +999,7 @@ function ReviewEntryForm({ detail, onClose, onSaved }: { detail: LearnerRecordDe
           <button type="button" onClick={onClose} className="h-10 rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/[0.62] ring-1 ring-[#102c3d]/[0.1]">Cancel</button>
           <button disabled={saving} className="h-10 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white disabled:opacity-55">{saving ? "Recording review" : "Record review or check-in"}</button>
         </div>
-      </form>
+      </fieldset></form>
     </MvpModal>
   );
 }
@@ -1121,6 +1042,7 @@ type BreakDetailsState = {
 
 function BreakDetailsForm({ detail, update: updating, onBack, onSaved }: { detail: LearnerRecordDetail; update: boolean; onBack: () => void; onSaved: (detail: LearnerRecordDetail, message: string) => void }) {
   const active = detail.activeBreak;
+  const mutation = useLearnerCommand(detail, updating && active ? `breaks/${encodeURIComponent(active.id)}` : "breaks", updating ? "PATCH" : "POST");
   const [idempotencyKey] = useState(activityKey);
   const [form, setForm] = useState<BreakDetailsState>({
     startDate: active?.startDate || todayDate(), expectedReturnDate: active?.expectedReturnDate || "", expectedReturnUnknown: active?.expectedReturnUnknown || false, reviewDate: active?.reviewDate || "",
@@ -1132,19 +1054,15 @@ function BreakDetailsForm({ detail, update: updating, onBack, onSaved }: { detai
   const [error, setError] = useState("");
   function set<K extends keyof BreakDetailsState>(key: K, value: BreakDetailsState[K]) { setForm((current) => ({ ...current, [key]: value })); }
   async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); setSaving(true); setError("");
+    event.preventDefault(); if (mutation.locked) return; setSaving(true); setError("");
     try {
-      const url = updating && active ? `/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/breaks/${encodeURIComponent(active.id)}` : `/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/breaks`;
       const body = updating ? { ...form, startDate: undefined, reasonCategory: undefined, effectiveLifecycleDate: undefined, expectedActivityVersion: detail.activityVersion } : { ...form, correctedStartDate: undefined, startDateCorrectionReason: undefined, expectedActivityVersion: detail.activityVersion, idempotencyKey };
-      const response = await fetch(url, { method: updating ? "PATCH" : "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-      const payload = await response.json() as LearnerMutationResponse;
-      if (!response.ok || !payload.learner) throw new Error(payload.message || "Break in learning could not be saved.");
-      onSaved(payload.learner, payload.message || (updating ? "Break in learning details updated." : "Break in learning started."));
+      await mutation.execute(body, (saved) => onSaved(saved, updating ? "Break in learning details updated." : "Break in learning started."));
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Break in learning could not be saved."); } finally { setSaving(false); }
   }
   return (
-    <MvpModal title={updating ? "Update break details" : "Start break in learning"} eyebrow="Learner lifecycle" onClose={onBack}>
-      <form onSubmit={submit} className="grid gap-4">
+    <MvpModal title={updating ? "Update break details" : "Start break in learning"} eyebrow="Learner lifecycle" onClose={() => { if (!mutation.locked) onBack(); }}>
+      <ClientMutationRecovery mutation={mutation} /><form onSubmit={submit}><fieldset disabled={mutation.locked} className="grid gap-4">
         <FormSection title="Dates and reason" copy="Record concise operational context. Do not include unnecessary medical detail.">
           <FormGrid>
             {updating ? <FormField label="Corrected break start date" type="date" value={form.correctedStartDate} onChange={(value) => set("correctedStartDate", value)} /> : <FormField label="Break start date" type="date" value={form.startDate} onChange={(value) => set("startDate", value)} required />}
@@ -1170,25 +1088,27 @@ function BreakDetailsForm({ detail, update: updating, onBack, onSaved }: { detai
           </div>
         </FormSection>
         <FormActions error={error} saving={saving} submit={updating ? "Save break details" : "Start break in learning"} onCancel={onBack} />
-      </form>
+      </fieldset></form>
     </MvpModal>
   );
 }
 
 function ReturnFromBreakForm({ detail, onBack, onSaved }: { detail: LearnerRecordDetail; onBack: () => void; onSaved: (detail: LearnerRecordDetail, message: string) => void }) {
-  const active = detail.activeBreak!;
+  const mutation = useLearnerCommand(detail, `breaks/${encodeURIComponent(detail.activeBreak!.id)}/return`);
+
   const [idempotencyKey] = useState(activityKey);
   const [form, setForm] = useState({ actualReturnDate: todayDate(), returnConfirmationNote: "", programmeStillValidConfirmed: false, providerReturnConfirmed: false, managerReturnConfirmed: false, learnerReturnConfirmed: false, revisedExpectedEndDate: "", revisedReviewDate: "", immediateSupportAction: "", progressResetNote: "", firstCheckInDate: "" });
   const [saving, setSaving] = useState(false); const [error, setError] = useState("");
   function set(key: keyof typeof form, value: string | boolean) { setForm((current) => ({ ...current, [key]: value })); }
-  async function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setSaving(true); setError(""); try { const response = await fetch(`/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/breaks/${encodeURIComponent(active.id)}/return`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...form, expectedActivityVersion: detail.activityVersion, idempotencyKey }) }); const payload = await response.json() as LearnerMutationResponse; if (!response.ok || !payload.learner) throw new Error(payload.message || "Learner could not be returned to active learning."); onSaved(payload.learner, payload.message || "Learner returned to active learning."); } catch (caught) { setError(caught instanceof Error ? caught.message : "Learner could not be returned to active learning."); } finally { setSaving(false); } }
-  return <MvpModal title="Return learner to active learning" eyebrow="Break in learning" onClose={onBack}><form onSubmit={submit} className="grid gap-4"><FormSection title="Return confirmation"><FormGrid><FormField label="Actual return date" type="date" value={form.actualReturnDate} onChange={(value) => set("actualReturnDate", value)} required /><FormTextArea label="Return confirmation note" value={form.returnConfirmationNote} onChange={(value) => set("returnConfirmationNote", value)} wide rows={3} required /><BreakCheckbox label="Current programme remains valid" checked={form.programmeStillValidConfirmed} onChange={(value) => set("programmeStillValidConfirmed", value)} /><BreakCheckbox label="Provider return confirmed" checked={form.providerReturnConfirmed} onChange={(value) => set("providerReturnConfirmed", value)} /><BreakCheckbox label="Manager informed" checked={form.managerReturnConfirmed} onChange={(value) => set("managerReturnConfirmed", value)} /><BreakCheckbox label="Learner informed" checked={form.learnerReturnConfirmed} onChange={(value) => set("learnerReturnConfirmed", value)} /></FormGrid></FormSection><FormSection title="Revised plan"><FormGrid><FormField label="Revised expected end date" type="date" value={form.revisedExpectedEndDate} onChange={(value) => set("revisedExpectedEndDate", value)} /><FormField label="Revised review date" type="date" value={form.revisedReviewDate} onChange={(value) => set("revisedReviewDate", value)} /><FormField label="First check-in after return" type="date" value={form.firstCheckInDate} onChange={(value) => set("firstCheckInDate", value)} /><FormTextArea label="Immediate support action" value={form.immediateSupportAction} onChange={(value) => set("immediateSupportAction", value)} wide rows={2} /><FormTextArea label="Progress reset note" value={form.progressResetNote} onChange={(value) => set("progressResetNote", value)} wide rows={2} /></FormGrid></FormSection><FormActions error={error} saving={saving} submit="Return learner to active learning" onCancel={onBack} /></form></MvpModal>;
+  async function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); if (mutation.locked) return; setSaving(true); setError(""); try { await mutation.execute({ ...form, expectedActivityVersion: detail.activityVersion, idempotencyKey }, saved => onSaved(saved, "Learner returned to active learning.")); } catch (caught) { setError(caught instanceof Error ? caught.message : "Learner could not be returned to active learning."); } finally { setSaving(false); } }
+  return <MvpModal title="Return learner to active learning" eyebrow="Break in learning" onClose={() => { if (!mutation.locked) onBack(); }}><ClientMutationRecovery mutation={mutation} /><form onSubmit={submit}><fieldset disabled={mutation.locked} className="grid gap-4"><FormSection title="Return confirmation"><FormGrid><FormField label="Actual return date" type="date" value={form.actualReturnDate} onChange={(value) => set("actualReturnDate", value)} required /><FormTextArea label="Return confirmation note" value={form.returnConfirmationNote} onChange={(value) => set("returnConfirmationNote", value)} wide rows={3} required /><BreakCheckbox label="Current programme remains valid" checked={form.programmeStillValidConfirmed} onChange={(value) => set("programmeStillValidConfirmed", value)} /><BreakCheckbox label="Provider return confirmed" checked={form.providerReturnConfirmed} onChange={(value) => set("providerReturnConfirmed", value)} /><BreakCheckbox label="Manager informed" checked={form.managerReturnConfirmed} onChange={(value) => set("managerReturnConfirmed", value)} /><BreakCheckbox label="Learner informed" checked={form.learnerReturnConfirmed} onChange={(value) => set("learnerReturnConfirmed", value)} /></FormGrid></FormSection><FormSection title="Revised plan"><FormGrid><FormField label="Revised expected end date" type="date" value={form.revisedExpectedEndDate} onChange={(value) => set("revisedExpectedEndDate", value)} /><FormField label="Revised review date" type="date" value={form.revisedReviewDate} onChange={(value) => set("revisedReviewDate", value)} /><FormField label="First check-in after return" type="date" value={form.firstCheckInDate} onChange={(value) => set("firstCheckInDate", value)} /><FormTextArea label="Immediate support action" value={form.immediateSupportAction} onChange={(value) => set("immediateSupportAction", value)} wide rows={2} /><FormTextArea label="Progress reset note" value={form.progressResetNote} onChange={(value) => set("progressResetNote", value)} wide rows={2} /></FormGrid></FormSection><FormActions error={error} saving={saving} submit="Return learner to active learning" onCancel={onBack} /></fieldset></form></MvpModal>;
 }
 
 function CancelBreakForm({ detail, onBack, onSaved }: { detail: LearnerRecordDetail; onBack: () => void; onSaved: (detail: LearnerRecordDetail, message: string) => void }) {
-  const active = detail.activeBreak!; const [reason, setReason] = useState(""); const [idempotencyKey] = useState(activityKey); const [saving, setSaving] = useState(false); const [error, setError] = useState("");
-  async function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setSaving(true); setError(""); try { const response = await fetch(`/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/breaks/${encodeURIComponent(active.id)}/cancel`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ cancellationReason: reason, expectedActivityVersion: detail.activityVersion, idempotencyKey }) }); const payload = await response.json() as LearnerMutationResponse; if (!response.ok || !payload.learner) throw new Error(payload.message || "Break record could not be cancelled."); onSaved(payload.learner, payload.message || "Break in learning record cancelled."); } catch (caught) { setError(caught instanceof Error ? caught.message : "Break record could not be cancelled."); } finally { setSaving(false); } }
-  return <MvpModal title="Cancel break record" eyebrow="Incorrect record only" onClose={onBack}><form onSubmit={submit} className="grid gap-4"><p className="rounded-xl border border-[#b13b51]/[0.15] bg-[#fff0f2] p-4 text-sm leading-6 text-[#8f3043]">Use this only when the learner did not genuinely pause learning. The cancelled record remains in the lifecycle history.</p><FormTextArea label="Cancellation reason" value={reason} onChange={setReason} rows={4} required /><FormActions error={error} saving={saving} submit="Cancel break record" onCancel={onBack} danger /></form></MvpModal>;
+  const mutation = useLearnerCommand(detail, `breaks/${encodeURIComponent(detail.activeBreak!.id)}/cancel`);
+  const [reason, setReason] = useState(""); const [idempotencyKey] = useState(activityKey); const [saving, setSaving] = useState(false); const [error, setError] = useState("");
+  async function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); if (mutation.locked) return; setSaving(true); setError(""); try { await mutation.execute({ cancellationReason: reason, expectedActivityVersion: detail.activityVersion, idempotencyKey }, saved => onSaved(saved, "Break in learning record cancelled.")); } catch (caught) { setError(caught instanceof Error ? caught.message : "Break record could not be cancelled."); } finally { setSaving(false); } }
+  return <MvpModal title="Cancel break record" eyebrow="Incorrect record only" onClose={() => { if (!mutation.locked) onBack(); }}><ClientMutationRecovery mutation={mutation} /><form onSubmit={submit}><fieldset disabled={mutation.locked} className="grid gap-4"><p className="rounded-xl border border-[#b13b51]/[0.15] bg-[#fff0f2] p-4 text-sm leading-6 text-[#8f3043]">Use this only when the learner did not genuinely pause learning. The cancelled record remains in the lifecycle history.</p><FormTextArea label="Cancellation reason" value={reason} onChange={setReason} rows={4} required /><FormActions error={error} saving={saving} submit="Cancel break record" onCancel={onBack} danger /></fieldset></form></MvpModal>;
 }
 
 function ActiveBreakBanner({ detail }: { detail: LearnerRecordDetail }) {
@@ -1226,6 +1146,9 @@ type PreEnrolmentForm = {
 };
 
 function PreEnrolmentWorkflow({ detail, onCancel, onSaved, onEnrolled }: { detail: LearnerRecordDetail; onCancel: () => void; onSaved: (detail: LearnerRecordDetail, message: string) => void; onEnrolled: (detail: LearnerRecordDetail) => void }) {
+  const saveMutation = useLearnerCommand(detail, "pre-enrolment", "PATCH");
+  const enrolMutation = useLearnerCommand(detail, "enrol");
+  const locked = saveMutation.locked || enrolMutation.locked;
   const [form, setForm] = useState<PreEnrolmentForm>(() => ({
     employmentRoute: detail.employmentRoute === "not_confirmed" ? "existing_employee_upskill" : detail.employmentRoute,
     eligibilityVerificationStatus: detail.eligibilityDeclaration?.verificationStatus === "employer_verified" ? "employer_verified" : detail.eligibilityDeclaration?.verificationStatus === "not_eligible" ? "not_eligible" : detail.eligibilityDeclaration?.verificationStatus === "needs_review" ? "needs_review" : "employer_verified",
@@ -1251,6 +1174,8 @@ function PreEnrolmentWorkflow({ detail, onCancel, onSaved, onEnrolled }: { detai
   }));
   const [saving, setSaving] = useState(false);
   const [enrolling, setEnrolling] = useState(false);
+  const [enrolmentKey] = useState(() => createEnrolmentRequestId());
+  const [initialEvidence, setInitialEvidence] = useState({ updateDate: "", target: "", actual: "", summary: "", firstReviewDate: "", firstReviewerName: "" });
   const [error, setError] = useState("");
   const readiness = detail.enrolmentReadiness;
 
@@ -1259,13 +1184,11 @@ function PreEnrolmentWorkflow({ detail, onCancel, onSaved, onEnrolled }: { detai
   }
 
   async function saveProgress() {
+    if (locked) return;
     setSaving(true);
     setError("");
     try {
-      const response = await fetch(`/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/pre-enrolment`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
+      await saveMutation.execute({
           expectedUpdatedAt: detail.updatedAt,
           employmentRoute: form.employmentRoute,
           eligibilityVerification: {
@@ -1298,11 +1221,7 @@ function PreEnrolmentWorkflow({ detail, onCancel, onSaved, onEnrolled }: { detai
             recipientSummary: form.guidesRecipientSummary,
             guidesNotes: form.guidesNotes,
           },
-        }),
-      });
-      const payload = (await response.json()) as LearnerMutationResponse;
-      if (!response.ok || !payload.learner) throw new Error(payload.message ?? "Pre-enrolment progress could not be saved.");
-      onSaved(payload.learner, "Pre-enrolment progress saved.");
+        }, saved => onSaved(saved, "Pre-enrolment progress saved."), { applicationId: form.applicationId, programmeId: form.programmeId, providerId: form.providerId });
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Pre-enrolment progress could not be saved.");
     } finally {
@@ -1311,13 +1230,18 @@ function PreEnrolmentWorkflow({ detail, onCancel, onSaved, onEnrolled }: { detai
   }
 
   async function markEnrolled() {
+    if (locked) return;
+    if (!initialEvidence.updateDate || initialEvidence.target === "" || initialEvidence.actual === "" || !initialEvidence.summary.trim() || !initialEvidence.firstReviewDate || !initialEvidence.firstReviewerName.trim()) {
+      setError("Enter the initial progress evidence and first provider review plan before confirming enrolment."); return;
+    }
     setEnrolling(true);
     setError("");
     try {
-      const response = await fetch(`/api/levytate-learners/${encodeURIComponent(detail.learnerRecordId)}/enrol`, { method: "POST" });
-      const payload = (await response.json()) as LearnerMutationResponse;
-      if (!response.ok || !payload.learner) throw new Error(payload.message ?? "Learner could not be marked as enrolled.");
-      onEnrolled(payload.learner);
+      await enrolMutation.execute({
+        idempotencyKey: enrolmentKey, expectedActivityVersion: detail.activityVersion,
+        initialProgress: { updateDate: initialEvidence.updateDate, targetProgressPercentage: Number(initialEvidence.target), actualProgressPercentage: Number(initialEvidence.actual), summary: initialEvidence.summary },
+        firstReviewDate: initialEvidence.firstReviewDate, firstReviewerName: initialEvidence.firstReviewerName,
+      }, saved => onEnrolled(saved));
     } catch (enrolError) {
       setError(enrolError instanceof Error ? enrolError.message : "Learner could not be marked as enrolled.");
     } finally {
@@ -1327,6 +1251,7 @@ function PreEnrolmentWorkflow({ detail, onCancel, onSaved, onEnrolled }: { detai
 
   return (
     <section className="rounded-xl border border-[#102c3d]/[0.075] bg-white shadow-[0_18px_46px_rgba(16,44,61,0.07)]">
+      <ClientMutationRecovery mutation={saveMutation} /><ClientMutationRecovery mutation={enrolMutation} /><fieldset disabled={locked} className="min-w-0 border-0 p-0">
       <div className="flex flex-col gap-3 border-b border-[#102c3d]/[0.06] px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">Pre-enrolment workflow</p>
@@ -1446,6 +1371,14 @@ function PreEnrolmentWorkflow({ detail, onCancel, onSaved, onEnrolled }: { detai
           {error ? <p className="rounded-xl bg-[#fff0f2] px-4 py-3 text-sm font-semibold text-[#b13b51]">{error}</p> : null}
 
           <div className="rounded-xl border border-[#102c3d]/[0.075] bg-white p-4">
+            {readiness.readyForEnrolment ? <div className="mb-5 grid gap-3"><h4 className="font-semibold">Initial evidence and review plan</h4><p className="text-xs leading-5 text-[#102c3d]/60">Record the actual starting evidence. The provider review is scheduled, not marked complete.</p>
+              <FormField label="Initial progress date" type="date" value={initialEvidence.updateDate} onChange={(updateDate) => setInitialEvidence((value) => ({ ...value, updateDate }))} required />
+              <FormField label="Initial target progress (%)" type="number" value={initialEvidence.target} onChange={(target) => setInitialEvidence((value) => ({ ...value, target }))} required />
+              <FormField label="Initial actual progress (%)" type="number" value={initialEvidence.actual} onChange={(actual) => setInitialEvidence((value) => ({ ...value, actual }))} required />
+              <FormTextArea label="Initial progress evidence" value={initialEvidence.summary} onChange={(summary) => setInitialEvidence((value) => ({ ...value, summary }))} rows={3} required />
+              <FormField label="First provider review date" type="date" value={initialEvidence.firstReviewDate} onChange={(firstReviewDate) => setInitialEvidence((value) => ({ ...value, firstReviewDate }))} required />
+              <FormField label="Planned provider reviewer" value={initialEvidence.firstReviewerName} onChange={(firstReviewerName) => setInitialEvidence((value) => ({ ...value, firstReviewerName }))} required />
+            </div> : null}
             <button type="button" onClick={saveProgress} disabled={saving || enrolling} className="flex h-11 w-full items-center justify-center rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white transition hover:bg-[#17394d] disabled:cursor-not-allowed disabled:opacity-55">
               {saving ? "Saving progress" : "Save progress"}
             </button>
@@ -1456,9 +1389,11 @@ function PreEnrolmentWorkflow({ detail, onCancel, onSaved, onEnrolled }: { detai
           </div>
         </aside>
       </div>
-    </section>
+    </fieldset></section>
   );
 }
+
+function createEnrolmentRequestId() { return `enrol-${globalThis.crypto.randomUUID()}`; }
 
 function CompactSelect({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
   return (

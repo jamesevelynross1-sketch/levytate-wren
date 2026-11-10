@@ -3,6 +3,7 @@
 import { ArrowRight, Clock3, LoaderCircle } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { FormTextArea, MvpModal, MvpPanel, StatusBadge } from "@/components/levytate-mvp/MvpUi";
+import { useRetainedWorkspaceRequest } from "@/components/levytate-mvp/useRetainedWorkspaceRequest";
 import type {
   ManagerOperationalActionDetail,
   ManagerOperationalActionFilter,
@@ -20,6 +21,7 @@ const filters: Array<{ value: ManagerOperationalActionFilter; label: string; sum
 ];
 
 export function ManagerActionsHome({ kind = "manager_support" }: { kind?: ManagerOperationalActionKindFilter }) {
+  const retainedRequest = useRetainedWorkspaceRequest();
   const [filter, setFilter] = useState<ManagerOperationalActionFilter>("all");
   const [response, setResponse] = useState<ManagerOperationalActionsResponse | null>(null);
   const [selected, setSelected] = useState<ManagerOperationalActionDetail | null>(null);
@@ -33,7 +35,7 @@ export function ManagerActionsHome({ kind = "manager_support" }: { kind?: Manage
     setLoading(true);
     setError("");
     try {
-      const request = await fetch(`/api/levytate-manager/actions?status=${encodeURIComponent(nextFilter)}&kind=${encodeURIComponent(kind)}`, { cache: "no-store" });
+      const request = await retainedRequest(`/api/levytate-manager/actions?status=${encodeURIComponent(nextFilter)}&kind=${encodeURIComponent(kind)}`, { cache: "no-store" });
       const body = await request.json() as ManagerOperationalActionsResponse & { message?: string };
       if (!request.ok) throw new Error(body.message || "Your actions could not be loaded.");
       setResponse(body);
@@ -42,13 +44,13 @@ export function ManagerActionsHome({ kind = "manager_support" }: { kind?: Manage
     } finally {
       setLoading(false);
     }
-  }, [kind]);
+  }, [kind, retainedRequest]);
 
   const openAction = useCallback(async (actionId: string, updateUrl = true) => {
     setError("");
     setConfirmation("");
     try {
-      const request = await fetch(`/api/levytate-manager/actions/${encodeURIComponent(actionId)}`, { cache: "no-store" });
+      const request = await retainedRequest(`/api/levytate-manager/actions/${encodeURIComponent(actionId)}`, { cache: "no-store" });
       const body = await request.json() as { action?: ManagerOperationalActionDetail; message?: string };
       if (!request.ok || !body.action) throw new Error(body.message || "That action could not be opened.");
       setSelected(body.action);
@@ -57,7 +59,7 @@ export function ManagerActionsHome({ kind = "manager_support" }: { kind?: Manage
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "That action could not be opened.");
     }
-  }, []);
+  }, [retainedRequest]);
 
   useEffect(() => { void load(filter); }, [filter, load]);
 
@@ -78,7 +80,7 @@ export function ManagerActionsHome({ kind = "manager_support" }: { kind?: Manage
     setError("");
     setConfirmation("");
     try {
-      const request = await fetch(`/api/levytate-manager/actions/${encodeURIComponent(action.actionId)}/${command}`, {
+      const request = await retainedRequest(`/api/levytate-manager/actions/${encodeURIComponent(action.actionId)}/${command}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ expectedVersion: action.version, ...(command === "start" && note.trim() ? { note: note.trim() } : {}) }),

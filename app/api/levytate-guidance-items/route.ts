@@ -2,7 +2,8 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
 import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
-import type { GuidanceItem, GuidanceItemReviewStatus } from "@/lib/levytate/guidance/source-registry";
+import { ClientRequestError, readAuthenticatedJson } from "@/lib/server/levytate-request-boundary";
+import { guidanceItemPatch, guidanceItemSave, parseAction } from "@/lib/server/levytate-operational-input";
 import {
   GuidanceSourcePermissionError,
   getGuidanceItemsForSession,
@@ -25,11 +26,6 @@ export async function GET() {
   return NextResponse.json({ ok: true, registry: await getGuidanceItemsForSession(session) });
 }
 
-type PostBody = {
-  item?: GuidanceItem;
-  sourceIds?: string[];
-};
-
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session) {
@@ -37,7 +33,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const body = (await request.json()) as PostBody;
+    const body = parseAction(guidanceItemSave, await readAuthenticatedJson(request, session.email));
     if (!body.item || !Array.isArray(body.sourceIds)) {
       return NextResponse.json({ message: "Guidance item and source ids are required." }, { status: 400 });
     }
@@ -51,14 +47,6 @@ export async function POST(request: Request) {
   }
 }
 
-type PatchBody = {
-  id?: unknown;
-  patch?: {
-    reviewStatus?: GuidanceItemReviewStatus;
-    copilotApproved?: boolean;
-  };
-};
-
 export async function PATCH(request: Request) {
   const session = await getSession();
   if (!session) {
@@ -66,7 +54,7 @@ export async function PATCH(request: Request) {
   }
 
   try {
-    const body = (await request.json()) as PatchBody;
+    const body = parseAction(guidanceItemPatch, await readAuthenticatedJson(request, session.email));
     if (typeof body.id !== "string" || !body.id.trim()) {
       return NextResponse.json({ message: "Guidance item id is required." }, { status: 400 });
     }
@@ -81,12 +69,14 @@ export async function PATCH(request: Request) {
 }
 
 function getStatus(error: unknown) {
+  if (error instanceof ClientRequestError) return error.status;
   if (error instanceof GuidanceSourcePermissionError) return 403;
   if (error instanceof LevyTateSupabaseError) return 503;
   return 500;
 }
 
 function getMessage(error: unknown) {
-  if (error instanceof Error) return error.message;
+  if (error instanceof ClientRequestError) return error.message;
+  if (error instanceof GuidanceSourcePermissionError) return "Only an authorised administrator may update guidance.";
   return "Guidance items could not be updated.";
 }

@@ -103,7 +103,7 @@ export function parseDasCsv(csv: string, suppliedMapping?: DasColumnMapping): Da
     });
   });
   const dates = transactions.map((item) => item.transactionDate).sort();
-  return { headers, detectedMapping, needsMapping: false, transactions, issues, sourceRows: Math.max(0, table.length - 1), dateRange: dates.length ? { from: dates[0], to: dates.at(-1) as string } : null };
+  return { headers, detectedMapping, needsMapping: false, transactions, issues, sourceRows: table.slice(1).filter((row) => row.some((cell) => cell.trim())).length, dateRange: dates.length ? { from: dates[0], to: dates.at(-1) as string } : null };
 }
 
 export function sanitiseFinanceFileName(value: string) {

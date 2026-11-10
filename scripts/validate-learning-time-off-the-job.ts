@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   assessCandidateOffTheJobActivity,
@@ -79,7 +81,7 @@ const revisedTotals = calculateLearningTimeTotals({ individualMinimumMinutes: 20
 check("latest provider confirmation supersedes earlier totals without overwriting evidence", revisedTotals.providerConfirmedMinutes === 45 && revisedTotals.remainingMinutes === 155);
 
 check("Employee can read and write own Learning Time", hasMvpPermission("Employee", "learningTime:read") && hasMvpPermission("Employee", "learningTime:write") && !hasMvpPermission("Employee", "learningTime:manage"));
-check("Line Manager has read-only Learning Time permission", hasMvpPermission("Line Manager", "learningTime:read") && !hasMvpPermission("Line Manager", "learningTime:write"));
+check("Line Manager has no organisation-wide Learning Time write permission", hasMvpPermission("Line Manager", "learningTime:read") && !hasMvpPermission("Line Manager", "learningTime:write") && !hasMvpPermission("Line Manager", "learningTime:manage"));
 check("Apprenticeship Lead can manage Learning Time", hasMvpPermission("Apprenticeship Lead", "learningTime:manage"));
 check("Platform Admin cannot read employer learning evidence", !hasMvpPermission("Platform Admin", "learningTime:read"));
 check("navigation is hidden when capability is off", getCoreEarlyAccessPolicy("Apprenticeship Lead").modules.find((item) => item.moduleKey === "Learning Time")?.availability === "hidden");
@@ -114,7 +116,26 @@ check("writes resolve organisation and employee scope server-side", server.inclu
 check("assistant cannot override deterministic ineligibility", assistant.includes('authoritative.assessment === "likely_ineligible"') && assistant.includes("return authoritative"));
 check("AI planning may reference only existing bounded priority IDs", assistant.includes("allowedPriorityIds.has(id)"));
 check("assistant planning returns no more than three suggestions", assistant.includes("slice(0, 3)"));
-check("private learner drafts stay out of employer and manager workspaces", server.includes('role === "Employee" || activity.status !== "draft"'));
+// Exercise the real service projection and rendered controls with fictional
+// transport. This supplements the separate PostgreSQL/Auth acceptance evidence;
+// an exact source fragment cannot prove the scoped Manager-own exception.
+const privacyDirectory = mkdtempSync(join(tmpdir(), "levytate-learning-time-validation-"));
+let privacyResults: { numPendingTests?: number; testResults?: Array<{ assertionResults?: Array<{ title: string; status: string }> }> };
+try {
+  const reportPath = join(privacyDirectory, "results.json");
+  const privacyRun = spawnSync(process.execPath, [join(root, "node_modules/vitest/vitest.mjs"), "run", "tests/manager-learning-time.test.ts", "--reporter=json", `--outputFile=${reportPath}`], { cwd: root, encoding: "utf8", timeout: 60_000 });
+  assert.equal(privacyRun.status, 0, "Manager-own Learning Time behavioural suite failed; run tests/manager-learning-time.test.ts for details");
+  privacyResults = JSON.parse(readFileSync(reportPath, "utf8"));
+} finally {
+  rmSync(privacyDirectory, { recursive: true, force: true });
+}
+const privacyAssertions = privacyResults.testResults?.flatMap(result => result.assertionResults ?? []) ?? [];
+check("Manager sees only current own drafts; report drafts and retired bindings stay hidden from Manager and Lead oversight", privacyResults.numPendingTests === 0 && [
+  "includes the exact own learner alongside reports, never the first People row or unrelated learner",
+  "renders own capture controls and read-only report controls using the selected learner, not a workspace-wide write flag",
+  "preserves Lead oversight while withholding every private draft",
+  "does not use manager visibility to write a report's draft",
+].every(title => privacyAssertions.some(result => result.title === title && result.status === "passed")));
 check("inactivity attention is suppressed during a break", server.includes("if (!activeBreak && plan)"));
 check("Production capability is fail-closed", capability.includes('process.env.VERCEL_ENV === "production"'));
 check("assistant exposes the three apprentice-facing entry choices", ["Does this count?", "Plan my learning time", "Help me write it up"].every((label) => learningTimeUi.includes(label)));

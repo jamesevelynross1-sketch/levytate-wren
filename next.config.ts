@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   distDir: ".next",
+  // A nested engineering worktree is still one standalone application. Do not
+  // infer a user's home directory from an unrelated parent lockfile.
+  outputFileTracingRoot: __dirname,
   async headers() {
     return [
       {
