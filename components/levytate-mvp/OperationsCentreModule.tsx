@@ -53,6 +53,7 @@ export function OperationsCentreModule({ onOpenLearner, onSignalContext }: { onO
   const [assignment, setAssignment] = useState<"all" | "mine" | "unassigned" | "shared">("all");
   const [moreFilters, setMoreFilters] = useState(false);
   const [selectedActionId, setSelectedActionId] = useState("");
+  const [intelligenceLocked, setIntelligenceLocked] = useState(false);
   const [workspaceView, setWorkspaceView] = useState<"autopilot" | "active" | "closed">("autopilot");
   const [refreshKey, setRefreshKey] = useState(0);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({ urgent: true, ready_to_enrol: true });
@@ -121,7 +122,7 @@ export function OperationsCentreModule({ onOpenLearner, onSignalContext }: { onO
   }
 
   if (workspaceView === "autopilot") {
-    return <div className="grid min-w-0 gap-4"><OperationsModeTabs value={workspaceView} onChange={setWorkspaceView} /><AutopilotOperationsPanel onOpenAction={setSelectedActionId} /></div>;
+    return <div className="grid min-w-0 gap-4"><fieldset disabled={intelligenceLocked} className="min-w-0"><OperationsModeTabs value={workspaceView} onChange={setWorkspaceView} /></fieldset><AutopilotOperationsPanel onOpenAction={setSelectedActionId} onLockedChange={setIntelligenceLocked} /></div>;
   }
 
   if (workspaceView === "closed") {
@@ -130,10 +131,10 @@ export function OperationsCentreModule({ onOpenLearner, onSignalContext }: { onO
 
   return (
     <>
-    <fieldset disabled={mutation.locked} className="min-w-0">
+    <fieldset disabled={mutation.locked || intelligenceLocked} className="min-w-0"><OperationsModeTabs value={workspaceView} onChange={setWorkspaceView} /></fieldset>
+    <fieldset disabled={mutation.locked} className="min-w-0"><ProgressReviewIntelligencePanel enabled={Boolean(meta?.storageMode === "supabase")} onSignalContext={onSignalContext} onLockedChange={setIntelligenceLocked} onOpenAction={setSelectedActionId} /></fieldset>
+    <fieldset disabled={mutation.locked || intelligenceLocked} className="min-w-0">
     <div className="grid min-w-0 gap-5" data-testid="operations-centre">
-      <OperationsModeTabs value={workspaceView} onChange={setWorkspaceView} />
-      <ProgressReviewIntelligencePanel enabled={Boolean(meta?.storageMode === "supabase")} onSignalContext={onSignalContext} />
       <section>
         <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
           <div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">Daily learner operations</p><h2 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-[#102c3d]">Operational status</h2></div>

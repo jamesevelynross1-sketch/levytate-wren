@@ -1,17 +1,15 @@
 "use client";
 
 import { ArrowRight, Bot, CheckCircle2, ChevronDown, ExternalLink, RefreshCw, Sparkles, X } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
-import type { AutopilotLane, AutopilotPersistedSignal } from "@/lib/levytate/autopilot/operations-autopilot";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { AutopilotLane } from "@/lib/levytate/autopilot/operations-autopilot";
 import type { OperationalOwnerType } from "@/lib/levytate/mvp/operations-centre";
 
-type Workspace = {
-  generatedAt: string;
-  analyserVersion: string;
-  brief: { actionNow: number; thisWeek: number; upcoming: number; waitingExternally: number; preparedNextActions: number; total: number };
-  lanes: Record<AutopilotLane, AutopilotPersistedSignal[]>;
-};
-type ApiResponse = { ok?: boolean; message?: string; workspace?: Workspace; operationalActionId?: string };
+import { useRetainedWorkspaceRequest } from "@/components/levytate-mvp/useRetainedWorkspaceRequest";
+import { useOperationsClientCommand } from "@/components/levytate-mvp/useOperationsClientCommand";
+import { OperationsReadbackRecovery } from "@/components/levytate-mvp/OperationsReadbackRecovery";
+import { ClientMutationRecovery } from "@/components/levytate-mvp/ClientMutationRecovery";
+import { decodeAutopilotRead, decodeAutopilotMutation, type ClientAutopilotSignal as AutopilotPersistedSignal, type ClientAutopilotWorkspace as Workspace } from "@/lib/levytate/intelligence-client-response";
 
 const laneOrder: AutopilotLane[] = ["needs_your_decision", "ready_to_action", "waiting_externally", "upcoming", "recently_resolved"];
 const laneCopy: Record<AutopilotLane, { title: string; description: string }> = {
@@ -23,73 +21,98 @@ const laneCopy: Record<AutopilotLane, { title: string; description: string }> = 
 };
 const ownerOptions: OperationalOwnerType[] = ["Apprenticeship Lead", "Line Manager", "Provider", "Employee", "HR", "Shared"];
 
-export function AutopilotOperationsPanel({ onOpenAction }: { onOpenAction: (actionId: string) => void }) {
+export function AutopilotOperationsPanel({ onOpenAction, onLockedChange }: { onOpenAction: (actionId: string) => void; onLockedChange?: (locked: boolean) => void }) {
+  const request = useRetainedWorkspaceRequest();
+  const mutation = useOperationsClientCommand();
+  const scope = mutation.scope;
+  const [readbackRequired, setReadbackRequired] = useState(false);
+  const confirmedRevision = useRef(0);
+  const locked = mutation.locked || readbackRequired;
+  useEffect(() => { onLockedChange?.(locked); return () => onLockedChange?.(false); }, [locked, onLockedChange]);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [selected, setSelected] = useState<AutopilotPersistedSignal | null>(null);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const refreshing = mutation.working;
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try {
-      const response = await fetch("/api/levytate-autopilot", { cache: "no-store" });
-      const payload = await response.json() as ApiResponse;
-      if (!response.ok || !payload.workspace) throw new Error(payload.message ?? "Operations Autopilot is unavailable.");
-      setWorkspace(payload.workspace);
+      const response = await request("/api/levytate-autopilot", { cache: "no-store" });
+      if (!response.ok) throw new Error("Operations Autopilot is unavailable.");
+      const next = decodeAutopilotRead(await response.json(), scope);
+      if (next.revision < confirmedRevision.current) throw new Error("The latest saved intelligence has not been returned yet.");
+      setWorkspace(next); setReadbackRequired(false);
     } catch (loadError) { setError(loadError instanceof Error ? loadError.message : "Operations Autopilot is unavailable."); }
     finally { setLoading(false); }
-  }, []);
+  }, [request, scope]);
 
   useEffect(() => { void load(); }, [load]);
 
   async function refresh() {
-    setRefreshing(true); setError("");
+    setError("");
+    const command = { action: "refresh" as const, idempotencyKey: crypto.randomUUID() };
+    try { await mutation.execute("/api/levytate-autopilot", command, value => decodeAutopilotMutation(value, scope, command), result => { confirmedRevision.current = result.workspace.revision; setWorkspace(result.workspace); setReadbackRequired(true); void load(); }); }
+    catch { /* Keep the exact refresh command until its receipt is confirmed. */ }
+  }
+
+  async function decide(signal: AutopilotPersistedSignal, action: "create_action" | "dismiss", fields: Record<string, unknown>) {
+    const command = { ...fields, action, signalId: signal.id, expectedRevision: signal.revision, idempotencyKey: crypto.randomUUID() };
     try {
-      const payload = await mutate({ action: "refresh" });
-      if (payload.workspace) setWorkspace(payload.workspace);
-    } catch (refreshError) { setError(refreshError instanceof Error ? refreshError.message : "The intelligence refresh could not be completed."); }
-    finally { setRefreshing(false); }
+      await mutation.execute("/api/levytate-autopilot", command, value => decodeAutopilotMutation(value, scope, command), result => {
+        confirmedRevision.current = result.workspace.revision; setWorkspace(result.workspace); setSelected(null);
+        if (result.operationalActionId) onOpenAction(result.operationalActionId);
+        else { setReadbackRequired(true); void load(); }
+      });
+    } catch { /* The drawer inputs and original command remain unchanged. */ }
   }
 
   const visibleTotal = workspace ? laneOrder.reduce((total, lane) => total + workspace.lanes[lane].length, 0) : 0;
 
   if (loading && !workspace) return <AutopilotSkeleton />;
   return (
+    <>
+    <fieldset disabled={locked || loading} onClickCapture={event => { if (locked && event.target instanceof Element && event.target.closest("a")) event.preventDefault(); }} className="min-w-0">
     <div className="grid min-w-0 gap-5" data-testid="operations-autopilot">
       <section className="overflow-hidden rounded-2xl border border-[#102c3d]/[0.08] bg-[#102c3d] text-white shadow-[0_18px_42px_rgba(16,44,61,0.12)]">
         <div className="grid gap-5 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
           <div className="max-w-2xl">
             <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#76d2c2]"><Sparkles size={13} />Autopilot</p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-[-0.025em]">Your apprenticeship operation, continuously monitored.</h2>
-            <p className="mt-2 text-sm leading-6 text-white/65"><strong className="font-semibold text-white">Operations brief:</strong> {workspace ? `${workspace.brief.total} item${workspace.brief.total === 1 ? "" : "s"} need attention. Autopilot has prepared ${workspace.brief.preparedNextActions} next action${workspace.brief.preparedNextActions === 1 ? "" : "s"} for review.` : "LevyTate checks persisted operational evidence. You decide whether a suggestion becomes an action."}</p>
+            <h2 className="mt-2 text-2xl font-semibold tracking-[-0.025em]">Review your apprenticeship operation.</h2>
+            <p className="mt-2 text-sm leading-6 text-white/65"><strong className="font-semibold text-white">Operations brief:</strong> {workspace?.checked ? `${workspace.brief.total} item${workspace.brief.total === 1 ? "" : "s"} need attention. Autopilot has prepared ${workspace.brief.preparedNextActions} next action${workspace.brief.preparedNextActions === 1 ? "" : "s"} for review.` : "Run an intelligence check to review the current operational evidence. Suggestions require your approval."}</p>
           </div>
-          <button type="button" onClick={refresh} disabled={refreshing} className="inline-flex h-10 w-fit items-center justify-center gap-2 rounded-full bg-[#23aa97] px-4 text-xs font-semibold text-white transition hover:bg-[#199684] disabled:cursor-wait disabled:opacity-65">
+          <button type="button" onClick={refresh} disabled={locked} className="inline-flex h-10 w-fit items-center justify-center gap-2 rounded-full bg-[#23aa97] px-4 text-xs font-semibold text-white transition hover:bg-[#199684] disabled:cursor-wait disabled:opacity-65">
             <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />{refreshing ? "Refreshing…" : "Refresh intelligence"}
           </button>
         </div>
-        {workspace ? <div className="grid border-t border-white/10 sm:grid-cols-2 lg:grid-cols-4">{[
+        {workspace?.checked ? <div className="grid border-t border-white/10 sm:grid-cols-2 lg:grid-cols-4">{[
           ["Action now", workspace.brief.actionNow], ["This week", workspace.brief.thisWeek], ["Upcoming", workspace.brief.upcoming], ["Waiting externally", workspace.brief.waitingExternally],
         ].map(([label, value]) => <div key={label} className="border-b border-white/10 px-5 py-4 last:border-b-0 sm:border-r lg:border-b-0"><strong className="block text-2xl font-semibold">{value}</strong><span className="mt-1 block text-[11px] font-semibold uppercase tracking-[0.11em] text-white/48">{label}</span></div>)}</div> : null}
       </section>
 
       {error ? <div role="alert" className="rounded-xl border border-[#b13b51]/15 bg-[#fff0f2] px-4 py-3 text-sm font-semibold text-[#b13b51]">{error}</div> : null}
 
-      {workspace && visibleTotal === 0 ? (
+      {workspace?.checked && visibleTotal === 0 ? (
         <section className="rounded-2xl border border-[#159b8f]/15 bg-[#f4fbf8] px-6 py-12 text-center">
           <CheckCircle2 className="mx-auto text-[#159b8f]" size={30} />
-          <h3 className="mt-3 text-lg font-semibold text-[#102c3d]">Nothing needs attention right now</h3>
-          <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[#102c3d]/55">Autopilot is monitoring applications, learners, reviews and operational actions.</p>
+          <h3 className="mt-3 text-lg font-semibold text-[#102c3d]">No items needed attention at the last check</h3>
+          <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[#102c3d]/55">No items needed attention at the last completed check. Refresh intelligence to check current evidence.</p>
         </section>
       ) : null}
 
-      {workspace ? <div className="grid gap-4">{laneOrder.map((lane) => (
+      {workspace && !workspace.checked ? <p role="status" className="rounded-xl bg-[#f8fbfa] p-4 text-sm text-[#102c3d]/65">Intelligence has not been checked yet. Select Refresh intelligence to run the first check.</p> : null}
+      {error ? <button type="button" onClick={() => void load()} className="min-h-10 text-sm font-semibold text-[#0b6f63]">Try loading again</button> : null}
+      {workspace && (workspace.checked || visibleTotal > 0) ? <div className="grid gap-4">{laneOrder.map((lane) => (
         <AutopilotLaneSection key={lane} lane={lane} signals={workspace.lanes[lane]} onReview={setSelected} onOpenAction={onOpenAction} />
       ))}</div> : null}
 
       {workspace?.generatedAt ? <p className="text-right text-[11px] font-medium text-[#102c3d]/40">Last evaluated {formatDateTime(workspace.generatedAt)} · deterministic rules with constrained interpretation</p> : null}
-      {selected ? <ActionReviewDrawer signal={selected} onClose={() => setSelected(null)} onChanged={(next, actionId) => { setWorkspace(next); setSelected(null); if (actionId) onOpenAction(actionId); }} /> : null}
+      {selected ? <ActionReviewDrawer signal={selected} saving={locked} onClose={() => { if (!locked) setSelected(null); }} onSubmit={(action, fields) => decide(selected, action, fields)} /> : null}
     </div>
+    </fieldset>
+    <ClientMutationRecovery mutation={mutation} />
+    <OperationsReadbackRecovery required={readbackRequired} loading={loading} retry={() => void load()} />
+    </>
   );
 }
 
@@ -125,23 +148,15 @@ function SignalRow({ signal, onReview, onOpenAction }: { signal: AutopilotPersis
   );
 }
 
-function ActionReviewDrawer({ signal, onClose, onChanged }: { signal: AutopilotPersistedSignal; onClose: () => void; onChanged: (workspace: Workspace, actionId?: string) => void }) {
+function ActionReviewDrawer({ signal, saving, onClose, onSubmit }: { signal: AutopilotPersistedSignal; saving: boolean; onClose: () => void; onSubmit: (action: "create_action" | "dismiss", fields: Record<string, unknown>) => Promise<void> }) {
   const [title, setTitle] = useState(signal.interpretation.headline);
   const [ownerType, setOwnerType] = useState<OperationalOwnerType>(signal.suggestedOwnerType);
   const [dueDate, setDueDate] = useState(signal.suggestedDueDate);
   const [communicationDraft, setCommunicationDraft] = useState(signal.interpretation.draftCommunication);
   const [dismissalReason, setDismissalReason] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
 
   async function submit(action: "create_action" | "dismiss") {
-    setSaving(true); setError("");
-    try {
-      const payload = await mutate(action === "dismiss" ? { action, signalId: signal.id, reason: dismissalReason } : { action, signalId: signal.id, title, ownerType, dueDate, communicationDraft });
-      if (!payload.workspace) throw new Error("The updated Autopilot workspace was not returned.");
-      onChanged(payload.workspace, payload.operationalActionId);
-    } catch (submitError) { setError(submitError instanceof Error ? submitError.message : "The signal could not be updated."); }
-    finally { setSaving(false); }
+    await onSubmit(action, action === "dismiss" ? { reason: dismissalReason } : { title, ownerType, dueDate, communicationDraft });
   }
 
   return <div className="fixed inset-0 z-[80] bg-[#081d29]/30 backdrop-blur-[2px]" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
@@ -152,7 +167,6 @@ function ActionReviewDrawer({ signal, onClose, onChanged }: { signal: AutopilotP
         <div className="rounded-xl bg-[#f4f8f6] p-4"><h4 className="text-sm font-semibold text-[#102c3d]">{signal.interpretation.headline}</h4><p className="mt-2 text-sm leading-6 text-[#102c3d]/60">{signal.interpretation.whyItMatters}</p><p className="mt-3 text-sm leading-6 text-[#102c3d]/60"><strong className="font-semibold text-[#102c3d]/75">Suggested next step:</strong> {signal.interpretation.suggestedNextStep}</p></div>
         <section className="mt-5"><h4 className="text-[10px] font-semibold uppercase tracking-[0.11em] text-[#102c3d]/45">Evidence</h4><div className="mt-2 grid gap-2">{signal.evidence.map((item) => <a key={`${item.sourceType}:${item.sourceId}`} href={item.url} className="flex items-center justify-between gap-3 rounded-xl border border-[#102c3d]/[0.08] px-3 py-3 text-sm text-[#102c3d]/65 hover:bg-[#f8fbfa]"><span><strong className="font-semibold text-[#102c3d]">{item.label}</strong><span className="ml-2 text-xs">{item.value}</span></span><ExternalLink size={13} className="shrink-0" /></a>)}</div></section>
         <div className="mt-5 grid gap-4"><Field label="Action title"><input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={160} className={inputClass} /></Field><div className="grid gap-4 sm:grid-cols-2"><Field label="Owner"><select value={ownerType} onChange={(event) => setOwnerType(event.target.value as OperationalOwnerType)} className={inputClass}>{ownerOptions.map((option) => <option key={option}>{option}</option>)}</select></Field><Field label="Due date"><input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} className={inputClass} /></Field></div><Field label="Communication draft (not sent)"><textarea value={communicationDraft} onChange={(event) => setCommunicationDraft(event.target.value)} rows={5} maxLength={1000} placeholder="Optional draft for a human to review and use later." className={`${inputClass} h-auto py-3`} /></Field><Field label="Dismissal reason"><input value={dismissalReason} onChange={(event) => setDismissalReason(event.target.value)} maxLength={240} placeholder="Required only when dismissing" className={inputClass} /></Field></div>
-        {error ? <p className="mt-4 rounded-lg bg-[#fff0f2] px-3 py-2 text-sm font-semibold text-[#b13b51]" role="alert">{error}</p> : null}
       </div>
       <div className="flex flex-wrap justify-end gap-2 border-t border-[#102c3d]/[0.07] px-5 py-4 sm:px-6"><button type="button" onClick={onClose} className="h-10 rounded-full px-4 text-xs font-semibold text-[#102c3d]/55">Cancel</button><button type="button" onClick={() => void submit("dismiss")} disabled={saving || !dismissalReason.trim()} className="h-10 rounded-full border border-[#102c3d]/10 px-4 text-xs font-semibold text-[#102c3d]/62 disabled:opacity-40">Dismiss</button><button type="button" onClick={() => void submit("create_action")} disabled={saving || !title.trim()} className="h-10 rounded-full bg-[#0b6f63] px-5 text-xs font-semibold text-white disabled:opacity-50">{saving ? "Saving…" : "Create action"}</button></div>
     </aside>
@@ -162,7 +176,7 @@ function ActionReviewDrawer({ signal, onClose, onChanged }: { signal: AutopilotP
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="grid gap-1.5"><span className="text-[10px] font-semibold uppercase tracking-[0.11em] text-[#102c3d]/45">{label}</span>{children}</label>; }
 function PriorityBadge({ priority }: { priority: AutopilotPersistedSignal["priority"] }) { const label = priority === "action_now" ? "Action now" : priority === "this_week" ? "This week" : "Upcoming"; const style = priority === "action_now" ? "bg-[#fff0f2] text-[#b13b51]" : priority === "this_week" ? "bg-[#fff8df] text-[#8d6810]" : "bg-[#edf5f8] text-[#3f6f88]"; return <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${style}`}>{label}</span>; }
 function AutopilotSkeleton() { return <div className="grid animate-pulse gap-4" aria-label="Loading Operations Autopilot"><div className="h-48 rounded-2xl bg-[#102c3d]/10" />{[1,2,3].map((item) => <div key={item} className="h-24 rounded-2xl bg-[#102c3d]/[0.05]" />)}</div>; }
-async function mutate(body: Record<string, unknown>) { const response = await fetch("/api/levytate-autopilot", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); const payload = await response.json() as ApiResponse; if (!response.ok) throw new Error(payload.message ?? "The Autopilot action could not be completed."); return payload; }
+
 const inputClass = "h-11 w-full rounded-xl border border-[#102c3d]/10 bg-white px-3 text-sm text-[#102c3d] outline-none focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10";
 function formatDate(value: string) { return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" }).format(new Date(`${value.slice(0,10)}T12:00:00Z`)); }
 function formatDateTime(value: string) { return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(value)); }

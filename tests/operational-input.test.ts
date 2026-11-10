@@ -25,8 +25,8 @@ describe("operational action schemas", () => {
   it("accepts the current UI shapes and preserves decision text", () => {
     expect(parseAction(operationalActionInput, { command: "complete", expectedVersion: 2, completionNote: "Fictional completion", resolvedOutsideLevyTate: false })).toMatchObject({ completionNote: "Fictional completion" });
     expect(parseAction(managerStartInput, { expectedVersion: 0, note: "Fictional manager note" })).toMatchObject({ expectedVersion: 0 });
-    expect(parseAction(autopilotActionInput, { action: "refresh" })).toEqual({ action: "refresh" });
-    expect(parseAction(intelligenceActionInput, { action: "dismiss", signalId: "signal-1", reason: "Already resolved" })).toMatchObject({ signalId: "signal-1" });
+    expect(parseAction(autopilotActionInput, { action: "refresh", idempotencyKey: "10000000-0000-4000-8000-000000000001" })).toEqual({ action: "refresh", idempotencyKey: "10000000-0000-4000-8000-000000000001" });
+    expect(parseAction(intelligenceActionInput, { action: "dismiss", signalId: "signal-1", reason: "Already resolved", idempotencyKey: "10000000-0000-4000-8000-000000000001", expectedRevision: 1 })).toMatchObject({ signalId: "signal-1" });
   });
   it.each([
     { command: "complete", expectedVersion: 1, actorUserId: "another-user" },
@@ -40,10 +40,24 @@ describe("operational action schemas", () => {
   ])("rejects forged or invalid operational input %j", (body) => { expect(() => parseAction(operationalActionInput, body)).toThrow(); });
   it("rejects unsupported fields on every smaller action contract", () => {
     expect(() => parseAction(managerAcknowledgeInput, { expectedVersion: 0, note: "not supported" })).toThrow();
-    expect(() => parseAction(intelligenceActionInput, { action: "analyse", signalId: "not supported" })).toThrow();
-    expect(() => parseAction(autopilotActionInput, { action: "refresh", organisationId: "another-tenant" })).toThrow();
+    expect(() => parseAction(intelligenceActionInput, { action: "analyse", idempotencyKey: "10000000-0000-4000-8000-000000000001", signalId: "not supported" })).toThrow();
+    expect(() => parseAction(autopilotActionInput, { action: "refresh", idempotencyKey: "10000000-0000-4000-8000-000000000001", organisationId: "another-tenant" })).toThrow();
     expect(() => parseAction(prospectActionInput, { operation: "complete_guidance", accessId: "another-tenant" })).toThrow();
     expect(() => parseAction(guidanceItemPatch, { id: "item", patch: { copilotApproved: "yes" } })).toThrow();
     expect(() => parseAction(guidanceSourcePatch, { id: "source", patch: { sourceUrl: "https://attacker.invalid" } })).toThrow();
+  });
+});
+
+
+describe("Intelligence command identity and revision boundaries", () => {
+  const idempotencyKey = "10000000-0000-4000-8000-000000000001";
+  const decision = { action: "accept", idempotencyKey, signalId: "signal-a", expectedRevision: 2 };
+  it.each([{ expectedRevision: "2" }, { expectedRevision: 0.5 }, { expectedRevision: -1 }, { expectedRevision: Number.MAX_SAFE_INTEGER + 1 }, { idempotencyKey: "not-a-uuid" }, { idempotencyKey: undefined }, { expectedRevision: undefined }, { organisationId: "foreign" }, { actorId: "foreign" }])("rejects an unsafe decision %j", change => {
+    expect(() => parseAction(intelligenceActionInput, { ...decision, ...change })).toThrow();
+  });
+  it("bounds editable Autopilot fields and validates real calendar dates", () => {
+    const body = { action: "create_action", idempotencyKey, signalId: "signal-a", expectedRevision: 2, title: "Fictional action", ownerType: "Line Manager", dueDate: "2026-11-11", communicationDraft: "" };
+    expect(parseAction(autopilotActionInput, body)).toEqual(body);
+    for (const change of [{ title: "" }, { title: "x".repeat(161) }, { communicationDraft: "x".repeat(1001) }, { ownerType: "Platform Admin" }, { dueDate: "2026-02-30" }, { dueDate: "not-a-date" }]) expect(() => parseAction(autopilotActionInput, { ...body, ...change })).toThrow();
   });
 });

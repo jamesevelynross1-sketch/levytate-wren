@@ -1,63 +1,91 @@
 "use client";
 
 import { ArrowRight, CheckCircle2, Eye, Lightbulb, ShieldAlert, TrendingDown, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
+import { OperationsReadbackRecovery } from "@/components/levytate-mvp/OperationsReadbackRecovery";
+import { ClientMutationRecovery } from "@/components/levytate-mvp/ClientMutationRecovery";
+import { useOperationsClientCommand } from "@/components/levytate-mvp/useOperationsClientCommand";
+import { decodeIntelligenceRead, decodeIntelligenceAnalysis, decodeIntelligenceDecision, type ClientIntelligenceSignal } from "@/lib/levytate/intelligence-client-response";
 import { useRetainedWorkspaceRequest } from "@/components/levytate-mvp/useRetainedWorkspaceRequest";
 import { SemanticStatus, type OperationalTone } from "@/components/levytate-mvp/OperationalVisuals";
 import { type IntelligenceDismissalReason, type IntelligenceSignal } from "@/lib/levytate/intelligence/progress-review";
 
 const dismissalReasons: IntelligenceDismissalReason[] = ["Already resolved", "Incorrect interpretation", "No action required", "Planned intervention already exists", "Other"];
 
-export function ProgressReviewIntelligencePanel({ enabled, onSignalContext }: { enabled: boolean; onSignalContext?: (signal: IntelligenceSignal | null) => void }) {
+export function ProgressReviewIntelligencePanel({ enabled, onSignalContext, onLockedChange, onOpenAction }: { enabled: boolean; onSignalContext?: (signal: IntelligenceSignal | null) => void; onLockedChange?: (locked: boolean) => void; onOpenAction?: (actionId: string) => void }) {
   const { data } = useMvpWorkspace();
   const request = useRetainedWorkspaceRequest();
-  const [signals, setSignals] = useState<IntelligenceSignal[]>([]);
-  const [selected, setSelected] = useState<IntelligenceSignal | null>(null);
+  const mutation = useOperationsClientCommand();
+  const scope = mutation.scope;
+  const [readbackRequired, setReadbackRequired] = useState(false);
+  const confirmedRevision = useRef(0);
+  const confirmedSignals = useRef(new Map<string, number>());
+  const locked = mutation.locked || readbackRequired;
+  const [checked, setChecked] = useState(false);
+  const [lastAnalysedAt, setLastAnalysedAt] = useState<string | null>(null);
+  useEffect(() => { onLockedChange?.(locked); return () => onLockedChange?.(false); }, [locked, onLockedChange]);
+  const [signals, setSignals] = useState<ClientIntelligenceSignal[]>([]);
+  const [selected, setSelected] = useState<ClientIntelligenceSignal | null>(null);
   const [dismissalReason, setDismissalReason] = useState<IntelligenceDismissalReason>("No action required");
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState("");
   const scenarioNames = useMemo(() => new Map(data.learnerRecords.map((record) => [record.id, data.employees.find((employee) => employee.id === record.employeeId)?.name ?? "Learner"])), [data.employees, data.learnerRecords]);
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!enabled) return;
-    let cancelled = false;
-    setLoading(true);
-    void request("/api/levytate-intelligence/signals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "analyse" }) })
-      .then(async (response) => {
-        const body = await response.json() as { signals?: IntelligenceSignal[]; message?: string };
-        if (!response.ok) throw new Error(body.message || "Intelligence refresh failed.");
-        if (!cancelled) setSignals(body.signals ?? []);
-      })
-      .catch(() => { if (!cancelled) setError("Intelligence signals could not be refreshed safely."); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [enabled, request]);
+    setLoading(true); setError("");
+    try {
+      const response = await request("/api/levytate-intelligence/signals", { cache: "no-store" });
+      if (!response.ok) throw new Error("Intelligence signals could not be loaded safely.");
+      const result = decodeIntelligenceRead(await response.json(), scope);
+      if (result.revision < confirmedRevision.current || result.signals.some(signal => signal.revision < (confirmedSignals.current.get(signal.id) ?? 0))) throw new Error("The latest saved Intelligence state has not been returned yet.");
+      setSignals(result.signals); setChecked(result.checked); setLastAnalysedAt(result.lastAnalysedAt);
+      setSelected(current => current ? result.signals.find(signal => signal.id === current.id) ?? null : null);
+      setReadbackRequired(false);
+    } catch { setError("Intelligence signals could not be loaded safely. Try loading again."); }
+    finally { setLoading(false); }
+  }, [enabled, request, scope]);
+  useEffect(() => { void load(); }, [load]);
   if (!enabled) return null;
 
-  const open = (signal: IntelligenceSignal) => { setSelected(signal); setNotice(""); };
-  const close = () => { setSelected(null); setNotice(""); };
-  async function update(signal: IntelligenceSignal, action: "acknowledge" | "dismiss" | "accept", reason?: IntelligenceDismissalReason) {
+  const open = (signal: ClientIntelligenceSignal) => { if (!locked) { setSelected(signal); setNotice(""); } };
+  const close = () => { if (!locked) { setSelected(null); setNotice(""); } };
+  async function analyse() {
     setError("");
+    const command = { action: "analyse" as const, idempotencyKey: crypto.randomUUID() };
     try {
-      const response = await request("/api/levytate-intelligence/signals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, signalId: signal.id, reason }) });
-      const body = await response.json() as { signal?: IntelligenceSignal; message?: string };
-      if (!response.ok || !body.signal) { setError(body.message || "The signal could not be updated."); return; }
-      setSignals((current) => body.signal?.status === "dismissed" ? current.filter((item) => item.id !== signal.id) : current.map((item) => item.id === signal.id ? body.signal! : item));
-      setSelected(body.signal);
-      if (action === "accept") onSignalContext?.(body.signal);
-      setNotice(action === "accept" ? "Operational action created." : action === "acknowledge" ? "Signal acknowledged for human follow-up." : "Signal dismissed with its reason recorded.");
-      if (action === "dismiss") close();
-    } catch { setError("The signal update could not be confirmed. Your selection is retained; reload to verify the current account and result."); }
+      await mutation.execute("/api/levytate-intelligence/signals", command, value => decodeIntelligenceAnalysis(value, scope, command), result => {
+        confirmedRevision.current = result.revision;
+        setSignals(result.signals); setChecked(result.checked); setLastAnalysedAt(result.lastAnalysedAt);
+        setReadbackRequired(true); void load();
+      });
+    } catch { /* A failed analysis remains an exact original command, including its receipt key. */ }
+  }
+  async function update(signal: ClientIntelligenceSignal, action: "acknowledge" | "dismiss" | "accept", reason?: IntelligenceDismissalReason) {
+    setError("");
+    const command = { action, signalId: signal.id, expectedRevision: signal.revision, idempotencyKey: crypto.randomUUID(), ...(action === "dismiss" ? { reason } : {}) };
+    try {
+      await mutation.execute("/api/levytate-intelligence/signals", command, value => decodeIntelligenceDecision(value, scope, command), next => {
+        confirmedSignals.current.set(next.id, next.revision); setReadbackRequired(true);
+        setSignals(current => next.status === "dismissed" ? current.filter(item => item.id !== signal.id) : current.map(item => item.id === signal.id ? next : item));
+        setSelected(next.status === "dismissed" ? null : next);
+        if (action === "accept") onSignalContext?.(next);
+        void load();
+        setNotice(action === "accept" ? "Operational action created." : action === "acknowledge" ? "Signal acknowledged for human follow-up." : "Signal dismissed with its reason recorded.");
+      });
+    } catch { /* Do not close the review or clear its original selection before confirmation. */ }
   }
   const visibleSignals = signals.filter((signal) => !["dismissed", "resolved"].includes(signal.status)).slice(0, 4);
   const primary = visibleSignals[0];
 
-  return <section className="border-l-2 border-[#159b8f] bg-[#f4fbf8] px-5 py-5 sm:px-6" aria-labelledby="levytate-intelligence-title" data-testid="progress-review-intelligence">
+  return <>
+    <fieldset disabled={locked || loading} className="min-w-0">
+    <section className="border-l-2 border-[#159b8f] bg-[#f4fbf8] px-5 py-5 sm:px-6" aria-labelledby="levytate-intelligence-title" data-testid="progress-review-intelligence">
     <div className="flex flex-wrap items-end justify-between gap-3">
-      <div><p className="text-[10px] font-semibold uppercase tracking-[.14em] text-[#0b6f63]">LevyTate Intelligence</p><h2 id="levytate-intelligence-title" className="mt-1 text-xl font-semibold tracking-[-.02em] text-[#102c3d]">{loading ? "Reviewing live learner evidence" : `LevyTate found ${visibleSignals.length} things worth your attention`}</h2></div>
-      <p className="text-xs font-semibold text-[#102c3d]/[0.48]">Human review required</p>
+      <div><p className="text-[10px] font-semibold uppercase tracking-[.14em] text-[#0b6f63]">LevyTate Intelligence</p><h2 id="levytate-intelligence-title" className="mt-1 text-xl font-semibold tracking-[-.02em] text-[#102c3d]">{loading ? "Loading recorded review intelligence" : error ? "Review intelligence is unavailable" : checked ? `LevyTate found ${visibleSignals.length} things worth your attention` : "Review intelligence has not been checked yet"}</h2></div>
+      <div className="grid gap-2"><p className="text-xs font-semibold text-[#102c3d]/[0.48]">Human review required</p><button type="button" disabled={locked || loading} onClick={() => void analyse()} className="min-h-10 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white disabled:opacity-50">{mutation.working ? "Checking…" : "Refresh review intelligence"}</button></div>
     </div>
 
     {primary ? <article className="mt-5 grid gap-4 border-y border-[#102c3d]/[.08] bg-white px-4 py-4 lg:grid-cols-[minmax(0,1fr)_minmax(240px,.65fr)_auto] lg:items-center">
@@ -67,8 +95,10 @@ export function ProgressReviewIntelligencePanel({ enabled, onSignalContext }: { 
     </article> : null}
 
     {visibleSignals.length > 1 ? <details className="mt-2"><summary className="min-h-11 cursor-pointer py-3 text-xs font-semibold text-[#0b6f63]">{visibleSignals.length - 1} more signal{visibleSignals.length === 2 ? "" : "s"}</summary><div className="grid gap-px bg-[#102c3d]/[.07] md:grid-cols-3">{visibleSignals.slice(1).map((signal) => <article key={signal.id} className="flex min-w-0 flex-col bg-[#f4fbf8] px-3 py-3"><SemanticStatus label={signal.priority} tone={categoryTone(signal.category)} /><h3 className="mt-2 text-sm font-semibold leading-5 text-[#102c3d]">{signal.title}</h3><p className="mt-1 text-xs text-[#102c3d]/[0.48]">{signal.evidence.length} evidence items</p><button type="button" onClick={() => open(signal)} className="mt-auto min-h-11 self-start text-xs font-semibold text-[#0b6f63] hover:text-[#102c3d]">Review evidence →</button></article>)}</div></details> : null}
-    {!loading && !visibleSignals.length ? <p className="mt-5 bg-white p-5 text-sm text-[#102c3d]/[0.56]">No signals need human review yet.</p> : null}
-    {error ? <p className="mt-4 bg-[#fff2f4] p-3 text-sm font-semibold text-[#ad344e]">{error}</p> : null}
+    {!loading && !error && checked && !visibleSignals.length ? <p className="mt-5 bg-white p-5 text-sm text-[#102c3d]/[0.56]">No signals needed human review at the last check.</p> : null}
+    {!loading && !checked && !error ? <p className="mt-4 text-sm text-[#102c3d]/60">Select Refresh review intelligence to check the current recorded evidence.</p> : null}
+    {lastAnalysedAt ? <p className="mt-3 text-xs text-[#102c3d]/50">Last checked {new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(lastAnalysedAt))}</p> : null}
+    {error ? <div role="alert" className="mt-4 bg-[#fff2f4] p-3 text-sm font-semibold text-[#ad344e]"><p>{error}</p><button type="button" onClick={() => void load()} className="mt-2 min-h-10">Try loading again</button></div> : null}
 
     {selected ? <div className="fixed inset-0 z-[60] flex justify-end bg-[#102c3d]/[0.25]" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}><aside role="dialog" aria-modal="true" aria-labelledby="signal-detail-title" className="h-full w-full max-w-xl overflow-y-auto bg-white p-5 shadow-[-20px_0_55px_rgba(16,44,61,.18)] sm:p-7"><div className="flex items-start justify-between gap-4"><div><p className="text-[10px] font-semibold uppercase tracking-[.14em] text-[#0b6f63]">What changed</p><h3 id="signal-detail-title" className="mt-2 text-2xl font-semibold tracking-[-.025em] text-[#102c3d]">{selected.title}</h3></div><button type="button" onClick={close} aria-label="Close signal review" className="grid h-11 w-11 place-items-center rounded-lg text-[#102c3d]/[0.55] hover:bg-[#f3f7f5]"><X size={18} /></button></div>
       <div className="mt-5 border-y border-[#102c3d]/[.08] py-4"><SignalEvidenceSummary signal={selected} /></div>
@@ -77,9 +107,14 @@ export function ProgressReviewIntelligencePanel({ enabled, onSignalContext }: { 
       <section className="mt-6"><h4 className="flex items-center gap-2 text-sm font-semibold text-[#102c3d]"><Eye size={15} aria-hidden="true" />Evidence</h4><div className="mt-3 grid gap-2">{selected.evidence.map((item) => <article key={`${item.sourceType}:${item.sourceId}`} className="border-l-2 border-[#4f7b95] bg-[#f8fbfa] p-3"><p className="text-xs font-semibold text-[#102c3d]">{item.label} · {formatDate(item.sourceDate)}</p>{item.excerpt ? <p className="mt-2 text-sm leading-5 text-[#102c3d]/[0.58]">“{item.excerpt}”</p> : null}{item.metric ? <p className="mt-2 text-sm font-semibold text-[#a7354a]">{item.metric.label}: {item.metric.value}</p> : null}</article>)}</div></section>
       <section className="mt-6 border-l-2 border-[#159b8f] bg-[#f4fbf8] p-4"><h4 className="flex items-center gap-2 text-sm font-semibold text-[#102c3d]"><Lightbulb size={15} aria-hidden="true" />What next</h4><p className="mt-2 text-sm leading-6 text-[#102c3d]/[0.62]">{selected.recommendedAction}</p></section>
       {notice ? <p className="mt-4 bg-[#edf7f3] p-3 text-sm font-semibold text-[#0b6f63]">{notice}</p> : null}
-      <div className="mt-6 grid gap-3 border-t border-[#102c3d]/[.08] pt-5"><div className="flex flex-wrap gap-2"><button type="button" onClick={() => void update(selected, "accept")} disabled={selected.confidence === "Low"} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#0b6f63] px-4 text-xs font-semibold text-white disabled:opacity-40"><CheckCircle2 size={14} aria-hidden="true" />Accept action</button><button type="button" onClick={() => void update(selected, "acknowledge")} className="min-h-11 rounded-full border border-[#102c3d]/[0.10] px-4 text-xs font-semibold text-[#102c3d]">Acknowledge</button></div><div className="flex flex-col gap-2 bg-[#fff8df] p-3 sm:flex-row"><label className="sr-only" htmlFor="signal-dismissal-reason">Dismissal reason</label><select id="signal-dismissal-reason" value={dismissalReason} onChange={(event) => setDismissalReason(event.target.value as IntelligenceDismissalReason)} className="min-h-11 flex-1 rounded-lg border border-[#102c3d]/[0.10] bg-white px-3 text-xs text-[#102c3d]">{dismissalReasons.map((reason) => <option key={reason}>{reason}</option>)}</select><button type="button" onClick={() => void update(selected, "dismiss", dismissalReason)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-4 text-xs font-semibold text-[#765b00]"><ShieldAlert size={14} aria-hidden="true" />Dismiss</button></div></div>
+      {selected.status === "accepted" ? <div className="mt-6 rounded-xl bg-[#edf7f3] p-4"><p className="text-sm font-semibold text-[#0b6f63]">This signal has an accepted operational action.</p>{selected.linkedOperationalActionId && onOpenAction ? <button type="button" onClick={() => onOpenAction(selected.linkedOperationalActionId!)} className="mt-2 min-h-10 text-sm font-semibold text-[#0b6f63]">Open operational action</button> : null}</div> : null}
+      {selected.status === "new" || selected.status === "acknowledged" ? <div className="mt-6 grid gap-3 border-t border-[#102c3d]/[.08] pt-5"><div className="flex flex-wrap gap-2"><button type="button" onClick={() => void update(selected, "accept")} disabled={selected.confidence === "Low"} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#0b6f63] px-4 text-xs font-semibold text-white disabled:opacity-40"><CheckCircle2 size={14} aria-hidden="true" />Accept action</button><button type="button" onClick={() => void update(selected, "acknowledge")} disabled={selected.status !== "new"} className="min-h-11 rounded-full border border-[#102c3d]/[0.10] px-4 text-xs font-semibold text-[#102c3d]">Acknowledge</button></div><div className="flex flex-col gap-2 bg-[#fff8df] p-3 sm:flex-row"><label className="sr-only" htmlFor="signal-dismissal-reason">Dismissal reason</label><select id="signal-dismissal-reason" value={dismissalReason} onChange={(event) => setDismissalReason(event.target.value as IntelligenceDismissalReason)} className="min-h-11 flex-1 rounded-lg border border-[#102c3d]/[0.10] bg-white px-3 text-xs text-[#102c3d]">{dismissalReasons.map((reason) => <option key={reason}>{reason}</option>)}</select><button type="button" onClick={() => void update(selected, "dismiss", dismissalReason)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-4 text-xs font-semibold text-[#765b00]"><ShieldAlert size={14} aria-hidden="true" />Dismiss</button></div></div> : null}
     </aside></div> : null}
-  </section>;
+  </section>
+  </fieldset>
+  <ClientMutationRecovery mutation={mutation} />
+  <OperationsReadbackRecovery required={readbackRequired} loading={loading} retry={() => void load()} />
+  </>;
 }
 
 function SignalEvidenceSummary({ signal }: { signal: IntelligenceSignal }) {

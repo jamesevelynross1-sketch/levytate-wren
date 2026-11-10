@@ -8,7 +8,7 @@ vi.mock('react', async (original) => {
   return { ...actual, useState: <T,>(initial: T | (() => T)) => { const index = slot(() => typeof initial === 'function' ? (initial as () => T)() : initial); return [harness.cells[index], (value: T | ((old: T) => T)) => { harness.cells[index] = typeof value === 'function' ? (value as (old: T) => T)(harness.cells[index] as T) : value; }]; }, useRef: <T,>(value: T) => { const index = slot(() => ({ current: value })); return harness.cells[index]; }, useMemo: memo, useCallback: <T,>(callback: T, deps?: unknown[]) => memo(() => callback, deps), useEffect: (effect: () => void, deps?: unknown[]) => { memo(() => { harness.effects.push(effect); return null; }, deps); } };
 });
 vi.mock('@/components/levytate-mvp/useRetainedWorkspaceRequest', () => ({ useRetainedWorkspaceRequest: () => harness.request }));
-vi.mock('@/components/levytate-mvp/MvpWorkspaceStore', () => ({ useMvpWorkspace: () => ({ meta: { storageMode: 'supabase', userEmail: 'lead@fictional.invalid', organisationId: 'tenant-a', role: 'Apprenticeship Lead' } }) }));
+vi.mock('@/components/levytate-mvp/MvpWorkspaceStore', () => ({ useMvpWorkspace: () => ({ meta: { storageMode: 'supabase', userEmail: 'lead@fictional.invalid', organisationId: 'tenant-a', userRole: 'Apprenticeship Lead' }, data: { learnerRecords: [], employees: [] } }) }));
 vi.mock('@/lib/levytate/client-session', () => ({ authenticatedClientFetch: harness.write }));
 import { OperationalActionDetail } from '@/components/levytate-mvp/OperationalActionDetail';
 type Element = { type: unknown; props: Record<string, unknown> };
@@ -33,4 +33,67 @@ it('does not confirm malformed HTTP 200, freezes the form and retains its exact 
   expect(harness.write.mock.calls[0]?.[1].body).toBe(harness.write.mock.calls[1]?.[1].body);
   expect(JSON.parse(harness.write.mock.calls[0]?.[1].body)).toEqual({ command: 'acknowledge', expectedVersion: 2 });
   expect(changed).toHaveBeenCalledOnce();
+});
+
+it('keeps recovery modal ownership while the first request is still in flight', async () => {
+  const props = { actionId: 'action-a', onBack: vi.fn(), onOpenAction: vi.fn(), onOpenLearner: vi.fn(), onChanged: vi.fn() };
+  function render() { harness.cursor = 0; return OperationalActionDetail(props); }
+  render(); harness.effects.splice(0).forEach(effect => effect()); await flush();
+  const button = descendants(render()).find(item => item.type === 'button' && text(item.props.children) === 'Acknowledge');
+  let resolve!: (value: Response) => void;
+  harness.write.mockImplementationOnce(() => new Promise<Response>(done => { resolve = done; }));
+  const request = (button!.props.onClick as () => Promise<void>)(); await flush();
+  const recovery = descendants(render()).find(item => item.props?.mutation && (item.props.mutation as { pending: boolean }).pending);
+  expect(recovery).toBeDefined(); expect((recovery!.props.mutation as { working: boolean }).working).toBe(true);
+  resolve(Response.json({})); await request;
+  expect((descendants(render()).find(item => item.props?.mutation)!.props.mutation as { pending: boolean; working: boolean })).toMatchObject({ pending: true, working: false });
+});
+
+import { AutopilotOperationsPanel } from '@/components/levytate-mvp/AutopilotOperationsPanel';
+import { ProgressReviewIntelligencePanel } from '@/components/levytate-mvp/ProgressReviewIntelligencePanel';
+it('rejects malformed successful Autopilot reads before rendering incomplete lanes', async () => {
+  const response = async () => Response.json({ ok: true, workspace: { brief: {}, lanes: {} } }); harness.request.mockImplementation(response); vi.stubGlobal('fetch', response);
+  function render() { harness.cursor = 0; return AutopilotOperationsPanel({ onOpenAction: vi.fn() }); }
+  try { render(); harness.effects.splice(0).forEach(effect => effect()); await flush(); expect(() => render()).not.toThrow(); expect(text(render())).not.toContain('Nothing needs attention right now'); }
+  finally { vi.unstubAllGlobals(); }
+});
+it('does not report zero Intelligence findings after a malformed successful analysis', async () => {
+  harness.request.mockImplementation(async () => Response.json({}));
+  function render() { harness.cursor = 0; return ProgressReviewIntelligencePanel({ enabled: true }); }
+  render(); harness.effects.splice(0).forEach(effect => effect()); await flush();
+  const output = text(render()); expect(output).not.toContain('found 0'); expect(output).not.toContain('No signals need human review yet');
+});
+
+import { fictionalAutopilot, fictionalIntelligence, intelligenceScope } from './helpers/intelligence-client-fixture';
+it('retains the actual Autopilot refresh handler request across a lost response and confirms its same key', async () => {
+  harness.request.mockImplementation(async () => Response.json({ ok: true, workspace: fictionalAutopilot() }));
+  function render() { harness.cursor = 0; return AutopilotOperationsPanel({ onOpenAction: vi.fn() }); }
+  render(); harness.effects.splice(0).forEach(effect => effect()); await flush();
+  const button = descendants(render()).find(item => item.type === 'button' && text(item.props.children).includes('Refresh intelligence')); expect(button).toBeDefined();
+  harness.write.mockRejectedValueOnce(new Error('Lost response'));
+  await (button!.props.onClick as () => Promise<void>)(); await flush();
+  const recovery = descendants(render()).find(item => item.props?.mutation && (item.props.mutation as { pending: boolean }).pending); expect(recovery).toBeDefined();
+  const original = JSON.parse(harness.write.mock.calls[0]?.[1].body);
+  expect(original.action).toBe('refresh'); expect(original.idempotencyKey).toMatch(/^[0-9a-f-]{36}$/);
+  harness.write.mockResolvedValueOnce(Response.json({ ok: true, workspace: { ...fictionalAutopilot(), confirmation: { ...intelligenceScope, ...original, signalId: null, revision: 1 } } }));
+  (recovery!.props.mutation as { retry: () => void }).retry(); await flush();
+  expect(harness.write.mock.calls[1]?.[1].body).toBe(harness.write.mock.calls[0]?.[1].body);
+  expect((descendants(render()).find(item => item.props?.mutation)!.props.mutation as { pending: boolean }).pending).toBe(false);
+});
+it('keeps the actual Intelligence accept review until exact target/key/revision and linked action are confirmed', async () => {
+  const read = fictionalIntelligence(); const onSignalContext = vi.fn();
+  harness.request.mockImplementation(async () => Response.json(read));
+  function render() { harness.cursor = 0; return ProgressReviewIntelligencePanel({ enabled: true, onSignalContext }); }
+  render(); harness.effects.splice(0).forEach(effect => effect()); await flush();
+  const open = descendants(render()).find(item => item.type === 'button' && text(item.props.children).startsWith('Review evidence')); expect(open).toBeDefined(); (open!.props.onClick as () => void)();
+  const accept = descendants(render()).find(item => item.type === 'button' && text(item.props.children) === 'Accept action'); expect(accept).toBeDefined();
+  harness.write.mockResolvedValueOnce(Response.json({ ok: true, signal: {} })); (accept!.props.onClick as () => void)(); await flush();
+  expect(onSignalContext).not.toHaveBeenCalled();
+  const recovery = descendants(render()).find(item => item.props?.mutation && (item.props.mutation as { pending: boolean }).pending); expect(recovery).toBeDefined();
+  const original = JSON.parse(harness.write.mock.calls[0]?.[1].body); const selected = read.signals.find(signal => signal.id === original.signalId)!;
+  expect(original.expectedRevision).toBe(1); expect(original.action).toBe('accept');
+  harness.write.mockResolvedValueOnce(Response.json({ ok: true, signal: { ...selected, revision: 2, status: 'accepted', linkedOperationalActionId: 'action-a' }, confirmation: { ...intelligenceScope, idempotencyKey: original.idempotencyKey, action: original.action, signalId: original.signalId, revision: 2 } }));
+  (recovery!.props.mutation as { retry: () => void }).retry(); await flush();
+  expect(harness.write.mock.calls[1]?.[1].body).toBe(harness.write.mock.calls[0]?.[1].body); expect(onSignalContext).toHaveBeenCalledOnce();
+  expect((descendants(render()).find(item => item.props?.mutation)!.props.mutation as { pending: boolean }).pending).toBe(false);
 });

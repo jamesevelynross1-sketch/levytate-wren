@@ -58,15 +58,17 @@ export const operationalActionInput = z.discriminatedUnion("command", [
   z.strictObject({ command: z.literal("due_date"), expectedVersion: version, dueDate: dateText, dueDateReason: note.optional() }),
   z.strictObject({ command: z.literal("cancel"), expectedVersion: version, cancellationReason: note, cancellationKind: z.enum(["duplicate_legacy_action", "invalidly_generated", "superseded_administrative_action"]) }),
 ]);
+const intelligenceReceipt = { idempotencyKey: z.string().uuid() };
+const intelligenceDecision = { ...intelligenceReceipt, expectedRevision: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER), signalId: id };
 export const intelligenceActionInput = z.discriminatedUnion("action", [
-  z.strictObject({ action: z.literal("analyse") }),
-  z.strictObject({ action: z.enum(["acknowledge", "accept"]), signalId: id }),
-  z.strictObject({ action: z.literal("dismiss"), signalId: id, reason: z.enum(["Already resolved", "Incorrect interpretation", "No action required", "Planned intervention already exists", "Other"]) }),
+  z.strictObject({ action: z.literal("analyse"), ...intelligenceReceipt }),
+  z.strictObject({ action: z.enum(["acknowledge", "accept"]), ...intelligenceDecision }),
+  z.strictObject({ action: z.literal("dismiss"), ...intelligenceDecision, reason: z.enum(["Already resolved", "Incorrect interpretation", "No action required", "Planned intervention already exists", "Other"]) }),
 ]);
 export const autopilotActionInput = z.discriminatedUnion("action", [
-  z.strictObject({ action: z.literal("refresh") }),
-  z.strictObject({ action: z.literal("dismiss"), signalId: id, reason: note }),
-  z.strictObject({ action: z.literal("create_action"), signalId: id, title: z.string().max(300), ownerType: z.string().max(80), dueDate: dateText, communicationDraft: note }),
+  z.strictObject({ action: z.literal("refresh"), ...intelligenceReceipt }),
+  z.strictObject({ action: z.literal("dismiss"), ...intelligenceDecision, reason: z.string().trim().min(1).max(240) }),
+  z.strictObject({ action: z.literal("create_action"), ...intelligenceDecision, title: z.string().trim().min(1).max(160), ownerType: z.enum(["Employee", "Line Manager", "Apprenticeship Lead", "HR", "Provider", "Shared"]), dueDate: z.union([calendarDate, z.literal("")]), communicationDraft: z.string().max(1000) }),
 ]);
 export const guidanceSourcePatch = z.strictObject({ id, patch: z.strictObject({
   reviewStatus: z.enum(guidanceReviewStatuses).optional(), sourceStatus: z.enum(guidanceSourceStatuses).optional(),

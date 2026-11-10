@@ -13,7 +13,7 @@ export function useOperationsClientCommand() {
   const [error, setError] = useState('');
   const run = useCallback(async (send: () => Promise<void>) => {
     if (controller.busy) throw new Error('An update is already in progress.');
-    setWorking(true); setError('');
+    setWorking(true); setPending(true); setError('');
     try { await send(); }
     catch (failure) { setError(failure instanceof Error && failure.name === 'Error' ? failure.message : 'The update could not be confirmed.'); throw failure; }
     finally { setWorking(controller.busy); setPending(controller.pending); }
