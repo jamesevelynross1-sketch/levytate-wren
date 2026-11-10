@@ -9,7 +9,7 @@ const state=JSON.parse(readFileSync(`${root}/private-stack-state.json`,"utf8")),
 if(db.hostname!=="127.0.0.1")throw new Error("Fault injection is restricted to the dedicated loopback stack");
 const app=localUrl(process.env.RELEASE_APP_URL??"http://localhost:3107","RELEASE_APP_URL");
 const faultTarget=process.env.RELEASE_FAULT_TARGET??"consume";
-const signatures={consume:"public.levytate_consume_auth_rate_limit(text,text,text,integer,integer,text,text,timestamptz)","callback-inspection":"public.levytate_check_auth_callback_failures(text,text)","release-contract":"public.levytate_required_client_contracts()"};
+const signatures={consume:"public.levytate_consume_auth_rate_limit(text,text,text,integer,integer,text,text,timestamptz)","callback-inspection":"public.levytate_check_auth_callback_failures(text,text)","release-contract":"public.levytate_required_client_contracts()","learning-time-command":"public.levytate_apply_learning_time_command(uuid,uuid,text,jsonb,jsonb,boolean)"};
 if(!Object.hasOwn(signatures,faultTarget))throw new Error("Unapproved local fault target");
 const signature=signatures[faultTarget];
 const env={...process.env,PGHOST:db.hostname,PGPORT:db.port,PGUSER:db.username,PGPASSWORD:db.password,PGDATABASE:db.pathname.slice(1)};
@@ -21,7 +21,7 @@ const ready=()=>fetch(`${app}/api/levytate-health/ready`,{cache:"no-store"});
 const expiry=()=>new Promise(resolve=>setTimeout(resolve,11000));
 try{
   releaseRuntime=lockAcceptanceRuntime("readiness-fault-injection");
-  const baseline=await ready();check("genuinely available local backend yields readiness200",baseline.status===200&&(await baseline.json()).status==="operational");
+  const baseline=await ready(),baselineReady=baseline.status===200&&(await baseline.json()).status==="operational";check("genuinely available local backend yields readiness200",baselineReady);if(!baselineReady)throw new Error("Local baseline is unavailable; no fault injected");
   if(sql(`select has_function_privilege('service_role','${signature}','EXECUTE');`)!=="t")throw new Error("Expected original execute grant is absent; no mutation performed");
   sql(`revoke execute on function ${signature} from service_role;`);injected=true;
   await expiry();
@@ -34,7 +34,7 @@ try{
     const refresh=await fetch(`${app}/api/levytate-auth/session`,{method:"POST",headers:{Origin:app}});
     check("session refresh fails unavailable when security store fails",refresh.status===503);
   }
-  if(faultTarget!=="release-contract"){
+  if(["consume","callback-inspection"].includes(faultTarget)){
     const callback=await fetch(`${app}/levytate/auth/callback?token_hash=synthetic-invalid&type=magiclink`,{redirect:"manual"});
     const callbackLocation=new URL(callback.headers.get("location")??"/",app);
     check("callback security-store outage redirects to same-origin unavailable, not invalid token",[302,303,307].includes(callback.status)&&callbackLocation.origin===app&&callbackLocation.searchParams.get("auth")==="unavailable");
