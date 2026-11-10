@@ -434,6 +434,10 @@ try {
       if(managerResult?.learnerId){const{verifyManagerLearningTime}=await import("./release-manager-learning-browser.mjs");await independentJourney("Manager personal Learning Time",()=>verifyManagerLearningTime({app,manifest,contexts,learnerId:managerResult.learnerId,backend,check}));}
       else results.push({name:"Manager personal Learning Time",status:"BLOCKED",reason:"Own Manager enrolment was not confirmed in this bounded genuine run"});
     }
+    if(process.env.RELEASE_LEARNER_RECOVERY_JOURNEY==="true"){
+      if(managerResult?.learnerId){const{verifyLearnerRecovery}=await import("./release-learner-recovery-browser.mjs");await independentJourney("Learner nested progress recovery",()=>verifyLearnerRecovery({app,manifest,contexts,learnerId:managerResult.learnerId,backend,check}));}
+      else results.push({name:"Learner nested progress recovery",status:"BLOCKED",reason:"Own Manager enrolment was not confirmed in this bounded genuine run"});
+    }
   }
   if(process.env.RELEASE_REQUESTS_JOURNEY==="true"){
     phase="genuine provider request, response and catalogue handoff";
