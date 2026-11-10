@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
 import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
-import { ClientRequestError, readAuthenticatedJson } from "@/lib/server/levytate-request-boundary";
+import { assertExpectedWorkspace, ClientRequestError, readAuthenticatedJson } from "@/lib/server/levytate-request-boundary";
 import { parseWorkspaceMutation } from "@/lib/server/levytate-mutation-input";
 import { ApplicationCommandError } from "@/lib/server/levytate-application-commands";
 import {
@@ -16,13 +16,15 @@ async function getSession() {
   return readAuthorisedLevyTateBetaSession(cookieStore.get(levytateBetaSessionCookie)?.value);
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const session = await getSession();
     if (!session) return noStore({ message: "Unauthorised." }, 401);
+    await assertExpectedWorkspace(request, session.email);
     const workspace = await getWorkspaceBootstrapForSession(session);
     return noStore({ ok: true, workspace });
   } catch (error) {
+    if (error instanceof ClientRequestError) return noStore({ message: error.message }, error.status);
     const status = error instanceof LevyTateWorkspacePermissionError ? 403 : 503;
     return noStore(
       { message: status === 403 ? "You do not have access to this workspace." : "LevyTate workspace is temporarily unavailable." },

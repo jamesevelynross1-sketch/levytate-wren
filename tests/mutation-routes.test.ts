@@ -45,7 +45,7 @@ describe("actual cookie-authenticated mutation routes", () => {
   it("does not expose provider diagnostics on reads or writes", async () => {
     const secret = "provider diagnostic with private credential";
     mocks.mutate.mockRejectedValue(new Error(secret)); mocks.bootstrap.mockRejectedValue(new Error(secret));
-    for (const response of [await workspacePost(request({ type: "archiveEmployee", id: "one", status: "Archived", expectedRevision: 0 })), await workspaceGet()]) {
+    for (const response of [await workspacePost(request({ type: "archiveEmployee", id: "one", status: "Archived", expectedRevision: 0 })), await workspaceGet(new Request("https://candidate.vercel.app/api/levytate-workspace"))]) {
       expect(response.status).toBe(503); expect(await response.text()).not.toContain(secret);
       expect(response.headers.get("cache-control")).toContain("no-store");
     }
@@ -53,7 +53,7 @@ describe("actual cookie-authenticated mutation routes", () => {
   it("returns a safe unavailable response when authentication itself is unavailable", async () => {
     const diagnostic = "private authentication dependency diagnostic";
     mocks.session.mockRejectedValue(new Error(diagnostic));
-    for (const response of [await workspacePost(request({ type: "archiveEmployee", id: "one", status: "Archived", expectedRevision: 0 })), await workspaceGet()]) {
+    for (const response of [await workspacePost(request({ type: "archiveEmployee", id: "one", status: "Archived", expectedRevision: 0 })), await workspaceGet(new Request("https://candidate.vercel.app/api/levytate-workspace"))]) {
       expect(response.status).toBe(503); expect(await response.text()).not.toContain(diagnostic);
       expect(response.headers.get("cache-control")).toContain("no-store");
     }
