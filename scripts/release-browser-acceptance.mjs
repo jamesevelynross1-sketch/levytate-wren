@@ -235,6 +235,13 @@ try {
       check(`${key}: unapproved ${path} remains tenant-gated`,gated.status()===404);
     }
   }
+  if(process.env.RELEASE_LIFT_RECOVERY_JOURNEY==="true"){
+    phase="genuine Lift recovery from the retained submitted assessment";
+    setLocalLiftFixture(manifest,true);restoreLift=()=>setLocalLiftFixture(manifest,false);
+    try{const{verifyLiftRecovery}=await import("./release-lift-recovery-browser.mjs");await independentJourney("retained Lift UI recovery",()=>verifyLiftRecovery({app,manifest,contexts,backend,check}));}
+    finally{restoreLift();restoreLift=undefined;}
+    check("resumed local Lift capability restored to disabled",(await contexts.get("a:lead").context.request.get(`${app}/api/levytate-lift`)).status()===404);
+  }
   if(process.env.RELEASE_LIFT_JOURNEY==="true"){
     phase="genuine independent Lift perspectives";
     setLocalLiftFixture(manifest,true);restoreLift=()=>setLocalLiftFixture(manifest,false);
