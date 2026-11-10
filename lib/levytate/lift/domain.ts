@@ -178,6 +178,8 @@ export type LiftProofRecord = {
   updatedAt: string;
 };
 
+export type LiftEmployeeContext = { id: string; context: string; disputed: boolean; recordedAt: string };
+
 export type LiftWorkspace = {
   /** Present for the live persisted workspace; absent only in labelled design previews. */
   mutationRevision?: number;
@@ -186,7 +188,7 @@ export type LiftWorkspace = {
   role: "Employee" | "Line Manager" | "Apprenticeship Lead" | "Employer Admin";
   framework: { key: string; questionnaireVersion: string; interpretationVersion: string; questions: LiftQuestion[] };
   coverage: { invited: number; submitted: number; workplacePerspectives: number; applicablePopulation: number; evidenceFrom: string | null; evidenceTo: string | null };
-  assessment: { id: string; status: "not_started" | "draft" | "submitted"; currentQuestionIndex: number; answers: LiftAnswerMap; findings: LiftCapabilityFinding[]; managerPerspectiveStatus: "not_added" | "submitted" | "released"; releasedManagerObservation: { id: string; observedWork: string; concreteExamples: string[]; suitableOpportunity: string; intendedOutcome: string; workplaceConditions: string[] } | null } | null;
+  assessment: { id: string; status: "not_started" | "draft" | "submitted"; currentQuestionIndex: number; answers: LiftAnswerMap; findings: LiftCapabilityFinding[]; managerPerspectiveStatus: "not_added" | "submitted" | "released"; releasedManagerObservation: { id: string; observedWork: string; concreteExamples: string[]; suitableOpportunity: string; intendedOutcome: string; workplaceConditions: string[]; ownContexts: LiftEmployeeContext[] } | null } | null;
   manager: { teamContextSubmitted: boolean; teamContextRevision?: number; directReports: Array<{ employeeId: string; employeeName: string; perspectiveStatus: "not_started" | "draft" | "submitted"; currentRevision?: number; draft?: Record<string, unknown>; employeeFindingsReleased: boolean; employeeFindings: LiftCapabilityFinding[] }> } | null;
   availableEmployees: Array<{ employeeId: string; employeeName: string; department: string; managerEmployeeId: string | null }>;
   opportunities: LiftOpportunity[];

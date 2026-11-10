@@ -31,6 +31,7 @@ type RevisionRow = { id: string; assessment_id: string; revision_number: number;
 type InterpretationRow = { id: string; participant_id: string; findings_snapshot: unknown; evidence_reference_ids: unknown; created_at: string };
 type ObservationRow = { id: string; campaign_id: string; participant_id: string; employee_id: string; manager_employee_id: string; status: "draft" | "submitted" | "released" | "revoked"; current_revision: number; active_submission_revision: number | null; submitted_at: string | null };
 type ObservationRevisionRow = { id: string; observation_id: string; revision_number: number; status: string; revision_kind: "initial" | "addendum"; clarifies_revision_number: number | null; workflow_group_key: import("@/lib/levytate/lift/domain").LiftWorkflowGroup; observed_work: string; observation_recency: string; opportunity_to_observe: "enough" | "limited" | "not_enough"; support_degree: string; capability_observations: unknown; concrete_examples: unknown; suitable_opportunity: string; intended_outcome: string; condition_time: string; condition_tools: string; condition_access: string; condition_supervision: string; condition_suitable_work: string; submitted_at: string | null };
+type EmployeeContextRow = { id: string; context: string; disputed: boolean; created_at: string };
 type OpportunityCandidateRow = { id: string; campaign_id: string; interpretation_id: string; employee_id: string; framework_key: string; questionnaire_version: string; interpretation_version: string; grouping_version: string; workflow_group_key: import("@/lib/levytate/lift/domain").LiftWorkflowGroup; capability_ids: unknown; relationship_type: "supported" | "hypothesis"; supporting_evidence_ids: unknown; contradictory_evidence_ids: unknown };
 type OpportunityRow = { id: string; campaign_id: string; framework_key: string; questionnaire_version: string; interpretation_version: string; grouping_version: string; workflow_group_key: import("@/lib/levytate/lift/domain").LiftWorkflowGroup; grouping_key: string; grouping_criteria: unknown; contributor_count: number; title: string; capability_ids: unknown; work_that_could_improve: string; named_constraint: string; outcome_worth_pursuing: string; relationship_type: "supported" | "hypothesis"; missing_inputs: unknown; decision_question: string; evidence_needed: unknown; state: LiftOpportunity["state"]; created_at: string };
 type DecisionRow = { id: string; opportunity_id: string; decision_version: number; status: LiftDecision["status"]; selected_option_id: string; rationale: string; responsible_owner: string; intended_measure: string; value_scenario: unknown; shared_benefit_ids: unknown; created_at: string };
@@ -70,7 +71,8 @@ export async function getLiftWorkspaceForSession(session: LevyTateBetaSession): 
   if (!await isLiftEnabledForOrganisation(context.organisation.id)) throw new LevyTateLiftError("Lift is not enabled for this workspace.", 404);
   const mutationRevision = await liftRevision(context.organisation.id);
   const employees = await selectAll<EmployeeRow>(context.organisation.id, "levytate_employees", { status: "eq.Active", order: "name.asc" });
-  const employee = employees.find((item) => item.email.trim().toLowerCase() === session.email.trim().toLowerCase()) ?? null;
+  const ownEmployees = employees.filter((item) => item.email.trim().toLowerCase() === session.email.trim().toLowerCase());
+  const employee = ownEmployees.length === 1 ? ownEmployees[0] : null;
   if ((role === "Employee" || role === "Line Manager") && !employee) throw new LevyTateLiftError("Your account is not linked to an active employee record.", 403);
   const participants = await selectAll<ParticipantRow>(context.organisation.id, tables.participants, { order: "invited_at.desc" });
   const assessments = await selectAll<AssessmentRow>(context.organisation.id, tables.assessments, { order: "updated_at.desc" });
@@ -79,7 +81,14 @@ export async function getLiftWorkspaceForSession(session: LevyTateBetaSession): 
   const interpretation = currentAssessment ? (await select<InterpretationRow>(context.organisation.id, tables.interpretations, { participant_id: `eq.${currentAssessment.participant_id}`, status: "in.(provisional,reviewed)", order: "created_at.desc", limit: "1" }))[0] ?? null : null;
   const observations = await selectAll<ObservationRow>(context.organisation.id, tables.observations, { order: "updated_at.desc" });
   const observationForEmployee = currentAssessment ? observations.find((item) => item.employee_id === currentAssessment.employee_id && item.campaign_id === currentAssessment.campaign_id) : null;
-  const releasedObservationRevision = observationForEmployee?.status === "released" && observationForEmployee.active_submission_revision ? (await select<ObservationRevisionRow>(context.organisation.id, tables.observationRevisions, { observation_id: `eq.${observationForEmployee.id}`, revision_number: `eq.${observationForEmployee.active_submission_revision}`, status: "eq.submitted", limit: "1" }))[0] ?? null : null;
+  const releasedObservationRevision = currentAssessment?.status === "submitted" && currentAssessment.active_submission_revision && observationForEmployee?.status === "released" && observationForEmployee.active_submission_revision ? (await select<ObservationRevisionRow>(context.organisation.id, tables.observationRevisions, { observation_id: `eq.${observationForEmployee.id}`, revision_number: `eq.${observationForEmployee.active_submission_revision}`, status: "eq.submitted", limit: "1" }))[0] ?? null : null;
+  // Clarifications are an employee-owned record for this exact released pair.
+  // Do not load them into manager, employer reporting or unpublished views.
+  const ownContexts = releasedObservationRevision && observationForEmployee && employee
+    ? await selectAll<EmployeeContextRow>(context.organisation.id, tables.employeeContexts, {
+      select: "id,context,disputed,created_at", employee_id: `eq.${employee.id}`,
+      observation_id: `eq.${observationForEmployee.id}`, order: "created_at.asc",
+    }) : [];
   const manager = role === "Line Manager" && employee ? await managerWorkspace(context.organisation.id, employee, employees, observations, assessments) : null;
   const aggregate = role === "Apprenticeship Lead" || role === "Employer Admin" ? await leaderWorkspace(context.organisation.id, participants) : { opportunities: [], decisions: [], proofs: [] };
   const dates = participants.flatMap((item) => item.submitted_at ? [item.submitted_at] : []);
@@ -104,8 +113,8 @@ export async function getLiftWorkspaceForSession(session: LevyTateBetaSession): 
       currentQuestionIndex: currentAssessment.current_question_index,
       answers: object<LiftAnswerMap>(revision?.answers),
       findings: interpretation ? object<{ findings?: LiftCapabilityFinding[] }>(interpretation.findings_snapshot).findings ?? [] : [],
-      managerPerspectiveStatus: observationForEmployee?.status === "released" ? "released" : observationForEmployee?.active_submission_revision ? "submitted" : "not_added",
-      releasedManagerObservation: releasedObservationRevision && observationForEmployee ? { id: observationForEmployee.id, observedWork: releasedObservationRevision.observed_work, concreteExamples: strings(releasedObservationRevision.concrete_examples), suitableOpportunity: releasedObservationRevision.suitable_opportunity, intendedOutcome: releasedObservationRevision.intended_outcome, workplaceConditions: [releasedObservationRevision.condition_time, releasedObservationRevision.condition_tools, releasedObservationRevision.condition_access, releasedObservationRevision.condition_supervision, releasedObservationRevision.condition_suitable_work].filter(Boolean) } : null,
+      managerPerspectiveStatus: releasedObservationRevision ? "released" : observationForEmployee?.active_submission_revision ? "submitted" : "not_added",
+      releasedManagerObservation: releasedObservationRevision && observationForEmployee ? { id: observationForEmployee.id, observedWork: releasedObservationRevision.observed_work, concreteExamples: strings(releasedObservationRevision.concrete_examples), suitableOpportunity: releasedObservationRevision.suitable_opportunity, intendedOutcome: releasedObservationRevision.intended_outcome, workplaceConditions: [releasedObservationRevision.condition_time, releasedObservationRevision.condition_tools, releasedObservationRevision.condition_access, releasedObservationRevision.condition_supervision, releasedObservationRevision.condition_suitable_work].filter(Boolean), ownContexts: ownContexts.map(row => ({ id: row.id, context: row.context, disputed: row.disputed, recordedAt: row.created_at })) } : null,
     } : null,
     manager,
     availableEmployees: role === "Apprenticeship Lead" || role === "Employer Admin" ? employees.map((item) => ({ employeeId: item.id, employeeName: item.name, department: item.department, managerEmployeeId: item.manager_id || null })) : [],

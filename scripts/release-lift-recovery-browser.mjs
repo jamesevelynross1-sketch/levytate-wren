@@ -37,7 +37,7 @@ export async function verifyLiftRecovery({ app: origin, manifest, contexts, back
   const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
   const page = employee.page, viewport = page.viewportSize(), recovery = page.getByRole("dialog", { name: "Update awaiting confirmation", exact: true });
   const field = () => page.getByLabel("Your context or clarification", { exact: true });
-  let posts = 0;
+  let posts = 0; const recordedTexts = [];
   const count = request => { if (new URL(request.url()).pathname === endpoint && request.method() === "POST") posts++; };
   page.on("request", count);
   const readFault = body => async route => {
@@ -110,6 +110,9 @@ export async function verifyLiftRecovery({ app: origin, manifest, contexts, back
         report(`${fault}: explicit keyboard retry sends original bytes and original account pins`, confirmation.status() === 200 && request.postData() === command && pinned["x-levytate-account"] === employee.user.email && pinned["x-levytate-organisation"] === employee.tenant.id);
         await recovery.waitFor({ state: "hidden" });
         report(`${fault}: confirmed retry does not duplicate any durable write`, same(durable, await snapshot()));
+        await page.getByRole("region", { name: "Your recorded context", exact: true }).getByText(text, { exact: true }).waitFor();
+        recordedTexts.push(text);
+        report(`${fault}: the confirmed persisted clarification is visible in the employee's history`, await field().inputValue() === "");
       } finally { release(); await page.unroute(pattern, intercept); }
     }
     const confirmed = await snapshot(), confirmedPosts = posts;
@@ -119,6 +122,12 @@ export async function verifyLiftRecovery({ app: origin, manifest, contexts, back
     report("failed read after confirmed writes does not replay either mutation", posts === confirmedPosts && same(confirmed, await snapshot()));
     await page.getByRole("button", { name: "Try again", exact: true }).click(); await field().waitFor();
     report("new read recovers actual Lift state and retains both durable context records", posts === confirmedPosts && same(confirmed, await snapshot()));
+    for (const text of recordedTexts) await page.getByRole("region", { name: "Your recorded context", exact: true }).getByText(text, { exact: true }).waitFor();
+    report("both saved clarifications remain visible after actual page refresh", recordedTexts.length === 2);
+    for (const actor of [manager, lead]) {
+      const response = await actor.context.request.get(pattern, { headers: headers(actor) }), body = await response.text();
+      report(`${actor.user.role} cannot read private employee clarification text`, response.status() === 200 && recordedTexts.every(text => !body.includes(text)));
+    }
     report("other employer context, receipts, revisions and audit are unchanged", same(otherBefore, await tenantSnapshot(other.tenant.id)));
     return { contextRecordsAdded: 2, newSignIns: 0, reconnect: "same genuine session", runtimeFixtureChanges: false };
   } finally {
