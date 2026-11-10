@@ -5,7 +5,7 @@ import{randomUUID}from'node:crypto';
 import{localUrl}from'./release-local-fixtures.mjs';
 export async function verifyLearnerRecovery({app:origin,manifest,contexts,learnerId,backend,check}){
  const app=localUrl(origin,'Learner recovery app'),lead=contexts.get('a:lead'),manager=contexts.get('a:manager'),other=contexts.get('b:employee');
- if(!manifest.synthetic||manifest.environment!=='local'||lead?.user.role!=='Apprenticeship Lead'||manager?.user.role!=='Line Manager'||lead.tenant.id!==manager.tenant.id||lead.tenant.id===other?.tenant.id||!/^learner-[a-f0-9-]{36}$/.test(learnerId))throw Error('Exact local genuine learner contexts required');
+ if(!manifest.synthetic||manifest.environment!=='local'||lead?.user.role!=='Apprenticeship Lead'||manager?.user.role!=='Line Manager'||other?.user.role!=='Employee'||lead.tenant.id!==manager.tenant.id||lead.tenant.id===other?.tenant.id||!/^learner-[a-f0-9-]{36}$/.test(learnerId))throw Error('Exact local genuine learner contexts required');
  const report=(name,ok)=>check(`Learner recovery: ${name}`,Boolean(ok)),headers={Origin:app,'X-LevyTate-Account':lead.user.email,'X-LevyTate-Organisation':lead.tenant.id},endpoint=`/api/levytate-learners/${learnerId}/progress`,url=`${app}${endpoint}`,page=lead.page;
  const read=async()=>{const r=await lead.context.request.get(`${app}/api/levytate-learners/${learnerId}`,{headers});report('Lead reads exact current enrolled Manager learner',r.status()===200);const d=(await r.json()).learner;report('current employee and lifecycle match the real enrolment',d?.learnerRecordId===learnerId&&d.learner.id===manager.user.personId&&d.lifecycleStatus==='enrolled');return d;};
  const snapshot=async()=>{const[records,progress,events,receipts,audit]=await Promise.all([
@@ -22,7 +22,7 @@ export async function verifyLearnerRecovery({app:origin,manifest,contexts,learne
  const row=page.getByTestId('learner-row').filter({has:page.getByText(detail.learner.name,{exact:true})});await row.getByTestId('learner-open-record').click();
  for(const fault of['lost','malformed']){
   const before=await snapshot(),summary=`Fictional progress recovery ${fault} ${randomUUID()}`;
-  await page.getByRole('button',{name:'Add progress update',exact:true}).click();
+  await page.locator('section').filter({has:page.getByRole('heading',{name:'Progress and reviews',exact:true})}).getByRole('button',{name:'Add progress update',exact:true}).click();
   const form=page.getByRole('dialog',{name:'Add progress update',exact:true}),field=form.getByLabel('Progress summary',{exact:true}),recovery=page.getByRole('dialog',{name:'Update awaiting confirmation',exact:true});
   await form.getByLabel('Update date',{exact:true}).fill(new Date().toISOString().slice(0,10));
   await form.getByRole('combobox',{name:'Progress source',exact:true}).selectOption('provider_report');
