@@ -35,7 +35,7 @@ export async function verifyWorkspaceRecovery({ app: origin, applicant, applicat
   const same = (left, right) => left.row.revision === right.row.revision && left.row.status === right.row.status && left.row.reason === right.row.reason && left.history === right.history && left.receipts === right.receipts && left.audit === right.audit;
   const before = await snapshot();
   report("starts from a genuinely editable own application", ["Draft", "More information requested"].includes(before.row.status));
-  const reason = page.getByLabel(reasonLabel, { exact: true });
+  const reason = page.getByRole("textbox", { name: reasonLabel, exact: true, includeHidden: true });
   const originalAnswer = `Synthetic retained answer ${randomUUID()}`;
   phase="refill current retained textarea";await reason.fill(originalAnswer);
   let originalDraft, upstreamError, intercepted = false;

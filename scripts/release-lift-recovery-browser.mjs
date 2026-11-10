@@ -7,7 +7,21 @@
 import { randomUUID } from "node:crypto";
 import { localUrl } from "./release-local-fixtures.mjs";
 
-export async function verifyLiftRecovery({ app: origin, manifest, contexts, backend, check }) {
+export async function verifyLiftRecovery(options) {
+  const diagnostic = { stage: "preflight" };
+  try { return await runLiftRecovery(options, diagnostic); }
+  catch (cause) {
+    // Raw Playwright/network errors can contain command text, URLs or bodies.
+    // Only fixed phase names and scalar locator observations leave this helper.
+    const error = new Error("Lift recovery browser check failed");
+    error.safeStage = diagnostic.stage;
+    error.safeErrorClass = ["TimeoutError", "TypeError"].includes(cause?.name) ? cause.name : "Error";
+    if (diagnostic.field) error.safeField = diagnostic.field;
+    throw error;
+  }
+}
+
+async function runLiftRecovery({ app: origin, manifest, contexts, backend, check }, diagnostic) {
   const app = localUrl(origin, "Lift recovery app"), endpoint = "/api/levytate-lift", pattern = `${app}${endpoint}`;
   const employee = contexts.get("a:employee"), manager = contexts.get("a:manager"), lead = contexts.get("a:lead"), other = contexts.get("b:employee");
   if (!manifest.synthetic || manifest.environment !== "local" || !/^[a-f0-9-]{36}$/.test(manifest.run) || employee?.user.role !== "Employee" || manager?.user.role !== "Line Manager" || lead?.user.role !== "Apprenticeship Lead" || other?.user.role !== "Employee" || employee.tenant.id === other.tenant.id || manager.tenant.id !== employee.tenant.id || lead.tenant.id !== employee.tenant.id) throw new Error("Reviewed four-role local Lift contexts required");
@@ -36,7 +50,20 @@ export async function verifyLiftRecovery({ app: origin, manifest, contexts, back
   const snapshot = () => tenantSnapshot(employee.tenant.id), otherBefore = await tenantSnapshot(other.tenant.id);
   const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
   const page = employee.page, viewport = page.viewportSize(), recovery = page.getByRole("dialog", { name: "Update awaiting confirmation", exact: true });
-  const field = () => page.getByLabel("Your context or clarification", { exact: true });
+  // Controlled textarea text changes the implicit label's textContent, while
+  // its accessible textbox name remains stable. Include the inert background
+  // control so retained values can still be checked behind the recovery dialog.
+  const field = () => page.getByRole("textbox", { name: "Your context or clarification", exact: true, includeHidden: true });
+  const retainedField = async (stage, text) => {
+    diagnostic.stage = stage;
+    diagnostic.field = {
+      labelCount: await page.getByLabel("Your context or clarification", { exact: true }).count(),
+      roleCount: await field().count(),
+    };
+    diagnostic.field.valueMatches = (await field().inputValue()) === text;
+    diagnostic.field.disabled = await field().isDisabled();
+    return diagnostic.field.valueMatches && diagnostic.field.disabled;
+  };
   let posts = 0; const recordedTexts = [];
   const count = request => { if (new URL(request.url()).pathname === endpoint && request.method() === "POST") posts++; };
   page.on("request", count);
@@ -47,6 +74,7 @@ export async function verifyLiftRecovery({ app: origin, manifest, contexts, back
   const malformedRead = readFault({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, workspace: {} }) });
   const unavailableRead = readFault({ status: 503, contentType: "application/json", body: JSON.stringify({ ok: false, message: "Synthetic temporary read failure." }) });
   try {
+    diagnostic.stage = "malformed-read";
     const beforeRead = await snapshot();
     await page.route(pattern, malformedRead);
     try {
@@ -54,11 +82,13 @@ export async function verifyLiftRecovery({ app: origin, manifest, contexts, back
       await page.getByRole("heading", { name: "Lift is unavailable", exact: true }).waitFor();
       report("malformed successful read shows unavailable and never manufactures an assessment", await page.getByTestId("lift-module").count() === 0 && posts === 0);
     } finally { await page.unroute(pattern, malformedRead); }
+    diagnostic.stage = "read-retry";
     await page.getByRole("button", { name: "Try again", exact: true }).click();
     await field().waitFor();
     report("read retry returns the actual persisted assessment without a write", same(beforeRead, await snapshot()) && posts === 0);
 
     for (const fault of ["lost", "malformed"]) {
+      diagnostic.stage = `${fault}:fill-original`; delete diagnostic.field;
       const text = `Fictional Lift recovery ${fault} ${randomUUID()}`, before = await snapshot();
       await field().fill(text);
       let command, intercepted = false, failed = false, release, markCommitted;
@@ -80,17 +110,21 @@ export async function verifyLiftRecovery({ app: origin, manifest, contexts, back
       };
       await page.route(pattern, intercept);
       try {
+        diagnostic.stage = `${fault}:await-commit`;
         await page.getByRole("button", { name: "Record my context", exact: true }).click();
         let timeout;
         try { await Promise.race([committed, new Promise((_, reject) => { timeout = setTimeout(() => reject(new Error("Lift commit observation timed out")), 30_000); })]); }
         finally { clearTimeout(timeout); }
         report(`${fault}: original command commits before the held response is released`, intercepted && !failed);
-        report(`${fault}: in-flight original input remains unchanged and disabled`, await field().inputValue() === text && await field().isDisabled());
+        report(`${fault}: in-flight original input remains unchanged and disabled`, await retainedField(`${fault}:in-flight-field`, text));
+        diagnostic.stage = `${fault}:durable-commit`;
         const durable = await snapshot(), entry = durable.entries.filter(row => row.context === text);
         report(`${fault}: one owned context, receipt, revision and audit exist before response loss`, entry.length === 1 && entry[0].observation_id === observationId && entry[0].employee_id === employee.user.personId && entry[0].created_by === employee.user.membershipId && durable.entries.length === before.entries.length + 1 && durable.receipts.length === before.receipts.length + 1 && durable.revision === before.revision + 1 && durable.audit.length === before.audit.length + 1);
+        diagnostic.stage = `${fault}:await-recovery`;
         release(); await recovery.waitFor();
-        report(`${fault}: uncertain response retains original input without false success`, await field().inputValue() === text && await field().isDisabled());
+        report(`${fault}: uncertain response retains original input without false success`, await retainedField(`${fault}:retained-field`, text));
         if (fault === "malformed") {
+          diagnostic.stage = "malformed:mobile-reconnect";
           await page.setViewportSize({ width: 390, height: 844 });
           const box = await recovery.boundingBox();
           report("mobile recovery dialog fits the viewport", box && box.x >= 0 && box.y >= 0 && box.x + box.width <= 391 && box.y + box.height <= 845);
@@ -103,6 +137,7 @@ export async function verifyLiftRecovery({ app: origin, manifest, contexts, back
           const fresh = await reconnected, meta = (await fresh.json()).workspace?.meta;
           report("keyboard reconnect reads the genuine same account without clearing or resending its pending command", fresh.status() === 200 && meta?.userEmail === employee.user.email && meta?.organisationId === employee.tenant.id && posts === beforeReconnect && await recovery.isVisible() && await field().isDisabled());
         }
+        diagnostic.stage = `${fault}:exact-retry`;
         const retried = page.waitForResponse(value => new URL(value.url()).pathname === endpoint && value.request().method() === "POST");
         await recovery.getByRole("button", { name: "Retry original update", exact: true }).focus();
         await page.keyboard.press("Enter");
@@ -110,11 +145,13 @@ export async function verifyLiftRecovery({ app: origin, manifest, contexts, back
         report(`${fault}: explicit keyboard retry sends original bytes and original account pins`, confirmation.status() === 200 && request.postData() === command && pinned["x-levytate-account"] === employee.user.email && pinned["x-levytate-organisation"] === employee.tenant.id);
         await recovery.waitFor({ state: "hidden" });
         report(`${fault}: confirmed retry does not duplicate any durable write`, same(durable, await snapshot()));
+        diagnostic.stage = `${fault}:confirmed-history`;
         await page.getByRole("region", { name: "Your recorded context", exact: true }).getByText(text, { exact: true }).waitFor();
         recordedTexts.push(text);
         report(`${fault}: the confirmed persisted clarification is visible in the employee's history`, await field().inputValue() === "");
       } finally { release(); await page.unroute(pattern, intercept); }
     }
+    diagnostic.stage = "confirmed-read-failure"; delete diagnostic.field;
     const confirmed = await snapshot(), confirmedPosts = posts;
     await page.route(pattern, unavailableRead);
     try { await page.reload(); await page.getByRole("heading", { name: "Lift is unavailable", exact: true }).waitFor(); }
@@ -124,6 +161,7 @@ export async function verifyLiftRecovery({ app: origin, manifest, contexts, back
     report("new read recovers actual Lift state and retains both durable context records", posts === confirmedPosts && same(confirmed, await snapshot()));
     for (const text of recordedTexts) await page.getByRole("region", { name: "Your recorded context", exact: true }).getByText(text, { exact: true }).waitFor();
     report("both saved clarifications remain visible after actual page refresh", recordedTexts.length === 2);
+    diagnostic.stage = "private-history-boundary";
     for (const actor of [manager, lead]) {
       const response = await actor.context.request.get(pattern, { headers: headers(actor) }), body = await response.text();
       report(`${actor.user.role} cannot read private employee clarification text`, response.status() === 200 && recordedTexts.every(text => !body.includes(text)));

@@ -33,6 +33,6 @@ export async function verifyEmployeeRecovery({app,mailpit,manifest,contexts,back
   // Only fictional row identity is retained, never a draft, command or session.
   writeFileSync(marker,JSON.stringify({parentRun:manifest.run,organisationId:applicant.tenant.id,employeeId:applicant.user.personId,applicationId}),{mode:0o600,flag:"wx"});
  }
- for(const[index,label]of["Why are you interested in this programme?","How could it help your current role or future development?","What support will you need from your manager?"].entries())await page.getByLabel(label,{exact:true}).fill(`Synthetic genuine recovery answer ${index+1}; no customer information.`);
+ for(const[index,label]of["Why are you interested in this programme?","How could it help your current role or future development?","What support will you need from your manager?"].entries())await page.getByRole("textbox",{name:label,exact:true,includeHidden:true}).fill(`Synthetic genuine recovery answer ${index+1}; no customer information.`);
  await verifyWorkspaceRecovery({app,applicant,applicationId,backend,check,mailpit,waitForCapturedLink});
 }
