@@ -36,6 +36,7 @@ export function EmployerRequestsContainer({
 }: Pick<EmployerRequestsModuleProps, "onOpenMarketplace" | "onOpenMyProviders" | "onOpenMyProgrammes">) {
   const [workspace, setWorkspace] = useState<EmployerRequestsWorkspaceBootstrap | null>(null);
   const [error, setError] = useState("");
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const { meta } = useMvpWorkspace();
   const identity = useRef(meta ? { email: meta.userEmail, organisationId: meta.organisationId } : null);
   const mutation = usePinnedClientMutation(identity.current, "/api/levytate-requests", (value) => decodeRequestsMutationResponse(value, identity.current?.organisationId));
@@ -58,13 +59,13 @@ export function EmployerRequestsContainer({
       })
       .catch((caught) => { if (live) setError(message(caught)); });
     return () => { live = false; };
-  }, []);
+  }, [loadAttempt]);
 
   async function mutate(action: EmployerRequestAction) {
     return mutation.execute(action, setWorkspace);
   }
 
-  if (error) return <RequestLoadState title="Requests are unavailable" copy={error} />;
+  if (error) return <RequestLoadState title="Requests are unavailable" copy={error} onRetry={() => { setError(""); setLoadAttempt(attempt => attempt + 1); }} />;
   if (!workspace) return <RequestLoadState title="Loading Requests" copy="Preparing this employer workspace…" />;
 
   const providers = providerOptions(workspace);
@@ -121,8 +122,8 @@ export function EmployerRequestsContainer({
   </fieldset></div>);
 }
 
-function RequestLoadState({ title, copy }: { title: string; copy: string }) {
-  return <section role="status" className="rounded-2xl border border-[#27456a]/[0.09] bg-white p-6"><h2 className="text-lg font-semibold text-[#27456a]">{title}</h2><p className="mt-2 text-sm leading-6 text-[#52677d]">{copy}</p></section>;
+function RequestLoadState({ title, copy, onRetry }: { title: string; copy: string; onRetry?: () => void }) {
+  return <section role={onRetry ? "alert" : "status"} className="rounded-2xl border border-[#27456a]/[0.09] bg-white p-6"><h2 className="text-lg font-semibold text-[#27456a]">{title}</h2><p className="mt-2 text-sm leading-6 text-[#52677d]">{copy}</p>{onRetry ? <button type="button" onClick={onRetry} className="mt-3 text-sm font-semibold text-[#27456a] underline">Try again</button> : null}</section>;
 }
 
 function providerOptions(workspace: EmployerRequestsWorkspaceBootstrap): EmployerRequestProviderOption[] {
