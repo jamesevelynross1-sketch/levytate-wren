@@ -39,3 +39,7 @@ The previously created blank employer `045e3932-f8d0-4977-ab16-892c0b8a285b` was
 Independent read-only native verification added **6 PASS**: deleted organisation absent; exclusive Auth user and sessions absent; target Storage catalogue empty; native physical target bytes absent; both original fictional employers active; independent other-tenant physical control bytes unchanged. Reproduce with `scripts/release-lifecycle-durable-check.mjs` and the exact successful browser evidence path.
 
 Both runs' external-delivery BLOCKED result is intentional: signed Auth hook and actual local SMTP capture prove the isolated route, not delivery to a real external inbox. Hosted acceptance and real-client approval remain separate and incomplete.
+
+## Bounded popup diagnosis before the next sign-in batch
+
+`verify-recovery-popup-browser.mjs` rendered the actual shared recovery components and native pending dialog, then opened the real public local login page without making an Auth request: **6 PASS**, Edge 157.0.4341.42, one actual `window.open`, one new page, no browser exceptions, retained background answer intact. Initial bare-esbuild probe failures were missing Next browser `process`/`__dirname` polyfills; inspection confirmed the actual application bundle already provides them. The faithful probe uses Next's provided process implementation. This proves the component/public-page path works in isolation; it does not resolve or retrospectively pass the failed genuine expired-session journey.
