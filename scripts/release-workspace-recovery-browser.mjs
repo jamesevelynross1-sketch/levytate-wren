@@ -11,6 +11,11 @@ const reasonLabel = "Why are you interested in this programme?";
 const recoveryName = "Update awaiting confirmation";
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function local(value) { const url = new URL(value); if (url.protocol !== "http:" || !["127.0.0.1", "localhost"].includes(url.hostname) || url.username || url.password || url.search || url.hash) throw new Error("Local acceptance origin required"); return url.origin; }
+// Attach rejection handling immediately: an earlier assertion can fail before
+// this event is awaited, and normal context cleanup must still complete.
+export const observeBrowserEvent = promise => promise.then(value => ({value}), error => ({error}));
+const observe = observeBrowserEvent;
+async function observed(promise) { const result=await promise;if(result.error)throw result.error;return result.value; }
 
 export async function verifyWorkspaceRecovery({ app: origin, applicant, applicationId, backend, check, mailpit, waitForCapturedLink }) {
   let phase="initialisation";
@@ -58,71 +63,73 @@ export async function verifyWorkspaceRecovery({ app: origin, applicant, applicat
   report("draft commits once despite rejected response", saved.row.reason === originalAnswer && saved.row.revision === before.row.revision + 1 && saved.history === before.history + 1 && saved.receipts === before.receipts + 1 && saved.audit === before.audit + 1);
   report("bad200 keeps original answers and freezes editing", (await reason.inputValue()) === originalAnswer && await reason.isDisabled());
   let recovery = page.getByRole("dialog", { name: recoveryName, exact: true });
-  phase="draft original command retry";const draftReplay = page.waitForResponse(predicate);
+  phase="draft original command retry";const draftReplay = observe(page.waitForResponse(predicate));
   await recovery.getByRole("button", { name: "Retry original update", exact: true }).click();
-  const confirmedDraft = await draftReplay;
+  const confirmedDraft = await observed(draftReplay);
   report("draft retry uses byte-identical original body", confirmedDraft.status() === 200 && confirmedDraft.request().postData() === originalDraft);
   await recovery.waitFor({ state: "hidden" });
   report("confirmed draft retry creates no duplicate revision, history, receipt or audit", same(saved, await snapshot()));
 
-  phase="submission and genuine session revocation";let originalSubmit, logoutStatus, committed = false;
+  phase="submission and genuine session revocation";let originalSubmit, logoutStatus, submissionHttpStatus, submissionConfirmed=false, submissionErrorClass, committed = false;
   const expireAfterCommit = async route => {
     const request = route.request();
     if (!committed && request.method() === "POST" && request.postDataJSON()?.type === "saveApplication" && request.postDataJSON()?.application?.id === applicationId && request.postDataJSON()?.application?.status === "Submitted to Line Manager") {
       committed = true; originalSubmit = request.postData();
       try {
         const response = await route.fetch();
-        if (response.status() !== 200 || (await response.json()).ok !== true) throw new Error("Original submission did not commit successfully");
+        submissionHttpStatus=response.status();submissionConfirmed=(await response.json()).ok===true;
+        if (submissionHttpStatus !== 200 || !submissionConfirmed) throw new Error("Original submission did not commit successfully");
         // Revoke the actual provider session and clear the genuine browser jar.
         // The automatic refresh below must fail for real, not a mocked endpoint.
         logoutStatus = (await context.request.post(`${app}/api/levytate-beta-logout`, { headers: { Origin: app }, maxRedirects: 0 })).status();
         await route.fulfill({ status: 401, contentType: "application/json", body: JSON.stringify({ ok: false, message: "Sign in to continue." }) });
-      } catch { upstreamError = true; await route.abort(); }
+      } catch (error) { upstreamError = true;submissionErrorClass=["TimeoutError","TypeError","SyntaxError"].includes(error?.name)?error.name:"Error"; await route.abort(); }
     } else await route.continue();
   };
-  const expiredRefresh = page.waitForResponse(response => new URL(response.url()).pathname === "/api/levytate-auth/session" && response.request().method() === "POST");
+  const expiredRefresh = observe(page.waitForResponse(response => new URL(response.url()).pathname === "/api/levytate-auth/session" && response.request().method() === "POST"));
   await page.route(pattern, expireAfterCommit);
   try { await page.getByRole("button", { name: /^(Submit to line manager|Submit application|Respond and resubmit)$/, exact: true }).click(); await recovery.waitFor(); }
   finally { await page.unroute(pattern, expireAfterCommit); }
-  report("submission commits before genuine logout and refresh denial", committed && !upstreamError && logoutStatus === 303 && (await expiredRefresh).status() === 401);
+  console.log(JSON.stringify({diagnostic:"workspace-recovery-submission",intercepted:committed,httpStatus:submissionHttpStatus??null,successBodyConfirmed:submissionConfirmed,logoutStatus:logoutStatus??null,errorClass:submissionErrorClass??null}));
+  report("submission commits before genuine logout and refresh denial", committed && !upstreamError && logoutStatus === 303 && (await observed(expiredRefresh)).status() === 401);
   const submitted = await snapshot();
   report("submitted outcome persists exactly once before session recovery", ["Awaiting Manager Review", "Submitted to Line Manager"].includes(submitted.row.status) && submitted.row.revision === saved.row.revision + 1 && submitted.history === saved.history + 1 && submitted.receipts === saved.receipts + 1 && submitted.audit === saved.audit + 1);
   report("expired session still retains the original form", await reason.isDisabled() && (await reason.inputValue()) === originalAnswer);
   report("recovery dialog exposes sign-in and reconnect without dismissing retained update", await recovery.getByRole("button", { name: "Sign in in new tab", exact: true }).count() === 1 && await recovery.getByRole("button", { name: "Reconnect workspace", exact: true }).count() === 1);
 
-  phase="click visible sign-in";const popup = context.waitForEvent("page");
+  phase="click visible sign-in";const popup = observe(context.waitForEvent("page"));
   await recovery.getByRole("button", { name: "Sign in in new tab", exact: true }).click();
   phase="await popup page";
-  const login = await popup;
+  const login = await observed(popup);
   try {
     phase="popup login form";
     await login.getByRole("textbox", { name: "Work email", exact: true }).fill(user.email);
     const loginLocation=new URL(login.url());
     report("recovery popup is the expected same-origin sign-in page",loginLocation.origin===app&&loginLocation.pathname==="/levytate/login");
     const after = Date.now();
-    const requested = login.waitForResponse(response => new URL(response.url()).pathname === "/api/levytate-auth/request" && response.request().method() === "POST");
+    const requested = observe(login.waitForResponse(response => new URL(response.url()).pathname === "/api/levytate-auth/request" && response.request().method() === "POST"));
     phase="submit renewed sign-in link";
     await login.getByRole("button", { name: "Send secure sign-in link", exact: true }).click();
     phase="await renewed sign-in response";
-    const response = await requested;
+    const response = await observed(requested);
     if (response.status() === 429) throw new Error("BLOCKED: natural authentication rate budget reached; no reset permitted");
     report("retained form signs in again through actual captured email route", response.status() === 200);
     phase="redeem renewed captured callback";
     await login.goto(await waitForCapturedLink(capture, user.email, app, after));
     await login.waitForURL(url => url.origin === app && url.pathname.includes("/app"));
     phase="visible workspace reconnect";
-    const reconnected = page.waitForResponse(response => new URL(response.url()).pathname === endpoint && response.request().method() === "GET");
+    const reconnected = observe(page.waitForResponse(response => new URL(response.url()).pathname === endpoint && response.request().method() === "GET"));
     await recovery.getByRole("button", { name: "Reconnect workspace", exact: true }).click();
-    const read = await reconnected;
+    const read = await observed(reconnected);
     const actual = (await read.json()).workspace;
     report("visible reconnect reads genuine same-account submitted state", read.status() === 200 && actual.meta?.userEmail === user.email && actual.meta.organisationId === tenant.id && actual.data.applications.some(row => row.id === applicationId && ["Awaiting Manager Review", "Submitted to Line Manager"].includes(row.status)));
     // The application is now read-only, but its exact retained receipt must be
     // recoverable. A fresh edited command would still be denied by the server.
     await page.getByText(originalAnswer, { exact: true }).waitFor();
     report("pending update stays open after reconnect", await recovery.isVisible());
-    phase="post-reconnect original receipt retry";const submitReplay = page.waitForResponse(predicate);
+    phase="post-reconnect original receipt retry";const submitReplay = observe(page.waitForResponse(predicate));
     await recovery.getByRole("button", { name: "Retry original update", exact: true }).click();
-    const confirmation = await submitReplay;
+    const confirmation = await observed(submitReplay);
     report("post-reconnect retry sends the exact original revision and body", confirmation.status() === 200 && confirmation.request().postData() === originalSubmit);
     await recovery.waitFor({ state: "hidden" });
     report("confirmed submission receipt creates no duplicate revision, history, receipt or audit", same(submitted, await snapshot()));

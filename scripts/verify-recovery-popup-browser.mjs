@@ -5,6 +5,7 @@ import { resolve, isAbsolute } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import { build } from "esbuild";
+import { observeBrowserEvent } from "./release-workspace-recovery-browser.mjs";
 
 const {values}=parseArgs({options:{browser:{type:"string"},playwright:{type:"string"}},strict:true});
 assert(isAbsolute(values.browser??"")&&isAbsolute(values.playwright??""),"Explicit local browser paths required");
@@ -26,6 +27,7 @@ try{
  stage="actual recovery modal";await page.goto(probe);const dialog=page.getByRole("dialog",{name:"Update awaiting confirmation",exact:true});await dialog.waitFor();const button=dialog.getByRole("button",{name:"Sign in in new tab",exact:true});assert(await button.isEnabled());
  stage="click recovery button";const next=context.waitForEvent("page").catch(error=>({safeError:error}));await button.click();observations.clickCompleted=true;stage="await context popup";const popup=await next;if(popup.safeError)throw popup.safeError;popup.setDefaultTimeout(10000);
  stage="real public login form";await popup.getByRole("textbox",{name:"Work email",exact:true}).waitFor();const location=new URL(popup.url());assert.equal(location.origin,app);assert.equal(location.pathname,"/levytate/login");assert.equal(authPosts,0);assert(await dialog.isVisible());assert.equal(await page.getByRole("textbox",{name:"Retained answer",exact:true,includeHidden:true}).inputValue(),"Synthetic original answer");
- console.log(JSON.stringify({result:"PASS",kind:"actual-recovery-components-and-public-login-GET-not-authentication-proof",browserVersion:browser.version(),assertions:6,authRequests:authPosts,observations}));await context.close();
+ stage="close before an expected response";const abandoned=observeBrowserEvent(popup.waitForResponse(response=>new URL(response.url()).pathname==="/never-requested"));await popup.close();assert((await abandoned).error instanceof Error);
+ console.log(JSON.stringify({result:"PASS",kind:"actual-recovery-components-and-public-login-GET-not-authentication-proof",browserVersion:browser.version(),assertions:7,authRequests:authPosts,observations}));await context.close();
 }catch(error){console.log(JSON.stringify({result:"FAIL",safeStage:stage,safeErrorClass:["TimeoutError","TypeError"].includes(error?.name)?error.name:"Error",authRequests:authPosts,observations}));process.exitCode=1;}
 finally{await browser?.close();if(server.listening)await new Promise(resolve=>server.close(resolve));}
