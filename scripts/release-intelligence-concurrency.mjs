@@ -9,7 +9,7 @@ import { createHash, randomUUID } from "node:crypto";
 const runtime = process.env.RELEASE_LOCAL_RUNTIME;
 const database = process.env.RELEASE_TEST_DATABASE;
 const candidate = new URL("../supabase/release-migrations/20261110090943_client_intelligence_atomic_commands.sql", import.meta.url);
-const candidateHash = "1e3bff237a0e7594675e43193099d701b14a1a7e299167bdb4ba2b763de8ea60";
+const candidateHash = "ed54f19093a13d11c5aab15c799183c0f01f99e158c5bf92a60546b0773134f7";
 if (!runtime?.startsWith("/private/tmp/levytate-release-runtime.") || database !== "levytate_release_intelligence_review26") throw new Error("Dedicated local Intelligence review database required");
 if (createHash("sha256").update(readFileSync(candidate)).digest("hex") !== candidateHash) throw new Error("Reviewed candidate hash differs");
 const state = JSON.parse(readFileSync(`${runtime}/private-stack-state.json`, "utf8"));

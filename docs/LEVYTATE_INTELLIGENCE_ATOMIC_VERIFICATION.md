@@ -2,7 +2,7 @@
 
 Local engineering evidence recorded 10 November 2026. This does not authorise hosted migration execution, Production deployment, paid model calls, or external communications. The execution owner and remaining release gates remain in `LEVYTATE_CLIENT_RELEASE_EXECUTION.md`.
 
-Candidate27 is `20261110090943_client_intelligence_atomic_commands.sql`, SHA-256 `1e3bff237a0e7594675e43193099d701b14a1a7e299167bdb4ba2b763de8ea60`. Earlier release migration bytes are unchanged. The generated release worktree contains27 ordered files including the two approved bootstrap files;038 remains excluded.
+Candidate27 is `20261110090943_client_intelligence_atomic_commands.sql`, SHA-256 `ed54f19093a13d11c5aab15c799183c0f01f99e158c5bf92a60546b0773134f7`. Earlier release migration bytes are unchanged. The generated release worktree contains27 ordered files including the two approved bootstrap files;038 remains excluded.
 
 Both visible signal families now use one actor-bound SQL command for state, attributable signal history, accepted Operations action, audit and exact retry receipt. Current employer/actor authority is checked before receipt lookup. Reconciliation captures source hashes, workspace revision and bounded eligible IDs before generation; missing source coverage fails without persisting an analysis. Decisions require the original signal revision and unchanged source evidence. Browser routes also pass the original employer as a separate service argument, checked before any command. Microsoft refresh retains its existing canonical external-actor gate and cannot implicitly accept an action.
 
@@ -10,13 +10,14 @@ Recorded reconciliation time distinguishes an unchecked workspace from a genuine
 
 ## Actual local evidence
 
-Database: exclusive `levytate_release_intelligence_review26`, PostgreSQL17.11, initialized from the reviewed26 schema without copied employer/Auth/Storage data or fabricated migration rows. The reviewed27 candidate was compiled, then independently reviewed exact function replacements were used during iteration. A fresh complete27 rebuild remains a separate independent check.
+Database: exclusive `levytate_release_intelligence_review26`, PostgreSQL17.11, initialized from the reviewed26 schema without copied employer/Auth/Storage data or fabricated migration rows. The reviewed27 candidate was compiled, then independently reviewed exact function replacements were used during iteration. The verifier independently rebuilt the prior1e3 candidate from the full27-file chain and reran57 atomic,9 historical,9 Intelligence readiness,8 release readiness,5 independent readiness and15 Learning Time assertions successfully on an empty database. The final terminal-status-only ed54 followup requires its own fresh complete-chain check.
 
 | Check | Actual result |
 |---|---|
 | Existing26 defect reproduction |4 reproduced: partial signal/history failure, denied direct Operations insert, denied action-event insert, stale overwrite |
 | Atomic transaction/source tests |57 PASS, rollback only |
-| Archived/inactive historical evidence |9 PASS, rollback only |
+| Archived/inactive/terminal historical evidence |21 PASS, rollback only |
+| Application and current-manager source paths |6 PASS, rollback only |
 | Final candidate transaction races |31 PASS; each wait verified with `pg_blocking_pids` before explicit release |
 | New Intelligence readiness failures |9 PASS, rollback only |
 | Existing release readiness |8 PASS |
@@ -24,7 +25,7 @@ Database: exclusive `levytate_release_intelligence_review26`, PostgreSQL17.11, i
 | Service, source, health adapter and worktree unit tests |102 PASS across5 files |
 | Full lint |PASS |
 
-Earlier candidate failures were retained as evidence: the first migration attempt failed atomically with42601; actual operational-action signal shape failed403 before correction; revoked named-owner reuse incorrectly succeeded; archived-source resolution failed403; missing signal revision falsely reported ready. Each was challenged before its correction. A synthetic Autopilot test initially used an invalid lane; the fixture was corrected to the real `needs_your_decision` value, with no product relaxation.
+Earlier candidate failures were retained as evidence: the first migration attempt failed atomically with42601; actual operational-action signal shape failed403 before correction; revoked named-owner reuse incorrectly succeeded; archived-source resolution failed403; missing signal revision falsely reported ready; terminal learner lifecycle states remained eligible despite an Active record. The final candidate excludes withdrawn, achieved and completed-without-achievement learners from current source sets, counts and actionable evidence, while retaining exact resolved history. Each was challenged before its correction. A synthetic Autopilot test initially used an invalid lane; the fixture was corrected to the real `needs_your_decision` value, with no product relaxation.
 
 The31-race suite leaves fictional review rows for independent inspection. Auth users, Storage objects and migration ledger rows remain zero. The Learning Time readiness suite passed14 assertions in this database, then its final *empty employer/People database* assertion failed because those deliberate race fixtures exist. Its complete run must use the independent empty schema database; the assertion was preserved.
 
