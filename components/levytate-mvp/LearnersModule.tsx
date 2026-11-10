@@ -227,15 +227,15 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
 
   return (
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5">
-      <OperationalMetricRail items={[
-        { label: "Total records", value: summary?.total ?? 0 },
-        { label: "Pre-enrolment", value: summary?.preEnrolment ?? 0, tone: "neutral" },
-        { label: "Active learners", value: summary?.activeLearners ?? 0, tone: "healthy" },
-        { label: "Break in learning", value: summary?.breakInLearning ?? 0, tone: "watch" },
-        { label: "Assessment stage", value: summary?.assessmentStage ?? 0, tone: "info" },
-        { label: "Achieved", value: summary?.achieved ?? 0, tone: "healthy" },
-        { label: "Need attention", value: summary?.needingAttention ?? 0, tone: "risk" },
-      ]} />
+      {summary && !error ? <OperationalMetricRail items={[
+        { label: "Total records", value: summary.total },
+        { label: "Pre-enrolment", value: summary.preEnrolment, tone: "neutral" },
+        { label: "Active learners", value: summary.activeLearners, tone: "healthy" },
+        { label: "Break in learning", value: summary.breakInLearning, tone: "watch" },
+        { label: "Assessment stage", value: summary.assessmentStage, tone: "info" },
+        { label: "Achieved", value: summary.achieved, tone: "healthy" },
+        { label: "Need attention", value: summary.needingAttention, tone: "risk" },
+      ]} /> : null}
 
       <MvpPanel title="Learners" eyebrow="Lifecycle operations">
         {mayMutatePreEnrolment ? <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[#102c3d]/[0.07] pb-4"><p className="text-xs leading-5 text-[#102c3d]/[0.52]">Start pre-enrolment from a final-approved application. Historical learner import is not enabled.</p><button type="button" onClick={() => setOnboarding(true)} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white"><Plus size={15} />Start pre-enrolment</button></div> : null}
@@ -263,7 +263,7 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
 
         {loading ? (
           <div className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] px-5 py-10 text-center text-sm font-semibold text-[#102c3d]/[0.54]">Loading learner lifecycle records.</div>
-        ) : visible.length ? (
+        ) : error ? null : visible.length ? (
           <>
             <div className="hidden min-w-0 md:block">
               <TableShell testId="learners-table-scroll" minimumWidthClass="min-w-[1040px]" tableClassName="table-fixed">
