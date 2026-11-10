@@ -42,6 +42,14 @@ describe("actual workspace bootstrap rejects stale retained account scope before
     expect((await GET(request())).status).toBe(409);
     expect(mocks.bootstrap).not.toHaveBeenCalled();
   });
+  it("withholds a newly resolved employer if membership changes between the scope check and bootstrap", async () => {
+    mocks.bootstrap.mockResolvedValue({ meta: { userEmail: email, organisationId: otherOrganisationId }, data: { privateMarker: "actual-current-workspace" } });
+    const response = await GET(request());
+    expect(response.status).toBe(409);
+    expect(await response.text()).not.toContain("actual-current-workspace");
+    expect(mocks.select).toHaveBeenCalledOnce();
+    expect(mocks.bootstrap).toHaveBeenCalledOnce();
+  });
   it.each([[], [member, member], [{ ...member, active: false }]].map(members => ({ members })))("rejects an unknown, ambiguous or inactive membership", async ({ members }) => {
     mocks.select.mockResolvedValue(members);
     expect((await GET(request())).status).toBe(409);

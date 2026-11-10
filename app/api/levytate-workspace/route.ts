@@ -22,6 +22,12 @@ export async function GET(request: Request) {
     if (!session) return noStore({ message: "Unauthorised." }, 401);
     await assertExpectedWorkspace(request, session.email);
     const workspace = await getWorkspaceBootstrapForSession(session);
+    // Bootstrap resolves the current membership independently. If it changed
+    // while this read was in flight, do not deliver it into the retained form.
+    const expectedOrganisation = request.headers.get("x-levytate-organisation");
+    if (expectedOrganisation !== null && expectedOrganisation.trim().toLowerCase() !== workspace.meta.organisationId.toLowerCase()) {
+      return noStore({ message: "Your workspace has changed. Reload to reconnect." }, 409);
+    }
     return noStore({ ok: true, workspace });
   } catch (error) {
     if (error instanceof ClientRequestError) return noStore({ message: error.message }, error.status);
