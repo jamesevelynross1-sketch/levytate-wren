@@ -78,7 +78,10 @@ try {
   let timer;
   try { await Promise.race([held, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("Stub request missing")), 5000); })]); }
   finally { clearTimeout(timer); }
-  observations.pending = { labelCount: await label.count(), roleCount: await role.count(), valueRetained: await role.inputValue() === text, disabled: await role.isDisabled() };
+  const pendingDialog = page.getByRole("dialog", { name: "Update awaiting confirmation", exact: true, includeHidden: true });
+  observations.pending = { labelCount: await label.count(), roleCount: await role.count(), valueRetained: await role.inputValue() === text, disabled: await role.isDisabled(), recoveryVisible: await pendingDialog.isVisible(), retryDisabled: await pendingDialog.getByRole("button", { name: "Retry original update", exact: true, includeHidden: true }).isDisabled() };
+  assert.equal(observations.pending.recoveryVisible, true);
+  assert.equal(observations.pending.retryDisabled, true);
   release();
   stage = "lift-failed-response";
   await page.getByRole("dialog", { name: "Update awaiting confirmation", exact: true }).waitFor();
@@ -89,7 +92,7 @@ try {
     assert.equal(observation.disabled, true);
   }
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ result: "PASS", kind: "isolated-actual-components-stub-transport-not-auth", assertions: 12, observations }));
+  console.log(JSON.stringify({ result: "PASS", kind: "isolated-actual-components-stub-transport-not-auth", assertions: 14, observations }));
   await context.close();
 } catch (cause) {
   console.log(JSON.stringify({ result: "FAIL", safeStage: stage, safeErrorClass: ["TimeoutError", "TypeError"].includes(cause?.name) ? cause.name : "Error", observations }));

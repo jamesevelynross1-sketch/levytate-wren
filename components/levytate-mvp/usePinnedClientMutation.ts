@@ -12,7 +12,9 @@ export function usePinnedClientMutation<T>(identity: ClientIdentity | null, path
   const [reconciled, setReconciled] = useState(0);
   const run = useCallback(async (command?: unknown, confirmed?: (value: T) => void) => {
     if (controller.busy) throw new Error("An update is already in progress.");
-    setWorking(true); setError("");
+    // The command is retained while transport is still in flight, too. Expose
+    // recovery immediately so native modality prevents navigation losing it.
+    setWorking(true); setPending(true); setError("");
     try {
       const result = command === undefined ? await controller.retry() : await controller.execute(command, confirmed);
       if (command === undefined) setReconciled((value) => value + 1);
