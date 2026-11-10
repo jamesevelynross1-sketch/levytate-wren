@@ -5,7 +5,7 @@ vi.mock("@/lib/server/levytate-authorised-session", () => ({ readAuthorisedLevyT
 vi.mock("@/lib/server/levytate-supabase", () => ({ getLevyTateSupabaseConfig: mocks.config, supabaseSelect: mocks.select }));
 vi.mock("@/lib/server/levytate-auth-rate-limit", () => ({ checkAuthenticatedWriteLimit: vi.fn(), LevyTateRateLimitStoreError: class extends Error {} }));
 vi.mock("@/lib/server/levytate-manager-scope", () => ({ LevyTateManagerScopeError: class extends Error {} }));
-vi.mock("@/lib/server/levytate-learner-lifecycle", () => ({ LevyTateLearnerLifecyclePermissionError: class extends Error {} }));
+vi.mock("@/lib/server/levytate-learner-lifecycle", () => ({ LevyTateLearnerLifecycleConflictError: class extends Error {}, LevyTateLearnerLifecyclePermissionError: class extends Error {} }));
 vi.mock("@/lib/server/levytate-manager-actions", () => ({ listManagerActions: mocks.list, getManagerAction: mocks.detail }));
 vi.mock("@/lib/server/levytate-operational-actions", () => ({
   getOperationalAction: mocks.detail, getOperationalActionManagementDetail: mocks.management, getOperationalActionHistory: mocks.history,

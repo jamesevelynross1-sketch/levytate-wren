@@ -6,7 +6,7 @@ vi.mock("@/lib/server/levytate-provider-auth", () => ({ readAuthorisedLevyTatePr
 vi.mock("@/lib/server/levytate-auth-rate-limit", () => ({ checkAuthenticatedWriteLimit: mocks.budget, LevyTateRateLimitStoreError: class extends Error {} }));
 vi.mock("@/lib/server/levytate-service-requests", () => ({ LevyTateServiceRequestError: class extends Error {}, applyEmployerRequestActionForSession: mocks.service, getEmployerRequestsWorkspaceForSession: mocks.service, applyProviderRequestActionForSession: mocks.service, getProviderWorkspaceBootstrapForSession: mocks.service }));
 vi.mock("@/lib/server/levytate-provider-access-admin", () => ({ LevyTateProviderAccessAdminError: class extends Error {}, listProviderAccessForAdmin: mocks.service, provisionProviderAccess: mocks.service, updateProviderAccess: mocks.service }));
-vi.mock("@/lib/server/levytate-learner-lifecycle", () => ({ LevyTateLearnerLifecyclePermissionError: class extends Error {} }));
+vi.mock("@/lib/server/levytate-learner-lifecycle", () => ({ LevyTateLearnerLifecycleConflictError: class extends Error {}, LevyTateLearnerLifecyclePermissionError: class extends Error {} }));
 vi.mock("@/lib/server/levytate-operational-actions", () => ({
   LevyTateOperationalActionError: class extends Error {}, LevyTateOperationalActionConflictError: class extends Error {}, LevyTateManagerOperationalActionAccessError: class extends Error {},
   acknowledgeOperationalAction: mocks.service, assignOperationalActionOwner: mocks.service, cancelOperationalAction: mocks.service, completeOperationalAction: mocks.service, dismissOperationalAction: mocks.service,
@@ -16,6 +16,7 @@ import * as employer from "@/app/api/levytate-requests/route";
 import * as provider from "@/app/api/levytate-provider/opportunities/route";
 import * as access from "@/app/api/levytate-platform/provider-access/route";
 import * as action from "@/app/api/levytate-operational-actions/[actionId]/route";
+import { LevyTateLearnerLifecycleConflictError } from "@/lib/server/levytate-learner-lifecycle";
 import { LevyTateManagerOperationalActionAccessError } from "@/lib/server/levytate-operational-actions";
 
 function request(method = "POST", body: unknown = {}) {
@@ -46,6 +47,13 @@ describe("private client HTTP outage boundaries (unit, not real authentication)"
   it.each(routes)("%s handles a missing session before reading data or writing", async (_name, invoke) => {
     mocks.session.mockResolvedValue(null);
     const response = await invoke(); expect(response.status).toBe(401); expect(response.headers.get("cache-control")).toContain("no-store"); expect(mocks.service).not.toHaveBeenCalled();
+  });
+  it.each(["GET", "PATCH"])("action %s distinguishes a source-context conflict from genuine dependency failure", async method => {
+    const invoke = () => method === "GET" ? action.GET(request("GET"), context) : action.PATCH(request("PATCH", { command: "acknowledge", expectedVersion: 1 }), context);
+    mocks.service.mockRejectedValueOnce(new LevyTateLearnerLifecycleConflictError("private changed tenant detail"));
+    const conflict = await invoke(); expect(conflict.status).toBe(409); expect(await conflict.text()).not.toContain("private changed");
+    mocks.service.mockRejectedValueOnce(new Error("private dependency detail"));
+    const outage = await invoke(); expect(outage.status).toBe(503); expect(await outage.text()).not.toContain("private dependency");
   });
   it("returns403 for a manager who no longer owns the action", async () => {
     const denied = new LevyTateManagerOperationalActionAccessError(); denied.message = "private scope";

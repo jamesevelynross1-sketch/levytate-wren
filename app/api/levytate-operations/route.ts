@@ -2,7 +2,8 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
 import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
-import { LevyTateLearnerLifecycleError, LevyTateLearnerLifecyclePermissionError } from "@/lib/server/levytate-learner-lifecycle";
+import { LevyTateLearnerLifecycleConflictError, LevyTateLearnerLifecycleError, LevyTateLearnerLifecyclePermissionError } from "@/lib/server/levytate-learner-lifecycle";
+import { LevyTateOperationalActionConflictError } from "@/lib/server/levytate-operational-actions";
 import { getOrganisationOperationsSummary, type OperationsQuery } from "@/lib/server/levytate-operations";
 import { logLevyTateServerError, operationalActionsRefreshError } from "@/lib/server/levytate-safe-api-error";
 import { assertExpectedWorkspace, ClientRequestError, readAuthenticatedJson, requireActionKeys } from "@/lib/server/levytate-request-boundary";
@@ -35,10 +36,11 @@ async function respond(request: Request, synchronise: boolean) {
       const body = await readAuthenticatedJson(request, session.email, 1024);
       requireActionKeys(body, []);
     }
-    const operations = await getOrganisationOperationsSummary(session, queryFor(url), { synchronise });
+    const operations = await getOrganisationOperationsSummary(session, queryFor(url), { synchronise, expectedOrganisationId: request.headers.get("x-levytate-organisation") ?? undefined });
     if (!synchronise) assertReturnedReadScope(request, operations.scope);
     return NextResponse.json({ ok: true, ...operations }, { headers });
   } catch (error) {
+    if (error instanceof LevyTateOperationalActionConflictError || error instanceof LevyTateLearnerLifecycleConflictError) return NextResponse.json({ message: "Your workspace changed while loading Operations. Reload to reconnect." }, { status: 409, headers });
     if (error instanceof ClientRequestError) return NextResponse.json({ message: error.message }, { status: error.status, headers });
     const status = error instanceof LevyTateLearnerLifecyclePermissionError
       ? 403

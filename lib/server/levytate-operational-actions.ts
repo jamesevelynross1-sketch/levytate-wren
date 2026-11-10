@@ -228,12 +228,14 @@ export type OperationalActionSynchronisationResult = {
 
 export async function synchroniseOrganisationOperationalActions(
   session: LevyTateBetaSession,
+  expectedOrganisationId?: string,
 ): Promise<OperationalActionSynchronisationResult> {
-  const [context, details] = await Promise.all([
-    requireOperationalActionContext(session, "write"),
-    listOrganisationLearnerLifecycleDetails(session),
-  ]);
+  const context = await requireOperationalActionContext(session, "write");
   const organisationId = context.organisation.id;
+  if (expectedOrganisationId !== undefined && expectedOrganisationId.trim().toLowerCase() !== organisationId.toLowerCase()) {
+    throw new LevyTateOperationalActionConflictError("Your workspace has changed. Reload to reconnect.");
+  }
+  const details = await listOrganisationLearnerLifecycleDetails(session, organisationId);
   rememberLearnerSources(context,details);
   const now = new Date().toISOString();
   const derived = buildOrganisationOperationalItems(details, new Date(now));
@@ -741,7 +743,7 @@ export async function getOperationalActionManagementDetail(
     };
   }
   const [details, history, occurrences, ownerOptions] = await Promise.all([
-    listOrganisationLearnerLifecycleDetails(session),
+    listOrganisationLearnerLifecycleDetails(session, context.organisation.id),
     selectActionHistory(context.organisation.id, actionId),
     selectActions(context.organisation.id, { sourceKey: action.sourceKey, includeTerminal: true }),
     buildOwnerOptions(context, action),
@@ -794,7 +796,7 @@ export async function completeOperationalAction(
   const replay=await prepareOperationalRequest(context,action,expectedVersion,"transition",{action:"complete",completionNote,resolvedOutsideLevyTate});if(replay)return replay;
   assertNotApplicationSourceManaged(action);
   assertVersion(action, expectedVersion);
-  const details = await listOrganisationLearnerLifecycleDetails(session);
+  const details = await listOrganisationLearnerLifecycleDetails(session, context.organisation.id);
   rememberLearnerSources(context,details);
   const currentKeys = new Set(uniqueSourceItems(buildOrganisationOperationalItems(details).items).map((item) => item.sourceKey));
   if (currentKeys.has(action.sourceKey)) {
@@ -868,7 +870,7 @@ export async function updateOperationalActionDueDate(
   if (isOperationalActionTerminal(action.status)) throw new LevyTateOperationalActionError("Terminal actions cannot have their due date changed.");
   const cleanDate = dueDate.trim();
   if (cleanDate && !/^\d{4}-\d{2}-\d{2}$/.test(cleanDate)) throw new LevyTateOperationalActionError("Enter a valid due date.");
-  const details = await listOrganisationLearnerLifecycleDetails(session);
+  const details = await listOrganisationLearnerLifecycleDetails(session, context.organisation.id);
   rememberLearnerSources(context,details);
   const derived = buildOrganisationOperationalItems(details).items.find((item) => item.sourceKey === action.sourceKey);
   const sourceDate = derived?.dueDate ?? "";

@@ -1357,10 +1357,16 @@ export async function listOrganisationLearnerLifecycleSummaries(session: LevyTat
     .sort(compareLearnerOperationalPriority);
 }
 
-export async function listOrganisationLearnerLifecycleDetails(session: LevyTateBetaSession): Promise<LearnerRecordDetail[]> {
+export async function listOrganisationLearnerLifecycleDetails(
+  session: LevyTateBetaSession,
+  expectedOrganisationId?: string,
+): Promise<LearnerRecordDetail[]> {
   const context = await contextForSession(session);
   assertOrganisationLearnerReadPermission(context);
   const organisationId = context.organisation.id;
+  if (expectedOrganisationId !== undefined && expectedOrganisationId.trim().toLowerCase() !== organisationId.toLowerCase()) {
+    throw new LevyTateLearnerLifecycleConflictError("Your workspace has changed. Reload to reconnect.");
+  }
   const rows = await selectMany<LearnerRecordRow>(learnerRecordsTable, organisationId, "record_status=eq.Active", "updated_at.desc");
   if (!rows.length) return [];
 

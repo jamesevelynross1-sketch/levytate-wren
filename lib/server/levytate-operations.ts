@@ -14,7 +14,7 @@ import {
   type OperationsResponse,
 } from "@/lib/levytate/mvp/operations-centre";
 import { getLearnerLifecycleServerContext, listOrganisationLearnerLifecycleDetails } from "@/lib/server/levytate-learner-lifecycle";
-import { listOperationalActions, synchroniseOrganisationOperationalActions } from "@/lib/server/levytate-operational-actions";
+import { LevyTateOperationalActionConflictError, listOperationalActions, synchroniseOrganisationOperationalActions } from "@/lib/server/levytate-operational-actions";
 
 export type OperationsQuery = {
   priority?: string;
@@ -35,15 +35,23 @@ export type OperationsQuery = {
 export async function getOrganisationOperationsSummary(
   session: LevyTateBetaSession,
   query: OperationsQuery = {},
-  options: { synchronise?: boolean } = {},
+  options: { synchronise?: boolean; expectedOrganisationId?: string } = {},
 ): Promise<OperationsResponse> {
-  if (options.synchronise) await synchroniseOrganisationOperationalActions(session);
-  const [details, actionContext] = await Promise.all([
-    listOrganisationLearnerLifecycleDetails(session),
-    getLearnerLifecycleServerContext(session),
-  ]);
-  const derived = buildOrganisationOperationalItems(details);
+  const synchronised = options.synchronise
+    ? await synchroniseOrganisationOperationalActions(session, options.expectedOrganisationId)
+    : undefined;
+  const actionContext = await getLearnerLifecycleServerContext(session);
+  const organisationId = actionContext.organisation.id;
+  const expectedOrganisationId = options.expectedOrganisationId ?? synchronised?.organisationId;
+  const changed = () => new LevyTateOperationalActionConflictError("Your workspace has changed. Reload to reconnect.");
+  if (expectedOrganisationId !== undefined && expectedOrganisationId.trim().toLowerCase() !== organisationId.toLowerCase()) throw changed();
+  const details = await listOrganisationLearnerLifecycleDetails(session, organisationId);
   const activeActions = await listOperationalActions(session);
+  if (activeActions.some(action => action.organisationId !== organisationId)) throw changed();
+  const currentContext = await getLearnerLifecycleServerContext(session);
+  if (currentContext.organisation.id !== organisationId || currentContext.user.id !== actionContext.user.id
+    || currentContext.user.email !== actionContext.user.email || currentContext.user.role !== actionContext.user.role) throw changed();
+  const derived = buildOrganisationOperationalItems(details);
   const actionBySource = new Map(activeActions.map((action) => [action.sourceKey, action]));
   const currentItems = derived.items.map((item) => {
     const action = actionBySource.get(item.sourceKey);

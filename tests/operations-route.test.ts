@@ -5,8 +5,9 @@ vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => ({ value: "s
 vi.mock("@/lib/server/levytate-authorised-session", () => ({ readAuthorisedLevyTateBetaSession: mocks.session }));
 vi.mock("@/lib/server/levytate-operations", () => ({ getOrganisationOperationsSummary: mocks.summary }));
 vi.mock("@/lib/server/levytate-auth-rate-limit", () => ({ checkAuthenticatedWriteLimit: mocks.budget, LevyTateRateLimitStoreError: class extends Error {} }));
-vi.mock("@/lib/server/levytate-learner-lifecycle", () => ({ LevyTateLearnerLifecyclePermissionError: class extends Error {}, LevyTateLearnerLifecycleError: class extends Error {} }));
+vi.mock("@/lib/server/levytate-learner-lifecycle", () => ({ LevyTateLearnerLifecycleConflictError: class extends Error {}, LevyTateLearnerLifecyclePermissionError: class extends Error {}, LevyTateLearnerLifecycleError: class extends Error {} }));
 import { GET, POST } from "@/app/api/levytate-operations/route";
+import { LevyTateOperationalActionConflictError } from "@/lib/server/levytate-operational-actions";
 import { LevyTateRateLimitStoreError } from "@/lib/server/levytate-auth-rate-limit";
 import { LevyTateLearnerLifecyclePermissionError } from "@/lib/server/levytate-learner-lifecycle";
 import { logLevyTateServerError } from "@/lib/server/levytate-safe-api-error";
@@ -22,7 +23,7 @@ describe("Operations HTTP boundary (unit)", () => {
   it("GET is read-only and cannot opt into synchronisation", async () => {
     const response = await GET(new Request("https://candidate.vercel.app/api/levytate-operations?priority=Critical"));
     expect(response.status).toBe(200); expect(response.headers.get("cache-control")).toContain("no-store");
-    expect(mocks.summary).toHaveBeenCalledWith({ email: "lead@fictional.invalid" }, expect.objectContaining({ priority: "Critical" }), { synchronise: false });
+    expect(mocks.summary).toHaveBeenCalledWith({ email: "lead@fictional.invalid" }, expect.objectContaining({ priority: "Critical" }), { synchronise: false, expectedOrganisationId: undefined });
     mocks.summary.mockClear();
     expect((await GET(new Request("https://candidate.vercel.app/api/levytate-operations?synchronise=true"))).status).toBe(400);
     expect(mocks.summary).not.toHaveBeenCalled(); expect(mocks.budget).not.toHaveBeenCalled();
@@ -57,7 +58,16 @@ describe("Operations HTTP boundary (unit)", () => {
   it("explicit POST synchronises only after a bounded same-origin budgeted request", async () => {
     expect((await POST(post())).status).toBe(200);
     expect(mocks.budget).toHaveBeenCalledOnce();
-    expect(mocks.summary).toHaveBeenCalledWith({ email: "lead@fictional.invalid" }, expect.objectContaining({ priority: "Critical" }), { synchronise: true });
+    expect(mocks.summary).toHaveBeenCalledWith({ email: "lead@fictional.invalid" }, expect.objectContaining({ priority: "Critical" }), { synchronise: true, expectedOrganisationId: undefined });
+  });
+  it("passes the original POST tenant through to the writing service and maps a post-pin conflict", async () => {
+    const organisationId = "10000000-0000-4000-8000-000000000001";
+    mocks.membership.mockResolvedValue([{ email: "lead@fictional.invalid", organisation_id: organisationId, active: true }]);
+    const request = () => { const value = post(); value.headers.set("x-levytate-organisation", organisationId); return value; };
+    expect((await POST(request())).status).toBe(200);
+    expect(mocks.summary).toHaveBeenCalledWith({ email: "lead@fictional.invalid" }, expect.any(Object), { synchronise: true, expectedOrganisationId: organisationId });
+    mocks.summary.mockRejectedValueOnce(new LevyTateOperationalActionConflictError("private changed membership detail"));
+    const response = await POST(request()); expect(response.status).toBe(409); expect(await response.text()).not.toContain("private changed");
   });
   it("rejects cross-origin, tenant override, oversize and malformed JSON", async () => {
     expect((await POST(post({}, "https://other.vercel.app"))).status).toBe(403);

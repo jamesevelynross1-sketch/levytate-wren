@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
 import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
-import { LevyTateLearnerLifecyclePermissionError } from "@/lib/server/levytate-learner-lifecycle";
+import { LevyTateLearnerLifecycleConflictError, LevyTateLearnerLifecyclePermissionError } from "@/lib/server/levytate-learner-lifecycle";
 import {
   acknowledgeOperationalAction,
   assignOperationalActionOwner,
@@ -73,6 +73,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 }
 
 function actionErrorResponse(error: unknown) {
+  if (error instanceof LevyTateLearnerLifecycleConflictError) return reply({ message: "Your workspace changed while loading the action. Reload to reconnect." }, 409);
   if (error instanceof ClientRequestError) return reply({ message: error.message }, error.status);
   const status = error instanceof LevyTateLearnerLifecyclePermissionError || error instanceof LevyTateManagerOperationalActionAccessError
     ? 403
