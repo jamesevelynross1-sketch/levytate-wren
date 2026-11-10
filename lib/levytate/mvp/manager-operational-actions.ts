@@ -16,6 +16,8 @@ export const managerOwnedOperationalActionTypes = [
 export type ManagerOperationalActionFilter = "all" | "open" | "acknowledged" | "in_progress" | "overdue";
 export type ManagerOperationalActionKindFilter = "all" | "application_review" | "manager_support";
 
+export type ManagerOperationalScope = { organisationId: string; userEmail: string; role: "Line Manager" };
+
 export type ManagerOperationalActionListItem = {
   actionId: string;
   title: string;
@@ -39,6 +41,7 @@ export type ManagerOperationalActionListItem = {
 export type ManagerOperationalActionHistoryItem = Pick<OperationalActionEvent, "eventType" | "actorName" | "eventDate" | "summary">;
 
 export type ManagerOperationalActionDetail = ManagerOperationalActionListItem & {
+  scope: ManagerOperationalScope;
   employee: { name: string; jobTitle: string; department: string; site: string };
   programme: { name: string; providerName: string };
   ownerLabel: string;
@@ -48,6 +51,7 @@ export type ManagerOperationalActionDetail = ManagerOperationalActionListItem & 
 };
 
 export type ManagerOperationalActionsResponse = {
+  scope: ManagerOperationalScope;
   source: "supabase";
   generatedAt: string;
   summary: { open: number; acknowledged: number; inProgress: number; overdue: number };

@@ -67,6 +67,7 @@ export async function getOrganisationOperationsSummary(
   });
   const filtered = currentItems.filter((item) => matchesQuery(item, query, actionContext.user.id));
   return {
+    scope: { organisationId: actionContext.organisation.id, userEmail: actionContext.user.email, role: actionContext.user.role },
     source: "supabase",
     generatedAt: new Date().toISOString(),
     summary: derived.summary,

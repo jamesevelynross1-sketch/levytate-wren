@@ -14,7 +14,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ act
   try {
     const { actionId } = await params;
     const body = parseAction(managerStartInput, await readAuthenticatedJson(request, session.email));
-    return NextResponse.json({ ok: true, action: await startManagerAction(session, actionId, body.expectedVersion!, body.note ?? "") });
+    return NextResponse.json({ ok: true, ...(await startManagerAction(session, actionId, body.expectedVersion!, body.note ?? "")) });
   } catch (error) {
     return managerActionErrorResponse("manager-action-start", error);
   }

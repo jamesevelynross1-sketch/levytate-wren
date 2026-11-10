@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ session: vi.fn(), summary: vi.fn(), budget: vi.fn() }));
+const mocks = vi.hoisted(() => ({ session: vi.fn(), summary: vi.fn(), budget: vi.fn(), membership: vi.fn() }));
+vi.mock("@/lib/server/levytate-supabase", () => ({ getLevyTateSupabaseConfig: () => ({}), supabaseSelect: mocks.membership }));
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => ({ value: "synthetic-session" }) }) }));
 vi.mock("@/lib/server/levytate-authorised-session", () => ({ readAuthorisedLevyTateBetaSession: mocks.session }));
 vi.mock("@/lib/server/levytate-operations", () => ({ getOrganisationOperationsSummary: mocks.summary }));
@@ -25,6 +26,21 @@ describe("Operations HTTP boundary (unit)", () => {
     mocks.summary.mockClear();
     expect((await GET(new Request("https://candidate.vercel.app/api/levytate-operations?synchronise=true"))).status).toBe(400);
     expect(mocks.summary).not.toHaveBeenCalled(); expect(mocks.budget).not.toHaveBeenCalled();
+  });
+  it("rejects stale account and tenant GET pins before loading any Operations data", async () => {
+    const organisationId = "10000000-0000-4000-8000-000000000001";
+    const request = (headers: Record<string, string>) => new Request("https://candidate.vercel.app/api/levytate-operations", { headers });
+    expect((await GET(request({ "X-LevyTate-Account": "other@fictional.invalid" }))).status).toBe(409);
+    expect(mocks.membership).not.toHaveBeenCalled(); expect(mocks.summary).not.toHaveBeenCalled();
+    mocks.membership.mockResolvedValue([{ email: "lead@fictional.invalid", organisation_id: "10000000-0000-4000-8000-000000000002", active: true }]);
+    expect((await GET(request({ "X-LevyTate-Account": "lead@fictional.invalid", "X-LevyTate-Organisation": organisationId }))).status).toBe(409);
+    expect(mocks.summary).not.toHaveBeenCalled();
+    mocks.membership.mockRejectedValueOnce(new Error("private dependency detail"));
+    expect((await GET(request({ "X-LevyTate-Organisation": organisationId }))).status).toBe(503);
+    expect(mocks.summary).not.toHaveBeenCalled();
+    mocks.membership.mockResolvedValue([{ email: "lead@fictional.invalid", organisation_id: organisationId, active: true }]);
+    expect((await GET(request({ "X-LevyTate-Account": "lead@fictional.invalid", "X-LevyTate-Organisation": organisationId }))).status).toBe(200);
+    expect(mocks.summary).toHaveBeenCalledOnce(); expect(mocks.budget).not.toHaveBeenCalled();
   });
   it("explicit POST synchronises only after a bounded same-origin budgeted request", async () => {
     expect((await POST(post())).status).toBe(200);

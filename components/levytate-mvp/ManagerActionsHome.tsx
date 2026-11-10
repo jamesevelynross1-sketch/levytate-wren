@@ -3,6 +3,9 @@
 import { ArrowRight, Clock3, LoaderCircle } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { FormTextArea, MvpModal, MvpPanel, StatusBadge } from "@/components/levytate-mvp/MvpUi";
+import { ClientMutationRecovery } from "@/components/levytate-mvp/ClientMutationRecovery";
+import { useOperationsClientCommand } from "@/components/levytate-mvp/useOperationsClientCommand";
+import { decodeManagerAction, decodeManagerActions, decodeManagerMutation } from "@/lib/levytate/operations-client-response";
 import { useRetainedWorkspaceRequest } from "@/components/levytate-mvp/useRetainedWorkspaceRequest";
 import type {
   ManagerOperationalActionDetail,
@@ -27,7 +30,9 @@ export function ManagerActionsHome({ kind = "manager_support" }: { kind?: Manage
   const [selected, setSelected] = useState<ManagerOperationalActionDetail | null>(null);
   const [startNote, setStartNote] = useState("");
   const [loading, setLoading] = useState(true);
-  const [mutating, setMutating] = useState(false);
+  const mutation = useOperationsClientCommand();
+  const mutating = mutation.locked;
+  const scope = mutation.scope;
   const [error, setError] = useState("");
   const [confirmation, setConfirmation] = useState("");
 
@@ -36,30 +41,28 @@ export function ManagerActionsHome({ kind = "manager_support" }: { kind?: Manage
     setError("");
     try {
       const request = await retainedRequest(`/api/levytate-manager/actions?status=${encodeURIComponent(nextFilter)}&kind=${encodeURIComponent(kind)}`, { cache: "no-store" });
-      const body = await request.json() as ManagerOperationalActionsResponse & { message?: string };
-      if (!request.ok) throw new Error(body.message || "Your actions could not be loaded.");
-      setResponse(body);
+      if (!request.ok) throw new Error("Your actions could not be loaded.");
+      setResponse(decodeManagerActions(await request.json(), scope));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Your actions could not be loaded.");
     } finally {
       setLoading(false);
     }
-  }, [kind, retainedRequest]);
+  }, [kind, retainedRequest, scope]);
 
   const openAction = useCallback(async (actionId: string, updateUrl = true) => {
     setError("");
     setConfirmation("");
     try {
       const request = await retainedRequest(`/api/levytate-manager/actions/${encodeURIComponent(actionId)}`, { cache: "no-store" });
-      const body = await request.json() as { action?: ManagerOperationalActionDetail; message?: string };
-      if (!request.ok || !body.action) throw new Error(body.message || "That action could not be opened.");
-      setSelected(body.action);
+      if (!request.ok) throw new Error("That action could not be opened.");
+      setSelected(decodeManagerAction(await request.json(), scope, actionId));
       setStartNote("");
       if (updateUrl) window.history.replaceState(null, "", `/levytate/app?module=Home&managerAction=${encodeURIComponent(actionId)}`);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "That action could not be opened.");
     }
-  }, [retainedRequest]);
+  }, [retainedRequest, scope]);
 
   useEffect(() => { void load(filter); }, [filter, load]);
 
@@ -69,6 +72,7 @@ export function ManagerActionsHome({ kind = "manager_support" }: { kind?: Manage
   }, [openAction]);
 
   function closeAction() {
+    if (mutation.locked) return;
     setSelected(null);
     setStartNote("");
     setConfirmation("");
@@ -76,26 +80,18 @@ export function ManagerActionsHome({ kind = "manager_support" }: { kind?: Manage
   }
 
   async function transition(action: ManagerOperationalActionListItem, command: "acknowledge" | "start", note = "") {
-    setMutating(true);
-    setError("");
-    setConfirmation("");
+    setError(""); setConfirmation("");
+    const original = { actionId: action.actionId, version: action.version, command };
     try {
-      const request = await retainedRequest(`/api/levytate-manager/actions/${encodeURIComponent(action.actionId)}/${command}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ expectedVersion: action.version, ...(command === "start" && note.trim() ? { note: note.trim() } : {}) }),
-      });
-      const body = await request.json() as { action?: ManagerOperationalActionDetail; message?: string };
-      if (!request.ok || !body.action) throw new Error(body.message || "The action could not be updated.");
-      if (selected?.actionId === action.actionId) setSelected(body.action);
-      setStartNote("");
-      setConfirmation(command === "acknowledge" ? "Action acknowledged." : "Action marked as in progress.");
-      await load(filter);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "The action could not be updated.");
-    } finally {
-      setMutating(false);
-    }
+      await mutation.execute(`/api/levytate-manager/actions/${encodeURIComponent(action.actionId)}/${command}`,
+        { expectedVersion: action.version, ...(command === "start" && note.trim() ? { note: note.trim() } : {}) },
+        value => decodeManagerMutation(value, scope, original),
+        next => {
+          setSelected(current => current?.actionId === action.actionId ? next : current);
+          setStartNote(""); setConfirmation(command === "acknowledge" ? "Action acknowledged." : "Action marked as in progress.");
+          void load(filter);
+        });
+    } catch { /* Keep the original command and note until its receipt is confirmed. */ }
   }
 
   function runPrimary(action: ManagerOperationalActionListItem) {
@@ -106,10 +102,12 @@ export function ManagerActionsHome({ kind = "manager_support" }: { kind?: Manage
   }
 
   return (
+    <>
+    <fieldset disabled={mutating} className="min-w-0">
     <MvpPanel title={kind === "all" ? "My actions" : "Other manager actions"} eyebrow="Direct-report work" actions={loading ? <LoaderCircle size={18} className="animate-spin text-[#0b6f63]" aria-label="Loading actions" /> : null}>
       <div className="grid gap-4">
         <div className="flex justify-end">
-          <button type="button" onClick={() => window.location.assign(kind === "all" ? "/levytate/app?module=Home" : "/levytate/app?module=Home&actions=all")} className="text-xs font-semibold text-[#0b6f63] hover:text-[#102c3d]">
+          <button type="button" onClick={() => !mutating && window.location.assign(kind === "all" ? "/levytate/app?module=Home" : "/levytate/app?module=Home&actions=all")} className="text-xs font-semibold text-[#0b6f63] hover:text-[#102c3d]">
             {kind === "all" ? "Back to Home" : "View all actions"}
           </button>
         </div>
@@ -178,13 +176,16 @@ export function ManagerActionsHome({ kind = "manager_support" }: { kind?: Manage
             <div className="flex flex-wrap gap-2">
               {selected.status === "open" ? <button type="button" disabled={mutating} onClick={() => void transition(selected, "acknowledge")} className="h-10 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white disabled:opacity-55">Acknowledge</button> : null}
               {selected.status === "acknowledged" ? <button type="button" disabled={mutating} onClick={() => void transition(selected, "start", startNote)} className="h-10 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white disabled:opacity-55">Start work</button> : null}
-              <a href={selected.sourceUrl} className={`inline-flex h-10 items-center rounded-full px-5 text-xs font-semibold ${selected.status === "in_progress" ? "bg-[#102c3d] text-white" : "bg-[#eaf5f1] text-[#0b6f63]"}`}>Open source workflow</a>
+              <a aria-disabled={mutating} onClick={event => { if (mutating) event.preventDefault(); }} href={selected.sourceUrl} className={`inline-flex h-10 items-center rounded-full px-5 text-xs font-semibold ${selected.status === "in_progress" ? "bg-[#102c3d] text-white" : "bg-[#eaf5f1] text-[#0b6f63]"}`}>Open source workflow</a>
             </div>
             <section><h3 className="text-sm font-semibold text-[#102c3d]">History</h3><div className="mt-3 grid gap-2">{selected.history.map((event, index) => <div key={`${event.eventDate}-${event.eventType}-${index}`} className="rounded-xl border border-[#102c3d]/[0.07] px-4 py-3"><p className="text-xs font-semibold text-[#102c3d]">{event.summary}</p><p className="mt-1 text-[11px] text-[#102c3d]/46">{event.actorName} · {formatDateTime(event.eventDate)}</p></div>)}</div></section>
           </div>
         </MvpModal>
       ) : null}
     </MvpPanel>
+    </fieldset>
+    <ClientMutationRecovery mutation={mutation} />
+    </>
   );
 }
 

@@ -31,6 +31,7 @@ const pendingEnrolment = { ...enrolment, id: "enrolment-pending", applicationId:
 workspace.data.enrolments.push(pendingEnrolment, { ...pendingEnrolment });
 
 const operations: OperationsResponse = {
+  scope: { organisationId: "fictional-validator", userEmail: "lead@fictional.invalid", role: "Apprenticeship Lead" },
   source: "supabase", generatedAt: now,
   summary: { needsAttentionNow: 1, readyToEnrol: 0, reviewsOverdue: 1, behindTarget: 0, activeBreaks: 0, approachingAssessmentCompletion: 0 },
   queues: { urgent: [{ id: "urgent-1", queueType: "urgent", learnerRecordId: "learner-1", learnerName: "Fictional Learner", programmeName: "Data Analyst", providerName: "Fictional Provider", department: "Operations", site: "HQ", lifecycleStatus: "Enrolled", priorityLevel: "High", priorityRank: 1, reason: "Provider review is overdue.", dueDate: "2026-10-10", dueStatus: "Overdue", daysOverdue: 10, timingLabel: "10 days overdue", ownerType: "Shared", actionType: "record_review", actionLabel: "Record review", actionUrl: "/levytate/app?module=Learners&learner=learner-1&action=record_review", secondaryActionUrl: "/levytate/app?module=Learners&learner=learner-1", sourceType: "review_due", sourceCondition: "provider-review-overdue", sourceKey: "learner-1:provider-review-overdue", persistentActionType: "record_provider_review" }], ready_to_enrol: [], reviews: [], progress: [], breaks: [], pre_enrolment: [], assessment: [] },

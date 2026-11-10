@@ -14,7 +14,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ act
   try {
     const { actionId } = await params;
     const body = parseAction(managerAcknowledgeInput, await readAuthenticatedJson(request, session.email));
-    return NextResponse.json({ ok: true, action: await acknowledgeManagerAction(session, actionId, body.expectedVersion!) });
+    return NextResponse.json({ ok: true, ...(await acknowledgeManagerAction(session, actionId, body.expectedVersion!)) });
   } catch (error) {
     return managerActionErrorResponse("manager-action-acknowledge", error);
   }

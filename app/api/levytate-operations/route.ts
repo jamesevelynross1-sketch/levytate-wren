@@ -5,7 +5,7 @@ import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authori
 import { LevyTateLearnerLifecycleError, LevyTateLearnerLifecyclePermissionError } from "@/lib/server/levytate-learner-lifecycle";
 import { getOrganisationOperationsSummary, type OperationsQuery } from "@/lib/server/levytate-operations";
 import { logLevyTateServerError, operationalActionsRefreshError } from "@/lib/server/levytate-safe-api-error";
-import { ClientRequestError, readAuthenticatedJson, requireActionKeys } from "@/lib/server/levytate-request-boundary";
+import { assertExpectedWorkspace, ClientRequestError, readAuthenticatedJson, requireActionKeys } from "@/lib/server/levytate-request-boundary";
 
 const headers = { "Cache-Control": "private, no-store, max-age=0" };
 
@@ -26,6 +26,7 @@ async function respond(request: Request, synchronise: boolean) {
   try {
     const session = await getSession();
     if (!session) return NextResponse.json({ message: "Unauthorised." }, { status: 401, headers });
+    if (!synchronise) await assertExpectedWorkspace(request, session.email);
     const url = new URL(request.url);
     if (url.searchParams.has("synchronise")) {
       throw new ClientRequestError("Refresh operations using the authenticated POST action, not a query parameter.", 400);
