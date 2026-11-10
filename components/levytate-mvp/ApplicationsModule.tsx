@@ -112,6 +112,11 @@ export function ApplicationsModule({
     draft.workflowPreview || !data.applications.some((application) => application.id === draft.id)
   ));
 
+  function startPreEnrolment(application: MvpApplication) {
+    setSelectedId(null);
+    setHandoff(application);
+  }
+
   function pathwaysForEmployee(employeeId: string) {
     const employee = data.employees.find((item) => item.id === employeeId);
     const role = data.roles.find((item) => item.id === employee?.roleId);
@@ -235,7 +240,7 @@ export function ApplicationsModule({
                         <TableAction onClick={() => setSelectedId(application.id)}>View</TableAction>
                         {application.status === "Draft" && !application.workflow ? <TableAction onClick={() => setDraft({ ...application })}>Edit draft</TableAction> : null}
                         {application.status === "Draft" ? <span className="self-center text-xs font-semibold text-[#102c3d]/45">Awaiting employee submission</span> : null}
-                        {application.status === "Approved for Enrolment" && ["Apprenticeship Lead", "Employer Admin"].includes(meta?.userRole ?? "") && !data.learnerRecords.some((learner) => learner.applicationId === application.id && learner.recordStatus === "Active") ? <TableAction onClick={() => setHandoff(application)}>Start pre-enrolment</TableAction> : null}
+                        <ApplicationHandoffControls application={application} onStartPreEnrolment={() => startPreEnrolment(application)} compact />
                       </div>
                     </td>
                   </tr>
@@ -309,9 +314,9 @@ export function ApplicationsModule({
       ) : null}
 
       {selectedApplication ? selectedApplication.workflow ? (
-        <ConfigurableWorkflowDecisionModal application={selectedApplication} onClose={() => setSelectedId(null)} />
+        <ConfigurableWorkflowDecisionModal application={selectedApplication} onClose={() => setSelectedId(null)} onStartPreEnrolment={() => startPreEnrolment(selectedApplication)} />
       ) : (
-        <ApplicationDetailModal application={selectedApplication} onClose={() => setSelectedId(null)} />
+        <ApplicationDetailModal application={selectedApplication} onClose={() => setSelectedId(null)} onStartPreEnrolment={() => startPreEnrolment(selectedApplication)} />
       ) : null}
       {handoff ? <ApplicationPreEnrolmentModal application={handoff} onClose={() => setHandoff(null)} onComplete={() => { setHandoff(null); setHandoffConfirmation("Pre-enrolment has been created. Open Learners to complete eligibility and employer checks."); }} /> : null}
     </div>
@@ -639,7 +644,7 @@ function ManagerReviewModal({ application, managerName: reviewerName, onClose, o
   );
 }
 
-function ConfigurableWorkflowDecisionModal({ application, onClose }: { application: MvpApplication; onClose: () => void }) {
+function ConfigurableWorkflowDecisionModal({ application, onClose, onStartPreEnrolment }: { application: MvpApplication; onClose: () => void; onStartPreEnrolment?: () => void }) {
   const { meta, data } = useMvpWorkspace();
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
@@ -669,6 +674,7 @@ function ConfigurableWorkflowDecisionModal({ application, onClose }: { applicati
   }
 
   return <MvpModal title={step?.label ?? "Application decision"} eyebrow="Application workflow" onClose={onClose} wide>
+    <ApplicationHandoffControls application={application} onStartPreEnrolment={onStartPreEnrolment} />
     <div className="mb-5 border-y border-[#102c3d]/[0.07] py-4"><StageTracker {...applicationTracker(application)} tone="info" /></div>
     <p className="text-sm leading-6 text-[#102c3d]/60">Responsible role: <strong>{step?.responsibleRole}</strong>. This decision is recorded against workflow version {workflow.version.version}.</p>
     <label className="mt-5 block text-xs font-semibold text-[#102c3d]">Decision note<textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={2000} className="mt-2 min-h-28 w-full rounded-xl border border-[#102c3d]/10 p-3 text-sm font-normal" /></label>
@@ -768,7 +774,26 @@ function LeadDecisionControls({ application }: { application: MvpApplication }) 
   </section>;
 }
 
-function ApplicationDetailModal({ application, onClose }: { application: MvpApplication; onClose: () => void }) {
+function ApplicationHandoffControls({ application, onStartPreEnrolment, compact = false }: { application: MvpApplication; onStartPreEnrolment?: () => void; compact?: boolean }) {
+  const { data, meta } = useMvpWorkspace();
+  if (!["Apprenticeship Lead", "Employer Admin"].includes(meta?.userRole ?? "")) return null;
+  const learners = data.learnerRecords.filter(learner => learner.applicationId === application.id && learner.recordStatus === "Active");
+  if (learners.length > 1) return compact ? null : <p role="alert" className="mb-4 text-sm text-[#b53c52]">More than one current learner record is linked. Open Learners to check the records before continuing.</p>;
+  const learner = learners[0];
+  if (!learner && (application.status !== "Approved for Enrolment" || !onStartPreEnrolment)) return null;
+  const controlClass = "inline-flex min-h-10 items-center rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white";
+  const control = learner
+    ? <a className={controlClass} href={`/levytate/app?module=Learners&learner=${encodeURIComponent(learner.id)}`}>Open learner record</a>
+    : <button type="button" className={controlClass} onClick={onStartPreEnrolment}>Start pre-enrolment</button>;
+  if (compact) return control;
+  return <section aria-label="Enrolment handoff" className="mb-5 rounded-xl border border-[#102c3d]/10 p-4">
+    <h3 className="text-sm font-semibold">{learner ? "Continue the learner journey" : "Ready for pre-enrolment"}</h3>
+    <p className="mb-3 mt-2 text-sm leading-6 text-[#102c3d]/60">{learner ? "A learner record is already linked to this application. Continue its recorded checks and provider arrangements." : "The application is approved. Select the programme and provider, then complete eligibility and employer checks in the learner record."}</p>
+    {control}
+  </section>;
+}
+
+function ApplicationDetailModal({ application, onClose, onStartPreEnrolment }: { application: MvpApplication; onClose: () => void; onStartPreEnrolment?: () => void }) {
   const { data } = useMvpWorkspace();
   const employee = data.employees.find((item) => item.id === application.employeeId);
   const standard = getApprenticeshipStandard(application.apprenticeshipStandardId);
@@ -776,6 +801,7 @@ function ApplicationDetailModal({ application, onClose }: { application: MvpAppl
   return (
     <MvpModal title={displayEmployee(employee)} eyebrow="Application record" onClose={onClose} wide>
       <LeadDecisionControls application={application} />
+      <ApplicationHandoffControls application={application} onStartPreEnrolment={onStartPreEnrolment} />
       <div className="mb-5 border-y border-[#102c3d]/[0.07] py-4"><StageTracker {...applicationTracker(application)} tone={application.status === "More information requested" ? "watch" : "info"} exceptionalStatus={application.status.startsWith("Declined") || application.status === "Withdrawn" || application.status === "Cancelled" ? { label: application.status, tone: "risk" } : undefined} /></div>
       <div className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <div className="space-y-4 rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4">
