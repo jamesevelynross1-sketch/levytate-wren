@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { LearnerRecordDetail } from "@/lib/levytate/mvp/learner-record-view";
+import type { LearnerListSummary, LearnerOperationalSummary, LearnerRecordDetail } from "@/lib/levytate/mvp/learner-record-view";
 
 export type LearnerCommandExpectation = {
   learnerRecordId?: string; employeeId: string; applicationId: string; programmeId: string; providerId: string;
@@ -47,6 +47,22 @@ const response = z.object({ ok: z.literal(true), learner: z.object({
   enrolmentReadiness: z.object({ readyForEnrolment: z.boolean(), completedChecks: z.array(check), outstandingChecks: z.array(check), blockingChecks: z.array(check), warningChecks: z.array(check), checks: z.array(check) }),
   withdrawal: withdrawal.nullable(), achievement: achievement.nullable(),
 }) });
+
+const listItem = response.shape.learner.omit({ activityVersion: true, eligibilityDeclaration: true, preEnrolmentChecks: true, assessmentReadiness: true, assessmentReadinessResult: true, progressHistory: true, reviewHistory: true, breaksInLearning: true, lifecycleTimeline: true, operationalActions: true, enrolmentReadiness: true, withdrawal: true, achievement: true });
+const count = z.number().int().nonnegative().safe();
+const listResponse = z.object({ ok: z.literal(true), learners: z.array(listItem), summary: z.object({ total: count, preEnrolment: count, activeLearners: count, breakInLearning: count, assessmentStage: count, achieved: count, needingAttention: count }) });
+
+/** List and detail GETs must satisfy the same rendered fields as saved results. */
+export function decodeLearnerListResponse(value: unknown): { learners: LearnerOperationalSummary[]; summary: LearnerListSummary } {
+  if (!listResponse.safeParse(value).success) throw new Error("Learner records returned an incomplete response. Retry to load the current workspace.");
+  return value as { learners: LearnerOperationalSummary[]; summary: LearnerListSummary };
+}
+
+export function decodeLearnerDetailResponse(value: unknown, learnerRecordId: string): LearnerRecordDetail {
+  const parsed = response.safeParse(value);
+  if (!learnerRecordId || !parsed.success || parsed.data.learner.learnerRecordId !== learnerRecordId) throw new Error("This learner record could not be loaded. Retry to load its saved details.");
+  return (value as { learner: LearnerRecordDetail }).learner;
+}
 
 /** Never close a retained form on a success for another learner or handoff. */
 export function decodeLearnerCommandResponse(value: unknown, expected: LearnerCommandExpectation | null): LearnerRecordDetail {

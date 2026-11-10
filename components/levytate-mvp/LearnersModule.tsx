@@ -10,6 +10,7 @@ import { useRetainedWorkspaceRequest } from "@/components/levytate-mvp/useRetain
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { ApplicationPreEnrolmentModal } from "@/components/levytate-mvp/ApplicationPreEnrolmentModal";
 import { LearnerOutcomePanel } from "@/components/levytate-mvp/LearnerOutcomePanel";
+import { decodeLearnerDetailResponse, decodeLearnerListResponse } from "@/lib/levytate/learner-command-response";
 import { includesSearch, statusTone } from "@/components/levytate-mvp/module-utils";
 import {
   assessmentConfirmationStatusLabels,
@@ -47,22 +48,6 @@ import {
   type LearnerAssessmentModel,
 } from "@/lib/levytate/mvp/learner-lifecycle";
 
-type LearnerListResponse = {
-  ok?: boolean;
-  source?: string;
-  summary?: LearnerListSummary;
-  learners?: LearnerOperationalSummary[];
-  message?: string;
-};
-
-type LearnerDetailResponse = {
-  ok?: boolean;
-  source?: string;
-  learner?: LearnerRecordDetail;
-  readiness?: LearnerRecordDetail["enrolmentReadiness"];
-  message?: string;
-};
-
 type SortMode = "Operational priority" | "Learner name" | "Lifecycle status";
 
 const allOption = "All";
@@ -82,6 +67,8 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
   const { can, meta } = useMvpWorkspace();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [readAttempt, setReadAttempt] = useState(0);
+  const [detailReadAttempt, setDetailReadAttempt] = useState(0);
   const [learners, setLearners] = useState<LearnerOperationalSummary[]>([]);
   const [summary, setSummary] = useState<LearnerListSummary | null>(null);
   const [selectedId, setSelectedId] = useState("");
@@ -124,10 +111,8 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
       setError("");
       try {
         const response = await request("/api/levytate-learners", { cache: "no-store" });
-        const payload = (await response.json()) as LearnerListResponse;
-        if (!response.ok || !payload.learners || !payload.summary) {
-          throw new Error(payload.message ?? "Learner lifecycle records are unavailable.");
-        }
+        if (!response.ok) throw new Error("Learner lifecycle records are unavailable.");
+        const payload = decodeLearnerListResponse(await response.json());
         if (!cancelled) {
           setLearners(payload.learners);
           setSummary(payload.summary);
@@ -143,7 +128,7 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
     return () => {
       cancelled = true;
     };
-  }, [mayReadOrganisationLearners, request]);
+  }, [mayReadOrganisationLearners, request, readAttempt]);
 
   useEffect(() => {
     if (!selectedId) {
@@ -157,11 +142,9 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
       setError("");
       try {
         const response = await request(`/api/levytate-learners?learnerRecordId=${encodeURIComponent(selectedId)}`, { cache: "no-store" });
-        const payload = (await response.json()) as LearnerDetailResponse;
-        if (!response.ok || !payload.learner) {
-          throw new Error(payload.message ?? "Learner record was not found.");
-        }
-        if (!cancelled) setDetail(payload.learner);
+        if (!response.ok) throw new Error("Learner record was not found.");
+        const learner = decodeLearnerDetailResponse(await response.json(), selectedId);
+        if (!cancelled) setDetail(learner);
       } catch (loadError) {
         if (!cancelled) setError(loadError instanceof Error ? loadError.message : "Learner record was not found.");
       } finally {
@@ -173,7 +156,7 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
     return () => {
       cancelled = true;
     };
-  }, [selectedId, request]);
+  }, [selectedId, request, detailReadAttempt]);
 
   const filters = useMemo(() => {
     const unique = (values: string[]) => [allOption, ...Array.from(new Set(values.filter(Boolean))).sort((a, b) => a.localeCompare(b))];
@@ -225,6 +208,7 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
         detail={detail}
         loading={detailLoading}
         error={error}
+        onRetry={() => setDetailReadAttempt(value => value + 1)}
         onBack={() => {
           setSelectedId("");
           setError("");
@@ -275,7 +259,7 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
           Attention required only
         </label>
 
-        {error ? <p className="mb-4 rounded-xl bg-[#fff0f2] px-4 py-3 text-sm font-semibold text-[#b13b51]">{error}</p> : null}
+        {error ? <div role="alert" className="mb-4 rounded-xl bg-[#fff0f2] px-4 py-3 text-sm font-semibold text-[#b13b51]"><p>{error}</p><button type="button" disabled={loading} onClick={() => setReadAttempt(value => value + 1)} className="mt-2 min-h-10 rounded-lg border border-current px-3">Retry loading learners</button></div> : null}
 
         {loading ? (
           <div className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] px-5 py-10 text-center text-sm font-semibold text-[#102c3d]/[0.54]">Loading learner lifecycle records.</div>
@@ -355,7 +339,7 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
   );
 }
 
-function LearnerRecordView({ detail, loading, error, onBack, mayMutatePreEnrolment, mayMutateLearnerActivity, initialAction, onDeepLinkConsumed, onDetailUpdated }: { detail: LearnerRecordDetail | null; loading: boolean; error: string; onBack: () => void; mayMutatePreEnrolment: boolean; mayMutateLearnerActivity: boolean; initialAction: LearnerDeepLinkAction; onDeepLinkConsumed?: () => void; onDetailUpdated: (detail: LearnerRecordDetail) => void }) {
+function LearnerRecordView({ detail, loading, error, onRetry, onBack, mayMutatePreEnrolment, mayMutateLearnerActivity, initialAction, onDeepLinkConsumed, onDetailUpdated }: { detail: LearnerRecordDetail | null; loading: boolean; error: string; onRetry: () => void; onBack: () => void; mayMutatePreEnrolment: boolean; mayMutateLearnerActivity: boolean; initialAction: LearnerDeepLinkAction; onDeepLinkConsumed?: () => void; onDetailUpdated: (detail: LearnerRecordDetail) => void }) {
   const [workflowOpen, setWorkflowOpen] = useState(false);
   const [activityMode, setActivityMode] = useState<"progress" | "review" | "">("");
   const [reviewFilter, setReviewFilter] = useState<LearnerReviewType | "all">("all");
@@ -384,7 +368,7 @@ function LearnerRecordView({ detail, loading, error, onBack, mayMutatePreEnrolme
         <button type="button" onClick={onBack} className="inline-flex w-fit items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-semibold text-[#102c3d]/[0.68] ring-1 ring-[#102c3d]/[0.08]">
           <ArrowLeft size={15} /> Back to learners
         </button>
-        <div className="rounded-xl border border-[#b13b51]/[0.10] bg-[#fff0f2] p-5 text-sm font-semibold text-[#b13b51]">{error || "Learner record was not found."}</div>
+        <div role="alert" className="rounded-xl border border-[#b13b51]/[0.10] bg-[#fff0f2] p-5 text-sm font-semibold text-[#b13b51]"><p>{error || "Learner record was not found."}</p><button type="button" onClick={onRetry} className="mt-2 min-h-10 rounded-lg border border-current px-3">Retry loading learner</button></div>
       </div>
     );
   }

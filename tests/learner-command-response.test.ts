@@ -1,12 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { createPinnedClientMutation } from "@/lib/levytate/client-mutation-retry";
-import { decodeLearnerCommandResponse, type LearnerCommandExpectation } from "@/lib/levytate/learner-command-response";
+import { decodeLearnerCommandResponse, decodeLearnerDetailResponse, decodeLearnerListResponse, type LearnerCommandExpectation } from "@/lib/levytate/learner-command-response";
 import { deriveAssessmentReadiness } from "@/lib/levytate/mvp/assessment-readiness";
 import { deriveBreakAttention, deriveLearnerAttention, deriveLearnerEnrolmentReadiness, deriveProgressPosition, deriveReviewSummaries, type LearnerRecordDetail } from "@/lib/levytate/mvp/learner-record-view";
 import type { LearnerWithdrawal } from "@/lib/levytate/mvp/learner-lifecycle";
 
 const expected: LearnerCommandExpectation = { learnerRecordId: "learner-a", employeeId: "person-a", applicationId: "application-a", programmeId: "programme-a", providerId: "provider-a" };
 const identity = { email: "lead@example.invalid", organisationId: "tenant-a" };
+const listSummary = { total: 1, preEnrolment: 1, activeLearners: 0, breakInLearning: 0, assessmentStage: 0, achieved: 0, needingAttention: 1 };
 function saved(): { ok: true; learner: LearnerRecordDetail & { futureServerField: string } } {
   const reviewSummaries = deriveReviewSummaries([], "2026-11-09");
   const attention = deriveLearnerAttention({ lifecycleStatus: "pre_enrolment", eligibilityDeclaration: null, preEnrolmentChecks: null, latestProgress: null, latestProviderReview: null, latestLAndDCheckIn: null, latestManagerCheckIn: null, reviewSummaries, activeBreak: null, assessmentReadiness: null, operationalActions: [], today: "2026-11-09" });
@@ -28,6 +29,25 @@ function saved(): { ok: true; learner: LearnerRecordDetail & { futureServerField
 function withdrawal(): LearnerWithdrawal { return { id: "withdrawal-a", organisationId: "tenant-a", learnerRecordId: "learner-a", withdrawalDate: "2026-11-09", effectiveDate: "2026-11-09", reasonCategory: "Fictional reason", reasonNotes: "Fictional evidenced withdrawal", initiatedBy: "Synthetic learner", providerNotified: false, providerNotifiedDate: "", employeeNotified: false, employeeNotifiedDate: "", recordedBy: "synthetic@example.test", recordedAt: "2026-11-09T19:40:00Z" }; }
 function achievement(): NonNullable<LearnerRecordDetail["achievement"]> { return { expectedAchievementDate: "2026-11-09", actualAchievementDate: "2026-11-09", grade: "Pass", gradeType: "Final result", certificateReceived: false, certificateReceivedDate: "", resultNotes: "Fictional result", recordedBy: "synthetic@example.test", recordedAt: "2026-11-09T19:40:00Z" }; }
 describe("learner handoff and terminal outcome confirmation", () => {
+  it("reads a complete learner list and detail without replacing source values", () => {
+    const value = saved(), list = { ok: true, learners: [value.learner], summary: listSummary };
+    expect(decodeLearnerDetailResponse(value, "learner-a")).toBe(value.learner);
+    expect(decodeLearnerListResponse(list)).toBe(list);
+    expect(decodeLearnerListResponse({ ok: true, learners: [], summary: { ...listSummary, total: 0, preEnrolment: 0, needingAttention: 0 } }).learners).toEqual([]);
+  });
+  it("does not publish a successful detail response for another selected learner", () => {
+    expect(() => decodeLearnerDetailResponse(saved(), "learner-b")).toThrow();
+    expect(() => decodeLearnerDetailResponse(saved(), "")).toThrow();
+  });
+  it.each([{}, { programme: {} }, { learner: {} }, { reviewSummaries: {} }, { attention: { reasons: null } }, { latestProgress: {} }, { activeBreak: {} }])("rejects malformed list rows before the actual view reads nested data", invalid => {
+    expect(() => decodeLearnerListResponse({ ok: true, learners: [{ ...saved().learner, ...invalid, ...(Object.keys(invalid).length ? {} : { learnerRecordId: undefined }) }], summary: listSummary })).toThrow();
+  });
+  it.each([null, {}, { ...listSummary, total: "1" }, { ...listSummary, total: -1 }, { ...listSummary, needingAttention: NaN }])("rejects invalid aggregate data instead of presenting invented zeroes", summary => {
+    expect(() => decodeLearnerListResponse({ ok: true, learners: [], summary })).toThrow();
+  });
+  it.each([null, {}, { ok: true, learner: {} }, { ...saved(), learner: { ...saved().learner, assessmentReadinessResult: {} } }])("rejects malformed detail reads before rendering the record", value => {
+    expect(() => decodeLearnerDetailResponse(value, "learner-a")).toThrow();
+  });
   it("preserves the matching complete server model without requiring a new handoff ID in advance", () => {
     const value = saved(); expect(decodeLearnerCommandResponse(value, expected)).toBe(value.learner);
     expect(decodeLearnerCommandResponse(value, { ...expected, learnerRecordId: undefined })).toBe(value.learner);
