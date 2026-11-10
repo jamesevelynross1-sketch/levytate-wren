@@ -47,7 +47,14 @@ function check(name, condition) {
 }
 async function independentJourney(name, task) {
   try { await task(); return true; }
-  catch(error){const blocked=error.message?.startsWith("BLOCKED:");const stage=error.message?.match(/^(?:Manager|Lifecycle) browser acceptance failed during ([a-z -]+);/)?.[1];results.push({name,status:blocked?"BLOCKED":"FAIL",reason:blocked?error.message:`Independent journey failed${stage?` during ${stage}`:""}; authentication state omitted`});console.error(`${blocked?"BLOCKED":"FAIL"} independent ${name}${stage?` during ${stage}`:""}; unrelated checks may continue in this bounded run`);if(process.exitCode!==1)process.exitCode=blocked?2:1;return false;}
+  catch(error){
+    const blocked=error.message?.startsWith("BLOCKED:");
+    const reportedStage=typeof error.safeStage==="string"&&/^[A-Za-z0-9 :_-]{1,120}$/.test(error.safeStage)?error.safeStage:error.message?.match(/^(?:Manager|Lifecycle) browser acceptance failed during ([a-z -]+);/)?.[1];
+    const errorClass=["Error","TimeoutError","TypeError"].includes(error.safeErrorClass??error.name)?(error.safeErrorClass??error.name):"UnclassifiedError";
+    results.push({name,status:blocked?"BLOCKED":"FAIL",...(reportedStage?{stage:reportedStage}:{}),errorClass,reason:blocked?error.message:`Independent journey failed${reportedStage?` during ${reportedStage}`:""}; authentication state omitted`});
+    console.error(`${blocked?"BLOCKED":"FAIL"} independent ${name}${reportedStage?` during ${reportedStage}`:""} (${errorClass}); unrelated checks may continue in this bounded run`);
+    if(process.exitCode!==1)process.exitCode=blocked?2:1;return false;
+  }
 }
 async function waitForCapturedLink(mailpit, email, appOrigin, after) {
   for (let attempt = 0; attempt < 40; attempt++) {
@@ -429,7 +436,7 @@ try {
     const{verifyManagerDevelopment}=await import("./release-manager-browser.mjs");
     const extension=JSON.parse(readFileSync(`${process.env.RELEASE_LOCAL_RUNTIME}/manager-fixture-manifest.json`,"utf8"));
     let managerResult;
-    await independentJourney("Manager personal development",async()=>{managerResult=await verifyManagerDevelopment({app,mailpit,browser,manifest,extension,backend,waitForCapturedLink,check,existingContexts:contexts});});
+    await independentJourney("Manager personal development",async()=>{managerResult=await verifyManagerDevelopment({app,mailpit,browser,manifest,extension,backend,waitForCapturedLink,check,existingContexts:contexts,resumeApplication:process.env.RELEASE_MANAGER_RESUME_APPLICATION_ID?{id:process.env.RELEASE_MANAGER_RESUME_APPLICATION_ID,revision:Number(process.env.RELEASE_MANAGER_RESUME_APPLICATION_REVISION)}:null});});
     if(process.env.RELEASE_MANAGER_LEARNING_JOURNEY==="true"){
       if(managerResult?.learnerId){const{verifyManagerLearningTime}=await import("./release-manager-learning-browser.mjs");await independentJourney("Manager personal Learning Time",()=>verifyManagerLearningTime({app,manifest,contexts,learnerId:managerResult.learnerId,backend,check}));}
       else results.push({name:"Manager personal Learning Time",status:"BLOCKED",reason:"Own Manager enrolment was not confirmed in this bounded genuine run"});
@@ -491,7 +498,7 @@ try {
     const{verifyLifecycle}=await import("./release-lifecycle-browser.mjs");
     const extension=JSON.parse(readFileSync(`${process.env.RELEASE_LOCAL_RUNTIME}/lifecycle-fixture-manifest.json`,"utf8"));
     await independentJourney("Platform Admin lifecycle",async()=>{
-      const evidence=await verifyLifecycle({app,mailpit,browser,manifest,extension,backend,waitForCapturedLink,check,resumeSuspended:process.env.RELEASE_LIFECYCLE_RESUME_SUSPENDED==="true",verifyBlankWorkspace:process.env.RELEASE_BLANK_WORKSPACE_JOURNEY==="true",resumeBlankWorkspaceId:process.env.RELEASE_RESUME_BLANK_WORKSPACE_ID??null,verifyReinvitedMemberSession:process.env.RELEASE_LIFECYCLE_REINVITED_SESSION==="true"});
+      const evidence=await verifyLifecycle({app,mailpit,browser,manifest,extension,backend,waitForCapturedLink,check,resumeSuspended:process.env.RELEASE_LIFECYCLE_RESUME_SUSPENDED==="true",verifyBlankWorkspace:process.env.RELEASE_BLANK_WORKSPACE_JOURNEY==="true",resumeBlankWorkspaceId:process.env.RELEASE_RESUME_BLANK_WORKSPACE_ID??null,verifyReinvitedMemberSession:process.env.RELEASE_LIFECYCLE_REINVITED_SESSION==="true",resumeApprovedReactivationId:process.env.RELEASE_RESUME_APPROVED_REACTIVATION_ID??null});
       if(evidence.result==="PARTIAL")for(const name of evidence.missingMandatoryChecks)results.push({name:`Lifecycle: ${name}`,status:"BLOCKED",reason:"Earlier genuine context was closed; no session fabricated"});
       writeFileSync(`${process.env.RELEASE_LOCAL_RUNTIME}/lifecycle-browser-result-${Date.now()}.json`,JSON.stringify({...evidence,candidateCommit},null,2),{mode:0o600,flag:"wx"});
     });

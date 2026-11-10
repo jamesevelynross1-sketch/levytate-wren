@@ -1,6 +1,7 @@
 /** Independent real-session Copilot boundaries and local browser presentation. */
 import {writeFileSync} from "node:fs";
 import {spawnSync} from "node:child_process";
+const normaliseVisibleText=value=>value.normalize("NFKC").replace(/\s+/gu," ").trim().toLocaleLowerCase("en-GB");
 function pdfText(path){
  const result=spawnSync(process.env.RELEASE_PDFTOTEXT??"/Users/jamesross/.cache/codex-runtimes/codex-primary-runtime/dependencies/native/poppler/poppler/bin/pdftotext",[path,"-"],{encoding:"utf8"});
  if(result.status!==0||typeof result.stdout!=="string")throw new Error("PDF content verification unavailable");
@@ -26,14 +27,20 @@ export async function verifyUsability({app,manifest,contexts,check}){
  const fit=await employee.page.evaluate(()=>({width:document.documentElement.clientWidth,scroll:document.documentElement.scrollWidth}));
  check("Employee home has no overflow at the 640px effective 200-percent viewport",fit.width===640&&fit.scroll<=fit.width+2);
  if(new URL(employee.page.url()).pathname!=="/levytate/app"||new URL(employee.page.url()).searchParams.has("token_hash"))throw new Error("Synthetic authenticated application page required for capture");
- await employee.page.screenshot({path:`${root}/synthetic-employee-effective-200-${Date.now()}.png`,fullPage:true});
+ await employee.page.screenshot({path:`${root}/synthetic-employee-effective-200-top-${Date.now()}.png`,fullPage:false});
+ await employee.page.evaluate(()=>window.scrollTo(0,document.documentElement.scrollHeight));
+ await employee.page.waitForFunction(()=>Math.abs(window.scrollY+window.innerHeight-document.documentElement.scrollHeight)<=2||document.documentElement.scrollHeight<=window.innerHeight);
+ const bottom=await employee.page.evaluate(()=>({atBottom:window.scrollY+window.innerHeight>=document.documentElement.scrollHeight-2,footerVisible:[...document.querySelectorAll('a')].filter(a=>['Privacy','Terms','Support','Data rights'].includes(a.textContent?.trim()??'')).some(a=>{const b=a.getBoundingClientRect();return b.top>=0&&b.bottom<=window.innerHeight;})}));
+ check("Employee effective-200 viewport can scroll to visible bottom content",bottom.atBottom&&bottom.footerVisible);
+ await employee.page.screenshot({path:`${root}/synthetic-employee-effective-200-bottom-${Date.now()}.png`,fullPage:false});
+ await employee.page.evaluate(()=>window.scrollTo(0,0));
  await employee.page.setViewportSize({width:1280,height:900});
  await employee.page.screenshot({path:`${root}/synthetic-employee-desktop-${Date.now()}.png`,fullPage:true});
  await employee.page.emulateMedia({media:"print"});const pdf=await employee.page.pdf({format:"A4",printBackground:true});
  const employeePdf=`${root}/synthetic-employee-print-${Date.now()}.pdf`;
  writeFileSync(employeePdf,pdf,{mode:0o600,flag:"wx"});
- const employeeText=pdfText(employeePdf);
- check("Employee print contains actual visible journey text",pdf.subarray(0,4).toString()==="%PDF"&&employeeText.includes("Your next step")&&employeeText.includes("Good to see you")&&employeeText.trim().length>100);
+ const employeeText=normaliseVisibleText(pdfText(employeePdf));
+ check("Employee print contains actual visible journey text",pdf.subarray(0,4).toString()==="%PDF"&&employeeText.includes(normaliseVisibleText("Your next step"))&&employeeText.includes(normaliseVisibleText("Good to see you"))&&employeeText.trim().length>100);
  await employee.page.emulateMedia({media:"screen"});
  const lead=contexts.get("b:lead")??contexts.get("a:lead");await lead.page.goto(`${app}/levytate/app?module=Insights`);
  await lead.page.getByRole("button",{name:"Print executive report",exact:true}).waitFor();
@@ -48,7 +55,7 @@ export async function verifyUsability({app,manifest,contexts,check}){
  const executive=await lead.page.pdf({format:"A4",printBackground:true});
  const employerPdf=`${root}/synthetic-employer-executive-${Date.now()}.pdf`;
  writeFileSync(employerPdf,executive,{mode:0o600,flag:"wx"});
- const employerText=pdfText(employerPdf);
- check("Lead executive print contains actual operating and financial evidence",executive.subarray(0,4).toString()==="%PDF"&&employerText.includes("Executive operating brief")&&employerText.includes("Levy financial position")&&employerText.includes("Evidence definitions and material limitations"));
+ const employerText=normaliseVisibleText(pdfText(employerPdf));
+ check("Lead executive print contains actual operating and financial evidence",executive.subarray(0,4).toString()==="%PDF"&&employerText.includes(normaliseVisibleText("Executive operating brief"))&&employerText.includes(normaliseVisibleText("Levy financial position"))&&employerText.includes(normaliseVisibleText("Evidence definitions and material limitations")));
  await lead.page.evaluate(()=>window.dispatchEvent(new Event("afterprint")));await lead.page.emulateMedia({media:"screen"});
 }

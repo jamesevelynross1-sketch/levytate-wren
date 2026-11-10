@@ -8,8 +8,9 @@ import { assertManagerManifest } from "./release-manager-fixtures.mjs";
 import { localUrl } from "./release-local-fixtures.mjs";
 const workspacePath = "/api/levytate-workspace";
 const questions = ["Why are you interested in this programme?", "How could it help your current role or future development?", "What support will you need from your manager?"];
-export async function verifyManagerDevelopment({ app: value, mailpit: capture, browser, manifest, extension, backend, waitForCapturedLink, check, challengeApplicant, existingContexts }) {
+export async function verifyManagerDevelopment({ app: value, mailpit: capture, browser, manifest, extension, backend, waitForCapturedLink, check, challengeApplicant, existingContexts, resumeApplication = null }) {
   const app = localUrl(value, "manager journey app"), mailpit = localUrl(capture, "manager journey capture"), plan = assertManagerManifest(extension, manifest, true);
+  if(resumeApplication!==null&&(!/^application-[a-f0-9-]{36}$/.test(resumeApplication.id??"")||!Number.isSafeInteger(resumeApplication.revision)||resumeApplication.revision<1))throw Error("Explicit reviewed current application continuation required");
   const tenant = manifest.tenants.find((item) => item.key === "a"), other = manifest.tenants.find((item) => item.key === "b");
   const actors = [], ownedContexts = new Set(), report = (label, condition) => check(`Manager development: ${label}`, condition);
   const headers = (actor) => ({ Origin: app, "X-LevyTate-Account": actor.user.email, "X-LevyTate-Organisation": tenant.id });
@@ -58,6 +59,13 @@ export async function verifyManagerDevelopment({ app: value, mailpit: capture, b
       report(`${user.key} refreshes the actual provider session`, (await context.request.post(`${app}/api/levytate-auth/session`, { headers: headers(actor) })).status() === 200);
     }
     const [applicant, reviewer, lead] = actors;
+    if(resumeApplication){
+      phase="existing own application continuation";const current=(await rows()).filter(item=>item.id===resumeApplication.id);
+      report("continuation uses the exact own application awaiting distinct review",current.length===1&&current[0].status==="Awaiting Manager Review"&&current[0].revision===resumeApplication.revision);
+      applicationId=resumeApplication.id;
+      report("continuation has one active own application and creates no replacement",(await rows()).filter(item=>!["Declined","Withdrawn","Completed","Cancelled"].includes(item.status)).length===1);
+      await navigate(applicant,"My Application");await applicant.page.getByRole("heading",{name:"My application",exact:true}).waitFor();
+    }else{
     phase = "own programme selection";
     const initial = await workspace(applicant), published = initial.data.providerProgrammes.find((item) => item.id === manifest.catalogue.programmeId);
     report("own manager has no active personal application before this journey", !(await rows()).some((item) => !["Declined", "Withdrawn", "Completed", "Cancelled"].includes(item.status)));
@@ -70,7 +78,7 @@ export async function verifyManagerDevelopment({ app: value, mailpit: capture, b
     report("manager starts only their own mapped application through UI", (await started).status() === 200);
     const draftRows = (await rows()).filter((item) => item.status === "Draft");
     report("exactly one personal draft persisted", draftRows.length === 1); applicationId = draftRows[0].id;
-    for (const [index, label] of questions.entries()) await applicant.page.getByLabel(label, { exact: true }).fill(`Synthetic own-manager acceptance answer ${index + 1} ${plan.run}`);
+    for (const [index, label] of questions.entries()) await applicant.page.getByRole("textbox", { name: label, exact: true }).fill(`Synthetic own-manager acceptance answer ${index + 1} ${plan.run}`);
     phase = "own draft and submission";
     if (challengeApplicant) {
       await challengeApplicant({ app, applicant, reviewer, lead, applicationId, backend, check });
@@ -79,6 +87,7 @@ export async function verifyManagerDevelopment({ app: value, mailpit: capture, b
       await applicant.page.getByRole("button", { name: "Save draft", exact: true }).click(); report("manager saves personal answers through UI", (await saved).status() === 200);
       const submitted = applicant.page.waitForResponse((response) => new URL(response.url()).pathname === workspacePath && response.request().method() === "POST");
       await applicant.page.getByRole("button", { name: "Submit to line manager", exact: true }).click(); report("manager submits their own application through UI", (await submitted).status() === 200);
+    }
     }
     let application = (await rows()).find((item) => item.id === applicationId);
     report("own submission reaches the distinct manager's review", ["Awaiting Manager Review", "Submitted to Line Manager"].includes(application?.status));
@@ -141,10 +150,10 @@ export async function verifyManagerDevelopment({ app: value, mailpit: capture, b
     report("own recorded journey renders enrolled status", await applicant.page.getByText("enrolled", { exact: true }).count() > 0);
     report("own application is durably Completed", (await workspace(applicant)).data.applications.some((item) => item.id === applicationId && item.status === "Completed"));
     report("second employer organisation remains unchanged", JSON.stringify(beforeOther) === JSON.stringify(await backend(`rest/v1/levytate_organisations?id=eq.${other.id}&select=id,status,updated_at`)));
-    return { fixtureRun: plan.run, applicationId, learnerId, result: "PASS", authentication: "distinct genuine public sign-in sessions; any existing contexts freshly verified within the same bounded run", newSignIns: ownedContexts.size, adversarialChallenge: Boolean(challengeApplicant) };
+    return { fixtureRun: plan.run, applicationId, learnerId, result: "PASS", scope:resumeApplication?"Continuation of exact persisted own application awaiting manager review; no new application or reset":"Full own Manager application journey", authentication: "distinct genuine public sign-in sessions; any existing contexts freshly verified within the same bounded run", newSignIns: ownedContexts.size, adversarialChallenge: Boolean(challengeApplicant) };
   } catch (error) {
     if (error.message === "BLOCKED: natural authentication rate budget not yet available") throw error;
-    throw new Error(`Manager browser acceptance failed during ${phase}; private authentication state omitted`);
+    const safe=new Error(`Manager browser acceptance failed during ${phase}; private authentication state omitted`);safe.safeStage=phase;safe.safeErrorClass=["Error","TimeoutError","TypeError"].includes(error?.name)?error.name:"UnclassifiedError";throw safe;
   } finally {
     for (const actor of actors) {
       if (!ownedContexts.has(actor.context)) continue; // The orchestrator owns reused contexts and their final logout.

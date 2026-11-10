@@ -13,6 +13,8 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function local(value) { const url = new URL(value); if (url.protocol !== "http:" || !["127.0.0.1", "localhost"].includes(url.hostname) || url.username || url.password || url.search || url.hash) throw new Error("Local acceptance origin required"); return url.origin; }
 
 export async function verifyWorkspaceRecovery({ app: origin, applicant, applicationId, backend, check, mailpit, waitForCapturedLink }) {
+  let phase="initialisation";
+  try{
   const app = local(origin), capture = local(mailpit);
   const { context, page, user, tenant } = applicant;
   if (!uuid.test(tenant.id) || !/^[a-z0-9_-]+$/i.test(applicationId) || !/^release\.[a-f0-9-]+\.[ab]\.[a-z-]+@example\.test$/i.test(user.email) || !["Employee", "Line Manager"].includes(user.role) || new URL(page.url()).origin !== app) throw new Error("Reviewed fictional own applicant required");
@@ -35,7 +37,7 @@ export async function verifyWorkspaceRecovery({ app: origin, applicant, applicat
   report("starts from a genuinely editable own application", ["Draft", "More information requested"].includes(before.row.status));
   const reason = page.getByLabel(reasonLabel, { exact: true });
   const originalAnswer = `Synthetic retained answer ${randomUUID()}`;
-  await reason.fill(originalAnswer);
+  phase="refill current retained textarea";await reason.fill(originalAnswer);
   let originalDraft, upstreamError, intercepted = false;
   const malformed = async route => {
     const request = route.request();
@@ -48,22 +50,22 @@ export async function verifyWorkspaceRecovery({ app: origin, applicant, applicat
       } catch { upstreamError = true; await route.abort(); }
     } else await route.continue();
   };
-  await page.route(pattern, malformed);
+  phase="draft malformed-response pending dialog";await page.route(pattern, malformed);
   try { await page.getByRole("button", { name: "Save draft", exact: true }).click(); await page.getByRole("dialog", { name: recoveryName, exact: true }).waitFor(); }
   finally { await page.unroute(pattern, malformed); }
-  report("malformed200 follows a real successful draft commit", intercepted && !upstreamError);
+  phase="draft durable receipt verification";report("malformed200 follows a real successful draft commit", intercepted && !upstreamError);
   const saved = await snapshot();
   report("draft commits once despite rejected response", saved.row.reason === originalAnswer && saved.row.revision === before.row.revision + 1 && saved.history === before.history + 1 && saved.receipts === before.receipts + 1 && saved.audit === before.audit + 1);
   report("bad200 keeps original answers and freezes editing", (await reason.inputValue()) === originalAnswer && await reason.isDisabled());
   let recovery = page.getByRole("dialog", { name: recoveryName, exact: true });
-  const draftReplay = page.waitForResponse(predicate);
+  phase="draft original command retry";const draftReplay = page.waitForResponse(predicate);
   await recovery.getByRole("button", { name: "Retry original update", exact: true }).click();
   const confirmedDraft = await draftReplay;
   report("draft retry uses byte-identical original body", confirmedDraft.status() === 200 && confirmedDraft.request().postData() === originalDraft);
   await recovery.waitFor({ state: "hidden" });
   report("confirmed draft retry creates no duplicate revision, history, receipt or audit", same(saved, await snapshot()));
 
-  let originalSubmit, logoutStatus, committed = false;
+  phase="submission and genuine session revocation";let originalSubmit, logoutStatus, committed = false;
   const expireAfterCommit = async route => {
     const request = route.request();
     if (!committed && request.method() === "POST" && request.postDataJSON()?.type === "saveApplication" && request.postDataJSON()?.application?.id === applicationId && request.postDataJSON()?.application?.status === "Submitted to Line Manager") {
@@ -88,7 +90,7 @@ export async function verifyWorkspaceRecovery({ app: origin, applicant, applicat
   report("expired session still retains the original form", await reason.isDisabled() && (await reason.inputValue()) === originalAnswer);
   report("recovery dialog exposes sign-in and reconnect without dismissing retained update", await recovery.getByRole("button", { name: "Sign in in new tab", exact: true }).count() === 1 && await recovery.getByRole("button", { name: "Reconnect workspace", exact: true }).count() === 1);
 
-  const popup = context.waitForEvent("page");
+  phase="visible sign-in and reconnect";const popup = context.waitForEvent("page");
   await recovery.getByRole("button", { name: "Sign in in new tab", exact: true }).click();
   const login = await popup;
   try {
@@ -110,7 +112,7 @@ export async function verifyWorkspaceRecovery({ app: origin, applicant, applicat
     // recoverable. A fresh edited command would still be denied by the server.
     await page.getByText(originalAnswer, { exact: true }).waitFor();
     report("pending update stays open after reconnect", await recovery.isVisible());
-    const submitReplay = page.waitForResponse(predicate);
+    phase="post-reconnect original receipt retry";const submitReplay = page.waitForResponse(predicate);
     await recovery.getByRole("button", { name: "Retry original update", exact: true }).click();
     const confirmation = await submitReplay;
     report("post-reconnect retry sends the exact original revision and body", confirmation.status() === 200 && confirmation.request().postData() === originalSubmit);
@@ -122,4 +124,5 @@ export async function verifyWorkspaceRecovery({ app: origin, applicant, applicat
     report("recorded answers survive refresh after successful genuine recovery", (await snapshot()).row.reason === originalAnswer && await page.getByText(originalAnswer, { exact: true }).count() === 1);
   } finally { await login.close(); }
   return { applicationId, status: submitted.row.status, revision: submitted.row.revision };
+  }catch(error){if(error.message?.startsWith("BLOCKED:"))throw error;const safe=new Error("Workspace recovery acceptance remains incomplete; private state omitted");safe.safeStage=phase;safe.safeErrorClass=["Error","TimeoutError","TypeError"].includes(error?.name)?error.name:"UnclassifiedError";throw safe;}
 }
