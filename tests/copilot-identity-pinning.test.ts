@@ -16,9 +16,10 @@ import { LevyTateLearnerLifecyclePermissionError } from "@/lib/server/levytate-l
 import { createEmptyMvpWorkspace } from "@/lib/levytate/mvp/workspace";
 const email = "lead@fictional.example", tenant = "10000000-0000-4000-8000-000000000001", origin = "https://candidate.vercel.app";
 const pin = { "X-LevyTate-Account": email, "X-LevyTate-Organisation": tenant };
+const analysisKey = "30000000-0000-4000-8000-000000000003";
 const request = (kind: string, headers: Record<string, string> = pin) => new Request(`${origin}/api/synthetic`, {
   method: kind === "signals" ? "GET" : "POST", headers: { origin, "content-type": "application/json", ...headers },
-  ...(kind === "signals" ? {} : { body: JSON.stringify(kind === "Copilot" ? { role: "Apprenticeship Lead", selectedSite: "Synthetic site", currentSection: "Reports", employerContext: "Synthetic employer", userMessage: "Show my report", conversationHistory: [] } : { action: "analyse" }) }),
+  ...(kind === "signals" ? {} : { body: JSON.stringify(kind === "Copilot" ? { role: "Apprenticeship Lead", selectedSite: "Synthetic site", currentSection: "Reports", employerContext: "Synthetic employer", userMessage: "Show my report", conversationHistory: [] } : { action: "analyse", idempotencyKey: analysisKey }) }),
 });
 beforeEach(() => {
   vi.resetAllMocks(); vi.stubEnv("VERCEL_ENV", "preview"); vi.stubEnv("VERCEL_URL", "candidate.vercel.app");
@@ -46,7 +47,7 @@ describe.each([["Copilot", copilot], ["signals", signals], ["signal write", sign
     const result = await route(request(kind)); expect(result.status).toBe(200); expect(result.headers.get("cache-control")).toContain("no-store"); expect(mocks.select).toHaveBeenCalledOnce();
     if (kind === "Copilot") { expect(mocks.limits).toHaveBeenCalledOnce(); expect(mocks.writes).not.toHaveBeenCalled(); }
     else if (kind === "signals") { expect(mocks.limits).not.toHaveBeenCalled(); expect(mocks.writes).not.toHaveBeenCalled(); }
-    else { expect(mocks.writes).toHaveBeenCalledOnce(); expect(mocks.limits).not.toHaveBeenCalled(); }
+    else { expect(mocks.writes).toHaveBeenCalledOnce(); expect(mocks.limits).not.toHaveBeenCalled(); expect(mocks.analyse).toHaveBeenCalledWith({ email, accessLevel: "approved" }, { idempotencyKey: analysisKey }); }
   });
 });
 it("continues to deny organisation signals outside the existing authorised role", async () => {
