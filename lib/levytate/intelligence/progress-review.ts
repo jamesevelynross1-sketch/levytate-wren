@@ -16,7 +16,7 @@ export type IntelligenceEvidenceSourceType = "provider_review" | "manager_check_
 export type IntelligenceEvidence = { sourceType:IntelligenceEvidenceSourceType; sourceId:string; sourceDate:string; label:string; excerpt?:string; metric?:{label:string;value:string|number} };
 export type IntelligenceSignalStatus = "new" | "acknowledged" | "accepted" | "dismissed" | "resolved";
 export type IntelligenceSignal = {
-  id:string; fingerprint:string; organisationId:string; entityType:"learner"|"provider"|"programme"|"organisation"; entityId:string;
+  id:string; revision:number; fingerprint:string; organisationId:string; entityType:"learner"|"provider"|"programme"|"organisation"; entityId:string;
   learnerRecordId?:string; providerId?:string; programmeId?:string; category:IntelligenceSignalCategory; signalType:ProgressReviewSignalType;
   title:string; summary:string; evidence:IntelligenceEvidence[]; confidence:"High"|"Medium"|"Low"; priority:Exclude<OperationalPriorityLevel,"Informational">;
   recommendedAction?:string; suggestedOwnerType?:OperationalOwnerType; suggestedDueDate?:string; status:IntelligenceSignalStatus;
@@ -58,11 +58,11 @@ const reviewEvidence=(review:LearnerReview,label="Provider review"):Intelligence
 const progressEvidence=(update:LearnerProgressUpdate):IntelligenceEvidence=>({sourceType:"progress_update",sourceId:update.id,sourceDate:update.updateDate,label:"Recorded progress",metric:{label:"Target / actual / variance",value:`${update.targetProgressPercentage}% / ${update.actualProgressPercentage}% / ${update.variancePercentage}%`}});
 const stableHash=(value:string)=>{let left=2166136261,right=2246822519;for(let index=0;index<value.length;index+=1){const code=value.charCodeAt(index);left=Math.imul(left^code,16777619);right=Math.imul(right^code,3266489917);}return `${(left>>>0).toString(16).padStart(8,"0")}${(right>>>0).toString(16).padStart(8,"0")}`;};
 const fingerprint=(input:ProgressReviewAnalysisInput,type:ProgressReviewSignalType,condition:string)=>stableHash(`${input.organisationId}:${input.learnerRecordId}:${type}:${condition}`);
-function makeSignal(input:ProgressReviewAnalysisInput,values:Omit<IntelligenceSignal,"id"|"fingerprint"|"organisationId"|"entityType"|"entityId"|"learnerRecordId"|"providerId"|"programmeId"|"status"|"detectedAt"|"lastEvaluatedAt"|"analyserVersion"> & {condition:string}):IntelligenceSignal {
+function makeSignal(input:ProgressReviewAnalysisInput,values:Omit<IntelligenceSignal,"id"|"revision"|"fingerprint"|"organisationId"|"entityType"|"entityId"|"learnerRecordId"|"providerId"|"programmeId"|"status"|"detectedAt"|"lastEvaluatedAt"|"analyserVersion"> & {condition:string}):IntelligenceSignal {
   const now=input.now??new Date().toISOString(); const key=fingerprint(input,values.signalType,values.condition);
   const {condition:_,...signal}=values; void _;
   if(!signal.evidence.length)throw new Error("Intelligence Signals require evidence.");
-  return {...signal,id:`signal-${key.slice(0,20)}`,fingerprint:key,organisationId:input.organisationId,entityType:"learner",entityId:input.learnerRecordId,learnerRecordId:input.learnerRecordId,providerId:input.providerId,programmeId:input.programmeId,status:"new",detectedAt:now,lastEvaluatedAt:now,analyserVersion};
+  return {...signal,revision:0,id:`signal-${key.slice(0,20)}`,fingerprint:key,organisationId:input.organisationId,entityType:"learner",entityId:input.learnerRecordId,learnerRecordId:input.learnerRecordId,providerId:input.providerId,programmeId:input.programmeId,status:"new",detectedAt:now,lastEvaluatedAt:now,analyserVersion};
 }
 
 export function analyseProgressReviewIntelligence(input:ProgressReviewAnalysisInput){

@@ -76,6 +76,7 @@ export type DetectedAutopilotSignal = {
 };
 
 export type AutopilotPersistedSignal = DetectedAutopilotSignal & {
+  revision: number;
   status: "new" | "acknowledged" | "accepted" | "dismissed" | "resolved";
   resolvedAt?: string;
   dismissedAt?: string;
@@ -277,10 +278,11 @@ export function reconcileAutopilotSignals(existing: AutopilotPersistedSignal[], 
   const detectedKeys = new Set(detected.map((signal) => signal.signalKey));
   const next = detected.map((signal): AutopilotPersistedSignal => {
     const prior = byKey.get(signal.signalKey);
-    if (!prior) return { ...signal, status: "new" };
+    if (!prior) return { ...signal, revision: 0, status: "new" };
     const materiallyChanged = prior.fingerprint !== signal.fingerprint;
     return {
       ...signal,
+      revision: prior.revision,
       id: prior.id,
       detectedAt: prior.detectedAt,
       status: materiallyChanged ? "new" : prior.status === "resolved" ? "new" : prior.status,
