@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { authenticatedClientFetch } from "@/lib/levytate/client-session";
 import { decodeRequestsMutationResponse } from "@/lib/levytate/client-module-responses";
+import { decodeRequestsReadResponse } from "@/lib/levytate/client-employer-module-reads";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { usePinnedClientMutation } from "@/components/levytate-mvp/usePinnedClientMutation";
 import { ClientMutationRecovery } from "@/components/levytate-mvp/ClientMutationRecovery";
@@ -50,9 +51,10 @@ export function EmployerRequestsContainer({
     let live = true;
     void authenticatedClientFetch("/api/levytate-requests", {}, identity.current ?? undefined)
       .then(async (response) => {
-        const body = await response.json() as { workspace?: EmployerRequestsWorkspaceBootstrap; message?: string };
-        if (!response.ok || !body.workspace || body.workspace.organisation.id !== identity.current?.organisationId) throw new Error(body.message ?? "Requests could not be loaded for this account. Reload to reconnect.");
-        if (live) setWorkspace(body.workspace);
+        const body: unknown = await response.json();
+        if (!response.ok) throw new Error("Requests could not be loaded for this account. Reload to reconnect.");
+        const next = decodeRequestsReadResponse(body, identity.current?.organisationId);
+        if (live) setWorkspace(next);
       })
       .catch((caught) => { if (live) setError(message(caught)); });
     return () => { live = false; };

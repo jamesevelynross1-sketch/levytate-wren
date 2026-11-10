@@ -7,6 +7,7 @@ import { usePinnedClientMutation } from "@/components/levytate-mvp/usePinnedClie
 import { ClientMutationRecovery } from "@/components/levytate-mvp/ClientMutationRecovery";
 import { authenticatedClientFetch } from "@/lib/levytate/client-session";
 import { decodeFinanceMutationResponse } from "@/lib/levytate/client-module-responses";
+import { decodeFinanceReadResponse } from "@/lib/levytate/client-employer-module-reads";
 
 import { calculateLevyFinance, financeReportingPeriod, formatGbp, monthLabel } from "@/lib/levytate/finance/calculations";
 import { financeUploadMaxBytes, mergeFinanceTransactions, parseDasCsv, sanitiseFinanceFileName } from "@/lib/levytate/finance/das-import";
@@ -44,9 +45,10 @@ export function LevyFinanceModule({ organisationId, demoMode }: { organisationId
     setLoading(true);
     void authenticatedClientFetch("/api/levytate-finance", {}, identity.current ?? undefined)
       .then(async (response) => {
-        const body = await response.json() as { state?: LevyFinanceState; message?: string };
-        if (!response.ok || !body.state) throw new Error(body.message || "Finance unavailable.");
-        if (!cancelled) setState(body.state);
+        const body: unknown = await response.json();
+        if (!response.ok) throw new Error("Finance unavailable.");
+        const next = decodeFinanceReadResponse(body);
+        if (!cancelled) setState(next);
       })
       .catch(() => { if (!cancelled) setError("LevyTate Finance could not load safely. Try again."); })
       .finally(() => { if (!cancelled) setLoading(false); });

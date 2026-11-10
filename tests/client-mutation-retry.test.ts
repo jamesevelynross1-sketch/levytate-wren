@@ -5,7 +5,7 @@ import { decodeFinanceMutationResponse, decodeRequestsMutationResponse } from "@
 
 const identity = () => ({ email: "original@example.invalid", organisationId: "tenant-a" });
 const finance = () => ({ ok: true, state: { version: 1, mode: "persistent", transactions: [], imports: [] } });
-const requestWorkspace = () => ({ ok: true, workspace: { requestsEnabled: true, organisation: { id: "tenant-a", name: "Synthetic" }, metrics: {}, requests: [], providerOptions: [], programmeOptions: [] } });
+const requestWorkspace = () => ({ ok: true, workspace: { requestsEnabled: true, organisation: { id: "tenant-a", name: "Synthetic" }, metrics: { openRequests: 0, responsesReceived: 0, requestsInDecision: 0, progressedToAgreement: 0 }, requests: [], providerOptions: [], programmeOptions: [] } });
 const decode = (value: unknown) => decodeRequestsMutationResponse(value, "tenant-a");
 const command = () => ({ action: "create_draft", content: { title: "Original fictional brief" }, idempotencyKey: "original-key" });
 
