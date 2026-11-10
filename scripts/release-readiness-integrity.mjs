@@ -9,7 +9,7 @@ const state=JSON.parse(readFileSync(`${root}/private-stack-state.json`,"utf8")),
 if(db.hostname!=="127.0.0.1")throw new Error("Fault injection is restricted to the dedicated loopback stack");
 const app=localUrl(process.env.RELEASE_APP_URL??"http://localhost:3107","RELEASE_APP_URL");
 const faultTarget=process.env.RELEASE_FAULT_TARGET??"consume";
-const signatures={consume:"public.levytate_consume_auth_rate_limit(text,text,text,integer,integer,text,text,timestamptz)","callback-inspection":"public.levytate_check_auth_callback_failures(text,text)","release-contract":"public.levytate_required_client_contracts()","learning-time-command":"public.levytate_apply_learning_time_command(uuid,uuid,text,jsonb,jsonb,boolean)"};
+const signatures={consume:"public.levytate_consume_auth_rate_limit(text,text,text,integer,integer,text,text,timestamptz)","callback-inspection":"public.levytate_check_auth_callback_failures(text,text)","release-contract":"public.levytate_required_client_contracts()","learning-time-command":"public.levytate_apply_learning_time_command(uuid,uuid,text,jsonb,jsonb,boolean)","intelligence-command":"public.levytate_apply_intelligence_command(uuid,uuid,text,jsonb,boolean,text,integer,jsonb)"};
 if(!Object.hasOwn(signatures,faultTarget))throw new Error("Unapproved local fault target");
 const signature=signatures[faultTarget];
 const env={...process.env,PGHOST:db.hostname,PGPORT:db.port,PGUSER:db.username,PGPASSWORD:db.password,PGDATABASE:db.pathname.slice(1)};

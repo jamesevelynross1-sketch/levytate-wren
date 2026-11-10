@@ -24,8 +24,8 @@ describe("separate release migration worktrees (offline artifacts, no database e
   it("hash-locks every new source without altering the approved bootstrap", async () => {
     const verified = await verifyReleaseSources();
     expect(verified.bootstrap.convergence.sha256).toBe("3bd6b681196ff865f50976129981b48601314d2bab2421794648fba51aefb204");
-    expect(verified.manifest.migrations).toHaveLength(25);
-    expect(verified.manifest.migrations.at(-1)).toEqual({ path: "supabase/release-migrations/20261110090943_client_intelligence_atomic_commands.sql", sha256: "1e3bff237a0e7594675e43193099d701b14a1a7e299167bdb4ba2b763de8ea60" });
+    expect(verified.manifest.migrations).toHaveLength(26);
+    expect(verified.manifest.migrations.at(-1)).toEqual({ path: "supabase/release-migrations/20261110093655_client_operational_event_append.sql", sha256: "c36af60538633a6ff2059046834666cbcbe1b55a26d06ccda6cd068e4711f084" });
   });
   it.each(["fresh", "shared"] as const)("generates the %s tree with identical release SQL and no038, refusing overwrite", async (mode) => {
     const { verified, baseline } = await baselineFixture(mode);
@@ -40,7 +40,7 @@ describe("separate release migration worktrees (offline artifacts, no database e
     for (const source of verified.manifest.migrations) expect(hash(await readFile(join(output, "supabase/migrations", basename(source.path))))).toBe(source.sha256);
     if (mode === "fresh") {
       expect(files.filter((name) => name.startsWith("20261027"))).toHaveLength(2);
-      expect(files).toHaveLength(27);
+      expect(files).toHaveLength(28);
     }
     else expect(files).toContain("006_create_levytate_production_foundation.sql");
     await expect(buildReleaseWorktree({ mode, baseline: baselinePath, output })).rejects.toThrow("must be empty");

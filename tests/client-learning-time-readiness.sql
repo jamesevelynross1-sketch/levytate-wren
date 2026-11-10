@@ -4,7 +4,7 @@ create function pg_temp.check_result(ok boolean,label text) returns void languag
 select pg_temp.check_result((select not prosecdef and provolatile='s' from pg_proc where oid='public.levytate_required_client_contracts()'::regprocedure),'contract remains stable and security invoker');
 select pg_temp.check_result(not has_function_privilege('anon','public.levytate_required_client_contracts()','execute') and not has_function_privilege('authenticated','public.levytate_required_client_contracts()','execute'),'browser roles cannot inspect the contract');
 set local role service_role;
-select pg_temp.check_result(public.levytate_required_client_contracts()='{"version":"20261110090943","available":true}'::jsonb,'actual service role accepts complete current schema');
+select pg_temp.check_result(public.levytate_required_client_contracts()='{"version":"20261110093655","available":true}'::jsonb,'actual service role accepts complete current schema');
 reset role;
 savepoint missing_helper;
 alter function public.levytate_submit_otj_activity(uuid,uuid,uuid,text,integer) rename to unavailable_otj_submit;
@@ -67,7 +67,7 @@ select pg_temp.check_result(public.levytate_required_client_contracts()->>'avail
 reset role;
 rollback to savepoint unavailable_read;
 set local role service_role;
-select pg_temp.check_result(public.levytate_required_client_contracts()='{"version":"20261110090943","available":true}'::jsonb,'restored dependencies recover availability');
+select pg_temp.check_result(public.levytate_required_client_contracts()='{"version":"20261110093655","available":true}'::jsonb,'restored dependencies recover availability');
 reset role;
 select pg_temp.check_result((select count(*)=0 from auth.users) and (select count(*)=0 from storage.objects) and (select count(*)=0 from public.levytate_organisations) and (select count(*)=0 from public.levytate_employees) and (select count(*)=0 from supabase_migrations.schema_migrations),'probe creates no identities, uploaded files, employers, people or fabricated ledger');
 rollback;

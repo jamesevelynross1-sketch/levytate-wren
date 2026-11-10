@@ -163,7 +163,7 @@ begin
  perform pg_temp.check_result(true,'new state and receipt tables retain complete disposal inventory and freeze coverage');
 end $$;
 set local role service_role;
-select pg_temp.check_result(public.levytate_required_client_contracts()='{"version":"20261110090943","available":true}'::jsonb,'actual service readiness requires current atomic Intelligence contract');
+select pg_temp.check_result(public.levytate_required_client_contracts()='{"version":"20261110093655","available":true}'::jsonb,'actual service readiness requires current atomic Intelligence contract');
 reset role;
 select pg_temp.check_result((select bool_and(relrowsecurity) from pg_class where oid in('public.levytate_intelligence_workspaces'::regclass,'public.levytate_intelligence_command_receipts'::regclass)),'new state and receipt tables enforce RLS');
 select pg_temp.check_result(not has_function_privilege('anon','public.levytate_apply_intelligence_command(uuid,uuid,text,jsonb,boolean,text,integer,jsonb)','execute') and not has_function_privilege('authenticated','public.levytate_apply_intelligence_command(uuid,uuid,text,jsonb,boolean,text,integer,jsonb)','execute'),'browser roles cannot call atomic command');

@@ -2,7 +2,7 @@
 begin;
 create function pg_temp.check_result(ok boolean,label text)returns void language plpgsql as $$begin if ok is distinct from true then raise exception 'FAIL: %',label;end if;raise notice 'PASS: %',label;end;$$;
 set local role service_role;
-select pg_temp.check_result(public.levytate_required_client_contracts()='{"version":"20261110090943","available":true}'::jsonb,'current service contract available');
+select pg_temp.check_result(public.levytate_required_client_contracts()='{"version":"20261110093655","available":true}'::jsonb,'current service contract available');
 reset role;
 savepoint missing_command;
 alter function public.levytate_apply_intelligence_command(uuid,uuid,text,jsonb,boolean,text,integer,jsonb) rename to unavailable_intelligence_command;
@@ -40,6 +40,6 @@ set local role service_role;
 select pg_temp.check_result(public.levytate_required_client_contracts()->>'available'='false','disabled receipt RLS is unavailable');
 reset role;rollback to savepoint missing_rls;
 set local role service_role;
-select pg_temp.check_result(public.levytate_required_client_contracts()='{"version":"20261110090943","available":true}'::jsonb,'restored contract recovers truthfully');
+select pg_temp.check_result(public.levytate_required_client_contracts()='{"version":"20261110093655","available":true}'::jsonb,'restored contract recovers truthfully');
 reset role;
 rollback;
