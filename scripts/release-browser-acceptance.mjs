@@ -51,7 +51,8 @@ async function independentJourney(name, task) {
     const blocked=error.message?.startsWith("BLOCKED:");
     const reportedStage=typeof error.safeStage==="string"&&/^[A-Za-z0-9 :_-]{1,120}$/.test(error.safeStage)?error.safeStage:error.message?.match(/^(?:Manager|Lifecycle) browser acceptance failed during ([a-z -]+);/)?.[1];
     const errorClass=["Error","TimeoutError","TypeError"].includes(error.safeErrorClass??error.name)?(error.safeErrorClass??error.name):"UnclassifiedError";
-    results.push({name,status:blocked?"BLOCKED":"FAIL",...(reportedStage?{stage:reportedStage}:{}),errorClass,reason:blocked?error.message:`Independent journey failed${reportedStage?` during ${reportedStage}`:""}; authentication state omitted`});
+    const field=error.safeField,safeField=field&&Number.isInteger(field.labelCount)&&Number.isInteger(field.roleCount)&&typeof field.valueMatches==="boolean"&&typeof field.disabled==="boolean"?{labelCount:field.labelCount,roleCount:field.roleCount,valueMatches:field.valueMatches,disabled:field.disabled}:null;
+    results.push({name,status:blocked?"BLOCKED":"FAIL",...(reportedStage?{stage:reportedStage}:{}),errorClass,...(safeField?{safeField}:{}),reason:blocked?error.message:`Independent journey failed${reportedStage?` during ${reportedStage}`:""}; authentication state omitted`});
     console.error(`${blocked?"BLOCKED":"FAIL"} independent ${name}${reportedStage?` during ${reportedStage}`:""} (${errorClass}); unrelated checks may continue in this bounded run`);
     if(process.exitCode!==1)process.exitCode=blocked?2:1;return false;
   }
