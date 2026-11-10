@@ -1,6 +1,6 @@
 begin;
 create function pg_temp.verify(condition boolean,label text)returns void language plpgsql as $$begin if condition is distinct from true then raise exception 'FAIL %',label;end if;raise notice 'PASS %',label;end$$;
-select pg_temp.verify(public.levytate_required_client_contracts()=jsonb_build_object('version','20261110085437','available',true),'reviewed contract exact baseline');
+select pg_temp.verify(public.levytate_required_client_contracts()=jsonb_build_object('version','20261110093655','available',true),'reviewed contract exact baseline');
 set local role service_role;
 select pg_temp.verify(public.levytate_required_client_contracts()->>'available'='true','actual service caller can inspect availability');
 reset role;
