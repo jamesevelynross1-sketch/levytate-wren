@@ -11,8 +11,11 @@ import { localUrl, releaseBackend } from "./release-local-fixtures.mjs";
 import { lockAcceptanceRuntime } from "./release-runtime-lock.mjs";
 
 const results = [];
+const verifiedContexts = new Map();
 const commitRead=spawnSync("git",["rev-parse","HEAD"],{encoding:"utf8"});
 const candidateCommit=commitRead.status===0&&/^[a-f0-9]{40}$/.test(commitRead.stdout.trim())?commitRead.stdout.trim():null;
+const appCodeCommit=process.env.RELEASE_APP_COMMIT??candidateCommit;
+if(!/^[a-f0-9]{40}$/.test(appCodeCommit??""))throw Error("Exact application commit required for evidence");
 let browser;
 let browserEngineVersion;
 let browserDistribution="bundled-chromium";
@@ -42,6 +45,15 @@ function failureBudgetWritesSince(since) {
 }
 function check(name, condition) {
   results.push({ name, status: condition ? "PASS" : "FAIL" });
+  if(condition){
+    const base=name.match(/^([ab]) (Employee|Line Manager|Apprenticeship Lead): canonical role and tenant resolved$/);
+    if(base)verifiedContexts.set(`${base[1]}:${base[2]}`,base[2]);
+    const manager=name.match(/^Manager development: (manager|lead|reviewer) resolves the exact account, role and employer$/);
+    if(manager)verifiedContexts.set(manager[1]==="reviewer"?"manager:reviewer":`a:${manager[1]==="lead"?"Apprenticeship Lead":"Line Manager"}`,manager[1]==="lead"?"Apprenticeship Lead":"Line Manager");
+    const lifecycle=name.match(/^Lifecycle: (admin-a|admin-b|member) resolves its distinct canonical role and tenant$/);
+    if(lifecycle)verifiedContexts.set(`lifecycle:${lifecycle[1]}`,lifecycle[1]==="member"?"Apprenticeship Lead":"Platform Admin");
+    if(name==="Lifecycle: renewed invitation binds the original Lead and employer")verifiedContexts.set("lifecycle:renewed-member","Apprenticeship Lead");
+  }
   console.log(`${condition ? "PASS" : "FAIL"} ${name}`);
   if (!condition) throw new Error("Acceptance assertion failed");
 }
@@ -432,14 +444,28 @@ try {
     const{resumeLearner}=await import("./release-learner-resume-browser.mjs");
     await independentJourney("retained learner completion",()=>resumeLearner({app,manifest,contexts,backend,check}));
   }
-  if(process.env.RELEASE_MANAGER_JOURNEY==="true"){
+  if(process.env.RELEASE_MANAGER_JOURNEY==="true"||process.env.RELEASE_MANAGER_EXISTING_LEARNER_ID){
     phase="genuine own Manager development with distinct superior";
     const{verifyManagerDevelopment}=await import("./release-manager-browser.mjs");
     const extension=JSON.parse(readFileSync(`${process.env.RELEASE_LOCAL_RUNTIME}/manager-fixture-manifest.json`,"utf8"));
     let managerResult;
-    await independentJourney("Manager personal development",async()=>{managerResult=await verifyManagerDevelopment({app,mailpit,browser,manifest,extension,backend,waitForCapturedLink,check,existingContexts:contexts,resumeApplication:process.env.RELEASE_MANAGER_RESUME_APPLICATION_ID?{id:process.env.RELEASE_MANAGER_RESUME_APPLICATION_ID,revision:Number(process.env.RELEASE_MANAGER_RESUME_APPLICATION_REVISION)}:null});});
+    if(process.env.RELEASE_MANAGER_EXISTING_LEARNER_ID){
+      await independentJourney("Manager existing enrolled journey verification",async()=>{
+        const id=process.env.RELEASE_MANAGER_EXISTING_LEARNER_ID,manager=contexts.get("a:manager"),lead=contexts.get("a:lead");
+        if(!/^learner-[a-f0-9-]{36}$/.test(id)||!manager||!lead||extension.source.person.id!==manager.user.personId)throw Error("Exact existing own Manager learner required");
+        const rows=await backend(`rest/v1/levytate_learner_records?organisation_id=eq.${manager.tenant.id}&employee_id=eq.${manager.user.personId}&id=eq.${id}&select=id,employee_id,application_id,lifecycle_status,record_status`);
+        check("existing Manager learner is exactly the preserved enrolled own record",rows.length===1&&rows[0].lifecycle_status==="enrolled"&&rows[0].record_status==="Active");
+        const application=await backend(`rest/v1/levytate_applications?organisation_id=eq.${manager.tenant.id}&id=eq.${rows[0].application_id}&employee_id=eq.${manager.user.personId}&select=id,status`);
+        check("existing Manager application remains completed without creating a replacement",application.length===1&&application[0].status==="Completed");
+        for(const actor of[manager,lead]){
+          const response=await actor.context.request.get(`${app}/api/levytate-learners/${id}`,{headers:{"X-LevyTate-Account":actor.user.email,"X-LevyTate-Organisation":actor.tenant.id}}),body=await response.json();
+          check(`${actor.user.role} genuine session resolves the exact existing enrolled Manager learner`,response.status()===200&&body.learner?.learnerRecordId===id&&body.learner.learner?.id===manager.user.personId&&body.learner.programme?.applicationReference===application[0].id&&body.learner.lifecycleStatus==="enrolled");
+        }
+        managerResult={learnerId:id};
+      });
+    }else await independentJourney("Manager personal development",async()=>{managerResult=await verifyManagerDevelopment({app,mailpit,browser,manifest,extension,backend,waitForCapturedLink,check,existingContexts:contexts,resumeApplication:process.env.RELEASE_MANAGER_RESUME_APPLICATION_ID?{id:process.env.RELEASE_MANAGER_RESUME_APPLICATION_ID,revision:Number(process.env.RELEASE_MANAGER_RESUME_APPLICATION_REVISION)}:null});});
     if(process.env.RELEASE_MANAGER_LEARNING_JOURNEY==="true"){
-      if(managerResult?.learnerId){const{verifyManagerLearningTime}=await import("./release-manager-learning-browser.mjs");await independentJourney("Manager personal Learning Time",()=>verifyManagerLearningTime({app,manifest,contexts,learnerId:managerResult.learnerId,backend,check}));}
+      if(managerResult?.learnerId){const{verifyManagerLearningTime}=await import("./release-manager-learning-browser.mjs");await independentJourney("Manager personal Learning Time",()=>verifyManagerLearningTime({app,manifest,contexts,learnerId:managerResult.learnerId,backend,check,existingPlanId:process.env.RELEASE_MANAGER_EXISTING_PLAN_ID??null}));}
       else results.push({name:"Manager personal Learning Time",status:"BLOCKED",reason:"Own Manager enrolment was not confirmed in this bounded genuine run"});
     }
     if(process.env.RELEASE_LEARNER_RECOVERY_JOURNEY==="true"){
@@ -524,7 +550,7 @@ try {
   if(app&&contexts.size){let loggedOut=0;for(const{context}of contexts.values()){try{const r=await context.request.post(`${app}/api/levytate-beta-logout`,{headers:{Origin:app},maxRedirects:0});if(r.status()===303)loggedOut++;}catch{/* Raw transport errors may carry Auth details. */}}console.log(`Local failed-run cleanup: ${loggedOut}/${contexts.size} logout responses confirmed; all browser contexts closing`);}
   await browser?.close();
   releaseRuntime?.();
-  const evidence = { schemaVersion: 1, environment: "local", candidateCommit, browserEngineVersion, browserDistribution, authenticationMethod: "requested-sign-in-link-through-local-smtp", authenticatedRolesVerified: results.filter((item) => item.name.endsWith("canonical role and tenant resolved") && item.status === "PASS").length, emailEvidence: "local-smtp-capture-only", results };
+  const evidence = { schemaVersion: 2, environment: "local", candidateCommit, appCodeCommit, browserEngineVersion, browserDistribution, authenticationMethod: "requested-sign-in-link-through-local-smtp", authenticatedContextsVerified: verifiedContexts.size, distinctAuthenticatedRoles: [...new Set(verifiedContexts.values())].sort(), emailEvidence: "local-smtp-capture-only", results };
   if (process.env.RELEASE_EVIDENCE_PATH?.startsWith("/private/tmp/")) {
     const requested = process.env.RELEASE_EVIDENCE_PATH;
     const path = existsSync(requested) ? requested.replace(/\.json$/, `-${Date.now()}.json`) : requested;

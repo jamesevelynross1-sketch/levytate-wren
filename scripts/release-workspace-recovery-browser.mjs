@@ -90,19 +90,27 @@ export async function verifyWorkspaceRecovery({ app: origin, applicant, applicat
   report("expired session still retains the original form", await reason.isDisabled() && (await reason.inputValue()) === originalAnswer);
   report("recovery dialog exposes sign-in and reconnect without dismissing retained update", await recovery.getByRole("button", { name: "Sign in in new tab", exact: true }).count() === 1 && await recovery.getByRole("button", { name: "Reconnect workspace", exact: true }).count() === 1);
 
-  phase="visible sign-in and reconnect";const popup = context.waitForEvent("page");
+  phase="click visible sign-in";const popup = context.waitForEvent("page");
   await recovery.getByRole("button", { name: "Sign in in new tab", exact: true }).click();
+  phase="await popup page";
   const login = await popup;
   try {
-    await login.getByLabel("Work email", { exact: true }).fill(user.email);
+    phase="popup login form";
+    await login.getByRole("textbox", { name: "Work email", exact: true }).fill(user.email);
+    const loginLocation=new URL(login.url());
+    report("recovery popup is the expected same-origin sign-in page",loginLocation.origin===app&&loginLocation.pathname==="/levytate/login");
     const after = Date.now();
     const requested = login.waitForResponse(response => new URL(response.url()).pathname === "/api/levytate-auth/request" && response.request().method() === "POST");
+    phase="submit renewed sign-in link";
     await login.getByRole("button", { name: "Send secure sign-in link", exact: true }).click();
+    phase="await renewed sign-in response";
     const response = await requested;
     if (response.status() === 429) throw new Error("BLOCKED: natural authentication rate budget reached; no reset permitted");
     report("retained form signs in again through actual captured email route", response.status() === 200);
+    phase="redeem renewed captured callback";
     await login.goto(await waitForCapturedLink(capture, user.email, app, after));
     await login.waitForURL(url => url.origin === app && url.pathname.includes("/app"));
+    phase="visible workspace reconnect";
     const reconnected = page.waitForResponse(response => new URL(response.url()).pathname === endpoint && response.request().method() === "GET");
     await recovery.getByRole("button", { name: "Reconnect workspace", exact: true }).click();
     const read = await reconnected;
