@@ -97,3 +97,61 @@ it('keeps the actual Intelligence accept review until exact target/key/revision 
   expect(harness.write.mock.calls[1]?.[1].body).toBe(harness.write.mock.calls[0]?.[1].body); expect(onSignalContext).toHaveBeenCalledOnce();
   expect((descendants(render()).find(item => item.props?.mutation)!.props.mutation as { pending: boolean }).pending).toBe(false);
 });
+
+import { analyseOperationsAutopilot, autopilotLanes, buildOperationsBrief } from '@/lib/levytate/autopilot/operations-autopilot';
+function applicationWorkflowWorkspace(owner: 'Apprenticeship Lead' | 'Provider Partner', linked = false) {
+  const signals = analyseOperationsAutopilot({ organisationId: intelligenceScope.organisationId, now: '2026-11-10T12:00:00Z', learners: [], actions: [], applications: [{ id: 'application-workflow', employeeId: 'person-workflow', employeeName: 'Fictional Workflow Applicant', status: owner === 'Apprenticeship Lead' ? 'Awaiting Final Approval' : 'Approved for Enrolment', currentOwner: owner, updatedAt: '2026-10-01T12:00:00Z' }] }).map(signal => ({ ...signal, revision: 1, status: 'new' as const, ...(linked ? { linkedOperationalActionId: 'old-generic-action' } : {}) }));
+  return { ...fictionalAutopilot(), brief: buildOperationsBrief(signals), lanes: Object.fromEntries(autopilotLanes.map(lane => [lane, signals.filter(signal => signal.lane === lane)])) };
+}
+function renderIsolatedChild(item: Element) {
+  const cells = harness.cells, cursor = harness.cursor; harness.cells = []; harness.cursor = 0;
+  try { return (item.type as (props: Record<string, unknown>) => unknown)(item.props); }
+  finally { harness.cells = cells; harness.cursor = cursor; }
+}
+function actualSignalRows(tree: unknown) {
+  return descendants(tree).filter(item => typeof item.type === 'function' && item.type.name === 'AutopilotLaneSection')
+    .flatMap(section => descendants(renderIsolatedChild(section)).filter(item => typeof item.type === 'function' && item.type.name === 'SignalRow').map(renderIsolatedChild));
+}
+it.each([
+  { owner: 'Apprenticeship Lead' as const, label: 'Review application', linked: false },
+  { owner: 'Provider Partner' as const, label: 'Open enrolment handoff', linked: false },
+  { owner: 'Apprenticeship Lead' as const, label: 'Review application', linked: true },
+])('takes $owner suggestions to the exact canonical workflow, including stale linked tasks: $linked', async ({ owner, label, linked }) => {
+  const open = vi.fn(); harness.request.mockImplementation(async () => Response.json({ ok: true, workspace: applicationWorkflowWorkspace(owner, linked) }));
+  function render() { harness.cursor = 0; return AutopilotOperationsPanel({ onOpenAction: open }); }
+  render(); harness.effects.splice(0).forEach(effect => effect()); await flush();
+  const row = actualSignalRows(render()).find(row => text(row).includes('Fictional Workflow Applicant')); expect(row).toBeDefined();
+  const destination = descendants(row).find(item => item.type === 'a' && text(item.props.children).includes(label));
+  expect(destination).toBeDefined(); expect(destination!.props.href).toBe('/levytate/app?module=Applications&application=application-workflow');
+  expect(descendants(row).some(item => item.type === 'button' && text(item.props.children).includes('Open action'))).toBe(false);
+  expect(harness.write).not.toHaveBeenCalled(); expect(open).not.toHaveBeenCalled();
+  const review = descendants(row).find(item => item.type === 'button' && text(item.props.children).includes('Review options')); expect(review).toBeDefined();
+  (review!.props.onClick as () => void)();
+  const drawer = descendants(render()).find(item => typeof item.type === 'function' && item.type.name === 'ActionReviewDrawer'); expect(drawer).toBeDefined();
+  const drawerTree = renderIsolatedChild(drawer!);
+  expect(text(drawerTree)).toContain(label); expect(text(drawerTree)).toContain('Dismiss'); expect(text(drawerTree)).not.toContain('Create action');
+  expect(text(drawerTree)).not.toContain('Action title'); expect(text(drawerTree)).not.toContain('Communication draft');
+});
+it('removes canonical navigation targets while a real signal command is in flight or uncertain', async () => {
+  harness.request.mockImplementation(async () => Response.json({ ok: true, workspace: applicationWorkflowWorkspace('Apprenticeship Lead') }));
+  function render() { harness.cursor = 0; return AutopilotOperationsPanel({ onOpenAction: vi.fn() }); }
+  render(); harness.effects.splice(0).forEach(effect => effect()); await flush();
+  const row = actualSignalRows(render()).find(row => text(row).includes('Fictional Workflow Applicant'));
+  const review = descendants(row).find(item => item.type === 'button' && text(item.props.children).includes('Review options'));
+  (review!.props.onClick as () => void)();
+  const drawer = descendants(render()).find(item => typeof item.type === 'function' && item.type.name === 'ActionReviewDrawer');
+  let resolve!: (response: Response) => void; harness.write.mockImplementationOnce(() => new Promise<Response>(done => { resolve = done; }));
+  const pending = (drawer!.props.onSubmit as (action: string, fields: Record<string, unknown>) => Promise<void>)('dismiss', { reason: 'Fictional reviewed evidence' }); await flush();
+  function expectNoNavigation() {
+    const tree = render(), target = '/levytate/app?module=Applications&application=application-workflow';
+    const currentDrawer = descendants(tree).find(item => typeof item.type === 'function' && item.type.name === 'ActionReviewDrawer')!;
+    expect(currentDrawer.props.saving).toBe(true);
+    const components = [...actualSignalRows(tree), renderIsolatedChild(currentDrawer)];
+    for (const rendered of components) {
+      expect(descendants(rendered).some(item => item.type === 'a' && item.props.href === target && text(item.props.children).includes('Review application'))).toBe(false);
+      expect(descendants(rendered).some(item => item.props['aria-disabled'] === true && text(item.props.children).includes('Review application'))).toBe(true);
+    }
+    expect(descendants(tree).some(item => item.props?.mutation && (item.props.mutation as { pending: boolean }).pending)).toBe(true);
+  }
+  expectNoNavigation(); resolve(Response.json({})); await pending; await flush(); expectNoNavigation();
+});

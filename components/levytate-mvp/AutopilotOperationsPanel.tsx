@@ -2,7 +2,7 @@
 
 import { ArrowRight, Bot, CheckCircle2, ChevronDown, ExternalLink, RefreshCw, Sparkles, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { AutopilotLane } from "@/lib/levytate/autopilot/operations-autopilot";
+import { autopilotApplicationDestination, type AutopilotLane } from "@/lib/levytate/autopilot/operations-autopilot";
 import type { OperationalOwnerType } from "@/lib/levytate/mvp/operations-centre";
 
 import { useRetainedWorkspaceRequest } from "@/components/levytate-mvp/useRetainedWorkspaceRequest";
@@ -103,7 +103,7 @@ export function AutopilotOperationsPanel({ onOpenAction, onLockedChange }: { onO
       {workspace && !workspace.checked ? <p role="status" className="rounded-xl bg-[#f8fbfa] p-4 text-sm text-[#102c3d]/65">Intelligence has not been checked yet. Select Refresh intelligence to run the first check.</p> : null}
       {error ? <button type="button" onClick={() => void load()} className="min-h-10 text-sm font-semibold text-[#0b6f63]">Try loading again</button> : null}
       {workspace && (workspace.checked || visibleTotal > 0) ? <div className="grid gap-4">{laneOrder.map((lane) => (
-        <AutopilotLaneSection key={lane} lane={lane} signals={workspace.lanes[lane]} onReview={setSelected} onOpenAction={onOpenAction} />
+        <AutopilotLaneSection key={lane} lane={lane} signals={workspace.lanes[lane]} disabled={locked || loading} onReview={setSelected} onOpenAction={onOpenAction} />
       ))}</div> : null}
 
       {workspace?.generatedAt ? <p className="text-right text-[11px] font-medium text-[#102c3d]/40">Last evaluated {formatDateTime(workspace.generatedAt)} · deterministic rules with constrained interpretation</p> : null}
@@ -116,7 +116,7 @@ export function AutopilotOperationsPanel({ onOpenAction, onLockedChange }: { onO
   );
 }
 
-function AutopilotLaneSection({ lane, signals, onReview, onOpenAction }: { lane: AutopilotLane; signals: AutopilotPersistedSignal[]; onReview: (signal: AutopilotPersistedSignal) => void; onOpenAction: (id: string) => void }) {
+function AutopilotLaneSection({ lane, signals, disabled, onReview, onOpenAction }: { lane: AutopilotLane; signals: AutopilotPersistedSignal[]; disabled: boolean; onReview: (signal: AutopilotPersistedSignal) => void; onOpenAction: (id: string) => void }) {
   const [expanded, setExpanded] = useState(lane !== "recently_resolved");
   const copy = laneCopy[lane];
   return (
@@ -125,13 +125,14 @@ function AutopilotLaneSection({ lane, signals, onReview, onOpenAction }: { lane:
         <div><div className="flex items-center gap-2"><h3 className="text-sm font-semibold uppercase tracking-[0.08em] text-[#102c3d]">{copy.title}</h3><span className="rounded-full bg-[#edf7f3] px-2.5 py-1 text-[10px] font-semibold text-[#0b6f63]">{signals.length}</span></div><p className="mt-1 text-xs leading-5 text-[#102c3d]/48">{copy.description}</p></div>
         <ChevronDown size={17} className={`shrink-0 text-[#102c3d]/40 transition ${expanded ? "rotate-180" : ""}`} />
       </button>
-      {expanded ? <div className="border-t border-[#102c3d]/[0.06]">{signals.length ? signals.map((signal) => <SignalRow key={signal.id} signal={signal} onReview={onReview} onOpenAction={onOpenAction} />) : <p className="px-5 py-6 text-sm text-[#102c3d]/48">No current items in this lane.</p>}</div> : null}
+      {expanded ? <div className="border-t border-[#102c3d]/[0.06]">{signals.length ? signals.map((signal) => <SignalRow key={signal.id} signal={signal} disabled={disabled} onReview={onReview} onOpenAction={onOpenAction} />) : <p className="px-5 py-6 text-sm text-[#102c3d]/48">No current items in this lane.</p>}</div> : null}
     </section>
   );
 }
 
-function SignalRow({ signal, onReview, onOpenAction }: { signal: AutopilotPersistedSignal; onReview: (signal: AutopilotPersistedSignal) => void; onOpenAction: (id: string) => void }) {
+function SignalRow({ signal, disabled, onReview, onOpenAction }: { signal: AutopilotPersistedSignal; disabled: boolean; onReview: (signal: AutopilotPersistedSignal) => void; onOpenAction: (id: string) => void }) {
   const resolved = signal.status === "resolved";
+  const destination = autopilotApplicationDestination(signal);
   return (
     <article className="grid gap-4 border-b border-[#102c3d]/[0.055] px-5 py-4 last:border-b-0 lg:grid-cols-[minmax(0,1fr)_minmax(180px,0.35fr)_auto] lg:items-center">
       <div className="min-w-0">
@@ -143,12 +144,13 @@ function SignalRow({ signal, onReview, onOpenAction }: { signal: AutopilotPersis
         <p className="mt-2 text-xs font-medium text-[#102c3d]/48"><strong className="text-[#102c3d]/68">Based on:</strong> {signal.interpretation.evidenceSummary.join(" · ")}</p>
       </div>
       <div className="grid gap-1 text-xs text-[#102c3d]/50"><span><strong className="font-semibold text-[#102c3d]/68">Owner:</strong> {signal.suggestedOwnerType}</span><span><strong className="font-semibold text-[#102c3d]/68">Due:</strong> {signal.suggestedDueDate ? formatDate(signal.suggestedDueDate) : "Review required"}</span><span>{resolved ? `Resolved ${formatDate(signal.resolvedAt ?? signal.lastEvaluatedAt)}` : `Observed ${formatDate(signal.lastEvaluatedAt)}`}</span></div>
-      <div className="flex flex-wrap gap-2 lg:justify-end">{signal.linkedOperationalActionId ? <button type="button" onClick={() => onOpenAction(signal.linkedOperationalActionId!)} className="inline-flex h-9 items-center gap-2 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white">Open action<ArrowRight size={13} /></button> : !resolved ? <button type="button" onClick={() => onReview(signal)} className="inline-flex h-9 items-center gap-2 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white">Review action<ArrowRight size={13} /></button> : null}<a href={signal.evidence[0]?.url ?? "/levytate/app?module=Operations"} className="inline-flex h-9 items-center gap-1.5 rounded-full border border-[#102c3d]/10 px-3 text-xs font-semibold text-[#102c3d]/60">Evidence<ExternalLink size={12} /></a></div>
+      <div className="flex flex-wrap gap-2 lg:justify-end">{destination ? <>{disabled ? <span aria-disabled={true} className="inline-flex min-h-9 items-center rounded-full bg-[#102c3d]/50 px-4 text-xs font-semibold text-white">{destination.label}</span> : <a href={destination.href} className="inline-flex min-h-9 items-center gap-2 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white">{destination.label}<ArrowRight size={13} /></a>}{!resolved ? <button type="button" onClick={() => onReview(signal)} className="inline-flex min-h-9 items-center rounded-full border border-[#102c3d]/10 px-3 text-xs font-semibold text-[#102c3d]/60">Review options</button> : null}</> : signal.linkedOperationalActionId ? <button type="button" onClick={() => onOpenAction(signal.linkedOperationalActionId!)} className="inline-flex h-9 items-center gap-2 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white">Open action<ArrowRight size={13} /></button> : !resolved ? <button type="button" onClick={() => onReview(signal)} className="inline-flex h-9 items-center gap-2 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white">Review action<ArrowRight size={13} /></button> : null}<a href={signal.evidence[0]?.url ?? "/levytate/app?module=Operations"} className="inline-flex h-9 items-center gap-1.5 rounded-full border border-[#102c3d]/10 px-3 text-xs font-semibold text-[#102c3d]/60">Evidence<ExternalLink size={12} /></a></div>
     </article>
   );
 }
 
 function ActionReviewDrawer({ signal, saving, onClose, onSubmit }: { signal: AutopilotPersistedSignal; saving: boolean; onClose: () => void; onSubmit: (action: "create_action" | "dismiss", fields: Record<string, unknown>) => Promise<void> }) {
+  const destination = autopilotApplicationDestination(signal);
   const [title, setTitle] = useState(signal.interpretation.headline);
   const [ownerType, setOwnerType] = useState<OperationalOwnerType>(signal.suggestedOwnerType);
   const [dueDate, setDueDate] = useState(signal.suggestedDueDate);
@@ -156,19 +158,20 @@ function ActionReviewDrawer({ signal, saving, onClose, onSubmit }: { signal: Aut
   const [dismissalReason, setDismissalReason] = useState("");
 
   async function submit(action: "create_action" | "dismiss") {
+    if (action === "create_action" && destination) return;
     await onSubmit(action, action === "dismiss" ? { reason: dismissalReason } : { title, ownerType, dueDate, communicationDraft });
   }
 
   return <div className="fixed inset-0 z-[80] bg-[#081d29]/30 backdrop-blur-[2px]" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-    <aside role="dialog" aria-modal="true" aria-label="Review suggested operational action" className="absolute inset-y-0 right-0 flex w-full max-w-xl flex-col bg-white shadow-[-22px_0_56px_rgba(8,29,41,0.16)]">
-      <div className="flex items-start justify-between gap-4 border-b border-[#102c3d]/[0.07] px-5 py-5 sm:px-6"><div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">Human approval required</p><h3 className="mt-1 text-xl font-semibold text-[#102c3d]">Review action</h3></div><button type="button" onClick={onClose} className="rounded-full p-2 text-[#102c3d]/50 hover:bg-[#f3f7f5]" aria-label="Close"><X size={18} /></button></div>
+    <aside role="dialog" aria-modal="true" aria-label={destination ? "Review application workflow options" : "Review suggested operational action"} className="absolute inset-y-0 right-0 flex w-full max-w-xl flex-col bg-white shadow-[-22px_0_56px_rgba(8,29,41,0.16)]">
+      <div className="flex items-start justify-between gap-4 border-b border-[#102c3d]/[0.07] px-5 py-5 sm:px-6"><div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">{destination ? "Existing application workflow" : "Human approval required"}</p><h3 className="mt-1 text-xl font-semibold text-[#102c3d]">{destination ? "Review options" : "Review action"}</h3></div><button type="button" onClick={onClose} className="rounded-full p-2 text-[#102c3d]/50 hover:bg-[#f3f7f5]" aria-label="Close"><X size={18} /></button></div>
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
         <div className="mb-3 flex flex-wrap items-center gap-2"><PriorityBadge priority={signal.priority} /><span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#102c3d]/42">{signal.category.replace(/_/g, " ")}</span></div>
         <div className="rounded-xl bg-[#f4f8f6] p-4"><h4 className="text-sm font-semibold text-[#102c3d]">{signal.interpretation.headline}</h4><p className="mt-2 text-sm leading-6 text-[#102c3d]/60">{signal.interpretation.whyItMatters}</p><p className="mt-3 text-sm leading-6 text-[#102c3d]/60"><strong className="font-semibold text-[#102c3d]/75">Suggested next step:</strong> {signal.interpretation.suggestedNextStep}</p></div>
         <section className="mt-5"><h4 className="text-[10px] font-semibold uppercase tracking-[0.11em] text-[#102c3d]/45">Evidence</h4><div className="mt-2 grid gap-2">{signal.evidence.map((item) => <a key={`${item.sourceType}:${item.sourceId}`} href={item.url} className="flex items-center justify-between gap-3 rounded-xl border border-[#102c3d]/[0.08] px-3 py-3 text-sm text-[#102c3d]/65 hover:bg-[#f8fbfa]"><span><strong className="font-semibold text-[#102c3d]">{item.label}</strong><span className="ml-2 text-xs">{item.value}</span></span><ExternalLink size={13} className="shrink-0" /></a>)}</div></section>
-        <div className="mt-5 grid gap-4"><Field label="Action title"><input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={160} className={inputClass} /></Field><div className="grid gap-4 sm:grid-cols-2"><Field label="Owner"><select value={ownerType} onChange={(event) => setOwnerType(event.target.value as OperationalOwnerType)} className={inputClass}>{ownerOptions.map((option) => <option key={option}>{option}</option>)}</select></Field><Field label="Due date"><input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} className={inputClass} /></Field></div><Field label="Communication draft (not sent)"><textarea value={communicationDraft} onChange={(event) => setCommunicationDraft(event.target.value)} rows={5} maxLength={1000} placeholder="Optional draft for a human to review and use later." className={`${inputClass} h-auto py-3`} /></Field><Field label="Dismissal reason"><input value={dismissalReason} onChange={(event) => setDismissalReason(event.target.value)} maxLength={240} placeholder="Required only when dismissing" className={inputClass} /></Field></div>
+        <div className="mt-5 grid gap-4">{destination ? <p className="rounded-xl bg-[#edf7f3] p-4 text-sm leading-6 text-[#0b6f63]">{destination.instruction}</p> : <><Field label="Action title"><input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={160} className={inputClass} /></Field><div className="grid gap-4 sm:grid-cols-2"><Field label="Owner"><select value={ownerType} onChange={(event) => setOwnerType(event.target.value as OperationalOwnerType)} className={inputClass}>{ownerOptions.map((option) => <option key={option}>{option}</option>)}</select></Field><Field label="Due date"><input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} className={inputClass} /></Field></div><Field label="Communication draft (not sent)"><textarea value={communicationDraft} onChange={(event) => setCommunicationDraft(event.target.value)} rows={5} maxLength={1000} placeholder="Optional draft for a human to review and use later." className={`${inputClass} h-auto py-3`} /></Field></>}<Field label="Dismissal reason"><input value={dismissalReason} onChange={(event) => setDismissalReason(event.target.value)} maxLength={240} placeholder="Required only when dismissing" className={inputClass} /></Field></div>
       </div>
-      <div className="flex flex-wrap justify-end gap-2 border-t border-[#102c3d]/[0.07] px-5 py-4 sm:px-6"><button type="button" onClick={onClose} className="h-10 rounded-full px-4 text-xs font-semibold text-[#102c3d]/55">Cancel</button><button type="button" onClick={() => void submit("dismiss")} disabled={saving || !dismissalReason.trim()} className="h-10 rounded-full border border-[#102c3d]/10 px-4 text-xs font-semibold text-[#102c3d]/62 disabled:opacity-40">Dismiss</button><button type="button" onClick={() => void submit("create_action")} disabled={saving || !title.trim()} className="h-10 rounded-full bg-[#0b6f63] px-5 text-xs font-semibold text-white disabled:opacity-50">{saving ? "Saving…" : "Create action"}</button></div>
+      <div className="flex flex-wrap justify-end gap-2 border-t border-[#102c3d]/[0.07] px-5 py-4 sm:px-6"><button type="button" onClick={onClose} className="h-10 rounded-full px-4 text-xs font-semibold text-[#102c3d]/55">Cancel</button><button type="button" onClick={() => void submit("dismiss")} disabled={saving || !dismissalReason.trim()} className="h-10 rounded-full border border-[#102c3d]/10 px-4 text-xs font-semibold text-[#102c3d]/62 disabled:opacity-40">Dismiss</button>{destination ? saving ? <span aria-disabled={true} className="inline-flex min-h-10 items-center rounded-full bg-[#0b6f63]/50 px-5 text-xs font-semibold text-white">{destination.label}</span> : <a href={destination.href} className="inline-flex min-h-10 items-center rounded-full bg-[#0b6f63] px-5 text-xs font-semibold text-white">{destination.label}</a> : <button type="button" onClick={() => void submit("create_action")} disabled={saving || !title.trim()} className="h-10 rounded-full bg-[#0b6f63] px-5 text-xs font-semibold text-white disabled:opacity-50">{saving ? "Saving…" : "Create action"}</button>}</div>
     </aside>
   </div>;
 }
