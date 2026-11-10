@@ -26,7 +26,7 @@ beforeEach(() => {
   mocks.session.mockResolvedValue({ email, accessLevel: "approved" }); mocks.config.mockReturnValue({ url: "https://synthetic.invalid", serviceRoleKey: "synthetic-not-a-credential" });
   mocks.select.mockResolvedValue([{ email, organisation_id: tenant, active: true }]); mocks.limits.mockResolvedValue({ allowed: true }); mocks.writes.mockResolvedValue({ allowed: true });
   mocks.workspace.mockResolvedValue({ data: createEmptyMvpWorkspace(), meta: { organisationId: tenant, userEmail: email, userRole: "Apprenticeship Lead", storageMode: "supabase" } });
-  mocks.operational.mockResolvedValue({ source: "deterministic", assistantMessage: "Synthetic permitted answer" }); mocks.signals.mockResolvedValue([]); mocks.analyse.mockResolvedValue({ signals: [] });
+  mocks.operational.mockResolvedValue({ source: "deterministic", assistantMessage: "Synthetic permitted answer" }); mocks.signals.mockResolvedValue({ signals: [], scope: { organisationId: tenant, userEmail: email, role: "Apprenticeship Lead" }, organisationId: tenant, revision: 0, lastAnalysedAt: null, checked: false }); mocks.analyse.mockResolvedValue({ signals: [] });
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
@@ -46,8 +46,8 @@ describe.each([["Copilot", copilot], ["signals", signals], ["signal write", sign
   it("preserves exact current identity and existing read or abuse-budget policy", async () => {
     const result = await route(request(kind)); expect(result.status).toBe(200); expect(result.headers.get("cache-control")).toContain("no-store"); expect(mocks.select).toHaveBeenCalledOnce();
     if (kind === "Copilot") { expect(mocks.limits).toHaveBeenCalledOnce(); expect(mocks.writes).not.toHaveBeenCalled(); }
-    else if (kind === "signals") { expect(mocks.limits).not.toHaveBeenCalled(); expect(mocks.writes).not.toHaveBeenCalled(); }
-    else { expect(mocks.writes).toHaveBeenCalledOnce(); expect(mocks.limits).not.toHaveBeenCalled(); expect(mocks.analyse).toHaveBeenCalledWith({ email, accessLevel: "approved" }, { idempotencyKey: analysisKey }); }
+    else if (kind === "signals") { expect(mocks.limits).not.toHaveBeenCalled(); expect(mocks.writes).not.toHaveBeenCalled(); expect(await result.json()).toMatchObject({ scope: { organisationId: tenant, userEmail: email }, checked: false }); }
+    else { expect(mocks.writes).toHaveBeenCalledOnce(); expect(mocks.limits).not.toHaveBeenCalled(); expect(mocks.analyse).toHaveBeenCalledWith({ email, accessLevel: "approved" }, { idempotencyKey: analysisKey }, tenant); }
   });
 });
 it("continues to deny organisation signals outside the existing authorised role", async () => {
