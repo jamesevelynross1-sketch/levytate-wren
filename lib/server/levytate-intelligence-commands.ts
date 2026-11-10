@@ -30,7 +30,11 @@ export async function intelligenceCommand(scope: IntelligenceActorScope, family:
         || !object(confirmation) || confirmation.idempotencyKey !== command.idempotencyKey || confirmation.action !== command.action || confirmation.organisationId !== scope.organisationId || confirmation.userEmail !== scope.userEmail || confirmation.role !== scope.role
         || confirmation.signalId !== (command.signalId ?? null) || !Number.isSafeInteger(confirmation.revision)
         || (command.expectedRevision !== undefined && confirmation.revision !== Number(command.expectedRevision) + 1)
+        || !Number.isSafeInteger(result.learnerCount) || Number(result.learnerCount) < 0
         || typeof result.reused !== "boolean" || !(result.operationalActionId === null || typeof result.operationalActionId === "string")) throw new IntelligenceCommandError("The Intelligence update could not be confirmed.");
+      if (command.signalId !== undefined && (!object(result.signal) || result.signal.id !== command.signalId || result.signal.organisation_id !== scope.organisationId || result.signal.analyser_version !== family || result.signal.revision !== confirmation.revision
+        || result.signal.status !== (command.action === "dismiss" ? "dismissed" : command.action === "acknowledge" ? "acknowledged" : "accepted"))) throw new IntelligenceCommandError("The signal decision could not be confirmed.");
+      if (["analyse", "refresh"].includes(String(command.action)) && (state.reconciled_at === null || confirmation.revision !== state.revision)) throw new IntelligenceCommandError("The analysis could not be confirmed.");
       return { receipt: result as IntelligenceCommandResult };
     }
     if (!prepare || typeof response.sourceHash !== "string" || !/^[0-9a-f]{64}$/.test(response.sourceHash) || !Number.isSafeInteger(response.revision) || Number(response.revision) < 0 || !Array.isArray(response.signals)) throw new IntelligenceCommandError("The Intelligence source snapshot is unavailable.");

@@ -18,7 +18,7 @@ revoke insert,update,delete,truncate on public.levytate_intelligence_signals,pub
 -- and tenant-freeze locks, shared by every reviewed source command, before use.
 create function public.levytate_intelligence_source_hash(p_org uuid) returns text
 language plpgsql volatile security definer set search_path=pg_catalog,public as $$
-declare t text; part jsonb; parts jsonb:='{}';
+declare t text; part jsonb; parts jsonb:=jsonb_build_object('asOfDate',current_date);
 begin
  foreach t in array array['levytate_employees','levytate_applications','levytate_learner_records','levytate_learner_reviews','levytate_learner_progress_updates',
  'levytate_learner_assessment_readiness','levytate_learner_achievements','levytate_operational_actions','levytate_organisation_capabilities',
@@ -94,7 +94,7 @@ begin
    elsif proposed.learner_record_id is null or not exists(select 1 from public.levytate_learner_records l where l.organisation_id=p_organisation_id and l.id=proposed.learner_record_id and l.record_status='Active') then raise exception using errcode='PT403',message='Learner evidence outside tenant';end if;
    if jsonb_typeof(proposed.evidence) is distinct from 'array' or jsonb_array_length(proposed.evidence) not between 1 and 100 then raise exception using errcode='PT422',message='Recorded evidence required';end if;
    for evidence in select value from jsonb_array_elements(proposed.evidence) loop
-    if not case evidence->>'sourceType'
+    if not (case evidence->>'sourceType'
      when 'application' then exists(select 1 from public.levytate_applications where organisation_id=p_organisation_id and id=evidence->>'sourceId' and id=proposed.entity_id)
      when 'operational_action' then exists(select 1 from public.levytate_operational_actions where organisation_id=p_organisation_id and id=evidence->>'sourceId' and (learner_record_id=proposed.learner_record_id or application_id=proposed.entity_id))
      when 'learning_time' then exists(select 1 from public.levytate_learner_records where organisation_id=p_organisation_id and id=evidence->>'sourceId' and id=proposed.learner_record_id)
@@ -103,7 +103,7 @@ begin
      when 'manager_check_in' then exists(select 1 from public.levytate_learner_reviews where organisation_id=p_organisation_id and id=evidence->>'sourceId' and learner_record_id=proposed.learner_record_id and review_type='manager_check_in')
      when 'l_and_d_check_in' then exists(select 1 from public.levytate_learner_reviews where organisation_id=p_organisation_id and id=evidence->>'sourceId' and learner_record_id=proposed.learner_record_id and review_type='l_and_d_check_in')
      when 'learner_review' then exists(select 1 from public.levytate_learner_reviews where organisation_id=p_organisation_id and id=evidence->>'sourceId' and learner_record_id=proposed.learner_record_id)
-     else false end then raise exception using errcode='PT403',message='Signal evidence outside current source';end if;
+     else false end) then raise exception using errcode='PT403',message='Signal evidence outside current source';end if;
    end loop;
    proposed.revision:=coalesce(prior.revision,0)+1;proposed.source_hash:=v_source_hash;
    proposed.created_at:=coalesce(prior.created_at,now_at);proposed.updated_at:=now_at;proposed.last_evaluated_at:=now_at;proposed.detected_at:=coalesce(prior.detected_at,now_at);
@@ -115,7 +115,7 @@ begin
    proposed.signal_key:=coalesce(proposed.signal_key,'');proposed.lane:=coalesce(proposed.lane,'');proposed.autopilot_priority:=coalesce(proposed.autopilot_priority,'');proposed.deterministic_payload:=coalesce(proposed.deterministic_payload,'{}');proposed.communication_draft:=coalesce(proposed.communication_draft,'');proposed.suggested_action_type:=coalesce(proposed.suggested_action_type,'');
    if prior.id is null then insert into public.levytate_intelligence_signals select proposed.*;
    else
-    update public.levytate_intelligence_signals set linked_operational_action_id=proposed.linked_operational_action_id,fingerprint=proposed.fingerprint,category=proposed.category,signal_type=proposed.signal_type,title=proposed.title,summary=proposed.summary,evidence=proposed.evidence,confidence=proposed.confidence,priority=proposed.priority,recommended_action=proposed.recommended_action,suggested_owner_type=proposed.suggested_owner_type,suggested_due_date=proposed.suggested_due_date,status=proposed.status,model_identifier=proposed.model_identifier,last_evaluated_at=now_at,resolved_at=proposed.resolved_at,dismissed_by=proposed.dismissed_by,dismissed_at=proposed.dismissed_at,dismissal_reason=proposed.dismissal_reason,updated_at=now_at,revision=proposed.revision,source_hash=v_source_hash,lane=proposed.lane,autopilot_priority=proposed.autopilot_priority,deterministic_payload=proposed.deterministic_payload,ai_interpretation=proposed.ai_interpretation,communication_draft=proposed.communication_draft,suggested_action_type=proposed.suggested_action_type where organisation_id=p_organisation_id and id=proposed.id;
+    update public.levytate_intelligence_signals set provider_id=proposed.provider_id,programme_id=proposed.programme_id,linked_operational_action_id=proposed.linked_operational_action_id,fingerprint=proposed.fingerprint,category=proposed.category,signal_type=proposed.signal_type,title=proposed.title,summary=proposed.summary,evidence=proposed.evidence,confidence=proposed.confidence,priority=proposed.priority,recommended_action=proposed.recommended_action,suggested_owner_type=proposed.suggested_owner_type,suggested_due_date=proposed.suggested_due_date,status=proposed.status,model_identifier=proposed.model_identifier,last_evaluated_at=now_at,resolved_at=proposed.resolved_at,dismissed_by=proposed.dismissed_by,dismissed_at=proposed.dismissed_at,dismissal_reason=proposed.dismissal_reason,updated_at=now_at,revision=proposed.revision,source_hash=v_source_hash,lane=proposed.lane,autopilot_priority=proposed.autopilot_priority,deterministic_payload=proposed.deterministic_payload,ai_interpretation=proposed.ai_interpretation,communication_draft=proposed.communication_draft,suggested_action_type=proposed.suggested_action_type where organisation_id=p_organisation_id and id=proposed.id;
    end if;
    event_type:=case when prior.id is null then 'detected' when proposed.status='resolved' and prior.status<>'resolved' then 'resolved' when proposed.fingerprint<>prior.fingerprint then 'regenerated' else 'updated' end;
    insert into public.levytate_intelligence_signal_events(organisation_id,id,signal_id,event_type,previous_status,new_status,actor_user_id,actor_name,summary,metadata)
@@ -187,7 +187,7 @@ begin
  end if;
  insert into public.levytate_intelligence_workspaces(organisation_id,family,revision,reconciled_at)values(p_organisation_id,p_family,coalesce(state.revision,0)+1,case when action in('analyse','refresh') then now_at else state.reconciled_at end)
  on conflict(organisation_id,family)do update set revision=excluded.revision,reconciled_at=excluded.reconciled_at returning * into state;
- confirmation:=jsonb_build_object('idempotencyKey',v_request_id,'action',action,'organisationId',p_organisation_id,'userEmail',actor.email,'role',actor.role,'signalId',case when action in('analyse','refresh') then null else proposed.id end,'revision',case when action in('analyse','refresh') then state.revision else proposed.revision end);
+ confirmation:=jsonb_build_object('idempotencyKey',p_command->>'idempotencyKey','action',action,'organisationId',p_organisation_id,'userEmail',actor.email,'role',actor.role,'signalId',case when action in('analyse','refresh') then null else proposed.id end,'revision',case when action in('analyse','refresh') then state.revision else proposed.revision end);
  result:=jsonb_build_object('signals',coalesce((select jsonb_agg(to_jsonb(s) order by id) from public.levytate_intelligence_signals s where s.organisation_id=p_organisation_id and s.analyser_version=p_family),'[]'::jsonb),
  'state',to_jsonb(state),'learnerCount',(select count(*) from public.levytate_learner_records where organisation_id=p_organisation_id and record_status='Active'),'signal',case when action in('analyse','refresh') then null else to_jsonb(proposed) end,'confirmation',confirmation,'operationalActionId',action_id,'reused',reused);
  insert into public.levytate_audit_events(organisation_id,actor_email,actor_role,entity_type,entity_id,action,summary,metadata) values(p_organisation_id,actor.email,actor.role,'intelligence',coalesce(proposed.id,p_family),'intelligence.'||action,'Signal state, history and receipt committed atomically.',jsonb_build_object('requestId',v_request_id,'revision',state.revision));
