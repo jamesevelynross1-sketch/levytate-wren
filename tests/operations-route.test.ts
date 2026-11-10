@@ -15,7 +15,7 @@ function post(body: unknown = {}, origin = "https://candidate.vercel.app") {
 }
 beforeEach(() => {
   vi.resetAllMocks(); vi.stubEnv("VERCEL_ENV", "preview"); vi.stubEnv("VERCEL_URL", "candidate.vercel.app");
-  mocks.session.mockResolvedValue({ email: "lead@fictional.invalid" }); mocks.budget.mockResolvedValue({ allowed: true }); mocks.summary.mockResolvedValue({ source: "supabase" });
+  mocks.session.mockResolvedValue({ email: "lead@fictional.invalid" }); mocks.budget.mockResolvedValue({ allowed: true }); mocks.summary.mockResolvedValue({ source: "supabase", scope: { organisationId: "10000000-0000-4000-8000-000000000001", userEmail: "lead@fictional.invalid", role: "Apprenticeship Lead" } });
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 describe("Operations HTTP boundary (unit)", () => {
@@ -41,6 +41,18 @@ describe("Operations HTTP boundary (unit)", () => {
     mocks.membership.mockResolvedValue([{ email: "lead@fictional.invalid", organisation_id: organisationId, active: true }]);
     expect((await GET(request({ "X-LevyTate-Account": "lead@fictional.invalid", "X-LevyTate-Organisation": organisationId }))).status).toBe(200);
     expect(mocks.summary).toHaveBeenCalledOnce(); expect(mocks.budget).not.toHaveBeenCalled();
+  });
+  it("does not deliver another employer when membership changes after the initial read pin", async () => {
+    const tenantA = "10000000-0000-4000-8000-000000000001", tenantB = "20000000-0000-4000-8000-000000000002";
+    mocks.membership.mockResolvedValue([{ email: "lead@fictional.invalid", organisation_id: tenantA, active: true }]);
+    mocks.summary.mockResolvedValue({ source: "supabase", scope: { organisationId: tenantB, userEmail: "lead@fictional.invalid", role: "Apprenticeship Lead" }, privateMarker: "foreign-tenant-data" });
+    const response = await GET(new Request("https://candidate.vercel.app/api/levytate-operations", { headers: { "X-LevyTate-Account": "lead@fictional.invalid", "X-LevyTate-Organisation": tenantA } }));
+    expect(mocks.summary).toHaveBeenCalledOnce(); expect(response.status).toBe(409); expect(await response.text()).not.toContain("foreign-tenant-data");
+  });
+  it.each([{ scope: undefined, status: 503 }, { scope: { organisationId: "10000000-0000-4000-8000-000000000001", userEmail: "other@fictional.invalid" }, status: 409 }])("does not return a missing or changed canonical account scope", async ({ scope, status }) => {
+    mocks.summary.mockResolvedValue({ scope, privateMarker: "foreign-tenant-data" });
+    const response = await GET(new Request("https://candidate.vercel.app/api/levytate-operations", { headers: { "X-LevyTate-Account": "lead@fictional.invalid" } }));
+    expect(response.status).toBe(status); expect(await response.text()).not.toContain("foreign-tenant-data");
   });
   it("explicit POST synchronises only after a bounded same-origin budgeted request", async () => {
     expect((await POST(post())).status).toBe(200);

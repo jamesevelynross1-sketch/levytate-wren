@@ -36,6 +36,7 @@ async function respond(request: Request, synchronise: boolean) {
       requireActionKeys(body, []);
     }
     const operations = await getOrganisationOperationsSummary(session, queryFor(url), { synchronise });
+    if (!synchronise) assertReturnedReadScope(request, operations.scope);
     return NextResponse.json({ ok: true, ...operations }, { headers });
   } catch (error) {
     if (error instanceof ClientRequestError) return NextResponse.json({ message: error.message }, { status: error.status, headers });
@@ -80,4 +81,18 @@ function value(url: URL, key: string) {
 function assignmentValue(url: URL) {
   const value = url.searchParams.get("assignment")?.trim();
   return value === "mine" || value === "unassigned" || value === "shared" || value === "all" ? value : undefined;
+}
+
+/** A canonical membership may change between the initial pin check and the read. */
+function assertReturnedReadScope(request: Request, value: unknown) {
+  const expectedOrganisation = request.headers.get("x-levytate-organisation");
+  const expectedAccount = request.headers.get("x-levytate-account");
+  if (expectedOrganisation === null && expectedAccount === null) return;
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new ClientRequestError("The workspace response could not be verified. Try loading again.", 503);
+  const scope = value as Record<string, unknown>;
+  if (typeof scope.organisationId !== "string" || !scope.organisationId || typeof scope.userEmail !== "string" || !scope.userEmail) throw new ClientRequestError("The workspace response could not be verified. Try loading again.", 503);
+  if ((expectedOrganisation !== null && expectedOrganisation.trim().toLowerCase() !== scope.organisationId.toLowerCase())
+    || (expectedAccount !== null && expectedAccount.trim().toLowerCase() !== scope.userEmail.trim().toLowerCase())) {
+    throw new ClientRequestError("Your workspace has changed. Reload to reconnect.", 409);
+  }
 }
