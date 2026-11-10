@@ -22,7 +22,7 @@ export async function verifyLearnerRecovery({app:origin,manifest,contexts,learne
  const row=page.getByTestId('learner-row').filter({has:page.getByText(detail.learner.name,{exact:true})});await row.getByTestId('learner-open-record').click();
  for(const fault of['lost','malformed']){
   const before=await snapshot(),summary=`Fictional progress recovery ${fault} ${randomUUID()}`;
-  await page.locator('section').filter({has:page.getByRole('heading',{name:'Progress and reviews',exact:true})}).getByRole('button',{name:'Add progress update',exact:true}).click();
+  await page.getByRole('heading',{name:'Progress and reviews',exact:true}).locator('xpath=ancestor::section[1]').getByRole('button',{name:'Add progress update',exact:true}).click();
   const form=page.getByRole('dialog',{name:'Add progress update',exact:true}),field=form.getByLabel('Progress summary',{exact:true}),recovery=page.getByRole('dialog',{name:'Update awaiting confirmation',exact:true});
   await form.getByLabel('Update date',{exact:true}).fill(new Date().toISOString().slice(0,10));
   await form.getByRole('combobox',{name:'Progress source',exact:true}).selectOption('provider_report');
