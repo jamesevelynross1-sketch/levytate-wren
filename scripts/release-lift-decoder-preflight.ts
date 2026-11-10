@@ -18,7 +18,11 @@ async function main(){
    const u=t.users.find((x:{key:string})=>x.key===key),rows=await q(`levytate_users?id=eq.${u.membershipId}&select=auth_subject`);if(rows.length!==1||!rows[0].auth_subject)throw Error('Current identity required');
    const session={email:u.email,authSubject:rows[0].auth_subject,authMode:'supabase_email',accessLevel:'beta_user',issuedAt:Math.floor(Date.now()/1000),expiresAt:Math.floor(Date.now()/1000)+300};
    phase=`${key} service model`;const workspace=await service.getLiftWorkspaceForSession(session),body={ok:true,workspace};checks[`${key}ActualModelAccepted`]=decoder.decodeLiftMutationResponse(body)===workspace;
-   if(key==='employee')checks.retainedSubmittedAndReleased=workspace.assessment?.status==='submitted'&&Boolean(workspace.assessment.releasedManagerObservation?.id);
+   if(key==='employee'){
+    checks.retainedSubmittedAndReleased=workspace.assessment?.status==='submitted'&&Boolean(workspace.assessment.releasedManagerObservation?.id);
+    checks.ownContextReadbackPresent=Array.isArray(workspace.assessment?.releasedManagerObservation?.ownContexts);
+    try{decoder.decodeLiftMutationResponse({ok:true,workspace:{...workspace,assessment:{...workspace.assessment,releasedManagerObservation:{...workspace.assessment.releasedManagerObservation,ownContexts:null}}}});checks.malformedOwnContextsDenied=false;}catch{checks.malformedOwnContextsDenied=true;}
+   }else checks[`${key}NoEmployeeContextReadback`]=!JSON.stringify(workspace).includes('"ownContexts"');
    for(const[field,value]of[['framework',{}],['coverage',null],['role','Unknown']]as const){try{decoder.decodeLiftMutationResponse({ok:true,workspace:{...workspace,[field]:value}});checks[`${key}${field}MalformedDenied`]=false;}catch{checks[`${key}${field}MalformedDenied`]=true;}}
   }
  }finally{cap(false);release();}
