@@ -4,7 +4,7 @@ create function pg_temp.check_result(ok boolean,label text) returns void languag
 select pg_temp.check_result(not has_function_privilege('anon','public.levytate_required_client_contracts()','execute') and not has_function_privilege('authenticated','public.levytate_required_client_contracts()','execute'),'browser roles cannot inspect release contracts');
 select pg_temp.check_result((select not prosecdef and provolatile='s' from pg_proc where oid='public.levytate_required_client_contracts()'::regprocedure),'release probe is stable and never elevates caller privileges');
 set local role service_role;
-select pg_temp.check_result(public.levytate_required_client_contracts()='{"version":"20261109182509","available":true}'::jsonb,'complete required schema is available to actual service role');
+select pg_temp.check_result(public.levytate_required_client_contracts()='{"version":"20261110085437","available":true}'::jsonb,'complete required schema is available to actual service role');
 reset role;
 savepoint missing_permission;
 revoke execute on function public.levytate_personal_programme_choices(uuid,jsonb) from service_role;

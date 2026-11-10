@@ -153,7 +153,7 @@ export function createSupabaseHealthAdapter(): HealthCheckAdapter {
         const result: unknown = await readBoundedJson(response, 1024);
         if (!result || typeof result !== "object" || Array.isArray(result)
           || Object.keys(result).sort().join(",") !== "available,version"
-          || (result as { version?: unknown }).version !== "20261109182509"
+          || (result as { version?: unknown }).version !== "20261110085437"
           || (result as { available?: unknown }).available !== true) throw new Error("dependency");
         return;
       }
