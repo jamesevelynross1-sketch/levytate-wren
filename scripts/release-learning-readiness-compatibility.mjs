@@ -10,7 +10,7 @@ if (!/^\/private\/tmp\/levytate-release-runtime\.[A-Za-z0-9]+$/.test(runtime ?? 
 const connection = new URL(JSON.parse(readFileSync(`${runtime}/private-stack-state.json`, "utf8")).env.DB_URL);
 if (connection.hostname !== "127.0.0.1") throw Error("Loopback database required");
 const run = sql => spawnSync("/opt/homebrew/opt/postgresql@17/bin/psql", ["-XAtq", "-v", "ON_ERROR_STOP=1", "-v", "VERBOSITY=verbose"], { input: sql, encoding: "utf8", env: { ...process.env, PGHOST: connection.hostname, PGPORT: connection.port, PGUSER: connection.username, PGPASSWORD: connection.password, PGDATABASE: database } });
-const guard = run("select current_setting('server_version_num')::int/10000=17 and (select count(*)=0 from auth.users) and (select count(*)=0 from storage.objects) and (select count(*)=0 from public.levytate_organisations) and (select count(*)=0 from supabase_migrations.schema_migrations) and public.levytate_required_client_contracts()=' {\"version\":\"20261110085437\",\"available\":true}'::jsonb;");
+const guard = run("select current_setting('server_version_num')::int/10000=17 and (select count(*)=0 from auth.users) and (select count(*)=0 from storage.objects) and (select count(*)=0 from public.levytate_organisations) and (select count(*)=0 from supabase_migrations.schema_migrations) and public.levytate_required_client_contracts()=' {\"version\":\"20261110090943\",\"available\":true}'::jsonb;");
 if (guard.status !== 0 || guard.stdout.trim() !== "t") throw Error("Reviewed current contract and empty local database required before compatibility tests");
 const older = [
   ["supabase/migrations/033_create_off_the_job_learning_assistant.sql", "levytate_submit_otj_activity", "35236c66e14fed6a2f64dc3c32d557b835b13b69ac9f01b4ba9a16b2ab010cae"],
@@ -30,7 +30,7 @@ for (const routines of [...older.map(item => [item]), older]) {
   if (result.status !== 0) failures++;
   console.log(JSON.stringify({ status: result.status === 0 ? "PASS" : "FAIL", check: "older-same-signature-routines-unavailable", routines: routines.map(({ name, sourceSha256 }) => ({ name, sourceSha256 })), sqlstate: result.stderr.match(/(?:ERROR|FATAL):\s+([A-Z0-9]{5}):/)?.[1] ?? null, hosted: false }));
 }
-const recovered = run("set default_transaction_read_only=on;select public.levytate_required_client_contracts()=' {\"version\":\"20261110085437\",\"available\":true}'::jsonb;");
+const recovered = run("set default_transaction_read_only=on;select public.levytate_required_client_contracts()=' {\"version\":\"20261110090943\",\"available\":true}'::jsonb;");
 if (recovered.status !== 0 || recovered.stdout.trim() !== "t") failures++;
 console.log(JSON.stringify({ status: failures ? "FAIL" : "PASS", checks: 5, recoveryReadOnly: recovered.status === 0 && recovered.stdout.trim() === "t", hosted: false }));
 if (failures) process.exitCode = 1;

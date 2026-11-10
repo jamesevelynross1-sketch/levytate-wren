@@ -71,7 +71,13 @@ begin
  end if;
  select * into state from public.levytate_intelligence_workspaces where organisation_id=p_organisation_id and family=p_family;
  v_source_hash:=public.levytate_intelligence_source_hash(p_organisation_id);
- if p_prepare then return jsonb_build_object('sourceHash',v_source_hash,'revision',coalesce(state.revision,0),'signals',coalesce((select jsonb_agg(to_jsonb(s) order by id) from public.levytate_intelligence_signals s where s.organisation_id=p_organisation_id and s.analyser_version=p_family),'[]'::jsonb));end if;
+ if p_prepare then result:=jsonb_build_object('sourceHash',v_source_hash,'revision',coalesce(state.revision,0),
+  'eligibleLearnerIds',coalesce((select jsonb_agg(l.id order by l.id) from public.levytate_learner_records l join public.levytate_employees e on e.organisation_id=l.organisation_id and e.id=l.employee_id and e.status='Active' where l.organisation_id=p_organisation_id and l.record_status='Active'),'[]'::jsonb),
+  'eligibleApplicationIds',coalesce((select jsonb_agg(a.id order by a.id) from public.levytate_applications a join public.levytate_employees e on e.organisation_id=a.organisation_id and e.id=a.employee_id and e.status='Active' where a.organisation_id=p_organisation_id),'[]'::jsonb),
+  'eligibleActionIds',coalesce((select jsonb_agg(o.id order by o.id) from public.levytate_operational_actions o join public.levytate_employees e on e.organisation_id=o.organisation_id and e.id=o.employee_id and e.status='Active' where o.organisation_id=p_organisation_id
+   and ((o.learner_record_id is not null and exists(select 1 from public.levytate_learner_records l where l.organisation_id=o.organisation_id and l.id=o.learner_record_id and l.employee_id=e.id and l.record_status='Active')) or(o.learner_record_id is null and exists(select 1 from public.levytate_applications a where a.organisation_id=o.organisation_id and a.id=o.application_id and a.employee_id=e.id)))),'[]'::jsonb),
+  'signals',coalesce((select jsonb_agg(to_jsonb(s) order by id) from public.levytate_intelligence_signals s where s.organisation_id=p_organisation_id and s.analyser_version=p_family),'[]'::jsonb));
+  if jsonb_array_length(result->'eligibleLearnerIds')>10000 or jsonb_array_length(result->'eligibleApplicationIds')>10000 or jsonb_array_length(result->'eligibleActionIds')>10000 then raise exception using errcode='PT422',message='Analysis source exceeds supported bound';end if;return result;end if;
  now_at:=clock_timestamp();
  if action in('analyse','refresh') then
   if p_source_hash is distinct from v_source_hash or p_workspace_revision is distinct from coalesce(state.revision,0) then raise exception using errcode='PT409',message='Source evidence or decisions changed; refresh analysis';end if;
@@ -87,16 +93,25 @@ begin
    if prior.id is not null and (prior.analyser_version<>p_family or prior.entity_type<>proposed.entity_type or prior.entity_id<>proposed.entity_id or prior.learner_record_id is distinct from proposed.learner_record_id) then raise exception using errcode='PT403',message='Immutable signal identity';end if;
    if prior.id is null and proposed.status<>'new' then raise exception using errcode='PT422',message='New signal cannot invent a decision';end if;
    if prior.id is not null and proposed.status not in(prior.status,'resolved') and not(proposed.status='new' and (prior.status='resolved' or (p_family='operations-autopilot-v1' and prior.fingerprint<>proposed.fingerprint))) then raise exception using errcode='PT409',message='Analysis cannot overwrite a human decision';end if;
+   -- Retained resolution is an exact historical snapshot, never newly supplied
+   -- evidence or authority to act on an inactive source.
+   if prior.id is not null and proposed.status='resolved' then
+    if proposed.fingerprint is distinct from prior.fingerprint or proposed.evidence is distinct from prior.evidence then raise exception using errcode='PT403',message='Historical resolution must retain original evidence';end if;
+    proposed:=prior;proposed.status:='resolved';if p_family='operations-autopilot-v1' then proposed.lane:='recently_resolved';end if;
+   else
    if proposed.entity_type='application' then
-    if p_family<>'operations-autopilot-v1' or not exists(select 1 from public.levytate_applications a where a.organisation_id=p_organisation_id and a.id=proposed.entity_id) then raise exception using errcode='PT403',message='Application evidence outside tenant';end if;
+    if p_family<>'operations-autopilot-v1' or not exists(select 1 from public.levytate_applications a join public.levytate_employees e on e.organisation_id=a.organisation_id and e.id=a.employee_id and e.status='Active' where a.organisation_id=p_organisation_id and a.id=proposed.entity_id) then raise exception using errcode='PT403',message='Application evidence outside tenant';end if;
    elsif proposed.entity_type='operational_action' then
-    if p_family<>'operations-autopilot-v1' or not exists(select 1 from public.levytate_operational_actions o where o.organisation_id=p_organisation_id and o.id=proposed.entity_id and o.learner_record_id is not distinct from proposed.learner_record_id) then raise exception using errcode='PT403',message='Operational evidence outside tenant';end if;
-   elsif proposed.learner_record_id is null or not exists(select 1 from public.levytate_learner_records l where l.organisation_id=p_organisation_id and l.id=proposed.learner_record_id and l.record_status='Active') then raise exception using errcode='PT403',message='Learner evidence outside tenant';end if;
+    if p_family<>'operations-autopilot-v1' or not exists(select 1 from public.levytate_operational_actions o join public.levytate_employees e on e.organisation_id=o.organisation_id and e.id=o.employee_id and e.status='Active'
+      where o.organisation_id=p_organisation_id and o.id=proposed.entity_id and (proposed.learner_record_id is null or o.learner_record_id=proposed.learner_record_id)
+      and ((o.learner_record_id is not null and exists(select 1 from public.levytate_learner_records l where l.organisation_id=o.organisation_id and l.id=o.learner_record_id and l.employee_id=e.id and l.record_status='Active'))
+       or (o.learner_record_id is null and exists(select 1 from public.levytate_applications a where a.organisation_id=o.organisation_id and a.id=o.application_id and a.employee_id=e.id)))) or proposed.linked_operational_action_id is distinct from proposed.entity_id then raise exception using errcode='PT403',message='Operational evidence outside tenant';end if;
+   elsif proposed.learner_record_id is null or not exists(select 1 from public.levytate_learner_records l join public.levytate_employees e on e.organisation_id=l.organisation_id and e.id=l.employee_id and e.status='Active' where l.organisation_id=p_organisation_id and l.id=proposed.learner_record_id and l.record_status='Active') then raise exception using errcode='PT403',message='Learner evidence outside tenant';end if;
    if jsonb_typeof(proposed.evidence) is distinct from 'array' or jsonb_array_length(proposed.evidence) not between 1 and 100 then raise exception using errcode='PT422',message='Recorded evidence required';end if;
    for evidence in select value from jsonb_array_elements(proposed.evidence) loop
     if not (case evidence->>'sourceType'
      when 'application' then exists(select 1 from public.levytate_applications where organisation_id=p_organisation_id and id=evidence->>'sourceId' and id=proposed.entity_id)
-     when 'operational_action' then exists(select 1 from public.levytate_operational_actions where organisation_id=p_organisation_id and id=evidence->>'sourceId' and (learner_record_id=proposed.learner_record_id or application_id=proposed.entity_id))
+     when 'operational_action' then exists(select 1 from public.levytate_operational_actions where organisation_id=p_organisation_id and id=evidence->>'sourceId' and (learner_record_id=proposed.learner_record_id or application_id=proposed.entity_id or (proposed.entity_type='operational_action' and id=proposed.entity_id)))
      when 'learning_time' then exists(select 1 from public.levytate_learner_records where organisation_id=p_organisation_id and id=evidence->>'sourceId' and id=proposed.learner_record_id)
      when 'progress_update' then exists(select 1 from public.levytate_learner_progress_updates where organisation_id=p_organisation_id and id=evidence->>'sourceId' and learner_record_id=proposed.learner_record_id)
      when 'provider_review' then exists(select 1 from public.levytate_learner_reviews where organisation_id=p_organisation_id and id=evidence->>'sourceId' and learner_record_id=proposed.learner_record_id and review_type='provider_review')
@@ -105,9 +120,10 @@ begin
      when 'learner_review' then exists(select 1 from public.levytate_learner_reviews where organisation_id=p_organisation_id and id=evidence->>'sourceId' and learner_record_id=proposed.learner_record_id)
      else false end) then raise exception using errcode='PT403',message='Signal evidence outside current source';end if;
    end loop;
+   end if;
    proposed.revision:=coalesce(prior.revision,0)+1;proposed.source_hash:=v_source_hash;
    proposed.created_at:=coalesce(prior.created_at,now_at);proposed.updated_at:=now_at;proposed.last_evaluated_at:=now_at;proposed.detected_at:=coalesce(prior.detected_at,now_at);
-   if proposed.linked_operational_action_id is not null and not exists(select 1 from public.levytate_operational_actions o where o.organisation_id=p_organisation_id and o.id=proposed.linked_operational_action_id and (o.learner_record_id=proposed.learner_record_id or o.application_id=proposed.entity_id or (proposed.entity_type='operational_action' and o.id=proposed.entity_id))) then raise exception using errcode='PT403',message='Linked action outside signal source';end if;
+   if not(prior.id is not null and proposed.status='resolved') and proposed.linked_operational_action_id is not null and not exists(select 1 from public.levytate_operational_actions o where o.organisation_id=p_organisation_id and o.id=proposed.linked_operational_action_id and (o.learner_record_id=proposed.learner_record_id or o.application_id=proposed.entity_id or (proposed.entity_type='operational_action' and o.id=proposed.entity_id))) then raise exception using errcode='PT403',message='Linked action outside signal source';end if;
    proposed.linked_operational_action_id:=coalesce(prior.linked_operational_action_id,proposed.linked_operational_action_id);
    proposed.acknowledged_by:=coalesce(prior.acknowledged_by,'');proposed.acknowledged_at:=prior.acknowledged_at;
    proposed.dismissed_by:=case when proposed.status='new' then '' else coalesce(prior.dismissed_by,'') end;proposed.dismissed_at:=case when proposed.status='new' then null else prior.dismissed_at end;proposed.dismissal_reason:=case when proposed.status='new' then '' else coalesce(prior.dismissal_reason,'') end;
@@ -133,8 +149,8 @@ begin
    if signal.linked_operational_action_id is not null then
     select * into existing_action from public.levytate_operational_actions where organisation_id=p_organisation_id and id=signal.linked_operational_action_id and status in('open','acknowledged','in_progress');
    end if;
-   if signal.learner_record_id is not null then
-    select * into learner from public.levytate_learner_records where organisation_id=p_organisation_id and id=signal.learner_record_id and record_status='Active';
+   if coalesce(signal.learner_record_id,existing_action.learner_record_id) is not null then
+    select * into learner from public.levytate_learner_records where organisation_id=p_organisation_id and id=coalesce(signal.learner_record_id,existing_action.learner_record_id) and record_status='Active';
     select * into employee from public.levytate_employees where organisation_id=p_organisation_id and id=learner.employee_id and status='Active';source_version:=learner.updated_at;
    elsif p_family='operations-autopilot-v1' and (signal.entity_type='application' or existing_action.id is not null) then
     select * into application from public.levytate_applications where organisation_id=p_organisation_id and id=case when signal.entity_type='application' then signal.entity_id else existing_action.application_id end;
@@ -163,6 +179,13 @@ begin
    elsif signal.linked_operational_action_id is not null then select * into existing_action from public.levytate_operational_actions where organisation_id=p_organisation_id and id=signal.linked_operational_action_id and employee_id=employee.id and status in('open','acknowledged','in_progress');end if;
    if existing_action.id is not null then
     if existing_action.employee_id<>employee.id or existing_action.owner_type<>owner_type or (action_type='review_application' and existing_action.owner_user_id<>owner_id) then raise exception using errcode='PT409',message='Existing action authority changed';end if;
+    if nullif(existing_action.owner_user_id,'') is not null and not exists(select 1 from public.levytate_users u where u.organisation_id=p_organisation_id and u.id::text=existing_action.owner_user_id and u.active
+     and (case existing_action.owner_type
+      when 'Apprenticeship Lead' then u.role in('Apprenticeship Lead','Employer Admin')
+      when 'Line Manager' then u.role='Line Manager' and lower(btrim(u.email))=lower(btrim(manager.email))
+      when 'Employee' then lower(btrim(u.email))=lower(btrim(employee.email))
+      when 'HR' then exists(select 1 from public.levytate_employees e where e.organisation_id=p_organisation_id and e.status='Active' and lower(btrim(e.email))=lower(btrim(u.email)) and e.department~*'^(hr|people)')
+      else false end)) then raise exception using errcode='PT403',message='Existing action owner is outside current authority';end if;
     action_id:=existing_action.id;reused:=true;
    else
     action_id:='action-'||signal.id||'-'||(signal.revision+1)::text;
@@ -189,7 +212,7 @@ begin
  on conflict(organisation_id,family)do update set revision=excluded.revision,reconciled_at=excluded.reconciled_at returning * into state;
  confirmation:=jsonb_build_object('idempotencyKey',p_command->>'idempotencyKey','action',action,'organisationId',p_organisation_id,'userEmail',actor.email,'role',actor.role,'signalId',case when action in('analyse','refresh') then null else proposed.id end,'revision',case when action in('analyse','refresh') then state.revision else proposed.revision end);
  result:=jsonb_build_object('signals',coalesce((select jsonb_agg(to_jsonb(s) order by id) from public.levytate_intelligence_signals s where s.organisation_id=p_organisation_id and s.analyser_version=p_family),'[]'::jsonb),
- 'state',to_jsonb(state),'learnerCount',(select count(*) from public.levytate_learner_records where organisation_id=p_organisation_id and record_status='Active'),'signal',case when action in('analyse','refresh') then null else to_jsonb(proposed) end,'confirmation',confirmation,'operationalActionId',action_id,'reused',reused);
+ 'state',to_jsonb(state),'learnerCount',(select count(*) from public.levytate_learner_records l join public.levytate_employees e on e.organisation_id=l.organisation_id and e.id=l.employee_id and e.status='Active' where l.organisation_id=p_organisation_id and l.record_status='Active'),'signal',case when action in('analyse','refresh') then null else to_jsonb(proposed) end,'confirmation',confirmation,'operationalActionId',action_id,'reused',reused);
  insert into public.levytate_audit_events(organisation_id,actor_email,actor_role,entity_type,entity_id,action,summary,metadata) values(p_organisation_id,actor.email,actor.role,'intelligence',coalesce(proposed.id,p_family),'intelligence.'||action,'Signal state, history and receipt committed atomically.',jsonb_build_object('requestId',v_request_id,'revision',state.revision));
  insert into public.levytate_intelligence_command_receipts(organisation_id,actor_user_id,request_id,command,result)values(p_organisation_id,p_actor_user_id,v_request_id,command,result);
  return jsonb_build_object('receipt',result);
@@ -341,6 +364,8 @@ language sql stable security invoker set search_path=pg_catalog,public as $$
    ]) signature),false)
   and exists(select 1 from pg_index where indexrelid=to_regclass('public.levytate_applications_one_active_employee') and indisvalid and indisunique)
   and exists(select 1 from pg_class where oid=to_regclass('public.levytate_tenant_reactivation_requests') and relrowsecurity)
+  and (select count(*)=2 and bool_and(relrowsecurity) from pg_class where oid in(to_regclass('public.levytate_intelligence_workspaces'),to_regclass('public.levytate_intelligence_command_receipts')))
+  and (select count(*)=2 from information_schema.columns where table_schema='public' and table_name='levytate_intelligence_signals' and column_name in('revision','source_hash'))
   and (select count(*)=3 from information_schema.columns where table_schema='public' and table_name='levytate_employee_development_profiles'
     and column_name in('saved_programme_ids','compared_programme_ids','discovery_revision'))
   and (select bool_and(coalesce(p.prosecdef and p.prokind='f'

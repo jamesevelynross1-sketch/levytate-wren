@@ -88,7 +88,7 @@ export function analyseProgressReviewIntelligence(input:ProgressReviewAnalysisIn
 export function reconcileIntelligenceSignals(existing:IntelligenceSignal[],current:IntelligenceSignal[],now=new Date().toISOString()){
   const currentByFingerprint=new Map(current.map(signal=>[signal.fingerprint,signal])); const result:IntelligenceSignal[]=[];
   for(const signal of current){const prior=existing.find(item=>item.fingerprint===signal.fingerprint&&!item.resolvedAt);if(prior?.status==="dismissed"){result.push({...prior,lastEvaluatedAt:now});continue;}result.push(prior?{...signal,id:prior.id,status:prior.status,detectedAt:prior.detectedAt,lastEvaluatedAt:now,linkedOperationalActionId:prior.linkedOperationalActionId}:{...signal,lastEvaluatedAt:now});}
-  for(const prior of existing)if(!currentByFingerprint.has(prior.fingerprint)&&prior.status!=="resolved")result.push({...prior,status:"resolved",resolvedAt:now,lastEvaluatedAt:now});
+  for(const prior of existing)if(!currentByFingerprint.has(prior.fingerprint))result.push(prior.status==="resolved"?prior:{...prior,status:"resolved",resolvedAt:now,lastEvaluatedAt:now});
   return result;
 }
 export function acceptSignalAsOperationalAction(signal:IntelligenceSignal,overrides:Partial<Pick<IntelligenceOperationalActionInput,"title"|"description"|"ownerType"|"dueDate">>={}):IntelligenceOperationalActionInput {

@@ -13,7 +13,7 @@ import { getLevyTateSupabaseConfig, supabaseSelect } from "@/lib/server/levytate
 
 const signalsTable = "levytate_intelligence_signals";
 const family = "progress-review-v1";
-import { intelligenceCommand, intelligenceWorkspaceState, IntelligenceCommandError, type IntelligenceActorScope, type IntelligenceCommandKey, type IntelligenceDecisionKey, type IntelligenceCommandResult } from "@/lib/server/levytate-intelligence-commands";
+import { assertIntelligenceExpectedOrganisation, assertIntelligenceSourceCoverage, intelligenceCommand, intelligenceWorkspaceState, IntelligenceCommandError, type IntelligenceActorScope, type IntelligenceCommandKey, type IntelligenceDecisionKey, type IntelligenceCommandResult } from "@/lib/server/levytate-intelligence-commands";
 function actorScope(context: Awaited<ReturnType<typeof getLearnerLifecycleServerContext>>): IntelligenceActorScope { return { organisationId: context.organisation.id, userId: context.user.id, userEmail: context.user.email, role: context.user.role }; }
 function present(result: IntelligenceCommandResult) {
   const scope = { organisationId: result.confirmation.organisationId, userEmail: result.confirmation.userEmail, role: result.confirmation.role };
@@ -58,18 +58,20 @@ export async function listIntelligenceSignals(session: LevyTateBetaSession) {
   return { signals: rows.map(signalFromRow).filter((signal) => !["dismissed", "resolved"].includes(signal.status)), scope: { organisationId: scope.organisationId, userEmail: scope.userEmail, role: scope.role }, organisationId: scope.organisationId, revision: state.revision, lastAnalysedAt: state.reconciled_at, checked: state.reconciled_at !== null };
 }
 
-export async function analyseAndPersistIntelligenceSignals(session: LevyTateBetaSession, key: IntelligenceCommandKey) {
+export async function analyseAndPersistIntelligenceSignals(session: LevyTateBetaSession, key: IntelligenceCommandKey, expectedOrganisationId?: string) {
   const context = await intelligenceContext(session, true);
   const scope = actorScope(context), command = { action: "analyse", idempotencyKey: key.idempotencyKey };
+  assertIntelligenceExpectedOrganisation(scope, expectedOrganisationId);
   const prepared = await intelligenceCommand(scope, family, command, undefined, undefined, true);
   if ("receipt" in prepared) return { ...present(prepared.receipt), learnersAnalysed: Number(prepared.receipt.learnerCount) };
   const [details, actions] = await Promise.all([
     listOrganisationLearnerLifecycleDetails(session),
     listOperationalActions(session, { includeTerminal: true }),
   ]);
+  assertIntelligenceSourceCoverage(prepared, { learnerIds: details.map(detail => detail.learnerRecordId), actionIds: actions.map(action => action.id) });
   const existing = prepared.signals.map(row => signalFromRow(row as SignalRow));
   const now = new Date().toISOString();
-  const detected = details.flatMap((detail) => analyseProgressReviewIntelligence({
+  const detected = details.filter(detail => prepared.eligibleLearnerIds.includes(detail.learnerRecordId)).flatMap((detail) => analyseProgressReviewIntelligence({
     organisationId: context.organisation.id,
     learnerRecordId: detail.learnerRecordId,
     learnerLabel: detail.learner.name,
@@ -77,7 +79,7 @@ export async function analyseAndPersistIntelligenceSignals(session: LevyTateBeta
     programmeId: detail.programme.programmeId,
     reviews: detail.reviewHistory,
     progressUpdates: detail.progressHistory,
-    operationalActions: actions.filter((action) => action.learnerRecordId === detail.learnerRecordId).map((action) => ({
+    operationalActions: actions.filter((action) => prepared.eligibleActionIds.includes(action.id) && action.learnerRecordId === detail.learnerRecordId).map((action) => ({
       id: action.id,
       status: action.status,
       title: action.title,
@@ -94,8 +96,9 @@ export async function analyseAndPersistIntelligenceSignals(session: LevyTateBeta
   return { ...present(completed.receipt), learnersAnalysed: Number(completed.receipt.learnerCount) };
 }
 
-export async function updateIntelligenceSignal(session: LevyTateBetaSession, signalId: string, action: "acknowledge" | "dismiss" | "accept", reason: IntelligenceDismissalReason | undefined, key: IntelligenceDecisionKey) {
+export async function updateIntelligenceSignal(session: LevyTateBetaSession, signalId: string, action: "acknowledge" | "dismiss" | "accept", reason: IntelligenceDismissalReason | undefined, key: IntelligenceDecisionKey, expectedOrganisationId?: string) {
   const context = await intelligenceContext(session, true);
+  assertIntelligenceExpectedOrganisation(actorScope(context), expectedOrganisationId);
   const completed = await intelligenceCommand(actorScope(context), family, { action, signalId, ...key, ...(action === "dismiss" ? { reason } : {}) });
   if (!("receipt" in completed) || !completed.receipt.signal) throw new IntelligenceCommandError("The signal decision could not be confirmed.");
   return { signal: signalFromRow(completed.receipt.signal as SignalRow), confirmation: completed.receipt.confirmation };

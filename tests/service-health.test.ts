@@ -126,12 +126,12 @@ describe("authentication rate-limit readiness probe", () => {
     const result = await getPublicReadiness({ bypassCache: true, adapter: async (input) => { if (input.key === key) throw new Error("missing required release schema"); } });
     expect(result.status).toBe("unavailable");
   });
-  it.each([null, [], {}, { version: "20261110085437", available: false }, { version: "20261027", available: true }, { version: "20261109182509", available: true }, { version: "20261110085437", available: "true" }, { version: "20261110085437", available: true, detail: "unexpected" }, "x".repeat(1025)])("rejects unavailable or malformed required release contract %#", async (body) => {
+  it.each([null, [], {}, { version: "20261110090943", available: false }, { version: "20261027", available: true }, { version: "20261109182509", available: true }, { version: "20261110085437", available: true }, { version: "20261110090943", available: "true" }, { version: "20261110090943", available: true, detail: "unexpected" }, "x".repeat(1025)])("rejects unavailable or malformed required release contract %#", async (body) => {
     stubRequiredEnvironment(); vi.stubGlobal("fetch", vi.fn(async () => Response.json(body)));
     await expect(createSupabaseHealthAdapter()({ key: "client-release-contract", kind: "release-contract", label: "Client contracts", timeoutMs: 50 })).rejects.toThrow();
   });
   it("requires the exact current read-only release contract without a synthetic actor or customer write", async () => {
-    stubRequiredEnvironment(); const transport = vi.fn(async () => Response.json({ version: "20261110085437", available: true })); vi.stubGlobal("fetch", transport);
+    stubRequiredEnvironment(); const transport = vi.fn(async () => Response.json({ version: "20261110090943", available: true })); vi.stubGlobal("fetch", transport);
     await createSupabaseHealthAdapter()({ key: "client-release-contract", kind: "release-contract", label: "Client contracts", timeoutMs: 50 });
     const [url, init] = transport.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toContain("/rpc/levytate_required_client_contracts");
@@ -139,8 +139,9 @@ describe("authentication rate-limit readiness probe", () => {
   });
   it.each([
     { name: "old 24 contract even with reachable tables", body: { version: "20261109182509", available: true }, expected: "unavailable" },
-    { name: "new contract with missing Manager learning permissions", body: { version: "20261110085437", available: false }, expected: "unavailable" },
-    { name: "verified current contract", body: { version: "20261110085437", available: true }, expected: "operational" },
+    { name: "old 26 contract without atomic Intelligence", body: { version: "20261110085437", available: true }, expected: "unavailable" },
+    { name: "new contract with missing Manager learning permissions", body: { version: "20261110090943", available: false }, expected: "unavailable" },
+    { name: "verified current contract", body: { version: "20261110090943", available: true }, expected: "operational" },
   ])("reports the $name truthfully through public readiness", async ({ body, expected }) => {
     stubRequiredEnvironment();
     const transport = vi.fn(async () => Response.json(body));

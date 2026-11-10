@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ rpc: vi.fn(), select: vi.fn(), context: vi.fn(), details: vi.fn(), actions: vi.fn(), insert: vi.fn(), update: vi.fn() }));
+const mocks = vi.hoisted(() => ({ rpc: vi.fn(), select: vi.fn(), context: vi.fn(), details: vi.fn(), actions: vi.fn(), insert: vi.fn(), update: vi.fn(), bootstrap: vi.fn() }));
 vi.mock("@/lib/server/levytate-supabase", async original => ({ ...await original<typeof import("@/lib/server/levytate-supabase")>(), getLevyTateSupabaseConfig: () => ({ url: "https://fictional.invalid", serviceRoleKey: "fictional-only" }), supabaseFetchJson: mocks.rpc, supabaseSelect: mocks.select, supabaseInsert: mocks.insert, supabaseUpdate: mocks.update }));
 vi.mock("@/lib/server/levytate-learner-lifecycle", () => ({ getLearnerLifecycleServerContext: mocks.context, listOrganisationLearnerLifecycleDetails: mocks.details, LevyTateLearnerLifecyclePermissionError: class extends Error {} }));
 vi.mock("@/lib/server/levytate-operational-actions", () => ({ listOperationalActions: mocks.actions }));
-import { intelligenceCommand, IntelligenceCommandError } from "@/lib/server/levytate-intelligence-commands";
+vi.mock("@/lib/server/levytate-workspace", () => ({ getWorkspaceBootstrapForSession: mocks.bootstrap }));
+import { assertIntelligenceSourceCoverage, intelligenceCommand, IntelligenceCommandError } from "@/lib/server/levytate-intelligence-commands";
 import { analyseAndPersistIntelligenceSignals, listIntelligenceSignals, updateIntelligenceSignal } from "@/lib/server/levytate-intelligence-signals";
-import { createAutopilotAction, dismissAutopilotSignal, getAutopilotWorkspace } from "@/lib/server/levytate-autopilot";
+import { createAutopilotAction, dismissAutopilotSignal, getAutopilotWorkspace, refreshAutopilotWorkspace } from "@/lib/server/levytate-autopilot";
 import { LevyTateSupabaseError } from "@/lib/server/levytate-supabase";
 import type { LevyTateBetaSession } from "@/lib/levytate/config/beta-access";
 const org = "10000000-0000-4000-8000-000000000001", actor = "20000000-0000-4000-8000-000000000002", request = "30000000-0000-4000-8000-000000000003";
@@ -16,8 +17,23 @@ function receipt(action = "acknowledge", selectedFamily = family) {
   const signal = { ...row, analyser_version: selectedFamily, status: action === "dismiss" ? "dismissed" : ["accept", "create_action"].includes(action) ? "accepted" : "acknowledged", linked_operational_action_id: ["accept", "create_action"].includes(action) ? "action-one" : null };
   return { receipt: { signals: [signal], signal, state: { organisation_id: org, family: selectedFamily, revision: 4, reconciled_at: "2026-11-10T08:00:00Z" }, confirmation: { idempotencyKey: request, action, organisationId: org, userEmail: scope.userEmail, role: scope.role, signalId: signal.id, revision: 2 }, operationalActionId: signal.linked_operational_action_id, reused: false, learnerCount: 1 } };
 }
-beforeEach(() => { vi.resetAllMocks(); mocks.context.mockResolvedValue({ organisation: { id: org }, user: { id: actor, email: scope.userEmail, role: scope.role } }); mocks.rpc.mockResolvedValue(receipt()); mocks.select.mockResolvedValue([]); });
+beforeEach(() => { vi.resetAllMocks(); mocks.context.mockResolvedValue({ organisation: { id: org }, user: { id: actor, email: scope.userEmail, role: scope.role } }); mocks.rpc.mockResolvedValue(receipt()); mocks.select.mockResolvedValue([]); mocks.bootstrap.mockResolvedValue({ data: { employees: [], applications: [] }, meta: { offTheJobAssistantEnabled: false } }); });
 describe("atomic Intelligence service transport", () => {
+  it.each(["analyse", "acknowledge", "refresh", "dismiss", "create_action"])("rejects original-employer drift before %s performs any RPC", async action => {
+    const key = { idempotencyKey: request, expectedRevision: 1 };
+    const invoke = () => action === "analyse" ? analyseAndPersistIntelligenceSignals(session, key, "original-other-employer")
+      : action === "acknowledge" ? updateIntelligenceSignal(session, row.id, "acknowledge", undefined, key, "original-other-employer")
+      : action === "refresh" ? refreshAutopilotWorkspace(session, key, "original-other-employer")
+      : action === "dismiss" ? dismissAutopilotSignal(session, row.id, "Synthetic decision", key, "original-other-employer")
+      : createAutopilotAction(session, row.id, { title: "Synthetic task", ownerType: "Apprenticeship Lead", dueDate: "", communicationDraft: "" }, key, "original-other-employer");
+    await expect(invoke()).rejects.toMatchObject({ status: 409 });
+    expect(mocks.rpc).not.toHaveBeenCalled(); expect(mocks.details).not.toHaveBeenCalled();
+  });
+  it.each(["learnerIds", "actionIds", "applicationIds"])("rejects truncated %s before analysis can claim a false zero", key => {
+    const prepared = { sourceHash: "a".repeat(64), revision: 0, signals: [], eligibleLearnerIds: ["learner"], eligibleActionIds: ["action"], eligibleApplicationIds: ["application"] };
+    const sources = { learnerIds: ["learner"], actionIds: ["action"], applicationIds: ["application"], [key]: [] };
+    expect(() => assertIntelligenceSourceCoverage(prepared, sources)).toThrow(IntelligenceCommandError);
+  });
   it.each(["acknowledge", "dismiss", "accept"] as const)("sends %s only through the actor-bound atomic RPC", async action => {
     mocks.rpc.mockResolvedValue(receipt(action));
     const result = await updateIntelligenceSignal(session, row.id, action, action === "dismiss" ? "No action required" : undefined, { idempotencyKey: request, expectedRevision: 1 });
@@ -37,6 +53,26 @@ describe("atomic Intelligence service transport", () => {
     const actual = await listIntelligenceSignals(session);
     expect(actual).toMatchObject({ signals: [], checked: false, revision: 0, lastAnalysedAt: null, scope: { organisationId: org, userEmail: scope.userEmail, role: scope.role } });
     expect(mocks.select.mock.calls.find(([,table]) => table === "levytate_intelligence_signals")?.[2].get("analyser_version")).toBe(`eq.${family}`);
+  });
+  it.each(["eligibleLearnerIds", "eligibleApplicationIds", "eligibleActionIds"])("rejects malformed captured %s before any source analysis", async key => {
+    for (const invalid of [null, {}, [null], [""], ["same", "same"], Array(10001).fill("bounded")]) {
+      mocks.rpc.mockResolvedValue({ sourceHash: "a".repeat(64), revision: 0, signals: [], eligibleLearnerIds: [], eligibleApplicationIds: [], eligibleActionIds: [], [key]: invalid });
+      await expect(analyseAndPersistIntelligenceSignals(session, { idempotencyKey: request })).rejects.toBeInstanceOf(IntelligenceCommandError);
+    }
+    expect(mocks.details).not.toHaveBeenCalled();
+  });
+  it.each(["analyse", "refresh"])("filters inactive-source rows before %s generation using the captured eligible set", async action => {
+    const selectedFamily = action === "analyse" ? family : "operations-autopilot-v1";
+    const final = receipt(action, selectedFamily);
+    final.receipt.signals = []; final.receipt.signal = null as unknown as typeof final.receipt.signal;
+    final.receipt.confirmation.signalId = null as unknown as string; final.receipt.confirmation.revision = 4; final.receipt.learnerCount = 0;
+    mocks.rpc.mockResolvedValueOnce({ sourceHash: "a".repeat(64), revision: 0, signals: [], eligibleLearnerIds: [], eligibleApplicationIds: [], eligibleActionIds: [] }).mockResolvedValueOnce(final);
+    // Deliberately incomplete inactive rows must never be consumed by a generator.
+    mocks.details.mockResolvedValue([{ learnerRecordId: "inactive-learner" }]);
+    mocks.actions.mockResolvedValue([{ id: "inactive-action" }]);
+    mocks.bootstrap.mockResolvedValue({ data: { employees: [], applications: [{ id: "inactive-application" }] }, meta: { offTheJobAssistantEnabled: false } });
+    await (action === "analyse" ? analyseAndPersistIntelligenceSignals(session, { idempotencyKey: request }) : refreshAutopilotWorkspace(session, { idempotencyKey: request }));
+    expect(JSON.parse(mocks.rpc.mock.calls[1][2].body).p_rows).toEqual([]);
   });
   it.each(["Employee", "Line Manager", "Department Head", "Platform Admin"])("does not turn %s into organisation Intelligence authority", async role => {
     mocks.context.mockResolvedValue({ organisation: { id: org }, user: { id: actor, email: scope.userEmail, role } });

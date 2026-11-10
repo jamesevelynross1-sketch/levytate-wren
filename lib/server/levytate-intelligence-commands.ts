@@ -12,11 +12,18 @@ export type IntelligenceCommandResult = {
   reused: boolean;
   learnerCount: number;
 };
-export type IntelligenceCommandPreparation = { sourceHash: string; revision: number; signals: Record<string, unknown>[] };
+export type IntelligenceCommandPreparation = { sourceHash: string; revision: number; signals: Record<string, unknown>[]; eligibleLearnerIds: string[]; eligibleApplicationIds: string[]; eligibleActionIds: string[] };
 export class IntelligenceCommandError extends Error {
   constructor(message: string, readonly status: 400 | 403 | 404 | 409 | 503 = 503) { super(message); this.name = "IntelligenceCommandError"; }
 }
+export function assertIntelligenceExpectedOrganisation(scope: IntelligenceActorScope, expected?: string) { if (expected !== undefined && scope.organisationId !== expected) throw new IntelligenceCommandError("The active employer changed. Reopen this workspace before continuing.", 409); }
 function config() { const value = getLevyTateSupabaseConfig(); if (!value) throw new IntelligenceCommandError("Intelligence persistence is unavailable."); return value; }
+function eligibleIds(value: unknown): value is string[] { return Array.isArray(value) && value.length <= 10000 && value.every(id => typeof id === "string" && id.length > 0 && id.length <= 160) && new Set(value).size === value.length; }
+export function assertIntelligenceSourceCoverage(prepared: IntelligenceCommandPreparation, sources: { learnerIds: string[]; actionIds: string[]; applicationIds?: string[] }) {
+  for (const [expected, actual] of [[prepared.eligibleLearnerIds, sources.learnerIds], [prepared.eligibleActionIds, sources.actionIds], ...(sources.applicationIds === undefined ? [] : [[prepared.eligibleApplicationIds, sources.applicationIds]])]) {
+    if (!eligibleIds(actual) || expected.some(id => !actual.includes(id))) throw new IntelligenceCommandError("The complete Intelligence source could not be loaded. No analysis was saved.");
+  }
+}
 function object(value: unknown): value is Record<string, unknown> { return Boolean(value) && typeof value === "object" && !Array.isArray(value); }
 export async function intelligenceCommand(scope: IntelligenceActorScope, family: string, command: Record<string, unknown>, preparation?: IntelligenceCommandPreparation, rows?: unknown[], prepare = false): Promise<{ receipt: IntelligenceCommandResult } | IntelligenceCommandPreparation> {
   try {
@@ -37,7 +44,7 @@ export async function intelligenceCommand(scope: IntelligenceActorScope, family:
       if (["analyse", "refresh"].includes(String(command.action)) && (state.reconciled_at === null || confirmation.revision !== state.revision)) throw new IntelligenceCommandError("The analysis could not be confirmed.");
       return { receipt: result as IntelligenceCommandResult };
     }
-    if (!prepare || typeof response.sourceHash !== "string" || !/^[0-9a-f]{64}$/.test(response.sourceHash) || !Number.isSafeInteger(response.revision) || Number(response.revision) < 0 || !Array.isArray(response.signals)) throw new IntelligenceCommandError("The Intelligence source snapshot is unavailable.");
+    if (!prepare || typeof response.sourceHash !== "string" || !/^[0-9a-f]{64}$/.test(response.sourceHash) || !Number.isSafeInteger(response.revision) || Number(response.revision) < 0 || !Array.isArray(response.signals) || response.signals.some(row => !object(row) || row.organisation_id !== scope.organisationId || row.analyser_version !== family) || !eligibleIds(response.eligibleLearnerIds) || !eligibleIds(response.eligibleApplicationIds) || !eligibleIds(response.eligibleActionIds)) throw new IntelligenceCommandError("The Intelligence source snapshot is unavailable.");
     return response as IntelligenceCommandPreparation;
   } catch (error) {
     if (error instanceof IntelligenceCommandError) throw error;

@@ -217,6 +217,7 @@ export function analyseOperationsAutopilot(input: AutopilotAnalysisInput) {
   }
 
   for (const application of input.applications) {
+    if (application.currentOwner === "Completed" || ["Completed", "Cancelled", "Withdrawn", "Declined by Line Manager", "Declined by Apprenticeship Lead", "Enrolled"].includes(application.status)) continue;
     const age = Math.max(0, -daysBetween(today, isoDate(application.updatedAt)));
     if (age < 5) continue;
     const evidence = [applicationEvidence(application)];
@@ -235,7 +236,7 @@ export function analyseOperationsAutopilot(input: AutopilotAnalysisInput) {
         summary: `${application.employeeName}'s application has awaited provider progress for ${age} days.`, recommendedAction: "Confirm the outstanding provider dependency and agree a response date.",
         ownerType: "Provider", dueDate: today, actionType: "confirm_provider", evidence, payload: { rule: "application_awaiting_provider", daysInState: age, status: application.status }, linkedOperationalActionId: matchingApplicationAction?.id,
       }));
-    } else if (age >= 7 && !["Completed", "Cancelled", "Withdrawn"].includes(application.status)) {
+    } else if (age >= 7) {
       signals.push(buildSignal(input, {
         key: `application:${application.id}:stalled`, type: "application_stalled", category: "applications", lane: "needs_your_decision", priority: age >= 14 ? "action_now" : "this_week",
         entityType: "application", entityId: application.id, application, subjectLabel: application.employeeName, title: "Application has not progressed",

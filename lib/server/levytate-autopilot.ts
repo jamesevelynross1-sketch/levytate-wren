@@ -24,7 +24,7 @@ import { getWorkspaceBootstrapForMicrosoftCopilotActor, getWorkspaceBootstrapFor
 import { getLearningTimeWorkspace } from "@/lib/server/levytate-off-the-job";
 
 const signalsTable = "levytate_intelligence_signals";
-import { intelligenceCommand, intelligenceWorkspaceState, IntelligenceCommandError, type IntelligenceActorScope, type IntelligenceCommandKey, type IntelligenceDecisionKey, type IntelligenceCommandResult } from "@/lib/server/levytate-intelligence-commands";
+import { assertIntelligenceExpectedOrganisation, assertIntelligenceSourceCoverage, intelligenceCommand, intelligenceWorkspaceState, IntelligenceCommandError, type IntelligenceActorScope, type IntelligenceCommandKey, type IntelligenceDecisionKey, type IntelligenceCommandResult } from "@/lib/server/levytate-intelligence-commands";
 function actorScope(context: Awaited<ReturnType<typeof getLearnerLifecycleServerContext>>): IntelligenceActorScope { return { organisationId: context.organisation.id, userId: context.user.id, userEmail: context.user.email, role: context.user.role }; }
 function presentReceipt(result: IntelligenceCommandResult) {
   const scope = { organisationId: result.confirmation.organisationId, userEmail: result.confirmation.userEmail, role: result.confirmation.role };
@@ -72,9 +72,10 @@ export async function getAutopilotWorkspaceForMicrosoftCopilotActor(actor: Micro
   return presentWorkspace(signals, state.reconciled_at, state.revision, scope);
 }
 
-export async function refreshAutopilotWorkspace(session: LevyTateBetaSession, key: IntelligenceCommandKey) {
+export async function refreshAutopilotWorkspace(session: LevyTateBetaSession, key: IntelligenceCommandKey, expectedOrganisationId?: string) {
   const context = await autopilotContext(session, true);
   const scope = actorScope(context), command = { action: "refresh", idempotencyKey: key.idempotencyKey };
+  assertIntelligenceExpectedOrganisation(scope, expectedOrganisationId);
   const prepared = await intelligenceCommand(scope, autopilotAnalyserVersion, command, undefined, undefined, true);
   if ("receipt" in prepared) return presentReceipt(prepared.receipt);
   const [details, actions, bootstrap] = await Promise.all([
@@ -82,15 +83,16 @@ export async function refreshAutopilotWorkspace(session: LevyTateBetaSession, ke
     listOperationalActions(session, { includeTerminal: true }),
     getWorkspaceBootstrapForSession(session),
   ]);
+  assertIntelligenceSourceCoverage(prepared, { learnerIds: details.map(detail => detail.learnerRecordId), actionIds: actions.map(action => action.id), applicationIds: bootstrap.data.applications.map(application => application.id) });
   const now = new Date().toISOString();
   const learningTime = bootstrap.meta.offTheJobAssistantEnabled ? await getLearningTimeWorkspace(session) : null;
   const employees = new Map(bootstrap.data.employees.map((employee) => [employee.id, employee.name]));
-  const actionInputs: AutopilotActionInput[] = actions.map((action) => ({
+  const actionInputs: AutopilotActionInput[] = actions.filter(action => prepared.eligibleActionIds.includes(action.id)).map((action) => ({
     id: action.id, learnerRecordId: action.learnerRecordId, applicationId: action.applicationId, employeeId: action.employeeId,
     title: action.title, description: action.description, actionType: action.actionType, ownerType: action.ownerType, dueDate: action.dueDate,
     status: action.status, sourceUrl: action.sourceUrl, updatedAt: action.updatedAt,
   }));
-  const applicationInputs: AutopilotApplicationInput[] = bootstrap.data.applications.map((application) => {
+  const applicationInputs: AutopilotApplicationInput[] = bootstrap.data.applications.filter(application => prepared.eligibleApplicationIds.includes(application.id)).map((application) => {
     const workflow = deriveApplicationWorkflowCompatibility(application);
     return {
       id: application.id, employeeId: application.employeeId, employeeName: employees.get(application.employeeId) ?? "Employee",
@@ -101,7 +103,7 @@ export async function refreshAutopilotWorkspace(session: LevyTateBetaSession, ke
   const detected = [
     ...analyseOperationsAutopilot({
     organisationId: context.organisation.id, now,
-    learners: details.map((detail) => ({
+    learners: details.filter(detail => prepared.eligibleLearnerIds.includes(detail.learnerRecordId)).map((detail) => ({
       learnerRecordId: detail.learnerRecordId, learnerName: detail.learner.name,
       providerId: detail.programme.providerId, providerName: detail.programme.providerName,
       programmeId: detail.programme.programmeId, programmeName: detail.programme.programmeName,
@@ -113,7 +115,7 @@ export async function refreshAutopilotWorkspace(session: LevyTateBetaSession, ke
     }),
     ...(learningTime ? analyseLearningTimeAutopilot({
       organisationId: context.organisation.id, now,
-      learners: learningTime.learners.map((learner) => ({
+      learners: learningTime.learners.filter(learner => prepared.eligibleLearnerIds.includes(learner.learnerRecordId)).map((learner) => ({
         learnerRecordId: learner.learnerRecordId, learnerName: learner.learnerName,
         providerId: learner.providerId, programmeId: learner.programmeId,
         attention: learner.attention.map((item) => ({ ...item, type: item.type as AutopilotSignalType })),
@@ -151,6 +153,7 @@ export async function refreshAutopilotWorkspaceForMicrosoftCopilotActor(actor: M
     })),
   ]);
   const { data, meta } = bootstrap;
+  assertIntelligenceSourceCoverage(prepared, { learnerIds: data.learnerRecords.map(record => record.id), actionIds: actionRows.map(action => action.id), applicationIds: data.applications.map(application => application.id) });
   const now = new Date().toISOString();
   const learningTime = meta.offTheJobAssistantEnabled
     ? await getLearningTimeWorkspace(microsoftCopilotActorSession(actor))
@@ -161,7 +164,7 @@ export async function refreshAutopilotWorkspaceForMicrosoftCopilotActor(actor: M
     ...analyseOperationsAutopilot({
     organisationId: actor.organisationId,
     now,
-    learners: data.learnerRecords.map((record) => {
+    learners: data.learnerRecords.filter(record => prepared.eligibleLearnerIds.includes(record.id)).map((record) => {
       const programme = programmes.get(record.programmeId);
       return {
         learnerRecordId: record.id,
@@ -175,19 +178,19 @@ export async function refreshAutopilotWorkspaceForMicrosoftCopilotActor(actor: M
           .map((review) => ({ id: review.id, type: review.reviewType as "provider_review" | "l_and_d_check_in" | "manager_check_in", nextReviewDate: review.nextReviewDate, reviewDate: review.reviewDate, status: review.status })),
       };
     }),
-    actions: actionRows.map((action) => ({
+    actions: actionRows.filter(action => prepared.eligibleActionIds.includes(action.id)).map((action) => ({
       id: action.id, learnerRecordId: action.learner_record_id ?? "", applicationId: action.application_id, employeeId: action.employee_id,
       title: action.title, description: action.description, actionType: action.action_type, ownerType: action.owner_type,
       dueDate: action.due_date ?? "", status: action.status, sourceUrl: action.source_url, updatedAt: action.updated_at,
     })),
-    applications: data.applications.map((application) => {
+    applications: data.applications.filter(application => prepared.eligibleApplicationIds.includes(application.id)).map((application) => {
       const workflow = deriveApplicationWorkflowCompatibility(application);
       return { id: application.id, employeeId: application.employeeId, employeeName: employees.get(application.employeeId) ?? "Employee", status: workflow.status, currentOwner: workflow.currentOwner, updatedAt: workflow.lastProgressedAt, currentStepLabel: workflow.currentStepLabel, currentResponsibleRole: workflow.currentResponsibleRole };
       }),
     }),
     ...(learningTime ? analyseLearningTimeAutopilot({
       organisationId: actor.organisationId, now,
-      learners: learningTime.learners.map((learner) => ({
+      learners: learningTime.learners.filter(learner => prepared.eligibleLearnerIds.includes(learner.learnerRecordId)).map((learner) => ({
         learnerRecordId: learner.learnerRecordId, learnerName: learner.learnerName,
         providerId: learner.providerId, programmeId: learner.programmeId,
         attention: learner.attention.map((item) => ({ ...item, type: item.type as AutopilotSignalType })),
@@ -207,15 +210,17 @@ export async function refreshAutopilotWorkspaceForMicrosoftCopilotActor(actor: M
   return presentReceipt(completed.receipt);
 }
 
-export async function dismissAutopilotSignal(session: LevyTateBetaSession, signalId: string, reason: string, key: IntelligenceDecisionKey) {
+export async function dismissAutopilotSignal(session: LevyTateBetaSession, signalId: string, reason: string, key: IntelligenceDecisionKey, expectedOrganisationId?: string) {
   const context = await autopilotContext(session, true);
+  assertIntelligenceExpectedOrganisation(actorScope(context), expectedOrganisationId);
   const completed = await intelligenceCommand(actorScope(context), autopilotAnalyserVersion, { action: "dismiss", signalId, reason, ...key });
   if (!("receipt" in completed)) throw new IntelligenceCommandError("The signal decision could not be confirmed.");
   return presentReceipt(completed.receipt);
 }
 
-export async function createAutopilotAction(session: LevyTateBetaSession, signalId: string, input: { title: string; ownerType: string; dueDate: string; communicationDraft: string }, key: IntelligenceDecisionKey) {
+export async function createAutopilotAction(session: LevyTateBetaSession, signalId: string, input: { title: string; ownerType: string; dueDate: string; communicationDraft: string }, key: IntelligenceDecisionKey, expectedOrganisationId?: string) {
   const context = await autopilotContext(session, true);
+  assertIntelligenceExpectedOrganisation(actorScope(context), expectedOrganisationId);
   const completed = await intelligenceCommand(actorScope(context), autopilotAnalyserVersion, { action: "create_action", signalId, ...input, ...key });
   if (!("receipt" in completed) || !completed.receipt.operationalActionId) throw new IntelligenceCommandError("The accepted action could not be confirmed.");
   return { workspace: presentReceipt(completed.receipt), operationalActionId: completed.receipt.operationalActionId, reused: completed.receipt.reused, confirmation: completed.receipt.confirmation };
