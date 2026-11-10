@@ -123,6 +123,6 @@ export async function verifyManagerLearningTime({ app: origin, manifest, context
       report("selecting a report does not retain own capture or review controls", await page.getByRole("button", { name: "Add learning activity", exact: true }).count() === 0 && await page.getByRole("button", { name: "Employer check", exact: true }).count() === 0 && await page.getByRole("button", { name: "Withdraw activity", exact: true }).count() === 0);
     }
     return { learnerId, activityId: savedActivity.id, result: "PASS", lostResponseAfterRealCommit: true, newSignIns: 0 };
-  } catch (error) { throw Error(`Manager Learning Time acceptance failed during ${phase}; safeErrorClass=${["TimeoutError", "TypeError"].includes(error?.name) ? error.name : "Error"}; malformedReads=${badGet}; upstreamFailed=${upstreamFailed}; private state omitted`); }
+  } catch (error) { const safe=Error("Manager Learning Time acceptance remains incomplete; private state omitted");safe.safeStage=phase;safe.safeErrorClass=["TimeoutError", "TypeError"].includes(error?.name)?error.name:"Error";console.log(JSON.stringify({diagnostic:"manager-learning-read-fault",malformedReads:badGet,upstreamFailed}));throw safe; }
   finally { await page.unroute("**/api/levytate-learning-time", malformed); await page.unroute("**/api/levytate-learning-time", loseSave); capability(false); report("optional capability restored disabled", (await manager.context.request.get(path, { headers: headers(manager) })).status() === 404); }
 }
