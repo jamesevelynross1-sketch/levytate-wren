@@ -4,6 +4,7 @@ import { interpretAutopilotSignal } from "@/lib/levytate/autopilot/ai";
 import {
   analyseOperationsAutopilot,
   analyseLearningTimeAutopilot,
+  autopilotApplicationDestination,
   autopilotAnalyserVersion,
   buildOperationsBrief,
   reconcileAutopilotSignals,
@@ -221,6 +222,11 @@ export async function dismissAutopilotSignal(session: LevyTateBetaSession, signa
 export async function createAutopilotAction(session: LevyTateBetaSession, signalId: string, input: { title: string; ownerType: string; dueDate: string; communicationDraft: string }, key: IntelligenceDecisionKey, expectedOrganisationId?: string) {
   const context = await autopilotContext(session, true);
   assertIntelligenceExpectedOrganisation(actorScope(context), expectedOrganisationId);
+  const rows = await supabaseSelect<SignalRow>(requireConfig(), signalsTable, new URLSearchParams({ select: "*", organisation_id: `eq.${context.organisation.id}`, analyser_version: `eq.${autopilotAnalyserVersion}`, id: `eq.${signalId}`, limit: "2" }));
+  if (rows.length === 0) throw new LevyTateAutopilotError("The Autopilot signal is unavailable.", 404);
+  if (rows.length !== 1 || rows[0].organisation_id !== context.organisation.id || rows[0].analyser_version !== autopilotAnalyserVersion || rows[0].id !== signalId) throw new LevyTateAutopilotError("The Autopilot source could not be confirmed.", 503);
+  const destination = autopilotApplicationDestination(fromRow(rows[0]));
+  if (destination) throw new LevyTateAutopilotError(destination.instruction, 409);
   const completed = await intelligenceCommand(actorScope(context), autopilotAnalyserVersion, { action: "create_action", signalId, ...input, ...key });
   if (!("receipt" in completed) || !completed.receipt.operationalActionId) throw new IntelligenceCommandError("The accepted action could not be confirmed.");
   return { workspace: presentReceipt(completed.receipt), operationalActionId: completed.receipt.operationalActionId, reused: completed.receipt.reused, confirmation: completed.receipt.confirmation };

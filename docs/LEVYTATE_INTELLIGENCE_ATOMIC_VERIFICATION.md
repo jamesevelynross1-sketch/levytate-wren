@@ -34,3 +34,11 @@ TypeScript in the isolated service worktree reports only five expected old route
 ## Reproduction
 
 Use `scripts/release-run-local-sql.mjs` with explicit loopback runtime, dedicated database, SQL path and exact current file SHA. Run the readiness tests on an empty reviewed schema before any persistent race fixtures. `scripts/release-intelligence-concurrency.mjs` additionally checks the exact candidate hash and exclusive database name, uses real overlapping transactions, and prints only aggregate outcomes. Never run these fixtures against a hosted or shared project.
+
+## Canonical application destinations
+
+The actual generator → `createAutopilotAction` → dedicated PostgreSQL RPC path reproduced two unusable task mappings: Awaiting Final Approval returnedPT409 for a Lead-owned `review_application`, and Approved for Enrolment/Provider Partner returnedPT422 for application-only `confirm_provider`. Both preserved the new signal, its one refresh receipt and zero Operations actions; fixtures were rolled back. Context resolution was mocked, so this is service/database evidence rather than Auth acceptance.
+
+The pure `autopilotApplicationDestination` helper now uses the exact application entity and matching source evidence to open the existing Applications route. These stages no longer advertise an unsupported task type or increment the prepared-task count. Supported manager-review tasks retain their existing mapping. A scoped service read catches old stored suggestions and returns a canonical-workflow instruction before a write RPC. SQL permissions and migration27 remain unchanged. The UI owner connects these destinations to the existing final review and handoff controls and retains dismissal/recovery.
+
+The opt-in `autopilot-application-workflow-native.test.ts` preserves both native SQL denial cases and verifies the service's navigation instruction without a write. Together with destination and service tests,52 focused checks pass; full lint passes. Genuine browser navigation and the integrated build remain the independent acceptance owner's responsibility. The isolated worktree still lacks the separately integrated HTTP adapters, so its five old route-signature TypeScript errors do not establish an integrated build result.

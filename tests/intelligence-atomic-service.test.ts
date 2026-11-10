@@ -27,7 +27,7 @@ describe("atomic Intelligence service transport", () => {
       : action === "dismiss" ? dismissAutopilotSignal(session, row.id, "Synthetic decision", key, "original-other-employer")
       : createAutopilotAction(session, row.id, { title: "Synthetic task", ownerType: "Apprenticeship Lead", dueDate: "", communicationDraft: "" }, key, "original-other-employer");
     await expect(invoke()).rejects.toMatchObject({ status: 409 });
-    expect(mocks.rpc).not.toHaveBeenCalled(); expect(mocks.details).not.toHaveBeenCalled();
+    expect(mocks.rpc).not.toHaveBeenCalled(); expect(mocks.details).not.toHaveBeenCalled(); expect(mocks.select).not.toHaveBeenCalled();
   });
   it.each(["learnerIds", "actionIds", "applicationIds"])("rejects truncated %s before analysis can claim a false zero", key => {
     const prepared = { sourceHash: "a".repeat(64), revision: 0, signals: [], eligibleLearnerIds: ["learner"], eligibleActionIds: ["action"], eligibleApplicationIds: ["application"] };
@@ -109,7 +109,14 @@ describe("Autopilot uses the same atomic boundary and truthful read state", () =
   });
   it("accepted action and signal are confirmed by one receipt without direct writes", async () => {
     mocks.rpc.mockResolvedValue(receipt("create_action", "operations-autopilot-v1"));
+    mocks.select.mockResolvedValue([{ ...row, analyser_version: "operations-autopilot-v1", signal_type: "review_overdue" }]);
     const result = await createAutopilotAction(session, row.id, { title: "Synthetic human reviewed action", ownerType: "Apprenticeship Lead", dueDate: "2026-11-11", communicationDraft: "Draft only; never sent" }, { idempotencyKey: request, expectedRevision: 1 });
-    expect(result.operationalActionId).toBe("action-one"); expect(result.confirmation.action).toBe("create_action"); expect(mocks.rpc).toHaveBeenCalledOnce(); expect(mocks.insert).not.toHaveBeenCalled(); expect(mocks.update).not.toHaveBeenCalled(); expect(mocks.select).not.toHaveBeenCalled();
+    expect(result.operationalActionId).toBe("action-one"); expect(result.confirmation.action).toBe("create_action"); expect(mocks.rpc).toHaveBeenCalledOnce(); expect(mocks.insert).not.toHaveBeenCalled(); expect(mocks.update).not.toHaveBeenCalled(); expect(mocks.select).toHaveBeenCalledOnce();
+    expect(mocks.select.mock.calls[0][2].get("organisation_id")).toBe(`eq.${org}`);expect(mocks.select.mock.calls[0][2].get("id")).toBe(`eq.${row.id}`);
+  });
+  it.each([{ rows: [], status: 404 }, { rows: [{ ...row, organisation_id: "other", analyser_version: "operations-autopilot-v1" }], status: 503 }, { rows: [{ ...row, analyser_version: "operations-autopilot-v1" }, { ...row, analyser_version: "operations-autopilot-v1" }], status: 503 }])("fails closed when the selected canonical action source is absent or ambiguous", async ({ rows, status }) => {
+    mocks.select.mockResolvedValue(rows);
+    await expect(createAutopilotAction(session, row.id, { title: "Synthetic task", ownerType: "Apprenticeship Lead", dueDate: "", communicationDraft: "" }, { idempotencyKey: request, expectedRevision: 1 })).rejects.toMatchObject({ status });
+    expect(mocks.rpc).not.toHaveBeenCalled();
   });
 });
