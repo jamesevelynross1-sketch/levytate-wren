@@ -3,7 +3,7 @@
  * login, injected sessions, demo switcher, traces or authentication screenshots.
  * Mailpit proves local SMTP capture, not delivery to a real external inbox.
  */
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, mkdtempSync, rmSync } from "node:fs";
 import { randomUUID, createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
@@ -19,6 +19,8 @@ const candidateCommit=commitRead.status===0&&/^[a-f0-9]{40}$/.test(commitRead.st
 const appCodeCommit=process.env.RELEASE_APP_COMMIT??candidateCommit;
 if(!/^[a-f0-9]{40}$/.test(appCodeCommit??""))throw Error("Exact application commit required for evidence");
 let browser;
+let nativeLeadContext;
+let nativeLeadProfile;
 let browserEngineVersion;
 let browserDistribution="bundled-chromium";
 let app;
@@ -127,14 +129,20 @@ try {
       if(peopleUiOnly&&!accountUiOnly&&(tenant.key!=="a"||user.key!=="lead"))continue;
       if(accountUiOnly&&user.key!=="lead")continue;
       const label = `${tenant.key} ${user.role}`;
-      const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+      const nativePersistent=process.env.RELEASE_NATIVE_ZOOM_JOURNEY==="true"&&tenant.key==="a"&&user.key==="lead";
+      if(nativePersistent){
+        if(browserExecutable!==verifiedCurrentEdge||!/^\/private\/tmp\/levytate-release-runtime\.[A-Za-z0-9]+$/.test(process.env.RELEASE_LOCAL_RUNTIME??""))throw Error("Exact current Edge and dedicated runtime required for native zoom");
+        nativeLeadProfile=mkdtempSync(`${process.env.RELEASE_LOCAL_RUNTIME}/native-lead-profile-`);
+        nativeLeadContext=await chromium.launchPersistentContext(nativeLeadProfile,{executablePath:browserExecutable,headless:true,viewport:null,args:["--window-size=1280,900"],serviceWorkers:"block"});
+      }
+      const context = nativePersistent?nativeLeadContext:await browser.newContext({ viewport: { width: 1280, height: 900 } });
       const page = await context.newPage();
       page.on("response", (response) => {
         const path = new URL(response.url()).pathname;
         if (path.startsWith("/api/levytate-auth/") && response.status() >= 400) console.log(`DIAGNOSTIC auth API status ${response.status()} at ${path}`);
         if(path==="/api/levytate-workspace"&&response.status()>=400)console.log(`DIAGNOSTIC workspace API status ${response.status()}`);
       });
-      contexts.set(`${tenant.key}:${user.key}`, { context, page, user, tenant });
+      contexts.set(`${tenant.key}:${user.key}`, { context, page, user, tenant,nativePersistent });
       await page.goto(`${app}/levytate/login`);
       check(`${label}: no demo login required`, !(await page.getByText("Internal demonstration access", { exact: true }).count()));
       const after = Date.now();
@@ -200,11 +208,12 @@ try {
       phase = `${label}: provider refresh`;
       const refresh = await context.request.post(`${app}/api/levytate-auth/session`, { headers: { Origin: app } });
       check(`${label}: provider session refresh succeeds`, refresh.status() === 200);
-      for (const width of [320, 390, 768]) {
+      for (const width of nativePersistent?[]:[320, 390, 768]) {
         await page.setViewportSize({ width, height: 900 });
         check(`${label}: no horizontal overflow at ${width}px`, await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
       }
-      await page.setViewportSize({ width: 1280, height: 900 });
+      if(nativePersistent)notRunScopes.push("A Lead emulated 320/390/768 viewport microchecks skipped: fresh persistent context reserved for actual native browser zoom");
+      else await page.setViewportSize({ width: 1280, height: 900 });
     }
   }
   const failureWrites=failureBudgetWritesSince(failureBudgetStartedAt);
@@ -535,6 +544,11 @@ try {
     }
     await independentJourney("Operations and Intelligence UI",()=>verifyOperationsIntelligence({app,manifest,contexts,backend,check,learnerId:coreLearnerId,noPaidModel:true,notRun:scope=>notRunScopes.push(`Operations/Intelligence: ${scope}`)}));
   }
+  if(process.env.RELEASE_NATIVE_ZOOM_JOURNEY==="true"){
+    phase="genuine Lead native browser zoom";
+    const{verifyNativeApplicationZoom}=await import("./release-native-zoom-browser.mjs");
+    await independentJourney("genuine Lead native browser zoom",()=>verifyNativeApplicationZoom({app,lead:contexts.get("a:lead"),check,root:process.env.RELEASE_LOCAL_RUNTIME,appCodeCommit}));
+  }
   if(process.env.RELEASE_EMPLOYEE_RECOVERY_JOURNEY==="true"){
     phase="genuine Employee malformed-response and expired-session recovery";
     const{verifyEmployeeRecovery}=await import("./release-employee-recovery-browser.mjs");
@@ -580,6 +594,8 @@ try {
 } finally {
   try{restoreLift?.();}catch{results.push({name:"Restore local-only Lift capability to disabled",status:"FAIL"});console.error("FAIL local Lift capability restoration; inspect synthetic runtime before more acceptance");process.exitCode=1;}
   if(app&&contexts.size){let loggedOut=0;for(const{context}of contexts.values()){try{const r=await context.request.post(`${app}/api/levytate-beta-logout`,{headers:{Origin:app},maxRedirects:0});if(r.status()===303)loggedOut++;}catch{/* Raw transport errors may carry Auth details. */}}console.log(`Local failed-run cleanup: ${loggedOut}/${contexts.size} logout responses confirmed; all browser contexts closing`);}
+  try { await nativeLeadContext?.close(); } catch { results.push({name:"Close native Lead browser context",status:"FAIL"});process.exitCode=1; }
+  if(nativeLeadProfile){try{rmSync(nativeLeadProfile,{recursive:true});results.push({name:"Remove disposable native Lead browser profile without exporting sessions",status:"PASS"});}catch{results.push({name:"Remove disposable native Lead browser profile",status:"FAIL"});process.exitCode=1;}}
   await browser?.close();
   releaseRuntime?.();
   const evidence = { schemaVersion: 2, environment: "local", candidateCommit, appCodeCommit, browserEngineVersion, browserDistribution, authenticationMethod: "requested-sign-in-link-through-local-smtp", authenticatedContextsVerified: verifiedContexts.size, distinctAuthenticatedRoles: [...new Set(verifiedContexts.values())].sort(), emailEvidence: "local-smtp-capture-only", notRunScopes, results };
