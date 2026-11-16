@@ -30,9 +30,10 @@ export async function verifyNativeApplicationZoom({ app, lead, check, root, appC
     await navigation.focus(); await page.keyboard.press("Enter");
     await page.getByRole("navigation", { name: "Mobile workspace navigation", exact: true }).waitFor();
     await capture("200-navigation"); await page.keyboard.press("Escape");
+    await page.getByRole("navigation", { name: "Mobile workspace navigation", exact: true }).waitFor({state:"hidden"});
     report("keyboard closes navigation and restores trigger focus", await navigation.evaluate(button => button === document.activeElement));
     await page.getByRole("navigation", { name: "Trust and support", exact: true }).scrollIntoViewIfNeeded();
-    report("bottom support navigation remains visible after actual scrolling", await page.getByRole("navigation", { name: "Trust and support", exact: true }).isVisible());
+    report("bottom support navigation remains inside the native viewport after actual scrolling", await page.getByRole("navigation", { name: "Trust and support", exact: true }).evaluate(nav=>{const rect=nav.getBoundingClientRect();return rect.top>=0&&rect.bottom<=innerHeight+1&&rect.left>=0&&rect.right<=innerWidth+1;}));
     await capture("200-bottom");
     report("authenticated application contains no MPR marketing chrome", !(await page.locator("body").innerText()).match(/MPR Consulting|Book a Conversation/));
     evidence.status = "PASS";
