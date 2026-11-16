@@ -2,13 +2,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, rmSync, symlinkSync, readdirSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
-import { assertEmptyStartupSources, canonicalExpectedMigrations, readSourceEvidence, sha256, validateEmptyDatabase, validateLocalStackState, verifyScheduledMigrations } from "../scripts/release-native-migration-gate.mjs";
+import { assertEmptyStartupSources, canonicalExpectedMigrations, localRuntimePattern, readSourceEvidence, sha256, validateEmptyDatabase, validateLocalStackState, verifyScheduledMigrations } from "../scripts/release-native-migration-gate.mjs";
 import { localMigrationArguments, runNativeMigrationStage } from "../scripts/release-stage-native-migrations.mjs";
 const repository = resolve(import.meta.dirname, "..");
 const roots: string[] = [];
 const empty = { postgresMajorVersion: 17, publicRelations: 0, publicFunctions: 0, publicTypes: 0, applicationSchemas: 0, ledgerRows: 0, ledgerExists: false, authUsers: 0, authIdentities: 0, authSessions: 0, storageBuckets: 0, storageObjects: 0, schemaNames: ["auth", "public", "storage"] };
 async function fixture() {
-  const root = mkdtempSync("/private/tmp/levytate-release-runtime."); roots.push(root);
+  const root = mkdtempSync(`${process.platform === "darwin" ? "/private/tmp" : "/tmp"}/levytate-release-runtime.`); roots.push(root);
   writeFileSync(`${root}/supabase`, `#!${process.execPath}\nif(process.argv[2]!=="--version")process.exit(99);console.log("2.122.1");\n`, { mode: 0o700 });
   const result = spawnSync(process.execPath, [resolve(repository, "scripts/release-create-native-runtime.mjs")], { env: { ...process.env, RELEASE_LOCAL_RUNTIME: root }, encoding: "utf8" });
   expect(result.status).toBe(0);
@@ -18,11 +18,13 @@ async function fixture() {
   writeFileSync(`${root}/startup-source-evidence.json`, JSON.stringify({ formatVersion: 1, stackId: "unit-only-no-server", configSha256: evidence.configSha256, manifestSha256: evidence.candidateManifest, privateStateSha256: sha256(stateBytes), startupSourceGuard: "empty" }));
   vi.stubEnv("RELEASE_LOCAL_RUNTIME", root); vi.stubEnv("RELEASE_RUNTIME_QUIESCENT", "true");
   const readDatabase = vi.fn(() => structuredClone(empty));
-  const readStatus = vi.fn(() => JSON.parse(stateBytes.toString()));
+  const originalState = JSON.parse(stateBytes.toString());
+  const status = { identity: { id: originalState.id, name: "unit", project_root: `${root}/project`, branch_context: "unit" }, runtime: originalState.runtime, env: originalState.env };
+  const readStatus = vi.fn(() => structuredClone(status));
   const invokeCli = vi.fn(async (args: string[]) => args.includes("--dry-run") ? `DRY RUN: migrations will not be applied\nWould push these migrations:\n${expected.map(row => ` • ${row.filename}`).join("\n")}\n` : "Applied reviewed migrations");
   const verifyApplied = vi.fn(() => ({}));
   const run = (mode: string) => runNativeMigrationStage({ runtime: root, repository, mode }, { readDatabase, readStatus, invokeCli, verifyApplied });
-  return { root, expected, run, readDatabase, readStatus, invokeCli, verifyApplied };
+  return { root, expected, run, readDatabase, readStatus, status, invokeCli, verifyApplied };
 }
 afterEach(() => { vi.unstubAllEnvs(); for (const root of roots.splice(0)) rmSync(root, { recursive: true }); });
 
@@ -84,20 +86,33 @@ describe("fresh local startup migration gate (mock CLI/DB, never native acceptan
   });
   it("rejects live CLI registry drift even when the private startup evidence is unchanged", async () => {
     const f = await fixture(); await f.run("stage"); await f.run("dry-run");
-    f.readStatus.mockReturnValue({ runtime: "native", id: "another", env: { DB_URL: "postgresql://unit:unit@127.0.0.1:2/another" } });
+    f.readStatus.mockReturnValue({ identity: { ...f.status.identity, id: "another" }, runtime: "native", env: { DB_URL: "postgresql://unit:unit@127.0.0.1:2/another" } });
     await expect(f.run("apply")).rejects.toThrow(/Live local CLI target/); expect(f.invokeCli).toHaveBeenCalledOnce();
   });
   it("refuses to activate SQL when the live target changes during empty-database verification", async () => {
-    const f = await fixture(), unchanged = JSON.parse(readFileSync(`${f.root}/private-stack-state.json`, "utf8"));
-    f.readStatus.mockReturnValueOnce(unchanged).mockReturnValue({ ...unchanged, id: "another" });
+    const f = await fixture();
+    f.readStatus.mockReturnValueOnce(f.status).mockReturnValue({ ...f.status, identity: { ...f.status.identity, id: "another" } });
     await expect(f.run("stage")).rejects.toThrow(/Live local CLI target/);
     expect(readdirSync(`${f.root}/project/supabase/migrations`)).toEqual([]); expect(f.invokeCli).not.toHaveBeenCalled();
   });
   it("rechecks the live CLI target at the final apply boundary after its first valid check", async () => {
     const f = await fixture(); await f.run("stage"); await f.run("dry-run");
-    const unchanged = JSON.parse(readFileSync(`${f.root}/private-stack-state.json`, "utf8"));
-    f.readStatus.mockReturnValueOnce(unchanged).mockReturnValue({ ...unchanged, env: { DB_URL: "postgresql://unit:unit@127.0.0.1:2/another" } });
+    f.readStatus.mockReturnValueOnce(f.status).mockReturnValue({ ...f.status, env: { DB_URL: "postgresql://unit:unit@127.0.0.1:2/another" } });
     await expect(f.run("apply")).rejects.toThrow(/Live local CLI target/); expect(f.invokeCli).toHaveBeenCalledOnce();
+  });
+  it.each(["missing", "null", "array", "wrong", "mixed", "legacy"])("rejects %s status identity without staging SQL", async variant => {
+    const f = await fixture();
+    const malformed: Record<string, unknown> = structuredClone(f.status);
+    if (variant === "missing") delete malformed.identity;
+    if (variant === "null") malformed.identity = null;
+    if (variant === "array") malformed.identity = [];
+    if (variant === "wrong") malformed.identity = { ...f.status.identity, id: "another" };
+    if (variant === "mixed") malformed.id = "another";
+    if (variant === "legacy") { delete malformed.identity; malformed.id = f.status.identity.id; }
+    f.readStatus.mockReturnValue(malformed as typeof f.status);
+    await expect(f.run("stage")).rejects.toThrow(/Live local CLI target/);
+    expect(readdirSync(`${f.root}/project/supabase/migrations`)).toEqual([]);
+    expect(f.readDatabase).not.toHaveBeenCalled(); expect(f.invokeCli).not.toHaveBeenCalled();
   });
   it("rejects expired or traversing dry-run receipts and retains active reviewed sources", async () => {
     const f = await fixture(); await f.run("stage"); await f.run("dry-run");
@@ -127,6 +142,10 @@ it("rejects unknown schemas and malformed counts", () => {
   for (const schema of ["unreviewed", "pgclient", "pgx"]) expect(() => validateEmptyDatabase({ ...empty, schemaNames: [...empty.schemaNames, schema] })).toThrow();
   expect(() => validateEmptyDatabase({ ...empty, authUsers: "0" })).toThrow();
 });
+it("accepts the exact empty native managed schemas without allowing similar unknown names", () => {
+  expect(() => validateEmptyDatabase({ ...empty, schemaNames: [...empty.schemaNames, "_realtime", "pgbouncer"] })).not.toThrow();
+  for (const schema of ["_realtime_custom", "pgbouncer_custom", "pgclient", "pgx"]) expect(() => validateEmptyDatabase({ ...empty, schemaNames: [...empty.schemaNames, schema] })).toThrow();
+});
 it("rejects remote or unrelated loopback stack identity before database access", () => {
   const evidence = { configSha256: "config", candidateManifest: "manifest" };
   for (const endpoint of ["postgresql://unit:unit@db.example.test:5432/postgres", "postgresql://unit:unit@127.0.0.1:5432/postgres?host=remote"]) {
@@ -148,4 +167,8 @@ it("constructs only explicit local commands with vault writes excluded", () => {
     expect(args).toContain("--local"); expect(args).toContain("--skip-vault");
     expect(args.some(value => ["--linked", "--db-url", "--include-all", "--include-seed", "--include-roles", "reset", "repair"].includes(value))).toBe(false);
   }
+});
+it("accepts only the two explicit temporary roots without traversal or prefix aliases", () => {
+  for (const root of ["/private/tmp/levytate-release-runtime.Exact1", "/tmp/levytate-release-runtime.Exact1"]) expect(localRuntimePattern.test(root)).toBe(true);
+  for (const root of ["/var/tmp/levytate-release-runtime.X", "/tmp/levytate-release-runtime.X/other", "/tmp/levytate-release-runtime../X", "relative/tmp/levytate-release-runtime.X", "/tmp/other.X"]) expect(localRuntimePattern.test(root)).toBe(false);
 });

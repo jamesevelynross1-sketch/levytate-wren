@@ -73,7 +73,11 @@ export async function runNativeMigrationStage({ runtime, repository, mode }, io 
     const readStatus = io.readStatus ?? readLocalStatus;
     async function assertCurrentTarget() {
       const current = await readStatus(runtime);
-      if (current?.runtime !== "native" || current.id !== state.id || current.env?.DB_URL !== state.env.DB_URL) throw Error("Live local CLI target differs from guarded startup identity");
+      // CLI2.122.1 start emits top-level id; status deliberately has a distinct DTO.
+      // Accept only the observed structured status identity, never an alias fallback.
+      if (!current || typeof current !== "object" || Array.isArray(current) || Object.hasOwn(current, "id")
+        || !current.identity || typeof current.identity !== "object" || Array.isArray(current.identity)
+        || current.runtime !== "native" || current.identity.id !== state.id || current.env?.DB_URL !== state.env.DB_URL) throw Error("Live local CLI target differs from guarded startup identity");
     }
     await assertCurrentTarget();
     const readDatabase = io.readDatabase ?? readEmptyNativeDatabase;

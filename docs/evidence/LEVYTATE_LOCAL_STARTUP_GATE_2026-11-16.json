@@ -1,0 +1,97 @@
+{
+  "observedAt": "2026-11-16T10:23:33.193Z",
+  "environment": "fresh isolated local native",
+  "baselineSourceCommit": "3e61d6c",
+  "runtimeId": "4a1715fd1068b7d29d195b433549b626032e3a246527b0a621d5c687ee537cb6",
+  "publicArtifacts": {
+    "cliVersion": "2.122.1",
+    "cliBinarySha256": "748dee3195d9d817de74175521dd963c2c371c4aa2a5444a82ecce4cf6bd002f",
+    "cliArchiveSha256": "e97582f76237d1dd4cb27f5051e8a98587733f98837d43d74d2e3330436d7c79",
+    "lockSha256": "bb79a76ce5623b715e59b8ce223b08e6056ca988dcaa1fe8d4213207d431042a",
+    "verifiedCopiedServiceTrees": 7,
+    "privateRuntimeStateCopied": false
+  },
+  "startup": {
+    "status": "PASS",
+    "activeSqlBeforeStart": 0,
+    "activeSqlAfterStart": 0,
+    "reviewedSqlOutsideActiveProject": 28,
+    "applicationDatabaseEmptyClaimedByStartupWrapper": false
+  },
+  "initialStageAttempt": {
+    "status": "BLOCKED",
+    "reason": "Actual stack status uses identity.id; original guard expected top-level id",
+    "activeSqlAfterFailure": 0,
+    "stageReceiptCount": 0
+  },
+  "actualStatusContract": {
+    "startupIdLocation": "id",
+    "statusIdLocation": "identity.id",
+    "nativeRuntime": true,
+    "stackIdentifierMatches": true,
+    "databaseEndpointMatches": true,
+    "credentialValuesIncluded": false
+  },
+  "initialEmptyPreflight": {
+    "status": "BLOCKED",
+    "reason": "Two managed schema names were absent from explicit allowlist",
+    "managedSchemaNames": [
+      "_realtime",
+      "pgbouncer"
+    ],
+    "metadata": {
+      "authUsers": 0,
+      "publicTypes": 0,
+      "schemaNames": [
+        "_realtime",
+        "auth",
+        "extensions",
+        "graphql",
+        "graphql_public",
+        "pgbouncer",
+        "public",
+        "realtime",
+        "storage",
+        "supabase_functions",
+        "vault"
+      ],
+      "authSessions": 0,
+      "ledgerExists": false,
+      "authIdentities": 0,
+      "storageBuckets": 0,
+      "storageObjects": 0,
+      "publicFunctions": 0,
+      "publicRelations": 0,
+      "applicationSchemas": 0,
+      "postgresMajorVersion": 17,
+      "ledgerRows": 0
+    }
+  },
+  "managedSchemaProvenance": {
+    "pgbouncer": "Verified PostgreSQL17.11.0.006 native archive: share/supabase-cli/migrations/init-scripts/00-schema.sql line5",
+    "_realtime": "Literal CREATE SCHEMA IF NOT EXISTS _realtime present in exact verified CLI binary",
+    "unknownSchemasRemainRejected": [
+      "pgclient",
+      "pgx",
+      "_realtime_custom",
+      "pgbouncer_custom"
+    ]
+  },
+  "readOnlyPostgresPredicateProof": {
+    "oldVisible": [
+      "public"
+    ],
+    "literalVisible": [
+      "pgclient",
+      "pgx",
+      "public"
+    ],
+    "postgresVersion": "17.11"
+  },
+  "dryRunPerformed": false,
+  "applicationMigrationsApplied": false,
+  "authRequestsSent": 0,
+  "hostedActionsPerformed": false,
+  "existingAcceptanceRuntimeAccessed": false,
+  "nativeProofComplete": false
+}

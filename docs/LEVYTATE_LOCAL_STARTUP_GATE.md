@@ -12,7 +12,7 @@ The creator records the installed CLI binary hash after requiring version2.122.1
 
 ## Explicit sequence
 
-Use an exclusively owned idle runtime. Install the published-checksum-verified CLI binary there first. The following commands assume `RELEASE_LOCAL_RUNTIME` names that fresh `/private/tmp/levytate-release-runtime.*` directory. Do not point them at an existing acceptance runtime or set hosted credentials.
+Use an exclusively owned idle runtime. Install the published-checksum-verified CLI binary there first. The following commands assume `RELEASE_LOCAL_RUNTIME` names that fresh `/private/tmp/levytate-release-runtime.*` directory on macOS. Offline Linux CI uses the corresponding `/tmp/levytate-release-runtime.*` prefix; only these two absolute prefixes are accepted, with real-path and symlink checks retained. Do not point them at an existing acceptance runtime or set hosted credentials.
 
 ```sh
 node scripts/release-create-native-runtime.mjs
@@ -23,7 +23,9 @@ RELEASE_RUNTIME_QUIESCENT=true node scripts/release-stage-native-migrations.mjs 
 
 Stage performs a read-only live check before activating any SQL. It requires the exact guarded stack record, loopback PostgreSQL 17, no application relations/functions/types or application schemas, no migration ledger entries, no Auth users/identities/sessions, and no Storage buckets/objects. Managed schemas are explicitly allowlisted; unknown schemas fail closed. It repeats the empty check after copying the exact reviewed files. No SQL is executed by stage.
 
-The gate also calls supported `stack status --output-format json` using the same isolated native environment and exact project workdir. It privately compares the current runtime, stack identifier and database endpoint against the guarded startup record before staging, dry-run and apply, repeating the check at each final command boundary. This prevents a stale private state file from approving one empty database while the CLI targets another. Endpoint and credential values are never included in errors or evidence.
+The gate also calls supported `stack status --output-format json` using the same isolated native environment and exact project workdir. CLI 2.122.1 startup returns a top-level `id`; its status response returns `identity.id`. The gate requires this exact structured status contract and rejects legacy or mixed identifier shapes. It privately compares the current runtime, stack identifier and database endpoint against the guarded startup record before staging, dry-run and apply, repeating the check at each final command boundary. This prevents a stale private state file from approving one empty database while the CLI targets another. Endpoint and credential values are never included in errors or evidence.
+
+The untouched native database also contains the managed `_realtime` and `pgbouncer` schemas. The exact pinned CLI binary includes the former's schema creation; the verified PostgreSQL17.11.0.006 public archive creates the latter in `share/supabase-cli/migrations/init-scripts/00-schema.sql`. These two explicit names are allowed. Similar unknown names, including `pgclient` and `pgx`, remain rejected; the reserved system prefix is checked literally as `pg_`, not SQL's wildcard pattern `pg_%`.
 
 Dry-run invokes only `db push --local --skip-vault --dry-run` with the generated project as its workdir. It requires exactly 28 scheduled filenames in their reviewed order, with no missing, duplicate, renamed, extra, seed or role SQL. It repeats the live empty check and records a restricted receipt containing safe hashes and filenames, not raw CLI output or credentials. Disabled-migration and up-to-date responses are not accepted as a first bootstrap dry-run.
 

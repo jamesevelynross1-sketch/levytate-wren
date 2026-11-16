@@ -6,7 +6,7 @@ import { verifyReleaseSources } from "./build-release-supabase-worktree.mjs";
 export const reviewedReleaseManifestSha256 = "8685dbf196c76f7881017f7523a0f1bee412e0da2b6fded393271cc9de2a146f";
 export const reviewedBootstrapManifestSha256 = "f12810747526e66d45789840549be88046c14b8a152fc583f4897dc09e4718b6";
 export const sha256 = value => createHash("sha256").update(value).digest("hex");
-export const localRuntimePattern = /^\/private\/tmp\/levytate-release-runtime\.[A-Za-z0-9]+$/;
+export const localRuntimePattern = /^\/(?:private\/)?tmp\/levytate-release-runtime\.[A-Za-z0-9]+$/;
 export function existsWithoutFollowing(path) {
   try { lstatSync(path); return true; } catch (error) { if (error.code === "ENOENT") return false; throw error; }
 }
@@ -87,7 +87,7 @@ export function verifyInactiveArtifact(root, expected) {
   verifyExactMigrationFiles(`${root}/reviewed-project/supabase/migrations`, expected);
 }
 const countKeys = ["publicRelations", "publicFunctions", "publicTypes", "applicationSchemas", "ledgerRows", "authUsers", "authIdentities", "authSessions", "storageBuckets", "storageObjects"];
-const managedSchemas = new Set(["public", "auth", "storage", "realtime", "supabase_functions", "supabase_migrations", "extensions", "graphql", "graphql_public", "vault", "net", "pgsodium", "pgsodium_masks", "cron"]);
+const managedSchemas = new Set(["public", "auth", "storage", "realtime", "_realtime", "pgbouncer", "supabase_functions", "supabase_migrations", "extensions", "graphql", "graphql_public", "vault", "net", "pgsodium", "pgsodium_masks", "cron"]);
 export function validateEmptyDatabase(value) {
   if (!value || value.postgresMajorVersion !== 17 || typeof value.ledgerExists !== "boolean"
     || !Array.isArray(value.schemaNames) || new Set(value.schemaNames).size !== value.schemaNames.length
