@@ -1,6 +1,7 @@
 /** Genuine LOCAL Operations/Intelligence acceptance using existing role contexts.
- * The orchestrator must launch the app with paid-model keys cleared and external
- * fetch blocked. No Auth creation, source fixtures, backdating or direct writes.
+ * The orchestrator must observe disabled AI, absent model keys and exact
+ * loopback email interception. This is not a blanket network-isolation claim.
+ * No Auth creation, source fixtures, backdating or direct writes.
  * Original commands live only in this bounded run; output contains labels only.
  */
 import { randomUUID } from 'node:crypto';
