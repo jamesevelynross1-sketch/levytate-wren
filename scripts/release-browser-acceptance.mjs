@@ -104,8 +104,9 @@ try {
   const browserExecutable=process.env.RELEASE_BROWSER_EXECUTABLE;
   const verifiedEdge="/private/tmp/levytate-current-browser-20261109/edge-extracted/MicrosoftEdge-157.0.4341.42.pkg/Payload/Microsoft Edge.app/Contents/MacOS/Microsoft Edge";
   const verifiedChrome="/private/tmp/levytate-current-browser-20261109/chrome-extracted/GoogleChrome.pkg/Payload/Google Chrome.app/Contents/MacOS/Google Chrome";
-  if(browserExecutable&&(![verifiedEdge,verifiedChrome].includes(browserExecutable)||!existsSync(browserExecutable)))throw new Error("Exact independently signature-verified isolated browser required");
-  browserDistribution=browserExecutable===verifiedEdge?"isolated-verified-edge":browserExecutable===verifiedChrome?"isolated-verified-chrome":"bundled-chromium";
+  const verifiedCurrentEdge="/private/tmp/levytate-current-browser-20261116/edge-extracted/MicrosoftEdge-157.0.4341.60.pkg/Payload/Microsoft Edge.app/Contents/MacOS/Microsoft Edge";
+  if(browserExecutable&&(![verifiedEdge,verifiedChrome,verifiedCurrentEdge].includes(browserExecutable)||!existsSync(browserExecutable)))throw new Error("Exact independently signature-verified isolated browser required");
+  browserDistribution=[verifiedEdge,verifiedCurrentEdge].includes(browserExecutable)?"isolated-verified-edge":browserExecutable===verifiedChrome?"isolated-verified-chrome":"bundled-chromium";
   browser = await chromium.launch({ headless: true,...(browserExecutable?{executablePath:browserExecutable}:{}) });
   browserEngineVersion=browser.version();
   console.log(`Browser engine: ${browserDistribution} ${browserEngineVersion}`);
