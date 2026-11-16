@@ -1,12 +1,12 @@
 # Local native startup migration gate
 
-This procedure applies only to a new, isolated temporary PostgreSQL17 acceptance runtime using the reviewed Supabase CLI2.122.1 and current28 migration chain. It does not authorise hosted execution. Production, the shared project, migration038, resets, migration repair, seeds and role imports remain excluded.
+This procedure applies only to a new, isolated temporary PostgreSQL 17 acceptance runtime using the reviewed Supabase CLI 2.122.1 and current 28 migration chain. It does not authorise hosted execution. Production, the shared project, migration038, resets, migration repair, seeds and role imports remain excluded.
 
-On16November2026, the old creator put28 reviewed migrations into the active project before `stack start`. CLI2.122.1 applied them during startup, before the planned explicit dry-run. The existing `PpTKRn` runtime and its genuine ledger were preserved; its first application must remain recorded as lacking a pre-application dry-run. This change does not retrospectively repair or relabel that evidence.
+On 16 November 2026, the old creator put 28 reviewed migrations into the active project before `stack start`. CLI 2.122.1 applied them during startup, before the planned explicit dry-run. The existing `PpTKRn` runtime and its genuine ledger were preserved; its first application must remain recorded as lacking a pre-application dry-run. This change does not retrospectively repair or relabel that evidence.
 
-The revised creator stores all28 hash-checked files under `reviewed-project/supabase/migrations`, outside the active CLI project. The active `project/supabase/migrations` starts empty. The startup wrapper rejects SQL anywhere under active `project/supabase`, including nested files, and rejects symlinks. It records the native stack identity and private-state hash after successful startup. That record explicitly does **not** claim that the database has been checked empty.
+The revised creator stores all 28 hash-checked files under `reviewed-project/supabase/migrations`, outside the active CLI project. The active `project/supabase/migrations` starts empty. The startup wrapper rejects SQL anywhere under active `project/supabase`, including nested files, and rejects symlinks. It records the native stack identity and private-state hash after successful startup. That record explicitly does **not** claim that the database has been checked empty.
 
-The source identities are fixed to the reviewed release manifest `8685dbf196c76f7881017f7523a0f1bee412e0da2b6fded393271cc9de2a146f`, bootstrap manifest `f12810747526e66d45789840549be88046c14b8a152fc583f4897dc09e4718b6`, and28 verified SQL files. A newly changed, even internally consistent manifest requires a separate review and gate update.
+The source identities are fixed to the reviewed release manifest `8685dbf196c76f7881017f7523a0f1bee412e0da2b6fded393271cc9de2a146f`, bootstrap manifest `f12810747526e66d45789840549be88046c14b8a152fc583f4897dc09e4718b6`, and 28 verified SQL files. A newly changed, even internally consistent manifest requires a separate review and gate update.
 
 ## Explicit sequence
 
@@ -19,9 +19,9 @@ RELEASE_RUNTIME_QUIESCENT=true node scripts/release-stage-native-migrations.mjs 
 RELEASE_RUNTIME_QUIESCENT=true node scripts/release-stage-native-migrations.mjs dry-run
 ```
 
-Stage performs a read-only live check before activating any SQL. It requires the exact guarded stack record, loopback PostgreSQL17, no application relations/functions/types or application schemas, no migration ledger entries, no Auth users/identities/sessions, and no Storage buckets/objects. Managed schemas are explicitly allowlisted; unknown schemas fail closed. It repeats the empty check after copying the exact reviewed files. No SQL is executed by stage.
+Stage performs a read-only live check before activating any SQL. It requires the exact guarded stack record, loopback PostgreSQL 17, no application relations/functions/types or application schemas, no migration ledger entries, no Auth users/identities/sessions, and no Storage buckets/objects. Managed schemas are explicitly allowlisted; unknown schemas fail closed. It repeats the empty check after copying the exact reviewed files. No SQL is executed by stage.
 
-Dry-run invokes only `db push --local --skip-vault --dry-run` with the generated project as its workdir. It requires exactly28 scheduled filenames in their reviewed order, with no missing, duplicate, renamed, extra, seed or role SQL. It repeats the live empty check and records a restricted receipt containing safe hashes and filenames, not raw CLI output or credentials. Disabled-migration and up-to-date responses are not accepted as a first bootstrap dry-run.
+Dry-run invokes only `db push --local --skip-vault --dry-run` with the generated project as its workdir. It requires exactly 28 scheduled filenames in their reviewed order, with no missing, duplicate, renamed, extra, seed or role SQL. It repeats the live empty check and records a restricted receipt containing safe hashes and filenames, not raw CLI output or credentials. Disabled-migration and up-to-date responses are not accepted as a first bootstrap dry-run.
 
 Review the successful dry-run evidence before issuing the separate apply command:
 
@@ -29,7 +29,7 @@ Review the successful dry-run evidence before issuing the separate apply command
 RELEASE_RUNTIME_QUIESCENT=true node scripts/release-stage-native-migrations.mjs apply
 ```
 
-Apply refuses without a matching successful dry-run receipt less than30minutes old. It rechecks exact source bytes, generated config, private stack identity, active files and the live empty database immediately before `db push --local --skip-vault --yes`. It then runs the existing exact ledger/catalogue/security verifier and requires empty Auth, Storage-object, employer and People counts. It never resets, restores, repairs or fabricates migration history on failure.
+Apply refuses without a matching successful dry-run receipt less than 30 minutes old. It rechecks exact source bytes, generated config, private stack identity, active files and the live empty database immediately before `db push --local --skip-vault --yes`. It then runs the existing exact ledger/catalogue/security verifier and requires empty Auth, Storage-object, employer and People counts. It never resets, restores, repairs or fabricates migration history on failure.
 
 The old `release-local-command.mjs bootstrap-dry-run` and `bootstrap` entries delegate to this gate. There is no automatic stage or apply. `--skip-vault` excludes the CLI's otherwise separate Vault-secret update in both dry-run and apply.
 
@@ -45,8 +45,8 @@ Deactivate moves only an exact reviewed migration directory to a timestamped pre
 
 The historical `release-prepare-native-runtime.mjs` produces the old active-SQL layout and does not produce the new source evidence. The startup gate rejects it; it is not the supported creator for this procedure.
 
-These helpers assume exclusive, quiescent ownership of the temporary project and use the shared acceptance lock. Filesystem checks reject observed symlinks and bound regular-file reads using `O_NOFOLLOW` and `fstat`. They do not claim protection against a malicious process concurrently replacing parent directories or forging restricted evidence. Do not use unguarded direct CLI startup while SQL is active: CLI2.122.1 can apply it automatically.
+These helpers assume exclusive, quiescent ownership of the temporary project and use the shared acceptance lock. Filesystem checks reject observed symlinks and bound regular-file reads using `O_NOFOLLOW` and `fstat`. They do not claim protection against a malicious process concurrently replacing parent directories or forging restricted evidence. Do not use unguarded direct CLI startup while SQL is active: CLI 2.122.1 can apply it automatically.
 
 ## Verification status
 
-The original independent regression used the real creator and startup wrapper with a fake CLI that only enumerated its input; it observed28 active SQL files and failed the expected-zero assertion. The unchanged regression passes with this change. Unit tests exercise stage/dry-run/apply ordering, exact source identities, non-empty database rejection, changed config/state/SQL, unexpected SQL, receipt expiry and deactivation using explicitly mocked database/CLI boundaries. This is engineering evidence, not native database or hosted acceptance. A separate fresh native runtime proof requires source review before execution; the existing acceptance runtime must not be reused for it.
+The original independent regression used the real creator and startup wrapper with a fake CLI that only enumerated its input; it observed 28 active SQL files and failed the expected-zero assertion. The unchanged regression passes with this change. Unit tests exercise stage/dry-run/apply ordering, exact source identities, non-empty database rejection, changed config/state/SQL, unexpected SQL, receipt expiry and deactivation using explicitly mocked database/CLI boundaries. This is engineering evidence, not native database or hosted acceptance. A separate fresh native runtime proof requires source review before execution; the existing acceptance runtime must not be reused for it.

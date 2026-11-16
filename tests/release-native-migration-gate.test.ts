@@ -100,7 +100,7 @@ it.each(["publicRelations", "publicFunctions", "publicTypes", "applicationSchema
   expect(() => validateEmptyDatabase({ ...empty, [key]: 1 })).toThrow();
 });
 it("rejects unknown schemas and malformed counts", () => {
-  expect(() => validateEmptyDatabase({ ...empty, schemaNames: [...empty.schemaNames, "unreviewed"] })).toThrow();
+  for (const schema of ["unreviewed", "pgclient", "pgx"]) expect(() => validateEmptyDatabase({ ...empty, schemaNames: [...empty.schemaNames, schema] })).toThrow();
   expect(() => validateEmptyDatabase({ ...empty, authUsers: "0" })).toThrow();
 });
 it("rejects remote or unrelated loopback stack identity before database access", () => {

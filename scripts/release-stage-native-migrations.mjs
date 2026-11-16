@@ -33,7 +33,7 @@ export function readEmptyNativeDatabase(db, root) {
     'publicFunctions',(select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and not exists(select 1 from pg_depend d where d.classid='pg_proc'::regclass and d.objid=p.oid and d.deptype='e')),
     'publicTypes',(select count(*) from pg_type t join pg_namespace n on n.oid=t.typnamespace where n.nspname='public' and t.typtype<>'c' and t.typelem=0 and not exists(select 1 from pg_depend d where d.classid='pg_type'::regclass and d.objid=t.oid and d.deptype='e')),
     'applicationSchemas',(select count(*) from pg_namespace where nspname like 'levytate%'),
-    'schemaNames',(select jsonb_agg(nspname order by nspname) from pg_namespace where nspname not like 'pg_%' and nspname<>'information_schema'),
+    'schemaNames',(select jsonb_agg(nspname order by nspname) from pg_namespace where left(nspname,3)<>'pg_' and nspname<>'information_schema'),
     'ledgerExists',to_regclass('supabase_migrations.schema_migrations') is not null,
     'authUsers',(select count(*) from auth.users),'authIdentities',(select count(*) from auth.identities),'authSessions',(select count(*) from auth.sessions),
     'storageBuckets',(select count(*) from storage.buckets),'storageObjects',(select count(*) from storage.objects));`);
