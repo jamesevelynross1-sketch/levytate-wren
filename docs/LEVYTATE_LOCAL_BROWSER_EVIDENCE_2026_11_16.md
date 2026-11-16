@@ -68,3 +68,12 @@ The final canonical application detail correctly exposed the exact existing lear
 Actual authenticated native Edge 157.0.4341.60 zoom passed: at fixed 1280×900 outer window, the CSS viewport changed 1272×816 → 636×408, DPR 1 → 2, and CSS zoom/pinch scale remained 1. Responsive navigation worked with Enter/Escape, focus returned, the bottom support navigation remained inside the actual scrolled viewport, no horizontal overflow occurred, and native 100% was restored. Four uncropped native viewport screenshots were captured; independent visual inspection is recorded separately. This replaces the prior native-zoom NOT_RUN for this Lead only.
 
 The Lead logged out successfully, protected reads and refresh then denied access, the disposable profile was deleted, and the application stopped/flushed. The generated trace scan found zero trace files and zero credential-query markers after the actual callback. No browser session state was exported.
+
+
+## Canonical learner navigation correction verified
+
+The actual shell omitted the `Learners`/`learner` URL target. The correction opens the permitted scoped learner, preserves its target across refresh, and clears it on explicit Back/list navigation. This is a product correction, not a weakened heading assertion.
+
+A final bounded run used application `f1fe44de8e405d81e8f00f8fa3479d5788096eed` and harness `4a57753b92a9492db22b8ddf1ca4753dd5415a54`: **29 PASS, 0 FAIL, 1 external-delivery BLOCKED**. One genuine Lead public sign-in and real captured callback opened the exact existing application→learner link, reloaded the same learner detail, returned to the list without reopening stale detail, and loaded the same direct URL. The original learner revision and all observed application, learner, command-receipt, lifecycle-event, operational-action and audit records were unchanged. No other mutation journey, new fixture, limiter reset or additional role was used.
+
+Normal logout succeeded; protected reads and refresh denied further access. All contexts closed, the app stopped/flushed, and the trace scan again found zero trace files and credential-query markers. Earlier failed artifacts remain intact; this narrow proof closes their canonical navigation failure only. The development dependency patch prepared separately was not present in this browser-tested lockfile; final publication must identify that difference.
