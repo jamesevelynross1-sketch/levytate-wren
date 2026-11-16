@@ -7,10 +7,60 @@ import { randomUUID } from 'node:crypto';
 import { localUrl } from './release-local-fixtures.mjs';
 // Observe rejection immediately so normal cleanup cannot create an unhandled
 // waitForResponse rejection when an earlier assertion has already stopped us.
+const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
 const observe = promise => promise.then(value => ({ value }), error => ({ error }));
 async function observed(promise) { const result = await promise; if (result.error) throw result.error; return result.value; }
 
-export async function verifyOperationsIntelligence({ app: origin, manifest, contexts, backend, check, learnerId, noPaidModel }) {
+async function within(promise, label) {
+  let timer;
+  try { return await Promise.race([promise, new Promise((_, reject) => { timer = setTimeout(() => reject(Error(label)), 30000); })]); }
+  finally { clearTimeout(timer); }
+}
+
+/** Fetch the real upstream response, hold it while checking the visible gate,
+ * then lose/corrupt only transport. An explicit visible retry must send the
+ * original body and identity and leave the entire durable snapshot unchanged.
+ */
+export async function verifyRetainedOperationTransport({ app, page, lead, snapshot, report, verifyCommit, idle, label, path, method = 'POST', action, family, trigger, fault, malformed, validate, during, after }) {
+  const before = await snapshot(), recovery = page.getByRole('dialog', { name: 'Update awaiting confirmation', exact: true });
+  let intercepted = false, failed = false, command, body, input, release, signalCommitted;
+  const held = new Promise(resolve => { release = resolve; }), committed = new Promise(resolve => { signalCommitted = resolve; });
+  const pattern = `${app}${path}*`;
+  const intercept = async route => {
+    if (intercepted || route.request().method() !== method || (action && route.request().postDataJSON()?.action !== action)) { await route.continue(); return; }
+    intercepted = true; command = route.request().postData(); input = route.request().postDataJSON();
+    try {
+      const headers = route.request().headers();
+      if (headers['x-levytate-account'] !== lead.user.email || headers['x-levytate-organisation'] !== lead.tenant.id) throw Error('Original request identity missing');
+      const response = await route.fetch({ maxRedirects: 0 }); body = await response.json();
+      if (response.status() !== 200 || body.ok !== true || !validate(body, input)) throw Error('Real upstream command was not confirmed');
+      signalCommitted(); await held;
+      if (fault === 'lost') await route.abort('connectionreset');
+      else await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(malformed(structuredClone(body))) });
+    } catch { failed = true; signalCommitted(); try { await route.abort(); } catch {} }
+  };
+  await page.route(pattern, intercept);
+  try {
+    await trigger(); await within(committed, `${label} upstream observation timed out`);
+    report(`${label}: failure injection follows genuine upstream success`, intercepted && !failed);
+    await recovery.waitFor();
+    report(`${label}: in-flight command owns visible recovery and disables premature retry`, await recovery.getByRole('button', { name: 'Retry original update', exact: true }).isDisabled());
+    if (during) await during();
+    const durable = await snapshot(); verifyCommit(before, durable, input, family, body);
+    release();
+    await recovery.getByRole('button', { name: 'Retry original update', exact: true }).waitFor();
+    const retried = observe(page.waitForResponse(response => new URL(response.url()).pathname === path && response.request().method() === method));
+    await recovery.getByRole('button', { name: 'Retry original update', exact: true }).click();
+    const retry = await observed(retried), headers = retry.request().headers();
+    report(`${label}: visible retry preserves exact command and current original identity`, retry.status() === 200 && retry.request().postData() === command && headers['x-levytate-account'] === lead.user.email && headers['x-levytate-organisation'] === lead.tenant.id);
+    await idle();
+    report(`${label}: retry adds no duplicate action, signal, receipt, history or audit`, same(durable, await snapshot()));
+    if (after) await after({ before, durable, body, input });
+    return { body, input, command, durable };
+  } finally { release(); await page.unroute(pattern, intercept); }
+}
+
+export async function verifyOperationsIntelligence({ app: origin, manifest, contexts, backend, check, learnerId, noPaidModel, notRun }) {
   const app = localUrl(origin, 'Operations acceptance app');
   const lead = contexts.get('a:lead'), manager = contexts.get('a:manager'), employee = contexts.get('a:employee'), other = contexts.get('b:employee');
   if (noPaidModel !== true) throw Error('Observed local no-paid-model launch evidence required');
@@ -19,9 +69,8 @@ export async function verifyOperationsIntelligence({ app: origin, manifest, cont
     || lead.tenant.id !== manager.tenant.id || lead.tenant.id !== employee.tenant.id || lead.tenant.id === other.tenant.id
     || ![lead, manager, employee, other].every(actor => manifest.tenants.some(tenant => tenant.id === actor.tenant.id))) throw Error('Reviewed local genuine four-role contexts required');
   const report = (name, ok) => { check(`Operations/Intelligence: ${name}`, Boolean(ok)); if (!ok) throw Error(`Operations acceptance check failed: ${name}`); };
-  const gaps = [], page = lead.page, modes = page.getByRole('navigation', { name: 'Operations Centre views', exact: true, includeHidden: true });
+  const gaps = [], notRunScopes = [], page = lead.page, modes = page.getByRole('navigation', { name: 'Operations Centre views', exact: true, includeHidden: true });
   const pins = actor => ({ Origin: app, 'X-LevyTate-Account': actor.user.email, 'X-LevyTate-Organisation': actor.tenant.id });
-  const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
   const paths = { operations: '/api/levytate-operations', autopilot: '/api/levytate-autopilot', intelligence: '/api/levytate-intelligence/signals' };
   const select = (tenant, table, fields, extra = '') => backend(`rest/v1/${table}?organisation_id=eq.${tenant}&select=${fields}${extra}`);
   const snapshot = async (tenant = lead.tenant.id) => {
@@ -45,16 +94,12 @@ export async function verifyOperationsIntelligence({ app: origin, manifest, cont
     report(`${kind} read has the exact current canonical scope`, body.ok === true && value?.scope?.organisationId === lead.tenant.id && value.scope.userEmail === lead.user.email && value.scope.role === lead.user.role);
     return value;
   };
+  const unexercised = label => { notRunScopes.push(label); if (typeof notRun === 'function') notRun(label); };
   const missing = label => { gaps.push(label); check(`Operations/Intelligence: required existing source coverage — ${label}`, false); };
   const idle = async () => {
     await page.getByRole('dialog', { name: 'Update awaiting confirmation', exact: true }).waitFor({ state: 'hidden' });
     await page.getByRole('dialog', { name: 'Saved update confirmed', exact: true }).waitFor({ state: 'hidden' });
   };
-  async function within(promise, label) {
-    let timer;
-    try { return await Promise.race([promise, new Promise((_, reject) => { timer = setTimeout(() => reject(Error(label)), 30000); })]); }
-    finally { clearTimeout(timer); }
-  }
   function verifyCommit(before, after, input, family, body) {
     if (family) {
       const prior = before.states.find(item => item.family === family), current = after.states.find(item => item.family === family);
@@ -72,48 +117,7 @@ export async function verifyOperationsIntelligence({ app: origin, manifest, cont
       } else report(`${input.action}: analysis never creates operational actions`, same(after.actions, before.actions));
     }
   }
-  /** Fetch the real upstream response, hold it while checking the visible gate,
-   * then lose/corrupt only transport. An explicit visible retry must send the
-   * original body and identity and leave the entire durable snapshot unchanged.
-   */
-  async function uncertain({ label, path, method = 'POST', action, family, trigger, fault, malformed, validate, during, after }) {
-    const before = await snapshot(), recovery = page.getByRole('dialog', { name: 'Update awaiting confirmation', exact: true });
-    let intercepted = false, failed = false, command, body, input, release, observed;
-    const held = new Promise(resolve => { release = resolve; }), committed = new Promise(resolve => { observed = resolve; });
-    const pattern = `${app}${path}*`;
-    const intercept = async route => {
-      if (intercepted || route.request().method() !== method || (action && route.request().postDataJSON()?.action !== action)) { await route.continue(); return; }
-      intercepted = true; command = route.request().postData(); input = route.request().postDataJSON();
-      try {
-        const headers = route.request().headers();
-        if (headers['x-levytate-account'] !== lead.user.email || headers['x-levytate-organisation'] !== lead.tenant.id) throw Error('Original request identity missing');
-        const response = await route.fetch({ maxRedirects: 0 }); body = await response.json();
-        if (response.status() !== 200 || body.ok !== true || !validate(body, input)) throw Error('Real upstream command was not confirmed');
-        observed(); await held;
-        if (fault === 'lost') await route.abort('connectionreset');
-        else await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(malformed(structuredClone(body))) });
-      } catch { failed = true; observed(); try { await route.abort(); } catch {} }
-    };
-    await page.route(pattern, intercept);
-    try {
-      await trigger(); await within(committed, `${label} upstream observation timed out`);
-      report(`${label}: failure injection follows genuine upstream success`, intercepted && !failed);
-      await recovery.waitFor();
-      report(`${label}: in-flight command owns visible recovery and disables premature retry`, await recovery.getByRole('button', { name: 'Retry original update', exact: true }).isDisabled());
-      if (during) await during();
-      const durable = await snapshot(); verifyCommit(before, durable, input, family, body);
-      release();
-      await recovery.getByRole('button', { name: 'Retry original update', exact: true }).waitFor();
-      const retried = observe(page.waitForResponse(response => new URL(response.url()).pathname === path && response.request().method() === method));
-      await recovery.getByRole('button', { name: 'Retry original update', exact: true }).click();
-      const retry = await observed(retried), headers = retry.request().headers();
-      report(`${label}: visible retry preserves exact command and current original identity`, retry.status() === 200 && retry.request().postData() === command && headers['x-levytate-account'] === lead.user.email && headers['x-levytate-organisation'] === lead.tenant.id);
-      await idle();
-      report(`${label}: retry adds no duplicate action, signal, receipt, history or audit`, same(durable, await snapshot()));
-      if (after) await after({ before, durable, body, input });
-      return { body, input, command, durable };
-    } finally { release(); await page.unroute(pattern, intercept); }
-  }
+  const uncertain = options => verifyRetainedOperationTransport({ app, page, lead, snapshot, report, verifyCommit, idle, ...options });
   async function challengeDecision(kind, input) {
     const before = await snapshot();
     for (const actor of [manager, employee, other]) {
@@ -305,13 +309,34 @@ export async function verifyOperationsIntelligence({ app: origin, manifest, cont
       report('canonical signal links to its exact application, including older linked tasks', await row.count() === 1 && await row.getByRole('link', { name: label, exact: true }).getAttribute('href') === `/levytate/app?module=Applications&application=${encodeURIComponent(signal.entityId)}`);
       await row.getByRole('link', { name: label, exact: true }).click(); await page.getByRole('dialog').waitFor();
       report('canonical application opens under the same genuine application origin', new URL(page.url()).origin === app && new URL(page.url()).searchParams.get('application') === signal.entityId);
-    } else missing('an existing aged application workflow signal for the canonical final-review or handoff link');
+    } else unexercised('Genuine aged application Autopilot row absent in the fresh local run; canonical destination is tested separately, and no aging or signal rows are manufactured.');
+
+    phase = 'canonical application and existing learner handoff';
+    if (learnerId) {
+      const response = await lead.context.request.get(`${app}/api/levytate-learners/${learnerId}`, { headers: pins(lead) });
+      report('canonical handoff starts from the actual authorised enrolled learner', response.status() === 200);
+      const detail = (await response.json()).learner, applicationId = detail?.programme?.applicationReference;
+      report('canonical handoff uses the durable application identity on that exact learner', detail?.learnerRecordId === learnerId && detail.lifecycleStatus === 'enrolled' && typeof applicationId === 'string' && /^application-[a-f0-9-]{36}$/.test(applicationId));
+      const linkedRecords = () => select(lead.tenant.id, 'levytate_learner_records', 'id,application_id,mutation_revision,lifecycle_status', `&application_id=eq.${applicationId}&order=id`);
+      const before = await linkedRecords(), beforeOperations = await snapshot();
+      report('one enrolled learner already exists for the canonical application', before.length === 1 && before[0].id === learnerId && before[0].lifecycle_status === 'enrolled');
+      await page.goto(`${app}/levytate/app?module=Applications&application=${encodeURIComponent(applicationId)}`);
+      const modal = page.getByRole('dialog').filter({ has: page.getByRole('region', { name: 'Enrolment handoff', exact: true }) });
+      const existing = modal.getByRole('link', { name: 'Open learner record', exact: true }); await existing.waitFor();
+      report('canonical application offers the exact existing learner and cannot start a duplicate pre-enrolment', await existing.getAttribute('href') === `/levytate/app?module=Learners&learner=${encodeURIComponent(learnerId)}` && await modal.getByRole('button', { name: 'Start pre-enrolment', exact: true }).count() === 0);
+      await existing.click(); await page.getByRole('heading', { name: detail.learner.name, exact: true, level: 2 }).waitFor();
+      report('the canonical handoff reaches the same recorded learner on the application origin', new URL(page.url()).origin === app && new URL(page.url()).searchParams.get('learner') === learnerId);
+      await manager.page.goto(`${app}/levytate/app?module=Approvals&application=${encodeURIComponent(applicationId)}`);
+      await manager.page.getByRole('heading', { name: 'Approvals', exact: true }).waitFor();
+      report('the genuine Manager does not acquire Lead pre-enrolment or learner-handoff controls', await manager.page.getByRole('button', { name: 'Start pre-enrolment', exact: true }).count() === 0 && await manager.page.getByRole('link', { name: 'Open learner record', exact: true }).count() === 0);
+      report('canonical navigation changes no learner, Operations record or command receipt', same(before, await linkedRecords()) && same(beforeOperations, await snapshot()));
+    } else unexercised('No genuine core enrolment learner was supplied for canonical Applications handoff navigation.');
 
     phase = 'durable readback after reload';
     const durable = await snapshot(); await page.goto(`${app}/levytate/app?module=Operations`); await page.getByTestId('operations-autopilot').waitFor(); await read('autopilot'); await read('intelligence');
     report('reload and independent reads add no commands or hidden mutations', same(durable, await snapshot()));
     report('other employer Intelligence and Operations remain unchanged', same(otherBefore, await snapshot(other.tenant.id)));
-    return { newSignIns: 0, paidModelCalls: false, directSourceWrites: false, missingCoverage: gaps };
+    return { newSignIns: 0, paidModelCalls: false, directSourceWrites: false, missingCoverage: gaps, notRunScopes };
   } catch {
     check(`Operations/Intelligence: stopped safely at ${phase}`, false);
     throw Error(`Operations/Intelligence acceptance stopped at ${phase}`);
