@@ -4,7 +4,7 @@ import { analyseOperationsAutopilot, type AutopilotAnalysisInput } from '@/lib/l
 import type { LearnerProgressUpdate, LearnerReview } from '@/lib/levytate/mvp/learner-lifecycle';
 // JavaScript acceptance helper is intentionally imported without executing a browser.
 // @ts-expect-error The executable .mjs helper has no declaration file.
-import { verifyOperationsIntelligence } from '../scripts/release-operations-intelligence-browser.mjs';
+import { verifyOperationsIntelligence, matchesCanonicalEnrolment, validApplicationReference } from '../scripts/release-operations-intelligence-browser.mjs';
 
 const today = '2026-11-16', now = `${today}T12:00:00Z`, organisationId = '10000000-0000-4000-8000-000000000001', learnerRecordId = 'learner-one';
 const progress = (id: string, target: number, actual: number, createdAt: string): LearnerProgressUpdate => ({ id, organisationId, learnerRecordId, updateDate: today, targetProgressPercentage: target, actualProgressPercentage: actual, variancePercentage: actual - target, progressSource: 'provider_report', sourceReference: 'Synthetic acceptance observation only', summary: 'Fictional progress observation', supportAction: '', updatedBy: 'lead@fictional.invalid', createdAt });
@@ -70,5 +70,24 @@ describe('browser helper remains bounded before any request', () => {
     await expect(verifyOperationsIntelligence(input)).rejects.toThrow('Reviewed local genuine four-role contexts required'); expect(input.backend).not.toHaveBeenCalled();
     const wrongRole = args(); wrongRole.contexts.get('a:lead')!.user.role = 'Employee';
     await expect(verifyOperationsIntelligence(wrongRole)).rejects.toThrow('Reviewed local genuine four-role contexts required'); expect(wrongRole.backend).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('canonical handoff provenance uses real opaque application identifiers', () => {
+  const run = '30000000-0000-4000-8000-000000000003';
+  const fixture = (id = `browser-${run}`) => ({ detail: { learnerRecordId: 'learner-one', lifecycleStatus: 'enrolled', learner: { id: 'person-one' }, programme: { applicationReference: id } }, applications: [{ id, organisation_id: organisationId, employee_id: 'person-one' }], learners: [{ id: 'learner-one', organisation_id: organisationId, application_id: id, lifecycle_status: 'enrolled' }] });
+  it.each([`browser-${run}`, `application-${run}`])('accepts actual same-tenant enrolment without inventing a prefix: %s', id => {
+    const value = fixture(id); expect(matchesCanonicalEnrolment(value.detail, 'learner-one', value.applications, value.learners, organisationId)).toBe(true);
+  });
+  it('rejects a foreign application, wrong learner link or duplicate handoff', () => {
+    const value = fixture();
+    expect(matchesCanonicalEnrolment(value.detail, 'learner-one', [{ ...value.applications[0], organisation_id: 'other-tenant' }], value.learners, organisationId)).toBe(false);
+    expect(matchesCanonicalEnrolment(value.detail, 'learner-one', [{ ...value.applications[0], employee_id: 'another-person' }], value.learners, organisationId)).toBe(false);
+    expect(matchesCanonicalEnrolment(value.detail, 'learner-one', value.applications, [{ ...value.learners[0], application_id: 'another-application' }], organisationId)).toBe(false);
+    expect(matchesCanonicalEnrolment(value.detail, 'learner-one', value.applications, [...value.learners, value.learners[0]], organisationId)).toBe(false);
+  });
+  it.each(['', ' padded', 'trailing ', 'control\nvalue', 'x'.repeat(161), undefined])('rejects unsafe application reference %# before constructing a request', id => {
+    expect(validApplicationReference(id)).toBe(false);
   });
 });

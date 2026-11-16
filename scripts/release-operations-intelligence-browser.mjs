@@ -60,6 +60,18 @@ export async function verifyRetainedOperationTransport({ app, page, lead, snapsh
   } finally { release(); await page.unroute(pattern, intercept); }
 }
 
+// Source identifiers are opaque; fresh core applications legitimately use the
+// browser-run prefix. Equality with current tenant rows supplies provenance.
+export function validApplicationReference(value) {
+  return typeof value === 'string' && value.length > 0 && value.length <= 160 && value.trim() === value && !/[\x00-\x1f\x7f]/.test(value);
+}
+export function matchesCanonicalEnrolment(detail, learnerId, applicationRows, learnerRows, organisationId) {
+  const applicationId = detail?.programme?.applicationReference;
+  return validApplicationReference(applicationId) && detail?.learnerRecordId === learnerId && detail.lifecycleStatus === 'enrolled'
+    && Array.isArray(applicationRows) && applicationRows.length === 1 && applicationRows[0].id === applicationId && applicationRows[0].organisation_id === organisationId && applicationRows[0].employee_id === detail.learner?.id
+    && Array.isArray(learnerRows) && learnerRows.length === 1 && learnerRows[0].id === learnerId && learnerRows[0].organisation_id === organisationId && learnerRows[0].application_id === applicationId && learnerRows[0].lifecycle_status === 'enrolled';
+}
+
 export async function verifyOperationsIntelligence({ app: origin, manifest, contexts, backend, check, learnerId, noPaidModel, notRun }) {
   const app = localUrl(origin, 'Operations acceptance app');
   const lead = contexts.get('a:lead'), manager = contexts.get('a:manager'), employee = contexts.get('a:employee'), other = contexts.get('b:employee');
@@ -316,10 +328,11 @@ export async function verifyOperationsIntelligence({ app: origin, manifest, cont
       const response = await lead.context.request.get(`${app}/api/levytate-learners/${learnerId}`, { headers: pins(lead) });
       report('canonical handoff starts from the actual authorised enrolled learner', response.status() === 200);
       const detail = (await response.json()).learner, applicationId = detail?.programme?.applicationReference;
-      report('canonical handoff uses the durable application identity on that exact learner', detail?.learnerRecordId === learnerId && detail.lifecycleStatus === 'enrolled' && typeof applicationId === 'string' && /^application-[a-f0-9-]{36}$/.test(applicationId));
-      const linkedRecords = () => select(lead.tenant.id, 'levytate_learner_records', 'id,application_id,mutation_revision,lifecycle_status', `&application_id=eq.${applicationId}&order=id`);
+      report('canonical handoff uses the durable application identity on that exact learner', detail?.learnerRecordId === learnerId && detail.lifecycleStatus === 'enrolled' && validApplicationReference(applicationId));
+      const linkedRecords = () => select(lead.tenant.id, 'levytate_learner_records', 'id,organisation_id,application_id,mutation_revision,lifecycle_status', `&application_id=eq.${encodeURIComponent(applicationId)}&order=id`);
+      const applicationRows = await select(lead.tenant.id, 'levytate_applications', 'id,organisation_id,employee_id,status', `&id=eq.${encodeURIComponent(applicationId)}`);
       const before = await linkedRecords(), beforeOperations = await snapshot();
-      report('one enrolled learner already exists for the canonical application', before.length === 1 && before[0].id === learnerId && before[0].lifecycle_status === 'enrolled');
+      report('one enrolled learner and its canonical application belong to the exact current tenant and employee', matchesCanonicalEnrolment(detail, learnerId, applicationRows, before, lead.tenant.id));
       await page.goto(`${app}/levytate/app?module=Applications&application=${encodeURIComponent(applicationId)}`);
       const modal = page.getByRole('dialog').filter({ has: page.getByRole('region', { name: 'Enrolment handoff', exact: true }) });
       const existing = modal.getByRole('link', { name: 'Open learner record', exact: true }); await existing.waitFor();
