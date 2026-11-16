@@ -105,7 +105,11 @@ describe('actual shell learner deep-link effects', () => {
     expect(operations).toBeDefined();
     (operations!.props.onOpenLearner as (target: unknown) => void)({ learnerRecordId: learnerId, actionType: 'record_review' });
     expect(learner()?.props).toMatchObject({ initialLearnerRecordId: learnerId, initialAction: 'record_review' });
+    expect(location.searchParams.get('learner')).toBe(learnerId);
     (learner()!.props.onDeepLinkConsumed as () => void)();
+    expect(learner()?.props).toMatchObject({ initialLearnerRecordId: learnerId, initialAction: 'open_learner' });
+    for (const effect of hooks.effects.values()) effect.cleanup?.();
+    hooks.cells = []; hooks.effects.clear(); hooks.pending = []; listeners.clear();
     expect(learner()?.props).toMatchObject({ initialLearnerRecordId: learnerId, initialAction: 'open_learner' });
   });
   it('the actual Learners component clears changed detail selection and calls Back without a mutation', () => {
