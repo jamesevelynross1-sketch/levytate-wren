@@ -1,0 +1,9 @@
+{
+  "environment": "local",
+  "appCommit": "c7d57b14ddcd6c22b0bbcba672223d0f0d151e5a",
+  "appStoppedAndFlushed": true,
+  "actualGenuineCallbacks": 5,
+  "traceFiles": [],
+  "credentialQueryMarkers": 0,
+  "disposableNativeProfilesRemaining": 0
+}

@@ -1,0 +1,711 @@
+{
+  "schemaVersion": 2,
+  "environment": "local",
+  "candidateCommit": "b1ca1f33ac4e93a5d3c9b850326a947a9188a510",
+  "appCodeCommit": "c7d57b14ddcd6c22b0bbcba672223d0f0d151e5a",
+  "browserEngineVersion": "157.0.4341.60",
+  "browserDistribution": "isolated-verified-edge",
+  "authenticationMethod": "requested-sign-in-link-through-local-smtp",
+  "authenticatedContextsVerified": 4,
+  "distinctAuthenticatedRoles": [
+    "Apprenticeship Lead",
+    "Employee",
+    "Line Manager"
+  ],
+  "emailEvidence": "local-smtp-capture-only",
+  "notRunScopes": [
+    "A Lead emulated 320/390/768 viewport microchecks skipped: fresh persistent context reserved for actual native browser zoom",
+    "Core approval/enrolment not repeated: exact current-run completed handoff and live learner verified read-only"
+  ],
+  "results": [
+    {
+      "name": "a Apprenticeship Lead: no demo login required",
+      "status": "PASS"
+    },
+    {
+      "name": "a Apprenticeship Lead: actual sign-in request reached local SMTP capture",
+      "status": "PASS"
+    },
+    {
+      "name": "a Apprenticeship Lead: callback stays on application origin",
+      "status": "PASS"
+    },
+    {
+      "name": "a Apprenticeship Lead: three HttpOnly host-only cookies",
+      "status": "PASS"
+    },
+    {
+      "name": "a Apprenticeship Lead: canonical role and tenant resolved",
+      "status": "PASS"
+    },
+    {
+      "name": "a Apprenticeship Lead: other tenant is absent",
+      "status": "PASS"
+    },
+    {
+      "name": "a Apprenticeship Lead: authenticated refresh persists",
+      "status": "PASS"
+    },
+    {
+      "name": "a Apprenticeship Lead: provider session refresh succeeds",
+      "status": "PASS"
+    },
+    {
+      "name": "a Line Manager: no demo login required",
+      "status": "PASS"
+    },
+    {
+      "name": "a Line Manager: actual sign-in request reached local SMTP capture",
+      "status": "PASS"
+    },
+    {
+      "name": "a Line Manager: callback stays on application origin",
+      "status": "PASS"
+    },
+    {
+      "name": "a Line Manager: three HttpOnly host-only cookies",
+      "status": "PASS"
+    },
+    {
+      "name": "a Line Manager: canonical role and tenant resolved",
+      "status": "PASS"
+    },
+    {
+      "name": "a Line Manager: other tenant is absent",
+      "status": "PASS"
+    },
+    {
+      "name": "a Line Manager: authenticated refresh persists",
+      "status": "PASS"
+    },
+    {
+      "name": "a Line Manager: provider session refresh succeeds",
+      "status": "PASS"
+    },
+    {
+      "name": "a Line Manager: no horizontal overflow at 320px",
+      "status": "PASS"
+    },
+    {
+      "name": "a Line Manager: no horizontal overflow at 390px",
+      "status": "PASS"
+    },
+    {
+      "name": "a Line Manager: no horizontal overflow at 768px",
+      "status": "PASS"
+    },
+    {
+      "name": "a Employee: no demo login required",
+      "status": "PASS"
+    },
+    {
+      "name": "a Employee: actual sign-in request reached local SMTP capture",
+      "status": "PASS"
+    },
+    {
+      "name": "a Employee: callback stays on application origin",
+      "status": "PASS"
+    },
+    {
+      "name": "a Employee: three HttpOnly host-only cookies",
+      "status": "PASS"
+    },
+    {
+      "name": "a Employee: genuine authenticated Data API cannot read employer tables directly",
+      "status": "PASS"
+    },
+    {
+      "name": "a Employee: anonymous Data API cannot enumerate memberships",
+      "status": "PASS"
+    },
+    {
+      "name": "a Employee: actual authenticated identity cannot inspect callback budgets",
+      "status": "PASS"
+    },
+    {
+      "name": "a Employee: canonical role and tenant resolved",
+      "status": "PASS"
+    },
+    {
+      "name": "a Employee: other tenant is absent",
+      "status": "PASS"
+    },
+    {
+      "name": "a Employee: employee has own People only",
+      "status": "PASS"
+    },
+    {
+      "name": "a Employee: authenticated refresh persists",
+      "status": "PASS"
+    },
+    {
+      "name": "a Employee: provider session refresh succeeds",
+      "status": "PASS"
+    },
+    {
+      "name": "a Employee: no horizontal overflow at 320px",
+      "status": "PASS"
+    },
+    {
+      "name": "a Employee: no horizontal overflow at 390px",
+      "status": "PASS"
+    },
+    {
+      "name": "a Employee: no horizontal overflow at 768px",
+      "status": "PASS"
+    },
+    {
+      "name": "b Employee: no demo login required",
+      "status": "PASS"
+    },
+    {
+      "name": "b Employee: actual sign-in request reached local SMTP capture",
+      "status": "PASS"
+    },
+    {
+      "name": "b Employee: callback stays on application origin",
+      "status": "PASS"
+    },
+    {
+      "name": "b Employee: three HttpOnly host-only cookies",
+      "status": "PASS"
+    },
+    {
+      "name": "b Employee: genuine authenticated Data API cannot read employer tables directly",
+      "status": "PASS"
+    },
+    {
+      "name": "b Employee: anonymous Data API cannot enumerate memberships",
+      "status": "PASS"
+    },
+    {
+      "name": "b Employee: actual authenticated identity cannot inspect callback budgets",
+      "status": "PASS"
+    },
+    {
+      "name": "b Employee: canonical role and tenant resolved",
+      "status": "PASS"
+    },
+    {
+      "name": "b Employee: other tenant is absent",
+      "status": "PASS"
+    },
+    {
+      "name": "b Employee: employee has own People only",
+      "status": "PASS"
+    },
+    {
+      "name": "b Employee: authenticated refresh persists",
+      "status": "PASS"
+    },
+    {
+      "name": "b Employee: provider session refresh succeeds",
+      "status": "PASS"
+    },
+    {
+      "name": "b Employee: no horizontal overflow at 320px",
+      "status": "PASS"
+    },
+    {
+      "name": "b Employee: no horizontal overflow at 390px",
+      "status": "PASS"
+    },
+    {
+      "name": "b Employee: no horizontal overflow at 768px",
+      "status": "PASS"
+    },
+    {
+      "name": "4 genuine successful callbacks do not consume failed-link budget",
+      "status": "PASS"
+    },
+    {
+      "name": "a:employee: unapproved levytate-lift remains tenant-gated",
+      "status": "PASS"
+    },
+    {
+      "name": "a:employee: unapproved levytate-learning-time remains tenant-gated",
+      "status": "PASS"
+    },
+    {
+      "name": "a:employee: unapproved levytate-requests remains tenant-gated",
+      "status": "PASS"
+    },
+    {
+      "name": "a:employee: unapproved levytate-pastoral remains tenant-gated",
+      "status": "PASS"
+    },
+    {
+      "name": "a:manager: unapproved levytate-lift remains tenant-gated",
+      "status": "PASS"
+    },
+    {
+      "name": "a:manager: unapproved levytate-learning-time remains tenant-gated",
+      "status": "PASS"
+    },
+    {
+      "name": "a:manager: unapproved levytate-requests remains tenant-gated",
+      "status": "PASS"
+    },
+    {
+      "name": "a:manager: unapproved levytate-pastoral remains tenant-gated",
+      "status": "PASS"
+    },
+    {
+      "name": "a:lead: unapproved levytate-lift remains tenant-gated",
+      "status": "PASS"
+    },
+    {
+      "name": "a:lead: unapproved levytate-learning-time remains tenant-gated",
+      "status": "PASS"
+    },
+    {
+      "name": "a:lead: unapproved levytate-requests remains tenant-gated",
+      "status": "PASS"
+    },
+    {
+      "name": "a:lead: unapproved levytate-pastoral remains tenant-gated",
+      "status": "PASS"
+    },
+    {
+      "name": "a:employee: consumed magic link cannot replay",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations continuation uses exact prior current-run live enrolment without resetting records",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: operations returns an authorised live read",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: operations read has the exact current canonical scope",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: a:Line Manager cannot read employer operations",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: a:Line Manager cannot mutate employer operations",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: a:Employee cannot read employer operations",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: a:Employee cannot mutate employer operations",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: b:Employee cannot read employer operations",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: b:Employee cannot mutate employer operations",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: operations refuses a foreign retained workspace before returning data",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: operations denied requests preserve all durable state",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: autopilot returns an authorised live read",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: autopilot read has the exact current canonical scope",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: a:Line Manager cannot read employer autopilot",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: a:Line Manager cannot mutate employer autopilot",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: a:Employee cannot read employer autopilot",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: a:Employee cannot mutate employer autopilot",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: b:Employee cannot read employer autopilot",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: b:Employee cannot mutate employer autopilot",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: autopilot refuses a foreign retained workspace before returning data",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: autopilot denied requests preserve all durable state",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: intelligence returns an authorised live read",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: intelligence read has the exact current canonical scope",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: a:Line Manager cannot read employer intelligence",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: a:Line Manager cannot mutate employer intelligence",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: a:Employee cannot read employer intelligence",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: a:Employee cannot mutate employer intelligence",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: b:Employee cannot read employer intelligence",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: b:Employee cannot mutate employer intelligence",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: intelligence refuses a foreign retained workspace before returning data",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: intelligence denied requests preserve all durable state",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: normal fictional evidence uses the genuinely enrolled current-tenant learner",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: the supplied learner is active and belongs to an actual same-tenant test identity",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: the actual enrolled learner has one visible row",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: progress: no duplicate earlier acceptance observation exists",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: progress: continuation retains the original source, receipt and exact actor-owned events",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: review: no duplicate earlier acceptance observation exists",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: fictional provider review retains the actual enrolled provider identity",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: review: normal Lead UI records the explicit fictional observation",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: review: one source and actor receipt persist with the exact linked provider-review event",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: review: persisted source identifies the exact original receipt and actor",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: current-date scenario durably records 30/5, variance \u221225 and the distinct fictional provider narrative",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: malformed successful Autopilot read never mutates data or advertises an all-clear",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Autopilot refresh lost: failure injection follows genuine upstream success",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Autopilot refresh lost: in-flight command owns visible recovery and disables premature retry",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Autopilot refresh lost: workspace navigation stays locked",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: refresh: one actor-owned receipt and workspace revision commit",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: refresh: one Intelligence audit commits with the receipt",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: refresh: signal history is durable and exact",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: refresh: analysis never creates operational actions",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Autopilot refresh lost: visible retry preserves exact command and current original identity",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Autopilot refresh lost: retry adds no duplicate action, signal, receipt, history or audit",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Autopilot refresh malformed: failure injection follows genuine upstream success",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Autopilot refresh malformed: in-flight command owns visible recovery and disables premature retry",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Autopilot refresh malformed: workspace navigation stays locked",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: refresh: one actor-owned receipt and workspace revision commit",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: refresh: one Intelligence audit commits with the receipt",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: refresh: signal history is durable and exact",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: refresh: analysis never creates operational actions",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Autopilot refresh malformed: visible retry preserves exact command and current original identity",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Autopilot refresh malformed: retry adds no duplicate action, signal, receipt, history or audit",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: autopilot returns an authorised live read",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: autopilot read has the exact current canonical scope",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: actual scheduled review fires a source-backed Autopilot review signal",
+      "status": "FAIL"
+    },
+    {
+      "name": "Operations/Intelligence: stopped safely at Autopilot action creation recovery",
+      "status": "FAIL"
+    },
+    {
+      "name": "Operations and Intelligence UI",
+      "status": "FAIL",
+      "errorClass": "Error",
+      "reason": "Independent journey failed; authentication state omitted"
+    },
+    {
+      "name": "Native Lead zoom: actual current role, account and employer remain authenticated",
+      "status": "PASS"
+    },
+    {
+      "name": "genuine Lead native browser zoom",
+      "status": "FAIL",
+      "errorClass": "TimeoutError",
+      "reason": "Independent journey failed; authentication state omitted"
+    },
+    {
+      "name": "genuine direct manager naturally reopens the recorded recovery application",
+      "status": "PASS"
+    },
+    {
+      "name": "recorded recovery application is editable without resetting history",
+      "status": "PASS"
+    },
+    {
+      "name": "Employee workspace recovery: database observation has exactly one own application",
+      "status": "PASS"
+    },
+    {
+      "name": "Employee workspace recovery: starts from a genuinely editable own application",
+      "status": "PASS"
+    },
+    {
+      "name": "Employee workspace recovery: malformed200 follows a real successful draft commit",
+      "status": "PASS"
+    },
+    {
+      "name": "Employee workspace recovery: database observation has exactly one own application",
+      "status": "PASS"
+    },
+    {
+      "name": "Employee workspace recovery: draft commits once despite rejected response",
+      "status": "PASS"
+    },
+    {
+      "name": "Employee workspace recovery: bad200 keeps original answers and freezes editing",
+      "status": "PASS"
+    },
+    {
+      "name": "Employee workspace recovery: draft retry uses byte-identical original body",
+      "status": "PASS"
+    },
+    {
+      "name": "Employee workspace recovery: database observation has exactly one own application",
+      "status": "PASS"
+    },
+    {
+      "name": "Employee workspace recovery: confirmed draft retry creates no duplicate revision, history, receipt or audit",
+      "status": "PASS"
+    },
+    {
+      "name": "Employee workspace recovery: submission commits before genuine logout and refresh denial",
+      "status": "PASS"
+    },
+    {
+      "name": "Employee workspace recovery: database observation has exactly one own application",
+      "status": "PASS"
+    },
+    {
+      "name": "Employee workspace recovery: submitted outcome persists exactly once before session recovery",
+      "status": "PASS"
+    },
+    {
+      "name": "Employee workspace recovery: expired session still retains the original form",
+      "status": "PASS"
+    },
+    {
+      "name": "Employee workspace recovery: recovery dialog exposes sign-in and reconnect without dismissing retained update",
+      "status": "PASS"
+    },
+    {
+      "name": "Employee workspace recovery: loaded recovery sign-in form retains the intended valid email",
+      "status": "PASS"
+    },
+    {
+      "name": "Employee workspace recovery: recovery popup is the expected same-origin sign-in page",
+      "status": "PASS"
+    },
+    {
+      "name": "Employee workspace recovery: retained form signs in again through actual captured email route",
+      "status": "PASS"
+    },
+    {
+      "name": "Employee workspace recovery: visible reconnect reads genuine same-account submitted state",
+      "status": "PASS"
+    },
+    {
+      "name": "Employee workspace recovery: pending update stays open after reconnect",
+      "status": "PASS"
+    },
+    {
+      "name": "Employee workspace recovery: post-reconnect retry sends the exact original revision and body",
+      "status": "PASS"
+    },
+    {
+      "name": "Employee workspace recovery: database observation has exactly one own application",
+      "status": "PASS"
+    },
+    {
+      "name": "Employee workspace recovery: confirmed submission receipt creates no duplicate revision, history, receipt or audit",
+      "status": "PASS"
+    },
+    {
+      "name": "Employee workspace recovery: database observation has exactly one own application",
+      "status": "PASS"
+    },
+    {
+      "name": "Employee workspace recovery: recorded answers survive refresh after successful genuine recovery",
+      "status": "PASS"
+    },
+    {
+      "name": "a Apprenticeship Lead: logout confirmed",
+      "status": "PASS"
+    },
+    {
+      "name": "a Apprenticeship Lead: no access after logout",
+      "status": "PASS"
+    },
+    {
+      "name": "a Apprenticeship Lead: refresh cannot restore logged-out session",
+      "status": "PASS"
+    },
+    {
+      "name": "a Line Manager: logout confirmed",
+      "status": "PASS"
+    },
+    {
+      "name": "a Line Manager: no access after logout",
+      "status": "PASS"
+    },
+    {
+      "name": "a Line Manager: refresh cannot restore logged-out session",
+      "status": "PASS"
+    },
+    {
+      "name": "a Employee: logout confirmed",
+      "status": "PASS"
+    },
+    {
+      "name": "a Employee: no access after logout",
+      "status": "PASS"
+    },
+    {
+      "name": "a Employee: refresh cannot restore logged-out session",
+      "status": "PASS"
+    },
+    {
+      "name": "b Employee: logout confirmed",
+      "status": "PASS"
+    },
+    {
+      "name": "b Employee: no access after logout",
+      "status": "PASS"
+    },
+    {
+      "name": "b Employee: refresh cannot restore logged-out session",
+      "status": "PASS"
+    },
+    {
+      "name": "External inbox delivery",
+      "status": "BLOCKED",
+      "reason": "Local SMTP capture proves no external inbox delivery"
+    },
+    {
+      "name": "Remove disposable native Lead browser profile without exporting sessions",
+      "status": "PASS"
+    }
+  ]
+}
