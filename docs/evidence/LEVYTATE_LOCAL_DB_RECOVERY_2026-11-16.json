@@ -1,0 +1,22 @@
+{
+  "status": "PASS",
+  "environment": "local",
+  "sourceRuntimeId": "f24f834c68b99fd88ad6d330af1e53b796735c4347488dc6d8657e3e88106c55",
+  "database": "levytate_release_recovery_initial28",
+  "archiveBytes": 1921829,
+  "archiveSha256": "f456337e2231cef5f87b16f2fd4a4cc2dbf1014870131fe29b7aecdbd5855089",
+  "encryptedArchiveSha256": "78ac9a55852c273bad1e8af05c46cde6109ae1e62efea863f7880e0a8e3ed271",
+  "archiveEncryption": "AES-256-GCM; HKDF key derived from existing restricted local Preview secret",
+  "keyLocation": "existing restricted private-app-secrets.json; never in archive/evidence",
+  "archiveEntries": 2478,
+  "rls": 135,
+  "ledger": 28,
+  "people": 0,
+  "tables": 135,
+  "authUsers": 0,
+  "employers": 0,
+  "ledgerHash": "bcdec756a743e5a30f2e1d3d63b7a1681114b4b6bd5b06c1c85f3d5a34dfa659",
+  "storageObjects": 0,
+  "fullStorageBytesRecovery": false,
+  "hosted": false
+}

@@ -1,4 +1,5 @@
 "use client";
+import { useCatalogueAction } from "@/components/levytate-mvp/useCatalogueAction";
 
 import {
   ArrowLeft,
@@ -132,6 +133,9 @@ export function EmployerProgrammeDirectory({ onRequest }: { onRequest?: (context
   const [comparison, setComparison] = useState<string[]>([]);
   const [visibleCount, setVisibleCount] = useState(directoryPageSize);
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
+  const [error, setError] = useState("");
+  const { saving, perform } = useCatalogueAction(setError);
+  const notice = error ? <p role="alert" className="mb-3 text-sm text-red-700">{error}</p> : saving ? <p role="status" className="mb-3 text-sm">Saving catalogue selection…</p> : null;
 
   const directory = useMemo(() => data.providerProgrammes
     .filter((programme) => programme.recordStatus === "Active" && programme.status === "Active")
@@ -243,25 +247,25 @@ export function EmployerProgrammeDirectory({ onRequest }: { onRequest?: (context
     setComparison((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id].slice(-3));
   }
 
-  function addProvider(id: string) {
+  async function addProvider(id: string) {
     const now = new Date().toISOString();
-    saveOrganisationProvider({ providerId: id, status: "Active", selectedAt: now, updatedAt: now });
+    await perform(() => saveOrganisationProvider({ providerId: id, status: "Active", selectedAt: now, updatedAt: now }));
   }
 
-  function addProgramme(item: DirectoryProgramme) {
+  async function addProgramme(item: DirectoryProgramme) {
     const now = new Date().toISOString();
-    saveOrganisationProgramme({ programmeId: item.programme.id, providerId: item.provider.providerId, status: "Active", selectedAt: now, updatedAt: now });
+    await perform(() => saveOrganisationProgramme({ programmeId: item.programme.id, providerId: item.provider.providerId, status: "Active", selectedAt: now, updatedAt: now }));
   }
 
-  if (selectedProgramme) return <ProgrammeDetail item={selectedProgramme} selected={data.organisationProgrammes.some((item) => item.programmeId === selectedProgramme.programme.id && item.status === "Active")} onAdd={() => addProgramme(selectedProgramme)} onBack={back} onProvider={() => openProvider(selectedProgramme.provider.providerId)} onRequest={meta?.requestsEnabled && onRequest ? () => onRequest({ programmeId: selectedProgramme.programme.id, providerId: selectedProgramme.provider.providerId }) : undefined} />;
-  if (selectedProvider) return <ProviderProfile provider={selectedProvider} programmes={providerProgrammes} selected={data.organisationProviders.some((item) => item.providerId === selectedProvider.providerId && item.status === "Active")} onAdd={() => addProvider(selectedProvider.providerId)} onBack={back} onProgramme={openProgramme} onRequest={meta?.requestsEnabled && onRequest ? () => onRequest({ providerId: selectedProvider.providerId }) : undefined} />;
+  if (selectedProgramme) return <>{notice}<fieldset disabled={saving}><ProgrammeDetail item={selectedProgramme} selected={data.organisationProgrammes.some((item) => item.programmeId === selectedProgramme.programme.id && item.status === "Active")} onAdd={() => addProgramme(selectedProgramme)} onBack={back} onProvider={() => openProvider(selectedProgramme.provider.providerId)} onRequest={meta?.requestsEnabled && onRequest ? () => onRequest({ programmeId: selectedProgramme.programme.id, providerId: selectedProgramme.provider.providerId }) : undefined} /></fieldset></>;
+  if (selectedProvider) return <>{notice}<fieldset disabled={saving}><ProviderProfile provider={selectedProvider} programmes={providerProgrammes} selected={data.organisationProviders.some((item) => item.providerId === selectedProvider.providerId && item.status === "Active")} onAdd={() => addProvider(selectedProvider.providerId)} onBack={back} onProgramme={openProgramme} onRequest={meta?.requestsEnabled && onRequest ? () => onRequest({ providerId: selectedProvider.providerId }) : undefined} /></fieldset></>;
 
   const visibleProviders = new Set(results.map((item) => item.provider.providerId)).size;
   const resultSummary = view === "Programmes"
     ? `${results.length} programme${results.length === 1 ? "" : "s"} from ${visibleProviders} provider${visibleProviders === 1 ? "" : "s"}`
     : `${providerResults.length} provider${providerResults.length === 1 ? "" : "s"} offering ${results.length} programme${results.length === 1 ? "" : "s"}`;
   return (
-    <div className="grid gap-5 text-[#27456a]">
+    <div className="grid gap-5 text-[#27456a]">{notice}
       <section aria-labelledby="marketplace-directory-heading" className="grid gap-4 rounded-2xl border border-[#27456a]/[0.08] bg-[#fbf6f1] p-4 shadow-[0_12px_30px_rgba(39,69,106,0.035)] sm:p-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#17786e]">Global factual catalogue</p>

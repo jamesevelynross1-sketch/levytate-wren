@@ -1,0 +1,140 @@
+{
+  "schemaVersion": 2,
+  "environment": "local",
+  "candidateCommit": "4a57753b92a9492db22b8ddf1ca4753dd5415a54",
+  "appCodeCommit": "f1fe44de8e405d81e8f00f8fa3479d5788096eed",
+  "browserEngineVersion": "157.0.4341.60",
+  "browserDistribution": "isolated-verified-edge",
+  "authenticationMethod": "requested-sign-in-link-through-local-smtp",
+  "authenticatedContextsVerified": 1,
+  "distinctAuthenticatedRoles": [
+    "Apprenticeship Lead"
+  ],
+  "emailEvidence": "local-smtp-capture-only",
+  "notRunScopes": [
+    "Employee, Manager and second-tenant genuine role boundaries not repeated: prior exact c7d57b1 four-context proof retained separately"
+  ],
+  "results": [
+    {
+      "name": "a Apprenticeship Lead: no demo login required",
+      "status": "PASS"
+    },
+    {
+      "name": "a Apprenticeship Lead: actual sign-in request reached local SMTP capture",
+      "status": "PASS"
+    },
+    {
+      "name": "a Apprenticeship Lead: callback stays on application origin",
+      "status": "PASS"
+    },
+    {
+      "name": "a Apprenticeship Lead: three HttpOnly host-only cookies",
+      "status": "PASS"
+    },
+    {
+      "name": "a Apprenticeship Lead: canonical role and tenant resolved",
+      "status": "PASS"
+    },
+    {
+      "name": "a Apprenticeship Lead: other tenant is absent",
+      "status": "PASS"
+    },
+    {
+      "name": "a Apprenticeship Lead: authenticated refresh persists",
+      "status": "PASS"
+    },
+    {
+      "name": "a Apprenticeship Lead: provider session refresh succeeds",
+      "status": "PASS"
+    },
+    {
+      "name": "a Apprenticeship Lead: no horizontal overflow at 320px",
+      "status": "PASS"
+    },
+    {
+      "name": "a Apprenticeship Lead: no horizontal overflow at 390px",
+      "status": "PASS"
+    },
+    {
+      "name": "a Apprenticeship Lead: no horizontal overflow at 768px",
+      "status": "PASS"
+    },
+    {
+      "name": "1 genuine successful callbacks do not consume failed-link budget",
+      "status": "PASS"
+    },
+    {
+      "name": "a:lead: unapproved levytate-lift remains tenant-gated",
+      "status": "PASS"
+    },
+    {
+      "name": "a:lead: unapproved levytate-learning-time remains tenant-gated",
+      "status": "PASS"
+    },
+    {
+      "name": "a:lead: unapproved levytate-requests remains tenant-gated",
+      "status": "PASS"
+    },
+    {
+      "name": "a:lead: unapproved levytate-pastoral remains tenant-gated",
+      "status": "PASS"
+    },
+    {
+      "name": "Canonical learner: actual current-tenant learner read succeeds",
+      "status": "PASS"
+    },
+    {
+      "name": "Canonical learner: one exact application and enrolled learner retain canonical ownership",
+      "status": "PASS"
+    },
+    {
+      "name": "Canonical learner: existing learner link is exact and duplicate handoff is unavailable",
+      "status": "PASS"
+    },
+    {
+      "name": "Canonical learner: canonical link opens the actual learner on the same origin",
+      "status": "PASS"
+    },
+    {
+      "name": "Canonical learner: normal reload preserves exact learner detail",
+      "status": "PASS"
+    },
+    {
+      "name": "Canonical learner: explicit Back removes the selected learner from the URL",
+      "status": "PASS"
+    },
+    {
+      "name": "Canonical learner: list reload does not reopen stale learner detail",
+      "status": "PASS"
+    },
+    {
+      "name": "Canonical learner: direct canonical URL resolves the same learner",
+      "status": "PASS"
+    },
+    {
+      "name": "Canonical learner: actual current-tenant learner read succeeds",
+      "status": "PASS"
+    },
+    {
+      "name": "Canonical learner: read-only navigation preserves learner revision and all command/audit records",
+      "status": "PASS"
+    },
+    {
+      "name": "a Apprenticeship Lead: logout confirmed",
+      "status": "PASS"
+    },
+    {
+      "name": "a Apprenticeship Lead: no access after logout",
+      "status": "PASS"
+    },
+    {
+      "name": "a Apprenticeship Lead: refresh cannot restore logged-out session",
+      "status": "PASS"
+    },
+    {
+      "name": "External inbox delivery",
+      "status": "BLOCKED",
+      "reason": "Local SMTP capture proves no external inbox delivery"
+    }
+  ]
+}

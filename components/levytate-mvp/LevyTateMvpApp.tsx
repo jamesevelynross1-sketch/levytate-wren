@@ -1,4 +1,5 @@
 "use client";
+import { dialogTabBoundary, dialogTabStops, isTopmostDialog, topmostModalDialog } from "@/lib/levytate/dialog-focus";
 
 import type { LucideIcon } from "lucide-react";
 import dynamic from "next/dynamic";
@@ -207,7 +208,7 @@ export function LevyTateMvpApp({ initialWorkspace, persistLocal = false, initial
   persistLocal?: boolean;
   initialManagerDirectReportDetail?: ManagerDirectReportLearnerDetail | null;
 }) {
-  return <LevyTateStandardsProvider><MvpWorkspaceProvider initialWorkspace={initialWorkspace} persistLocal={persistLocal}><MvpAppShell initialManagerDirectReportDetail={initialManagerDirectReportDetail} /></MvpWorkspaceProvider></LevyTateStandardsProvider>;
+  return <LevyTateStandardsProvider demoMode={persistLocal}><MvpWorkspaceProvider initialWorkspace={initialWorkspace} persistLocal={persistLocal}><MvpAppShell initialManagerDirectReportDetail={initialManagerDirectReportDetail} /></MvpWorkspaceProvider></LevyTateStandardsProvider>;
 }
 
 function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirectReportDetail: ManagerDirectReportLearnerDetail | null }) {
@@ -275,11 +276,17 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
             : null,
         );
         setPeopleEmployeeId(access.permitted && resolved === "People" ? searchParams.get("employee") : null);
+        const learnerId = searchParams.get("learner");
+        setLearnerTarget(access.permitted && resolved === "Learners"
+          && availableModules.some(module => module.name === "Learners")
+          && learnerId && /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,199}$/.test(learnerId)
+          ? { learnerRecordId: learnerId, actionType: "open_learner" } : null);
         if (!access.permitted) window.history.replaceState(null, "", access.safeRedirect);
       } else {
         setActiveModule("Home");
         setManagerReviewApplicationId(null);
         setPeopleEmployeeId(null);
+        setLearnerTarget(null);
       }
     }
     if (!deepLinkHandled.current) {
@@ -293,30 +300,25 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
   useEffect(() => {
     if (!mobileMenuOpen) return;
     const drawer = mobileDrawerRef.current;
+    if (!drawer) return;
     const trigger = mobileMenuButtonRef.current;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const focusable = () => drawer ? Array.from(drawer.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), [tabindex]:not([tabindex="-1"])')) : [];
-    focusable()[0]?.focus();
-    function onKeyDown(event: globalThis.KeyboardEvent) {
+    dialogTabStops(drawer)[0]?.focus();
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.defaultPrevented || !isTopmostDialog(drawer)) return;
       if (event.key === "Escape") {
         event.preventDefault();
         setMobileMenuOpen(false);
         return;
       }
       if (event.key !== "Tab") return;
-      const elements = focusable();
-      if (!elements.length) return;
-      const first = elements[0];
-      const last = elements[elements.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
+      const target = dialogTabBoundary(drawer, document.activeElement, event.shiftKey);
+      if (target) {
         event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
+        target.focus();
       }
-    }
+    };
     document.addEventListener("keydown", onKeyDown);
     return () => {
       document.removeEventListener("keydown", onKeyDown);
@@ -333,7 +335,8 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
       setAccountMenuOpen(false);
     }
     function closeOnEscape(event: globalThis.KeyboardEvent) {
-      if (event.key !== "Escape") return;
+      if (event.key !== "Escape" || event.defaultPrevented || topmostModalDialog(document)) return;
+      event.preventDefault();
       setAccountMenuOpen(false);
       accountButtonRef.current?.focus();
     }
@@ -365,6 +368,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
     setManagerDirectReportDetail(null);
     setManagerReviewApplicationId(null);
     setPeopleEmployeeId(null);
+    setLearnerTarget(null);
     setCopilotEntity(null);
     window.history[options.replace ? "replaceState" : "pushState"](null, "", module === "Home" ? "/levytate/app" : `/levytate/app?module=${encodeURIComponent(module)}`);
     setActiveModule(module);
@@ -640,10 +644,10 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
                 : <EmployeesModule onOpenDirectReport={openDirectReport} onStartDiscovery={(employeeId) => { setAiEmployeeId(employeeId); openModule("Copilot"); }} />
             ) : null}
             {activeModule === "Approvals" ? <ApplicationsModule onOpenDirectReport={openDirectReport} initialApplicationId={managerReviewApplicationId} onApplicationSelectionChange={updateApplicationReviewSelection} /> : null}
-            {activeModule === "Operations" ? <OperationsCentreModule onOpenLearner={(target) => { setLearnerTarget(target); openModule("Learners"); }} onSignalContext={(signal) => setCopilotEntity(signal ? { type: "intelligence_signal", id: signal.id, label: `Signal: ${signal.title}` } : null)} /> : null}
+            {activeModule === "Operations" ? <OperationsCentreModule onOpenLearner={(target) => { openModule("Learners"); setLearnerTarget(target); window.history.replaceState(null, "", `/levytate/app?module=Learners&learner=${encodeURIComponent(target.learnerRecordId)}`); }} onSignalContext={(signal) => setCopilotEntity(signal ? { type: "intelligence_signal", id: signal.id, label: `Signal: ${signal.title}` } : null)} /> : null}
             {activeModule === "Intelligence" ? <ProviderIntelligenceModule onOpenProvider={() => openModule("Marketplace")} /> : null}
             {activeModule === "Applications" ? <ApplicationsModule initialApplicationId={managerReviewApplicationId} onApplicationSelectionChange={updateApplicationReviewSelection} /> : null}
-            {activeModule === "Learners" ? <LearnersModule initialLearnerRecordId={learnerTarget?.learnerRecordId} initialAction={learnerTarget?.actionType} onDeepLinkConsumed={() => setLearnerTarget(null)} onLearnerSelectionChange={updateLearnerCopilotSelection} /> : null}
+            {activeModule === "Learners" ? <LearnersModule initialLearnerRecordId={learnerTarget?.learnerRecordId} initialAction={learnerTarget?.actionType} onDeepLinkConsumed={() => setLearnerTarget(current => current ? { ...current, actionType: "open_learner" } : null)} onBackToList={() => { setLearnerTarget(null); window.history.replaceState(null, "", "/levytate/app?module=Learners"); }} onLearnerSelectionChange={updateLearnerCopilotSelection} /> : null}
             {activeModule === "Learning Time" ? <LearningTimeModule /> : null}
             {activeModule === "My Support" || activeModule === "Learner Support" ? <PastoralSupportModule /> : null}
             {activeModule === "Assessments" ? <AssessmentsModule /> : null}

@@ -74,10 +74,11 @@ async function dispatchTool(actor: MicrosoftCopilotActor, toolName: MicrosoftCop
         .map((signal) => ({ title: signal.title, priority: signal.priority, nextStep: signal.recommendedAction }));
       return {
         generatedAt: workspace.generatedAt,
-        portfolio: buildMicrosoftCopilotOperationsPortfolio(data, workspace.generatedAt.slice(0, 10)),
-        brief: workspace.brief,
+        checked: workspace.checked,
+        portfolio: workspace.generatedAt ? buildMicrosoftCopilotOperationsPortfolio(data, workspace.generatedAt.slice(0, 10)) : null,
+        brief: workspace.checked ? workspace.brief : null,
         topAttention,
-        openSignalCount: Object.values(workspace.lanes).flat().filter((signal) => !["resolved", "dismissed"].includes(signal.status)).length,
+        openSignalCount: workspace.checked ? Object.values(workspace.lanes).flat().filter((signal) => !["resolved", "dismissed"].includes(signal.status)).length : null,
         link: microsoftCopilotCanonicalUrl("/levytate/app", { module: "Operations" }),
       };
     }

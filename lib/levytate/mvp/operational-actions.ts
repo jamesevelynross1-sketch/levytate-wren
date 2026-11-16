@@ -66,6 +66,7 @@ export const operationalActionEventTypes = [
   "dismissed",
   "cancelled",
   "regenerated",
+  "source_refreshed",
 ] as const;
 
 export type OperationalActionEventType = typeof operationalActionEventTypes[number];

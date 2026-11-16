@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { findRelease2NavigationArea, getRelease2Navigation } from "../lib/levytate/release-2-navigation";
 import type { CoreEarlyAccessModuleKey } from "../lib/levytate/core-early-access-policy";
+import { restoreDialogFocus } from "../lib/levytate/dialog-focus";
 
 let assertions = 0;
 function check(condition: unknown, message: string) {
@@ -49,7 +50,11 @@ check(!shell.includes('<select value={activeModule}'), "The technical mobile mod
 check(shell.includes('aria-current={active ? "page"'), "Selected navigation state is exposed accessibly");
 
 const ui = readFileSync(new URL("../components/levytate-mvp/MvpUi.tsx", import.meta.url), "utf8");
-check(ui.includes("previousFocus?.focus()"), "Dialogs restore focus after close");
+check(ui.includes("restoreDialogFocus(previousFocus)"), "Dialogs use the tested focus-restoration contract");
+let focusCalls = 0;
+check(restoreDialogFocus({ isConnected: true, focus: () => { focusCalls += 1; } }) && focusCalls === 1, "Dialog cleanup restores the connected trigger");
+check(!restoreDialogFocus({ isConnected: false, focus: () => { focusCalls += 1; } }) && focusCalls === 1, "Dialog cleanup never focuses a removed trigger");
+check(!restoreDialogFocus(null) && focusCalls === 1, "Dialog cleanup safely handles absent prior focus");
 check(ui.includes('aria-labelledby={titleId}'), "Dialogs have an explicit accessible title association");
 check(ui.includes('event.key !== "Tab"'), "Dialogs contain keyboard focus");
 

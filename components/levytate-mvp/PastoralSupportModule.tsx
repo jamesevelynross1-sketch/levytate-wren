@@ -18,14 +18,53 @@ import type {
   PastoralConversationMessage,
   PastoralSupportRequestView,
   PastoralSupportRequestDraft,
+  PastoralSupportMutation,
   PastoralTopicCategory,
   PastoralUrgencyRoute,
   PastoralWorkspace,
 } from "@/lib/levytate/pastoral/domain";
 import { pastoralRecipientIsSafeForConcern } from "@/lib/levytate/pastoral/domain";
+import { pastoralLocalDateToInstant } from "@/lib/levytate/pastoral/dates";
+import { createAccountPinnedPastoralPost, createPastoralMutationRetry } from "@/lib/levytate/pastoral/mutation-retry";
 import { MvpLoadingState, MvpPanel, StatusBadge } from "@/components/levytate-mvp/MvpUi";
+import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 
 type EmployeeView = "conversation" | "requests" | "privacy";
+
+function usePastoralMutation(onWorkspace: (workspace: PastoralWorkspace) => void) {
+  const { meta } = useMvpWorkspace();
+  const identity = useRef(meta ? { email: meta.userEmail, organisationId: meta.organisationId } : null);
+  const [working, setWorking] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+  const workspaceCallback = useRef(onWorkspace);
+  workspaceCallback.current = onWorkspace;
+  const retry = useRef<ReturnType<typeof createPastoralMutationRetry> | null>(null);
+  if (!retry.current) {
+    const post = createAccountPinnedPastoralPost(identity.current);
+    retry.current = createPastoralMutationRetry(async (body) => { workspaceCallback.current(await post(body)); });
+  }
+  async function run(command?: PastoralSupportMutation, confirmed?: () => void) {
+    const controller = retry.current!;
+    if (controller.busy) return;
+    setWorking(true); setError("");
+    try {
+      const result = await controller.run(command, confirmed);
+      if (result.status === "pending") setError(result.error instanceof Error && result.error.name === "Error" ? result.error.message : "The connection was interrupted. The update could not be confirmed.");
+      if (result.status === "blocked") setError("Confirm the original update before making another change.");
+    } finally { setWorking(controller.busy); setPending(controller.pending); }
+  }
+  return { run, retry: () => run(), working, pending, error, locked: working || pending };
+}
+type PastoralMutationController = ReturnType<typeof usePastoralMutation>;
+
+function MutationStatus({ mutation }: { mutation: PastoralMutationController }) {
+  if (!mutation.pending && !mutation.error) return null;
+  return <div role="alert" className="rounded-xl border border-[#c95568]/20 bg-[#fff4f5] p-4 text-sm leading-6 text-[#8f3042]">
+    <p>{mutation.error || "The update is awaiting confirmation."}</p>
+    {mutation.pending ? <><p className="mt-1">Keep this page open. Retry sends the original update unchanged. Reloading shows the current saved state; check it before submitting again.</p><div className="mt-3 flex gap-2"><button type="button" disabled={mutation.working} onClick={mutation.retry} className="min-h-10 rounded-xl bg-[#102c3d] px-4 text-xs font-semibold text-white disabled:opacity-45">Retry original update</button><button type="button" disabled={mutation.working} onClick={() => window.location.reload()} className="min-h-10 rounded-xl border border-[#102c3d]/15 px-4 text-xs font-semibold disabled:opacity-45">Reload saved state</button></div></> : null}
+  </div>;
+}
 
 const starters = [
   "I'm struggling to keep up.",
@@ -88,14 +127,13 @@ export function PastoralSupportModule() {
   async function load() {
     setLoading(true);
     setError("");
-    const response = await fetch("/api/levytate-pastoral", { cache: "no-store" });
-    const body = await safeJson(response);
-    setLoading(false);
-    if (!response.ok || !body?.workspace) {
-      setError(body?.message || "My Support is temporarily unavailable.");
-      return;
-    }
-    setWorkspace(body.workspace as PastoralWorkspace);
+    try {
+      const response = await fetch("/api/levytate-pastoral", { cache: "no-store", signal: AbortSignal.timeout(30_000) });
+      const body = await safeJson(response);
+      if (!response.ok || !body?.workspace) { setError(body?.message || "My Support is temporarily unavailable."); return; }
+      setWorkspace(body.workspace as PastoralWorkspace);
+    } catch { setError("My Support could not connect. Your saved data has not been changed."); }
+    finally { setLoading(false); }
   }
 
   useEffect(() => { void load(); }, []);
@@ -108,6 +146,7 @@ export function PastoralSupportModule() {
 }
 
 function EmployeePastoralWorkspace({ workspace, onWorkspace }: { workspace: PastoralWorkspace; onWorkspace: (workspace: PastoralWorkspace) => void }) {
+  const mutation = usePastoralMutation(onWorkspace);
   const [view, setView] = useState<EmployeeView>("conversation");
   const [messages, setMessages] = useState<PastoralConversationMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -117,6 +156,7 @@ function EmployeePastoralWorkspace({ workspace, onWorkspace }: { workspace: Past
   const [assistantDraft, setAssistantDraft] = useState<PastoralSupportRequestDraft | null>(null);
 
   function openRequest(topic = suggestedTopic, urgency = suggestedUrgency, draft?: PastoralSupportRequestDraft | null) {
+    if (mutation.locked) return;
     setSuggestedTopic(topic);
     setSuggestedUrgency(urgency);
     setAssistantDraft(draft ?? null);
@@ -144,12 +184,13 @@ function EmployeePastoralWorkspace({ workspace, onWorkspace }: { workspace: Past
         <div className="max-w-3xl"><p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#9de5d8]">Private apprenticeship support</p><h2 className="mt-2 text-2xl font-semibold tracking-[-0.025em]">What would help today?</h2><p className="mt-2 text-sm leading-6 text-white/72">Whether you&apos;re finding your workload difficult, struggling with your programme or unsure how to ask for help, you can talk it through here.</p></div>
         <div className="mt-5 flex items-start gap-3 rounded-xl border border-white/12 bg-white/[0.08] p-4 text-xs leading-5 text-white/72"><ShieldCheck className="mt-0.5 shrink-0 text-[#9de5d8]" size={17} aria-hidden="true" /><p>This is an AI assistant, not a human pastoral officer, and chats are not monitored live. Private chat is not shared with your employer. You decide whether to send a separate support request.</p></div>
       </div>
-      <div role="tablist" aria-label="My Support sections" className="grid border-t border-[#102c3d]/[0.06] sm:grid-cols-3">{tabs.map(({ id, label, icon: Icon }) => <button key={id} type="button" role="tab" aria-selected={view === id} onClick={() => setView(id)} className={`flex min-h-12 items-center justify-center gap-2 border-b border-[#102c3d]/[0.06] px-3 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 sm:border-b-0 sm:border-r ${view === id ? "bg-[#edf7f3] text-[#087c73]" : "text-[#102c3d]/58 hover:bg-[#f7faf8] hover:text-[#102c3d]"}`}><Icon size={15} aria-hidden="true" />{label}</button>)}</div>
+      <div role="tablist" aria-label="My Support sections" className="grid border-t border-[#102c3d]/[0.06] sm:grid-cols-3">{tabs.map(({ id, label, icon: Icon }) => <button key={id} type="button" role="tab" aria-selected={view === id} disabled={mutation.locked} onClick={() => setView(id)} className={`flex min-h-12 items-center justify-center gap-2 border-b border-[#102c3d]/[0.06] px-3 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 sm:border-b-0 sm:border-r ${view === id ? "bg-[#edf7f3] text-[#087c73]" : "text-[#102c3d]/58 hover:bg-[#f7faf8] hover:text-[#102c3d]"}`}><Icon size={15} aria-hidden="true" />{label}</button>)}</div>
     </section>
 
+    <MutationStatus mutation={mutation} />
     {view === "conversation" ? <ConversationPanel workspace={workspace} messages={messages} conversationId={conversationId} onMessages={setMessages} onConversationId={setConversationId} onRequestSupport={openRequest} /> : null}
-    {view === "requests" ? <EmployeeRequests workspace={workspace} draftOpen={draftOpen} initialTopic={suggestedTopic} initialUrgency={suggestedUrgency} assistantDraft={assistantDraft} onBlankDraft={() => openRequest("apprenticeship_support", "standard", null)} onDraftOpen={setDraftOpen} onWorkspace={onWorkspace} /> : null}
-    {view === "privacy" ? <PrivacyPanel workspace={workspace} onWorkspace={onWorkspace} onResume={resumeConversation} /> : null}
+    {view === "requests" ? <EmployeeRequests workspace={workspace} draftOpen={draftOpen} initialTopic={suggestedTopic} initialUrgency={suggestedUrgency} assistantDraft={assistantDraft} onBlankDraft={() => openRequest("apprenticeship_support", "standard", null)} onDraftOpen={setDraftOpen} mutation={mutation} /> : null}
+    {view === "privacy" ? <PrivacyPanel workspace={workspace} mutation={mutation} onResume={resumeConversation} /> : null}
   </div>;
 }
 
@@ -257,7 +298,7 @@ function ContextCard({ workspace }: { workspace: PastoralWorkspace }) {
   return <section className="rounded-2xl border border-[#102c3d]/[0.07] bg-white p-5"><p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#0b6f63]">Your apprenticeship context</p><h3 className="mt-2 text-sm font-semibold text-[#102c3d]">{context.programmeName}</h3><dl className="mt-3 grid gap-2 text-xs"><div className="flex justify-between gap-3"><dt className="text-[#102c3d]/48">Provider</dt><dd className="text-right font-semibold">{context.providerName}</dd></div><div className="flex justify-between gap-3"><dt className="text-[#102c3d]/48">Stage</dt><dd className="text-right font-semibold">{humanise(context.lifecycleStage)}</dd></div></dl><p className="mt-3 text-[11px] leading-5 text-[#102c3d]/48">Only this minimal, learner-visible context is made available to the assistant.</p></section>;
 }
 
-function EmployeeRequests({ workspace, draftOpen, initialTopic, initialUrgency, assistantDraft, onBlankDraft, onDraftOpen, onWorkspace }: {
+function EmployeeRequests({ workspace, draftOpen, initialTopic, initialUrgency, assistantDraft, onBlankDraft, onDraftOpen, mutation }: {
   workspace: PastoralWorkspace;
   draftOpen: boolean;
   initialTopic: PastoralTopicCategory;
@@ -265,11 +306,10 @@ function EmployeeRequests({ workspace, draftOpen, initialTopic, initialUrgency, 
   assistantDraft: PastoralSupportRequestDraft | null;
   onBlankDraft: () => void;
   onDraftOpen: (open: boolean) => void;
-  onWorkspace: (workspace: PastoralWorkspace) => void;
+  mutation: PastoralMutationController;
 }) {
   const [draft, setDraft] = useState(() => ({ ...emptyDraft(), topicCategory: initialTopic, urgencyRoute: initialUrgency }));
   const [reviewing, setReviewing] = useState(false);
-  const [working, setWorking] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -278,25 +318,11 @@ function EmployeeRequests({ workspace, draftOpen, initialTopic, initialUrgency, 
     setDraft(assistantDraft ? formDraftFromAssistant(assistantDraft) : { ...emptyDraft(), topicCategory: initialTopic, urgencyRoute: initialUrgency });
   }, [assistantDraft, draftOpen, initialTopic, initialUrgency]);
 
-  async function mutate(body: unknown) {
-    if (working) return false;
-    setWorking(true); setError(""); setSuccess("");
-    try {
-      const response = await fetch("/api/levytate-pastoral", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      const result = await safeJson(response);
-      if (!response.ok || !result?.workspace) { setError(response.status === 401 ? "Your session has ended. Sign in again before retrying." : result?.message || "The support request could not be updated. Your draft has been kept."); return false; }
-      onWorkspace(result.workspace as PastoralWorkspace);
-      return true;
-    } catch {
-      setError("The connection was interrupted. Your draft has been kept and the same submission can be retried safely.");
-      return false;
-    } finally { setWorking(false); }
-  }
-
   async function send() {
     const recipient = workspace.recipients.find((entry) => entry.id === draft.recipientId);
     if (!recipient) { setError("Choose an approved support contact."); return; }
-    const ok = await mutate({
+    setError(""); setSuccess("");
+    await mutation.run({
       action: "submit_support_request",
       recipientId: draft.recipientId,
       topicCategory: draft.topicCategory,
@@ -310,33 +336,31 @@ function EmployeeRequests({ workspace, draftOpen, initialTopic, initialUrgency, 
         preferredContactMethod: draft.preferredContactMethod,
         sharingRestrictions: draft.sharingRestrictions,
       },
+    }, () => {
+      setSuccess(`Your support request was sent to ${recipient.label}.`);
+      setDraft(emptyDraft()); setReviewing(false); onDraftOpen(false);
     });
-    if (!ok) return;
-    setSuccess(`Your support request was sent to ${recipient.label}.`);
-    setDraft(emptyDraft());
-    setReviewing(false);
-    onDraftOpen(false);
   }
 
   async function employeeTransition(request: PastoralSupportRequestView, transition: "reopen" | "dispute") {
-    const ok = await mutate({ action: "transition_support_request", requestId: request.id, transition, expectedLockVersion: request.lockVersion, idempotencyKey: crypto.randomUUID(), note: transition === "dispute" ? "I do not agree that this support request is resolved and would like further help." : "I would like further help with this request." });
-    if (ok) setSuccess(transition === "reopen" ? "The support request has been reopened." : "Your request for further help has been recorded.");
+    setError(""); setSuccess("");
+    await mutation.run({ action: "transition_support_request", requestId: request.id, transition, expectedLockVersion: request.lockVersion, idempotencyKey: crypto.randomUUID(), note: transition === "dispute" ? "I do not agree that this support request is resolved and would like further help." : "I would like further help with this request." }, () => { setSuccess(transition === "reopen" ? "The support request has been reopened." : "Your request for further help has been recorded."); });
   }
 
   async function employeeOutcome(request: PastoralSupportRequestView, outcome: "helped" | "further_support_requested") {
-    const ok = await mutate({ action: "record_employee_outcome", requestId: request.id, outcome, expectedLockVersion: request.lockVersion, idempotencyKey: crypto.randomUUID(), note: outcome === "further_support_requested" ? "I need further support with this request." : undefined });
-    if (ok) setSuccess(outcome === "helped" ? "You confirmed that the support helped." : "Your request for further support has been recorded.");
+    setError(""); setSuccess("");
+    await mutation.run({ action: "record_employee_outcome", requestId: request.id, outcome, expectedLockVersion: request.lockVersion, idempotencyKey: crypto.randomUUID(), note: outcome === "further_support_requested" ? "I need further support with this request." : undefined }, () => { setSuccess(outcome === "helped" ? "You confirmed that the support helped." : "Your request for further support has been recorded."); });
   }
 
-  return <div className="grid gap-5">
+  return <fieldset disabled={mutation.locked} aria-label="Support requests and decisions" className="grid min-w-0 gap-5">
     <MvpPanel title="My support requests" eyebrow="Only what you choose to share" actions={<button type="button" onClick={() => { onBlankDraft(); setReviewing(false); setError(""); }} disabled={!workspace.recipients.length} className="min-h-10 rounded-xl bg-[#102c3d] px-4 text-xs font-semibold text-white disabled:opacity-45">New support request</button>}>
       <p className="text-sm leading-6 text-[#102c3d]/58">A support request is separate from your private AI conversation. Your transcript is never attached automatically and later messages are not shared.</p>
       {success ? <p role="status" className="mt-4 rounded-xl bg-[#eaf7f2] p-3 text-sm font-semibold text-[#0b6f63]">{success}</p> : null}
       {error ? <p role="alert" className="mt-4 rounded-xl bg-[#fff1f3] p-3 text-sm font-semibold text-[#a33a4d]">{error}</p> : null}
       {!workspace.requests.length ? <div className="mt-5 rounded-xl border border-dashed border-[#102c3d]/15 bg-[#f8fbfa] p-6 text-center"><UserRoundCheck className="mx-auto text-[#0b776e]" size={23} aria-hidden="true" /><h3 className="mt-3 text-sm font-semibold text-[#102c3d]">No support requests sent</h3><p className="mt-1 text-xs leading-5 text-[#102c3d]/55">You stay in control of whether anything is shared.</p></div> : <div className="mt-5 grid gap-3">{workspace.requests.map((request) => <RequestCard key={request.id} request={request} employeeView onTransition={(transition) => employeeTransition(request, transition)} onOutcome={(outcome) => employeeOutcome(request, outcome)} />)}</div>}
     </MvpPanel>
-    {draftOpen ? <SupportRequestDraft workspace={workspace} draft={draft} reviewing={reviewing} working={working} onDraft={setDraft} onReview={() => setReviewing(true)} onBack={() => setReviewing(false)} onCancel={() => { onDraftOpen(false); setReviewing(false); }} onSend={send} /> : null}
-  </div>;
+    {draftOpen ? <SupportRequestDraft workspace={workspace} draft={draft} reviewing={reviewing} working={mutation.working} onDraft={setDraft} onReview={() => setReviewing(true)} onBack={() => setReviewing(false)} onCancel={() => { onDraftOpen(false); setReviewing(false); }} onSend={send} /> : null}
+  </fieldset>;
 }
 
 function SupportRequestDraft({ workspace, draft, reviewing, working, onDraft, onReview, onBack, onCancel, onSend }: {
@@ -358,11 +382,13 @@ function SupportRequestDraft({ workspace, draft, reviewing, working, onDraft, on
   return <MvpPanel title="Prepare a support request" eyebrow="Editable draft"><form onSubmit={(event) => { event.preventDefault(); if (canReview) onReview(); }} className="grid gap-4">{draft.employeeReportedFacts.length || draft.aiSuggestions.length ? <div className="grid gap-3 rounded-xl border border-[#102c3d]/[0.08] bg-[#f8fbfa] p-4 md:grid-cols-2"><DraftEvidenceList title="What you reported" items={draft.employeeReportedFacts} empty="No facts were extracted." /><DraftEvidenceList title="AI suggestions — not reported facts" items={draft.aiSuggestions} empty="No suggestions were added." /></div> : null}<p className="text-xs leading-5 text-[#102c3d]/55">Check every field. Delete, change or omit anything you do not want to share.</p><div className="grid gap-4 md:grid-cols-2"><SelectField label="Topic category" value={draft.topicCategory} options={topicOptions} onChange={(value) => onDraft({ ...draft, topicCategory: value as PastoralTopicCategory })} /><SelectField label="Intended recipient" value={recipient ? draft.recipientId : ""} options={[{ value: "", label: safeRecipients.length ? "Choose an approved support contact" : "No independent approved contact is available" }, ...safeRecipients.map((entry) => ({ value: entry.id, label: entry.label }))]} onChange={(value) => onDraft({ ...draft, recipientId: value })} /></div>{safeRecipients.length < workspace.recipients.length ? <p className="rounded-xl bg-[#fff8df] p-3 text-xs leading-5 text-[#65550b]">A contact mentioned in the concern has been removed from the recipient choices. Choose an independent approved support route.</p> : null}<TextField label="Topic" value={draft.topic} maxLength={180} onChange={(value) => onDraft({ ...draft, topic: value })} placeholder="A short description of what you need help with" /><TextArea label="What would you like your support contact to understand?" value={draft.whatIWantYouToUnderstand} maxLength={2500} onChange={(value) => onDraft({ ...draft, whatIWantYouToUnderstand: value })} /><TextArea label="How is this affecting your apprenticeship?" value={draft.howItIsAffectingMe} maxLength={1800} onChange={(value) => onDraft({ ...draft, howItIsAffectingMe: value })} /><TextArea label="What support would you like?" value={draft.supportIWant} maxLength={1800} onChange={(value) => onDraft({ ...draft, supportIWant: value })} /><div className="grid gap-4 md:grid-cols-2"><SelectField label="Preferred contact method" value={draft.preferredContactMethod} options={[{ value: "in_platform", label: "In LevyTate" }, { value: "email", label: "Email" }, { value: "phone", label: "Phone" }, { value: "meeting", label: "Meeting" }, { value: "provider_route", label: "Provider support route" }]} onChange={(value) => onDraft({ ...draft, preferredContactMethod: value as PastoralContactMethod })} /><TextField label="Restrictions on who should be contacted" value={draft.sharingRestrictions} maxLength={1000} onChange={(value) => onDraft({ ...draft, sharingRestrictions: value })} placeholder="Optional" /></div><div className="flex flex-col-reverse gap-2 border-t border-[#102c3d]/[0.07] pt-4 sm:flex-row sm:justify-end"><button type="button" onClick={onCancel} className="min-h-11 rounded-xl border border-[#102c3d]/10 px-4 text-xs font-semibold">Cancel</button><button disabled={!canReview} className="min-h-11 rounded-xl bg-[#102c3d] px-5 text-xs font-semibold text-white disabled:opacity-45">Review support request</button></div></form></MvpPanel>;
 }
 
-function PrivacyPanel({ workspace, onWorkspace, onResume }: { workspace: PastoralWorkspace; onWorkspace: (workspace: PastoralWorkspace) => void; onResume: (id: string) => void }) {
-  const [working, setWorking] = useState(false);
-  const [error, setError] = useState("");
-  async function mutate(body: unknown) { setWorking(true); setError(""); const response = await fetch("/api/levytate-pastoral", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); const result = await safeJson(response); setWorking(false); if (!response.ok || !result?.workspace) { setError(result?.message || "Your privacy setting could not be updated."); return; } onWorkspace(result.workspace as PastoralWorkspace); }
-  return <div className="grid gap-5 lg:grid-cols-2"><MvpPanel title="Conversation saving" eyebrow="Your choice"><div className="flex items-start justify-between gap-5 rounded-xl border border-[#102c3d]/[0.08] bg-[#f8fbfa] p-4"><div><p className="text-sm font-semibold text-[#102c3d]">Save private conversations</p><p className="mt-1 text-xs leading-5 text-[#102c3d]/58">When on, messages are encrypted before storage and kept for {workspace.employee?.historyRetentionDays ?? 30} days. Turn this off to stop saving future messages.</p></div><button type="button" role="switch" aria-checked={workspace.employee?.historySavingEnabled ?? false} disabled={working} onClick={() => mutate({ action: "set_history_preference", saveHistory: !workspace.employee?.historySavingEnabled, retentionDays: workspace.employee?.historyRetentionDays ?? 30 })} className={`relative h-7 w-12 shrink-0 rounded-full transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 ${workspace.employee?.historySavingEnabled ? "bg-[#159b8f]" : "bg-[#102c3d]/20"}`}><span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition ${workspace.employee?.historySavingEnabled ? "left-6" : "left-1"}`}><span className="sr-only">{workspace.employee?.historySavingEnabled ? "Saving on" : "Saving off"}</span></span></button></div>{error ? <p role="alert" className="mt-3 text-xs font-semibold text-[#a33a4d]">{error}</p> : null}<div className="mt-5 space-y-3 text-sm leading-6 text-[#102c3d]/60"><p>{workspace.privacyNotice}</p><p>Deleting a saved conversation removes the active database copy and its encrypted messages. It may remain temporarily in restricted backups until those backups expire. A support request you deliberately sent is a separate record and is not deleted with a conversation.</p></div></MvpPanel><MvpPanel title="Saved conversations" eyebrow="Private history">{!workspace.conversations.length ? <p className="text-sm leading-6 text-[#102c3d]/58">You have no saved conversations.</p> : <div className="grid gap-3">{workspace.conversations.map((conversation) => <div key={conversation.id} className="rounded-xl border border-[#102c3d]/[0.08] p-4"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold text-[#102c3d]">Conversation from {formatDate(conversation.createdAt)}</p><p className="mt-1 text-xs text-[#102c3d]/48">{conversation.messages.length} messages · retained until {formatDate(conversation.retentionExpiresAt)}</p></div><StatusBadge tone="green">Encrypted</StatusBadge></div><div className="mt-4 flex flex-wrap gap-2"><button type="button" onClick={() => onResume(conversation.id)} className="min-h-10 rounded-xl bg-[#102c3d] px-4 text-xs font-semibold text-white">Resume</button><button type="button" disabled={working} onClick={() => mutate({ action: "delete_conversation", conversationId: conversation.id })} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#c95568]/20 px-4 text-xs font-semibold text-[#a33a4d]"><Trash2 size={14} aria-hidden="true" />Delete</button></div></div>)}</div>}</MvpPanel></div>;
+function PrivacyPanel({ workspace, mutation, onResume }: { workspace: PastoralWorkspace; mutation: PastoralMutationController; onResume: (id: string) => void }) {
+  async function mutate(body: { action: "set_history_preference"; saveHistory: boolean; retentionDays: number } | { action: "delete_conversation"; conversationId: string }) {
+    if (!workspace.employee) return;
+    const command = body.action === "set_history_preference" ? { ...body, expectedVersion: workspace.employee.historyPreferenceVersion } : body;
+    await mutation.run(command);
+  }
+  return <fieldset disabled={mutation.locked} aria-label="Private history settings" className="grid min-w-0 gap-5 lg:grid-cols-2"><MvpPanel title="Conversation saving" eyebrow="Your choice"><div className="flex items-start justify-between gap-5 rounded-xl border border-[#102c3d]/[0.08] bg-[#f8fbfa] p-4"><div><p className="text-sm font-semibold text-[#102c3d]">Save private conversations</p><p className="mt-1 text-xs leading-5 text-[#102c3d]/58">When on, messages are encrypted before storage and kept for {workspace.employee?.historyRetentionDays ?? 30} days. Turn this off to stop saving future messages.</p></div><button type="button" role="switch" aria-checked={workspace.employee?.historySavingEnabled ?? false} disabled={mutation.locked} onClick={() => mutate({ action: "set_history_preference", saveHistory: !workspace.employee?.historySavingEnabled, retentionDays: workspace.employee?.historyRetentionDays ?? 30 })} className={`relative h-7 w-12 shrink-0 rounded-full transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 ${workspace.employee?.historySavingEnabled ? "bg-[#159b8f]" : "bg-[#102c3d]/20"}`}><span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition ${workspace.employee?.historySavingEnabled ? "left-6" : "left-1"}`}><span className="sr-only">{workspace.employee?.historySavingEnabled ? "Saving on" : "Saving off"}</span></span></button></div><div className="mt-5 space-y-3 text-sm leading-6 text-[#102c3d]/60"><p>{workspace.privacyNotice}</p><p>Deleting a saved conversation removes the active database copy and its encrypted messages. It may remain temporarily in restricted backups until those backups expire. A support request you deliberately sent is a separate record and is not deleted with a conversation.</p></div></MvpPanel><MvpPanel title="Saved conversations" eyebrow="Private history">{!workspace.conversations.length ? <p className="text-sm leading-6 text-[#102c3d]/58">You have no saved conversations.</p> : <div className="grid gap-3">{workspace.conversations.map((conversation) => <div key={conversation.id} className="rounded-xl border border-[#102c3d]/[0.08] p-4"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold text-[#102c3d]">Conversation from {formatDate(conversation.createdAt)}</p><p className="mt-1 text-xs text-[#102c3d]/48">{conversation.messages.length} messages · retained until {formatDate(conversation.retentionExpiresAt)}</p></div><StatusBadge tone="green">Encrypted</StatusBadge></div><div className="mt-4 flex flex-wrap gap-2"><button type="button" onClick={() => onResume(conversation.id)} className="min-h-10 rounded-xl bg-[#102c3d] px-4 text-xs font-semibold text-white">Resume</button><button type="button" disabled={mutation.locked} onClick={() => mutate({ action: "delete_conversation", conversationId: conversation.id })} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#c95568]/20 px-4 text-xs font-semibold text-[#a33a4d]"><Trash2 size={14} aria-hidden="true" />Delete</button></div></div>)}</div>}</MvpPanel></fieldset>;
 }
 
 function SupportInbox({ workspace, onWorkspace }: { workspace: PastoralWorkspace; onWorkspace: (workspace: PastoralWorkspace) => void }) {
@@ -372,50 +398,43 @@ function SupportInbox({ workspace, onWorkspace }: { workspace: PastoralWorkspace
   const [actionSummary, setActionSummary] = useState("");
   const [actionDueAt, setActionDueAt] = useState("");
   const [actionOwnerId, setActionOwnerId] = useState("");
-  const [working, setWorking] = useState(false);
+  const mutation = usePastoralMutation(onWorkspace);
+  const working = mutation.locked;
   const [message, setMessage] = useState("");
   const noteId = useId();
   const selected = workspace.requests.find((request) => request.id === selectedId) ?? workspace.requests[0];
   const counts = useMemo(() => ({ open: workspace.requests.filter((request) => request.status !== "resolved").length, followUp: workspace.requests.filter((request) => request.status === "follow_up").length, resolved: workspace.requests.filter((request) => request.status === "resolved").length }), [workspace.requests]);
 
-  async function mutate(body: unknown, success: string) {
-    if (working) return false;
-    setWorking(true); setMessage("");
-    try {
-      const response = await fetch("/api/levytate-pastoral", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      const result = await safeJson(response);
-      if (!response.ok || !result?.workspace) { setMessage(result?.message || "The request could not be updated."); return false; }
-      onWorkspace(result.workspace as PastoralWorkspace); setMessage(success); return true;
-    } catch {
-      setMessage("The connection was interrupted. Nothing was silently recorded; retry when ready."); return false;
-    } finally { setWorking(false); }
+  async function mutate(body: PastoralSupportMutation, success: string, confirmed?: () => void) {
+    setMessage("");
+    await mutation.run(body, () => { setMessage(success); confirmed?.(); });
   }
 
   async function transition(action: "acknowledge" | "start_support" | "request_follow_up" | "resolve") {
     if (!selected) return;
-    const ok = await mutate({ action: "transition_support_request", requestId: selected.id, transition: action, expectedLockVersion: selected.lockVersion, idempotencyKey: crypto.randomUUID(), note }, "Support request updated.");
-    if (ok) setNote("");
+    await mutate({ action: "transition_support_request", requestId: selected.id, transition: action, expectedLockVersion: selected.lockVersion, idempotencyKey: crypto.randomUUID(), note }, "Support request updated.", () => { setNote(""); });
   }
 
   async function recordFollowUp() {
     if (!selected || !followUpAt) return;
-    const ok = await mutate({ action: "record_follow_up", requestId: selected.id, expectedLockVersion: selected.lockVersion, agreedFollowUpAt: followUpAt, idempotencyKey: crypto.randomUUID(), note }, "The agreed follow-up date was recorded.");
-    if (ok) { setFollowUpAt(""); setNote(""); }
+    const agreedFollowUpAt = pastoralLocalDateToInstant(followUpAt);
+    if (!agreedFollowUpAt) { setMessage("Choose a valid follow-up date and local time."); return; }
+    await mutate({ action: "record_follow_up", requestId: selected.id, expectedLockVersion: selected.lockVersion, agreedFollowUpAt, idempotencyKey: crypto.randomUUID(), note }, "The agreed follow-up date was recorded.", () => { setFollowUpAt(""); setNote(""); });
   }
 
   async function createAction() {
     if (!selected || !actionSummary.trim()) return;
     const ownerId = actionOwnerId || selected.recipientId;
-    const ok = await mutate({ action: "create_support_action", requestId: selected.id, responsibleRecipientId: ownerId, dueAt: actionDueAt || null, summary: actionSummary, idempotencyKey: crypto.randomUUID() }, "The agreed support action was recorded.");
-    if (ok) { setActionSummary(""); setActionDueAt(""); setActionOwnerId(""); }
+    const dueAt = actionDueAt ? pastoralLocalDateToInstant(actionDueAt) : null;
+    if (actionDueAt && !dueAt) { setMessage("Choose a valid action due date."); return; }
+    await mutate({ action: "create_support_action", requestId: selected.id, responsibleRecipientId: ownerId, dueAt, summary: actionSummary, idempotencyKey: crypto.randomUUID() }, "The agreed support action was recorded.", () => { setActionSummary(""); setActionDueAt(""); setActionOwnerId(""); });
   }
 
   async function transitionAction(actionId: string, expectedLockVersion: number, transition: "start" | "progress" | "complete" | "cancel") {
-    const ok = await mutate({ action: "transition_support_action", supportActionId: actionId, transition, expectedLockVersion, idempotencyKey: crypto.randomUUID(), note }, "Support-action progress was recorded.");
-    if (ok) setNote("");
+    await mutate({ action: "transition_support_action", supportActionId: actionId, transition, expectedLockVersion, idempotencyKey: crypto.randomUUID(), note }, "Support-action progress was recorded.", () => { setNote(""); });
   }
 
-  return <div className="grid gap-5"><section className="rounded-2xl bg-[#102c3d] p-5 text-white sm:p-6"><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9de5d8]">Restricted support inbox</p><h2 className="mt-2 text-2xl font-semibold">Learner Support</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-white/68">Only requests addressed or explicitly assigned to your approved support identity appear here. Private employee conversations are never included.</p><div className="mt-5 grid gap-3 sm:grid-cols-3"><SummaryMetric label="Open requests" value={counts.open} /><SummaryMetric label="Follow-up" value={counts.followUp} /><SummaryMetric label="Resolved" value={counts.resolved} /></div></section>{!workspace.requests.length ? <MvpPanel title="Support inbox" eyebrow="Restricted"><div className="rounded-xl border border-dashed border-[#102c3d]/15 bg-[#f8fbfa] p-7 text-center"><CheckCircle2 className="mx-auto text-[#0b776e]" size={24} aria-hidden="true" /><h3 className="mt-3 text-sm font-semibold">No requests are assigned to you</h3><p className="mt-1 text-xs leading-5 text-[#102c3d]/55">Requests assigned to another support contact remain inaccessible.</p></div></MvpPanel> : <div className="grid gap-5 xl:grid-cols-[340px_minmax(0,1fr)]"><MvpPanel title="Assigned requests" eyebrow="Your support queue"><div className="grid gap-2">{workspace.requests.map((request) => <button key={request.id} type="button" onClick={() => setSelectedId(request.id)} aria-current={selected?.id === request.id ? "true" : undefined} className={`rounded-xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 ${selected?.id === request.id ? "border-[#159b8f]/35 bg-[#edf7f3]" : "border-[#102c3d]/[0.08] hover:bg-[#f8fbfa]"}`}><div className="flex items-start justify-between gap-2"><p className="text-sm font-semibold text-[#102c3d]">{request.payload.topic}</p><StatusBadge tone={statusTone(request.status)}>{humanise(request.status)}</StatusBadge></div><p className="mt-2 text-xs text-[#102c3d]/52">{request.employeeLabel} · {formatDate(request.submittedAt)}</p></button>)}</div></MvpPanel>{selected ? <MvpPanel title={selected.payload.topic} eyebrow="Employee-approved support request"><RequestDetail request={selected} /><div className="mt-5 grid gap-5 border-t border-[#102c3d]/[0.07] pt-5"><div><label htmlFor={noteId} className="text-xs font-semibold text-[#102c3d]">Response or progress note</label><textarea id={noteId} value={note} onChange={(event) => setNote(event.target.value.slice(0, 2000))} rows={3} maxLength={2000} placeholder="Record only the support response, progress or completion evidence." className="mt-2 w-full rounded-xl border border-[#102c3d]/10 bg-[#f8fbfa] px-4 py-3 text-sm leading-6 outline-none focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10" /><div className="mt-3 flex flex-wrap gap-2">{selected.status === "submitted" ? <ActionButton label="Acknowledge receipt" onClick={() => transition("acknowledge")} disabled={working} /> : null}{["acknowledged", "follow_up"].includes(selected.status) ? <ActionButton label="Start support" onClick={() => transition("start_support")} disabled={working} /> : null}{["support_in_progress", "follow_up"].includes(selected.status) ? <ActionButton label="Administratively close" onClick={() => transition("resolve")} disabled={working} /> : null}</div></div><div className="rounded-xl border border-[#102c3d]/[0.08] bg-[#f8fbfa] p-4"><p className="text-xs font-semibold text-[#102c3d]">Agree follow-up</p><label className="mt-3 grid gap-1.5 text-xs font-semibold text-[#102c3d]/60">Follow-up date and time<input type="datetime-local" value={followUpAt} onChange={(event) => setFollowUpAt(event.target.value)} className="h-11 rounded-xl border border-[#102c3d]/10 bg-white px-3 text-sm" /></label><button type="button" onClick={recordFollowUp} disabled={working || !followUpAt} className="mt-3 min-h-10 rounded-xl bg-[#102c3d] px-4 text-xs font-semibold text-white disabled:opacity-45">Record agreed follow-up</button></div><div className="rounded-xl border border-[#102c3d]/[0.08] bg-[#f8fbfa] p-4"><p className="text-xs font-semibold text-[#102c3d]">Agreed support action</p><TextArea label="Action the employee will see" value={actionSummary} maxLength={1800} onChange={setActionSummary} /><div className="mt-3 grid gap-3 md:grid-cols-2"><SelectField label="Responsible approved contact" value={actionOwnerId || selected.recipientId} options={workspace.recipients.map((recipient) => ({ value: recipient.id, label: recipient.label }))} onChange={setActionOwnerId} /><label className="grid gap-1.5 text-xs font-semibold text-[#102c3d]/60">Due date<input type="date" value={actionDueAt} onChange={(event) => setActionDueAt(event.target.value)} className="h-11 rounded-xl border border-[#102c3d]/10 bg-white px-3 text-sm" /></label></div><button type="button" onClick={createAction} disabled={working || !actionSummary.trim()} className="mt-3 min-h-10 rounded-xl bg-[#102c3d] px-4 text-xs font-semibold text-white disabled:opacity-45">Add agreed action</button>{selected.actions.length ? <div className="mt-4 grid gap-2">{selected.actions.map((action) => <div key={action.id} className="rounded-lg border border-[#102c3d]/[0.07] bg-white p-3"><div className="flex items-start justify-between gap-3"><p className="text-xs font-semibold leading-5">{action.summary}</p><StatusBadge tone={statusTone(action.status)}>{humanise(action.status)}</StatusBadge></div><p className="mt-1 text-[11px] text-[#102c3d]/48">{action.responsibleRecipientLabel}{action.dueAt ? ` · ${formatDateTime(action.dueAt)}` : ""}</p>{["agreed", "in_progress"].includes(action.status) ? <div className="mt-2 flex flex-wrap gap-2">{action.status === "agreed" ? <ActionButton label="Start" onClick={() => transitionAction(action.id, action.lockVersion, "start")} disabled={working} /> : null}<ActionButton label="Record progress" onClick={() => transitionAction(action.id, action.lockVersion, "progress")} disabled={working} /><ActionButton label="Complete" onClick={() => transitionAction(action.id, action.lockVersion, "complete")} disabled={working} /><ActionButton label="Cancel" onClick={() => transitionAction(action.id, action.lockVersion, "cancel")} disabled={working} /></div> : null}</div>)}</div> : null}</div>{message ? <p role="status" className="text-xs font-semibold text-[#0b6f63]">{message}</p> : null}</div></MvpPanel> : null}</div>}<SafetyCard notice={workspace.emergencyNotice} /></div>;
+  return <><MutationStatus mutation={mutation} /><fieldset disabled={mutation.locked} aria-label="Support inbox decisions" className="grid min-w-0 gap-5"><section className="rounded-2xl bg-[#102c3d] p-5 text-white sm:p-6"><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9de5d8]">Restricted support inbox</p><h2 className="mt-2 text-2xl font-semibold">Learner Support</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-white/68">Only requests addressed or explicitly assigned to your approved support identity appear here. Private employee conversations are never included.</p><div className="mt-5 grid gap-3 sm:grid-cols-3"><SummaryMetric label="Open requests" value={counts.open} /><SummaryMetric label="Follow-up" value={counts.followUp} /><SummaryMetric label="Resolved" value={counts.resolved} /></div></section>{!workspace.requests.length ? <MvpPanel title="Support inbox" eyebrow="Restricted"><div className="rounded-xl border border-dashed border-[#102c3d]/15 bg-[#f8fbfa] p-7 text-center"><CheckCircle2 className="mx-auto text-[#0b776e]" size={24} aria-hidden="true" /><h3 className="mt-3 text-sm font-semibold">No requests are assigned to you</h3><p className="mt-1 text-xs leading-5 text-[#102c3d]/55">Requests assigned to another support contact remain inaccessible.</p></div></MvpPanel> : <div className="grid gap-5 xl:grid-cols-[340px_minmax(0,1fr)]"><MvpPanel title="Assigned requests" eyebrow="Your support queue"><div className="grid gap-2">{workspace.requests.map((request) => <button key={request.id} type="button" onClick={() => setSelectedId(request.id)} aria-current={selected?.id === request.id ? "true" : undefined} className={`rounded-xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 ${selected?.id === request.id ? "border-[#159b8f]/35 bg-[#edf7f3]" : "border-[#102c3d]/[0.08] hover:bg-[#f8fbfa]"}`}><div className="flex items-start justify-between gap-2"><p className="text-sm font-semibold text-[#102c3d]">{request.payload.topic}</p><StatusBadge tone={statusTone(request.status)}>{humanise(request.status)}</StatusBadge></div><p className="mt-2 text-xs text-[#102c3d]/52">{request.employeeLabel} · {formatDate(request.submittedAt)}</p></button>)}</div></MvpPanel>{selected ? <MvpPanel title={selected.payload.topic} eyebrow="Employee-approved support request"><RequestDetail request={selected} /><div className="mt-5 grid gap-5 border-t border-[#102c3d]/[0.07] pt-5"><div><label htmlFor={noteId} className="text-xs font-semibold text-[#102c3d]">Response or progress note</label><textarea id={noteId} value={note} onChange={(event) => setNote(event.target.value.slice(0, 2000))} rows={3} maxLength={2000} placeholder="Record only the support response, progress or completion evidence." className="mt-2 w-full rounded-xl border border-[#102c3d]/10 bg-[#f8fbfa] px-4 py-3 text-sm leading-6 outline-none focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10" /><div className="mt-3 flex flex-wrap gap-2">{selected.status === "submitted" ? <ActionButton label="Acknowledge receipt" onClick={() => transition("acknowledge")} disabled={working} /> : null}{["acknowledged", "follow_up"].includes(selected.status) ? <ActionButton label="Start support" onClick={() => transition("start_support")} disabled={working} /> : null}{["support_in_progress", "follow_up"].includes(selected.status) ? <ActionButton label="Administratively close" onClick={() => transition("resolve")} disabled={working} /> : null}</div></div><div className="rounded-xl border border-[#102c3d]/[0.08] bg-[#f8fbfa] p-4"><p className="text-xs font-semibold text-[#102c3d]">Agree follow-up</p><label className="mt-3 grid gap-1.5 text-xs font-semibold text-[#102c3d]/60">Follow-up date and time<input type="datetime-local" value={followUpAt} onChange={(event) => setFollowUpAt(event.target.value)} className="h-11 rounded-xl border border-[#102c3d]/10 bg-white px-3 text-sm" /></label><button type="button" onClick={recordFollowUp} disabled={working || !followUpAt} className="mt-3 min-h-10 rounded-xl bg-[#102c3d] px-4 text-xs font-semibold text-white disabled:opacity-45">Record agreed follow-up</button></div><div className="rounded-xl border border-[#102c3d]/[0.08] bg-[#f8fbfa] p-4"><p className="text-xs font-semibold text-[#102c3d]">Agreed support action</p><TextArea label="Action the employee will see" value={actionSummary} maxLength={1800} onChange={setActionSummary} /><div className="mt-3 grid gap-3 md:grid-cols-2"><SelectField label="Responsible approved contact" value={actionOwnerId || selected.recipientId} options={workspace.recipients.map((recipient) => ({ value: recipient.id, label: recipient.label }))} onChange={setActionOwnerId} /><label className="grid gap-1.5 text-xs font-semibold text-[#102c3d]/60">Due date<input type="date" value={actionDueAt} onChange={(event) => setActionDueAt(event.target.value)} className="h-11 rounded-xl border border-[#102c3d]/10 bg-white px-3 text-sm" /></label></div><button type="button" onClick={createAction} disabled={working || !actionSummary.trim()} className="mt-3 min-h-10 rounded-xl bg-[#102c3d] px-4 text-xs font-semibold text-white disabled:opacity-45">Add agreed action</button>{selected.actions.length ? <div className="mt-4 grid gap-2">{selected.actions.map((action) => <div key={action.id} className="rounded-lg border border-[#102c3d]/[0.07] bg-white p-3"><div className="flex items-start justify-between gap-3"><p className="text-xs font-semibold leading-5">{action.summary}</p><StatusBadge tone={statusTone(action.status)}>{humanise(action.status)}</StatusBadge></div><p className="mt-1 text-[11px] text-[#102c3d]/48">{action.responsibleRecipientLabel}{action.dueAt ? ` · ${formatDateTime(action.dueAt)}` : ""}</p>{["agreed", "in_progress"].includes(action.status) ? <div className="mt-2 flex flex-wrap gap-2">{action.status === "agreed" ? <ActionButton label="Start" onClick={() => transitionAction(action.id, action.lockVersion, "start")} disabled={working} /> : null}<ActionButton label="Record progress" onClick={() => transitionAction(action.id, action.lockVersion, "progress")} disabled={working} /><ActionButton label="Complete" onClick={() => transitionAction(action.id, action.lockVersion, "complete")} disabled={working} /><ActionButton label="Cancel" onClick={() => transitionAction(action.id, action.lockVersion, "cancel")} disabled={working} /></div> : null}</div>)}</div> : null}</div>{message ? <p role="status" className="text-xs font-semibold text-[#0b6f63]">{message}</p> : null}</div></MvpPanel> : null}</div>}<SafetyCard notice={workspace.emergencyNotice} /></fieldset></>;
 }
 
 function RequestCard({ request, employeeView, onTransition, onOutcome }: { request: PastoralSupportRequestView; employeeView?: boolean; onTransition?: (action: "reopen" | "dispute") => void; onOutcome?: (outcome: "helped" | "further_support_requested") => void }) {

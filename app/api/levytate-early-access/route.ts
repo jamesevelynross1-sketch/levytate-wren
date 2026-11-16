@@ -11,6 +11,9 @@ import {
   levytateEmailSender,
 } from "@/lib/email/levytate-early-access";
 import { sendEmail } from "@/lib/server/resend";
+import { z } from "zod";
+import { ClientRequestError, readPublicBrowserJson } from "@/lib/server/levytate-request-boundary";
+import { checkEarlyAccessSubmissionLimits, LevyTateRateLimitStoreError } from "@/lib/server/levytate-auth-rate-limit";
 import {
   createEarlyAccessRequest,
   EarlyAccessStoreError,
@@ -18,6 +21,12 @@ import {
   listEarlyAccessRequests,
   normaliseEarlyAccessEmail,
 } from "@/lib/server/levytate-early-access";
+
+const earlyAccessInput = z.strictObject({
+  organisation: z.string().trim().min(1).max(200), contactName: z.string().trim().min(1).max(200),
+  email: z.string().trim().min(3).max(254), employeeCount: z.string().trim().min(1).max(80),
+  biggestChallenge: z.string().trim().max(2000).optional(), consent: z.literal(true),
+});
 
 export function OPTIONS(request: Request) {
   return applyLevyTatePublicCors(request, new NextResponse(null, { status: 204 }));
@@ -41,12 +50,15 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as Record<string, unknown>;
+    const parsed = earlyAccessInput.safeParse(await readPublicBrowserJson(request, 8192));
+    if (!parsed.success) throw new ClientRequestError("Check the required contact details, field lengths and consent before submitting.", 400);
+    const body = parsed.data;
     const email = normaliseEarlyAccessEmail(body.email);
 
     if (!isValidEarlyAccessEmail(email)) {
       return json(request, { message: "Please enter a valid work email." }, 400);
     }
+    if (!(await checkEarlyAccessSubmissionLimits(request, email)).allowed) return json(request, { message: "Too many requests. Please wait before submitting again." }, 429);
 
     const created = await createEarlyAccessRequest({
       organisation: typeof body.organisation === "string" ? body.organisation : "",
@@ -72,7 +84,9 @@ export async function POST(request: Request) {
         "Your Early Access request has been received. We will review your request and be in touch shortly.",
     });
   } catch (error) {
-    const status = error instanceof EarlyAccessStoreError ? 400 : 500;
+    if (error instanceof ClientRequestError) return json(request, { message: error.message }, error.status);
+    if (error instanceof LevyTateRateLimitStoreError) return json(request, { message: "Early access is temporarily unavailable. Please try again shortly." }, 503);
+    const status = error instanceof EarlyAccessStoreError ? error.status : 503;
     return json(request, { message: getUserFacingError(error) }, status);
   }
 }
@@ -98,7 +112,7 @@ async function sendEarlyAccessEmails(lead: Awaited<ReturnType<typeof createEarly
       console.error("LevyTate Early Access email failed", {
         leadId: lead.id,
         emailType: index === 0 ? "internal_notification" : "applicant_confirmation",
-        error: result.reason instanceof Error ? result.reason.message : "Unknown email error",
+        outcome: "delivery_not_confirmed",
       });
     }
   });

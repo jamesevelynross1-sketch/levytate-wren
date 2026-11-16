@@ -1,0 +1,35 @@
+{
+  "environment": "local",
+  "browserVersion": "157.0.4341.60",
+  "actualLoginComponents": true,
+  "actualAuthRequests": 0,
+  "externalEmail": false,
+  "genuineAuthenticationAcceptance": false,
+  "results": [
+    {
+      "kind": "employer",
+      "before": {
+        "delayedScripts": 5,
+        "inputDisabled": false,
+        "submitDisabled": false
+      },
+      "noPreHydrationRequest": true,
+      "exactOneInterceptedPost": true,
+      "noNativeLoginNavigation": true,
+      "status": "FAIL"
+    },
+    {
+      "kind": "provider",
+      "before": {
+        "delayedScripts": 5,
+        "inputDisabled": false,
+        "submitDisabled": false
+      },
+      "noPreHydrationRequest": true,
+      "exactOneInterceptedPost": true,
+      "noNativeLoginNavigation": true,
+      "status": "FAIL"
+    }
+  ],
+  "appCommit": "63eeb8fffd0638644b4d2156c861bd2aa26b2a63"
+}

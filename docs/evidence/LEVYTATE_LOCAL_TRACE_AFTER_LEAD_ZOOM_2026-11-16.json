@@ -1,0 +1,15 @@
+{
+  "environment": "local",
+  "appCodeCommit": "6562e009570444e7e3e0c0c69398898b1e120242",
+  "authenticatedCallbacks": 1,
+  "appStoppedAndFlushed": true,
+  "traceFileCount": 0,
+  "credentialQueryMarkerCounts": {
+    "token_hash=": 0,
+    "access_token=": 0,
+    "refresh_token=": 0,
+    "code=": 0
+  },
+  "remainingNativeProfiles": 0,
+  "passed": true
+}

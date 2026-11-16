@@ -60,12 +60,35 @@ export async function supabaseSelectAll<T>(
   const base = new URLSearchParams(query);
   base.delete("limit");
   base.delete("offset");
-  return collectPaginatedRows<T>(async (offset, limit) => {
+  const pageSize = options.pageSize ?? 1000;
+  const maxRows = options.maxRows ?? 100_000;
+  if (!Number.isInteger(pageSize) || pageSize < 1 || !Number.isInteger(maxRows) || maxRows < 1) throw new LevyTateSupabaseError("Invalid pagination limits.");
+  const rows: T[] = [];
+  let expectedTotal: number | null = null;
+  while (rows.length < maxRows) {
     const page = new URLSearchParams(base);
-    page.set("limit", String(limit));
-    page.set("offset", String(offset));
-    return supabaseSelect<T>(config, table, page);
-  }, options);
+    page.set("limit", String(Math.min(pageSize, maxRows - rows.length)));
+    page.set("offset", String(rows.length));
+    const response = await supabaseFetchRaw(config, `${table}?${page.toString()}`, { headers: { Prefer: "count=exact" }, cache: "no-store" });
+    if (!response.ok) throw new LevyTateSupabaseError(await formatSupabaseError(response));
+    const items: unknown = await response.json();
+    const range = response.headers.get("content-range")?.match(/^(?:(\d+)-(\d+)|\*)\/(\d+)$/);
+    if (!Array.isArray(items) || !range) throw new LevyTateSupabaseError("Supabase did not confirm the complete result range.");
+    const total = Number(range[3]);
+    if (!Number.isSafeInteger(total) || total > maxRows) throw new LevyTateSupabaseError(`Supabase pagination exceeded the ${maxRows} row safety limit.`);
+    if (expectedTotal !== null && total !== expectedTotal) throw new LevyTateSupabaseError("The result changed while loading. Reload to obtain a complete result.");
+    expectedTotal = total;
+    if (!items.length) {
+      if (total === rows.length) return rows;
+      throw new LevyTateSupabaseError("Supabase returned an incomplete result page.");
+    }
+    if (Number(range[1]) !== rows.length || Number(range[2]) !== rows.length + items.length - 1 || rows.length + items.length > total) throw new LevyTateSupabaseError("Supabase returned an inconsistent result range.");
+    rows.push(...items as T[]);
+    if (rows.length === total) return rows;
+    // The service can cap a page below the requested limit. Continue from the
+    // actual range, never mistake a short page for a complete tenant dataset.
+  }
+  throw new LevyTateSupabaseError(`Supabase pagination exceeded the ${maxRows} row safety limit.`);
 }
 
 export async function supabaseInsert<T>(
@@ -112,12 +135,14 @@ export async function supabaseDelete(
   table: string,
   query: string,
 ) {
-  return supabaseFetchRaw(config, `${table}?${query}`, {
+  const response = await supabaseFetchRaw(config, `${table}?${query}`, {
     method: "DELETE",
     headers: {
       Prefer: "return=minimal",
     },
   });
+  if (!response.ok) throw new LevyTateSupabaseError(await formatSupabaseError(response));
+  return response;
 }
 
 export async function supabaseFetchJson<T>(

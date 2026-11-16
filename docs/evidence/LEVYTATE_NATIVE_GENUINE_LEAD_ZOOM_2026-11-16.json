@@ -1,0 +1,69 @@
+{
+  "environment": "local",
+  "role": "Apprenticeship Lead",
+  "appCodeCommit": "6562e009570444e7e3e0c0c69398898b1e120242",
+  "method": "native Edge Appearance 100/200 percent",
+  "browserVersion": "157.0.4341.60",
+  "captures": [
+    {
+      "label": "100-top",
+      "path": "/private/tmp/levytate-release-runtime.PpTKRn/native-lead-1794825464017-100-top.png",
+      "width": 1272,
+      "height": 816
+    },
+    {
+      "label": "200-top",
+      "path": "/private/tmp/levytate-release-runtime.PpTKRn/native-lead-1794825464017-200-top.png",
+      "width": 1272,
+      "height": 816
+    },
+    {
+      "label": "200-navigation",
+      "path": "/private/tmp/levytate-release-runtime.PpTKRn/native-lead-1794825464017-200-navigation.png",
+      "width": 1272,
+      "height": 816
+    },
+    {
+      "label": "200-bottom",
+      "path": "/private/tmp/levytate-release-runtime.PpTKRn/native-lead-1794825464017-200-bottom.png",
+      "width": 1272,
+      "height": 816
+    }
+  ],
+  "visualReview": "pending independent image inspection",
+  "homeState": "priorities-awaiting-authorised-admin",
+  "baseline": {
+    "innerWidth": 1272,
+    "innerHeight": 816,
+    "outerWidth": 1280,
+    "outerHeight": 900,
+    "devicePixelRatio": 1,
+    "visualViewportScale": 1,
+    "rootZoom": "1",
+    "bodyZoom": "1",
+    "scrollWidth": 1272
+  },
+  "zoomed": {
+    "innerWidth": 636,
+    "innerHeight": 408,
+    "outerWidth": 1280,
+    "outerHeight": 900,
+    "devicePixelRatio": 2,
+    "visualViewportScale": 1,
+    "rootZoom": "1",
+    "bodyZoom": "1",
+    "scrollWidth": 636
+  },
+  "status": "PASS",
+  "restored": {
+    "innerWidth": 1272,
+    "innerHeight": 816,
+    "outerWidth": 1280,
+    "outerHeight": 900,
+    "devicePixelRatio": 1,
+    "visualViewportScale": 1,
+    "rootZoom": "1",
+    "bodyZoom": "1",
+    "scrollWidth": 1272
+  }
+}

@@ -16,7 +16,8 @@ import { getPersistentEarlyAccessState } from "@/lib/server/levytate-beta-access
 import { getEarlyAccessRequestByEmail } from "@/lib/server/levytate-early-access";
 import { ProspectAccessError, assertProspectLoginAccess, recordProspectFirstLogin } from "@/lib/server/levytate-prospect-access";
 import { checkBetaLoginLimits, LevyTateRateLimitStoreError } from "@/lib/server/levytate-auth-rate-limit";
-import { levytateAuthCookieOptions } from "@/lib/levytate/hosts";
+import { setLevyTateAuthCookies, type LevyTateAuthCookie } from "@/lib/server/levytate-auth-cookies";
+import { ClientRequestError, readBrowserJson, requireActionKeys } from "@/lib/server/levytate-request-boundary";
 import {
   createDemoControllerAuthorisation,
   isDemoRoleSwitcherRuntimeEnabled,
@@ -71,12 +72,9 @@ export async function POST(request: Request) {
     const prospectAccess = await recordProspectFirstLogin(email);
     const sessionToken = await createLevyTateBetaSession(email, accessLevel, { authMode: "internal_beta" });
     const response = NextResponse.json({ ok: true, user: { email, accessLevel }, prospectAccess });
-
-    response.cookies.set(
-      levytateBetaSessionCookie,
-      sessionToken,
-      levytateAuthCookieOptions(levytateBetaSessionMaxAge, request.headers.get("host")),
-    );
+    const authCookies: LevyTateAuthCookie[] = [
+      { name: levytateBetaSessionCookie, value: sessionToken, maxAge: levytateBetaSessionMaxAge },
+    ];
 
     if (isDemoRoleSwitcherRuntimeEnabled()) {
       try {
@@ -87,11 +85,12 @@ export async function POST(request: Request) {
           issuedAt: Date.now(),
           expiresAt: Date.now() + levytateBetaSessionMaxAge * 1000,
         });
-        response.cookies.set(
-          levytateDemoControllerCookie,
-          controllerToken,
-          levytateAuthCookieOptions(levytateDemoControllerMaxAge, request.headers.get("host"), "strict"),
-        );
+        authCookies.push({
+          name: levytateDemoControllerCookie,
+          value: controllerToken,
+          maxAge: levytateDemoControllerMaxAge,
+          sameSite: "strict",
+        });
       } catch (error) {
         // Internal beta sign-in remains available when the optional Preview demo controller is ineligible.
         if (!(error instanceof LevyTateDemoRoleSwitcherError && error.code === "unauthorised")) {
@@ -103,8 +102,10 @@ export async function POST(request: Request) {
       }
     }
 
+    setLevyTateAuthCookies(response, request.headers.get("host"), authCookies);
     return response;
   } catch (error) {
+    if (error instanceof ClientRequestError) return NextResponse.json({ ok: false, message: error.message }, { status: error.status });
     if (error instanceof LevyTateRateLimitStoreError) {
       return NextResponse.json({ ok: false, message: "Internal sign-in is temporarily unavailable." }, { status: 503 });
     }
@@ -120,11 +121,9 @@ export async function POST(request: Request) {
 }
 
 async function parseLoginRequestBody(request: Request): Promise<LoginRequestBody> {
-  try {
-    return (await request.json()) as LoginRequestBody;
-  } catch {
-    throw new BetaLoginError("We could not read your login request. Please try again.", 400);
-  }
+  const body = await readBrowserJson(request, 8192);
+  requireActionKeys(body, ["email", "code", "approvalToken"]);
+  return body;
 }
 
 async function resolveAccessLevel(email: string, approvalToken: string): Promise<LevyTateBetaAccessLevel> {

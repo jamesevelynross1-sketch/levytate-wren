@@ -3,14 +3,19 @@
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { LevyTateLogo } from "@/components/levytate-demo/PlatformShell";
+import { useHydratedForm } from "@/components/levytate-mvp/useHydratedForm";
+import { isSignInRequestAcknowledgement } from "@/lib/levytate/sign-in-form";
 
 export function ProviderLoginClient({
   invalidLink = false,
+  authIssue,
   providerLogoutWarning = false,
 }: {
   invalidLink?: boolean;
+  authIssue?: "rate-limited" | "unavailable";
   providerLogoutWarning?: boolean;
 }) {
+  const ready = useHydratedForm();
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -18,6 +23,10 @@ export function ProviderLoginClient({
 
   async function requestLink(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!ready || loading) return;
+    const submittedEmail = new FormData(event.currentTarget).get("email");
+    if (typeof submittedEmail !== "string" || !submittedEmail.trim()) { setError("Enter your work email to request a sign-in link."); return; }
+    setEmail(submittedEmail);
     setLoading(true);
     setError("");
 
@@ -25,7 +34,7 @@ export function ProviderLoginClient({
       const response = await fetch("/api/levytate-provider-auth/request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email: submittedEmail }),
       });
       const body = (await response.json().catch(() => null)) as
         | { message?: string }
@@ -35,10 +44,11 @@ export function ProviderLoginClient({
         setError(body?.message ?? "We couldn’t complete sign-in just now. Please try again.");
         return;
       }
+      if (!isSignInRequestAcknowledgement(body)) throw new Error("Sign-in acknowledgement unavailable");
 
       setSent(true);
     } catch {
-      setError("Secure sign-in is temporarily unavailable. Please try again shortly.");
+      setError("Secure sign-in is temporarily unavailable. Your email is retained; please try again shortly.");
     } finally {
       setLoading(false);
     }
@@ -77,6 +87,7 @@ export function ProviderLoginClient({
             You are signed out locally. Provider sign-out could not be confirmed, so close shared browsers before leaving.
           </p>
         ) : null}
+        {authIssue ? <p role="alert" className="mt-5 rounded-2xl bg-[#fff4f5] px-4 py-3 text-sm text-[#ad344e]">{authIssue === "rate-limited" ? "Too many sign-in attempts. Wait a few minutes before trying again." : "Secure sign-in is temporarily unavailable. Please try again shortly."}</p> : null}
 
         {sent ? (
           <div aria-live="polite" className="mt-6 rounded-2xl bg-[#eef9f5] p-5 ring-1 ring-[#159b8f]/15">
@@ -93,11 +104,14 @@ export function ProviderLoginClient({
             </button>
           </div>
         ) : (
-          <form onSubmit={requestLink} className="mt-6 grid gap-4">
+          <form onSubmit={requestLink} aria-busy={!ready || loading} className="mt-6 grid gap-4">
+            {!ready ? <p role="status" className="text-sm text-[#102c3d]/60">Preparing secure sign-in…</p> : null}
+            <fieldset disabled={!ready || loading} className="m-0 grid min-w-0 gap-4 border-0 p-0">
             <label className="grid min-w-0 gap-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-[#102c3d]/42">
               Work email
               <input
                 type="email"
+                name="email"
                 autoComplete="email"
                 inputMode="email"
                 required
@@ -108,11 +122,14 @@ export function ProviderLoginClient({
               />
             </label>
             <button
-              disabled={loading}
+              type="submit"
+              disabled={!ready || loading}
               className="h-12 rounded-full bg-[#102c3d] px-5 text-sm font-semibold text-white transition hover:bg-[#17394d] focus:outline-none focus:ring-4 focus:ring-[#159b8f]/20 disabled:cursor-wait disabled:opacity-70"
             >
               {loading ? "Sending secure link" : "Send secure sign-in link"}
             </button>
+            </fieldset>
+            <noscript>Enable JavaScript and reload this page to use secure sign-in.</noscript>
           </form>
         )}
 

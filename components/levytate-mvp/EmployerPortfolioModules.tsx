@@ -1,10 +1,14 @@
 "use client";
+import { useState } from "react";
+import { useCatalogueAction } from "@/components/levytate-mvp/useCatalogueAction";
 
 import { Building2, CalendarDays, GraduationCap, Store } from "lucide-react";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 
 export function MyProvidersModule({ onOpenMarketplace, onRequest }: { onOpenMarketplace: () => void; onRequest?: (providerId: string) => void }) {
   const { data, saveOrganisationProvider } = useMvpWorkspace();
+  const [error, setError] = useState("");
+  const { saving, perform } = useCatalogueAction(setError);
   const active = data.organisationProviders.filter((selection) => selection.status === "Active");
   const providers = active.flatMap((selection) => {
     const provider = data.providers.find((item) => item.providerId === selection.providerId);
@@ -15,7 +19,7 @@ export function MyProvidersModule({ onOpenMarketplace, onRequest }: { onOpenMark
     return <EmptyPortfolio icon={Building2} title="No providers added yet" copy="Add a provider from Marketplace to build your organisation’s delivery network." action="Explore Marketplace" onAction={onOpenMarketplace} />;
   }
 
-  return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" data-testid="my-providers">
+  return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" data-testid="my-providers">{error ? <p role="alert" className="text-sm text-red-700 sm:col-span-2 xl:col-span-3">{error}</p> : null}
     {providers.map(({ provider, selection }) => {
       const programmeIds = new Set(data.organisationProgrammes.filter((item) => item.providerId === provider.providerId && item.status === "Active").map((item) => item.programmeId));
       const learnerCount = data.learnerRecords.filter((record) => record.providerId === provider.providerId && record.recordStatus === "Active").length;
@@ -27,7 +31,7 @@ export function MyProvidersModule({ onOpenMarketplace, onRequest }: { onOpenMark
         <p className="mt-2 text-sm text-[#102c3d]/[0.56]">{provider.deliveryModels.slice(0, 2).join(", ") || "Delivery details under review"} · {provider.regions.slice(0, 2).join(", ") || "Coverage under review"}</p>
         <dl className="mt-4 grid grid-cols-2 gap-3 text-sm"><Fact label="My programmes" value={String(programmeIds.size)} /><Fact label="Learners" value={String(learnerCount)} /><Fact label="Latest review" value={reviews[0] ? displayDate(reviews[0].reviewDate) : "Not recorded"} /><Fact label="Next review" value={relationship?.reviewDate ? displayDate(relationship.reviewDate) : reviews[0]?.nextReviewDate ? displayDate(reviews[0].nextReviewDate) : "Not scheduled"} /></dl>
         {reviews[0]?.supportRequired ? <p className="mt-4 border-t border-[#102c3d]/[0.07] pt-3 text-xs leading-5 text-[#102c3d]/[0.56]"><strong>Support:</strong> {reviews[0].supportRequired}</p> : null}
-        <div className="mt-5 flex flex-wrap gap-2">{onRequest ? <button type="button" onClick={() => onRequest(provider.providerId)} className="min-h-11 rounded-full bg-[#edf7f3] px-4 text-xs font-semibold text-[#0b6f63]">Request proposal</button> : null}<button type="button" onClick={() => saveOrganisationProvider({ ...selection, status: "Inactive", updatedAt: new Date().toISOString() })} className="min-h-11 rounded-full px-3 text-xs font-semibold text-[#ad344e] hover:bg-[#fff2f4]">Remove from My Providers</button></div>
+        <div className="mt-5 flex flex-wrap gap-2">{onRequest ? <button type="button" onClick={() => onRequest(provider.providerId)} className="min-h-11 rounded-full bg-[#edf7f3] px-4 text-xs font-semibold text-[#0b6f63]">Request proposal</button> : null}<button type="button" disabled={saving} onClick={() => { if (window.confirm("Remove this provider and unpublish all of its programmes from your workspace? Existing learner history is retained.")) void perform(() => saveOrganisationProvider({ ...selection, status: "Inactive", updatedAt: new Date().toISOString() })); }} className="min-h-11 rounded-full px-3 text-xs font-semibold text-[#ad344e] hover:bg-[#fff2f4]">Remove from My Providers</button></div>
       </article>;
     })}
   </div>;
@@ -35,6 +39,8 @@ export function MyProvidersModule({ onOpenMarketplace, onRequest }: { onOpenMark
 
 export function MyProgrammesModule({ onOpenMarketplace, onRequest }: { onOpenMarketplace: () => void; onRequest?: (programmeId: string, providerId: string) => void }) {
   const { data, saveOrganisationProgramme } = useMvpWorkspace();
+  const [error, setError] = useState("");
+  const { saving, perform } = useCatalogueAction(setError);
   const programmes = data.organisationProgrammes.filter((selection) => selection.status === "Active").flatMap((selection) => {
     const programme = data.providerProgrammes.find((item) => item.id === selection.programmeId);
     const provider = data.providers.find((item) => item.providerId === selection.providerId);
@@ -45,7 +51,7 @@ export function MyProgrammesModule({ onOpenMarketplace, onRequest }: { onOpenMar
     return <EmptyPortfolio icon={GraduationCap} title="No programmes added yet" copy="Add programmes from Marketplace before employees begin apprenticeship applications." action="Explore Marketplace" onAction={onOpenMarketplace} />;
   }
 
-  return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" data-testid="my-programmes">
+  return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" data-testid="my-programmes">{error ? <p role="alert" className="text-sm text-red-700 sm:col-span-2 xl:col-span-3">{error}</p> : null}
     {programmes.map(({ programme, provider, selection }) => {
       const learnerCount = data.learnerRecords.filter((record) => record.programmeId === programme.id && record.recordStatus === "Active").length;
       const applicationCount = data.applications.filter((application) => programme.linkedStandardIds.includes(application.apprenticeshipStandardId) || programme.linkedStandardId === application.apprenticeshipStandardId).length;
@@ -55,7 +61,7 @@ export function MyProgrammesModule({ onOpenMarketplace, onRequest }: { onOpenMar
         <p className="mt-3 text-sm leading-6 text-[#102c3d]/[0.56]">{programme.shortDescription || "Programme details are available in Marketplace."}</p>
         <dl className="mt-4 grid grid-cols-2 gap-3"><Fact label="Standard-linked applications" value={String(applicationCount)} /><Fact label="Confirmed learners" value={String(learnerCount)} /><Fact label="Duration" value={programme.duration || "To confirm"} /><Fact label="Level" value={programme.level ? `Level ${programme.level}` : "To confirm"} /></dl>
         {applicationCount ? <p className="mt-3 text-xs leading-5 text-[#102c3d]/[0.48]">These applications reference the same apprenticeship standard. They are not confirmed against this provider programme until an operational relationship is established.</p> : null}
-        <div className="mt-5 flex flex-wrap gap-2">{onRequest ? <button type="button" onClick={() => onRequest(programme.id, provider.providerId)} className="min-h-11 rounded-full bg-[#edf7f3] px-4 text-xs font-semibold text-[#0b6f63]">Request proposals</button> : null}<button type="button" onClick={() => saveOrganisationProgramme({ ...selection, status: "Inactive", updatedAt: new Date().toISOString() })} className="min-h-11 rounded-full px-3 text-xs font-semibold text-[#ad344e] hover:bg-[#fff2f4]">Unpublish programme</button></div>
+        <div className="mt-5 flex flex-wrap gap-2">{onRequest ? <button type="button" onClick={() => onRequest(programme.id, provider.providerId)} className="min-h-11 rounded-full bg-[#edf7f3] px-4 text-xs font-semibold text-[#0b6f63]">Request proposals</button> : null}<button type="button" disabled={saving} onClick={() => { void perform(() => saveOrganisationProgramme({ ...selection, status: "Inactive", updatedAt: new Date().toISOString() })); }} className="min-h-11 rounded-full px-3 text-xs font-semibold text-[#ad344e] hover:bg-[#fff2f4]">Unpublish programme</button></div>
       </article>;
     })}
   </div>;

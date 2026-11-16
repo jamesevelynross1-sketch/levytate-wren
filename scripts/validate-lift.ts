@@ -8,6 +8,7 @@ import { calculateLiftCapacityValue, canTransitionLiftProof, overlappingBenefitW
 import { buildLiftFixtureWorkspace } from "../lib/server/levytate-lift-fixtures";
 import { buildLiftOpportunities, interpretLiftAssessment, validateLiftAnswers, validateOpportunityReferences } from "../lib/server/levytate-lift-interpretation";
 import { liftRubricMatrix } from "../lib/server/levytate-lift-rubric";
+import { assertBrowserOrigin, readAuthenticatedJson } from "../lib/server/levytate-request-boundary";
 import { groupLiftOpportunityCandidates, type LiftOpportunityCandidateForGrouping } from "../lib/server/levytate-lift-grouping";
 
 async function main() {
@@ -98,7 +99,9 @@ assert.equal(canTransitionLiftProof({ current: proofBase, nextState: "change_tes
 const quantity = { id: "evidence-a", source: "operational_baseline" as const, version: "v1", recordedAt: "2026-10-01T09:00:00Z", subject: "process", permissions: "authorised_employer" as const, description: "Fictional evidence", limitations: [], quantity: { value: 10, unit: "minutes", population: "weekly report", period: "four weeks" } };
 const trial = { ...proofBase, baseline: quantity, agreedScope: "One report", owner: "Owner", intendedMeasure: "Minutes" };
 assert.equal(canTransitionLiftProof({ current: trial, nextState: "change_tested", decisionRecorded: true }), true);
-assert.equal(canTransitionLiftProof({ current: { ...trial, outcome: { ...quantity, id: "evidence-b", source: "measured_outcome" }, reviewedBy: "Reviewer", verification: "internal_review" }, nextState: "outcome_evidenced", decisionRecorded: true }), true);
+const measuredTrial: LiftProofRecord = { ...trial, state: "change_tested", outcome: { ...quantity, id: "evidence-b", source: "measured_outcome", recordedAt: "2026-10-15T09:00:00Z", quantity: { ...quantity.quantity, value: 7 } }, reviewedBy: "Reviewer", verification: "internal_review" };
+assert.equal(canTransitionLiftProof({ current: { ...measuredTrial, state: "work_context_confirmed" }, nextState: "outcome_evidenced", decisionRecorded: true }), false, "Reviewed evidence cannot skip the recorded change-tested stage.");
+assert.equal(canTransitionLiftProof({ current: measuredTrial, nextState: "outcome_evidenced", decisionRecorded: true }), true, "A recorded trial with comparable outcome evidence and review can advance.");
 assert.equal(canTransitionLiftProof({ current: trial, nextState: "no_improvement", decisionRecorded: true }), true, "No-improvement evidence remains a permitted durable outcome rather than being hidden.");
 
 const leadFixture = buildLiftFixtureWorkspace("Apprenticeship Lead");
@@ -128,7 +131,13 @@ assert.match(capabilitySource, /LEVYTATE_LIFT_ALLOWED_BRANCH/);
 assert.match(capabilitySource, /LEVYTATE_LIFT_ALLOWED_ORGANISATION_ID/);
 assert.match(capabilitySource, /lift_enabled: "eq\.true"/);
 const routeSource = readFileSync(new URL("../app/api/levytate-lift/route.ts", import.meta.url), "utf8");
-assert.match(routeSource, /request\.headers\.get\("origin"\)/);
+assert.match(routeSource, /readAuthenticatedJson\(request,\s*session\.email/, "Lift writes delegate to the shared authenticated browser boundary.");
+const localWrite = (headers: Record<string, string> = {}) => new Request("http://localhost:3000/api/levytate-lift", { method: "POST", headers: { "content-type": "application/json", origin: "http://localhost:3000", ...headers }, body: "{}" });
+assert.doesNotThrow(() => assertBrowserOrigin(localWrite()));
+const invalidOrigins: Record<string, string>[] = [{ origin: "https://unrelated.example.test" }, { origin: "" }, { "sec-fetch-site": "cross-site" }];
+for (const headers of invalidOrigins) {
+  await assert.rejects(readAuthenticatedJson(localWrite(headers), "fictional@example.test"), { name: "ClientRequestError", status: 403 }, "The shared Lift write boundary rejects an unrelated or missing browser origin before persistence.");
+}
 assert.match(routeSource, /private, no-store/);
 const fixturePreviewSource = readFileSync(new URL("../app/levytate/lift-preview/page.tsx", import.meta.url), "utf8");
 assert.match(fixturePreviewSource, /NODE_ENV !== "development"/);

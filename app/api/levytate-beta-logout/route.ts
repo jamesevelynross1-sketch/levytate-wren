@@ -1,13 +1,18 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { applicationRequestOrigin } from "@/lib/server/levytate-request-origin";
 import { levytateBetaSessionCookie, readLevyTateBetaSession } from "@/lib/levytate/config/beta-access";
-import { levyTateEmployerSignInPath, levytateAuthCookieOptions, requestHostname } from "@/lib/levytate/hosts";
+import { levyTateEmployerSignInPath, requestHostname } from "@/lib/levytate/hosts";
 import { invalidateEmployerAuthSession, levytateSupabaseAccessCookie, levytateSupabaseRefreshCookie, recordEmployerLogoutEvent } from "@/lib/server/levytate-auth";
+import { expireLevyTateAuthCookies } from "@/lib/server/levytate-auth-cookies";
 import { levytateDemoControllerCookie } from "@/lib/server/levytate-demo-role-switcher";
+import { assertBrowserOrigin, ClientRequestError } from "@/lib/server/levytate-request-boundary";
 
 const authenticationCookies = [levytateBetaSessionCookie, levytateSupabaseAccessCookie, levytateSupabaseRefreshCookie, levytateDemoControllerCookie] as const;
 
 export async function POST(request: Request) {
+  try { assertBrowserOrigin(request); }
+  catch (error) { return NextResponse.json({ message: "This request did not originate from this application." }, { status: error instanceof ClientRequestError ? error.status : 403 }); }
   const store = await cookies();
   const session = await readLevyTateBetaSession(store.get(levytateBetaSessionCookie)?.value);
   let providerFailure = false;
@@ -30,10 +35,10 @@ export async function POST(request: Request) {
     }
   }
 
-  const destination = new URL(levyTateEmployerSignInPath(requestHostname(request.headers.get("host") || new URL(request.url).host)), request.url);
+  const destination = new URL(levyTateEmployerSignInPath(requestHostname(request.headers.get("host") || new URL(request.url).host)), applicationRequestOrigin(request));
   if (providerFailure) destination.searchParams.set("logout", "local-only");
   const response = NextResponse.redirect(destination, 303);
-  for (const name of authenticationCookies) expireCookie(response, request, name);
+  expireLevyTateAuthCookies(response, request.headers.get("host"), authenticationCookies);
   response.headers.set("Clear-Site-Data", '"cache", "storage"');
   response.headers.set("Cache-Control", "private, no-store, max-age=0");
   if (session) {
@@ -41,13 +46,6 @@ export async function POST(request: Request) {
     await safelyAudit(session, "auth.logout_completed", providerFailure ? "local_only" : "completed");
   }
   return response;
-}
-
-function expireCookie(response: NextResponse, request: Request, name: string) {
-  response.cookies.set(name, "", {
-    ...levytateAuthCookieOptions(0, request.headers.get("host")),
-    expires: new Date(0),
-  });
 }
 
 async function safelyAudit(session: NonNullable<Awaited<ReturnType<typeof readLevyTateBetaSession>>>, action: string, outcome: string) {

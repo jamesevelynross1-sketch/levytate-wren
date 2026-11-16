@@ -16,6 +16,9 @@ class CookieJar {
   values = new Map();
   apply(response) {
     for (const value of response.headers.getSetCookie?.() ?? []) {
+      // This lightweight jar tracks the host-only variant. Domain expiries are
+      // the separate, transitional copy of the same cookie name.
+      if (/Domain=/i.test(value)) continue;
       const [pair] = value.split(";", 1);
       const separator = pair.indexOf("=");
       if (separator < 0) continue;
@@ -70,6 +73,7 @@ const controllerCookie = controllerLogin.result?.response?.headers?.getSetCookie
   ?? controllerLogin.response.headers.getSetCookie().find((value) => value.startsWith("levytate_demo_controller="));
 check("controller cookie is HTTP-only", /HttpOnly/i.test(controllerCookie ?? ""));
 check("controller cookie uses SameSite Strict", /SameSite=Strict/i.test(controllerCookie ?? ""));
+check("controller cookie is host-only", !/Domain=/i.test(controllerCookie ?? ""));
 
 const initial = await request("/api/levytate-demo-perspective", controllerJar);
 check("switcher state loads", initial.response.status === 200 && initial.body?.switcher?.enabled === true, initial.body);
@@ -83,6 +87,7 @@ const originalApplications = JSON.stringify((leadWorkspace.body?.workspace?.data
 
 const managerSwitch = await switchPerspective(controllerJar, "line_manager");
 check("Line Manager switch succeeds", managerSwitch.response.status === 200 && managerSwitch.body?.switcher?.currentRole === "Line Manager", managerSwitch.body);
+check("perspective switch returns a host-only session", managerSwitch.response.headers.getSetCookie().some((value) => value.startsWith("levytate_beta_session=") && !/Domain=/i.test(value) && !/Max-Age=0/i.test(value)));
 const managerWorkspace = await workspace(controllerJar);
 check("Line Manager workspace revalidates genuine role", managerWorkspace.response.status === 200 && managerWorkspace.body?.workspace?.meta?.userRole === "Line Manager", managerWorkspace.body);
 const managerEmployees = managerWorkspace.body?.workspace?.data?.employees ?? [];

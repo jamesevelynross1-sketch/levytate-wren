@@ -1,0 +1,73 @@
+/** Independent PG17 account-command checks. Synthetic data, no Auth calls or email. */
+import { readFileSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
+const root = process.env.RELEASE_LOCAL_RUNTIME, database = process.env.RELEASE_TEST_DATABASE;
+if (!root?.startsWith("/private/tmp/levytate-release-runtime.") || !/^levytate_release_admin_[a-z0-9_]+$/.test(database ?? "")) throw new Error("Dedicated admin verifier database required");
+const db = new URL(JSON.parse(readFileSync(`${root}/private-stack-state.json`, "utf8")).env.DB_URL);
+if (db.hostname !== "127.0.0.1") throw new Error("Loopback only");
+const env = { ...process.env, PGHOST: db.hostname, PGPORT: db.port, PGUSER: db.username, PGPASSWORD: db.password, PGDATABASE: database };
+const bin = "/opt/homebrew/opt/postgresql@17/bin/psql", args = ["-XAtq", "-v", "ON_ERROR_STOP=1", "-v", "VERBOSITY=verbose"];
+const parse = (status, out, err) => ({ ok: status === 0, value: out.trim(), code: err.match(/ERROR:\s+([A-Z0-9]{5}):/)?.[1] });
+const sql = (input) => { const r = spawnSync(bin, args, { env, input, encoding: "utf8" }); return parse(r.status, r.stdout, r.stderr); };
+const need = (input) => { const r = sql(input); if (!r.ok) throw new Error(`Local SQLSTATE ${r.code ?? "connection"}`); return r.value; };
+const parallel = (input) => new Promise((resolve) => { const p = spawn(bin, args, { env, stdio: ["pipe", "pipe", "pipe"] }); let out = "", err = ""; p.stdout.on("data", c => out += c); p.stderr.on("data", c => err += c); p.on("close", code => resolve(parse(code, out, err))); p.stdin.end(input); });
+const q = v => `'${String(v).replaceAll("'", "''")}'`, j = v => `${q(JSON.stringify(v))}::jsonb`;
+const ids = Object.fromEntries(["org", "other", "platform", "lead", "admin", "employee", "otherLead"].map(k => [k, randomUUID()]));
+const suffix = randomUUID().slice(0, 8), email = key => `${suffix}.${key}@example.test`;
+const rpc = (actor, command, payload, key = randomUUID()) => `select public.levytate_client_admin_command(${q(ids[actor])},${q(key)},${q(command)},${j(payload)});`;
+const tx = input => `begin;set local role service_role;set local request.jwt.claim.role='service_role';${input}commit;`;
+const call = (...args) => JSON.parse(need(tx(rpc(...args))));
+let passed = 0, failed = 0;
+const check = (name, pass) => { pass ? passed++ : failed++; console.log(`${pass ? "PASS" : "FAIL"} ${name}`); };
+const deny = (name, actor, command, payload, key, codes = ["PT403", "PT404", "PT409", "PT422"]) => { const r = sql(tx(rpc(actor, command, payload, key))); check(name, !r.ok && codes.includes(r.code)); };
+const member = key => ({ organisationId: ids.org, email: email(key), displayName: "Synthetic account", role: "Apprenticeship Lead" });
+try {
+  need(`insert into public.levytate_organisations(id,name,slug,status,workspace_template)values(${q(ids.org)},'Synthetic admin tests',${q(`admin-${suffix}`)},'Active','levytate-client-v1'),(${q(ids.other)},'Synthetic second tenant',${q(`admin-other-${suffix}`)},'Active','levytate-client-v1');
+    insert into public.levytate_users(id,organisation_id,email,role,active,access_level)values${[["platform", "Platform Admin"], ["lead", "Apprenticeship Lead"], ["admin", "Employer Admin"], ["employee", "Employee"], ["otherLead", "Apprenticeship Lead"]].map(([k, role]) => `(${q(ids[k])},${q(k === "otherLead" ? ids.other : ids.org)},${q(email(k))},${q(role)},true,'beta_user')`).join(",")};`);
+  const creation = { name: "Synthetic blank workspace", workspaceName: "Synthetic workspace", primaryContact: "Synthetic Lead", email: email("initial"), role: "Apprenticeship Lead", slug: `blank-${suffix}` }, createKey = randomUUID();
+  deny("Lead cannot create a tenant", "lead", "create_workspace", creation);
+  const created = call("platform", "create_workspace", creation, createKey);
+  check("Platform creates pending initial account without Auth or employer fixtures", !created.user.active && created.user.invitation_status === "not_requested" && need(`select (select count(*) from auth.users)||':'||(select count(*) from public.levytate_employees where organisation_id=${q(created.organisation.id)});`) === "0:0");
+  check("create exact retry returns same workspace and account", call("platform", "create_workspace", creation, createKey).user.id === created.user.id);
+  check("receipt contains no Auth subject or session identifiers", !("auth_subject" in created.user) && !("auth_bound_at" in created.user));
+  deny("changed create input cannot reuse request key", "platform", "create_workspace", { ...creation, name: "Changed" }, createKey);
+  deny("Employee cannot provision a member", "employee", "provision_user", member("denied"));
+  deny("other-tenant Lead cannot provision a member", "otherLead", "provision_user", member("denied"));
+  deny("Lead cannot elevate to Employer Admin", "lead", "provision_user", { ...member("admin-denied"), role: "Employer Admin" });
+  deny("Department Head cannot become an authenticated role", "admin", "provision_user", { ...member("department"), role: "Department Head" });
+  deny("Employee provisioning requires authoritative People linkage", "lead", "provision_user", { ...member("person"), role: "Employee" });
+  need(`insert into public.levytate_employees(organisation_id,id,employee_number,name,email,platform_role,status,start_date)values(${q(ids.org)},${q(`person-${suffix}`)},${q(`person-${suffix}`)},'Synthetic Person',${q(email("person"))},'Employee','Active',current_date);`);
+  const paired = call("lead", "provision_user", { ...member("person"), role: "Employee" });
+  check("matching Employee is prepared pending with no Auth identity", paired.user.role === "Employee" && !paired.user.active && need("select count(*) from auth.users;") === "0");
+  const repeatedKey = randomUUID(), same = member("repeat");
+  const repeatRace = await Promise.all([0, 1].map(() => parallel(tx(rpc("lead", "provision_user", same, repeatedKey)))));
+  check("two simultaneous exact retries return one durable membership", repeatRace.every(r => r.ok) && JSON.parse(repeatRace[0].value).user.id === JSON.parse(repeatRace[1].value).user.id && need(`select count(*) from public.levytate_users where email=${q(same.email)};`) === "1");
+  const duplicate = member("duplicate"), emailRace = await Promise.all([0, 1].map(() => parallel(tx(rpc("lead", "provision_user", duplicate)))));
+  check("two different requests for one email produce one commit and one409", emailRace.filter(r => r.ok).length === 1 && emailRace.some(r => r.code === "PT409"));
+  const constraint = `release_admin_audit_${suffix}`;
+  need(`alter table public.levytate_audit_events add constraint ${constraint} check(organisation_id<>${q(ids.org)}::uuid) not valid;`);
+  let failure;
+  try { failure = sql(tx(rpc("lead", "provision_user", member("rollback")))); }
+  finally { need(`alter table public.levytate_audit_events drop constraint ${constraint};`); }
+  check("audit failure rolls back membership and receipt", !failure.ok && failure.code === "23514" && need(`select (select count(*) from public.levytate_users where email=${q(email("rollback"))})||':'||(select count(*) from public.levytate_client_admin_commands where request_payload->>'email'=${q(email("rollback"))});`) === "0:0");
+  const target = call("admin", "provision_user", member("editable")).user;
+  need(`update public.levytate_users set active=true,auth_subject=${q(randomUUID())},auth_binding_status='bound',auth_bound_at=now() where id=${q(target.id)};`);
+  const changes = ["Apprenticeship Lead", "Employer Admin"].map(role => ({ userId: target.id, role, active: false, expectedGeneration: 0 }));
+  const editRace = await Promise.all(changes.map(payload => parallel(tx(rpc("admin", "update_user", payload)))));
+  check("concurrent access edits at one generation have one winner", editRace.filter(r => r.ok).length === 1 && editRace.some(r => r.code === "PT409"));
+  const changed = JSON.parse(editRace.find(r => r.ok).value).user;
+  check("revocation advances once and removes current Auth binding", changed.invitation_generation === 1 && changed.invitation_status === "revoked" && need(`select (not active and auth_subject is null and auth_bound_at is null)::text from public.levytate_users where id=${q(target.id)};`) === "true");
+  deny("direct activation cannot replace controlled reinvitation", "admin", "update_user", { userId: target.id, role: changed.role, active: true, expectedGeneration: 1 });
+  const revokeKey = randomUUID(), revoke = { userId: target.id, role: changed.role, active: false, expectedGeneration: 1 };
+  const first = call("admin", "update_user", revoke, revokeKey), replay = call("admin", "update_user", revoke, revokeKey);
+  check("old-generation lost-response retry returns exact prior result", JSON.stringify(first) === JSON.stringify(replay) && first.user.invitation_generation === 2);
+  need(`update public.levytate_users set role='Employee' where id=${q(ids.admin)};`);
+  deny("role-revoked actor cannot replay an account receipt", "admin", "update_user", revoke, revokeKey);
+  need(`update public.levytate_organisations set status='Suspended' where id=${q(ids.org)};`);
+  deny("suspended actor workspace cannot replay provisioning receipt", "lead", "provision_user", same, repeatedKey);
+  for (const role of ["anon", "authenticated"]) { const r = sql(`begin;set local role ${role};${rpc("lead", "provision_user", member("browser"))}rollback;`); check(`${role} cannot invoke privileged account RPC`, !r.ok && r.code === "42501"); }
+  check("service cannot read or mutate command receipts directly", need("select (not has_table_privilege('service_role','public.levytate_client_admin_commands','select') and not has_table_privilege('service_role','public.levytate_client_admin_commands','insert'))::text;") === "true");
+} catch (error) { failed++; console.error(`FAIL independent account execution: ${error.message}`); }
+console.log(`Independent client account integrity: ${passed} PASS, ${failed} FAIL`);
+if (failed) process.exitCode = 1;

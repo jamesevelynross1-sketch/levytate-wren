@@ -1,7 +1,7 @@
 "use client";
 
 import { CheckCircle2, Clock3, FileText, GraduationCap, HeartHandshake, LockKeyhole, MessageCircle, ShieldCheck } from "lucide-react";
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, useRef, useState, type FormEvent } from "react";
 import type { LucideIcon } from "lucide-react";
 import { getApprenticeshipStandard } from "@/lib/levytate/domain";
 import {
@@ -16,7 +16,8 @@ import {
   type MvpRole,
   type MvpWorkspaceData,
 } from "@/lib/levytate/mvp/workspace";
-import { employeeCurrentApplication, managerName } from "@/lib/levytate/mvp/workspace-insights";
+import { managerName } from "@/lib/levytate/mvp/workspace-insights";
+import { closedApplicationOutcome, personalApplicationHistory, personalApplicationRecord } from "@/lib/levytate/mvp/personal-application-history";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import {
   FormGrid,
@@ -25,6 +26,10 @@ import {
   StatusBadge,
 } from "@/components/levytate-mvp/MvpUi";
 import { statusTone } from "@/components/levytate-mvp/module-utils";
+import { EmployeeEligibilityPanel } from "@/components/levytate-mvp/EmployeeEligibilityPanel";
+import { PersonalProgrammeDiscovery } from "@/components/levytate-mvp/PersonalProgrammeDiscovery";
+import { ownDevelopmentPerson } from "@/lib/levytate/mvp/programme-discovery";
+import { ClientMutationRecovery } from "@/components/levytate-mvp/ClientMutationRecovery";
 
 type EmployeeModuleTarget = "Home" | "My Programme" | "My Application" | "My Support" | "Copilot" | "Knowledge";
 
@@ -68,7 +73,10 @@ type EmployeeApplicationState =
   | "manager-approved"
   | "lead-review"
   | "approved-enrolment"
-  | "declined";
+  | "declined"
+  | "completed"
+  | "withdrawn"
+  | "cancelled";
 
 type EmployeeActionSummary = {
   primaryLabel: string;
@@ -82,6 +90,7 @@ export function EmployeeHomeModule({ onNavigate }: { onNavigate: (target: Employ
   const { data, meta } = useMvpWorkspace();
   const context = useEmployeeContext(data);
   const nextAction = nextEmployeeAction(context, data);
+  const closed = closedApplicationOutcome(context.application);
 
   if (!context.employee) return <EmployeeSetupNotice />;
 
@@ -96,9 +105,12 @@ export function EmployeeHomeModule({ onNavigate }: { onNavigate: (target: Employ
 
       <section className="rounded-2xl border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_14px_36px_rgba(16,44,61,0.04)] sm:p-6">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">Your journey</p><h2 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-[#102c3d]">Good to see you, {firstName(context.employee.name)}.</h2></div><button type="button" onClick={() => onNavigate("Copilot")} className="min-h-11 self-start rounded-xl border border-[#102c3d]/10 px-4 text-xs font-semibold text-[#102c3d] hover:bg-[#f4f8f5]">Ask LevyTate Copilot</button></div>
-        <div className="mt-5 grid gap-3 md:grid-cols-3"><EmployeeSummaryTile label="Recommended programme" value={context.programmeName} /><EmployeeSummaryTile label="Current application" value={employeeStatusLabel(context.application)} /><EmployeeSummaryTile label="Line manager" value={managerName(data, context.employee)} /></div>
+        <div className="mt-5 grid gap-3 md:grid-cols-3"><EmployeeSummaryTile label={closed ? "Recorded programme" : "Recommended programme"} value={context.programmeName} /><EmployeeSummaryTile label={closed ? "Latest application" : "Current application"} value={employeeStatusLabel(context.application)} /><EmployeeSummaryTile label="Line manager" value={managerName(data, context.employee)} /></div>
         {context.application ? <div className="mt-5 border-t border-[#102c3d]/[0.07] pt-5"><ApplicationProgress application={context.application} compact /></div> : null}
+        {closed ? <button type="button" onClick={() => onNavigate("My Application")} className="mt-4 min-h-11 rounded-xl border border-[#102c3d]/15 px-4 text-xs font-semibold text-[#102c3d]">View application record</button> : null}
       </section>
+
+      {meta?.storageMode === "supabase" ? data.learnerRecords.filter((record) => record.employeeId === context.employee?.id && record.recordStatus === "Active" && record.lifecycleStatus === "pre_enrolment").map((record) => <EmployeeEligibilityPanel key={record.id} learnerId={record.id} />) : null}
 
       {meta?.pastoralSupportEnabled ? <section className="rounded-2xl border border-[#159b8f]/15 bg-[#eef8f4] p-5 sm:p-6"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-[#087c73] shadow-sm"><HeartHandshake size={19} aria-hidden="true" /></span><div><h2 className="text-sm font-semibold text-[#102c3d]">Need some support with your apprenticeship?</h2><p className="mt-1 max-w-2xl text-xs leading-5 text-[#102c3d]/58">Talk something through privately with My Support, or go directly to an approved human support contact. Nothing is shared unless you choose to send a separate request.</p></div></div><button type="button" onClick={() => onNavigate("My Support")} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#102c3d] px-4 text-xs font-semibold text-white">Open My Support<ChevronRightIcon /></button></div></section> : null}
     </div>
@@ -120,6 +132,7 @@ export function EmployeeProgrammeModule({ onNavigate }: { onNavigate: (target: E
     ...(context.profile?.automationOpportunities ?? []),
   ].filter(Boolean).slice(0, 8);
 
+  if (meta?.storageMode === "supabase") return <PersonalProgrammeDiscovery onNavigate={onNavigate} />;
   if (!context.employee) return <EmployeeSetupNotice />;
   if (!context.application && !context.programmeAvailable) return <EmployeeProgrammeUnavailable onNavigate={onNavigate} />;
 
@@ -179,6 +192,7 @@ export function EmployeeApplicationModule({ onNavigate }: { onNavigate: (target:
   const { data, saveApplication, meta } = useMvpWorkspace();
   const context = useEmployeeContext(data);
   const existing = context.application;
+  const closed = closedApplicationOutcome(existing);
   const state = employeeApplicationState(existing);
   const editable = state === "none" || state === "draft" || state === "more-info";
   const configurableWorkflow = meta?.applicationWorkflowPublished === true;
@@ -188,6 +202,9 @@ export function EmployeeApplicationModule({ onNavigate }: { onNavigate: (target:
   const [error, setError] = useState("");
   const [savedMessage, setSavedMessage] = useState("");
   const [saving, setSaving] = useState(false);
+  const pending = useRef<MvpApplication | null>(null);
+  const working = useRef(false);
+  const [uncertain, setUncertain] = useState(false);
 
   if (!context.employee) return <EmployeeSetupNotice />;
 
@@ -209,7 +226,7 @@ export function EmployeeApplicationModule({ onNavigate }: { onNavigate: (target:
   const manager = managerName(data, context.employee);
 
   async function save(status: MvpApplication["status"], note: string) {
-    if (!context.employee || !context.mapping) return;
+    if (working.current || pending.current || !context.employee || (!existing && !context.mapping)) return;
     if (!editable) {
       setError("Your submitted answers are locked. You can edit them only if your manager requests more information.");
       return;
@@ -223,12 +240,12 @@ export function EmployeeApplicationModule({ onNavigate }: { onNavigate: (target:
       ...(existing ?? {
         id: createMvpId("application"),
         employeeId: context.employee.id,
-        apprenticeshipStandardId: context.mapping.apprenticeshipStandardId,
+        apprenticeshipStandardId: context.mapping!.apprenticeshipStandardId,
         submittedAt: now,
         history: [],
       }),
       employeeId: context.employee.id,
-      apprenticeshipStandardId: context.mapping.apprenticeshipStandardId,
+      apprenticeshipStandardId: existing?.apprenticeshipStandardId ?? context.mapping!.apprenticeshipStandardId,
       status,
       currentOwner: applicationOwnerForStatus(status),
       reason: draft.reason,
@@ -242,17 +259,31 @@ export function EmployeeApplicationModule({ onNavigate }: { onNavigate: (target:
         buildApplicationHistoryEntry(status, note, now),
       ],
     };
+    pending.current = next;
+    await sendPending();
+  }
+
+  async function sendPending() {
+    if (working.current || !pending.current) return;
+    const original = pending.current;
+    working.current = true;
     setSaving(true);
     setError("");
     setSavedMessage("");
-    const result = await saveApplication(next);
-    setSaving(false);
-    if (!result.ok) {
-      setError(result.message);
-      return;
+    try {
+      const result = await saveApplication(original);
+      if (!result.ok) throw new Error(result.message);
+      pending.current = null;
+      setUncertain(false);
+      setSavedMessage(original.status === "Draft" ? "Draft saved." : configurableWorkflow ? "Application submitted to your organisation's approval workflow." : "Application submitted to your line manager.");
+      if (original.status !== "Draft") setFormOpen(false);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "The application update could not be confirmed.");
+      setUncertain(true);
+    } finally {
+      working.current = false;
+      setSaving(false);
     }
-    setSavedMessage(status === "Draft" ? "Draft saved." : configurableWorkflow ? "Application submitted to your organisation's approval workflow." : "Application submitted to your line manager.");
-    if (status !== "Draft") setFormOpen(false);
   }
 
   function onSaveDraft(event: FormEvent) {
@@ -312,9 +343,10 @@ export function EmployeeApplicationModule({ onNavigate }: { onNavigate: (target:
           {showReadOnly && existing ? (
             <SubmittedAnswerSummary application={existing} context={context} data={data} />
           ) : null}
+          {closed ? <ActionCard title="Continue your development" copy="This application stays closed. Explore published programmes to start a separate application when you are ready." primaryLabel="Explore programmes" onPrimary={() => onNavigate("My Programme")} /> : null}
 
           {showForm ? (
-            <form onSubmit={onSaveDraft}>
+            <form onSubmit={onSaveDraft}><fieldset disabled={saving || uncertain} className="min-w-0">
               <div className="rounded-xl border border-[#102c3d]/[0.07] bg-white p-4">
                 <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                   <div>
@@ -346,40 +378,43 @@ export function EmployeeApplicationModule({ onNavigate }: { onNavigate: (target:
                   </button>
                 </div>
               </div>
-            </form>
+            </fieldset></form>
           ) : null}
+          <ClientMutationRecovery mutation={{ pending: uncertain, working: saving, error, retry: () => { void sendPending(); } }} />
         </div>
       </MvpPanel>
 
       <aside className="grid gap-4 content-start">
         {existing ? <ApplicationProgress application={existing} /> : <ApplicationProgress application={null} />}
-        <SideCard icon={MessageCircle} title="Need help?" copy="Use Copilot to prepare clearer answers before you submit, or ask your manager what support would be realistic." />
+        <SideCard icon={MessageCircle} title="Need help?" copy={closed ? "Ask Copilot about your recorded feedback or discuss future development with your manager." : "Use Copilot to prepare clearer answers before you submit, or ask your manager what support would be realistic."} />
       </aside>
     </div>
   );
 }
 
 function useEmployeeContext(data: MvpWorkspaceData): EmployeeContext {
-  return useMemo(() => buildEmployeeContext(data), [data]);
+  const { meta } = useMvpWorkspace();
+  return useMemo(() => buildEmployeeContext(data, meta?.storageMode === "supabase" ? meta.userEmail : undefined), [data, meta?.storageMode, meta?.userEmail]);
 }
 
-function buildEmployeeContext(data: MvpWorkspaceData): EmployeeContext {
-  const employee = data.employees.find((item) => item.status === "Active") ?? data.employees[0] ?? null;
+function buildEmployeeContext(data: MvpWorkspaceData, email?: string): EmployeeContext {
+  const employee = email === undefined ? data.employees.find((item) => item.status === "Active") ?? data.employees[0] ?? null : ownDevelopmentPerson(data, email);
   const role = data.roles.find((item) => item.id === employee?.roleId) ?? null;
   const profile = data.employeeDevelopmentProfiles.find((item) => item.employeeId === employee?.id) ?? null;
-  const application = employee ? employeeCurrentApplication(data, employee.id) : null;
+  const application = employee ? personalApplicationRecord(data, employee.id) : null;
   const mappings = role ? [...role.pathwayMappings].sort((left, right) => left.priority - right.priority) : [];
   const activeProgrammeIds = new Set(data.organisationProgrammes.filter((item) => item.status === "Active").map((item) => item.programmeId));
   const availableProgrammeForMapping = (candidate: MvpPathwayMapping) => data.providerProgrammes.find((item) =>
     activeProgrammeIds.has(item.id) && (item.linkedStandardId === candidate.apprenticeshipStandardId || item.linkedStandardIds.includes(candidate.apprenticeshipStandardId))
   ) ?? null;
   const mapping = application
-    ? mappings.find((item) => item.apprenticeshipStandardId === application.apprenticeshipStandardId) ?? mappings[0] ?? null
+    ? mappings.find((item) => item.apprenticeshipStandardId === application.apprenticeshipStandardId) ?? null
     : mappings.find((item) => availableProgrammeForMapping(item)) ?? null;
-  const standard = mapping ? getApprenticeshipStandard(mapping.apprenticeshipStandardId) : null;
-  const programme = mapping ? (application
-    ? data.providerProgrammes.find((item) => item.linkedStandardId === mapping.apprenticeshipStandardId || item.linkedStandardIds.includes(mapping.apprenticeshipStandardId)) ?? null
-    : availableProgrammeForMapping(mapping)) : null;
+  const standard = application ? getApprenticeshipStandard(application.apprenticeshipStandardId) : mapping ? getApprenticeshipStandard(mapping.apprenticeshipStandardId) : null;
+  const programme = !application && mapping ? availableProgrammeForMapping(mapping) : null;
+  const recordedLearner = application ? data.learnerRecords.find((record) => record.applicationId === application.id && record.employeeId === employee?.id) : null;
+  const recordedProgramme = recordedLearner ? data.providerProgrammes.find((item) => item.id === recordedLearner.programmeId && item.providerId === recordedLearner.providerId) : null;
+  const recordedProvider = recordedLearner ? data.providers.find((item) => item.providerId === recordedLearner.providerId) : null;
 
   return {
     employee,
@@ -390,8 +425,8 @@ function buildEmployeeContext(data: MvpWorkspaceData): EmployeeContext {
     programmeAvailable: Boolean(programme && activeProgrammeIds.has(programme.id)),
     standardTitle: standard?.title ?? mapping?.apprenticeshipStandardId ?? "Programme to confirm",
     standardLevel: standard?.level ? `Level ${standard.level}` : "Level to confirm",
-    programmeName: programme?.programmeName ?? (application ? standard?.title : null) ?? "No published programme",
-    providerName: providerLabel(data, programme?.providerId),
+    programmeName: application ? recordedProgramme?.programmeName || standard?.title || "Recorded apprenticeship application" : programme?.programmeName ?? "No published programme",
+    providerName: application ? recordedProvider?.providerName || (recordedLearner?.providerId ? "Provider no longer in the current catalogue" : "Not confirmed for this application") : providerLabel(data, programme?.providerId),
   };
 }
 
@@ -555,14 +590,15 @@ function ManagerRequestPanel({ application, manager }: { application: MvpApplica
 }
 
 function SubmittedAnswerSummary({ application, context, data }: { application: MvpApplication; context: EmployeeContext; data: MvpWorkspaceData }) {
+  const closed = closedApplicationOutcome(application);
   return (
     <section className="rounded-xl border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_14px_34px_rgba(16,44,61,0.04)]">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">Submitted version</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">{closed ? "Recorded answers" : "Submitted version"}</p>
           <h3 className="mt-1 text-base font-semibold tracking-[-0.01em] text-[#102c3d]">{context.programmeName}</h3>
           <p className="mt-1 text-sm leading-6 text-[#102c3d]/56">
-            These answers are locked while the application is with {applicationOwnerLabel(application, context, data)}.
+            {closed ? "This application record is read-only. Any future application starts separately." : <>These answers are locked while the application is with {applicationOwnerLabel(application, context, data)}.</>}
           </p>
         </div>
         <StatusBadge tone={statusTone(application.status)}>{application.status}</StatusBadge>
@@ -605,7 +641,7 @@ function DeclinedFeedback({ application }: { application: MvpApplication }) {
       <p className="text-sm font-semibold text-[#102c3d]">Decision feedback</p>
       <p className="mt-1 text-sm leading-6 text-[#102c3d]/62">{latest?.note || application.managerNote || "The decision note will appear here when available."}</p>
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        <ReadonlyField label="Decision maker" value={application.currentOwner} />
+        <ReadonlyField label="Decision maker" value={closedApplicationOutcome(application)?.decisionMaker || "Recorded reviewer"} />
         <ReadonlyField label="Decision date" value={formatDate(latest?.createdAt ?? application.updatedAt)} />
         <ReadonlyField label="Next step" value="Review feedback" />
       </div>
@@ -625,6 +661,8 @@ function ReadonlyField({ label, value }: { label: string; value: string }) {
 }
 
 function ApplicationProgress({ application, compact = false }: { application: MvpApplication | null; compact?: boolean }) {
+  const closed = closedApplicationOutcome(application);
+  if (closed && application) return <ClosedApplicationHistory application={application} label={closed.label} compact={compact} />;
   const rows = timelineRows(application);
   const configuredStep = application?.workflow?.version.steps.find((step) => step.id === application.workflow?.instance.currentStepId);
   const current = application?.workflow?.instance.state === "needs_information" ? "More information requested" : configuredStep?.label ?? applicationStage(application);
@@ -667,6 +705,17 @@ function ApplicationProgress({ application, compact = false }: { application: Mv
   );
 }
 
+function ClosedApplicationHistory({ application, label, compact }: { application: MvpApplication; label: string; compact: boolean }) {
+  const history = personalApplicationHistory(application);
+  const visible = compact ? history.slice(-3) : history;
+  return <section className="rounded-xl border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_14px_34px_rgba(16,44,61,0.04)]">
+    <div className="flex items-center justify-between gap-3"><p className="text-sm font-semibold text-[#102c3d]">Application history</p><StatusBadge tone={statusTone(application.status)}>{label}</StatusBadge></div>
+    <p className="mt-2 text-xs leading-5 text-[#102c3d]/58">Closed record · no review is pending.</p>
+    {visible.length ? <ol className="mt-4 grid gap-3">{visible.map((entry) => <li key={entry.id} className="rounded-xl bg-[#f8fbfa] p-3"><p className="text-xs font-semibold text-[#102c3d]">{entry.status} · <time dateTime={entry.createdAt}>{formatDate(entry.createdAt)}</time></p><p className="mt-1 text-xs leading-5 text-[#102c3d]/58">{entry.note || "No note recorded."}</p></li>)}</ol> : <p className="mt-4 text-xs leading-5 text-[#102c3d]/58">No earlier history entries were recorded.</p>}
+    {visible.length < history.length ? <p className="mt-3 text-xs leading-5 text-[#102c3d]/58">Showing the latest three updates. Open My Application for the full record.</p> : null}
+  </section>;
+}
+
 function applicationStage(application: MvpApplication | null): (typeof applicationStages)[number] {
   if (!application) return "Not started";
   if (application.status === "Draft") return "Draft";
@@ -682,6 +731,8 @@ function applicationStage(application: MvpApplication | null): (typeof applicati
 
 function employeeApplicationState(application: MvpApplication | null): EmployeeApplicationState {
   if (!application) return "none";
+  const closed = closedApplicationOutcome(application);
+  if (closed) return closed.state;
   if (application.status === "Draft") return "draft";
   if (application.status === "More information requested") return "more-info";
   if (application.status === "Approved by Line Manager") return "manager-approved";
@@ -703,6 +754,11 @@ function applicationStateContent(context: EmployeeContext, data: MvpWorkspaceDat
   const state = employeeApplicationState(context.application);
   const manager = context.employee ? managerName(data, context.employee) : "your line manager";
   const owner = context.application ? applicationOwnerLabel(context.application, context, data) : "You";
+  const closed = closedApplicationOutcome(context.application);
+  if (closed) return {
+    title: closed.title, copy: closed.copy, supportingCopy: "Closed applications do not block a new application from My Programme.",
+    primaryAction: "Explore programmes", owner: "Closed — no review pending", tone: closed.state === "declined" ? "red" : closed.state === "completed" ? "green" : "neutral", icon: closed.state === "completed" ? CheckCircle2 : FileText,
+  };
 
   if (state === "none") {
     return {
@@ -815,6 +871,7 @@ function nextEmployeeAction(context: EmployeeContext, data: MvpWorkspaceData): E
     };
   }
   const content = applicationStateContent(context, data);
+  if (closedApplicationOutcome(context.application)) return { primaryLabel: "Explore programmes", target: "My Programme", heading: content.title, copy: content.copy, owner: "You" };
   return {
     primaryLabel: content.primaryAction,
     target: "My Application",
@@ -825,6 +882,8 @@ function nextEmployeeAction(context: EmployeeContext, data: MvpWorkspaceData): E
 }
 
 function employeeStatusLabel(application: MvpApplication | null) {
+  const closed = closedApplicationOutcome(application);
+  if (closed) return closed.label;
   const state = employeeApplicationState(application);
   if (state === "none") return "Not started";
   if (state === "draft") return "Draft saved";
@@ -854,7 +913,7 @@ function answerRows(application: MvpApplication) {
 }
 
 function latestHistory(application: MvpApplication) {
-  return application.history.at(-1) ?? null;
+  return personalApplicationHistory(application).at(-1) ?? null;
 }
 
 function statusToneFromState(tone: "blue" | "green" | "yellow" | "red" | "neutral") {

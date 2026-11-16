@@ -1,3 +1,4 @@
+import { readAuthenticatedJson } from "@/lib/server/levytate-request-boundary";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
@@ -11,7 +12,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ le
   if (!session) return NextResponse.json({ message: "Unauthorised." }, { status: 401 });
   try {
     const { learnerRecordId, breakId } = await params;
-    const result = await updateBreakInLearning(session, learnerRecordId, breakId, await request.json() as UpdateBreakInLearningInput);
+    const result = await updateBreakInLearning(session, learnerRecordId, breakId, await readAuthenticatedJson(request, session.email) as UpdateBreakInLearningInput);
     return NextResponse.json({ ok: true, source: "supabase", message: "Break in learning details updated.", ...result });
   } catch (error) {
     return lifecycleErrorResponse(error);

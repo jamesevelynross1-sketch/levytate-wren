@@ -8,6 +8,10 @@ import { OperationalActionDetail } from "@/components/levytate-mvp/OperationalAc
 import { OperationalGovernanceView } from "@/components/levytate-mvp/OperationalGovernanceView";
 import { ProgressReviewIntelligencePanel } from "@/components/levytate-mvp/ProgressReviewIntelligencePanel";
 import { AutopilotOperationsPanel } from "@/components/levytate-mvp/AutopilotOperationsPanel";
+import { ClientMutationRecovery } from "@/components/levytate-mvp/ClientMutationRecovery";
+import { useOperationsClientCommand } from "@/components/levytate-mvp/useOperationsClientCommand";
+import { useRetainedWorkspaceRequest } from "@/components/levytate-mvp/useRetainedWorkspaceRequest";
+import { decodeOperationsSummary } from "@/lib/levytate/operations-client-response";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { operationalActionStatusLabels, type OperationalActionStatus } from "@/lib/levytate/mvp/operational-actions";
 import type { IntelligenceSignal } from "@/lib/levytate/intelligence/progress-review";
@@ -21,7 +25,6 @@ import {
   type OperationsResponse,
 } from "@/lib/levytate/mvp/operations-centre";
 
-type OperationsApiResponse = Partial<OperationsResponse> & { ok?: boolean; error?: string; message?: string };
 type LearnerAction = { learnerRecordId: string; actionType: OperationalActionType };
 
 const queueOrder: OperationalQueueType[] = ["urgent", "ready_to_enrol", "assessment", "reviews", "progress", "breaks", "pre_enrolment"];
@@ -29,6 +32,11 @@ const dueStatuses: Array<OperationalDueStatus | "All"> = ["All", "Overdue", "Due
 
 export function OperationsCentreModule({ onOpenLearner, onSignalContext }: { onOpenLearner: (target: LearnerAction) => void; onSignalContext?: (signal: IntelligenceSignal | null) => void }) {
   const { can, meta } = useMvpWorkspace();
+  const request = useRetainedWorkspaceRequest();
+  const mutation = useOperationsClientCommand();
+  const scope = mutation.scope;
+  const command = useRef(mutation.execute);
+  command.current = mutation.execute;
   const authorised = can("learnerLifecycle:read") && ["Apprenticeship Lead", "Employer Admin"].includes(meta?.userRole ?? "");
   const [data, setData] = useState<OperationsResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -45,6 +53,7 @@ export function OperationsCentreModule({ onOpenLearner, onSignalContext }: { onO
   const [assignment, setAssignment] = useState<"all" | "mine" | "unassigned" | "shared">("all");
   const [moreFilters, setMoreFilters] = useState(false);
   const [selectedActionId, setSelectedActionId] = useState("");
+  const [intelligenceLocked, setIntelligenceLocked] = useState(false);
   const [workspaceView, setWorkspaceView] = useState<"autopilot" | "active" | "closed">("autopilot");
   const [refreshKey, setRefreshKey] = useState(0);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({ urgent: true, ready_to_enrol: true });
@@ -70,17 +79,18 @@ export function OperationsCentreModule({ onOpenLearner, onSignalContext }: { onO
       if (learner !== "All") params.set("learner", learner);
       if (programme !== "All") params.set("programme", programme);
       if (assignment !== "all") params.set("assignment", assignment);
-      if (initialSynchronisationPending.current) {
-        params.set("synchronise", "true");
-        initialSynchronisationPending.current = false;
-      }
+      const synchronise = initialSynchronisationPending.current;
       try {
-        const response = await fetch(`/api/levytate-operations${params.size ? `?${params}` : ""}`, { cache: "no-store", signal: controller.signal });
-        const payload = (await response.json()) as OperationsApiResponse;
-        if (!response.ok || !payload.summary || !payload.queues || !payload.filterOptions || !payload.recentActivity) {
-          throw new Error(payload.message ?? "Operations data is unavailable.");
+        const path = `/api/levytate-operations${params.size ? `?${params}` : ""}`;
+        if (synchronise) {
+          initialSynchronisationPending.current = false;
+          await command.current(path, {}, value => decodeOperationsSummary(value, scope), setData);
+        } else {
+          const response = await request(path, { cache: "no-store", signal: controller.signal });
+          if (!response.ok) throw new Error("Operations data is unavailable.");
+          const next = decodeOperationsSummary(await response.json(), scope);
+          if (!controller.signal.aborted) setData(next);
         }
-        setData(payload as OperationsResponse);
       } catch (loadError) {
         if (!(loadError instanceof DOMException && loadError.name === "AbortError")) {
           setError(loadError instanceof Error ? loadError.message : "Operations data is unavailable.");
@@ -93,7 +103,7 @@ export function OperationsCentreModule({ onOpenLearner, onSignalContext }: { onO
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [actionType, assignment, authorised, dueStatus, learner, owner, priority, programme, queue, refreshKey, search, status, workspaceView]);
+  }, [actionType, assignment, authorised, dueStatus, learner, owner, priority, programme, queue, refreshKey, search, status, workspaceView, request, scope]);
 
   const hasFilters = Boolean(search.trim()) || priority !== "All" || queue !== "All" || owner !== "All" || dueStatus !== "All" || status !== "All" || actionType !== "All" || learner !== "All" || programme !== "All" || assignment !== "all";
   const nextUpcoming = useMemo(() => data ? queueOrder.flatMap((key) => data.queues[key]).find((item) => item.dueStatus === "Due soon") : undefined, [data]);
@@ -108,11 +118,11 @@ export function OperationsCentreModule({ onOpenLearner, onSignalContext }: { onO
   }
 
   if (selectedActionId) {
-    return <OperationalActionDetail actionId={selectedActionId} onBack={() => setSelectedActionId("")} onOpenAction={setSelectedActionId} onOpenLearner={onOpenLearner} onChanged={() => setRefreshKey((current) => current + 1)} />;
+    return <OperationalActionDetail key={selectedActionId} actionId={selectedActionId} onBack={() => setSelectedActionId("")} onOpenAction={setSelectedActionId} onOpenLearner={onOpenLearner} onChanged={() => setRefreshKey((current) => current + 1)} />;
   }
 
   if (workspaceView === "autopilot") {
-    return <div className="grid min-w-0 gap-4"><OperationsModeTabs value={workspaceView} onChange={setWorkspaceView} /><AutopilotOperationsPanel onOpenAction={setSelectedActionId} /></div>;
+    return <div className="grid min-w-0 gap-4"><fieldset disabled={intelligenceLocked} className="min-w-0"><OperationsModeTabs value={workspaceView} onChange={setWorkspaceView} /></fieldset><AutopilotOperationsPanel onOpenAction={setSelectedActionId} onLockedChange={setIntelligenceLocked} /></div>;
   }
 
   if (workspaceView === "closed") {
@@ -120,9 +130,11 @@ export function OperationsCentreModule({ onOpenLearner, onSignalContext }: { onO
   }
 
   return (
+    <>
+    <fieldset disabled={mutation.locked || intelligenceLocked} className="min-w-0"><OperationsModeTabs value={workspaceView} onChange={setWorkspaceView} /></fieldset>
+    <fieldset disabled={mutation.locked} className="min-w-0"><ProgressReviewIntelligencePanel enabled={Boolean(meta?.storageMode === "supabase")} onSignalContext={onSignalContext} onLockedChange={setIntelligenceLocked} onOpenAction={setSelectedActionId} /></fieldset>
+    <fieldset disabled={mutation.locked || intelligenceLocked} className="min-w-0">
     <div className="grid min-w-0 gap-5" data-testid="operations-centre">
-      <OperationsModeTabs value={workspaceView} onChange={setWorkspaceView} />
-      <ProgressReviewIntelligencePanel enabled={Boolean(meta?.storageMode === "supabase")} onSignalContext={onSignalContext} />
       <section>
         <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
           <div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">Daily learner operations</p><h2 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-[#102c3d]">Operational status</h2></div>
@@ -178,6 +190,9 @@ export function OperationsCentreModule({ onOpenLearner, onSignalContext }: { onO
         </div>
       ) : null}
     </div>
+    </fieldset>
+    <ClientMutationRecovery mutation={mutation} />
+    </>
   );
 }
 

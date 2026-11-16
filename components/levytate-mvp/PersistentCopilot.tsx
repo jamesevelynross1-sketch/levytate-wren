@@ -4,6 +4,7 @@ import { PanelRightOpen, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { AskLevyTateAiWorkspace } from "@/components/levytate-mvp/AskLevyTateAiWorkspace";
 import type { LevyTateCopilotContext } from "@/lib/levytate/copilot-context";
+import { topmostModalDialog } from "@/lib/levytate/dialog-focus";
 
 export function PersistentCopilot({ context, initialEmployeeId, onNavigate }: { context: LevyTateCopilotContext; initialEmployeeId?: string | null; onNavigate?: (target: string) => void }) {
   const [open, setOpen] = useState(false);
@@ -14,7 +15,8 @@ export function PersistentCopilot({ context, initialEmployeeId, onNavigate }: { 
     if (!open) return;
     closeRef.current?.focus();
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
+      if (event.key !== "Escape" || event.defaultPrevented || topmostModalDialog(document)) return;
+      event.preventDefault();
       setOpen(false);
       requestAnimationFrame(() => launcherRef.current?.focus());
     };

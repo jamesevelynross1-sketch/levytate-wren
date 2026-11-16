@@ -33,7 +33,7 @@ const managerAreas: readonly Release2NavigationArea[] = [
   { key: "home", label: "Home", description: "Decisions and team attention", modules: ["Home"], priority: "primary" },
   { key: "team", label: "My Team", description: "Direct-report development", modules: ["My Team", "Learner Support"], priority: "primary" },
   { key: "approvals", label: "Approvals", description: "Applications awaiting your decision", modules: ["Approvals"], priority: "primary" },
-  { key: "development", label: "My Development", description: "Your own assessment and learning", modules: ["Assessments", "Learning Time"], priority: "secondary" },
+  { key: "development", label: "My Development", description: "Your own programmes, application, assessment and learning", modules: ["Assessments", "My Programme", "My Application", "Learning Time"], priority: "secondary" },
   { key: "copilot", label: "Copilot", description: "Grounded manager support", modules: ["Copilot"], priority: "secondary" },
   { key: "guidance", label: "Guidance", description: "Practical apprenticeship guidance", modules: ["Knowledge"], priority: "secondary" },
 ];

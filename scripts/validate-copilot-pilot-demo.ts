@@ -38,6 +38,7 @@ const signals = analyseOperationsAutopilot({
         type: "provider_review" as const,
         nextReviewDate: review.next_review_date,
         reviewDate: review.review_date,
+        createdAt: review.created_at,
         status: review.status,
       })),
     };
@@ -65,7 +66,7 @@ const signals = analyseOperationsAutopilot({
     updatedAt: application.updated_at,
   })),
 });
-const persisted = signals.map((signal) => ({ ...signal, status: "new" as const }));
+const persisted = signals.map((signal) => ({ ...signal, revision: 0, status: "new" as const }));
 const brief = buildOperationsBrief(persisted);
 check("source conditions produce exactly nine Autopilot signals", signals.length === 9);
 check("source conditions produce Action now 3", brief.actionNow === 3);

@@ -2,9 +2,14 @@
 
 import { ArrowRight, CheckCircle2, CircleDashed, ClipboardCheck, Info, LockKeyhole, Printer, RefreshCw, ShieldCheck, TriangleAlert, Users } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { LiftActionInput, LiftWorkspaceResponse } from "@/lib/levytate/lift/api";
-import { liftCapabilityLabels, liftWorkflowGroupLabels, type LiftAnswerMap, type LiftDecisionOption, type LiftOpportunity, type LiftWorkflowGroup, type LiftWorkspace } from "@/lib/levytate/lift/domain";
+import type { LiftActionInput } from "@/lib/levytate/lift/api";
+import { liftCapabilityLabels, liftWorkflowGroupLabels, type LiftAnswerMap, type LiftDecisionOption, type LiftEmployeeContext, type LiftOpportunity, type LiftWorkflowGroup, type LiftWorkspace } from "@/lib/levytate/lift/domain";
 import { calculateLiftCapacityValue } from "@/lib/levytate/lift/value";
+import { authenticatedClientFetch, type ClientIdentity } from "@/lib/levytate/client-session";
+import { decodeLiftMutationResponse } from "@/lib/levytate/client-module-responses";
+import { usePinnedClientMutation } from "@/components/levytate-mvp/usePinnedClientMutation";
+import { ClientMutationRecovery } from "@/components/levytate-mvp/ClientMutationRecovery";
+import { decodeLiftReadResponse } from "@/lib/levytate/client-module-reads";
 
 const panel = "rounded-2xl border border-[#102c3d]/[0.08] bg-white shadow-[0_14px_40px_rgba(16,44,61,0.055)]";
 const button = "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#102c3d] px-4 text-sm font-semibold text-white transition hover:bg-[#183f50] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/25 disabled:opacity-50";
@@ -13,21 +18,26 @@ const field = "w-full rounded-xl border border-[#102c3d]/15 bg-white px-3 py-3 t
 
 type LeaderView = "Opportunity" | "Decisions" | "Proof" | "Participation" | "Historical";
 
-export function LiftModule({ initialWorkspace = null, initialLeaderView = "Opportunity" }: { initialWorkspace?: LiftWorkspace | null; initialLeaderView?: LeaderView }) {
+export function LiftModule({ initialWorkspace = null, initialLeaderView = "Opportunity", identity = null }: { initialWorkspace?: LiftWorkspace | null; initialLeaderView?: LeaderView; identity?: ClientIdentity | null }) {
   const [workspace, setWorkspace] = useState<LiftWorkspace | null>(initialWorkspace);
   const [loading, setLoading] = useState(!initialWorkspace);
   const [message, setMessage] = useState("");
-  const actionInFlight = useRef(false);
-  const idempotencyKeys = useRef(new Map<string, string>());
+  const account = useRef(identity ? { ...identity } : null);
+  const mutation = usePinnedClientMutation(account.current, "/api/levytate-lift", decodeLiftMutationResponse);
+  const executeMutation = mutation.execute;
+  const workspaceRevision = useRef(initialWorkspace?.mutationRevision);
 
   const load = useCallback(async () => {
     setLoading(true);
     setMessage("");
     try {
-      const response = await fetch("/api/levytate-lift", { cache: "no-store" });
-      const payload = await response.json() as LiftWorkspaceResponse;
-      if (!response.ok || (!("ok" in payload) || payload.ok !== true)) throw new Error("message" in payload ? payload.message : "Lift could not be loaded.");
-      setWorkspace(payload.workspace);
+      if (!account.current) { setMessage("This illustrative preview cannot save changes."); return; }
+      const response = await authenticatedClientFetch("/api/levytate-lift", {}, account.current);
+      const body: unknown = await response.json();
+      if (!response.ok) throw new Error("Lift could not be loaded. Retry to load the current workspace.");
+      const next = decodeLiftReadResponse(body);
+      setWorkspace(next);
+      workspaceRevision.current = next.mutationRevision;
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Lift could not be loaded.");
     } finally { setLoading(false); }
@@ -36,35 +46,29 @@ export function LiftModule({ initialWorkspace = null, initialLeaderView = "Oppor
   useEffect(() => { if (!initialWorkspace) void load(); }, [initialWorkspace, load]);
 
   const action = useCallback(async (input: LiftActionInput) => {
-    if (actionInFlight.current) return false;
-    actionInFlight.current = true;
+    if (!account.current) { setMessage("This illustrative preview cannot save changes."); return false; }
     setMessage("");
     try {
-      const fingerprint = JSON.stringify(input);
-      const idempotencyKey = idempotencyKeys.current.get(fingerprint) ?? `${input.action}:${crypto.randomUUID()}`;
-      idempotencyKeys.current.set(fingerprint, idempotencyKey);
-      const response = await fetch("/api/levytate-lift", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...input, idempotencyKey }) });
-      const payload = await response.json() as LiftWorkspaceResponse;
-      if (!response.ok || (!("ok" in payload) || payload.ok !== true)) throw new Error("message" in payload ? payload.message : "The Lift action could not be completed.");
-      setWorkspace(payload.workspace);
-      setMessage("Saved successfully.");
+      await executeMutation({ ...input, idempotencyKey: `${input.action}:${crypto.randomUUID()}`, expectedWorkspaceRevision: workspaceRevision.current }, (next) => {
+        setWorkspace(next); workspaceRevision.current = next.mutationRevision; setMessage("Saved successfully.");
+      });
       return true;
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "The Lift action could not be completed.");
       return false;
-    } finally { actionInFlight.current = false; }
-  }, []);
+    }
+  }, [executeMutation]);
 
   if (loading) return <section className={`${panel} p-6`} role="status">Loading Lift…</section>;
   if (!workspace) return <section className={`${panel} p-6`} role="alert"><TriangleAlert size={20} className="text-[#c95568]"/><h2 className="mt-3 text-lg font-semibold">Lift is unavailable</h2><p className="mt-2 text-sm text-[#102c3d]/60">{message || "This workspace is not enabled for Lift."}</p><button className={`${secondary} mt-4`} onClick={() => void load()}><RefreshCw size={15}/>Try again</button></section>;
 
-  return <div className="space-y-5" data-testid="lift-module">
+  return <div className="space-y-4"><ClientMutationRecovery mutation={mutation}/><fieldset disabled={mutation.locked} key={mutation.reconciled} className="min-w-0 border-0 p-0"><div className="space-y-5" data-testid="lift-module">
     <LiftHeader workspace={workspace}/>
-    {message ? <p role="status" className="rounded-xl border border-[#159b8f]/20 bg-[#eef8f5] px-4 py-3 text-sm text-[#087c73]">{message}</p> : null}
+    {message ? <div role="status" className="rounded-xl border border-[#159b8f]/20 bg-[#eef8f5] px-4 py-3 text-sm text-[#087c73]"><p>{message}</p>{message !== "Saved successfully." && account.current ? <button className={`${secondary} mt-2`} onClick={() => { if (!mutation.locked) void load(); }}>Refresh workspace</button> : null}</div> : null}
     {workspace.role === "Employee" ? <EmployeeLift workspace={workspace} onAction={action}/> : null}
     {workspace.role === "Line Manager" ? <ManagerLift workspace={workspace} onAction={action}/> : null}
     {workspace.role === "Apprenticeship Lead" || workspace.role === "Employer Admin" ? <LeaderLift workspace={workspace} onAction={action} initialView={initialLeaderView}/> : null}
-  </div>;
+  </div></fieldset></div>;
 }
 
 function LiftHeader({ workspace }: { workspace: LiftWorkspace }) {
@@ -81,6 +85,10 @@ function EmployeeLift({ workspace, onAction }: { workspace: LiftWorkspace; onAct
   const [index, setIndex] = useState(assessment?.currentQuestionIndex ?? 0);
   const [answers, setAnswers] = useState<LiftAnswerMap>(assessment?.answers ?? {});
   const question = workspace.framework.questions[index];
+  const submit = async () => {
+    if (!assessment) return;
+    if (await onAction({ action: "save_assessment", assessmentId: assessment.id, answers, currentQuestionIndex: index, expectedRevision: 1 })) await onAction({ action: "submit_assessment", assessmentId: assessment.id, expectedRevision: 1 });
+  };
   if (!assessment || !question) return <Empty title="No current Lift invitation" copy="A private assessment appears here only after an authorised employer invitation."/>;
   if (assessment.status === "submitted") return <SubmittedEmployeeLift workspace={workspace} onAction={onAction}/>;
   const complete = Object.values(answers).filter((value) => value !== null && value !== "" && (!Array.isArray(value) || value.length)).length;
@@ -90,7 +98,7 @@ function EmployeeLift({ workspace, onAction }: { workspace: LiftWorkspace; onAct
       <div className="flex items-center justify-between gap-3 text-xs font-semibold text-[#102c3d]/55"><span>{question.episode}</span><span>{index + 1} of {workspace.framework.questions.length}</span></div>
       <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#e8efed]" role="progressbar" aria-valuenow={complete} aria-valuemin={0} aria-valuemax={workspace.framework.questions.length} aria-label="Lift assessment progress"><div className="h-full rounded-full bg-[#159b8f]" style={{ width: `${complete / workspace.framework.questions.length * 100}%` }}/></div>
       <fieldset className="mt-7"><legend className="text-xl font-semibold leading-8 tracking-[-0.02em] text-[#102c3d]">{question.prompt}</legend><p className="mt-2 text-sm leading-6 text-[#102c3d]/55">{question.helpText}</p><QuestionInput question={question} value={answers[question.id]} onChange={(value) => setAnswers({ ...answers, [question.id]: value })}/></fieldset>
-      <div className="mt-8 flex flex-wrap justify-between gap-3 border-t border-[#102c3d]/[0.08] pt-5"><button className={secondary} disabled={index === 0} onClick={() => setIndex(Math.max(0, index - 1))}>Previous</button><div className="flex flex-wrap gap-2"><button className={secondary} onClick={() => void onAction({ action: "save_assessment", assessmentId: assessment.id, answers, currentQuestionIndex: index, expectedRevision: 1 })}>Save and return later</button>{index === workspace.framework.questions.length - 1 ? <button className={button} onClick={() => void onAction({ action: "submit_assessment", assessmentId: assessment.id, expectedRevision: 1 })}>Final check and submit</button> : <button className={button} onClick={() => setIndex(Math.min(workspace.framework.questions.length - 1, index + 1))}>Next <ArrowRight size={15}/></button>}</div></div>
+      <div className="mt-8 flex flex-wrap justify-between gap-3 border-t border-[#102c3d]/[0.08] pt-5"><button className={secondary} disabled={index === 0} onClick={() => setIndex(Math.max(0, index - 1))}>Previous</button><div className="flex flex-wrap gap-2"><button className={secondary} onClick={() => void onAction({ action: "save_assessment", assessmentId: assessment.id, answers, currentQuestionIndex: index, expectedRevision: 1 })}>Save and return later</button>{index === workspace.framework.questions.length - 1 ? <button className={button} onClick={() => void submit()}>Final check and submit</button> : <button className={button} onClick={() => setIndex(Math.min(workspace.framework.questions.length - 1, index + 1))}>Next <ArrowRight size={15}/></button>}</div></div>
     </section>
   </div>;
 }
@@ -102,44 +110,76 @@ function SubmittedEmployeeLift({ workspace, onAction }: { workspace: LiftWorkspa
   const interest = typeof assessment.answers.intro_interests === "string" ? assessment.answers.intro_interests : "";
   return <div className="space-y-5">
     <section className={`${panel} p-5 sm:p-7`}><CheckCircle2 size={24} className="text-[#087c73]"/><h3 className="mt-3 text-xl font-semibold text-[#102c3d]">Your assessment is complete</h3><p className="mt-2 max-w-3xl text-sm leading-6 text-[#102c3d]/60">Thank you. These are evidence states for reflection, not scores, grades or employment decisions. New evidence creates a new interpretation rather than rewriting this submission.</p>{interest ? <div className="mt-4 rounded-xl bg-[#f2f7f4] p-4 text-sm leading-6 text-[#102c3d]/65"><b className="text-[#102c3d]">The development interest you volunteered</b><p className="mt-1">{interest}</p></div> : null}<div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">{assessment.findings.map((finding) => <article key={finding.capabilityId} className="rounded-xl border border-[#102c3d]/10 bg-[#fbfcfa] p-3"><p className="text-xs font-semibold text-[#102c3d]">{liftCapabilityLabels[finding.capabilityId]}</p><p className="mt-1 text-xs text-[#087c73]">{finding.state}</p><p className="mt-2 text-[11px] leading-5 text-[#102c3d]/52">{finding.limitation}</p></article>)}</div></section>
-    {assessment.releasedManagerObservation ? <section className={`${panel} p-5 sm:p-7`}><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#087c73]">Released Workplace Perspective</p><h3 className="mt-2 text-lg font-semibold text-[#102c3d]">Add context without overwriting either perspective</h3><div className="mt-4 grid gap-3 sm:grid-cols-2"><Description term="Observed work" value={assessment.releasedManagerObservation.observedWork}/><Description term="Suitable opportunity" value={assessment.releasedManagerObservation.suitableOpportunity}/><Description term="Intended outcome" value={assessment.releasedManagerObservation.intendedOutcome}/><Description term="Workplace conditions" value={assessment.releasedManagerObservation.workplaceConditions.join(" · ") || "None recorded"}/></div><TextField label="Your context or clarification" value={context} onChange={setContext}/><label className="mt-4 flex items-start gap-3 text-sm text-[#102c3d]"><input className="mt-1" type="checkbox" checked={disputed} onChange={(event) => setDisputed(event.target.checked)}/><span><b className="block">I dispute an example or interpretation</b><span className="text-xs text-[#102c3d]/55">The original observation stays intact and your context is recorded separately.</span></span></label><button className={`${button} mt-5`} disabled={!context.trim()} onClick={() => void onAction({ action: "record_employee_context", managerObservationId: assessment.releasedManagerObservation!.id, context, disputed })}>Record my context</button></section> : <Empty title="Workplace perspective not yet added" copy="You can continue without manager input. Missing manager evidence means not observed; it is never interpreted as low capability. Your initial findings stay private from the manager until they submit an independent perspective."/>}
+    {assessment.releasedManagerObservation ? <section className={`${panel} p-5 sm:p-7`}><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#087c73]">Released Workplace Perspective</p><h3 className="mt-2 text-lg font-semibold text-[#102c3d]">Add context without overwriting either perspective</h3><div className="mt-4 grid gap-3 sm:grid-cols-2"><Description term="Observed work" value={assessment.releasedManagerObservation.observedWork}/><Description term="Suitable opportunity" value={assessment.releasedManagerObservation.suitableOpportunity}/><Description term="Intended outcome" value={assessment.releasedManagerObservation.intendedOutcome}/><Description term="Workplace conditions" value={assessment.releasedManagerObservation.workplaceConditions.join(" · ") || "None recorded"}/></div><OwnLiftContexts entries={assessment.releasedManagerObservation.ownContexts}/><TextField label="Your context or clarification" value={context} onChange={setContext}/><label className="mt-4 flex items-start gap-3 text-sm text-[#102c3d]"><input className="mt-1" type="checkbox" checked={disputed} onChange={(event) => setDisputed(event.target.checked)}/><span><b className="block">I dispute an example or interpretation</b><span className="text-xs text-[#102c3d]/55">The original observation stays intact and your context is recorded separately.</span></span></label><button className={`${button} mt-5`} disabled={!context.trim()} onClick={async () => { if (await onAction({ action: "record_employee_context", managerObservationId: assessment.releasedManagerObservation!.id, context, disputed })) { setContext(""); setDisputed(false); } }}>Record my context</button></section> : <Empty title="Workplace perspective not yet added" copy="You can continue without manager input. Missing manager evidence means not observed; it is never interpreted as low capability. Your initial findings stay private from the manager until they submit an independent perspective."/>}
   </div>;
+}
+
+function OwnLiftContexts({ entries }: { entries: LiftEmployeeContext[] }) {
+  return <section aria-label="Your recorded context" className="mt-5">
+    <h4 className="text-sm font-semibold text-[#102c3d]">Your recorded context</h4>
+    <p className="mt-1 text-xs leading-5 text-[#102c3d]/55">Your entries remain separate from the original observation and are visible only to you.</p>
+    {entries.length ? <ol className="mt-3 space-y-3">
+      {entries.map(entry => <li key={entry.id} className="rounded-xl border border-[#102c3d]/10 bg-[#f8fbfa] p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#102c3d]/60">
+          <b>{entry.disputed ? "Disputed observation" : "Clarification"}</b>
+          <time dateTime={entry.recordedAt}>{new Date(entry.recordedAt).toLocaleString("en-GB", { timeZone: "UTC" })} UTC</time>
+        </div>
+        <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-[#102c3d]">{entry.context}</p>
+      </li>)}
+    </ol> : <p className="mt-3 text-sm text-[#102c3d]/55">No clarification has been recorded yet.</p>}
+  </section>;
 }
 
 function ManagerLift({ workspace, onAction }: { workspace: LiftWorkspace; onAction: (action: LiftActionInput) => Promise<boolean> }) {
   const manager = workspace.manager;
   const [selectedId, setSelectedId] = useState(manager?.directReports[0]?.employeeId ?? "");
-  const [context, setContext] = useState<{ workflowGroup: LiftWorkflowGroup; observedWork: string; example: string; opportunity: string; outcome: string; conditions: string }>({ workflowGroup: "other_reviewed", observedWork: "", example: "", opportunity: "", outcome: "", conditions: "" });
+  const [context, setContext] = useState(() => managerDraft(manager?.directReports[0]?.draft));
   const [teamContext, setTeamContext] = useState({ purpose: "", workflows: "", friction: "", expectedChanges: "", availableSupport: "" });
-  const submit = async () => {
+  const save = async () => {
     if (!selected) return;
-    const saved = await onAction({ action: "save_manager_perspective", employeeId: selected.employeeId, expectedRevision: 1, observations: {
+    return onAction({ action: "save_manager_perspective", employeeId: selected.employeeId, expectedRevision: selected.currentRevision ?? 1, observations: {
       observedWork: context.observedWork,
       workflowGroup: context.workflowGroup,
-      observationRecency: "Within the last three months",
+      observationRecency: context.observationRecency,
       opportunityToObserve: context.observedWork.trim() ? "enough" : "not_enough",
-      supportDegree: "some_support",
-      capabilityObservations: ["make_yourself_understood", "turn_priorities_into_progress"],
+      supportDegree: context.supportDegree,
+      capabilityObservations: context.capabilityObservations,
       concreteExamples: context.example.trim() ? [context.example] : [],
       suitableOpportunity: context.opportunity,
       intendedOutcome: context.outcome,
       conditionTime: context.conditions,
-      conditionTools: context.conditions,
-      conditionAccess: context.conditions,
-      conditionSupervision: context.conditions,
-      conditionSuitableWork: context.opportunity,
+      conditionTools: "",
+      conditionAccess: "",
+      conditionSupervision: "",
+      conditionSuitableWork: "",
     } });
-    if (saved) await onAction({ action: "submit_manager_perspective", employeeId: selected.employeeId, expectedRevision: 1 });
   };
+  const submit = async () => { if (selected && await save()) await onAction({ action: "submit_manager_perspective", employeeId: selected.employeeId, expectedRevision: selected.currentRevision ?? 1 }); };
   if (!manager) return <Empty title="Workplace Perspective unavailable" copy="Only a current authorised Line Manager can submit observations for a direct report."/>;
   const selected = manager.directReports.find((item) => item.employeeId === selectedId) ?? null;
   return <div className="space-y-5">
     {!manager.teamContextSubmitted ? <section className={`${panel} p-5 sm:p-7`} aria-labelledby="team-context-heading"><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#087c73]">Team context</p><h3 id="team-context-heading" className="mt-2 text-xl font-semibold text-[#102c3d]">Describe the work before observing people</h3><p className="mt-2 max-w-3xl text-sm leading-6 text-[#102c3d]/58">This context is recorded once for the campaign and remains separate from individual evidence.</p><div className="mt-4 grid gap-4 sm:grid-cols-2"><TextField label="Team purpose" value={teamContext.purpose} onChange={(purpose) => setTeamContext({ ...teamContext, purpose })}/><TextField label="Relevant workflows" value={teamContext.workflows} onChange={(workflows) => setTeamContext({ ...teamContext, workflows })}/><TextField label="Recurring friction" value={teamContext.friction} onChange={(friction) => setTeamContext({ ...teamContext, friction })}/><TextField label="Expected changes" value={teamContext.expectedChanges} onChange={(expectedChanges) => setTeamContext({ ...teamContext, expectedChanges })}/></div><TextField label="Support already available" value={teamContext.availableSupport} onChange={(availableSupport) => setTeamContext({ ...teamContext, availableSupport })}/><button className={`${button} mt-5`} disabled={!teamContext.purpose.trim()} onClick={() => void onAction({ action: "save_team_context", ...teamContext, expectedRevision: 1 })}>Save team context</button></section> : null}
     <div className="grid gap-5 xl:grid-cols-[minmax(16rem,.4fr)_minmax(0,1fr)]">
-    <aside className={`${panel} h-fit p-5`}><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#087c73]">Current direct reports</p><div className="mt-4 space-y-2">{manager.directReports.map((person) => <button key={person.employeeId} onClick={() => setSelectedId(person.employeeId)} className={`w-full rounded-xl border p-3 text-left ${selectedId === person.employeeId ? "border-[#159b8f] bg-[#eef8f5]" : "border-[#102c3d]/10"}`}><b className="text-sm text-[#102c3d]">{person.employeeName}</b><span className="mt-1 block text-xs text-[#102c3d]/52">Perspective {person.perspectiveStatus.replaceAll("_", " ")}</span></button>)}</div></aside>
-    <section className={`${panel} p-5 sm:p-7`}><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#087c73]">Independent evidence</p><h3 className="mt-2 text-xl font-semibold text-[#102c3d]">{selected?.employeeName ?? "Select a direct report"}</h3>{selected?.employeeFindingsReleased ? <div className="mt-3 rounded-xl border border-[#159b8f]/20 bg-[#eef8f5] p-4"><b className="text-sm text-[#102c3d]">Both perspectives are now available side by side</b><p className="mt-1 text-xs leading-5 text-[#102c3d]/60">They remain separate evidence and are never averaged.</p><ul className="mt-3 grid gap-2 sm:grid-cols-2">{selected.employeeFindings.map((finding) => <li key={finding.capabilityId} className="rounded-lg bg-white p-3 text-xs"><b className="text-[#102c3d]">{liftCapabilityLabels[finding.capabilityId]}</b><span className="mt-1 block text-[#102c3d]/55">Employee evidence: {finding.state}</span></li>)}</ul></div> : <div className="mt-3 rounded-xl bg-[#fff7ec] p-4 text-sm leading-6 text-[#6e4f20]"><b>Employee findings remain locked</b><p className="mt-1">Submit your initial observation before any corresponding employee findings are released. Your perspective is never averaged with theirs.</p></div>}<label className="mt-5 block text-sm font-semibold text-[#102c3d]">Reviewed workflow group<select className={`${field} mt-2`} value={context.workflowGroup} onChange={(event) => setContext({ ...context, workflowGroup: event.target.value as LiftWorkflowGroup })}>{Object.entries(liftWorkflowGroupLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><span className="mt-1 block text-xs font-normal leading-5 text-[#102c3d]/55">This controlled group supports privacy-safe aggregation; your wording is not exposed in the employer map.</span></label><div className="mt-5 grid gap-4 sm:grid-cols-2"><TextField label="Work you have observed" value={context.observedWork} onChange={(value) => setContext({ ...context, observedWork: value })}/><TextField label="Concrete recent example" value={context.example} onChange={(value) => setContext({ ...context, example: value })}/><TextField label="Suitable opportunity to apply capability" value={context.opportunity} onChange={(value) => setContext({ ...context, opportunity: value })}/><TextField label="Outcome worth pursuing" value={context.outcome} onChange={(value) => setContext({ ...context, outcome: value })}/></div><TextField label="What time, tools, access, supervision or suitable work would you need to put in place?" value={context.conditions} onChange={(value) => setContext({ ...context, conditions: value })}/><div className="mt-5 flex flex-wrap gap-2"><button className={secondary} onClick={() => selected && void onAction({ action: "save_manager_perspective", employeeId: selected.employeeId, expectedRevision: 1, observations: { workflowGroup: context.workflowGroup, observedWork: context.observedWork, concreteExamples: context.example ? [context.example] : [], suitableOpportunity: context.opportunity, intendedOutcome: context.outcome, opportunityToObserve: context.observedWork ? "enough" : "not_enough" } })}>Save draft</button><button className={button} disabled={!selected || !context.observedWork.trim()} onClick={() => void submit()}>Submit initial perspective</button></div></section>
+    <aside className={`${panel} h-fit p-5`}><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#087c73]">Current direct reports</p><div className="mt-4 space-y-2">{manager.directReports.map((person) => <button key={person.employeeId} onClick={() => { setSelectedId(person.employeeId); setContext(managerDraft(person.draft)); }} className={`w-full rounded-xl border p-3 text-left ${selectedId === person.employeeId ? "border-[#159b8f] bg-[#eef8f5]" : "border-[#102c3d]/10"}`}><b className="text-sm text-[#102c3d]">{person.employeeName}</b><span className="mt-1 block text-xs text-[#102c3d]/52">Perspective {person.perspectiveStatus.replaceAll("_", " ")}</span></button>)}</div></aside>
+    <section className={`${panel} p-5 sm:p-7`}>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#087c73]">Independent evidence</p><h3 className="mt-2 text-xl font-semibold text-[#102c3d]">{selected?.employeeName ?? "Select a direct report"}</h3>
+      {selected?.employeeFindingsReleased ? <div className="mt-3 rounded-xl border border-[#159b8f]/20 bg-[#eef8f5] p-4"><b className="text-sm text-[#102c3d]">Both perspectives are now available side by side</b><p className="mt-1 text-xs leading-5 text-[#102c3d]/60">They remain separate evidence and are never averaged.</p><ul className="mt-3 grid gap-2 sm:grid-cols-2">{selected.employeeFindings.map((finding) => <li key={finding.capabilityId} className="rounded-lg bg-white p-3 text-xs"><b className="text-[#102c3d]">{liftCapabilityLabels[finding.capabilityId]}</b><span className="mt-1 block text-[#102c3d]/55">Employee evidence: {finding.state}</span></li>)}</ul></div> : <div className="mt-3 rounded-xl bg-[#fff7ec] p-4 text-sm leading-6 text-[#6e4f20]"><b>Employee findings remain locked</b><p className="mt-1">Submit your initial observation before any corresponding employee findings are released.</p></div>}
+      {selected?.perspectiveStatus === "submitted" ? <p className="mt-5 text-sm">Your submitted perspective is preserved. It cannot be overwritten.</p> : <>
+        <label className="mt-5 block text-sm font-semibold">Reviewed workflow group<select className={`${field} mt-2`} value={context.workflowGroup} onChange={(event) => setContext({ ...context, workflowGroup: event.target.value as LiftWorkflowGroup })}>{Object.entries(liftWorkflowGroupLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+        <div className="mt-5 grid gap-4 sm:grid-cols-2"><TextField label="Work you have observed" value={context.observedWork} onChange={(value) => setContext({ ...context, observedWork: value })}/><TextField label="When did you observe this work?" value={context.observationRecency} onChange={(value) => setContext({ ...context, observationRecency: value })}/><TextField label="Concrete example" value={context.example} onChange={(value) => setContext({ ...context, example: value })}/><TextField label="Suitable opportunity" value={context.opportunity} onChange={(value) => setContext({ ...context, opportunity: value })}/><TextField label="Outcome worth pursuing" value={context.outcome} onChange={(value) => setContext({ ...context, outcome: value })}/></div>
+        <label className="mt-4 block text-sm font-semibold">Support observed<select className={`${field} mt-2`} value={context.supportDegree} onChange={(event) => setContext({ ...context, supportDegree: event.target.value })}>{["not_observed","independent","some_support","substantial_support"].map((item) => <option key={item} value={item}>{item.replaceAll("_"," ")}</option>)}</select></label>
+        <fieldset className="mt-4"><legend className="text-sm font-semibold">Capabilities you actually observed</legend><div className="mt-2 grid gap-2 sm:grid-cols-2">{Object.entries(liftCapabilityLabels).map(([id,label]) => <label key={id} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={context.capabilityObservations.includes(id)} onChange={(event) => setContext({ ...context, capabilityObservations: event.target.checked ? [...context.capabilityObservations,id] : context.capabilityObservations.filter((item) => item!==id) })}/>{label}</label>)}</div></fieldset>
+        <TextField label="Workplace conditions or support needed" value={context.conditions} onChange={(value) => setContext({ ...context, conditions: value })}/>
+        <div className="mt-5 flex flex-wrap gap-2"><button className={secondary} disabled={!selected} onClick={() => void save()}>Save draft</button><button className={button} disabled={!selected || !context.observedWork.trim() || !context.observationRecency.trim()} onClick={() => void submit()}>Submit initial perspective</button></div>
+      </>}
+    </section>
     </div>
   </div>;
+}
+
+function managerDraft(draft?: Record<string, unknown>) {
+  const text = (key: string) => typeof draft?.[key] === "string" ? draft[key] as string : "";
+  return { workflowGroup: (text("workflowGroup") || "other_reviewed") as LiftWorkflowGroup, observedWork: text("observedWork"), observationRecency: text("observationRecency"), supportDegree: text("supportDegree") || "not_observed", capabilityObservations: Array.isArray(draft?.capabilityObservations) ? draft.capabilityObservations.filter((value): value is string => typeof value === "string") : [], example: text("example"), opportunity: text("opportunity"), outcome: text("outcome"), conditions: text("conditions") };
 }
 
 function LeaderLift({ workspace, onAction, initialView }: { workspace: LiftWorkspace; onAction: (action: LiftActionInput) => Promise<boolean>; initialView: LeaderView }) {
@@ -175,7 +215,7 @@ function DecisionView({ workspace, selected, onSelect, onAction }: { workspace: 
   const options = decisionOptions(selected);
   const decision = workspace.decisions.find((item) => item.opportunityId === selected.id) ?? null;
   const value = decision?.valueScenario ? calculateLiftCapacityValue(decision.valueScenario) : null;
-  return <div className="space-y-5" data-testid="lift-decisions-view"><ContextBar workspace={workspace} selected={selected} onSelect={onSelect}/><section className={`${panel} p-5 sm:p-7`}><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#087c73]">Decision worth examining</p><h3 className="mt-2 text-xl font-semibold text-[#102c3d]">{selected.decisionQuestion}</h3><div className="mt-5 grid gap-4 xl:grid-cols-3">{options.map((option) => <DecisionCard key={option.id} option={option} selected={decision?.selectedOptionId === option.id}/>)}</div></section>{decision ? <section className="grid gap-5 lg:grid-cols-2"><article className={`${panel} p-5`}><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#087c73]">Recorded decision</p><h3 className="mt-2 text-lg font-semibold text-[#102c3d]">{decision.status.replaceAll("_", " ")}</h3><dl className="mt-4 space-y-3 text-sm"><Description term="Rationale" value={decision.rationale}/><Description term="Owner" value={decision.owner}/><Description term="Intended measure" value={decision.intendedMeasure}/></dl></article><article className={`${panel} p-5`}><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#087c73]">Transparent value scenario</p><h3 className="mt-2 text-lg font-semibold text-[#102c3d]">{value?.hours ?? "—"} hours modelled</h3><p className="mt-2 text-sm leading-6 text-[#102c3d]/60">The stored employer inputs are shown with units, period and realised fraction. No assessment response becomes a financial assumption.</p><p className="mt-3 rounded-xl bg-[#fff7ec] p-3 text-xs leading-5 text-[#6e4f20]">{value?.capacityEquivalentValue === null ? "No employer-loaded hourly rate is supplied, so Lift shows no monetary value or ROI." : value?.label}</p></article></section> : null}<DecisionRecorder opportunity={selected} options={options} existing={decision} onAction={onAction}/></div>;
+  return <div className="space-y-5" data-testid="lift-decisions-view"><ContextBar workspace={workspace} selected={selected} onSelect={onSelect}/><section className={`${panel} p-5 sm:p-7`}><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#087c73]">Decision worth examining</p><h3 className="mt-2 text-xl font-semibold text-[#102c3d]">{selected.decisionQuestion}</h3><div className="mt-5 grid gap-4 xl:grid-cols-3">{options.map((option) => <DecisionCard key={option.id} option={option} selected={decision?.selectedOptionId === option.id}/>)}</div></section>{decision ? <section className="grid gap-5 lg:grid-cols-2"><article className={`${panel} p-5`}><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#087c73]">Recorded decision</p><h3 className="mt-2 text-lg font-semibold text-[#102c3d]">{decision.status.replaceAll("_", " ")}</h3><dl className="mt-4 space-y-3 text-sm"><Description term="Rationale" value={decision.rationale}/><Description term="Owner" value={decision.owner}/><Description term="Intended measure" value={decision.intendedMeasure}/></dl></article><article className={`${panel} p-5`}><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#087c73]">Transparent value scenario</p><h3 className="mt-2 text-lg font-semibold text-[#102c3d]">{value?.hours ?? "—"} hours modelled</h3><p className="mt-2 text-sm leading-6 text-[#102c3d]/60">The stored employer inputs are shown with units, period and realised fraction. No assessment response becomes a financial assumption.</p><p className="mt-3 rounded-xl bg-[#fff7ec] p-3 text-xs leading-5 text-[#6e4f20]">{value?.capacityEquivalentValue === null ? "No employer-loaded hourly rate is supplied, so Lift shows no monetary value or ROI." : value?.label}</p></article></section> : null}<DecisionRecorder key={selected.id} opportunity={selected} options={options} existing={decision} onAction={onAction}/></div>;
 }
 
 function ProofView({ workspace, selected, onSelect, onAction }: { workspace: LiftWorkspace; selected: LiftOpportunity | null; onSelect: (id: string) => void; onAction: (action: LiftActionInput) => Promise<boolean> }) {
@@ -183,7 +223,7 @@ function ProofView({ workspace, selected, onSelect, onAction }: { workspace: Lif
   const proof = workspace.proofs.find((item) => item.opportunityId === selected.id) ?? null;
   const stages = ["Signal identified", "Work context confirmed", "Change tested", "Outcome evidenced"];
   const current = proof ? Math.max(0, ["signal_identified","work_context_confirmed","change_tested","outcome_evidenced"].indexOf(proof.state)) : Math.max(0, ["signal_identified","work_context_confirmed"].indexOf(selected.state));
-  return <div className="space-y-5" data-testid="lift-proof-view"><ContextBar workspace={workspace} selected={selected} onSelect={onSelect}/><section className={`${panel} p-5 sm:p-7`}><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#087c73]">Durable proof record</p><h3 className="mt-2 text-xl font-semibold text-[#102c3d]">What changed, and what the evidence can support</h3></div><button className={secondary} onClick={() => window.print()}><Printer size={15}/>Print opportunity brief</button></div><ol className="mt-6 grid gap-3 md:grid-cols-4">{stages.map((stage, index) => <li key={stage} className={`rounded-xl border p-4 ${index <= current ? "border-[#159b8f]/35 bg-[#eef8f5]" : "border-[#102c3d]/10 bg-[#fafbf9]"}`}><span className="grid h-7 w-7 place-items-center rounded-full bg-white text-xs font-bold text-[#087c73] ring-1 ring-[#159b8f]/25">{index + 1}</span><p className="mt-3 text-sm font-semibold text-[#102c3d]">{stage}</p></li>)}</ol></section>{proof ? <section className="grid gap-5 lg:grid-cols-2"><EvidenceMeasure title="Baseline" evidence={proof.baseline}/><EvidenceMeasure title="Observed outcome" evidence={proof.outcome}/><article className={`${panel} p-5 lg:col-span-2`}><div className="grid gap-4 md:grid-cols-3"><Description term="Agreed scope" value={proof.agreedScope}/><Description term="Intended measure" value={proof.intendedMeasure}/><Description term="Verified by" value={`${proof.reviewedBy ?? "Not reviewed"} · ${proof.verification.replaceAll("_", " ")}`}/></div><div className="mt-4 rounded-xl bg-[#fff7ec] p-4 text-sm leading-6 text-[#6e4f20]"><b>Interpretation boundary</b><p className="mt-1">{proof.limitations.join(" ")} Other relevant change: {proof.otherRelevantChanges.join(" ")}</p></div></article></section> : <Empty title="Outcome not yet evidenced" copy="A click cannot advance this record. A decision, owner, baseline, intended measure, scope, comparable outcome and authorised review are required."/>}<ProofRecorder opportunity={selected} existing={proof} onAction={onAction}/></div>;
+  return <div className="space-y-5" data-testid="lift-proof-view"><ContextBar workspace={workspace} selected={selected} onSelect={onSelect}/><section className={`${panel} p-5 sm:p-7`}><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#087c73]">Durable proof record</p><h3 className="mt-2 text-xl font-semibold text-[#102c3d]">What changed, and what the evidence can support</h3></div><button className={secondary} onClick={() => window.print()}><Printer size={15}/>Print opportunity brief</button></div><ol className="mt-6 grid gap-3 md:grid-cols-4">{stages.map((stage, index) => <li key={stage} className={`rounded-xl border p-4 ${index <= current ? "border-[#159b8f]/35 bg-[#eef8f5]" : "border-[#102c3d]/10 bg-[#fafbf9]"}`}><span className="grid h-7 w-7 place-items-center rounded-full bg-white text-xs font-bold text-[#087c73] ring-1 ring-[#159b8f]/25">{index + 1}</span><p className="mt-3 text-sm font-semibold text-[#102c3d]">{stage}</p></li>)}</ol></section>{proof ? <section className="grid gap-5 lg:grid-cols-2"><EvidenceMeasure title="Baseline" evidence={proof.baseline}/><EvidenceMeasure title="Observed outcome" evidence={proof.outcome}/><article className={`${panel} p-5 lg:col-span-2`}><div className="grid gap-4 md:grid-cols-3"><Description term="Agreed scope" value={proof.agreedScope}/><Description term="Intended measure" value={proof.intendedMeasure}/><Description term="Verified by" value={`${proof.reviewedBy ?? "Not reviewed"} · ${proof.verification.replaceAll("_", " ")}`}/></div><div className="mt-4 rounded-xl bg-[#fff7ec] p-4 text-sm leading-6 text-[#6e4f20]"><b>Interpretation boundary</b><p className="mt-1">{proof.limitations.join(" ")} Other relevant change: {proof.otherRelevantChanges.join(" ")}</p></div></article></section> : <Empty title="Outcome not yet evidenced" copy="A click cannot advance this record. A decision, owner, baseline, intended measure, scope, comparable outcome and authorised review are required."/>}<ProofRecorder key={selected.id} opportunity={selected} existing={proof} onAction={onAction}/></div>;
 }
 
 function DecisionRecorder({ opportunity, options, existing, onAction }: { opportunity: LiftOpportunity; options: LiftDecisionOption[]; existing: LiftWorkspace["decisions"][number] | null; onAction: (action: LiftActionInput) => Promise<boolean> }) {
@@ -209,11 +249,18 @@ function ProofRecorder({ opportunity, existing, onAction }: { opportunity: LiftO
   const [population, setPopulation] = useState(existing?.baseline?.quantity?.population ?? "");
   const [baselinePeriod, setBaselinePeriod] = useState(existing?.baseline?.quantity?.period ?? "");
   const [outcomePeriod, setOutcomePeriod] = useState(existing?.outcome?.quantity?.period ?? "");
-  const [reviewed, setReviewed] = useState(existing?.verification !== "not_reviewed");
-  const baselineId = useRef(existing?.baseline?.id ?? crypto.randomUUID());
-  const outcomeId = useRef(existing?.outcome?.id ?? crypto.randomUUID());
-  const evidence = (kind: "operational_baseline" | "measured_outcome", id: string, value: string, period: string) => value.trim() && unit.trim() && population.trim() && period.trim() ? { id, source: kind, version: "lift-proof-v1", recordedAt: new Date().toISOString(), subject: opportunity.id, permissions: "authorised_employer" as const, description: kind === "operational_baseline" ? "Employer-recorded operational baseline" : "Employer-recorded observed outcome", limitations: ["Before-and-after difference does not by itself prove causation."], quantity: { value: Number(value), unit, population, period } } : null;
-  const record = () => onAction({ action: "record_proof", opportunityId: opportunity.id, expectedRevision: existing?.revision ?? 0, proof: { revision: (existing?.revision ?? 0) + 1, state, baseline: evidence("operational_baseline", baselineId.current, baseline, baselinePeriod), outcome: evidence("measured_outcome", outcomeId.current, outcome, outcomePeriod), agreedScope: scope, owner, intendedMeasure: measure, reviewedBy: reviewed ? "Authorised reviewer" : null, verification: reviewed ? "internal_review" : "not_reviewed", otherRelevantChanges: [], limitations: ["Before-and-after difference does not by itself prove causation."], followUpAt: null } });
+  const [reviewed, setReviewed] = useState(Boolean(existing && existing.verification !== "not_reviewed"));
+  const evidenceDrafts = useRef(new Map<string, NonNullable<import("@/lib/levytate/lift/domain").LiftProofRecord["baseline"]>>());
+  const evidence = (kind: "operational_baseline" | "measured_outcome", value: string, period: string) => {
+    if (!value.trim() || !unit.trim() || !population.trim() || !period.trim()) return null;
+    const quantity = { value: Number(value), unit, population, period };
+    const saved = kind === "operational_baseline" ? existing?.baseline : existing?.outcome;
+    if (saved?.quantity && Object.entries(quantity).every(([key,item]) => saved.quantity?.[key as keyof typeof quantity] === item)) return saved;
+    const key = JSON.stringify({kind,quantity});
+    if (!evidenceDrafts.current.has(key)) evidenceDrafts.current.set(key, { id: crypto.randomUUID(), source: kind, version: "lift-proof-v1", recordedAt: new Date().toISOString(), subject: opportunity.id, permissions: "authorised_employer", description: kind === "operational_baseline" ? "Employer-recorded operational baseline" : "Employer-recorded observed outcome", limitations: ["Before-and-after difference does not by itself prove causation."], quantity });
+    return evidenceDrafts.current.get(key)!;
+  };
+  const record = () => onAction({ action: "record_proof", opportunityId: opportunity.id, expectedRevision: existing?.revision ?? 0, proof: { revision: (existing?.revision ?? 0) + 1, state, baseline: evidence("operational_baseline", baseline, baselinePeriod), outcome: evidence("measured_outcome", outcome, outcomePeriod), agreedScope: scope, owner, intendedMeasure: measure, reviewedBy: reviewed ? "Authorised reviewer" : null, verification: reviewed ? "internal_review" : "not_reviewed", otherRelevantChanges: [], limitations: ["Before-and-after difference does not by itself prove causation."], followUpAt: null } });
   return <section className={`${panel} p-5 sm:p-7`} aria-labelledby="record-proof-heading"><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#087c73]">Controlled evidence update</p><h3 id="record-proof-heading" className="mt-2 text-lg font-semibold text-[#102c3d]">Record evidence; do not advance by click alone</h3><div className="mt-4 grid gap-4 md:grid-cols-2"><label className="text-sm font-semibold text-[#102c3d]">Evidence state<select className={`${field} mt-1.5 font-normal`} value={state} onChange={(event) => setState(event.target.value as typeof state)}><option value="signal_identified">Signal identified</option><option value="work_context_confirmed">Work context confirmed</option><option value="change_tested">Change tested</option><option value="outcome_evidenced">Outcome evidenced</option><option value="paused">Paused</option><option value="not_supported">Not supported</option><option value="no_improvement">No improvement</option></select></label><SimpleInput label="Comparable unit" value={unit} onChange={setUnit}/></div><div className="grid gap-4 md:grid-cols-3"><TextField label="Agreed scope" value={scope} onChange={setScope}/><TextField label="Responsible owner" value={owner} onChange={setOwner}/><TextField label="Intended measure" value={measure} onChange={setMeasure}/></div><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><SimpleInput label="Baseline value" value={baseline} type="number" onChange={setBaseline}/><SimpleInput label="Baseline period" value={baselinePeriod} onChange={setBaselinePeriod}/><SimpleInput label="Outcome value" value={outcome} type="number" onChange={setOutcome}/><SimpleInput label="Outcome period" value={outcomePeriod} onChange={setOutcomePeriod}/></div><SimpleInput label="Population / process measured" value={population} onChange={setPopulation}/><label className="mt-4 flex items-center gap-3 text-sm text-[#102c3d]"><input type="checkbox" checked={reviewed} onChange={(event) => setReviewed(event.target.checked)}/>Authorised internal review completed</label><button className={`${button} mt-5`} disabled={!scope.trim() || !owner.trim() || !measure.trim()} onClick={() => void record()}>Record proof revision</button></section>;
 }
 

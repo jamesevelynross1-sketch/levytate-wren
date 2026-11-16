@@ -96,7 +96,7 @@ export function buildLiftFixtureWorkspace(role: LiftWorkspace["role"]): LiftWork
       answers: reporting.answers,
       findings: reporting.findings,
       managerPerspectiveStatus: "released",
-      releasedManagerObservation: { id: "lift-manager-observation-reporting", observedWork: "Alex prepared the weekly fictional operations brief and checked source limitations before review.", concreteExamples: ["The latest brief separated a missing data source from the recommendation."], suitableOpportunity: "Own a bounded reporting trial with authorised data access.", intendedOutcome: "Release review capacity while preserving report accuracy.", workplaceConditions: ["Two protected hours", "Authorised dataset access", "Fortnightly manager review"] },
+      releasedManagerObservation: { id: "lift-manager-observation-reporting", observedWork: "Alex prepared the weekly fictional operations brief and checked source limitations before review.", concreteExamples: ["The latest brief separated a missing data source from the recommendation."], suitableOpportunity: "Own a bounded reporting trial with authorised data access.", intendedOutcome: "Release review capacity while preserving report accuracy.", workplaceConditions: ["Two protected hours", "Authorised dataset access", "Fortnightly manager review"], ownContexts: [] },
     } : null,
     manager: role === "Line Manager" ? {
       teamContextSubmitted: true,

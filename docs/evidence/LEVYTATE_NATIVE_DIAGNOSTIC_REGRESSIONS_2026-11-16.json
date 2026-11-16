@@ -1,0 +1,48 @@
+{
+  "observedAt": "2026-11-16T10:21:58.867Z",
+  "applicationCommit": "c7d57b14ddcd6c22b0bbcba672223d0f0d151e5a",
+  "environment": "local",
+  "database": "levytate_release_intelligence_review26",
+  "scope": "Actual PostgreSQL17 rollback checks addressing database lint triage; no browser/Auth/hosted proof",
+  "before": {
+    "postgresMajorVersion": 17,
+    "authUsers": 0,
+    "storageObjects": 0,
+    "people": 0,
+    "employers": 0,
+    "ledgerRows": 0
+  },
+  "after": {
+    "postgresMajorVersion": 17,
+    "authUsers": 0,
+    "storageObjects": 0,
+    "people": 0,
+    "employers": 0,
+    "ledgerRows": 0
+  },
+  "tests": [
+    {
+      "path": "tests/workspace-atomic-integrity.sql",
+      "sha256": "f04e3d1d767de8237baa6c06fcb953dcd2c3940747c2decbc9d84832e77fe250",
+      "status": "PASS",
+      "assertions": 34,
+      "rolledBack": true
+    },
+    {
+      "path": "tests/catalogue-integrity.sql",
+      "sha256": "e67652026c483c2db8d53d8e0784d11c5fb0d6a5e31b4c22dad2398f841d89b8",
+      "status": "PASS",
+      "assertions": 23,
+      "rolledBack": true
+    },
+    {
+      "path": "tests/tenant-offboarding-integrity.sql",
+      "sha256": "a327d8eb67640da2842d670a11f5f291ac8a9641586658cf5c001d21b8f54852",
+      "status": "PASS",
+      "assertions": 26,
+      "rolledBack": true
+    }
+  ],
+  "hostedOperation": false,
+  "acceptanceFixtureDatabaseTouched": false
+}

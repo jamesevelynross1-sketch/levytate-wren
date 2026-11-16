@@ -1,0 +1,32 @@
+{
+  "observedAt": "2026-11-16T10:43:25.938Z",
+  "environment": "local",
+  "applicationCommit": "6562e009570444e7e3e0c0c69398898b1e120242",
+  "visualReviewer": "root independent image inspection",
+  "status": "PASS",
+  "review": "All four actual normal-origin captures inspected: readable native 100/200 percent reflow, responsive keyboard navigation and scrolled support footer; no MPR chrome. Next development indicator overlays a small area of the local footer; this is not hosted visual acceptance.",
+  "durablePrivateCopies": true,
+  "authStateExported": false,
+  "captures": [
+    {
+      "label": "100-top",
+      "sha256": "018dc3f879770743e84c18a844c49d4af3fc34b4354b9bfb34a4c332eda02390",
+      "bytes": 88130
+    },
+    {
+      "label": "200-top",
+      "sha256": "a1940be43bf5bc122d4c9d4600dd895f0de750569917b2ac71ab1068b8e53569",
+      "bytes": 100493
+    },
+    {
+      "label": "200-navigation",
+      "sha256": "c294b54c81457bdb8df66d4777ff05cfc70bce2ed80f25c2cdd361f5a48ff526",
+      "bytes": 107283
+    },
+    {
+      "label": "200-bottom",
+      "sha256": "aa757316f63e32b101a1d1ce0af45a9f905c749e668e8e21a9264773e492f5d0",
+      "bytes": 101499
+    }
+  ]
+}

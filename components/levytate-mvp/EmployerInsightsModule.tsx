@@ -1,13 +1,17 @@
 "use client";
 
-import { ArrowRight, BarChart3, CalendarClock, CheckCircle2, Info, Printer, RefreshCw, ShieldCheck, TriangleAlert } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ArrowRight, BarChart3, CalendarClock, CheckCircle2, Download, Info, Printer, RefreshCw, ShieldCheck, TriangleAlert } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { EmployerExecutiveReport } from "@/components/levytate-mvp/EmployerExecutiveReport";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { formatGbp } from "@/lib/levytate/finance/calculations";
 import { buildEmployerExecutiveReportContract } from "@/lib/levytate/intelligence/executive-report";
 import type { EmployerIntelligenceResponse, IntelligencePriority, WorkforceIntelligenceReport } from "@/lib/levytate/intelligence/types";
+import { authenticatedClientFetch } from "@/lib/levytate/client-session";
+import { decodeEvidenceDownload } from "@/lib/levytate/client-module-responses";
+import { usePinnedClientMutation } from "@/components/levytate-mvp/usePinnedClientMutation";
+import { ClientMutationRecovery } from "@/components/levytate-mvp/ClientMutationRecovery";
 
 type View = "overview" | "workforce";
 
@@ -17,20 +21,39 @@ const button = "inline-flex min-h-11 items-center justify-center gap-2 rounded-x
 
 export function EmployerInsightsModule({ view }: { view: View }) {
   const { meta } = useMvpWorkspace();
+  const identity = useRef(meta ? { email: meta.userEmail, organisationId: meta.organisationId } : null);
+  const mutation = usePinnedClientMutation(identity.current, "/api/levytate-employer-insights/export", (value) => decodeEvidenceDownload(value, identity.current?.organisationId), (response) => response.text());
   const [data, setData] = useState<EmployerIntelligenceResponse | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [selectedCampaignId, setSelectedCampaignId] = useState("");
   const [printing, setPrinting] = useState(false);
+  const exporting = mutation.working;
+  const [exportError, setExportError] = useState("");
+
+  async function downloadEvidence() {
+    if (mutation.locked) return;
+    setExportError("");
+    try {
+      await mutation.execute({}, (text) => {
+        const url = URL.createObjectURL(new Blob([text], { type: "application/json; charset=utf-8" }));
+        const anchor = document.createElement("a");
+        anchor.href = url; anchor.download = "levytate-employer-evidence-v1.json";
+        document.body.appendChild(anchor); anchor.click(); anchor.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+        setExportError("");
+      });
+    } catch (failure) { setExportError(failure instanceof Error ? failure.message : "Evidence export could not be prepared."); }
+  }
 
   async function load() {
     setLoading(true);
     setError("");
     setData(null);
     try {
-      const response = await fetch("/api/levytate-employer-insights", { cache: "no-store" });
+      const response = await authenticatedClientFetch("/api/levytate-employer-insights", {}, identity.current ?? undefined);
       const payload = await response.json() as { intelligence?: EmployerIntelligenceResponse; message?: string };
-      if (!response.ok || !payload.intelligence) throw new Error(payload.message || "Employer intelligence could not be loaded.");
+      if (!response.ok || !payload.intelligence || payload.intelligence.organisation.id !== identity.current?.organisationId) throw new Error(payload.message || "Employer intelligence could not be loaded for this account. Reload to reconnect.");
       setData(payload.intelligence);
       setSelectedCampaignId((current) => current && payload.intelligence!.workforce.reports.some((item) => item.campaignId === current) ? current : payload.intelligence!.workforce.reports[0]?.campaignId ?? "");
     } catch (loadError) {
@@ -54,7 +77,7 @@ export function EmployerInsightsModule({ view }: { view: View }) {
   if (error || !data) return <ErrorState message={error || "Employer intelligence is unavailable."} onRetry={() => void load()} />;
   const selected = data.workforce.reports.find((item) => item.campaignId === selectedCampaignId) ?? data.workforce.reports[0] ?? null;
 
-  return <div className="space-y-5" data-testid={`employer-insights-${view}`}>
+  return <div className="space-y-4"><ClientMutationRecovery mutation={mutation}/><fieldset disabled={mutation.locked} className="min-w-0 border-0 p-0"><div className="space-y-5" data-testid={`employer-insights-${view}`}>
     <section className={`${panel} overflow-hidden`}>
       <div className="border-b border-[#102c3d]/[0.07] bg-[linear-gradient(135deg,#102c3d_0%,#173e4d_60%,#0f6f68_120%)] px-5 py-6 text-white sm:px-7">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -66,6 +89,8 @@ export function EmployerInsightsModule({ view }: { view: View }) {
           <div className="flex flex-wrap gap-2">
             <span className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 text-xs text-white/75"><CalendarClock size={14} aria-hidden="true" />Reported {dateTime(data.generatedAt)}</span>
             {view === "overview" ? <button type="button" onClick={() => setPrinting(true)} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-white px-3.5 text-xs font-semibold text-[#102c3d] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/30"><Printer size={14} aria-hidden="true" />Print executive report</button> : null}
+            <button type="button" disabled={exporting} onClick={() => void downloadEvidence()} className={`${button} disabled:cursor-wait disabled:opacity-60`}><Download size={14} aria-hidden="true" />{exporting ? "Preparing evidence…" : "Download aggregate evidence"}</button>
+            <button type="button" onClick={() => void load()} className={button}><RefreshCw size={14} aria-hidden="true" />Refresh sources</button>
           </div>
         </div>
       </div>
@@ -76,6 +101,8 @@ export function EmployerInsightsModule({ view }: { view: View }) {
       </div>
     </section>
 
+    {exportError ? <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">{exportError} Your current report remains available. Retry the download after reconnecting if needed.</p> : null}
+
     {meta?.liftEnabled ? <section className={`${panel} flex flex-col gap-3 border-[#159b8f]/20 bg-[#f4faf7] p-5 sm:flex-row sm:items-center sm:justify-between`}><div><p className={eyebrow}>LevyTate Lift</p><h3 className="mt-1 text-base font-semibold text-[#102c3d]">Continue from evidence to opportunity and proof</h3><p className="mt-1 text-xs leading-5 text-[#102c3d]/55">Lift evidence remains separate from historical assessment scores and workforce aggregates.</p></div><a className={`${button} shrink-0`} href="/levytate/app?module=Assessments">Open Lift <ArrowRight size={14} aria-hidden="true"/></a></section> : null}
 
     {view === "overview"
@@ -84,7 +111,7 @@ export function EmployerInsightsModule({ view }: { view: View }) {
 
     <Definitions intelligence={data} />
     {printing ? <ExecutivePrintReport intelligence={data} campaign={selected} /> : null}
-  </div>;
+  </div></fieldset></div>;
 }
 
 function Overview({ intelligence, selectedCampaign }: { intelligence: EmployerIntelligenceResponse; selectedCampaign: WorkforceIntelligenceReport | null }) {

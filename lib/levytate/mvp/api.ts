@@ -49,6 +49,7 @@ export type LevyTateWorkspaceMeta = {
   prospectAccess?: ProspectAccessMeta | null;
   storageMode: MvpWorkspaceStorageMode;
   warnings: string[];
+  mutationRevisions?: Record<string, number>;
 };
 
 export type LevyTateWorkspaceBootstrap = {
@@ -56,19 +57,20 @@ export type LevyTateWorkspaceBootstrap = {
   meta: LevyTateWorkspaceMeta;
 };
 
-export type LevyTateWorkspaceMutation =
+export type LevyTateWorkspaceMutation = (
   | { type: "saveProfile"; profile: MvpWorkspaceProfile }
   | { type: "saveEmployee"; employee: MvpEmployee }
-  | { type: "archiveEmployee"; id: string }
+  | { type: "importEmployees"; importId: string; employees: MvpEmployee[] }
+  | { type: "archiveEmployee"; id: string; status: "Active" | "Archived" }
   | { type: "saveEmployeeDevelopmentProfile"; profile: MvpEmployeeDevelopmentProfile }
   | { type: "saveRole"; role: MvpRole }
-  | { type: "archiveRole"; id: string }
-  | { type: "saveApplication"; application: MvpApplication }
-  | { type: "updateApplicationStatus"; id: string; status: RequestStatus; note?: string }
+  | { type: "archiveRole"; id: string; status: "Active" | "Archived" }
+  | { type: "saveApplication"; application: MvpApplication; expectedRevision?: number; idempotencyKey?: string }
+  | { type: "updateApplicationStatus"; id: string; status: RequestStatus; note?: string; expectedRevision?: number; idempotencyKey?: string }
   | { type: "saveProvider"; provider: ProviderCatalogueRecord }
-  | { type: "archiveProvider"; id: string }
+  | { type: "archiveProvider"; id: string; status: "Active" | "Archived" }
   | { type: "saveProviderProgramme"; programme: ProviderProgramme }
-  | { type: "archiveProviderProgramme"; id: string }
+  | { type: "archiveProviderProgramme"; id: string; status: "Active" | "Archived" }
   | { type: "removeProviderProgramme"; id: string }
   | { type: "saveProviderRelationship"; relationship: MvpProviderRelationship }
   | { type: "saveOrganisationProvider"; selection: MvpOrganisationProvider }
@@ -76,4 +78,5 @@ export type LevyTateWorkspaceMutation =
   | { type: "saveMatchingRequest"; request: MvpMatchingRequest }
   | { type: "updateMatchingStatus"; id: string; status: MvpMatchingStatus }
   | { type: "saveEnrolment"; enrolment: MvpEnrolment }
-  | { type: "updateEnrolmentStatus"; id: string; status: MvpEnrolmentStatus };
+  | { type: "updateEnrolmentStatus"; id: string; status: MvpEnrolmentStatus }
+) & { expectedRevision?: number };

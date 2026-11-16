@@ -1,5 +1,8 @@
 "use client";
 
+import { WorkspaceSessionRecovery } from "@/components/levytate-mvp/MvpWorkspaceStore";
+import { dialogTabBoundary, dialogTabStops, isTopmostDialog, restoreDialogFocus } from "@/lib/levytate/dialog-focus";
+
 import { Plus, Search, X } from "lucide-react";
 import { useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type KeyboardEvent, type ReactNode } from "react";
 
@@ -63,44 +66,44 @@ export function MvpModal({ title, eyebrow, children, onClose, wide = false }: { 
   useEffect(() => {
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const modal = modalRef.current;
-    function focusableElements() {
-      return modal ? Array.from(modal.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')) : [];
-    }
+    if (!modal) return;
     closeRef.current?.focus();
-    function onKeyDown(event: globalThis.KeyboardEvent) {
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.defaultPrevented || !isTopmostDialog(modal)) return;
       if (event.key === "Escape") {
         event.preventDefault();
         onCloseRef.current();
         return;
       }
       if (event.key !== "Tab") return;
-      const elements = focusableElements();
-      if (!elements.length) return;
-      const first = elements[0];
-      const last = elements[elements.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
+      const target = dialogTabBoundary(modal, document.activeElement, event.shiftKey);
+      if (target) {
         event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
+        target.focus();
       }
-    }
+    };
+    const onFocusIn = (event: FocusEvent) => {
+      if (isTopmostDialog(modal) && event.target instanceof Node && !modal.contains(event.target)) {
+        (dialogTabStops(modal)[0] ?? modal).focus();
+      }
+    };
     document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("focusin", onFocusIn);
     return () => {
       document.removeEventListener("keydown", onKeyDown);
-      previousFocus?.focus();
+      document.removeEventListener("focusin", onFocusIn);
+      restoreDialogFocus(previousFocus);
     };
   }, []);
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-[#102c3d]/[0.38] px-4 py-6 backdrop-blur-sm" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <section ref={modalRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className={`mx-auto rounded-2xl bg-white shadow-[0_30px_90px_rgba(16,44,61,0.24)] ${wide ? "max-w-6xl" : "max-w-2xl"}`}>
+      <section ref={modalRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className={`mx-auto rounded-2xl bg-white shadow-[0_30px_90px_rgba(16,44,61,0.24)] ${wide ? "max-w-6xl" : "max-w-2xl"}`}>
         <div className="flex items-start justify-between gap-4 border-b border-[#102c3d]/[0.07] px-5 py-4">
           <div>{eyebrow ? <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">{eyebrow}</p> : null}<h2 id={titleId} className="mt-0.5 text-xl font-semibold text-[#102c3d]">{title}</h2></div>
           <button ref={closeRef} type="button" onClick={onClose} title="Close" aria-label="Close dialog" className="grid h-11 w-11 place-items-center rounded-xl text-[#102c3d]/[0.52] transition hover:bg-[#f5f8f6] hover:text-[#102c3d] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20"><X size={18} /></button>
         </div>
-        <div className="p-5">{children}</div>
+        <div className="p-5"><WorkspaceSessionRecovery />{children}</div>
       </section>
     </div>
   );
@@ -206,8 +209,8 @@ export function FormTagInput({ label, values, onChange, wide = false, placeholde
   );
 }
 
-export function FormActions({ onCancel, label = "Save changes", error, disabled = false }: { onCancel: () => void; label?: string; error?: string; disabled?: boolean }) {
-  return <div className="mt-5 flex flex-col gap-3 border-t border-[#102c3d]/[0.07] pt-4 sm:flex-row sm:items-center sm:justify-between">{error ? <p className="text-xs font-semibold text-[#b53c52]">{error}</p> : <span />}<div className="flex justify-end gap-2"><button type="button" disabled={disabled} onClick={onCancel} className="h-10 rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/[0.62] ring-1 ring-[#102c3d]/[0.1] disabled:opacity-50">Cancel</button><button disabled={disabled} className="h-10 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white disabled:opacity-50">{label}</button></div></div>;
+export function FormActions({ onCancel, label = "Save changes", error, disabled = false, submissionBlocked = false }: { onCancel: () => void; label?: string; error?: string; disabled?: boolean; submissionBlocked?: boolean }) {
+  return <div className="mt-5 flex flex-col gap-3 border-t border-[#102c3d]/[0.07] pt-4 sm:flex-row sm:items-center sm:justify-between">{error ? <p role="alert" className="text-xs font-semibold text-[#b53c52]">{error}</p> : <span />}<div className="flex justify-end gap-2"><button type="button" disabled={disabled} onClick={onCancel} className="h-10 rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/[0.62] ring-1 ring-[#102c3d]/[0.1] disabled:opacity-50">Cancel</button><button type="submit" disabled={disabled || submissionBlocked} className="h-10 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white disabled:opacity-50">{label}</button></div></div>;
 }
 
 export function StatusBadge({ children, tone = "neutral", testId }: { children: ReactNode; tone?: "neutral" | "green" | "yellow" | "red" | "blue"; testId?: string }) {

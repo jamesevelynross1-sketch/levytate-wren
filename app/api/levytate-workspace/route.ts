@@ -2,10 +2,11 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
 import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
-import type { LevyTateWorkspaceMutation } from "@/lib/levytate/mvp/api";
+import { assertExpectedWorkspace, ClientRequestError, readAuthenticatedJson } from "@/lib/server/levytate-request-boundary";
+import { parseWorkspaceMutation } from "@/lib/server/levytate-mutation-input";
+import { ApplicationCommandError } from "@/lib/server/levytate-application-commands";
 import {
   LevyTateWorkspacePermissionError,
-  LevyTateWorkspacePersistenceError,
   applyWorkspaceMutationForSession,
   getWorkspaceBootstrapForSession,
 } from "@/lib/server/levytate-workspace";
@@ -15,52 +16,53 @@ async function getSession() {
   return readAuthorisedLevyTateBetaSession(cookieStore.get(levytateBetaSessionCookie)?.value);
 }
 
-export async function GET() {
-  const session = await getSession();
-  if (!session) {
-    return noStore({ message: "Unauthorised." }, 401);
-  }
-
+export async function GET(request: Request) {
   try {
+    const session = await getSession();
+    if (!session) return noStore({ message: "Unauthorised." }, 401);
+    await assertExpectedWorkspace(request, session.email);
     const workspace = await getWorkspaceBootstrapForSession(session);
+    // Bootstrap resolves the current membership independently. If it changed
+    // while this read was in flight, do not deliver it into the retained form.
+    const expectedOrganisation = request.headers.get("x-levytate-organisation");
+    if (expectedOrganisation !== null && expectedOrganisation.trim().toLowerCase() !== workspace.meta.organisationId.toLowerCase()) {
+      return noStore({ message: "Your workspace has changed. Reload to reconnect." }, 409);
+    }
     return noStore({ ok: true, workspace });
   } catch (error) {
-    const status = error instanceof LevyTateWorkspacePermissionError ? 403 : 500;
+    if (error instanceof ClientRequestError) return noStore({ message: error.message }, error.status);
+    const status = error instanceof LevyTateWorkspacePermissionError ? 403 : 503;
     return noStore(
-      { message: getMessage(error) },
+      { message: status === 403 ? "You do not have access to this workspace." : "LevyTate workspace is temporarily unavailable." },
       status,
     );
   }
 }
 
 export async function POST(request: Request) {
-  const session = await getSession();
-  if (!session) {
-    return noStore({ message: "Unauthorised." }, 401);
-  }
-
   try {
-    const mutation = (await request.json()) as LevyTateWorkspaceMutation;
+    const session = await getSession();
+    if (!session) {
+      return noStore({ message: "Unauthorised." }, 401);
+    }
+    const expectedAccount = request.headers.get("x-levytate-account");
+    if (expectedAccount !== null && expectedAccount.trim().toLowerCase() !== session.email.trim().toLowerCase()) {
+      return noStore({ code: "account_changed", message: "A different account is signed in. Reload to switch accounts; this form was not submitted." }, 409);
+    }
+
+    const mutation = parseWorkspaceMutation(await readAuthenticatedJson(request, session.email, 1024 * 1024));
     const workspace = await applyWorkspaceMutationForSession(session, mutation);
     return noStore({ ok: true, workspace });
   } catch (error) {
-    const status = error instanceof LevyTateWorkspacePermissionError
-      ? 403
-      : error instanceof LevyTateWorkspacePersistenceError
-        ? 503
-        : 500;
+    if (error instanceof ClientRequestError) return noStore({ message: error.message }, error.status);
+    if (error instanceof ApplicationCommandError) return noStore({ message: error.message }, error.status);
+    const status = error instanceof LevyTateWorkspacePermissionError ? 403 : 503;
     return noStore(
-      { message: getMessage(error) },
+      { message: status === 403 ? "You do not have permission to perform this action." : "LevyTate could not confirm the change. Reload before retrying." },
       status,
     );
   }
 }
-
 function noStore(body: unknown, status = 200) {
   return NextResponse.json(body, { status, headers: { "Cache-Control": "private, no-store, max-age=0" } });
-}
-
-function getMessage(error: unknown) {
-  if (error instanceof Error) return error.message;
-  return "LevyTate workspace persistence is temporarily unavailable.";
 }

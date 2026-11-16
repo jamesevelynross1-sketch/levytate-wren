@@ -1,0 +1,469 @@
+{
+  "observedAt": "2026-11-16T10:23:33.193Z",
+  "environment": "fresh isolated local native",
+  "baselineSourceCommit": "3e61d6c",
+  "runtimeId": "4a1715fd1068b7d29d195b433549b626032e3a246527b0a621d5c687ee537cb6",
+  "publicArtifacts": {
+    "cliVersion": "2.122.1",
+    "cliBinarySha256": "748dee3195d9d817de74175521dd963c2c371c4aa2a5444a82ecce4cf6bd002f",
+    "cliArchiveSha256": "e97582f76237d1dd4cb27f5051e8a98587733f98837d43d74d2e3330436d7c79",
+    "lockSha256": "bb79a76ce5623b715e59b8ce223b08e6056ca988dcaa1fe8d4213207d431042a",
+    "verifiedCopiedServiceTrees": 7,
+    "privateRuntimeStateCopied": false
+  },
+  "startup": {
+    "status": "PASS",
+    "activeSqlBeforeStart": 0,
+    "activeSqlAfterStart": 0,
+    "reviewedSqlOutsideActiveProject": 28,
+    "applicationDatabaseEmptyClaimedByStartupWrapper": false
+  },
+  "initialStageAttempt": {
+    "status": "BLOCKED",
+    "reason": "Actual stack status uses identity.id; original guard expected top-level id",
+    "activeSqlAfterFailure": 0,
+    "stageReceiptCount": 0
+  },
+  "actualStatusContract": {
+    "startupIdLocation": "id",
+    "statusIdLocation": "identity.id",
+    "nativeRuntime": true,
+    "stackIdentifierMatches": true,
+    "databaseEndpointMatches": true,
+    "credentialValuesIncluded": false
+  },
+  "initialEmptyPreflight": {
+    "status": "BLOCKED",
+    "reason": "Two managed schema names were absent from explicit allowlist",
+    "managedSchemaNames": [
+      "_realtime",
+      "pgbouncer"
+    ],
+    "metadata": {
+      "authUsers": 0,
+      "publicTypes": 0,
+      "schemaNames": [
+        "_realtime",
+        "auth",
+        "extensions",
+        "graphql",
+        "graphql_public",
+        "pgbouncer",
+        "public",
+        "realtime",
+        "storage",
+        "supabase_functions",
+        "vault"
+      ],
+      "authSessions": 0,
+      "ledgerExists": false,
+      "authIdentities": 0,
+      "storageBuckets": 0,
+      "storageObjects": 0,
+      "publicFunctions": 0,
+      "publicRelations": 0,
+      "applicationSchemas": 0,
+      "postgresMajorVersion": 17,
+      "ledgerRows": 0
+    }
+  },
+  "managedSchemaProvenance": {
+    "pgbouncer": "Verified PostgreSQL17.11.0.006 native archive: share/supabase-cli/migrations/init-scripts/00-schema.sql line5",
+    "_realtime": "Literal CREATE SCHEMA IF NOT EXISTS _realtime present in exact verified CLI binary",
+    "unknownSchemasRemainRejected": [
+      "pgclient",
+      "pgx",
+      "_realtime_custom",
+      "pgbouncer_custom"
+    ]
+  },
+  "readOnlyPostgresPredicateProof": {
+    "oldVisible": [
+      "public"
+    ],
+    "literalVisible": [
+      "pgclient",
+      "pgx",
+      "public"
+    ],
+    "postgresVersion": "17.11"
+  },
+  "dryRunPerformed": true,
+  "applicationMigrationsApplied": true,
+  "authRequestsSent": 0,
+  "hostedActionsPerformed": false,
+  "existingAcceptanceRuntimeAccessed": false,
+  "nativeProofComplete": true,
+  "correctionSourceCommit": "2f42f4f",
+  "finalObservedAt": "2026-11-16T10:27:56.813Z",
+  "stage": {
+    "status": "PASS",
+    "observedAt": "2026-11-16T10:26:52.231Z",
+    "reviewedMigrationCount": 28,
+    "liveEmptyBeforeAndAfterVerified": true
+  },
+  "dryRun": {
+    "status": "PASS",
+    "observedAt": "2026-11-16T10:27:06.630Z",
+    "scheduled": [
+      "20261027174133_006_create_levytate_production_foundation.sql",
+      "20261027190000_levytate_fresh_project_convergence.sql",
+      "20261029135739_client_workflow_integrity.sql",
+      "20261029140740_client_identity_invitation_lifecycle.sql",
+      "20261029151204_client_finance_integrity.sql",
+      "20261029151308_client_people_integrity.sql",
+      "20261029152606_client_learner_atomic_commands.sql",
+      "20261029154432_client_catalogue_integrity.sql",
+      "20261029155724_client_callback_failure_budget.sql",
+      "20261029160250_client_tenant_suspension.sql",
+      "20261029161250_client_lift_atomic_commands.sql",
+      "20261029162529_client_learning_time_integrity.sql",
+      "20261029162929_client_workspace_atomic_writes.sql",
+      "20261029220936_client_request_actor_integrity.sql",
+      "20261029221818_client_operational_action_integrity.sql",
+      "20261109165014_client_admin_atomic_commands.sql",
+      "20261109165018_client_private_history_integrity.sql",
+      "20261109165542_client_invitation_atomic_attempts.sql",
+      "20261109171755_client_offboarding_controls.sql",
+      "20261109175443_tenant_storage_lifecycle_boundary.sql",
+      "20261109175830_client_reactivation_approval.sql",
+      "20261109181545_client_employee_discovery.sql",
+      "20261109181634_manager_personal_application_permissions.sql",
+      "20261109182509_client_personal_review_derivation.sql",
+      "20261109193701_manager_personal_learning_time_permissions.sql",
+      "20261110085437_client_learning_time_readiness_contract.sql",
+      "20261110090943_client_intelligence_atomic_commands.sql",
+      "20261110093655_client_operational_event_append.sql"
+    ],
+    "cliArguments": [
+      "db",
+      "push",
+      "--local",
+      "--skip-vault",
+      "--dry-run",
+      "--workdir",
+      "$ISOLATED_RUNTIME/project"
+    ],
+    "liveCliTargetVerified": true,
+    "liveEmptyBeforeAndAfter": true,
+    "outputSha256": "2408b9056c6a0c9b276c65847de141326968d60d986ea9aeaf915bae51daa18a",
+    "targetSourceFingerprint": "3061af69d1eb8c416c4ff65b029bd8858e509fd04b05ab3efa1038db47211543",
+    "applied": false
+  },
+  "preApplyGateProofComplete": true,
+  "nativeBootstrapComplete": true,
+  "preApplyFinalEmptyMetadata": {
+    "authUsers": 0,
+    "publicTypes": 0,
+    "schemaNames": [
+      "_realtime",
+      "auth",
+      "extensions",
+      "graphql",
+      "graphql_public",
+      "pgbouncer",
+      "public",
+      "realtime",
+      "storage",
+      "supabase_functions",
+      "vault"
+    ],
+    "authSessions": 0,
+    "ledgerExists": false,
+    "authIdentities": 0,
+    "storageBuckets": 0,
+    "storageObjects": 0,
+    "publicFunctions": 0,
+    "publicRelations": 0,
+    "applicationSchemas": 0,
+    "postgresMajorVersion": 17,
+    "ledgerRows": 0
+  },
+  "guardedApply": {
+    "status": "PASS",
+    "separateLocalApproval": true,
+    "applyAttempts": 1,
+    "reviewedDryRunReceipt": "migration-dry-run-1794824826631.json",
+    "targetSourceFingerprint": "3061af69d1eb8c416c4ff65b029bd8858e509fd04b05ab3efa1038db47211543",
+    "postApplyVerification": true,
+    "activeFilesRetained": true,
+    "guardedRestartRequiresDeactivation": true,
+    "hostedExecution": false
+  },
+  "postApplyCatalogueAndLedger": {
+    "environment": "local",
+    "observedAt": "2026-11-16T10:28:44.102Z",
+    "runtime": "native",
+    "runtimeId": "4a1715fd1068b7d29d195b433549b626032e3a246527b0a621d5c687ee537cb6",
+    "metadata": {
+      "people": 0,
+      "tables": 135,
+      "authUsers": 0,
+      "employers": 0,
+      "rlsTables": 135,
+      "publicBuckets": 0,
+      "privateBuckets": 4,
+      "storageObjects": 0,
+      "postgresVersion": "17.11",
+      "excluded038Absent": true,
+      "browserTableGrants": 0,
+      "browserFunctionGrants": 0
+    },
+    "rows": [
+      {
+        "name": "006_create_levytate_production_foundation",
+        "version": "20261027174133",
+        "statementCount": 61,
+        "statementsSha256": "f47356686324f4f41fcf02701f7e3e44bccc8c561d3aa68eecb250355330241a"
+      },
+      {
+        "name": "levytate_fresh_project_convergence",
+        "version": "20261027190000",
+        "statementCount": 954,
+        "statementsSha256": "3b582ad74254045351bbd89beee7cf16a5c0d9a16c613848eec3977e07ad947d"
+      },
+      {
+        "name": "client_workflow_integrity",
+        "version": "20261029135739",
+        "statementCount": 18,
+        "statementsSha256": "808b2f252957fb4ef8b2b7561b917af884fa16145262c28480fbbd2b9edb96cc"
+      },
+      {
+        "name": "client_identity_invitation_lifecycle",
+        "version": "20261029140740",
+        "statementCount": 3,
+        "statementsSha256": "f5b15d7168553ec74254d63810856e493efcdfce112c047f4615ae0f6f401077"
+      },
+      {
+        "name": "client_finance_integrity",
+        "version": "20261029151204",
+        "statementCount": 16,
+        "statementsSha256": "c66454fd10cae2d1f79b259afa30967ed668050e7ffcce2e526c2c21a7572c74"
+      },
+      {
+        "name": "client_people_integrity",
+        "version": "20261029151308",
+        "statementCount": 21,
+        "statementsSha256": "c0b53bc269f2687e65d564f9e1d7431b272aef8c875fb2069ba7cb4d3bf92721"
+      },
+      {
+        "name": "client_learner_atomic_commands",
+        "version": "20261029152606",
+        "statementCount": 15,
+        "statementsSha256": "67a73226c199b87f29078752540846209cf860005ead63e01c83e0753e930596"
+      },
+      {
+        "name": "client_catalogue_integrity",
+        "version": "20261029154432",
+        "statementCount": 25,
+        "statementsSha256": "237a13f7f33398866297fbd3d954fa8316a99eecb12f9773f1c600d76dade368"
+      },
+      {
+        "name": "client_callback_failure_budget",
+        "version": "20261029155724",
+        "statementCount": 3,
+        "statementsSha256": "18999ecdd74c87b5be28464105f7a6c447d278666daca94ec1f206c0e99aa703"
+      },
+      {
+        "name": "client_tenant_suspension",
+        "version": "20261029160250",
+        "statementCount": 6,
+        "statementsSha256": "890cab10057f63ff42f7e930cfa83e44244140694629894c27be87d68bec07d0"
+      },
+      {
+        "name": "client_lift_atomic_commands",
+        "version": "20261029161250",
+        "statementCount": 10,
+        "statementsSha256": "6ec20691ef2aa4e9b085ca690a5f10c448571ccfb94ecf07d5d17c2b08ea4626"
+      },
+      {
+        "name": "client_learning_time_integrity",
+        "version": "20261029162529",
+        "statementCount": 14,
+        "statementsSha256": "9245575fef635787d522cd030811a712dd12a2216a00636044b63b51357acb3a"
+      },
+      {
+        "name": "client_workspace_atomic_writes",
+        "version": "20261029162929",
+        "statementCount": 13,
+        "statementsSha256": "37566c00a95bfc4238f74392deedf755a7403d8d94e776a30d72fccbe86ad205"
+      },
+      {
+        "name": "client_request_actor_integrity",
+        "version": "20261029220936",
+        "statementCount": 9,
+        "statementsSha256": "2fc1a00c32433070bf63dca8ce9a6c7d4cafe85f64d58852644730568f4e1483"
+      },
+      {
+        "name": "client_operational_action_integrity",
+        "version": "20261029221818",
+        "statementCount": 10,
+        "statementsSha256": "0dd93385404381a712b496e2c0e743df913f0839e5cde52ea7cff0d90c28a21f"
+      },
+      {
+        "name": "client_admin_atomic_commands",
+        "version": "20261109165014",
+        "statementCount": 7,
+        "statementsSha256": "a89904944ffc3d8c8473e4f03ce024948d72492964b0d1cb0c496933ebde047c"
+      },
+      {
+        "name": "client_private_history_integrity",
+        "version": "20261109165018",
+        "statementCount": 13,
+        "statementsSha256": "dabece2869e4edf197a49045755c12c85b0959fd4ebe6defbdda661be65d2d9e"
+      },
+      {
+        "name": "client_invitation_atomic_attempts",
+        "version": "20261109165542",
+        "statementCount": 4,
+        "statementsSha256": "839f730e8f3f5d26096b5b51df277406052fbd4f73d7d1566e96a38a62e63fc1"
+      },
+      {
+        "name": "client_offboarding_controls",
+        "version": "20261109171755",
+        "statementCount": 59,
+        "statementsSha256": "69d135bda6c0af3eb1eae63753ba548bb2b9d0aa757ac95fcbbd88ff6a031ccf"
+      },
+      {
+        "name": "tenant_storage_lifecycle_boundary",
+        "version": "20261109175443",
+        "statementCount": 12,
+        "statementsSha256": "6477c8c9ebf88bbc3307805631aee9abf47d63c5f309344ea480adaf5cd76c4f"
+      },
+      {
+        "name": "client_reactivation_approval",
+        "version": "20261109175830",
+        "statementCount": 11,
+        "statementsSha256": "192ba4eb8ebe892a2514f23c1d85bd9294ea434a963aaabbeab0e822684324d8"
+      },
+      {
+        "name": "client_employee_discovery",
+        "version": "20261109181545",
+        "statementCount": 4,
+        "statementsSha256": "43d8542f88a9ce931a4d079e5173061222acf8cd53f1fb50d4bc7e0492c9f908"
+      },
+      {
+        "name": "manager_personal_application_permissions",
+        "version": "20261109181634",
+        "statementCount": 9,
+        "statementsSha256": "d91610235f284b27dd90d1c95d578b424d26e59e1f04e45c2a3630ca4639cc59"
+      },
+      {
+        "name": "client_personal_review_derivation",
+        "version": "20261109182509",
+        "statementCount": 6,
+        "statementsSha256": "ec0cb961aff3188ac262ca8bdd5dee99121ee5a64ed76f77b0d07d092359e494"
+      },
+      {
+        "name": "manager_personal_learning_time_permissions",
+        "version": "20261109193701",
+        "statementCount": 7,
+        "statementsSha256": "18e5386add6a72176ec1d4c5a41ad969f5af878fec1f7f4e7d6e70ac08384451"
+      },
+      {
+        "name": "client_learning_time_readiness_contract",
+        "version": "20261110085437",
+        "statementCount": 3,
+        "statementsSha256": "3fce55512ae4937a6d98e24ee3d856a9dc1b9c839e6e9baa7b2172fbc4d782df"
+      },
+      {
+        "name": "client_intelligence_atomic_commands",
+        "version": "20261110090943",
+        "statementCount": 21,
+        "statementsSha256": "b64713f9a475c4f4c521f47ea68e44b49603aa0ea49d78c66feff98a5e8f6a10"
+      },
+      {
+        "name": "client_operational_event_append",
+        "version": "20261110093655",
+        "statementCount": 6,
+        "statementsSha256": "0c7e1dc3e57326c77853d61792ec3b422e2ae31b5f6eaf013f11cb98e39dc5f7"
+      }
+    ],
+    "hostedAcceptance": false
+  },
+  "postApplyDataApi": {
+    "observedAt": "2026-11-16T10:30:32.903Z",
+    "environment": "isolated local native",
+    "runtimeId": "4a1715fd1068b7d29d195b433549b626032e3a246527b0a621d5c687ee537cb6",
+    "readOnly": true,
+    "authRequestsSent": 0,
+    "fixtureWrites": 0,
+    "checks": [
+      {
+        "label": "service can read empty organisations",
+        "status": 200,
+        "pass": true
+      },
+      {
+        "label": "service can read empty People",
+        "status": 200,
+        "pass": true
+      },
+      {
+        "label": "service can read empty command receipts",
+        "status": 200,
+        "pass": true
+      },
+      {
+        "label": "anonymous organisation access denied",
+        "status": 401,
+        "pass": true
+      },
+      {
+        "label": "anonymous People access denied",
+        "status": 401,
+        "pass": true
+      },
+      {
+        "label": "missing API credential denied",
+        "status": 401,
+        "pass": true
+      },
+      {
+        "label": "required read-only release28 contract available",
+        "status": 200,
+        "pass": true
+      },
+      {
+        "label": "anonymous required contract execution denied",
+        "status": 401,
+        "pass": true
+      },
+      {
+        "label": "four exact private Storage buckets",
+        "status": 200,
+        "pass": true
+      }
+    ]
+  },
+  "independentCatalogueComparison": {
+    "status": "PASS",
+    "verifierCommit": "850d0da",
+    "evidenceFile": "LEVYTATE_LOCAL_GUARDED_BOOTSTRAP_PARITY_2026-11-16.json",
+    "checksPassed": 14,
+    "catalogueRows": 4124,
+    "catalogueSha256": "ddde4403f4ca8e9a8f2138e5c01b721702c5c7662ee315717de9e318066e1848",
+    "ledgerSha256": "bcdec756a743e5a30f2e1d3d63b7a1681114b4b6bd5b06c1c85f3d5a34dfa659",
+    "supplementalSha256": "e910512b6eb5b42a57e8e00072c170fe0be9298a658a553201ebbe7bee21f55e",
+    "freshEmptyCounts": {
+      "people": 0,
+      "learners": 0,
+      "authUsers": 0,
+      "employers": 0,
+      "memberships": 0,
+      "applications": 0,
+      "authSessions": 0,
+      "authIdentities": 0,
+      "storageObjects": 0
+    },
+    "requiredRegistrations": {
+      "liftFrameworks": 1,
+      "otjRequirements": 2,
+      "assessmentFrameworks": 3,
+      "apprenticeshipStandards": 0
+    },
+    "readOnly": true,
+    "acceptedBusinessDataRead": false
+  },
+  "hostedAcceptance": false
+}

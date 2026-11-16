@@ -1,6 +1,7 @@
 import { createMvpId, nowIso } from "@/lib/levytate/mvp/workspace";
 import type { AssessmentReadinessConfirmations } from "@/lib/levytate/mvp/assessment-readiness";
 import type { ManagerCheckInDetails } from "@/lib/levytate/mvp/manager-check-in";
+import { completedReviewEvidence } from "@/lib/levytate/mvp/review-planning";
 
 export type LearnerLifecycleRecordStatus = "Active" | "Archived";
 
@@ -608,9 +609,9 @@ export function getLatestReviewByType(
   learnerRecordId: string,
   reviewType: LearnerReviewType,
 ) {
-  return reviews
-    .filter((review) => review.learnerRecordId === learnerRecordId && review.reviewType === reviewType)
-    .sort((left, right) => right.reviewDate.localeCompare(left.reviewDate) || right.createdAt.localeCompare(left.createdAt))[0] ?? null;
+  // These fields describe observations, independently of the current follow-up
+  // plan. Scheduled/cancelled appointments are retained in reviewHistory.
+  return completedReviewEvidence(reviews.filter(review => review.learnerRecordId === learnerRecordId && review.reviewType === reviewType))[0] ?? null;
 }
 
 export function getLearnerLifecycleSummary(

@@ -2,12 +2,14 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
 import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
-import { LevyTateLearnerLifecyclePermissionError } from "@/lib/server/levytate-learner-lifecycle";
+import { LevyTateLearnerLifecycleConflictError, LevyTateLearnerLifecyclePermissionError } from "@/lib/server/levytate-learner-lifecycle";
 import {
   listOperationalActions,
+  LevyTateOperationalActionConflictError,
   synchroniseOrganisationOperationalActions,
 } from "@/lib/server/levytate-operational-actions";
 import { logLevyTateServerError, operationalActionsRefreshError } from "@/lib/server/levytate-safe-api-error";
+import { assertAuthenticatedWrite, ClientRequestError } from "@/lib/server/levytate-request-boundary";
 
 async function sessionFromCookie() {
   const cookieStore = await cookies();
@@ -29,11 +31,12 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST() {
+export async function POST(request: Request) {
   const session = await sessionFromCookie();
   if (!session) return NextResponse.json({ message: "Unauthorised." }, { status: 401 });
   try {
-    const result = await synchroniseOrganisationOperationalActions(session);
+    await assertAuthenticatedWrite(request, session.email);
+    const result = await synchroniseOrganisationOperationalActions(session, request.headers.get("x-levytate-organisation") ?? undefined);
     return NextResponse.json({ ok: true, result });
   } catch (error) {
     return actionErrorResponse(error);
@@ -41,6 +44,8 @@ export async function POST() {
 }
 
 function actionErrorResponse(error: unknown) {
+  if (error instanceof LevyTateOperationalActionConflictError || error instanceof LevyTateLearnerLifecycleConflictError) return NextResponse.json({ message: "Your workspace changed while refreshing Operations. Reload to reconnect." }, { status: 409 });
+  if (error instanceof ClientRequestError) return NextResponse.json({ message: error.message }, { status: error.status });
   const status = error instanceof LevyTateLearnerLifecyclePermissionError ? 403 : 500;
   if (status === 500) {
     logLevyTateServerError("operational-actions", error);

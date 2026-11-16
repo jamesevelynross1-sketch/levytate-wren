@@ -1,17 +1,73 @@
-name: Test
+name: LevyTate launch gate
 
 on:
   pull_request:
   push:
 
+permissions:
+  contents: read
+
 jobs:
-  test:
+  quality:
+    name: Test, lint, validate and build
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CI: true
+      NEXT_TELEMETRY_DISABLED: 1
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Check out the reviewed commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
-      - run: npm test
+
+      - name: Use the reviewed npm version
+        run: |
+          npm install --global npm@11.6.2
+          test "$(npm --version)" = "11.6.2"
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Run unit and routing tests
+        run: npm test
+
+      - name: Lint the full application, including LevyTate
+        run: npm run lint
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Verify host-routing contract explicitly
+        run: npm test -- tests/host-routing.test.ts
+
+      - name: Verify service-health contracts
+        run: node --import tsx scripts/validate-service-health-contracts.mjs
+
+      - name: Verify secure employer authentication foundation
+        run: node --import tsx scripts/validate-secure-employer-auth-foundation.mjs
+
+      - name: Verify Core Early Access boundary
+        run: node --import tsx scripts/validate-core-early-access-boundary.mjs
+
+      - name: Verify credential-free environment manifest
+        run: node scripts/validate-levytate-environment-manifest.mjs
+
+      - name: Verify selected launch-release contracts
+        run: |
+          npm run validate:launch-release-1
+          npm run validate:launch-release-2
+          npm run validate:launch-release-3
+          npm run validate:launch-release-4
+
+      - name: Build the release candidate
+        run: npm run build

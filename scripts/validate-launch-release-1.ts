@@ -11,8 +11,12 @@ assert.match(store, /return syncMutation\(mutation\)/, "Supabase mutations must 
 assert.match(store, /Your information is still in this form; please retry/, "Network failure must provide a recoverable retry message.");
 
 const employeeApplication = source("components/levytate-mvp/EmployeeExperienceModule.tsx");
-assert.match(employeeApplication, /const result = await saveApplication\(next\)/);
-assert.ok(employeeApplication.indexOf("if (!result.ok)") < employeeApplication.indexOf("setSavedMessage(status"), "Success must only appear after confirmed persistence.");
+assert.match(employeeApplication, /const result = await saveApplication\(original\)/, "Submission must await the retained original application, including retries.");
+const confirmedGuard = employeeApplication.indexOf("if (!result.ok) throw");
+const clearPending = employeeApplication.indexOf("pending.current = null;");
+const successMessage = employeeApplication.indexOf("setSavedMessage(original.status");
+assert.ok(confirmedGuard >= 0 && clearPending > confirmedGuard && successMessage > clearPending, "The retained command may be cleared and success shown only after confirmed persistence.");
+assert.match(employeeApplication, /fieldset disabled=\{saving \|\| uncertain\}/, "An uncertain application must retain its original fields until retry or inspection.");
 assert.match(employeeApplication, /onSecondary=\{\(\) => onNavigate\("My Programme"\)\}/, "View programme must not remain an empty handler.");
 assert.match(employeeApplication, /disabled=\{saving\}/, "Repeated employee submissions must be disabled while persistence is pending.");
 

@@ -40,6 +40,7 @@ import { getOrganisationOperationsSummary } from "@/lib/server/levytate-operatio
 import { getLearningTimeWorkspace } from "@/lib/server/levytate-off-the-job";
 import { runLearningTimeAssistant } from "@/lib/server/levytate-off-the-job-assistant";
 import { getWorkspaceBootstrapForSession } from "@/lib/server/levytate-workspace";
+import { logLevyTateServerError } from "@/lib/server/levytate-safe-api-error";
 
 const resultLimit = 25;
 const operationalRoles = new Set(["Line Manager", "Apprenticeship Lead", "Employer Admin"]);
@@ -90,7 +91,7 @@ export async function routeOperationalCopilotQuery(
     serverContext = await getLearnerLifecycleServerContext(session);
     role = normaliseMvpUserRole(serverContext.user.role);
   } catch (error) {
-    console.error("LevyTate operational Copilot scope resolution failed", { intent: classification.intent, error });
+    logLevyTateServerError("copilot-scope", error);
     return responseForPayload(
       request,
       classification,
@@ -162,7 +163,7 @@ export async function routeOperationalCopilotQuery(
         true,
       );
     } catch (error) {
-      console.error("LevyTate employee programme Copilot retrieval failed", { error });
+      logLevyTateServerError("copilot-programmes", error);
       return auditedResponse({
         type: "data_unavailable",
         title: "Programme data unavailable",
@@ -229,11 +230,7 @@ export async function routeOperationalCopilotQuery(
       managerScopeResolutionMs,
     }, true);
   } catch (error) {
-    console.error("LevyTate operational Copilot retrieval failed", {
-      intent: classification.intent,
-      role,
-      error,
-    });
+    logLevyTateServerError("copilot-retrieval", error);
     return auditedResponse(
       {
         type: "data_unavailable",

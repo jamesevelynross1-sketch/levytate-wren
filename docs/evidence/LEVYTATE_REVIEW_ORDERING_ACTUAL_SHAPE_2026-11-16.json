@@ -1,0 +1,20 @@
+{
+  "environment": "local",
+  "readOnly": true,
+  "reviews": [
+    {
+      "id": "learner-149592ee-109c-4441-befc-5056b5d25a9b-first-provider-review",
+      "status": "scheduled",
+      "reviewDate": "2026-12-16",
+      "reviewType": "provider_review",
+      "nextReviewDate": null
+    },
+    {
+      "id": "learner-review-learner-149592ee-109c-4441-befc-5056b5d25a9b-41ec37a6860e4d7a8750cbd148e8d58d",
+      "status": "completed",
+      "reviewDate": "2026-11-16",
+      "reviewType": "provider_review",
+      "nextReviewDate": "2026-11-23"
+    }
+  ]
+}

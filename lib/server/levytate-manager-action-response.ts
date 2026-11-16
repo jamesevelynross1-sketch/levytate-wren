@@ -7,8 +7,10 @@ import {
   LevyTateOperationalActionError,
 } from "@/lib/server/levytate-operational-actions";
 import { logLevyTateServerError } from "@/lib/server/levytate-safe-api-error";
+import { ClientRequestError } from "@/lib/server/levytate-request-boundary";
 
 export function managerActionErrorResponse(context: string, error: unknown) {
+  if (error instanceof ClientRequestError) return NextResponse.json({ message: error.message }, { status: error.status });
   if (error instanceof LevyTateManagerOperationalActionAccessError
     || error instanceof LevyTateManagerScopeError
     || error instanceof LevyTateLearnerLifecyclePermissionError) {

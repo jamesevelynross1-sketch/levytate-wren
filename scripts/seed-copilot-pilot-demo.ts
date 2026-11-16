@@ -84,7 +84,7 @@ export async function seedCopilotPilotDemo(referenceDate = new Date().toISOStrin
     objectId: String(guard.identity.external_object_id),
     identityId: String(guard.identity.id),
   };
-  const autopilot = await refreshAutopilotWorkspaceForMicrosoftCopilotActor(actor);
+  const autopilot = await refreshAutopilotWorkspaceForMicrosoftCopilotActor(actor, { idempotencyKey: crypto.randomUUID() });
   const report = await validatePersistedState(config, model, autopilot);
   return { operation: existing.mode === "empty" ? "seeded" : "already_seeded", referenceDate, ...report };
 }

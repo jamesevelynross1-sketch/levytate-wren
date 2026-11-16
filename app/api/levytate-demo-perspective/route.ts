@@ -4,8 +4,9 @@ import {
   levytateBetaSessionCookie,
   levytateBetaSessionMaxAge,
 } from "@/lib/levytate/config/beta-access";
-import { levytateAuthCookieOptions } from "@/lib/levytate/hosts";
 import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
+import { setLevyTateAuthCookies } from "@/lib/server/levytate-auth-cookies";
+import { ClientRequestError, readAuthenticatedJson, requireActionKeys } from "@/lib/server/levytate-request-boundary";
 import {
   getDemoRoleSwitcherState,
   isDemoRoleSwitcherRuntimeEnabled,
@@ -32,14 +33,11 @@ export async function GET() {
 
 export async function POST(request: Request) {
   if (!isDemoRoleSwitcherRuntimeEnabled()) return response({ message: "Not found." }, 404);
-  if (!isSameOriginRequest(request)) {
-    return response({ message: "The demo perspective request could not be verified." }, 403);
-  }
-
   try {
     const session = await currentSession();
     if (!session) return response({ message: "Your session has ended. Sign in again." }, 401);
-    const body = await readBody(request);
+    const body = await readAuthenticatedJson(request, session.email, 2048);
+    requireActionKeys(body, ["perspective"]);
     const store = await cookies();
     const result = await switchDemoPerspective(
       session,
@@ -47,11 +45,9 @@ export async function POST(request: Request) {
       body.perspective,
     );
     const next = response({ ok: true, switcher: result.state });
-    next.cookies.set(
-      levytateBetaSessionCookie,
-      result.sessionToken,
-      levytateAuthCookieOptions(levytateBetaSessionMaxAge, request.headers.get("host")),
-    );
+    setLevyTateAuthCookies(next, request.headers.get("host"), [
+      { name: levytateBetaSessionCookie, value: result.sessionToken, maxAge: levytateBetaSessionMaxAge },
+    ]);
     return next;
   } catch (error) {
     return roleSwitcherError(error, false);
@@ -63,28 +59,8 @@ async function currentSession() {
   return readAuthorisedLevyTateBetaSession(store.get(levytateBetaSessionCookie)?.value);
 }
 
-async function readBody(request: Request): Promise<{ perspective?: unknown }> {
-  if (!request.headers.get("content-type")?.toLowerCase().startsWith("application/json")) {
-    throw new LevyTateDemoRoleSwitcherError("invalid_request", "Choose an available demo perspective.", 400);
-  }
-  try {
-    return await request.json() as { perspective?: unknown };
-  } catch {
-    throw new LevyTateDemoRoleSwitcherError("invalid_request", "Choose an available demo perspective.", 400);
-  }
-}
-
-function isSameOriginRequest(request: Request) {
-  const origin = request.headers.get("origin");
-  if (!origin) return false;
-  try {
-    return new URL(origin).origin === new URL(request.url).origin;
-  } catch {
-    return false;
-  }
-}
-
 function roleSwitcherError(error: unknown, concealEligibility: boolean) {
+  if (error instanceof ClientRequestError) return response({ message: error.message }, error.status);
   if (error instanceof LevyTateDemoRoleSwitcherError) {
     if (concealEligibility && ["disabled", "unauthorised"].includes(error.code)) {
       return response({ message: "Not found." }, 404);

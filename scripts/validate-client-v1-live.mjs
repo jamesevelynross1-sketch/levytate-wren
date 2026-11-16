@@ -113,7 +113,7 @@ try {
   await jsonRequest(`/api/levytate-learners/${learnerId}/reviews`, { method: "POST", cookie: leadA.cookie, body: { expectedActivityVersion: activityVersion, idempotencyKey: `client-v1-review-${suffix}`, reviewType: "provider_review", reviewDate: "2026-08-31", nextReviewDate: "2026-09-30", reviewerName: "Validation Lead", providerId: qa.providerId, summary: "Progress variance requires employer and provider follow-up.", actions: ["Agree a recovery plan."], supportRequired: "Provider action required.", status: "action_required" } });
   const learners = await jsonRequest("/api/levytate-learners", { cookie: leadA.cookie });
   assert(learners.learners?.length === 1 && learners.learners[0].learnerRecordId === learnerId, "existing learner onboarding, progress and provider review persist");
-  const operations = await jsonRequest("/api/levytate-operations?synchronise=true", { cookie: leadA.cookie });
+  const operations = await jsonRequest("/api/levytate-operations", { method: "POST", cookie: leadA.cookie, body: {} });
   assert(operations.summary && Object.values(operations.queues || {}).flat().length > 0, "Operations Centre derives queues from live organisation data");
 
   const analysed = await jsonRequest("/api/levytate-intelligence/signals", { method: "POST", cookie: leadA.cookie, body: { action: "analyse" } });

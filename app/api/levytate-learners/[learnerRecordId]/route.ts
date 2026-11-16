@@ -3,7 +3,9 @@ import { NextResponse } from "next/server";
 import { levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
 import { readAuthorisedLevyTateBetaSession } from "@/lib/server/levytate-authorised-session";
 import { lifecycleErrorResponse } from "@/lib/server/levytate-learner-api";
-import { getOrganisationLearnerLifecycleRecordDetail } from "@/lib/server/levytate-learner-lifecycle";
+import { getOrganisationLearnerLifecycleRecordDetail, getLearnerLifecycleServerContext } from "@/lib/server/levytate-learner-lifecycle";
+
+import { assertExpectedWorkspace } from "@/lib/server/levytate-request-boundary";
 
 async function getSession() {
   const cookieStore = await cookies();
@@ -11,7 +13,7 @@ async function getSession() {
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ learnerRecordId: string }> },
 ) {
   const session = await getSession();
@@ -20,9 +22,11 @@ export async function GET(
   }
 
   try {
+    await assertExpectedWorkspace(request, session.email);
+    const { organisation } = await getLearnerLifecycleServerContext(session);
     const { learnerRecordId } = await params;
     const learner = await getOrganisationLearnerLifecycleRecordDetail(session, learnerRecordId);
-    return NextResponse.json({ ok: true, source: "supabase", learner });
+    return NextResponse.json({ ok: true, source: "supabase", organisationId: organisation.id, learner });
   } catch (error) {
     return lifecycleErrorResponse(error);
   }

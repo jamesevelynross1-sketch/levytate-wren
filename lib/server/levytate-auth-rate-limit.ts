@@ -6,8 +6,30 @@ type RateLimitRule = { limit: number; windowSeconds: number };
 type RateLimitResult = { allowed: boolean; request_count: number; remaining: number; reset_at: string };
 type RateLimitCheck = { action: string; actorKey: string; route: string; eventType: string; rule: RateLimitRule };
 
+// Accept PostgreSQL JSON timestamps and RFC 3339 without accepting Date.parse's
+// numeric shorthand, implicit local timezone or invalid-day rollover.
+export function isValidAuthResetInstant(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  const match = /^(\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])[T ](?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d{1,6})?(?:Z|[+-](?:[01]\d|2[0-3])(?::?[0-5]\d)?)$/.exec(value);
+  if (!match || !Number.isFinite(Date.parse(value))) return false;
+  const year = Number(match[1]), month = Number(match[2]), day = Number(match[3]);
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return year > 0 && day <= days[month - 1];
+}
+
 export class LevyTateRateLimitStoreError extends Error {
   constructor() { super("Authentication security controls are temporarily unavailable."); this.name = "LevyTateRateLimitStoreError"; }
+}
+
+export function decodeAuthRateLimitResult(value: unknown, limit: number): RateLimitResult {
+  if (!Array.isArray(value) || value.length !== 1 || !value[0] || typeof value[0] !== "object") throw new LevyTateRateLimitStoreError();
+  const row = value[0] as RateLimitResult;
+  if (typeof row.allowed !== "boolean" || !Number.isSafeInteger(row.request_count) || row.request_count < 1 || row.request_count > limit + 1
+    || row.allowed !== (row.request_count <= limit)
+    || !Number.isSafeInteger(row.remaining) || row.remaining !== Math.max(limit - row.request_count, 0)
+    || !isValidAuthResetInstant(row.reset_at)) throw new LevyTateRateLimitStoreError();
+  return row;
 }
 
 export async function checkMagicLinkRequestLimits(request: Request, email: string) {
@@ -23,8 +45,29 @@ export async function checkMagicLinkRequestLimits(request: Request, email: strin
 }
 
 export async function checkCallbackAttemptLimit(request: Request) {
+  const transport = await consumeChecks([
+    check("magic_link.callback.transport", networkRateLimitKey(request), "/levytate/auth/callback", "callback_transport_rate_limited", levyTateAuthRateLimits.callbackTransportNetwork),
+    check("magic_link.callback.token", rateLimitKey("callback_token", (new URL(request.url).searchParams.get("token_hash") ?? "missing").slice(0, 2048)), "/levytate/auth/callback", "callback_replay_rate_limited", levyTateAuthRateLimits.callbackToken),
+  ]);
+  if (!transport.allowed) return transport;
+  // Successful callbacks must not consume the invalid-link budget for everyone
+  // behind an employer NAT. Check the existing failed-only bucket without a
+  // write; actual failures are consumed atomically after provider verification.
+  // Transport/token caps also bound concurrent attempts before failures settle.
+  try {
+    const config = getLevyTateSupabaseConfig();
+    if (!config) throw new LevyTateRateLimitStoreError();
+    const rows = await supabaseFetchJson<Array<{ allowed: boolean; reset_at: string }>>(config, "rpc/levytate_check_auth_callback_failures", {
+      method: "POST", body: JSON.stringify({ p_environment_namespace: getLevyTateRateLimitEnvironment(), p_key_hash: networkRateLimitKey(request) }),
+    });
+    if (!Array.isArray(rows) || rows.length !== 1 || !rows[0] || typeof rows[0].allowed !== "boolean" || !isValidAuthResetInstant(rows[0].reset_at)) throw new LevyTateRateLimitStoreError();
+    return { allowed: rows[0].allowed, resetAt: rows[0].reset_at };
+  } catch { throw new LevyTateRateLimitStoreError(); }
+}
+
+export async function recordInvalidCallback(request: Request) {
   return consumeChecks([
-    check("magic_link.callback.invalid", networkRateLimitKey(request), "/levytate/auth/callback", "callback_abuse_threshold_reached", levyTateAuthRateLimits.invalidCallbackNetwork),
+    check("magic_link.callback.failure", networkRateLimitKey(request), "/levytate/auth/callback", "callback_abuse_threshold_reached", levyTateAuthRateLimits.invalidCallbackNetwork),
   ]);
 }
 
@@ -38,6 +81,38 @@ export async function checkBetaLoginLimits(request: Request, email: string) {
 export async function checkSessionRefreshLimit(request: Request) {
   return consumeChecks([
     check("session_refresh.network", networkRateLimitKey(request), "/api/levytate-auth/session", "session_refresh_rate_limited", levyTateAuthRateLimits.sessionRefreshNetwork),
+  ]);
+}
+
+/** Shared, persistent budget for cookie-authenticated writes across endpoints.
+ * Keys are HMACs and a changed session cookie cannot reset the identity budget.
+ */
+export async function checkAuthenticatedWriteLimit(request: Request, email: string) {
+  return consumeChecks([
+    check("workspace_write.identity.minute", rateLimitKey("email", email.trim().toLowerCase()), "/api/levytate-workspace", "workspace_write_rate_limited", { limit: 120, windowSeconds: 60 }),
+    check("workspace_write.network.minute", networkRateLimitKey(request), "/api/levytate-workspace", "workspace_write_rate_limited", { limit: 600, windowSeconds: 60 }),
+  ]);
+}
+
+export async function checkLevyTateCopilotLimits(request: Request, email: string) {
+  return consumeChecks([
+    check("copilot.identity.minute", rateLimitKey("email", email.trim().toLowerCase()), "/api/levytate-ai", "copilot_rate_limited", { limit: 12, windowSeconds: 60 }),
+    check("copilot.identity.hour", rateLimitKey("email", email.trim().toLowerCase()), "/api/levytate-ai", "copilot_rate_limited", { limit: 120, windowSeconds: 3600 }),
+    check("copilot.network.hour", networkRateLimitKey(request), "/api/levytate-ai", "copilot_rate_limited", { limit: 1200, windowSeconds: 3600 }),
+  ]);
+}
+
+export async function checkEarlyAccessSubmissionLimits(request: Request, email: string) {
+  return consumeChecks([
+    check("early_access.email", rateLimitKey("email", email.trim().toLowerCase()), "/api/levytate-early-access", "public_form_rate_limited", levyTateAuthRateLimits.publicFormEmailHour),
+    check("early_access.network", networkRateLimitKey(request), "/api/levytate-early-access", "public_form_rate_limited", levyTateAuthRateLimits.publicFormNetworkHour),
+    check("early_access.global", rateLimitKey("global", "early-access"), "/api/levytate-early-access", "public_form_rate_limited", { limit: 500, windowSeconds: 3600 }),
+  ]);
+}
+
+export async function checkDeliveryWebhookLimit(request: Request) {
+  return consumeChecks([
+    check("delivery_webhook.network", networkRateLimitKey(request), "/api/levytate-auth/delivery-events/resend", "delivery_webhook_rate_limited", { limit: 600, windowSeconds: 60 }),
   ]);
 }
 
@@ -120,8 +195,7 @@ async function consumeWithRetry(item: RateLimitCheck) {
           p_event_type: item.eventType,
         }),
       });
-      if (!rows[0]) throw new LevyTateRateLimitStoreError();
-      return rows[0];
+      return decodeAuthRateLimitResult(rows, item.rule.limit);
     } catch (error) {
       failure = error;
     }

@@ -1,19 +1,29 @@
 "use client";
 
 import { ArrowLeft, ArrowRight, CalendarClock, CheckCircle2, CircleDot, Clock3, History, UserRound } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StatusBadge } from "@/components/levytate-mvp/MvpUi";
+import { OperationsReadbackRecovery } from "@/components/levytate-mvp/OperationsReadbackRecovery";
+import { ClientMutationRecovery } from "@/components/levytate-mvp/ClientMutationRecovery";
+import { useOperationsClientCommand } from "@/components/levytate-mvp/useOperationsClientCommand";
+import { decodeOperationalDetail, decodeOperationalMutation } from "@/lib/levytate/operations-client-response";
+import { useRetainedWorkspaceRequest } from "@/components/levytate-mvp/useRetainedWorkspaceRequest";
 import { operationalActionStatusLabels, type OperationalActionEvent, type PersistentOperationalAction } from "@/lib/levytate/mvp/operational-actions";
 import type { OperationalActionType } from "@/lib/levytate/mvp/operations-centre";
 import type { OperationalActionManagementDetail, OperationalActionOwnerOption } from "@/lib/server/levytate-operational-actions";
 
-type ActionDetailResponse = Partial<OperationalActionManagementDetail> & { ok?: boolean; message?: string };
+
 type LearnerTarget = { learnerRecordId: string; actionType: OperationalActionType };
 
 export function OperationalActionDetail({ actionId, onBack, onOpenAction, onOpenLearner, onChanged }: { actionId: string; onBack: () => void; onOpenAction: (actionId: string) => void; onOpenLearner: (target: LearnerTarget) => void; onChanged: () => void }) {
+  const request = useRetainedWorkspaceRequest();
   const [detail, setDetail] = useState<OperationalActionManagementDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const mutation = useOperationsClientCommand();
+  const [readbackRequired, setReadbackRequired] = useState(false);
+  const confirmedVersion = useRef(0);
+  const saving = mutation.locked || readbackRequired;
+  const organisationId = mutation.identity?.organisationId ?? "";
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
@@ -21,43 +31,31 @@ export function OperationalActionDetail({ actionId, onBack, onOpenAction, onOpen
     setLoading(true);
     setError("");
     try {
-      const response = await fetch(`/api/levytate-operational-actions/${encodeURIComponent(actionId)}?management=true`, { cache: "no-store" });
-      const payload = await response.json() as ActionDetailResponse;
-      if (!response.ok || !payload.action || !payload.context || !payload.history || !payload.previousOccurrences || !payload.ownerOptions) throw new Error(payload.message ?? "The action could not be loaded.");
-      setDetail(payload as OperationalActionManagementDetail);
+      const response = await request(`/api/levytate-operational-actions/${encodeURIComponent(actionId)}?management=true`, { cache: "no-store" });
+      if (!response.ok) throw new Error("The action could not be loaded.");
+      const next = decodeOperationalDetail(await response.json(), { actionId, organisationId });
+      if (next.action.version < confirmedVersion.current) throw new Error("The latest saved action has not been returned yet.");
+      setDetail(next); setReadbackRequired(false);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "The action could not be loaded.");
     } finally {
       setLoading(false);
     }
-  }, [actionId]);
+  }, [actionId, organisationId, request]);
 
   useEffect(() => { void load(); }, [load]);
 
   async function mutate(command: string, payload: Record<string, unknown>, success: string) {
     if (!detail) return;
-    setSaving(true);
     setError("");
     setNotice("");
+    const original = { action: detail.action, command, payload: { ...payload } };
     try {
-      const response = await fetch(`/api/levytate-operational-actions/${encodeURIComponent(actionId)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ command, expectedVersion: detail.action.version, ...payload }),
-      });
-      const result = await response.json() as { message?: string };
-      if (!response.ok) {
-        if (response.status === 409) throw new Error("This action was updated by someone else. Refresh to see the latest version.");
-        throw new Error(result.message ?? "The action could not be updated.");
-      }
-      setNotice(success);
-      await load();
-      onChanged();
-    } catch (mutationError) {
-      setError(mutationError instanceof Error ? mutationError.message : "The action could not be updated.");
-    } finally {
-      setSaving(false);
-    }
+      await mutation.execute(`/api/levytate-operational-actions/${encodeURIComponent(actionId)}`,
+        { command, expectedVersion: detail.action.version, ...payload },
+        value => decodeOperationalMutation(value, original),
+        confirmed => { confirmedVersion.current = confirmed.version; setReadbackRequired(true); setNotice(success); void load(); onChanged(); }, "PATCH");
+    } catch { /* The original command remains available in the recovery dialog. */ }
   }
 
   if (loading && !detail) return <div className="rounded-2xl border border-[#102c3d]/[0.07] bg-white px-6 py-16 text-center text-sm font-semibold text-[#102c3d]/[0.52]">Loading operational action.</div>;
@@ -77,6 +75,8 @@ export function OperationalActionDetail({ actionId, onBack, onOpenAction, onOpen
         : { label: "View history", run: () => document.getElementById("operational-action-history")?.scrollIntoView({ behavior: "smooth" }) };
 
   return (
+    <>
+    <fieldset disabled={saving} className="min-w-0">
     <div className="grid min-w-0 gap-5" data-testid="operational-action-detail" data-action-status={action.status}>
       <button type="button" onClick={onBack} className="inline-flex w-fit items-center gap-2 text-xs font-semibold text-[#102c3d]/[0.58] transition hover:text-[#0b6f63]"><ArrowLeft size={15} />Back to Operations Centre</button>
 
@@ -142,6 +142,10 @@ export function OperationalActionDetail({ actionId, onBack, onOpenAction, onOpen
         </div>
       </section>
     </div>
+    </fieldset>
+    <ClientMutationRecovery mutation={mutation} />
+    <OperationsReadbackRecovery required={readbackRequired} loading={loading} retry={() => void load()} />
+    </>
   );
 }
 

@@ -118,6 +118,7 @@ export type OperationsFilterOptions = {
 };
 
 export type OperationsResponse = {
+  scope: { organisationId: string; userEmail: string; role: string };
   source: "supabase";
   generatedAt: string;
   summary: OperationsSummary;

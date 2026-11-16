@@ -37,6 +37,7 @@ export async function listManagerActions(
     || filter === "overdue" && action.overdue
     || action.status === filter);
   return {
+    scope: { organisationId: result.scope.organisation.id, userEmail: result.scope.user.email, role: "Line Manager" },
     source: "supabase",
     generatedAt: new Date().toISOString(),
     summary: {
@@ -58,6 +59,7 @@ export async function getManagerAction(session: LevyTateBetaSession, actionId: s
     : result.source.detail.programme.programmeName;
   return {
     ...item,
+    scope: { organisationId: result.scope.organisation.id, userEmail: result.scope.user.email, role: "Line Manager" },
     employee: {
       name: employee.name,
       jobTitle: employee.jobTitle,
@@ -76,13 +78,13 @@ export async function getManagerAction(session: LevyTateBetaSession, actionId: s
 }
 
 export async function acknowledgeManagerAction(session: LevyTateBetaSession, actionId: string, expectedVersion: number) {
-  await acknowledgeManagerDirectReportOperationalAction(session, actionId, expectedVersion);
-  return getManagerAction(session, actionId);
+  const receipt = await acknowledgeManagerDirectReportOperationalAction(session, actionId, expectedVersion);
+  return { action: await getManagerAction(session, actionId), confirmation: { actionId: receipt.id, version: receipt.version, status: receipt.status } };
 }
 
 export async function startManagerAction(session: LevyTateBetaSession, actionId: string, expectedVersion: number, note = "") {
-  await startManagerDirectReportOperationalAction(session, actionId, expectedVersion, note);
-  return getManagerAction(session, actionId);
+  const receipt = await startManagerDirectReportOperationalAction(session, actionId, expectedVersion, note);
+  return { action: await getManagerAction(session, actionId), confirmation: { actionId: receipt.id, version: receipt.version, status: receipt.status } };
 }
 
 type ManagerActionSource = Awaited<ReturnType<typeof getManagerDirectReportOperationalAction>>["source"];

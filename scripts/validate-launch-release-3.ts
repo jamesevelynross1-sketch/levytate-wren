@@ -24,8 +24,14 @@ const learner = { id: "learner-1", organisationId: "org-release-3", employeeId: 
 workspace.data.learnerRecords.push(learner, { ...learner });
 const enrolment = { id: "enrolment-1", applicationId: "app-1", employeeId: "employee-1", providerId: "provider-1", apprenticeshipStandardId: "ST0001", status: "Enrolment in progress" as const, startDate: "2026-11-01", notes: "", createdAt: now, updatedAt: now };
 workspace.data.enrolments.push(enrolment, { ...enrolment });
+// The first enrolment is stale legacy evidence: its application already has an
+// enrolled learner and must not be counted as an upcoming start. A distinct,
+// genuinely pre-start application still counts once despite duplicated rows.
+const pendingEnrolment = { ...enrolment, id: "enrolment-pending", applicationId: "app-pending", employeeId: "employee-pending" };
+workspace.data.enrolments.push(pendingEnrolment, { ...pendingEnrolment });
 
 const operations: OperationsResponse = {
+  scope: { organisationId: "fictional-validator", userEmail: "lead@fictional.invalid", role: "Apprenticeship Lead" },
   source: "supabase", generatedAt: now,
   summary: { needsAttentionNow: 1, readyToEnrol: 0, reviewsOverdue: 1, behindTarget: 0, activeBreaks: 0, approachingAssessmentCompletion: 0 },
   queues: { urgent: [{ id: "urgent-1", queueType: "urgent", learnerRecordId: "learner-1", learnerName: "Fictional Learner", programmeName: "Data Analyst", providerName: "Fictional Provider", department: "Operations", site: "HQ", lifecycleStatus: "Enrolled", priorityLevel: "High", priorityRank: 1, reason: "Provider review is overdue.", dueDate: "2026-10-10", dueStatus: "Overdue", daysOverdue: 10, timingLabel: "10 days overdue", ownerType: "Shared", actionType: "record_review", actionLabel: "Record review", actionUrl: "/levytate/app?module=Learners&learner=learner-1&action=record_review", secondaryActionUrl: "/levytate/app?module=Learners&learner=learner-1", sourceType: "review_due", sourceCondition: "provider-review-overdue", sourceKey: "learner-1:provider-review-overdue", persistentActionType: "record_provider_review" }], ready_to_enrol: [], reviews: [], progress: [], breaks: [], pre_enrolment: [], assessment: [] },
@@ -56,7 +62,7 @@ const populated = buildEmployerIntelligence({ generatedAt: now, workspace: { ok:
 check(populated.overview.signals.find((item) => item.metricId === "applications-awaiting-decision")?.value === 1, "Application decision count reconciles to source records");
 check(populated.overview.signals.find((item) => item.metricId === "operational-attention")?.value === 1, "Operational attention count reconciles to Operations Centre");
 check(populated.overview.signals.find((item) => item.metricId === "active-learners")?.value === 1, "Active learner count de-duplicates repeated source rows");
-check(populated.overview.signals.find((item) => item.metricId === "upcoming-enrolments")?.value === 1, "Upcoming enrolment count de-duplicates repeated source rows");
+check(populated.overview.signals.find((item) => item.metricId === "upcoming-enrolments")?.value === 1, "Upcoming enrolment count de-duplicates pending rows and excludes already-enrolled applications");
 check(populated.overview.priorities.filter((item) => item.id === "application:app-1").length === 1 && !populated.overview.priorities.some((item) => item.id === "application:app-closed"), "Priorities de-duplicate current applications and exclude closed applications");
 check(populated.overview.priorities[0]?.href.includes("learner-1"), "Priority opens the exact authorised learner action");
 check(populated.workforce.reports.length === 2 && populated.workforce.reports[0].questionnaireVersion === "v3" && populated.workforce.reports[1].questionnaireVersion === "v2", "Mixed framework versions remain separate campaign reports");

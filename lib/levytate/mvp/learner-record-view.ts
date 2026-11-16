@@ -18,6 +18,7 @@ import {
   type LearnerWithdrawal,
 } from "@/lib/levytate/mvp/learner-lifecycle";
 import type { AssessmentReadinessResult } from "@/lib/levytate/mvp/assessment-readiness";
+import { selectReviewPlan } from "@/lib/levytate/mvp/review-planning";
 
 export type LearnerProgressPosition = "Ahead of target" | "On target" | "Slightly behind" | "Significantly behind" | "No progress data";
 export type LearnerAttentionSeverity = "none" | "low" | "medium" | "high";
@@ -363,8 +364,8 @@ export function compareLearnerOperationalPriority(left: LearnerOperationalSummar
   const leftScore = learnerPriorityScore(left);
   const rightScore = learnerPriorityScore(right);
   if (leftScore !== rightScore) return rightScore - leftScore;
-  const leftReview = left.latestProviderReview?.nextReviewDate ?? "9999-12-31";
-  const rightReview = right.latestProviderReview?.nextReviewDate ?? "9999-12-31";
+  const leftReview = left.reviewSummaries.provider.nextDate || "9999-12-31";
+  const rightReview = right.reviewSummaries.provider.nextDate || "9999-12-31";
   if (leftReview !== rightReview) return leftReview.localeCompare(rightReview);
   return left.learner.name.localeCompare(right.learner.name);
 }
@@ -381,11 +382,8 @@ function learnerPriorityScore(record: LearnerOperationalSummary) {
 }
 
 function reviewSummary(reviews: LearnerReview[], reviewType: LearnerReviewType, today: string): LearnerReviewSummary {
-  const latest = reviews
-    .filter((review) => review.reviewType === reviewType)
-    .sort((left, right) => right.reviewDate.localeCompare(left.reviewDate) || right.createdAt.localeCompare(left.createdAt))[0] ?? null;
-  const nextDate = latest?.nextReviewDate ?? "";
-  return { latest, nextDate, overdue: Boolean(nextDate && nextDate < today && latest?.status !== "cancelled") };
+  const { latest, nextDate } = selectReviewPlan(reviews.filter(review => review.reviewType === reviewType));
+  return { latest, nextDate, overdue: Boolean(nextDate && nextDate < today) };
 }
 
 function progressIsOverdue(progress: LearnerProgressUpdate | null, today: string) {

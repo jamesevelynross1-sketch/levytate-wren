@@ -1116,12 +1116,17 @@ function responsePayload(draft: ResponseDraft): ProviderResponseContent {
   };
 }
 
+// A network failure must retry the same command, not create a second decision or response.
+const pendingProviderCommands=new Map<string,string>();
 async function providerMutation(action: ProviderRequestAction) {
+  const fingerprint=JSON.stringify(Object.fromEntries(Object.entries(action).filter(([key])=>key!=="idempotencyKey")));
+  const idempotencyKey=pendingProviderCommands.get(fingerprint)??action.idempotencyKey;
+  pendingProviderCommands.set(fingerprint,idempotencyKey);
   const response = await fetch("/api/levytate-provider/opportunities", {
     method: "POST",
     credentials: "same-origin",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(action),
+    body: JSON.stringify({...action,idempotencyKey}),
   });
   const body = (await response.json().catch(() => null)) as
     | { opportunity?: ProviderOpportunityView; message?: string }
@@ -1129,7 +1134,9 @@ async function providerMutation(action: ProviderRequestAction) {
   if (!response.ok || !body?.opportunity) {
     throw new Error(body?.message ?? "We couldn’t save this change. Please try again.");
   }
-  return { opportunity: normaliseProviderOpportunity(body.opportunity) };
+  const opportunity=normaliseProviderOpportunity(body.opportunity);
+  pendingProviderCommands.delete(fingerprint);
+  return { opportunity };
 }
 
 function responseStatusLabel(response?: ProviderResponse | null) {

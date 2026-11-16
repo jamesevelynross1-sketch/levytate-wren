@@ -4,10 +4,12 @@ import { OPTIONS, POST } from "@/app/api/levytate-early-access/route";
 import { middleware } from "@/middleware";
 import { createLevyTateBetaSession, levytateBetaSessionCookie } from "@/lib/levytate/config/beta-access";
 import {
+  isLevyTateAuthCookieHost,
   levyTateAuthCallbackUrl,
   levyTateEmployerSignInUrl,
   levyTatePublicSitemap,
-  levytateSessionCookieDomain,
+  levytateAuthCookieOptions,
+  levytateLegacySessionCookieDomain,
 } from "@/lib/levytate/hosts";
 import { levytateManifestForHost } from "@/lib/levytate/pwa-manifest";
 
@@ -69,6 +71,7 @@ describe("app.levytate.co.uk platform routing", () => {
     const apprenticeships = await middleware(requestFor("app.levytate.co.uk", "/apprenticeships"));
     const funding = await middleware(requestFor("app.levytate.co.uk", "/funding"));
     const manage = await middleware(requestFor("app.levytate.co.uk", "/manage-apprenticeships"));
+    const status = await middleware(requestFor("app.levytate.co.uk", "/status?source=app"));
 
     expect(privacy.status).toBe(301);
     expect(privacy.headers.get("location")).toBe("https://marketing.example.test/privacy?from=app");
@@ -79,6 +82,8 @@ describe("app.levytate.co.uk platform routing", () => {
     expect(apprenticeships.headers.get("location")).toBe("https://marketing.example.test/apprenticeships");
     expect(funding.headers.get("location")).toBe("https://marketing.example.test/funding");
     expect(manage.headers.get("location")).toBe("https://marketing.example.test/manage-apprenticeships");
+    expect(status.status).toBe(301);
+    expect(status.headers.get("location")).toBe("https://marketing.example.test/status?source=app");
   });
 
   it("leaves platform callbacks, provider routes and APIs on the app host", async () => {
@@ -131,6 +136,16 @@ describe("levytate.co.uk transition routing", () => {
     expect(solution.status).toBe(200);
     expect(solution.headers.get("x-middleware-rewrite")).toBeNull();
     expect(solution.headers.get("location")).toBeNull();
+  });
+
+  it.each(["levytate.co.uk", "www.levytate.co.uk"])("serves canonical /status content on %s", async (host) => {
+    vi.stubEnv("LEVYTATE_MCP_STAGING_ONLY", "");
+
+    const response = await middleware(requestFor(host, "/status"));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-middleware-rewrite")).toContain("/levytate/status");
+    expect(response.headers.get("location")).toBeNull();
   });
 
   it("follows LEVYTATE_APP_BASE_URL when the platform host is overridden", async () => {
@@ -206,14 +221,23 @@ describe("configurable platform URLs", () => {
     });
   });
 
-  it("binds session cookies to the platform host and refuses a parent domain", async () => {
+  it("uses host-only session cookies and limits legacy cleanup to the exact platform host", async () => {
     vi.stubEnv("LEVYTATE_MCP_STAGING_ONLY", "");
-    expect(levytateSessionCookieDomain("app.levytate.co.uk")).toBe("app.levytate.co.uk");
-    expect(levytateSessionCookieDomain("www.levytate.co.uk")).toBeUndefined();
+    expect(levytateAuthCookieOptions(60, "app.levytate.co.uk")).not.toHaveProperty("domain");
+    expect(levytateAuthCookieOptions(60, "www.levytate.co.uk")).not.toHaveProperty("domain");
+    expect(isLevyTateAuthCookieHost("app.levytate.co.uk")).toBe(true);
+    expect(isLevyTateAuthCookieHost("www.levytate.co.uk")).toBe(false);
+    expect(isLevyTateAuthCookieHost("unintended.app.levytate.co.uk")).toBe(false);
+    expect(levytateLegacySessionCookieDomain("app.levytate.co.uk")).toBe("app.levytate.co.uk");
+    expect(levytateLegacySessionCookieDomain("www.levytate.co.uk")).toBeUndefined();
+    expect(levytateLegacySessionCookieDomain("unintended.app.levytate.co.uk")).toBeUndefined();
 
     vi.stubEnv("LEVYTATE_SESSION_COOKIE_DOMAIN", "levytate.co.uk");
     const response = await middleware(requestFor("app.levytate.co.uk", "/app"));
-    expect(response.headers.getSetCookie().join("\n").toLowerCase()).not.toContain("domain=");
+    const domainCookies = response.headers.getSetCookie().filter((cookie) => /domain=/i.test(cookie));
+    expect(domainCookies).toHaveLength(1);
+    expect(domainCookies[0]).toMatch(/Domain=app\.levytate\.co\.uk/i);
+    expect(domainCookies[0]).toMatch(/Max-Age=0/i);
   });
 });
 

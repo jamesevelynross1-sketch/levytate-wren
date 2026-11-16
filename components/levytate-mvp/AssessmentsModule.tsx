@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowLeft, Check, ChevronRight, ClipboardList, Download, LockKeyhole, Printer, RefreshCw, Users } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import type { AssessmentActionInput, AssessmentView, AssessmentWorkspace } from "@/lib/levytate/assessments/api";
@@ -13,6 +13,10 @@ import {
 } from "@/lib/levytate/assessments/behaviour";
 import type { AssessmentAnswerMap } from "@/lib/levytate/assessments/domain";
 import { LiftModule } from "@/components/levytate-mvp/LiftModule";
+import { authenticatedClientFetch } from "@/lib/levytate/client-session";
+import { decodeAssessmentMutationResponse } from "@/lib/levytate/client-module-responses";
+import { usePinnedClientMutation } from "@/components/levytate-mvp/usePinnedClientMutation";
+import { ClientMutationRecovery } from "@/components/levytate-mvp/ClientMutationRecovery";
 
 const panel = "rounded-2xl border border-[#18384c]/10 bg-white p-5 shadow-[0_12px_35px_rgba(16,44,61,0.05)]";
 const input = "w-full rounded-xl border border-[#18384c]/15 bg-white px-3 py-2.5 text-sm text-[#102c3d] outline-none transition focus:border-[#0b7b70] focus:ring-2 focus:ring-[#0b7b70]/15";
@@ -21,6 +25,9 @@ const secondary = "inline-flex min-h-10 items-center justify-center gap-2 rounde
 
 export function AssessmentsModule() {
   const { data, meta } = useMvpWorkspace();
+  const identity = useRef(meta ? { email: meta.userEmail, organisationId: meta.organisationId } : null);
+  const mutation = usePinnedClientMutation(identity.current, "/api/levytate-assessments", decodeAssessmentMutationResponse);
+  const executeMutation = mutation.execute;
   const [experience, setExperience] = useState<"Lift" | "Historical">("Lift");
   const [workspace, setWorkspace] = useState<AssessmentWorkspace | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -30,7 +37,7 @@ export function AssessmentsModule() {
   const load = useCallback(async () => {
     setBusy(true);
     try {
-      const response = await fetch("/api/levytate-assessments", { cache: "no-store" });
+      const response = await authenticatedClientFetch("/api/levytate-assessments", {}, identity.current ?? undefined);
       const payload = await response.json() as { ok?: boolean; workspace?: AssessmentWorkspace; message?: string };
       if (!response.ok || !payload.workspace) throw new Error(payload.message || "Assessments could not be loaded.");
       const nextWorkspace = payload.workspace;
@@ -45,19 +52,16 @@ export function AssessmentsModule() {
   const executeAction = useCallback(async (action: AssessmentActionInput) => {
     setMessage("");
     try {
-      const response = await fetch("/api/levytate-assessments", {
-        method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ...action, idempotencyKey: `${action.action}:${crypto.randomUUID()}` }),
+      await executeMutation({ ...action, idempotencyKey: `${action.action}:${crypto.randomUUID()}` }, (next) => {
+        setWorkspace(next);
+        setMessage(action.action === "submit" ? "Assessment submitted successfully." : action.action === "save_answers" ? "Answers saved. Submit when ready." : "Saved successfully.");
       });
-      const payload = await response.json() as { ok?: boolean; workspace?: AssessmentWorkspace; message?: string };
-      if (!response.ok || !payload.workspace) throw new Error(payload.message || "The assessment action could not be completed.");
-      setWorkspace(payload.workspace);
       return true;
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "The assessment action could not be completed.");
       return false;
     }
-  }, []);
+  }, [executeMutation]);
 
   const act = useCallback(async (action: AssessmentActionInput) => {
     setBusy(true);
@@ -80,7 +84,7 @@ export function AssessmentsModule() {
     } finally { setBusy(false); }
   }, [executeAction]);
 
-  if (meta?.liftEnabled && experience === "Lift") return <div className="space-y-4"><AssessmentExperienceSwitch value={experience} onChange={setExperience}/><LiftModule/></div>;
+  if (meta?.liftEnabled && experience === "Lift") return <div className="space-y-4"><AssessmentExperienceSwitch value={experience} onChange={setExperience}/><LiftModule identity={identity.current}/></div>;
   if (!workspace) return <div className="space-y-4">{meta?.liftEnabled ? <AssessmentExperienceSwitch value={experience} onChange={setExperience}/> : null}<div className={panel} role="status">{busy ? "Loading Assessments…" : message || "Assessments are unavailable."}</div></div>;
   const selected = workspace.assessments.find((item) => item.id === selectedId) ?? null;
   const isEmployee = workspace.role === "Employee";
@@ -99,7 +103,7 @@ export function AssessmentsModule() {
   const standards = [...new Map(data.roles.flatMap((role) => role.pathwayMappings).map((mapping) => [mapping.apprenticeshipStandardId, mapping.apprenticeshipStandardId])).values()];
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4"><ClientMutationRecovery mutation={mutation}/><fieldset disabled={mutation.locked || busy} key={mutation.reconciled} className="min-w-0 border-0 p-0"><div className="space-y-5">
       {meta?.liftEnabled ? <AssessmentExperienceSwitch value={experience} onChange={setExperience}/> : null}
       <section className="rounded-2xl bg-[#102c3d] px-5 py-5 text-white md:px-7">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -119,7 +123,7 @@ export function AssessmentsModule() {
       ) : !isEmployee ? (
         <EmployerExperience workspace={reviewWorkspace} selected={reviewSelected} busy={busy} onSelect={setSelectedId} onAction={act} />
       ) : null}
-    </div>
+    </div></fieldset></div>
   );
 }
 

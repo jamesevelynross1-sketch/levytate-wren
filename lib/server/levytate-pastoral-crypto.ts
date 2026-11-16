@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes } from "node:crypto";
 import { readRuntimeEnv } from "@/lib/server/levytate-supabase";
 
 export type PastoralCiphertext = {
@@ -55,6 +55,11 @@ export function decryptPastoralJson<T>(value: PastoralCiphertext, associatedData
 
 export function digestPastoralPayload(value: unknown) {
   return createHash("sha256").update(stableJson(value)).digest("hex");
+}
+
+/** Keyed, domain-separated private-history retry binding; never a guessable plaintext digest. */
+export function authenticatePastoralHistoryCommand(value: unknown) {
+  return createHmac("sha256", pastoralEncryptionKey()).update("levytate-private-history-v1\0").update(stableJson(value)).digest("hex");
 }
 
 function pastoralEncryptionKey() {

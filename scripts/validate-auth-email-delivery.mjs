@@ -15,6 +15,8 @@ function check(label, condition) {
 const auth = readFileSync("lib/server/levytate-auth.ts", "utf8");
 const request = readFileSync("app/api/levytate-auth/request/route.ts", "utf8");
 const callback = readFileSync("app/levytate/auth/callback/route.ts", "utf8");
+const cookiePolicy = readFileSync("lib/server/levytate-auth-cookies.ts", "utf8");
+const hosts = readFileSync("lib/levytate/hosts.ts", "utf8");
 const loginPage = readFileSync("app/levytate/login/page.tsx", "utf8");
 const loginClient = readFileSync("components/levytate-mvp/LevyTateLoginClient.tsx", "utf8");
 const runbook = readFileSync("docs/LEVYTATE_AUTH_EMAIL_DELIVERY.md", "utf8");
@@ -27,7 +29,7 @@ check("provider failure is audited without raw errors", auth.includes('"auth.ema
 check("verified identity and successful sign-in are distinct", auth.includes('"auth.email_identity_verified"') && auth.includes('"auth.sign_in_successful"'));
 check("callback consumes a token hash", callback.includes('searchParams.get("token_hash")'));
 check("callback never accepts role or organisation", !/searchParams\.get\(["'](?:role|organisation)/.test(callback));
-check("session cookies stay HTTP-only", callback.includes("levytateAuthCookieOptions") && /httpOnly: true/.test(readFileSync("lib/levytate/hosts.ts", "utf8")));
+check("session cookies stay HTTP-only and host-only", callback.includes("setLevyTateAuthCookies") && cookiePolicy.includes("levytateAuthCookieOptions") && /httpOnly: true/.test(hosts) && !/return\s*\{[^}]*domain:/s.test(hosts));
 check("invalid-link state is server-derived without hydration drift", loginPage.includes('auth === "invalid-link"') && !loginClient.includes('typeof window !== "undefined"'));
 check("runbook names the exact Supabase project", runbook.includes("lzwcahdgchrkeulmlfqv"));
 check("runbook preserves Microsoft 365 mail routing", runbook.includes("Do not remove or replace the root Microsoft 365 MX or SPF records"));

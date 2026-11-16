@@ -60,6 +60,7 @@ export type MvpPermission =
 export type MvpWorkspaceMutationType =
   | "saveProfile"
   | "saveEmployee"
+  | "importEmployees"
   | "archiveEmployee"
   | "saveEmployeeDevelopmentProfile"
   | "saveRole"
@@ -207,6 +208,7 @@ export const mvpRolePermissions = {
     "employees:read",
     "employeeDevelopment:write",
     "applications:read",
+    "applications:write",
     "applications:status",
     "learnerLifecycle:read",
     "learningTime:read",
@@ -235,6 +237,7 @@ export const mvpRolePermissions = {
 export const mvpMutationPermission = {
   saveProfile: "settings:write",
   saveEmployee: "employees:write",
+  importEmployees: "employees:write",
   archiveEmployee: "employees:archive",
   saveEmployeeDevelopmentProfile: "employeeDevelopment:write",
   saveRole: "roles:write",
@@ -267,7 +270,7 @@ export const mvpMutationPermission = {
   completeOperationalAction: "learnerLifecycle:write",
 } as const satisfies Record<MvpWorkspaceMutationType, MvpPermission>;
 
-export function normaliseMvpUserRole(role: string | null | undefined): MvpUserRole {
+export function parseMvpUserRole(role: unknown): MvpUserRole | null {
   if (
     role === "Platform Admin" ||
     role === "Employer Admin" ||
@@ -278,11 +281,18 @@ export function normaliseMvpUserRole(role: string | null | undefined): MvpUserRo
     return role;
   }
 
-  return "Employee";
+  return null;
+}
+
+export function normaliseMvpUserRole(role: string | null | undefined): MvpUserRole {
+  const parsed = parseMvpUserRole(role);
+  if (!parsed) throw new RangeError("Unsupported LevyTate role.");
+  return parsed;
 }
 
 export function permissionsForMvpRole(role: MvpUserRole | string | null | undefined): MvpPermission[] {
-  return [...mvpRolePermissions[normaliseMvpUserRole(role)]];
+  const parsed = parseMvpUserRole(role);
+  return parsed ? [...mvpRolePermissions[parsed]] : [];
 }
 
 export function hasMvpPermission(

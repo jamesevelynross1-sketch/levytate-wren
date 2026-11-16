@@ -38,6 +38,8 @@ try {
     check(`${expectedRole} callback redirects to application`, login.status >= 300 && login.status < 400 && login.location.includes("/levytate/app"));
     check(`${expectedRole} HTTP-only LevyTate cookie issued`, /levytate_beta_session=.*HttpOnly/i.test(login.rawCookies));
     check(`${expectedRole} HTTP-only Auth cookies issued`, /levytate_auth_access=.*HttpOnly/i.test(login.rawCookies) && /levytate_auth_refresh=.*HttpOnly/i.test(login.rawCookies));
+    check(`${expectedRole} active callback cookies are host-only`, activeAuthCookies(login.setCookies).every((value) => !/Domain=/i.test(value)));
+    checkLegacyCleanup(`${expectedRole} callback`, login.setCookies);
     const workspace = await appRequest("/api/levytate-workspace", login.cookie);
     check(`${expectedRole} resolves correct canonical role`, workspace.status === 200 && workspace.json?.workspace?.meta?.userRole === expectedRole, workspace.json?.workspace?.meta);
     check(`${expectedRole} resolves one organisation`, workspace.status === 200 && Boolean(workspace.json?.workspace?.meta?.organisationId));
@@ -60,6 +62,8 @@ try {
 
   const refreshed = await appRequest("/api/levytate-auth/session", sessions.get("apprenticeshiplead.demo@levytate.test").cookie, { method: "POST" });
   check("session refresh succeeds", refreshed.status === 200 && refreshed.json?.ok === true);
+  check("session refresh cookies are host-only", activeAuthCookies(refreshed.setCookies).length === 3 && activeAuthCookies(refreshed.setCookies).every((value) => !/Domain=/i.test(value)));
+  checkLegacyCleanup("session refresh", refreshed.setCookies);
 
   const employeeSessionA = sessions.get("employee.demo@levytate.test");
   const employeeSessionB = await magicLogin("employee.demo@levytate.test");
@@ -69,6 +73,7 @@ try {
   check("logout returns a server-confirmed login redirect", logout.status === 303 && logout.location.includes("/levytate/login"));
   check("logout clears all authentication cookies", ["levytate_beta_session", "levytate_auth_access", "levytate_auth_refresh"].every((name) => !cookieValue(loggedOutCookie, name)));
   check("logout expiry attributes match the root cookie path", logout.setCookies.filter((value) => /levytate_(?:beta_session|auth_access|auth_refresh)=/i.test(value)).every((value) => /Path=\//i.test(value) && /Max-Age=0/i.test(value)));
+  checkLegacyCleanup("logout", logout.setCookies);
   const afterLogout = await appRequest("/api/levytate-workspace", loggedOutCookie);
   check("protected API denied after applying logout response", afterLogout.status === 401);
   const pageAfterLogout = await appRequest("/levytate/app", loggedOutCookie);
@@ -93,6 +98,8 @@ try {
   for (const [email, expectedRole] of identities) {
     const beta = await betaLogin(email);
     check(`${expectedRole} internal beta session starts`, beta.status === 200 && Boolean(cookieValue(beta.cookie, "levytate_beta_session")));
+    check(`${expectedRole} internal beta cookie is host-only`, activeAuthCookies(beta.setCookies).every((value) => !/Domain=/i.test(value)));
+    checkLegacyCleanup(`${expectedRole} internal beta login`, beta.setCookies);
     const betaLogout = await appRequest("/api/levytate-beta-logout", beta.cookie, { method: "POST" });
     const betaCleared = applySetCookies(beta.cookie, betaLogout.setCookies);
     check(`${expectedRole} internal beta session logout completes`, betaLogout.status === 303 && !cookieValue(betaCleared, "levytate_beta_session"));
@@ -135,9 +142,10 @@ async function magicLogin(email) {
   const payload = generated.json;
   const tokenHash = payload.hashed_token;
   const response = await fetch(`${baseUrl}/levytate/auth/callback?token_hash=${encodeURIComponent(tokenHash)}&type=magiclink`, { redirect: "manual" });
-  const rawCookies = response.headers.getSetCookie().join(", ");
-  const cookie = response.headers.getSetCookie().map(value => value.split(";", 1)[0]).join("; ");
-  return { status: response.status, location: response.headers.get("location") || "", rawCookies, cookie };
+  const setCookies = response.headers.getSetCookie();
+  const rawCookies = setCookies.join(", ");
+  const cookie = hostOnlyCookieHeader(setCookies);
+  return { status: response.status, location: response.headers.get("location") || "", rawCookies, cookie, setCookies };
 }
 async function ensureAuthUser(email) {
   const listed = await auth("admin/users?page=1&per_page=1000");
@@ -160,7 +168,7 @@ async function createTemporaryProspect() {
   temporaryRows.push({ table: "levytate_prospect_access", query: `id=eq.${accessId}` });
   return { userId, accessId, email };
 }
-async function betaLogin(email) { const response = await appRequest("/api/levytate-beta-login", "", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, code: process.env.LEVYTATE_BETA_CODE || "LEVYTATE-BETA" }) }); return { ...response, cookie: response.setCookies.map((value) => value.split(";", 1)[0]).join("; ") }; }
+async function betaLogin(email) { const response = await appRequest("/api/levytate-beta-login", "", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, code: process.env.LEVYTATE_BETA_CODE || "LEVYTATE-BETA" }) }); return { ...response, cookie: hostOnlyCookieHeader(response.setCookies) }; }
 async function appRequest(path, cookie, init = {}) { const response = await fetch(`${baseUrl}${path}`, { ...init, headers: { cookie, ...(init.headers ?? {}) }, redirect: "manual" }); const text = await response.text(); let json; try { json = JSON.parse(text); } catch {} const setCookies = response.headers.getSetCookie(); return { status: response.status, location: response.headers.get("location") || "", json, setCookies, rawCookies: setCookies.join(", ") }; }
 async function rest(path, init = {}) { const response = await fetch(`${supabaseUrl}/rest/v1/${path}`, { method: init.method || "GET", headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json", Prefer: "return=representation" }, ...(init.body ? { body: JSON.stringify(init.body) } : {}) }); const text = await response.text(); let json; try { json = JSON.parse(text); } catch {} return { status: response.status, json }; }
 async function auth(path, init = {}) { const response = await fetch(`${supabaseUrl}/auth/v1/${path}`, { method: init.method || "GET", headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, ...(init.body ? { body: JSON.stringify(init.body) } : {}) }); const text = await response.text(); let json; try { json = JSON.parse(text); } catch {} return { ok: response.ok, status: response.status, json }; }
@@ -168,3 +176,10 @@ function loadEnv() { const raw = fs.readFileSync(".env.local", "utf8"); for (con
 function cookieValue(cookie, name) { return cookie.split(/;\s*/).map((part) => part.split("=")).find(([key]) => key === name)?.slice(1).join("=") || ""; }
 function applySetCookies(cookie, setCookies) { const jar = new Map(cookie.split(/;\s*/).filter(Boolean).map((part) => { const index = part.indexOf("="); return [part.slice(0, index), part.slice(index + 1)]; })); for (const value of setCookies) { const pair = value.split(";", 1)[0]; const index = pair.indexOf("="); const name = pair.slice(0, index), next = pair.slice(index + 1); if (!next || /Max-Age=0/i.test(value)) jar.delete(name); else jar.set(name, next); } return [...jar].map(([name, value]) => `${name}=${value}`).join("; "); }
 function replaceCookie(cookie, name, value) { const jar = new Map(cookie.split(/;\s*/).filter(Boolean).map((part) => { const index = part.indexOf("="); return [part.slice(0, index), part.slice(index + 1)]; })); jar.set(name, value); return [...jar].map(([key, next]) => `${key}=${next}`).join("; "); }
+function activeAuthCookies(setCookies) { return setCookies.filter((value) => /levytate_(?:beta_session|auth_access|auth_refresh|demo_controller)=/i.test(value) && !/Max-Age=0/i.test(value)); }
+function hostOnlyCookieHeader(setCookies) { return activeAuthCookies(setCookies).filter((value) => !/Domain=/i.test(value)).map((value) => value.split(";", 1)[0]).join("; "); }
+function checkLegacyCleanup(label, setCookies) {
+  if (new URL(baseUrl).hostname !== "app.levytate.co.uk") return;
+  const legacy = setCookies.filter((value) => /levytate_(?:beta_session|auth_access|auth_refresh|demo_controller)=/i.test(value) && /Domain=/i.test(value));
+  check(`${label} expires legacy app-domain cookies`, legacy.length > 0 && legacy.every((value) => /Domain=app\.levytate\.co\.uk/i.test(value) && /Max-Age=0/i.test(value)));
+}
