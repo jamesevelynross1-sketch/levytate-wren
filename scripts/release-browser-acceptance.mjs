@@ -126,7 +126,9 @@ try {
   if(leadOnlyContinuation){
     if(selectedKeys?.length!==1||selectedKeys[0]!=="a:lead"||process.env.RELEASE_SKIP_CORE!=="true"||(canonicalLearnerOnly?process.env.RELEASE_OPERATIONS_INTELLIGENCE_JOURNEY==="true":process.env.RELEASE_OPERATIONS_INTELLIGENCE_JOURNEY!=="true")||!/^learner-[a-f0-9-]{36}$/.test((canonicalLearnerOnly?process.env.RELEASE_CANONICAL_LEARNER_ID:process.env.RELEASE_OPERATIONS_EXISTING_LEARNER_ID)??"")
       ||Object.entries(process.env).some(([name,value])=>/^RELEASE_.*_JOURNEY$/.test(name)&&value==="true"&&!["RELEASE_OPERATIONS_INTELLIGENCE_JOURNEY","RELEASE_NATIVE_ZOOM_JOURNEY"].includes(name)))throw Error("Lead-only continuation is restricted to the existing core learner and Operations/native zoom");
-    if(canonicalLearnerOnly&&Object.entries(process.env).some(([name,value])=>/^RELEASE_.*_JOURNEY$/.test(name)&&value==="true"))throw Error("Canonical navigation-only excludes all mutation journeys");
+    if(canonicalLearnerOnly&&(Object.entries(process.env).some(([name,value])=>/^RELEASE_.*_JOURNEY$/.test(name)&&value==="true")
+      ||["RELEASE_UI_RECOVERY","RELEASE_STALE_PEOPLE_EDITOR","RELEASE_EVIDENCE_EXPORT","RELEASE_EXPORT_ONLY","RELEASE_PEOPLE_UI_ONLY","RELEASE_ACCOUNT_UI_ONLY","RELEASE_LIFECYCLE_ONLY","RELEASE_LEARNING_TIME_RESUME"].some(name=>process.env[name]==="true")
+      ||process.env.RELEASE_MANAGER_EXISTING_LEARNER_ID))throw Error("Canonical navigation-only excludes other acceptance journeys");
     notRunScopes.push("Employee, Manager and second-tenant genuine role boundaries not repeated: prior exact c7d57b1 four-context proof retained separately");
   }
   if(!lifecycleOnly){
