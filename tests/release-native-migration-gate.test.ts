@@ -18,10 +18,11 @@ async function fixture() {
   writeFileSync(`${root}/startup-source-evidence.json`, JSON.stringify({ formatVersion: 1, stackId: "unit-only-no-server", configSha256: evidence.configSha256, manifestSha256: evidence.candidateManifest, privateStateSha256: sha256(stateBytes), startupSourceGuard: "empty" }));
   vi.stubEnv("RELEASE_LOCAL_RUNTIME", root); vi.stubEnv("RELEASE_RUNTIME_QUIESCENT", "true");
   const readDatabase = vi.fn(() => structuredClone(empty));
+  const readStatus = vi.fn(() => JSON.parse(stateBytes.toString()));
   const invokeCli = vi.fn(async (args: string[]) => args.includes("--dry-run") ? `DRY RUN: migrations will not be applied\nWould push these migrations:\n${expected.map(row => ` • ${row.filename}`).join("\n")}\n` : "Applied reviewed migrations");
   const verifyApplied = vi.fn(() => ({}));
-  const run = (mode: string) => runNativeMigrationStage({ runtime: root, repository, mode }, { readDatabase, invokeCli, verifyApplied });
-  return { root, expected, run, readDatabase, invokeCli, verifyApplied };
+  const run = (mode: string) => runNativeMigrationStage({ runtime: root, repository, mode }, { readDatabase, readStatus, invokeCli, verifyApplied });
+  return { root, expected, run, readDatabase, readStatus, invokeCli, verifyApplied };
 }
 afterEach(() => { vi.unstubAllEnvs(); for (const root of roots.splice(0)) rmSync(root, { recursive: true }); });
 
@@ -74,6 +75,23 @@ describe("fresh local startup migration gate (mock CLI/DB, never native acceptan
     state.env.DB_URL = "postgresql://unit:unit@127.0.0.1:2/another";
     writeFileSync(`${f.root}/private-stack-state.json`, JSON.stringify(state));
     await expect(f.run("apply")).rejects.toThrow(/startup identity/); expect(f.invokeCli).toHaveBeenCalledOnce();
+  });
+  it("rejects live CLI registry drift even when the private startup evidence is unchanged", async () => {
+    const f = await fixture(); await f.run("stage"); await f.run("dry-run");
+    f.readStatus.mockReturnValue({ runtime: "native", id: "another", env: { DB_URL: "postgresql://unit:unit@127.0.0.1:2/another" } });
+    await expect(f.run("apply")).rejects.toThrow(/Live local CLI target/); expect(f.invokeCli).toHaveBeenCalledOnce();
+  });
+  it("refuses to activate SQL when the live target changes during empty-database verification", async () => {
+    const f = await fixture(), unchanged = JSON.parse(readFileSync(`${f.root}/private-stack-state.json`, "utf8"));
+    f.readStatus.mockReturnValueOnce(unchanged).mockReturnValue({ ...unchanged, id: "another" });
+    await expect(f.run("stage")).rejects.toThrow(/Live local CLI target/);
+    expect(readdirSync(`${f.root}/project/supabase/migrations`)).toEqual([]); expect(f.invokeCli).not.toHaveBeenCalled();
+  });
+  it("rechecks the live CLI target at the final apply boundary after its first valid check", async () => {
+    const f = await fixture(); await f.run("stage"); await f.run("dry-run");
+    const unchanged = JSON.parse(readFileSync(`${f.root}/private-stack-state.json`, "utf8"));
+    f.readStatus.mockReturnValueOnce(unchanged).mockReturnValue({ ...unchanged, env: { DB_URL: "postgresql://unit:unit@127.0.0.1:2/another" } });
+    await expect(f.run("apply")).rejects.toThrow(/Live local CLI target/); expect(f.invokeCli).toHaveBeenCalledOnce();
   });
   it("rejects expired or traversing dry-run receipts and retains active reviewed sources", async () => {
     const f = await fixture(); await f.run("stage"); await f.run("dry-run");

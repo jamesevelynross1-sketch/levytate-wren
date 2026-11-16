@@ -14,7 +14,14 @@ function localEnvironment(root) {
 function checkedProcess(command, args, env, input) {
   const result = spawnSync(command, args, { env, input, encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
   if (result.status !== 0) throw Error("Local gate subprocess failed; raw diagnostics and private values withheld");
-  return `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
+  return { stdout: result.stdout ?? "", stderr: result.stderr ?? "" };
+}
+export function localStatusArguments(root) {
+  return ["stack", "status", "--output-format", "json", "--workdir", `${root}/project`];
+}
+function readLocalStatus(root) {
+  const result = checkedProcess(`${root}/supabase`, localStatusArguments(root), localEnvironment(root));
+  try { return JSON.parse(result.stdout); } catch { throw Error("Live local stack status unavailable; private diagnostics withheld"); }
 }
 export function localMigrationArguments(mode, root) {
   if (!["dry-run", "apply"].includes(mode)) throw Error("Explicit local dry-run or apply required");
@@ -63,29 +70,42 @@ export async function runNativeMigrationStage({ runtime, repository, mode }, io 
     const stateBytes = readRegularFile(`${runtime}/private-stack-state.json`), state = JSON.parse(stateBytes);
     const startup = JSON.parse(readRegularFile(`${runtime}/startup-source-evidence.json`));
     const db = validateLocalStackState(state, startup, evidence, stateBytes);
+    const readStatus = io.readStatus ?? readLocalStatus;
+    async function assertCurrentTarget() {
+      const current = await readStatus(runtime);
+      if (current?.runtime !== "native" || current.id !== state.id || current.env?.DB_URL !== state.env.DB_URL) throw Error("Live local CLI target differs from guarded startup identity");
+    }
+    await assertCurrentTarget();
     const readDatabase = io.readDatabase ?? readEmptyNativeDatabase;
     const empty = validateEmptyDatabase(await readDatabase(db, runtime));
     const fingerprint = gateFingerprint({ evidence, stateBytes, expected });
     const names = expected.map(row => row.filename);
     if (mode === "stage") {
+      await assertCurrentTarget();
       for (const row of expected) copyFileSync(`${runtime}/reviewed-project/supabase/migrations/${row.filename}`, `${active}/${row.filename}`, constants.COPYFILE_EXCL);
       verifyExactMigrationFiles(active, expected);
       validateEmptyDatabase(await readDatabase(db, runtime));
       assertProjectSources(runtime, expected);
+      await assertCurrentTarget();
       const staged = { formatVersion: 1, operation: "stage", fingerprint, stackId: state.id, observedAt: new Date().toISOString(), migrations: expected, emptyDatabase: empty, applied: false };
       writeFileSync(`${runtime}/migration-stage-${Date.now()}.json`, `${JSON.stringify(staged)}\n`, { flag: "wx", mode: 0o600 });
       return { status: "PASS", operation: mode, migrations: names, liveEmptyVerified: true, applied: false };
     }
-    const invokeCli = io.invokeCli ?? ((args) => checkedProcess(`${runtime}/supabase`, args, localEnvironment(runtime)));
+    const invokeCli = io.invokeCli ?? ((args) => {
+      const result = checkedProcess(`${runtime}/supabase`, args, localEnvironment(runtime));
+      return `${result.stdout}\n${result.stderr}`;
+    });
     if (mode === "dry-run") {
+      await assertCurrentTarget();
       const output = await invokeCli(localMigrationArguments(mode, runtime));
       verifyScheduledMigrations(output, names);
       // Detect any unexpected CLI mutation despite its dry-run request.
       validateEmptyDatabase(await readDatabase(db, runtime));
       verifyExactMigrationFiles(active, expected);
       assertProjectSources(runtime, expected);
+      await assertCurrentTarget();
       if (readSourceEvidence(runtime).configSha256 !== evidence.configSha256 || sha256(readRegularFile(`${runtime}/private-stack-state.json`)) !== sha256(stateBytes)) throw Error("Source/state changed during dry-run");
-      const receipt = { formatVersion: 1, operation: "dry-run", fingerprint, stackId: state.id, observedAt: new Date().toISOString(), scheduled: names, cliArguments: localMigrationArguments(mode, runtime), outputSha256: sha256(output), liveEmptyBeforeAndAfter: true, applied: false };
+      const receipt = { formatVersion: 1, operation: "dry-run", fingerprint, stackId: state.id, observedAt: new Date().toISOString(), scheduled: names, cliArguments: localMigrationArguments(mode, runtime), outputSha256: sha256(output), liveEmptyBeforeAndAfter: true, liveCliTargetVerified: true, applied: false };
       const receiptName = `migration-dry-run-${Date.now()}.json`;
       writeFileSync(`${runtime}/${receiptName}`, `${JSON.stringify(receipt)}\n`, { flag: "wx", mode: 0o600 });
       if (existsWithoutFollowing(`${runtime}/latest-migration-dry-run.json`)) readRegularFile(`${runtime}/latest-migration-dry-run.json`);
@@ -95,7 +115,7 @@ export async function runNativeMigrationStage({ runtime, repository, mode }, io 
     const pointer = JSON.parse(readRegularFile(`${runtime}/latest-migration-dry-run.json`));
     if (!/^migration-dry-run-\d+\.json$/.test(pointer.receipt ?? "")) throw Error("Exact saved dry-run receipt required before apply");
     const receipt = JSON.parse(readRegularFile(`${runtime}/${pointer.receipt}`));
-    if (receipt.formatVersion !== 1 || receipt.operation !== "dry-run" || receipt.fingerprint !== fingerprint || receipt.stackId !== state.id || receipt.liveEmptyBeforeAndAfter !== true || receipt.applied !== false
+    if (receipt.formatVersion !== 1 || receipt.operation !== "dry-run" || receipt.fingerprint !== fingerprint || receipt.stackId !== state.id || receipt.liveEmptyBeforeAndAfter !== true || receipt.liveCliTargetVerified !== true || receipt.applied !== false
       || JSON.stringify(receipt.scheduled) !== JSON.stringify(names) || JSON.stringify(receipt.cliArguments) !== JSON.stringify(localMigrationArguments("dry-run", runtime))
       || !/^[a-f0-9]{64}$/.test(receipt.outputSha256 ?? "") || !Number.isFinite(Date.parse(receipt.observedAt)) || Date.now() - Date.parse(receipt.observedAt) < 0 || Date.now() - Date.parse(receipt.observedAt) > 30 * 60 * 1000) throw Error("Current matching live-empty dry-run receipt required before apply");
     // Re-read all sources/state and live DB at the final mutation boundary.
@@ -103,10 +123,12 @@ export async function runNativeMigrationStage({ runtime, repository, mode }, io 
     assertProjectSources(runtime, expected);
     if (readSourceEvidence(runtime).configSha256 !== evidence.configSha256 || sha256(readRegularFile(`${runtime}/private-stack-state.json`)) !== sha256(stateBytes)) throw Error("Source/state changed before apply");
     validateEmptyDatabase(await readDatabase(db, runtime));
+    await assertCurrentTarget();
     await invokeCli(localMigrationArguments("apply", runtime));
+    await assertCurrentTarget();
     const verifyApplied = io.verifyApplied ?? (() => {
       const output = checkedProcess(process.execPath, [resolve(repository, "scripts/release-runtime-evidence.mjs")], localEnvironment(runtime));
-      const result = JSON.parse(output.trim());
+      const result = JSON.parse(output.stdout.trim());
       if (result.rows?.length !== expected.length || ["authUsers", "storageObjects", "employers", "people"].some(key => result.metadata?.[key] !== 0)) throw Error("Post-apply exact empty schema/security/ledger verification failed");
       return result;
     });

@@ -21,6 +21,8 @@ RELEASE_RUNTIME_QUIESCENT=true node scripts/release-stage-native-migrations.mjs 
 
 Stage performs a read-only live check before activating any SQL. It requires the exact guarded stack record, loopback PostgreSQL 17, no application relations/functions/types or application schemas, no migration ledger entries, no Auth users/identities/sessions, and no Storage buckets/objects. Managed schemas are explicitly allowlisted; unknown schemas fail closed. It repeats the empty check after copying the exact reviewed files. No SQL is executed by stage.
 
+The gate also calls supported `stack status --output-format json` using the same isolated native environment and exact project workdir. It privately compares the current runtime, stack identifier and database endpoint against the guarded startup record before staging, dry-run and apply, repeating the check at each final command boundary. This prevents a stale private state file from approving one empty database while the CLI targets another. Endpoint and credential values are never included in errors or evidence.
+
 Dry-run invokes only `db push --local --skip-vault --dry-run` with the generated project as its workdir. It requires exactly 28 scheduled filenames in their reviewed order, with no missing, duplicate, renamed, extra, seed or role SQL. It repeats the live empty check and records a restricted receipt containing safe hashes and filenames, not raw CLI output or credentials. Disabled-migration and up-to-date responses are not accepted as a first bootstrap dry-run.
 
 Review the successful dry-run evidence before issuing the separate apply command:
