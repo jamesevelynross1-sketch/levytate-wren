@@ -85,6 +85,16 @@ Record only the distinct owner and grantee **role names** needed by the archive 
 
 If a reliable object backup/restore path is not approved, all file-upload/file-download workflows must remain disabled for the first employer and the Database Owner must confirm the in-scope buckets contain no client objects. Database restore evidence alone must never be described as complete file recovery.
 
+### Fictional native acceptance recovery tools
+
+The local acceptance scripts provide a bounded engineering proof, separate from the hosted procedure above. `release-local-recovery.mjs` encrypts a full local database archive in memory, restores it into a new dedicated database, compares catalogue/count/ledger evidence and can retain the ciphertext with a separate archive-only key. It never restores over the source. `release-local-storage-recovery.mjs` snapshots the dedicated native Storage file tree, authenticates an encrypted byte archive, reads the saved archive/key back and restores into a new isolated directory. Both refuse shared or hosted targets.
+
+Run these only on the verifier-owned, idle fictional runtime. Set `RELEASE_LOCAL_RUNTIME` to that exact existing runtime; database recovery additionally needs a new `RELEASE_RECOVERY_DATABASE` name and `RELEASE_DURABLE_RECOVERY=true`. Physical-byte recovery requires `RELEASE_STORAGE_QUIESCENT=true`, a nonempty actual Storage catalogue, and object-key tenant prefixes matching both current fictional fixture organisations. Never invent a green result from an empty bucket.
+
+For this synthetic local exercise only, durable ciphertext, separate recovery keys and safe evidence may use the approved `.local-acceptance-private` directory in the original workspace. The directory must be real, mode0700 and excluded through local Git metadata; files are0600. This is an exception for fictional acceptance material, not approval to store a real-client backup inside a checkout. A derived database-archive key cannot sign application sessions; no browser cookies or storage-state exports are retained or injected for acceptance. Temporary-runtime cleanup must not be treated as a backup retention policy.
+
+The physical-byte proof is bounded to128MiB/10,000 files and rejects observed symlinks, unsafe paths, overwritten destinations, changed source metadata and unauthenticated ciphertext. Descriptor reads protect final-file replacement; the exclusively owned, quiescent source assumption remains necessary because the portable Node implementation does not defend against malicious concurrent parent-directory swaps. Its evidence explicitly does **not** establish a working restored Storage service, database/Storage snapshot consistency, cross-tenant application retrieval, or hosted recovery. Those restore gates remain required above. Actual native execution and its exact dated evidence must accompany the unit/source tests before claiming even this bounded local proof.
+
 ## Restore into an isolated local database
 
 Use an ephemeral PostgreSQL cluster with network listening disabled. A disposable container is acceptable; a local cluster must use a temporary Unix socket and a non-default port.
