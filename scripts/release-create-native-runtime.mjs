@@ -1,27 +1,29 @@
 /** Reproducible LOCAL-only recovery from Git. No prior runtime, ledger or data is copied. */
-import { mkdirSync, readFileSync, writeFileSync, copyFileSync, existsSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync, copyFileSync, constants } from "node:fs";
 import { randomBytes, createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { dirname, resolve, basename } from "node:path";
 import { fileURLToPath } from "node:url";
-import { verifyReleaseSources } from "./build-release-supabase-worktree.mjs";
+import { assertRuntimeDirectory, existsWithoutFollowing, canonicalExpectedMigrations, verifyExactMigrationFiles, reviewedBootstrapManifestSha256 } from "./release-native-migration-gate.mjs";
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const runtime = process.env.RELEASE_LOCAL_RUNTIME;
-if (!/^\/private\/tmp\/levytate-release-runtime\.[A-Za-z0-9]+$/.test(runtime ?? "")) throw new Error("Dedicated temporary local runtime required");
-if (existsSync(`${runtime}/project`) || existsSync(`${runtime}/home`) || existsSync(`${runtime}/private-stack-state.json`)) throw new Error("Existing runtime is preserved; choose a fresh empty runtime");
-if (!existsSync(`${runtime}/supabase`)) throw new Error("Install a published-checksum-verified native-capable CLI inside this runtime first");
-const verified = await verifyReleaseSources(repository);
+assertRuntimeDirectory(runtime);
+if (["project", "reviewed-project", "home", "private-stack-state.json", "runtime-source-evidence.json", "private-app-secrets.json"].some(name => existsWithoutFollowing(`${runtime}/${name}`))) throw new Error("Existing runtime is preserved; choose a fresh empty runtime");
+if (!existsWithoutFollowing(`${runtime}/supabase`)) throw new Error("Install a published-checksum-verified native-capable CLI inside this runtime first");
+const { verified, expected } = await canonicalExpectedMigrations(repository);
 mkdirSync(`${runtime}/home`, { mode: 0o700 });
 const env = { PATH: process.env.PATH, HOME: process.env.HOME, SUPABASE_HOME: `${runtime}/home`, SUPABASE_EXPERIMENTAL_STACK: "1" };
 const version = execFileSync(`${runtime}/supabase`, ["--version"], { env, encoding: "utf8" }).trim();
 if (version !== "2.122.1") throw new Error("This local harness requires reviewed Supabase CLI 2.122.1");
-execFileSync(process.execPath, [resolve(repository, "scripts/build-fresh-supabase-bootstrap.mjs"), "--output", `${runtime}/project`], { encoding: "utf8" });
+execFileSync(process.execPath, [resolve(repository, "scripts/build-fresh-supabase-bootstrap.mjs"), "--output", `${runtime}/reviewed-project`], { encoding: "utf8" });
 for (const migration of verified.manifest.migrations) {
   const bytes = readFileSync(resolve(repository, migration.path));
   if (createHash("sha256").update(bytes).digest("hex") !== migration.sha256) throw new Error("Release migration changed after verification");
-  copyFileSync(resolve(repository, migration.path), `${runtime}/project/supabase/migrations/${basename(migration.path)}`);
+  copyFileSync(resolve(repository, migration.path), `${runtime}/reviewed-project/supabase/migrations/${basename(migration.path)}`, constants.COPYFILE_EXCL);
 }
+verifyExactMigrationFiles(`${runtime}/reviewed-project/supabase/migrations`, expected);
+mkdirSync(`${runtime}/project/supabase/migrations`, { recursive: true, mode: 0o700 });
 // Minimal local config: no remote, no open registration, no external sender,
 // no inherited service credentials, no auto-seed and no optional live modules.
 const config = `project_id = "levytate-release-${randomBytes(6).toString("hex")}"
@@ -76,5 +78,5 @@ enabled = false
 `;
 writeFileSync(`${runtime}/project/supabase/config.toml`, config, { mode: 0o600 });
 writeFileSync(`${runtime}/private-app-secrets.json`, JSON.stringify({ hookSecret: randomBytes(32).toString("base64"), sessionSecret: randomBytes(48).toString("base64url") }), { flag: "wx", mode: 0o600 });
-writeFileSync(`${runtime}/runtime-source-evidence.json`, `${JSON.stringify({ version, sourceCommit: execFileSync("git", ["rev-parse", "HEAD"], { cwd: repository, encoding: "utf8" }).trim(), bootstrapConvergence: verified.bootstrap.convergence.sha256, candidateManifest: verified.manifestSha256, migrationCount: verified.manifest.migrations.length + 2, excludes038: true, hostedExecutionAuthorised: false }, null, 2)}\n`, { flag: "wx", mode: 0o600 });
-console.log(JSON.stringify({ prepared: runtime, cli: version, migrations: verified.manifest.migrations.length + 2, databaseCopied: false, hostedConnection: false }));
+writeFileSync(`${runtime}/runtime-source-evidence.json`, `${JSON.stringify({ formatVersion: 2, cli: version, startupRequiresEmptyActiveMigrations: true, activeMigrationCount: 0, configSha256: createHash("sha256").update(config).digest("hex"), bootstrapManifest: reviewedBootstrapManifestSha256, version, sourceCommit: execFileSync("git", ["rev-parse", "HEAD"], { cwd: repository, encoding: "utf8" }).trim(), bootstrapConvergence: verified.bootstrap.convergence.sha256, candidateManifest: verified.manifestSha256, migrationCount: verified.manifest.migrations.length + 2, excludes038: true, hostedExecutionAuthorised: false }, null, 2)}\n`, { flag: "wx", mode: 0o600 });
+console.log(JSON.stringify({ prepared: runtime, cli: version, reviewedMigrations: expected.length, activeMigrations: 0, startupRequiresEmptyActiveMigrations: true, databaseCopied: false, hostedConnection: false }));

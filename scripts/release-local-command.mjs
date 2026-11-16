@@ -74,8 +74,8 @@ const commands = {
   requests: [process.execPath,[resolve(scriptDir,"release-requests-integrity.mjs")]],
   start: [process.execPath, [resolve(scriptDir, "release-start-local-stack.mjs")]],
   stop: [`${root}/supabase`, ["stack", "stop", "--workdir", `${root}/project`, "--output-format", "json"]],
-  "bootstrap-dry-run": [`${root}/supabase`, ["db", "push", "--local", "--dry-run", "--workdir", `${root}/project`]],
-  bootstrap: [`${root}/supabase`, ["db", "push", "--local", "--workdir", `${root}/project`, "--yes"]],
+  "bootstrap-dry-run": [process.execPath, [resolve(scriptDir, "release-stage-native-migrations.mjs"), "dry-run"]],
+  bootstrap: [process.execPath, [resolve(scriptDir, "release-stage-native-migrations.mjs"), "apply"]],
   app: [process.execPath, [...(captureRequests ? ["--import", resolve(scriptDir, "release-local-email-preload.mjs")] : []), resolve(process.cwd(), "node_modules/next/dist/bin/next"), "dev", "--hostname", "127.0.0.1", "--port", "3107"]],
 };
 if (!commands[mode]) throw new Error("Unsupported local acceptance command");
