@@ -25,7 +25,12 @@ child.on("close", (code) => {
     console.error(diagnostic);
     // Emit error type only; never stdout/stderr, URLs with userinfo, or config.
     const tags = [...`${stdout}\n${stderr}`.matchAll(/(?:"_tag"\s*:\s*"|\b)([A-Z][A-Za-z]+Error)\b/g)].map((match) => match[1]);
-    console.error(JSON.stringify({ exit: code, errorTypes: [...new Set(tags)] }));
+    const combined=`${stdout}\n${stderr}`;
+    const httpStatuses=[...combined.matchAll(/(?:"status(?:Code)?"\s*:\s*|status(?:\s+code)?[=: ]+)([1-5]\d{2})\b/gi)].map(match=>Number(match[1]));
+    const hosts=[...combined.matchAll(/https?:\/\/[^\s"<>]+/g)].flatMap(match=>{try{const hostname=new URL(match[0]).hostname;return /^[a-z0-9.-]+$/i.test(hostname)?[hostname]:[];}catch{return[];}});
+    const safe={exit:code,errorTypes:[...new Set(tags)],httpStatuses:[...new Set(httpStatuses)],publicEndpointHosts:[...new Set(hosts)]};
+    writeFileSync(`${root}/startup-failure-${Date.now()}.json`,JSON.stringify(safe,null,2),{mode:0o600,flag:"wx"});
+    console.error(JSON.stringify(safe));
     process.exitCode = 1;
     return;
   }

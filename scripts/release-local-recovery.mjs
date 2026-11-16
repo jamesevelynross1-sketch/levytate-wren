@@ -1,5 +1,5 @@
 /** Restricted LOCAL recovery archive and isolated restore; never restores the source. */
-import { readFileSync, writeFileSync, mkdirSync, chmodSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, chmodSync, statSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { randomBytes, createHash, createCipheriv, createDecipheriv, hkdfSync } from "node:crypto";
 import { lockAcceptanceRuntime } from "./release-runtime-lock.mjs";
@@ -56,6 +56,24 @@ const restoredSummary = JSON.parse(query(summarySQL, target));
 if (JSON.stringify(sourceSummary) !== JSON.stringify(restoredSummary)) throw new Error("Recovery catalogue/count/ledger mismatch; source unchanged");
 const evidence = { status: "PASS", environment: "local", sourceRuntimeId: state.id, database: name, archiveBytes: archive.length, archiveSha256: digest(archive), encryptedArchiveSha256: digest(stored), archiveEncryption: "AES-256-GCM; HKDF key derived from existing restricted local Preview secret", keyLocation: "existing restricted private-app-secrets.json; never in archive/evidence", archiveEntries: list.split("\n").filter(line => /^\d+;/.test(line)).length, ...restoredSummary, fullStorageBytesRecovery: false, hosted: false };
 writeFileSync(`${directory}/database-${stamp}.evidence.json`, JSON.stringify(evidence, null, 2), { mode: 0o600, flag: "wx" });
+if(process.env.RELEASE_DURABLE_RECOVERY==="true"){
+  const repository="/Users/jamesross/Documents/levytate-wren",base=`${repository}/.local-acceptance-private`;
+  const mode=statSync(base).mode&0o777;
+  if(mode!==0o700||spawnSync("git",["-C",repository,"check-ignore","--quiet",base]).status!==0)throw Error("Approved durable recovery directory must be private and Git-ignored");
+  const durable=`${base}/${state.id}-${stamp}`;mkdirSync(durable,{mode:0o700});
+  writeFileSync(`${durable}/database.aes256gcm`,stored,{mode:0o600,flag:"wx"});
+  // Preserve only the derived archive key, separately from ciphertext. This
+  // cannot sign application sessions and is never used by browser acceptance.
+  writeFileSync(`${durable}/recovery-key.bin`,key,{mode:0o600,flag:"wx"});
+  const retained=readFileSync(`${durable}/database.aes256gcm`),retainedKey=readFileSync(`${durable}/recovery-key.bin`);
+  const verified=createDecipheriv("aes-256-gcm",retainedKey,retained.subarray(offset+32,offset+44));verified.setAuthTag(retained.subarray(offset+44,offset+60));
+  const plaintext=Buffer.concat([verified.update(retained.subarray(offset+60)),verified.final()]);
+  if(digest(plaintext)!==digest(archive))throw Error("Durable encrypted recovery verification failed");
+  plaintext.fill(0);retainedKey.fill(0);
+  const safe={...evidence,keyLocation:"separate restricted derived recovery key; not a session-signing credential",durableEncryptionVerified:true,directoryMode:"0700",fileMode:"0600",encryptedFiles:1,keyFiles:1,browserSessionStateExported:false};
+  writeFileSync(`${durable}/evidence.json`,JSON.stringify(safe,null,2),{mode:0o600,flag:"wx"});
+  console.log(JSON.stringify({durableRecovery:"PASS",directoryMode:"0700",fileMode:"0600",files:3,encryptedArchiveSha256:digest(retained),restoredDatabase:name,browserSessionStateExported:false}));
+}
 console.log(JSON.stringify(evidence));
 key.fill(0); restoreKey.fill(0); archive.fill(0); restoredArchive.fill(0);
 release();
