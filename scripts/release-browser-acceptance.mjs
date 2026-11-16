@@ -519,6 +519,20 @@ try {
     const{verifyOperationsIntelligence}=await import("./release-operations-intelligence-browser.mjs");
     const launch=JSON.parse(readFileSync(`${process.env.RELEASE_LOCAL_RUNTIME}/app-launch-evidence.json`,"utf8"));
     if(launch.environment!=="local"||launch.noPaidModel!==true||launch.externalEmailCaptured!==true)throw Error("Controlled no-paid-model local app launch required");
+    if(process.env.RELEASE_OPERATIONS_EXISTING_LEARNER_ID){
+      if(process.env.RELEASE_SKIP_CORE!=="true"||coreLearnerId)throw Error("Existing learner continuation cannot also create a core journey");
+      const id=process.env.RELEASE_OPERATIONS_EXISTING_LEARNER_ID,actor=contexts.get("a:employee");
+      if(!/^learner-[a-f0-9-]{36}$/.test(id)||!actor)throw Error("Explicit existing fictional learner and actual Employee context required");
+      const {confirmExistingCoreLearner}=await import("./release-existing-core-learner.mjs"),reference=`browser-${manifest.run}`;
+      const [learners,applications,enrolments]=await Promise.all([
+        backend(`rest/v1/levytate_learner_records?organisation_id=eq.${actor.tenant.id}&id=eq.${id}&select=id,organisation_id,employee_id,application_id,record_status,lifecycle_status`),
+        backend(`rest/v1/levytate_applications?organisation_id=eq.${actor.tenant.id}&id=eq.${reference}&select=id,organisation_id,employee_id,status`),
+        backend(`rest/v1/levytate_enrolments?organisation_id=eq.${actor.tenant.id}&application_id=eq.${reference}&select=organisation_id,employee_id,application_id,status`),
+      ]);
+      coreLearnerId=confirmExistingCoreLearner({id,manifest,tenant:actor.tenant,employee:actor.user,learners,applications,enrolments});
+      check("Operations continuation uses exact prior current-run live enrolment without resetting records",coreLearnerId===id);
+      notRunScopes.push("Core approval/enrolment not repeated: exact current-run completed handoff and live learner verified read-only");
+    }
     await independentJourney("Operations and Intelligence UI",()=>verifyOperationsIntelligence({app,manifest,contexts,backend,check,learnerId:coreLearnerId,noPaidModel:true,notRun:scope=>notRunScopes.push(`Operations/Intelligence: ${scope}`)}));
   }
   if(process.env.RELEASE_EMPLOYEE_RECOVERY_JOURNEY==="true"){
