@@ -82,7 +82,7 @@ const [command, args] = commands[mode];
 if(mode==="app"){
   const noPaidModel=["OPENAI_API_KEY","ANTHROPIC_API_KEY","GOOGLE_GENERATIVE_AI_API_KEY"].every(name=>!env[name])&&env.LEVYTATE_AI_ENABLED==="false";
   if(!noPaidModel)throw new Error("Local acceptance app requires explicitly disabled AI and absent paid model credentials");
-  writeFileSync(`${root}/app-launch-evidence.json`,JSON.stringify({environment:"local",startedAt:new Date().toISOString(),noPaidModel,aiEnabled:false,externalRequestsCaptured:captureRequests,loopbackOnly:new URL(base).hostname==="127.0.0.1"}),{mode:0o600});
+  writeFileSync(`${root}/app-launch-evidence.json`,JSON.stringify({environment:"local",startedAt:new Date().toISOString(),noPaidModel,aiEnabled:false,externalEmailCaptured:captureRequests,loopbackOnly:new URL(base).hostname==="127.0.0.1"}),{mode:0o600});
 }
 const child = spawn(command, args, { env, stdio: ["ignore", "pipe", "pipe"] });
 function safeOutput(data) {

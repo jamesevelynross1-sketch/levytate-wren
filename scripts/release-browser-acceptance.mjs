@@ -517,7 +517,7 @@ try {
     phase="genuine source-backed Operations and Intelligence workflow";
     const{verifyOperationsIntelligence}=await import("./release-operations-intelligence-browser.mjs");
     const launch=JSON.parse(readFileSync(`${process.env.RELEASE_LOCAL_RUNTIME}/app-launch-evidence.json`,"utf8"));
-    if(launch.environment!=="local"||launch.noPaidModel!==true||launch.externalRequestsCaptured!==true)throw Error("Controlled no-paid-model local app launch required");
+    if(launch.environment!=="local"||launch.noPaidModel!==true||launch.externalEmailCaptured!==true)throw Error("Controlled no-paid-model local app launch required");
     await independentJourney("Operations and Intelligence UI",()=>verifyOperationsIntelligence({app,manifest,contexts,backend,check,learnerId:coreLearnerId,noPaidModel:true,notRun:scope=>notRunScopes.push(`Operations/Intelligence: ${scope}`)}));
   }
   if(process.env.RELEASE_EMPLOYEE_RECOVERY_JOURNEY==="true"){
