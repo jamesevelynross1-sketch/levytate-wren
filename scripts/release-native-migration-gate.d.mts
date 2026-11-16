@@ -7,7 +7,7 @@ export const reviewedBootstrapManifestSha256: string;
 export function canonicalExpectedMigrations(repository: string): Promise<{ verified: unknown; expected: MigrationFile[] }>;
 export function existsWithoutFollowing(path: string): boolean;
 export function requireRealDirectory(path: string): void;
-export function readRegularFile(path: string): Buffer;
+export function readRegularFile(path: string, maximumBytes?: number): Buffer;
 export function assertRuntimeDirectory(root: string): void;
 export function readSourceEvidence(root: string): Record<string, unknown>;
 export function assertEmptyStartupSources(root: string): Record<string, unknown>;

@@ -50,6 +50,12 @@ describe("fresh local startup migration gate (mock CLI/DB, never native acceptan
     writeFileSync(`${f.root}/project/supabase/config.toml`, `${readFileSync(`${f.root}/project/supabase/config.toml`)}\n# changed\n`);
     await expect(f.run("apply")).rejects.toThrow(/config changed/); expect(f.invokeCli).toHaveBeenCalledOnce();
   });
+  it("rejects a replaced CLI executable before startup or apply", async () => {
+    const f = await fixture(); await f.run("stage"); await f.run("dry-run");
+    writeFileSync(`${f.root}/supabase`, "#!/bin/sh\nexit 0\n");
+    expect(() => assertEmptyStartupSources(f.root)).toThrow(/CLI executable changed/);
+    await expect(f.run("apply")).rejects.toThrow(/CLI executable changed/); expect(f.invokeCli).toHaveBeenCalledOnce();
+  });
   it("rejects a changed generated SQL file after dry-run and refuses to deactivate unknown bytes", async () => {
     const f = await fixture(); await f.run("stage"); await f.run("dry-run");
     writeFileSync(`${f.root}/project/supabase/migrations/${f.expected[0].filename}`, "select 'unreviewed';");

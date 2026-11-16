@@ -4,13 +4,14 @@ import { randomBytes, createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { dirname, resolve, basename } from "node:path";
 import { fileURLToPath } from "node:url";
-import { assertRuntimeDirectory, existsWithoutFollowing, canonicalExpectedMigrations, verifyExactMigrationFiles, reviewedBootstrapManifestSha256 } from "./release-native-migration-gate.mjs";
+import { assertRuntimeDirectory, existsWithoutFollowing, canonicalExpectedMigrations, verifyExactMigrationFiles, reviewedBootstrapManifestSha256, readRegularFile, sha256 } from "./release-native-migration-gate.mjs";
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const runtime = process.env.RELEASE_LOCAL_RUNTIME;
 assertRuntimeDirectory(runtime);
 if (["project", "reviewed-project", "home", "private-stack-state.json", "runtime-source-evidence.json", "private-app-secrets.json"].some(name => existsWithoutFollowing(`${runtime}/${name}`))) throw new Error("Existing runtime is preserved; choose a fresh empty runtime");
 if (!existsWithoutFollowing(`${runtime}/supabase`)) throw new Error("Install a published-checksum-verified native-capable CLI inside this runtime first");
+const cliSha256 = sha256(readRegularFile(`${runtime}/supabase`, 128 * 1024 * 1024));
 const { verified, expected } = await canonicalExpectedMigrations(repository);
 mkdirSync(`${runtime}/home`, { mode: 0o700 });
 const env = { PATH: process.env.PATH, HOME: process.env.HOME, SUPABASE_HOME: `${runtime}/home`, SUPABASE_EXPERIMENTAL_STACK: "1" };
@@ -78,5 +79,5 @@ enabled = false
 `;
 writeFileSync(`${runtime}/project/supabase/config.toml`, config, { mode: 0o600 });
 writeFileSync(`${runtime}/private-app-secrets.json`, JSON.stringify({ hookSecret: randomBytes(32).toString("base64"), sessionSecret: randomBytes(48).toString("base64url") }), { flag: "wx", mode: 0o600 });
-writeFileSync(`${runtime}/runtime-source-evidence.json`, `${JSON.stringify({ formatVersion: 2, cli: version, startupRequiresEmptyActiveMigrations: true, activeMigrationCount: 0, configSha256: createHash("sha256").update(config).digest("hex"), bootstrapManifest: reviewedBootstrapManifestSha256, version, sourceCommit: execFileSync("git", ["rev-parse", "HEAD"], { cwd: repository, encoding: "utf8" }).trim(), bootstrapConvergence: verified.bootstrap.convergence.sha256, candidateManifest: verified.manifestSha256, migrationCount: verified.manifest.migrations.length + 2, excludes038: true, hostedExecutionAuthorised: false }, null, 2)}\n`, { flag: "wx", mode: 0o600 });
+writeFileSync(`${runtime}/runtime-source-evidence.json`, `${JSON.stringify({ formatVersion: 2, cli: version, cliSha256, startupRequiresEmptyActiveMigrations: true, activeMigrationCount: 0, configSha256: createHash("sha256").update(config).digest("hex"), bootstrapManifest: reviewedBootstrapManifestSha256, version, sourceCommit: execFileSync("git", ["rev-parse", "HEAD"], { cwd: repository, encoding: "utf8" }).trim(), bootstrapConvergence: verified.bootstrap.convergence.sha256, candidateManifest: verified.manifestSha256, migrationCount: verified.manifest.migrations.length + 2, excludes038: true, hostedExecutionAuthorised: false }, null, 2)}\n`, { flag: "wx", mode: 0o600 });
 console.log(JSON.stringify({ prepared: runtime, cli: version, reviewedMigrations: expected.length, activeMigrations: 0, startupRequiresEmptyActiveMigrations: true, databaseCopied: false, hostedConnection: false }));

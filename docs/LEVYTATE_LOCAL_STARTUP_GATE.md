@@ -8,6 +8,8 @@ The revised creator stores all 28 hash-checked files under `reviewed-project/sup
 
 The source identities are fixed to the reviewed release manifest `8685dbf196c76f7881017f7523a0f1bee412e0da2b6fded393271cc9de2a146f`, bootstrap manifest `f12810747526e66d45789840549be88046c14b8a152fc583f4897dc09e4718b6`, and 28 verified SQL files. A newly changed, even internally consistent manifest requires a separate review and gate update.
 
+The creator records the installed CLI binary hash after requiring version2.122.1; subsequent checks require the same executable bytes and include that hash in the dry-run receipt binding. This protects against an accidental executable replacement after preparation. It does not replace verification against the official published CLI archive before installation.
+
 ## Explicit sequence
 
 Use an exclusively owned idle runtime. Install the published-checksum-verified CLI binary there first. The following commands assume `RELEASE_LOCAL_RUNTIME` names that fresh `/private/tmp/levytate-release-runtime.*` directory. Do not point them at an existing acceptance runtime or set hosted credentials.

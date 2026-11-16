@@ -13,12 +13,12 @@ export function existsWithoutFollowing(path) {
 export function requireRealDirectory(path) {
   if (!lstatSync(path).isDirectory() || realpathSync(path) !== resolve(path)) throw Error("Real local directory required; symlink ancestry rejected");
 }
-export function readRegularFile(path) {
+export function readRegularFile(path, maximumBytes = 16 * 1024 * 1024) {
   if (!lstatSync(path).isFile() || realpathSync(path) !== resolve(path)) throw Error("Regular local file required; symlinks rejected");
   const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
   try {
     const stat = fstatSync(fd);
-    if (!stat.isFile() || stat.size > 16 * 1024 * 1024) throw Error("Bounded regular local file required");
+    if (!stat.isFile() || stat.size > maximumBytes) throw Error("Bounded regular local file required");
     const bytes = Buffer.alloc(stat.size);
     let offset = 0;
     while (offset < bytes.length) {
@@ -50,6 +50,7 @@ export function readSourceEvidence(root) {
     || evidence.candidateManifest !== reviewedReleaseManifestSha256 || evidence.bootstrapManifest !== reviewedBootstrapManifestSha256) throw Error("New reviewed startup-gated runtime evidence required");
   const config = readRegularFile(`${root}/project/supabase/config.toml`);
   if (sha256(config) !== evidence.configSha256) throw Error("Generated local config changed");
+  if (!/^[a-f0-9]{64}$/.test(evidence.cliSha256 ?? "") || sha256(readRegularFile(`${root}/supabase`, 128 * 1024 * 1024)) !== evidence.cliSha256) throw Error("Reviewed local CLI executable changed");
   return evidence;
 }
 export function assertEmptyStartupSources(root) {
@@ -112,5 +113,5 @@ export function verifyScheduledMigrations(output, filenames) {
   return observed;
 }
 export function gateFingerprint({ evidence, stateBytes, expected }) {
-  return sha256(JSON.stringify({ manifestSha256: evidence.candidateManifest, configSha256: evidence.configSha256, privateStateSha256: sha256(stateBytes), migrations: expected }));
+  return sha256(JSON.stringify({ manifestSha256: evidence.candidateManifest, configSha256: evidence.configSha256, cliSha256: evidence.cliSha256, privateStateSha256: sha256(stateBytes), migrations: expected }));
 }
