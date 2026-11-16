@@ -22,7 +22,7 @@ try {
       if (url.pathname === endpoint) {
         if (request.method() !== "POST") return route.abort();
         posts++; emailMatches = request.postDataJSON()?.email === email;
-        return route.fulfill({ status: 200, contentType: "application/json", body: '{"ok":true}' });
+        return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, message: "Synthetic intercepted acknowledgement; no email sent." }) });
       }
       if (url.pathname === path && request.method() === "GET") {
         loginGets++; if (loginGets > 1 || url.search) return route.abort();
