@@ -1,0 +1,23 @@
+{
+  "environment": "local",
+  "manifestDeclaredSynthetic": true,
+  "catalogueMatchesExactFixtureTenants": true,
+  "sourceQuiescenceRequired": true,
+  "concurrentMaliciousParentSwapProtection": false,
+  "observedAt": "2026-11-16T10:00:44.147Z",
+  "runtime": "levytate-release-runtime.PpTKRn",
+  "status": "PASS",
+  "objects": 2,
+  "physicalFiles": 2,
+  "physicalBytes": 214,
+  "catalogueSha256": "a45ebf5565d083a5892ea66e4e1510e3a840e6391765013e4d0a3998ae90afcf",
+  "sourceFilesSha256": "39c2b7f0f609b9fcbb84fa9dc16b8716ab1046ed9f6165838682ff3a764a8ba5",
+  "encryptedArchiveSha256": "3f8bddd070d9a46cabcfc3da1bcc393aea887d692da6499dd6f005ab4b520443",
+  "encryption": "AES-256-GCM with independent archive-only key in separate0600 file",
+  "savedArchiveDecryptionVerified": true,
+  "isolatedByteRestoreVerified": true,
+  "sourceUnchanged": true,
+  "restoredToService": false,
+  "databaseRestoreVerifiedByThisScript": false,
+  "hostedAcceptance": false
+}

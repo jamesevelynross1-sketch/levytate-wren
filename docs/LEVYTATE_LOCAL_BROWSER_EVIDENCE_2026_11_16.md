@@ -21,3 +21,13 @@ The Operations helper recorded real current-date fictional progress through the 
 Employee recovery passed malformed draft-response retention/exact retry and actual submission commit followed by genuine logout and provider refresh denial. The visible popup reached the correct same-origin login form, but waiting for the renewed request response timed out. Its cause remains under investigation; end-to-end session recovery is not accepted.
 
 Readiness separately passed actual Intelligence RPC failure (5 assertions) and authentication rate-store failure (8 assertions), with 200 → 503 → 200 and original privileges restored. External inbox delivery remains unproved: all mail was confined to local SMTP capture.
+
+## Durable local recovery
+
+After the first bounded browser run, the actual local full database was encrypted and restored into a newly named isolated database. The restore retained all 28 ledger entries and 135 RLS-protected application tables, six fictional Auth accounts, four People records and three organisations (two employers plus the synthetic catalogue). The archive and separate derived archive-only key are retained under the ignored private recovery directory with 0700/0600 permissions. No browser cookie or storage-state export was made. [Database restore evidence](evidence/LEVYTATE_LOCAL_DB_RECOVERY_AFTER_ROLES_2026-11-16.json).
+
+Two explicitly fictional files were uploaded and read back through the actual local private Storage API, one per employer prefix. The physical-byte backup encrypted both files (214 bytes), verified the saved archive, restored them into a new isolated directory, and checked identical source catalogue and byte hashes afterward. This verifies physical byte recovery separately from the database restore; it does not claim a restored Storage service or hosted disaster-recovery acceptance. [Physical Storage evidence](evidence/LEVYTATE_LOCAL_STORAGE_RECOVERY_2026-11-16.json).
+
+## Login hydration reproduction
+
+A no-Auth probe against both actual login routes held five client scripts before hydration. Both frozen63 forms exposed enabled fields and buttons prematurely. After releasing scripts, both forms sent one correctly intercepted fictional request and displayed confirmation. Separately, the popup probe reproduced typed input being lost during hydration and showed a loaded-page wait prevents that timing failure. The application owner is adding a hydration guard; its corrected current-page probe and subsequent genuine recovery remain required. [Delayed-JS baseline](evidence/LEVYTATE_LOGIN_HYDRATION_BEFORE_2026-11-16.json).
