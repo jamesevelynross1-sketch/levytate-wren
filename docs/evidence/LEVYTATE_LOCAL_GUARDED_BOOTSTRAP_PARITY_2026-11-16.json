@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "environment": "local",
+  "createdAt": "2026-11-16T10:33:13.805Z",
+  "readOnly": true,
+  "acceptedRuntime": "levytate-release-runtime.PpTKRn",
+  "freshRuntime": "levytate-release-runtime.8e405d1e4493",
+  "signatureSourceSha256": "113ed5d0f55badb564773ccb37247202c813f2f18e60043db6364ac68483e49b",
+  "accepted": {
+    "postgres": "17.11",
+    "catalogueSha256": "ddde4403f4ca8e9a8f2138e5c01b721702c5c7662ee315717de9e318066e1848",
+    "catalogueRows": 4124,
+    "ledgerSha256": "bcdec756a743e5a30f2e1d3d63b7a1681114b4b6bd5b06c1c85f3d5a34dfa659",
+    "ledgerEntries": 28,
+    "excluded038Absent": true,
+    "supplementalSha256": "e910512b6eb5b42a57e8e00072c170fe0be9298a658a553201ebbe7bee21f55e",
+    "storageGuardCount": 1,
+    "security": {
+      "rlsCount": 135,
+      "tableCount": 135,
+      "publicBuckets": 0,
+      "invalidIndexes": 0,
+      "privateBuckets": 4,
+      "browserColumnGrants": 0,
+      "unvalidatedConstraints": 0,
+      "browserGrantCount": 0
+    }
+  },
+  "fresh": {
+    "postgres": "17.11",
+    "catalogueSha256": "ddde4403f4ca8e9a8f2138e5c01b721702c5c7662ee315717de9e318066e1848",
+    "catalogueRows": 4124,
+    "ledgerSha256": "bcdec756a743e5a30f2e1d3d63b7a1681114b4b6bd5b06c1c85f3d5a34dfa659",
+    "ledgerEntries": 28,
+    "excluded038Absent": true,
+    "supplementalSha256": "e910512b6eb5b42a57e8e00072c170fe0be9298a658a553201ebbe7bee21f55e",
+    "storageGuardCount": 1,
+    "security": {
+      "rlsCount": 135,
+      "tableCount": 135,
+      "publicBuckets": 0,
+      "invalidIndexes": 0,
+      "privateBuckets": 4,
+      "browserColumnGrants": 0,
+      "unvalidatedConstraints": 0,
+      "browserGrantCount": 0
+    }
+  },
+  "freshEmptyCounts": {
+    "people": 0,
+    "learners": 0,
+    "authUsers": 0,
+    "employers": 0,
+    "memberships": 0,
+    "applications": 0,
+    "authSessions": 0,
+    "authIdentities": 0,
+    "storageObjects": 0
+  },
+  "freshRegistrations": {
+    "liftFrameworks": 1,
+    "otjRequirements": 2,
+    "assessmentFrameworks": 3,
+    "apprenticeshipStandards": 0
+  },
+  "checks": {
+    "samePostgres": true,
+    "exactNormalizedCatalogue": true,
+    "exactFullLedger": true,
+    "exactSupplementalCatalogue": true,
+    "exactSecurity": true,
+    "expected28Ledger": true,
+    "all135TablesRls": true,
+    "noBrowserGrants": true,
+    "validIndexesAndConstraints": true,
+    "fourPrivateBuckets": true,
+    "storageGuardPresent": true,
+    "migration038Excluded": true,
+    "freshDataEmpty": true,
+    "requiredRegistrations": true
+  },
+  "passed": true,
+  "limitations": [
+    "Schema/ledger/security parity only; no hosted acceptance or authentication claim.",
+    "Application data in the accepted runtime was neither read nor compared."
+  ]
+}
