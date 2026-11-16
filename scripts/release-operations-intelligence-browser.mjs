@@ -97,14 +97,29 @@ export function matchesRecordedObservation(kind, before, after, summary, actorId
     && before.every((rows, position) => rows.every(prior => after[position].some(row => same(prior, row))));
 }
 
-export async function verifyOperationsIntelligence({ app: origin, manifest, contexts, backend, check, learnerId, noPaidModel, notRun }) {
-  const app = localUrl(origin, 'Operations acceptance app');
+export function operationsAcceptanceActors(manifest, contexts, learnerId, leadOnlyContinuation = false) {
   const lead = contexts.get('a:lead'), manager = contexts.get('a:manager'), employee = contexts.get('a:employee'), other = contexts.get('b:employee');
+  if (leadOnlyContinuation !== true) return { lead, manager, employee, other, roleActors: [manager, employee, other], otherTenant: other?.tenant, personIds: [employee?.user.personId, manager?.user.personId] };
+  const tenant = manifest.tenants?.find(item => item.key === 'a'), otherTenant = manifest.tenants?.find(item => item.key === 'b');
+  const declaredLead = tenant?.users?.find(user => user.key === 'lead' && user.role === 'Apprenticeship Lead');
+  const people = tenant?.users?.filter(user => ['Employee', 'Line Manager'].includes(user.role)) ?? [];
+  if (contexts.size !== 1 || [...contexts.keys()][0] !== 'a:lead' || !lead?.context || !lead?.page || lead.user.role !== 'Apprenticeship Lead'
+    || !tenant || !otherTenant || ![tenant.id, otherTenant.id].every(id => /^[a-f0-9-]{36}$/.test(id)) || tenant.id === otherTenant.id || lead.tenant.id !== tenant.id
+    || !declaredLead || lead.user.email !== declaredLead.email || lead.user.membershipId !== declaredLead.membershipId
+    || people.length !== 2 || new Set(people.map(user => user.role)).size !== 2 || new Set(people.map(user => user.personId)).size !== 2
+    || people.some(user => typeof user.personId !== 'string' || !validApplicationReference(user.personId))
+    || typeof learnerId !== 'string' || !/^learner-[a-f0-9-]{36}$/.test(learnerId)) throw Error('Explicit genuine Lead-only continuation requires the reviewed existing learner and fixture identities');
+  return { lead, manager: undefined, employee: undefined, other: undefined, roleActors: [], otherTenant, personIds: people.map(user => user.personId) };
+}
+
+export async function verifyOperationsIntelligence({ app: origin, manifest, contexts, backend, check, learnerId, noPaidModel, notRun, leadOnlyContinuation = false }) {
+  const app = localUrl(origin, 'Operations acceptance app');
+  const { lead, manager, employee, other, roleActors, otherTenant, personIds } = operationsAcceptanceActors(manifest, contexts, learnerId, leadOnlyContinuation);
   if (noPaidModel !== true) throw Error('Observed local no-paid-model launch evidence required');
   if (!manifest.synthetic || manifest.environment !== 'local' || !/^[a-f0-9-]{36}$/.test(manifest.run)
-    || lead?.user.role !== 'Apprenticeship Lead' || manager?.user.role !== 'Line Manager' || employee?.user.role !== 'Employee' || other?.user.role !== 'Employee'
-    || lead.tenant.id !== manager.tenant.id || lead.tenant.id !== employee.tenant.id || lead.tenant.id === other.tenant.id
-    || ![lead, manager, employee, other].every(actor => manifest.tenants.some(tenant => tenant.id === actor.tenant.id))) throw Error('Reviewed local genuine four-role contexts required');
+    || lead?.user.role !== 'Apprenticeship Lead' || (leadOnlyContinuation !== true && (manager?.user.role !== 'Line Manager' || employee?.user.role !== 'Employee' || other?.user.role !== 'Employee'
+    || lead.tenant.id !== manager.tenant.id || lead.tenant.id !== employee.tenant.id || lead.tenant.id === other.tenant.id))
+    || ![lead, ...roleActors].every(actor => manifest.tenants.some(tenant => tenant.id === actor.tenant.id))) throw Error('Reviewed local genuine four-role contexts required');
   const report = (name, ok) => { check(`Operations/Intelligence: ${name}`, Boolean(ok)); if (!ok) throw Error(`Operations acceptance check failed: ${name}`); };
   const gaps = [], notRunScopes = [], page = lead.page, modes = page.getByRole('navigation', { name: 'Operations Centre views', exact: true, includeHidden: true });
   const pins = actor => ({ Origin: app, 'X-LevyTate-Account': actor.user.email, 'X-LevyTate-Organisation': actor.tenant.id });
@@ -123,7 +138,6 @@ export async function verifyOperationsIntelligence({ app: origin, manifest, cont
     ]);
     return { signals, states, receipts, events, actions, actionReceipts, actionEvents, audits };
   };
-  const otherBefore = await snapshot(other.tenant.id);
   const read = async (kind) => {
     const response = await lead.context.request.get(`${app}${paths[kind]}`, { headers: pins(lead) });
     report(`${kind} returns an authorised live read`, response.status() === 200);
@@ -132,6 +146,8 @@ export async function verifyOperationsIntelligence({ app: origin, manifest, cont
     return value;
   };
   const unexercised = label => { notRunScopes.push(label); if (typeof notRun === 'function') notRun(label); };
+  if (leadOnlyContinuation === true) unexercised('NOT_REPEATED: Employee/Manager/foreign-actor denial requests and Manager handoff UI require their own genuine contexts; earlier multi-role evidence is retained. This continuation signs in only the genuine Lead.');
+  const otherBefore = await snapshot(otherTenant.id);
   const missing = label => { gaps.push(label); check(`Operations/Intelligence: required existing source coverage — ${label}`, false); };
   const idle = async () => {
     await page.getByRole('dialog', { name: 'Update awaiting confirmation', exact: true }).waitFor({ state: 'hidden' });
@@ -157,15 +173,15 @@ export async function verifyOperationsIntelligence({ app: origin, manifest, cont
   const uncertain = options => verifyRetainedOperationTransport({ app, page, lead, snapshot, report, verifyCommit, idle, ...options });
   async function challengeDecision(kind, input) {
     const before = await snapshot();
-    for (const actor of [manager, employee, other]) {
+    for (const actor of roleActors) {
       const response = await actor.context.request.post(`${app}${paths[kind]}`, { headers: pins(actor), data: input });
       report(`${kind}: ${actor.tenant.key}:${actor.user.role} cannot replay the Lead's actual signal command`, response.status() === 403);
     }
-    const staleScope = await lead.context.request.post(`${app}${paths[kind]}`, { headers: { ...pins(lead), 'X-LevyTate-Organisation': other.tenant.id }, data: input });
+    const staleScope = await lead.context.request.post(`${app}${paths[kind]}`, { headers: { ...pins(lead), 'X-LevyTate-Organisation': otherTenant.id }, data: input });
     report(`${kind}: a foreign retained tenant cannot replay the actual command`, staleScope.status() === 409);
     const staleRevision = await lead.context.request.post(`${app}${paths[kind]}`, { headers: pins(lead), data: { ...input, idempotencyKey: randomUUID() } });
     report(`${kind}: a new command cannot reuse the old signal revision`, staleRevision.status() === 409);
-    report(`${kind}: role, tenant and stale-revision denials create no durable changes`, same(before, await snapshot()));
+    report(`${kind}: ${leadOnlyContinuation ? 'tenant and stale-revision' : 'role, tenant and stale-revision'} denials create no durable changes`, same(before, await snapshot()));
   }
   async function recordCurrentFictionalEvidence() {
     if (!learnerId) return;
@@ -176,7 +192,7 @@ export async function verifyOperationsIntelligence({ app: origin, manifest, cont
     const detailResponse = await lead.context.request.get(`${app}/api/levytate-learners/${learnerId}`, { headers: pins(lead) });
     report('normal fictional evidence uses the genuinely enrolled current-tenant learner', detailResponse.status() === 200);
     const detail = (await detailResponse.json()).learner;
-    report('the supplied learner is active and belongs to an actual same-tenant test identity', detail?.learnerRecordId === learnerId && detail.lifecycleStatus === 'enrolled' && [employee.user.personId, manager.user.personId].includes(detail.learner.id));
+    report('the supplied learner is active and belongs to an actual same-tenant test identity', detail?.learnerRecordId === learnerId && detail.lifecycleStatus === 'enrolled' && personIds.includes(detail.learner.id));
     const records = () => Promise.all([
       select(lead.tenant.id, 'levytate_learner_progress_updates', 'id,update_date,target_progress_percentage,actual_progress_percentage,variance_percentage,summary,updated_by', `&learner_record_id=eq.${learnerId}&order=id`),
       select(lead.tenant.id, 'levytate_learner_reviews', 'id,review_type,review_date,next_review_date,summary,status,provider_id', `&learner_record_id=eq.${learnerId}&order=id`),
@@ -233,15 +249,22 @@ export async function verifyOperationsIntelligence({ app: origin, manifest, cont
     for (const kind of ['operations', 'autopilot', 'intelligence']) {
       await read(kind);
       const before = await snapshot();
-      for (const actor of [manager, employee, other]) {
+      for (const actor of roleActors) {
         const get = await actor.context.request.get(`${app}${paths[kind]}`, { headers: pins(actor) });
         report(`${actor.tenant.key}:${actor.user.role} cannot read employer ${kind}`, get.status() === 403);
         const post = await actor.context.request.post(`${app}${paths[kind]}`, { headers: pins(actor), data: kind === 'operations' ? {} : { action: kind === 'autopilot' ? 'refresh' : 'analyse', idempotencyKey: randomUUID() } });
         report(`${actor.tenant.key}:${actor.user.role} cannot mutate employer ${kind}`, post.status() === 403);
       }
-      const stale = await lead.context.request.get(`${app}${paths[kind]}`, { headers: { ...pins(lead), 'X-LevyTate-Organisation': other.tenant.id } });
+      const stale = await lead.context.request.get(`${app}${paths[kind]}`, { headers: { ...pins(lead), 'X-LevyTate-Organisation': otherTenant.id } });
       report(`${kind} refuses a foreign retained workspace before returning data`, stale.status() === 409);
       report(`${kind} denied requests preserve all durable state`, same(before, await snapshot()));
+    }
+    if (leadOnlyContinuation === true) {
+      const foreignLearners = await select(otherTenant.id, 'levytate_learner_records', 'id', '&order=id&limit=1');
+      if (foreignLearners.length === 1 && validApplicationReference(foreignLearners[0].id)) {
+        const denied = await lead.context.request.get(`${app}/api/levytate-learners/${encodeURIComponent(foreignLearners[0].id)}`, { headers: pins(lead) });
+        report('the genuine Lead cannot read an actual foreign learner record', denied.status() === 404);
+      } else unexercised('NOT_RUN: no actual foreign learner exists for this Lead-only learner-record denial; real foreign-tenant header denials are repeated without fabricating a learner.');
     }
     phase = 'current-date fictional observations through normal Learner UI';
     await recordCurrentFictionalEvidence();
@@ -408,16 +431,18 @@ export async function verifyOperationsIntelligence({ app: origin, manifest, cont
       report('canonical application offers the exact existing learner and cannot start a duplicate pre-enrolment', await existing.getAttribute('href') === `/levytate/app?module=Learners&learner=${encodeURIComponent(learnerId)}` && await modal.getByRole('button', { name: 'Start pre-enrolment', exact: true }).count() === 0);
       await existing.click(); await page.getByRole('heading', { name: detail.learner.name, exact: true, level: 2 }).waitFor();
       report('the canonical handoff reaches the same recorded learner on the application origin', new URL(page.url()).origin === app && new URL(page.url()).searchParams.get('learner') === learnerId);
-      await manager.page.goto(`${app}/levytate/app?module=Approvals&application=${encodeURIComponent(applicationId)}`);
-      await manager.page.getByRole('heading', { name: 'Approvals', exact: true }).waitFor();
-      report('the genuine Manager does not acquire Lead pre-enrolment or learner-handoff controls', await manager.page.getByRole('button', { name: 'Start pre-enrolment', exact: true }).count() === 0 && await manager.page.getByRole('link', { name: 'Open learner record', exact: true }).count() === 0);
+      if (manager) {
+        await manager.page.goto(`${app}/levytate/app?module=Approvals&application=${encodeURIComponent(applicationId)}`);
+        await manager.page.getByRole('heading', { name: 'Approvals', exact: true }).waitFor();
+        report('the genuine Manager does not acquire Lead pre-enrolment or learner-handoff controls', await manager.page.getByRole('button', { name: 'Start pre-enrolment', exact: true }).count() === 0 && await manager.page.getByRole('link', { name: 'Open learner record', exact: true }).count() === 0);
+      }
       report('canonical navigation changes no learner, Operations record or command receipt', same(before, await linkedRecords()) && same(beforeOperations, await snapshot()));
     } else unexercised('No genuine core enrolment learner was supplied for canonical Applications handoff navigation.');
 
     phase = 'durable readback after reload';
     const durable = await snapshot(); await page.goto(`${app}/levytate/app?module=Operations`); await page.getByTestId('operations-autopilot').waitFor(); await read('autopilot'); await read('intelligence');
     report('reload and independent reads add no commands or hidden mutations', same(durable, await snapshot()));
-    report('other employer Intelligence and Operations remain unchanged', same(otherBefore, await snapshot(other.tenant.id)));
+    report('other employer Intelligence and Operations remain unchanged', same(otherBefore, await snapshot(otherTenant.id)));
     return { newSignIns: 0, paidModelCalls: false, directSourceWrites: false, missingCoverage: gaps, notRunScopes };
   } catch {
     check(`Operations/Intelligence: stopped safely at ${phase}`, false);
