@@ -1,0 +1,205 @@
+{
+  "environment": "local",
+  "cliVersion": "2.122.1",
+  "lint": {
+    "exit": 1,
+    "results": [
+      {
+        "function": "public.levytate_apply_application_command",
+        "issues": [
+          {
+            "level": "warning extra",
+            "message": "never read variable \"v_saved\"",
+            "sqlState": "00000"
+          }
+        ]
+      },
+      {
+        "function": "public.levytate_workspace_command",
+        "issues": [
+          {
+            "level": "error",
+            "message": "column \"id\" does not exist",
+            "statement": {
+              "lineNumber": "69",
+              "text": "EXECUTE"
+            },
+            "query": {
+              "position": "73",
+              "text": "select to_jsonb(t) from public.levytate_organisation_programmes t where id=$1 for update"
+            },
+            "sqlState": "42703"
+          }
+        ]
+      },
+      {
+        "function": "public.levytate_pastoral_history_command",
+        "issues": [
+          {
+            "level": "warning extra",
+            "message": "auto variable \"v_index\" shadows a previously defined variable",
+            "statement": {
+              "lineNumber": "115",
+              "text": "FOR with integer loop variable"
+            },
+            "hint": "SET plpgsql.extra_warnings TO 'shadowed_variables'",
+            "sqlState": "00000"
+          },
+          {
+            "level": "warning",
+            "message": "unused variable \"v_index\"",
+            "sqlState": "00000"
+          },
+          {
+            "level": "warning extra",
+            "message": "never read variable \"v_employee\"",
+            "sqlState": "00000"
+          }
+        ]
+      },
+      {
+        "function": "public.levytate_offboarding_finish_delete",
+        "issues": [
+          {
+            "level": "warning",
+            "message": "target type is different type than source type",
+            "statement": {
+              "lineNumber": "4",
+              "text": "statement block"
+            },
+            "hint": "The input expression type does not have an assignment cast to the target type.",
+            "detail": "cast \"text\" value to \"jsonb\" type",
+            "context": "during statement block local variable \"counts\" initialization on line 3",
+            "sqlState": "42804"
+          }
+        ]
+      },
+      {
+        "function": "public.levytate_offboarding_data",
+        "issues": [
+          {
+            "level": "warning",
+            "message": "routine is marked as STABLE, but expression is VOLATILE",
+            "statement": {
+              "lineNumber": "4",
+              "text": "PERFORM"
+            },
+            "hint": "When you fix this issue, please, recheck other functions that uses this function.",
+            "detail": "there is a risk of unwanted behave",
+            "sqlState": "00000"
+          }
+        ]
+      },
+      {
+        "function": "public.levytate_offboarding_due",
+        "issues": [
+          {
+            "level": "warning",
+            "message": "routine is marked as STABLE, but expression is VOLATILE",
+            "statement": {
+              "lineNumber": "6",
+              "text": "PERFORM"
+            },
+            "hint": "When you fix this issue, please, recheck other functions that uses this function.",
+            "detail": "there is a risk of unwanted behave",
+            "sqlState": "00000"
+          },
+          {
+            "level": "warning",
+            "message": "routine is marked as STABLE, but expression is VOLATILE",
+            "statement": {
+              "lineNumber": "7",
+              "text": "PERFORM"
+            },
+            "hint": "When you fix this issue, please, recheck other functions that uses this function.",
+            "detail": "there is a risk of unwanted behave",
+            "sqlState": "00000"
+          },
+          {
+            "level": "warning",
+            "message": "routine is marked as STABLE, but expression is VOLATILE",
+            "statement": {
+              "lineNumber": "8",
+              "text": "IF"
+            },
+            "hint": "When you fix this issue, please, recheck other functions that uses this function.",
+            "detail": "there is a risk of unwanted behave",
+            "sqlState": "00000"
+          }
+        ]
+      },
+      {
+        "function": "public.levytate_apply_intelligence_command",
+        "issues": [
+          {
+            "level": "warning",
+            "message": "unused variable \"key\"",
+            "sqlState": "00000"
+          }
+        ]
+      },
+      {
+        "function": "public.levytate_apply_operational_action",
+        "issues": [
+          {
+            "level": "warning",
+            "message": "cannot determinate a result of dynamic SQL",
+            "statement": {
+              "lineNumber": "148",
+              "text": "EXECUTE"
+            },
+            "hint": "Don't use dynamic SQL and record type together, when you would check function.",
+            "detail": "There is a risk of related false alarms.",
+            "sqlState": "00000"
+          },
+          {
+            "level": "warning",
+            "message": "cannot determinate a result of dynamic SQL",
+            "statement": {
+              "lineNumber": "149",
+              "text": "EXECUTE"
+            },
+            "hint": "Don't use dynamic SQL and record type together, when you would check function.",
+            "detail": "There is a risk of related false alarms.",
+            "sqlState": "00000"
+          }
+        ]
+      },
+      {
+        "function": "public.levytate_apply_learning_time_command",
+        "issues": [
+          {
+            "level": "warning",
+            "message": "unused variable \"table_name\"",
+            "sqlState": "00000"
+          }
+        ]
+      },
+      {
+        "function": "public.levytate_intelligence_source_hash",
+        "issues": [
+          {
+            "level": "error",
+            "message": "relation \"public.{levytate_employees,levytate_applications,levytate_learner_reco\" does not exist",
+            "statement": {
+              "lineNumber": "7",
+              "text": "EXECUTE"
+            },
+            "query": {
+              "position": "85",
+              "text": "select coalesce(jsonb_agg(to_jsonb(r) order by to_jsonb(r)::text),'[]'::jsonb) from public.\"{levytate_employees,levytate_applications,levytate_learner_records,levytate_learner_reviews,levytate_learner_progress_updates,levytate_learner_assessment_readiness,levytate_learner_achievements,levytate_operational_actions,levytate_organisation_capabilities,levytate_otj_plans,levytate_otj_plan_versions,levytate_otj_learning_priorities,levytate_otj_activities,levytate_otj_activity_confirmations}\" r where organisation_id=$1"
+            },
+            "sqlState": "42P01"
+          }
+        ]
+      }
+    ],
+    "interpretation": "Findings retained for independent runtime and source triage; dynamic SQL errors are not assumed either true or false."
+  },
+  "indexStatistics": {
+    "exit": 0,
+    "rows": 417,
+    "meaning": "Fresh local empty-schema statistics only; no production workload performance claim."
+  },
+  "hostedAdvisorsRun": false
+}
