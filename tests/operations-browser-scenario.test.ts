@@ -4,7 +4,7 @@ import { analyseOperationsAutopilot, type AutopilotAnalysisInput } from '@/lib/l
 import type { LearnerProgressUpdate, LearnerReview } from '@/lib/levytate/mvp/learner-lifecycle';
 // JavaScript acceptance helper is intentionally imported without executing a browser.
 // @ts-expect-error The executable .mjs helper has no declaration file.
-import { verifyOperationsIntelligence, matchesCanonicalEnrolment, validApplicationReference } from '../scripts/release-operations-intelligence-browser.mjs';
+import { verifyOperationsIntelligence, matchesCanonicalEnrolment, validApplicationReference, matchesRecordedObservation, matchesStoredObservation } from '../scripts/release-operations-intelligence-browser.mjs';
 
 const today = '2026-11-16', now = `${today}T12:00:00Z`, organisationId = '10000000-0000-4000-8000-000000000001', learnerRecordId = 'learner-one';
 const progress = (id: string, target: number, actual: number, createdAt: string): LearnerProgressUpdate => ({ id, organisationId, learnerRecordId, updateDate: today, targetProgressPercentage: target, actualProgressPercentage: actual, variancePercentage: actual - target, progressSource: 'provider_report', sourceReference: 'Synthetic acceptance observation only', summary: 'Fictional progress observation', supportAction: '', updatedBy: 'lead@fictional.invalid', createdAt });
@@ -90,4 +90,36 @@ describe('canonical handoff provenance uses real opaque application identifiers'
   it.each(['', ' padded', 'trailing ', 'control\nvalue', 'x'.repeat(161), undefined])('rejects unsafe application reference %# before constructing a request', id => {
     expect(validApplicationReference(id)).toBe(false);
   });
+});
+
+
+describe('recorded fictional observation requires the actual lifecycle event contract', () => {
+  const before = [[], [], [], []];
+  const progress = (): Array<Array<Record<string, unknown>>> => [[{ id: 'new-progress', summary: 'Fictional measurement' }], [], [{ request_id: 'one-command', actor_user_id: 'lead' }], [{ id: 'event-progress', event_type: 'progress_updated', actor_user_id: 'lead', metadata: { progressId: 'new-progress' } }, { id: 'event-behind', event_type: 'learner_identified_behind_target', actor_user_id: 'lead', metadata: { progressId: 'new-progress' } }]];
+  it('requires the progress and behind-target events that the actual negative-variance transaction emits', () => {
+    expect(matchesRecordedObservation('progress', before, progress(), 'Fictional measurement', 'lead')).toBe(true);
+    const missing = progress(); missing[3].pop(); expect(matchesRecordedObservation('progress', before, missing, 'Fictional measurement', 'lead')).toBe(false);
+    const duplicate = progress(); duplicate[3].push(duplicate[3][0]); expect(matchesRecordedObservation('progress', before, duplicate, 'Fictional measurement', 'lead')).toBe(false);
+  });
+  it('refuses counts that belong to another source or actor', () => {
+    const otherSource = progress(); otherSource[3] = [{ id: 'event-progress', event_type: 'progress_updated', actor_user_id: 'lead', metadata: { progressId: 'wrong' } }, { id: 'event-behind', event_type: 'learner_identified_behind_target', actor_user_id: 'lead', metadata: { progressId: 'wrong' } }];
+    expect(matchesRecordedObservation('progress', before, otherSource, 'Fictional measurement', 'lead')).toBe(false);
+    expect(matchesRecordedObservation('progress', before, progress(), 'Fictional measurement', 'another-actor')).toBe(false);
+  });
+  it('requires exactly the completed provider review event and its own immutable source identity', () => {
+    const after = [[], [{ id: 'new-review', summary: 'Fictional provider review' }], [{ request_id: 'one-command', actor_user_id: 'lead' }], [{ id: 'event-review', event_type: 'provider_review_recorded', actor_user_id: 'lead', metadata: { reviewId: 'new-review' } }]];
+    expect(matchesRecordedObservation('review', before, after, 'Fictional provider review', 'lead')).toBe(true);
+    expect(matchesRecordedObservation('progress', before, after, 'Fictional provider review', 'lead')).toBe(false);
+  });
+});
+
+
+it('a bounded continuation checks the existing original receipt/events instead of writing another observation', () => {
+  const id = 'learner-progress-learner-one-original-key', source = { id, summary: 'Recorded fictional progress' };
+  const records: Array<Array<Record<string, unknown>>> = [[source], [], [{ request_id: 'original-key', actor_user_id: 'lead' }], [{ id: 'event-1', event_type: 'progress_updated', actor_user_id: 'lead', metadata: { progressId: id } }, { id: 'event-2', event_type: 'learner_identified_behind_target', actor_user_id: 'lead', metadata: { progressId: id } }]];
+  expect(matchesStoredObservation('progress', source, records, 'lead', 'learner-one')).toBe(true);
+  expect(matchesStoredObservation('progress', source, records, 'another', 'learner-one')).toBe(false);
+  expect(matchesStoredObservation('progress', source, records, 'lead', 'other-learner')).toBe(false);
+  records[2][0] = { request_id: 'different-key', actor_user_id: 'lead' };
+  expect(matchesStoredObservation('progress', source, records, 'lead', 'learner-one')).toBe(false);
 });

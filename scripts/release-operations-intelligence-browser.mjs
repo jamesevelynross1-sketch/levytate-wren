@@ -73,6 +73,30 @@ export function matchesCanonicalEnrolment(detail, learnerId, applicationRows, le
     && Array.isArray(learnerRows) && learnerRows.length === 1 && learnerRows[0].id === learnerId && learnerRows[0].organisation_id === organisationId && learnerRows[0].application_id === applicationId && learnerRows[0].lifecycle_status === 'enrolled';
 }
 
+const observationEventTypes = kind => kind === 'progress' ? ['learner_identified_behind_target', 'progress_updated'] : ['provider_review_recorded'];
+export function matchesStoredObservation(kind, source, records, actorId, learnerId) {
+  if (!['progress', 'review'].includes(kind) || typeof source?.id !== 'string') return false;
+  const prefix = `learner-${kind === 'progress' ? 'progress' : 'review'}-${learnerId}-`;
+  if (!source.id.startsWith(prefix)) return false;
+  const requestId = source.id.slice(prefix.length);
+  const receipts = records[2].filter(row => row.request_id === requestId);
+  const events = records[3].filter(event => event.metadata?.[kind === 'progress' ? 'progressId' : 'reviewId'] === source.id);
+  return receipts.length === 1 && receipts[0].actor_user_id === actorId && /^[a-zA-Z0-9_-]{8,80}$/.test(requestId)
+    && same(events.map(event => event.event_type).sort(), observationEventTypes(kind)) && events.every(event => event.actor_user_id === actorId);
+}
+export function matchesRecordedObservation(kind, before, after, summary, actorId) {
+  if (!['progress', 'review'].includes(kind)) return false;
+  const index = kind === 'progress' ? 0 : 1;
+  const added = (position) => after[position].filter(row => !before[position].some(prior => (prior.id ?? prior.request_id) === (row.id ?? row.request_id)));
+  const sources = added(index), receipts = added(2), events = added(3);
+  if (sources.length !== 1 || sources[0].summary !== summary || after[index].length !== before[index].length + 1
+    || receipts.length !== 1 || receipts[0].actor_user_id !== actorId || after[2].length !== before[2].length + 1) return false;
+  const expected = observationEventTypes(kind);
+  return after[1 - index].length === before[1 - index].length && same(events.map(event => event.event_type).sort(), expected) && after[3].length === before[3].length + expected.length
+    && events.every(event => event.actor_user_id === actorId && event.metadata?.[kind === 'progress' ? 'progressId' : 'reviewId'] === sources[0].id)
+    && before.every((rows, position) => rows.every(prior => after[position].some(row => same(prior, row))));
+}
+
 export async function verifyOperationsIntelligence({ app: origin, manifest, contexts, backend, check, learnerId, noPaidModel, notRun }) {
   const app = localUrl(origin, 'Operations acceptance app');
   const lead = contexts.get('a:lead'), manager = contexts.get('a:manager'), employee = contexts.get('a:employee'), other = contexts.get('b:employee');
@@ -156,8 +180,8 @@ export async function verifyOperationsIntelligence({ app: origin, manifest, cont
     const records = () => Promise.all([
       select(lead.tenant.id, 'levytate_learner_progress_updates', 'id,update_date,target_progress_percentage,actual_progress_percentage,variance_percentage,summary,updated_by', `&learner_record_id=eq.${learnerId}&order=id`),
       select(lead.tenant.id, 'levytate_learner_reviews', 'id,review_type,review_date,next_review_date,summary,status,provider_id', `&learner_record_id=eq.${learnerId}&order=id`),
-      select(lead.tenant.id, 'levytate_learner_command_receipts', 'request_id', `&learner_record_id=eq.${learnerId}&order=request_id`),
-      select(lead.tenant.id, 'levytate_learner_lifecycle_events', 'id', `&learner_record_id=eq.${learnerId}&order=id`),
+      select(lead.tenant.id, 'levytate_learner_command_receipts', 'request_id,actor_user_id', `&learner_record_id=eq.${learnerId}&order=request_id`),
+      select(lead.tenant.id, 'levytate_learner_lifecycle_events', 'id,event_type,actor_user_id,metadata', `&learner_record_id=eq.${learnerId}&order=id`),
     ]);
     await page.goto(`${app}/levytate/app?module=Learners`);
     const row = page.getByTestId('learner-row').filter({ has: page.getByText(detail.learner.name, { exact: true }) });
@@ -167,7 +191,10 @@ export async function verifyOperationsIntelligence({ app: origin, manifest, cont
     for (const kind of ['progress', 'review']) {
       const before = await records(), existing = before[kind === 'progress' ? 0 : 1].filter(item => item.summary === (kind === 'progress' ? progressText : reviewText));
       report(`${kind}: no duplicate earlier acceptance observation exists`, existing.length <= 1);
-      if (existing.length) continue; // A bounded retry uses the previously recorded fictional observation.
+      if (existing.length) {
+        report(`${kind}: continuation retains the original source, receipt and exact actor-owned events`, matchesStoredObservation(kind, existing[0], before, lead.user.membershipId, learnerId));
+        continue; // Verify the persisted observation; never create a replacement.
+      }
       const section = page.getByRole('heading', { name: 'Progress and reviews', exact: true }).locator('xpath=ancestor::section[1]');
       const name = kind === 'progress' ? 'Add progress update' : 'Record review or check-in';
       await section.getByRole('button', { name, exact: true }).click();
@@ -193,7 +220,10 @@ export async function verifyOperationsIntelligence({ app: origin, manifest, cont
       await form.getByRole('button', { name: kind === 'progress' ? 'Record progress update' : name, exact: true }).click();
       const response = await observed(responsePromise); report(`${kind}: normal Lead UI records the explicit fictional observation`, response.status() === 200 && (await response.json()).ok === true);
       await form.waitFor({ state: 'hidden' });
-      const after = await records(); report(`${kind}: one source record, receipt and lifecycle event persist`, after[kind === 'progress' ? 0 : 1].length === before[kind === 'progress' ? 0 : 1].length + 1 && after[2].length === before[2].length + 1 && after[3].length === before[3].length + 1);
+      const after = await records();
+      report(`${kind}: one source and actor receipt persist with the exact linked ${kind === 'progress' ? 'progress and behind-target events' : 'provider-review event'}`, matchesRecordedObservation(kind, before, after, kind === 'progress' ? progressText : reviewText, lead.user.membershipId));
+      const source = after[kind === 'progress' ? 0 : 1].find(item => item.summary === (kind === 'progress' ? progressText : reviewText));
+      report(`${kind}: persisted source identifies the exact original receipt and actor`, matchesStoredObservation(kind, source, after, lead.user.membershipId, learnerId));
     }
     const [progress, reviews] = await records(), measured = progress.find(item => item.summary === progressText), review = reviews.find(item => item.summary === reviewText);
     report('current-date scenario durably records 30/5, variance −25 and the distinct fictional provider narrative', measured?.update_date === today && measured.target_progress_percentage === 30 && measured.actual_progress_percentage === 5 && measured.variance_percentage === -25 && measured.updated_by === lead.user.email && review?.review_date === today && review.next_review_date === reviewDate && review.review_type === 'provider_review' && review.status === 'completed' && review.provider_id === detail.programme.providerId);
