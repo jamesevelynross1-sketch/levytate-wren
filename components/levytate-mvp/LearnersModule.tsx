@@ -1494,12 +1494,12 @@ function CheckCard({ title, status, lines }: { title: string; status: string; li
   );
 }
 
-function ReviewCard({ title, review, overdue, empty }: { title: string; review: LearnerRecordDetail["latestProviderReview"]; overdue?: boolean; empty: string }) {
+export function ReviewCard({ title, review, overdue, empty }: { title: string; review: LearnerRecordDetail["latestProviderReview"]; overdue?: boolean; empty: string }) {
   return (
     <div className="rounded-xl border border-[#102c3d]/[0.06] bg-[#fbfcfb] p-4">
       <div className="flex items-start justify-between gap-3"><h4 className="text-sm font-semibold text-[#102c3d]">{title}</h4>{overdue ? <StatusBadge tone="red">Overdue</StatusBadge> : null}</div>
       {review ? (
-        <div className="mt-3 text-xs leading-5 text-[#102c3d]/[0.56]"><div className="flex items-center gap-3"><span className="h-2.5 w-2.5 rounded-full bg-[#4f7b95]" aria-hidden="true" /><p><strong className="text-[#102c3d]">{formatDate(review.reviewDate)}</strong> · {humanise(review.status)}</p></div><p className="ml-5 mt-1">Next {formatDate(review.nextReviewDate) || "not scheduled"}</p><details className="ml-5 mt-2"><summary className="min-h-10 cursor-pointer py-2 font-semibold text-[#0b6f63]">Review detail</summary><div className="border-t border-[#102c3d]/[0.06] pt-2"><p>{review.reviewerName || "Reviewer not recorded"}</p><p className="mt-1 text-sm leading-6 text-[#102c3d]/[0.68]">{review.summary}</p>{review.supportRequired ? <p className="mt-1 font-semibold text-[#0b6f63]">{review.supportRequired}</p> : null}</div></details></div>
+        <div className="mt-3 text-xs leading-5 text-[#102c3d]/[0.56]"><div className="flex items-center gap-3"><span className="h-2.5 w-2.5 rounded-full bg-[#4f7b95]" aria-hidden="true" /><p><strong className="text-[#102c3d]">{formatDate(review.reviewDate)}</strong> · {humanise(review.status)}</p></div><p className="ml-5 mt-1">{review.status === "scheduled" ? "Scheduled appointment" : review.status === "cancelled" ? "No active follow-up plan" : `Next ${formatDate(review.nextReviewDate) || "not scheduled"}`}</p><details className="ml-5 mt-2"><summary className="min-h-10 cursor-pointer py-2 font-semibold text-[#0b6f63]">Review detail</summary><div className="border-t border-[#102c3d]/[0.06] pt-2"><p>{review.reviewerName || "Reviewer not recorded"}</p><p className="mt-1 text-sm leading-6 text-[#102c3d]/[0.68]">{review.summary}</p>{review.supportRequired ? <p className="mt-1 font-semibold text-[#0b6f63]">{review.supportRequired}</p> : null}</div></details></div>
       ) : <p className="mt-3 text-xs leading-5 text-[#102c3d]/[0.46]">{empty}</p>}
     </div>
   );
