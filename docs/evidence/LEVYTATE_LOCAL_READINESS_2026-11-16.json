@@ -1,0 +1,30 @@
+{
+  "environment": "local",
+  "applicationCommit": "63eeb8fffd0638644b4d2156c861bd2aa26b2a63",
+  "runtimeId": "f24f834c68b99fd88ad6d330af1e53b796735c4347488dc6d8657e3e88106c55",
+  "intelligenceCommand": {
+    "passed": 5,
+    "failed": 0,
+    "sequence": [
+      200,
+      503,
+      200
+    ]
+  },
+  "authenticationRateStore": {
+    "passed": 8,
+    "failed": 0,
+    "sequence": [
+      200,
+      503,
+      200
+    ],
+    "loginUnavailable": true,
+    "refreshUnavailable": true,
+    "callbackSameOriginUnavailable": true
+  },
+  "originalGrantsRestored": true,
+  "livenessRemained200": true,
+  "anonymousDiagnosticDetailsAbsent": true,
+  "hostedAcceptance": false
+}

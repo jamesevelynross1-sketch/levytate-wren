@@ -1,0 +1,24 @@
+{
+  "environment": "local",
+  "appCommit": "63eeb8fffd0638644b4d2156c861bd2aa26b2a63",
+  "browser": "signed Edge157.0.4341.60",
+  "actualComponent": true,
+  "transport": "intercepted Auth request; no provider request or email",
+  "beforeFix": {
+    "waitForLoad": false,
+    "readyAtFill": "interactive",
+    "filledValidAtFill": true,
+    "filledValidAfterClick": false,
+    "requests": 0,
+    "confirmation": false
+  },
+  "afterWait": {
+    "waitForLoad": true,
+    "readyAtFill": "complete",
+    "requests": 1,
+    "matchedFictionalEmail": true,
+    "confirmation": true
+  },
+  "genuineAuthAcceptance": false,
+  "browserContextsClosed": true
+}

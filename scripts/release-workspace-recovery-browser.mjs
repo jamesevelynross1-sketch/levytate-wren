@@ -103,7 +103,11 @@ export async function verifyWorkspaceRecovery({ app: origin, applicant, applicat
   const login = await observed(popup);
   try {
     phase="popup login form";
+    // A new-page event arrives before its client bundle has loaded. Filling
+    // server-rendered HTML during that interval can be replaced by hydration.
+    await login.waitForLoadState("load");
     await login.getByRole("textbox", { name: "Work email", exact: true }).fill(user.email);
+    report("loaded recovery sign-in form retains the intended valid email", await login.getByRole("textbox", { name: "Work email", exact: true }).evaluate((input, email) => input.value === email && input.checkValidity(), user.email));
     const loginLocation=new URL(login.url());
     report("recovery popup is the expected same-origin sign-in page",loginLocation.origin===app&&loginLocation.pathname==="/levytate/login");
     const after = Date.now();
