@@ -280,6 +280,7 @@ export async function verifyOperationsIntelligence({ app: origin, manifest, cont
     const autopilot = await read('autopilot'), signals = Object.values(autopilot.lanes).flat();
     if (learnerId) report('actual scheduled review fires a source-backed Autopilot review signal', signals.some(signal => signal.learnerRecordId === learnerId && ['review_upcoming', 'review_due_with_outstanding_actions'].includes(signal.signalType)));
     const candidate = signals.find(signal => ['new', 'acknowledged'].includes(signal.status) && signal.suggestedActionType && !signal.linkedOperationalActionId && !['application_stalled', 'application_awaiting_provider'].includes(signal.signalType));
+    let actionId;
     if (candidate) {
       const row = page.getByTestId('operations-autopilot').locator('article').filter({ has: page.getByRole('heading', { name: candidate.interpretation.headline, exact: true }) }).filter({ hasText: candidate.subjectLabel });
       report('the selected real Autopilot signal has one unambiguous rendered review', await row.count() === 1);
@@ -292,7 +293,21 @@ export async function verifyOperationsIntelligence({ app: origin, manifest, cont
         during: async () => report('in-flight prepared action retains disabled original title and owner', await drawer.getByRole('textbox', { name: 'Action title', exact: true, includeHidden: true }).isDisabled() && await drawer.getByRole('combobox', { name: 'Owner', exact: true, includeHidden: true }).isDisabled()),
       });
       await challengeDecision('autopilot', created.input);
-      const actionId = created.body.operationalActionId, detail = page.getByTestId('operational-action-detail'); await detail.waitFor();
+      actionId = created.body.operationalActionId;
+    } else {
+      unexercised('No genuinely unlinked Autopilot task source exists; canonical derived tasks are opened, never duplicated for acceptance.');
+      const durableActions = (await snapshot()).actions;
+      const linked = signals.find(signal => !['resolved', 'dismissed'].includes(signal.status) && signal.linkedOperationalActionId && (!learnerId || signal.learnerRecordId === learnerId) && durableActions.some(action => action.id === signal.linkedOperationalActionId && action.status === 'open'));
+      report('the current real Autopilot review links to an existing open canonical task', Boolean(linked));
+      actionId = linked.linkedOperationalActionId;
+      const row = page.getByTestId('operations-autopilot').locator('article').filter({ has: page.getByRole('heading', { name: linked.interpretation.headline, exact: true }) }).filter({ hasText: linked.subjectLabel });
+      report('the existing canonical task has one visible Autopilot entry', await row.count() === 1);
+      const beforeOpen = await snapshot(); await row.getByRole('button', { name: 'Open action', exact: true }).click();
+      await page.getByTestId('operational-action-detail').waitFor();
+      report('opening the canonical task creates no action, receipt or history', same(beforeOpen, await snapshot()));
+    }
+    if (actionId) {
+      const detail = page.getByTestId('operational-action-detail'); await detail.waitFor();
       phase = 'Operations action acknowledgement recovery';
       await uncertain({ label: phase, path: `/api/levytate-operational-actions/${encodeURIComponent(actionId)}`, method: 'PATCH', fault: 'lost',
         trigger: () => detail.getByRole('button', { name: 'Acknowledge', exact: true }).first().click(),
@@ -301,7 +316,30 @@ export async function verifyOperationsIntelligence({ app: origin, manifest, cont
         after: async ({ before, durable, body }) => report('Operations acknowledgement commits one version, receipt, event and audit', body.action.version === before.actions.find(item => item.id === actionId).version + 1 && durable.actionReceipts.length === before.actionReceipts.length + 1 && durable.actionEvents.length === before.actionEvents.length + 1 && durable.audits.length === before.audits.length + 1),
       });
       await detail.getByRole('button', { name: 'Back to Operations Centre', exact: true }).click();
-    } else missing('a current task-eligible Autopilot signal for visible create-action and Operations acknowledgement');
+    }
+    phase = 'Autopilot linked-signal dismissal recovery';
+    // A task acknowledgement changes source evidence. Refresh through the real
+    // UI before another signal decision, preserving the source-version guard.
+    const refreshPromise = observe(page.waitForResponse(response => new URL(response.url()).pathname === paths.autopilot && response.request().method() === 'POST' && response.request().postDataJSON()?.action === 'refresh'));
+    await page.getByRole('button', { name: 'Refresh intelligence', exact: true }).click();
+    const refreshed = await observed(refreshPromise);
+    report('Autopilot checks the actual updated task before a new human decision', refreshed.status() === 200 && (await refreshed.json()).ok === true); await idle();
+    const refreshedWorkspace = await read('autopilot'), linkedSignal = Object.values(refreshedWorkspace.lanes).flat().find(signal => signal.linkedOperationalActionId === actionId && !['resolved', 'dismissed'].includes(signal.status));
+    report('the updated source still has its exact linked operational signal', Boolean(linkedSignal));
+    const linkedRow = page.getByTestId('operations-autopilot').locator('article').filter({ has: page.getByRole('heading', { name: linkedSignal.interpretation.headline, exact: true }) }).filter({ hasText: linkedSignal.subjectLabel });
+    report('the linked signal exposes its own review without another task', await linkedRow.count() === 1 && await linkedRow.getByRole('button', { name: 'Review options', exact: true }).count() === 1);
+    await linkedRow.getByRole('button', { name: 'Review options', exact: true }).click();
+    const linkedDrawer = page.getByRole('dialog', { name: 'Review linked operational signal', exact: true, includeHidden: true });
+    report('linked-signal review cannot create a duplicate task', await linkedDrawer.getByRole('button', { name: 'Create action', exact: true }).count() === 0);
+    await linkedDrawer.getByRole('textbox', { name: 'Dismissal reason', exact: true }).fill('Fictional signal reviewed; existing canonical task remains tracked.');
+    const dismissed = await uncertain({ label: phase, path: paths.autopilot, action: 'dismiss', family: 'operations-autopilot-v1', fault: 'malformed',
+      trigger: () => linkedDrawer.getByRole('button', { name: 'Dismiss', exact: true }).click(),
+      validate: (body, input) => body.workspace?.confirmation?.idempotencyKey === input.idempotencyKey,
+      malformed: body => { body.workspace.lanes = {}; return body; },
+      during: async () => report('in-flight signal dismissal blocks navigation to the original task', await linkedDrawer.getByRole('button', { name: 'Open action', exact: true, includeHidden: true }).isDisabled()),
+      after: async ({ before, durable }) => report('signal dismissal leaves the canonical task and its history unchanged', same(before.actions, durable.actions) && same(before.actionEvents, durable.actionEvents) && same(before.actionReceipts, durable.actionReceipts)),
+    });
+    await challengeDecision('autopilot', dismissed.input);
 
     phase = 'Operations source synchronisation recovery';
     await uncertain({ label: phase, path: paths.operations, fault: 'malformed',

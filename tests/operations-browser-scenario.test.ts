@@ -47,6 +47,13 @@ describe('current-date Operations acceptance scenario uses actual deterministic 
     expect(signals[0]).toMatchObject({ signalType: 'review_due_with_outstanding_actions', entityId: 'current-review', suggestedActionType: 'record_provider_review' });
     expect(signals[0].evidence.map(item => item.sourceId)).toEqual(['current-review', 'existing-work']);
   });
+  it('keeps the canonical task already derived by the real review workflow', () => {
+    const input = autopilot();
+    input.actions = [{ id: 'derived-review-task', learnerRecordId, applicationId: 'application-one', employeeId: 'person-one', title: 'Recorded provider review task', description: 'Existing canonical task from the learner workflow', actionType: 'record_provider_review', ownerType: 'Shared', dueDate: '2026-11-23', status: 'open', sourceUrl: '/levytate/app?module=Learners', updatedAt: now }];
+    const reviewSignal = analyseOperationsAutopilot(input).find(signal => signal.entityId === 'current-review');
+    expect(reviewSignal).toMatchObject({ signalType: 'review_due_with_outstanding_actions', linkedOperationalActionId: 'derived-review-task', suggestedActionType: 'record_provider_review' });
+    expect(input.actions).toHaveLength(1); // Analysis points at existing work; it never writes a duplicate task.
+  });
   it('does not create an aged-application signal for a newly started workflow', () => {
     const input = autopilot(); input.learners = [];
     input.applications = [{ id: 'current-application', employeeId: 'person-one', employeeName: 'Fictional person', status: 'Awaiting Final Approval', currentOwner: 'Apprenticeship Lead', updatedAt: now }];
