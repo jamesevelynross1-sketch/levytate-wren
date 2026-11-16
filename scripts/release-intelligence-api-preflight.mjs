@@ -12,7 +12,7 @@ const results = [];
 const check = (name, pass) => { results.push({ name, status: pass ? "PASS" : "FAIL" }); console.log(`${pass ? "PASS" : "FAIL"} ${name}`); };
 const request = async (path, body, anonymous = false) => {
   const key = anonymous ? state.env.ANON_KEY : state.env.SERVICE_ROLE_KEY;
-  const response = await fetch(`${origin.origin}/rest/v1/${path}`, { redirect: "error", method: body === undefined ? "GET" : "POST", headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+  const response = await fetch(`${origin.origin}/rest/v1/${path}`, { redirect: "error", signal: AbortSignal.timeout(10000), method: body === undefined ? "GET" : "POST", headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
   return { status: response.status, body: await response.json() };
 };
 try {
@@ -37,7 +37,9 @@ try {
   if (existsSync(fixturePath)) {
     const fixture = JSON.parse(readFileSync(fixturePath, "utf8"));
     if (!fixture.synthetic || fixture.environment !== "local" || fixture.tenants?.length !== 2) throw Error("Exact fictional fixture manifest required");
-    const tenant = fixture.tenants.find(item => item.key === "a"), lead = tenant.users.find(item => item.key === "lead");
+    const tenant = fixture.tenants.find(item => item.key === "a"), lead = tenant?.users?.find(item => item.key === "lead");
+    const uuid=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+    if(!uuid.test(tenant?.id??"")||!uuid.test(lead?.membershipId??""))throw Error("Exact current fictional Lead membership required");
     const prepared = await request("rpc/levytate_apply_intelligence_command", { ...body, p_organisation_id: tenant.id, p_actor_user_id: lead.membershipId });
     check("real local server preparation reads the fictional current Lead scope", prepared.status === 200 && /^[a-f0-9]{64}$/.test(prepared.body?.sourceHash ?? "") && Number.isInteger(prepared.body?.revision) && Array.isArray(prepared.body?.eligibleLearnerIds) && Array.isArray(prepared.body?.signals));
   }

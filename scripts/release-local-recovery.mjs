@@ -1,5 +1,5 @@
 /** Restricted LOCAL recovery archive and isolated restore; never restores the source. */
-import { readFileSync, writeFileSync, mkdirSync, chmodSync, statSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, chmodSync, lstatSync, realpathSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { randomBytes, createHash, createCipheriv, createDecipheriv, hkdfSync } from "node:crypto";
 import { lockAcceptanceRuntime } from "./release-runtime-lock.mjs";
@@ -7,14 +7,17 @@ const root = process.env.RELEASE_LOCAL_RUNTIME;
 const name = process.env.RELEASE_RECOVERY_DATABASE;
 if (!/^\/private\/tmp\/levytate-release-runtime\.[A-Za-z0-9]+$/.test(root ?? "") || !/^levytate_release_recovery_[a-z0-9_]+$/.test(name ?? "")) throw new Error("Explicit dedicated local recovery target required");
 const release = lockAcceptanceRuntime("local encrypted recovery and isolated restore");
+const sensitiveBuffers=[];
+try {
 const state = JSON.parse(readFileSync(`${root}/private-stack-state.json`, "utf8"));
+if(!/^[a-f0-9]{64}$/.test(state.id??""))throw Error("Exact native runtime identity required");
 const db = new URL(state.env.DB_URL);
 if (db.hostname !== "127.0.0.1") throw new Error("Loopback source required");
 const bin = "/opt/homebrew/opt/postgresql@17/bin";
 const env = { ...process.env, PGHOST: db.hostname, PGPORT: db.port, PGUSER: db.username, PGPASSWORD: db.password, PGDATABASE: db.pathname.slice(1) };
 function run(command, args, input, commandEnv = env) {
   const result = spawnSync(`${bin}/${command}`, args, { env: commandEnv, input, maxBuffer: 128 * 1024 * 1024 });
-  if (result.status) throw new Error(`${command} recovery step failed; source unchanged and partial target retained`);
+  if (result.status) { result.stdout?.fill(0); result.stderr?.fill(0); throw new Error(`${command} recovery step failed; source unchanged and partial target retained`); }
   return result.stdout;
 }
 const query = (sql, commandEnv = env) => run("psql", ["-XAtq", "-v", "ON_ERROR_STOP=1"], sql, commandEnv).toString().trim();
@@ -25,7 +28,7 @@ const admin = { ...env, PGHOST: socket, PGPORT: port, PGUSER: "supabase_admin" }
 if (query("select current_setting('server_version_num')::int/10000=17 and rolsuper from pg_roles where rolname=current_user;", admin) !== "t") throw new Error("Expected local PG17 owner required");
 // Full database archive keeps extension dependencies, managed owners and ACLs.
 // No raw archive, Auth material or dump output is printed or stored unencrypted.
-const archive = run("pg_dump", ["--format=custom"], undefined, admin);
+const archive = run("pg_dump", ["--format=custom"], undefined, admin); sensitiveBuffers.push(archive);
 const list = run("pg_restore", ["--list"], archive).toString();
 if (!["auth", "storage", "public", "supabase_migrations"].every(schema => list.includes(` ${schema} `)) || !list.includes("supabase_migrations schema_migrations")) throw new Error("Required recovery schemas or ledger absent");
 const directory = `${root}/restricted-recovery`;
@@ -33,7 +36,7 @@ mkdirSync(directory, { recursive: true, mode: 0o700 }); chmodSync(directory, 0o7
 const stamp = Date.now();
 const salt = randomBytes(32), iv = randomBytes(12);
 const secret = JSON.parse(readFileSync(`${root}/private-app-secrets.json`, "utf8")).sessionSecret;
-const key = Buffer.from(hkdfSync("sha256", secret, salt, "LevyTate local recovery v1", 32));
+const key = Buffer.from(hkdfSync("sha256", secret, salt, "LevyTate local recovery v1", 32)); sensitiveBuffers.push(key);
 const cipher = createCipheriv("aes-256-gcm", key, iv);
 const ciphertext = Buffer.concat([cipher.update(archive), cipher.final()]);
 const tag = cipher.getAuthTag();
@@ -41,10 +44,12 @@ const path = `${directory}/database-${stamp}.aes256gcm`;
 writeFileSync(path, Buffer.concat([Buffer.from("LTREC01"), salt, iv, tag, ciphertext]), { mode: 0o600, flag: "wx" });
 // Verify decryption of the saved archive before restoring to a new database.
 const stored = readFileSync(path), offset = 7;
-const restoreKey = Buffer.from(hkdfSync("sha256", secret, stored.subarray(offset, offset + 32), "LevyTate local recovery v1", 32));
+const restoreKey = Buffer.from(hkdfSync("sha256", secret, stored.subarray(offset, offset + 32), "LevyTate local recovery v1", 32)); sensitiveBuffers.push(restoreKey);
 const decipher = createDecipheriv("aes-256-gcm", restoreKey, stored.subarray(offset + 32, offset + 44));
 decipher.setAuthTag(stored.subarray(offset + 44, offset + 60));
-const restoredArchive = Buffer.concat([decipher.update(stored.subarray(offset + 60)), decipher.final()]);
+const restoreChunk=decipher.update(stored.subarray(offset+60));sensitiveBuffers.push(restoreChunk);
+const restoreFinal=decipher.final();sensitiveBuffers.push(restoreFinal);
+const restoredArchive = Buffer.concat([restoreChunk,restoreFinal]); sensitiveBuffers.push(restoredArchive);
 const digest = bytes => createHash("sha256").update(bytes).digest("hex");
 if (digest(restoredArchive) !== digest(archive)) throw new Error("Saved archive decryption mismatch");
 query(`create database ${name} template template0;`, admin);
@@ -58,16 +63,18 @@ const evidence = { status: "PASS", environment: "local", sourceRuntimeId: state.
 writeFileSync(`${directory}/database-${stamp}.evidence.json`, JSON.stringify(evidence, null, 2), { mode: 0o600, flag: "wx" });
 if(process.env.RELEASE_DURABLE_RECOVERY==="true"){
   const repository="/Users/jamesross/Documents/levytate-wren",base=`${repository}/.local-acceptance-private`;
-  const mode=statSync(base).mode&0o777;
-  if(mode!==0o700||spawnSync("git",["-C",repository,"check-ignore","--quiet",base]).status!==0)throw Error("Approved durable recovery directory must be private and Git-ignored");
+  const info=lstatSync(base),mode=info.mode&0o777;
+  if(info.isSymbolicLink()||!info.isDirectory()||realpathSync(base)!==base||mode!==0o700||spawnSync("git",["-C",repository,"check-ignore","--quiet",base]).status!==0)throw Error("Approved durable recovery directory must be private and Git-ignored");
   const durable=`${base}/${state.id}-${stamp}`;mkdirSync(durable,{mode:0o700});
   writeFileSync(`${durable}/database.aes256gcm`,stored,{mode:0o600,flag:"wx"});
   // Preserve only the derived archive key, separately from ciphertext. This
   // cannot sign application sessions and is never used by browser acceptance.
   writeFileSync(`${durable}/recovery-key.bin`,key,{mode:0o600,flag:"wx"});
-  const retained=readFileSync(`${durable}/database.aes256gcm`),retainedKey=readFileSync(`${durable}/recovery-key.bin`);
+  const retained=readFileSync(`${durable}/database.aes256gcm`),retainedKey=readFileSync(`${durable}/recovery-key.bin`);sensitiveBuffers.push(retainedKey);
   const verified=createDecipheriv("aes-256-gcm",retainedKey,retained.subarray(offset+32,offset+44));verified.setAuthTag(retained.subarray(offset+44,offset+60));
-  const plaintext=Buffer.concat([verified.update(retained.subarray(offset+60)),verified.final()]);
+  const retainedChunk=verified.update(retained.subarray(offset+60));sensitiveBuffers.push(retainedChunk);
+  const retainedFinal=verified.final();sensitiveBuffers.push(retainedFinal);
+  const plaintext=Buffer.concat([retainedChunk,retainedFinal]);sensitiveBuffers.push(plaintext);
   if(digest(plaintext)!==digest(archive))throw Error("Durable encrypted recovery verification failed");
   plaintext.fill(0);retainedKey.fill(0);
   const safe={...evidence,keyLocation:"separate restricted derived recovery key; not a session-signing credential",durableEncryptionVerified:true,directoryMode:"0700",fileMode:"0600",encryptedFiles:1,keyFiles:1,browserSessionStateExported:false};
@@ -75,5 +82,7 @@ if(process.env.RELEASE_DURABLE_RECOVERY==="true"){
   console.log(JSON.stringify({durableRecovery:"PASS",directoryMode:"0700",fileMode:"0600",files:3,encryptedArchiveSha256:digest(retained),restoredDatabase:name,browserSessionStateExported:false}));
 }
 console.log(JSON.stringify(evidence));
-key.fill(0); restoreKey.fill(0); archive.fill(0); restoredArchive.fill(0);
-release();
+} finally {
+  for(const buffer of sensitiveBuffers)buffer.fill(0);
+  release();
+}
