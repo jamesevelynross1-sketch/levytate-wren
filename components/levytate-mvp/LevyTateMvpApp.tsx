@@ -276,11 +276,17 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
             : null,
         );
         setPeopleEmployeeId(access.permitted && resolved === "People" ? searchParams.get("employee") : null);
+        const learnerId = searchParams.get("learner");
+        setLearnerTarget(access.permitted && resolved === "Learners"
+          && availableModules.some(module => module.name === "Learners")
+          && learnerId && /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,199}$/.test(learnerId)
+          ? { learnerRecordId: learnerId, actionType: "open_learner" } : null);
         if (!access.permitted) window.history.replaceState(null, "", access.safeRedirect);
       } else {
         setActiveModule("Home");
         setManagerReviewApplicationId(null);
         setPeopleEmployeeId(null);
+        setLearnerTarget(null);
       }
     }
     if (!deepLinkHandled.current) {
@@ -362,6 +368,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
     setManagerDirectReportDetail(null);
     setManagerReviewApplicationId(null);
     setPeopleEmployeeId(null);
+    setLearnerTarget(null);
     setCopilotEntity(null);
     window.history[options.replace ? "replaceState" : "pushState"](null, "", module === "Home" ? "/levytate/app" : `/levytate/app?module=${encodeURIComponent(module)}`);
     setActiveModule(module);
@@ -637,10 +644,10 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
                 : <EmployeesModule onOpenDirectReport={openDirectReport} onStartDiscovery={(employeeId) => { setAiEmployeeId(employeeId); openModule("Copilot"); }} />
             ) : null}
             {activeModule === "Approvals" ? <ApplicationsModule onOpenDirectReport={openDirectReport} initialApplicationId={managerReviewApplicationId} onApplicationSelectionChange={updateApplicationReviewSelection} /> : null}
-            {activeModule === "Operations" ? <OperationsCentreModule onOpenLearner={(target) => { setLearnerTarget(target); openModule("Learners"); }} onSignalContext={(signal) => setCopilotEntity(signal ? { type: "intelligence_signal", id: signal.id, label: `Signal: ${signal.title}` } : null)} /> : null}
+            {activeModule === "Operations" ? <OperationsCentreModule onOpenLearner={(target) => { openModule("Learners"); setLearnerTarget(target); }} onSignalContext={(signal) => setCopilotEntity(signal ? { type: "intelligence_signal", id: signal.id, label: `Signal: ${signal.title}` } : null)} /> : null}
             {activeModule === "Intelligence" ? <ProviderIntelligenceModule onOpenProvider={() => openModule("Marketplace")} /> : null}
             {activeModule === "Applications" ? <ApplicationsModule initialApplicationId={managerReviewApplicationId} onApplicationSelectionChange={updateApplicationReviewSelection} /> : null}
-            {activeModule === "Learners" ? <LearnersModule initialLearnerRecordId={learnerTarget?.learnerRecordId} initialAction={learnerTarget?.actionType} onDeepLinkConsumed={() => setLearnerTarget(null)} onLearnerSelectionChange={updateLearnerCopilotSelection} /> : null}
+            {activeModule === "Learners" ? <LearnersModule initialLearnerRecordId={learnerTarget?.learnerRecordId} initialAction={learnerTarget?.actionType} onDeepLinkConsumed={() => setLearnerTarget(current => current ? { ...current, actionType: "open_learner" } : null)} onBackToList={() => { setLearnerTarget(null); window.history.replaceState(null, "", "/levytate/app?module=Learners"); }} onLearnerSelectionChange={updateLearnerCopilotSelection} /> : null}
             {activeModule === "Learning Time" ? <LearningTimeModule /> : null}
             {activeModule === "My Support" || activeModule === "Learner Support" ? <PastoralSupportModule /> : null}
             {activeModule === "Assessments" ? <AssessmentsModule /> : null}

@@ -62,7 +62,7 @@ const progressOptions: Array<LearnerProgressPosition | typeof allOption> = [
 
 type LearnerDeepLinkAction = "open_learner" | "complete_pre_enrolment" | "complete_enrolment" | "record_review" | "add_progress" | "manage_break" | "return_learner" | "manage_assessment";
 
-export function LearnersModule({ initialLearnerRecordId = "", initialAction = "open_learner", onDeepLinkConsumed, onLearnerSelectionChange }: { initialLearnerRecordId?: string; initialAction?: LearnerDeepLinkAction; onDeepLinkConsumed?: () => void; onLearnerSelectionChange?: (learnerRecordId: string | null, learnerName?: string) => void }) {
+export function LearnersModule({ initialLearnerRecordId = "", initialAction = "open_learner", onDeepLinkConsumed, onLearnerSelectionChange, onBackToList }: { initialLearnerRecordId?: string; initialAction?: LearnerDeepLinkAction; onDeepLinkConsumed?: () => void; onLearnerSelectionChange?: (learnerRecordId: string | null, learnerName?: string) => void; onBackToList?: () => void }) {
   const request = useRetainedWorkspaceRequest();
   const { can, meta } = useMvpWorkspace();
   const [loading, setLoading] = useState(true);
@@ -71,7 +71,7 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
   const [detailReadAttempt, setDetailReadAttempt] = useState(0);
   const [learners, setLearners] = useState<LearnerOperationalSummary[]>([]);
   const [summary, setSummary] = useState<LearnerListSummary | null>(null);
-  const [selectedId, setSelectedId] = useState("");
+  const [selectedId, setSelectedId] = useState(initialLearnerRecordId);
   const [detail, setDetail] = useState<LearnerRecordDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [search, setSearch] = useState("");
@@ -92,7 +92,7 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
   const mayMutateLearnerActivity = can("learnerLifecycle:write") && (meta?.userRole === "Apprenticeship Lead" || meta?.userRole === "Employer Admin");
 
   useEffect(() => {
-    if (initialLearnerRecordId) setSelectedId(initialLearnerRecordId);
+    setSelectedId(initialLearnerRecordId);
   }, [initialLearnerRecordId]);
 
   useEffect(() => {
@@ -212,6 +212,7 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
         onBack={() => {
           setSelectedId("");
           setError("");
+          onBackToList?.();
         }}
         mayMutatePreEnrolment={mayMutatePreEnrolment}
         mayMutateLearnerActivity={mayMutateLearnerActivity}

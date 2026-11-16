@@ -80,6 +80,12 @@ describe('actual shell learner deep-link effects', () => {
     render(); navigate(`?module=Applications&learner=${learnerId}`); expect(learner()).toBeUndefined();
     navigate('?module=Learners'); expect(learner()?.props.initialLearnerRecordId).toBeUndefined();
   });
+  it('clears the target and query for an explicit Back to learners action, including reload', () => {
+    (learner()!.props.onBackToList as () => void)();
+    expect(learner()?.props.initialLearnerRecordId).toBeUndefined();
+    expect(location.searchParams.get('learner')).toBeNull();
+    navigate(location.search); expect(learner()?.props.initialLearnerRecordId).toBeUndefined();
+  });
   it.each(['', '../other', 'learner/other', 'learner?tenant=other', 'learner\nother', 'x'.repeat(201)])('ignores a malformed learner identifier %j', value => {
     location = new URL(`https://fictional.invalid/levytate/app?module=Learners&learner=${encodeURIComponent(value)}`);
     expect(learner()?.props.initialLearnerRecordId).toBeUndefined();
@@ -99,5 +105,20 @@ describe('actual shell learner deep-link effects', () => {
     expect(operations).toBeDefined();
     (operations!.props.onOpenLearner as (target: unknown) => void)({ learnerRecordId: learnerId, actionType: 'record_review' });
     expect(learner()?.props).toMatchObject({ initialLearnerRecordId: learnerId, initialAction: 'record_review' });
+    (learner()!.props.onDeepLinkConsumed as () => void)();
+    expect(learner()?.props).toMatchObject({ initialLearnerRecordId: learnerId, initialAction: 'open_learner' });
+  });
+  it('the actual Learners component clears changed detail selection and calls Back without a mutation', () => {
+    hooks.store.can = () => true;
+    const back = vi.fn();
+    const invokeLearners = (id: string) => { hooks.cursor = 0; hooks.pending = []; return LearnersModule({ initialLearnerRecordId: id, onBackToList: back }); };
+    const view = descendants(invokeLearners(learnerId)).find(item => typeof item.type === 'function' && item.type.name === 'LearnerRecordView');
+    expect(view).toBeDefined();
+    (view!.props.onBack as () => void)(); expect(back).toHaveBeenCalledOnce();
+    // Execute the first real effect only (incoming selection); do not run API
+    // effects in this component contract test or claim server acceptance.
+    invokeLearners(learnerId); hooks.pending[0]?.();
+    invokeLearners(''); hooks.pending[0]?.();
+    expect(descendants(invokeLearners('')).some(item => typeof item.type === 'function' && item.type.name === 'LearnerRecordView')).toBe(false);
   });
 });
