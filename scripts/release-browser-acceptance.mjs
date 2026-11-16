@@ -121,10 +121,12 @@ try {
   if(retainCoreLearner&&(process.env.RELEASE_LEARNER_JOURNEY!=="true"||process.env.RELEASE_OPERATIONS_INTELLIGENCE_JOURNEY!=="true"||process.env.RELEASE_SKIP_CORE==="true"))throw Error("Retained core learner requires this run’s genuine learner and Intelligence journeys");
   const selectedKeys=process.env.RELEASE_AUTH_KEYS?.split(",");
   if(selectedKeys&&(new Set(selectedKeys).size!==selectedKeys.length||selectedKeys.some(key=>!/^[ab]:(lead|manager|employee)$/.test(key))))throw new Error("Exact synthetic authentication roles required");
-  const leadOnlyContinuation=process.env.RELEASE_OPERATIONS_LEAD_ONLY==="true";
+  const canonicalLearnerOnly=process.env.RELEASE_CANONICAL_LEARNER_ONLY==="true";
+  const leadOnlyContinuation=process.env.RELEASE_OPERATIONS_LEAD_ONLY==="true"||canonicalLearnerOnly;
   if(leadOnlyContinuation){
-    if(selectedKeys?.length!==1||selectedKeys[0]!=="a:lead"||process.env.RELEASE_SKIP_CORE!=="true"||process.env.RELEASE_OPERATIONS_INTELLIGENCE_JOURNEY!=="true"||!/^learner-[a-f0-9-]{36}$/.test(process.env.RELEASE_OPERATIONS_EXISTING_LEARNER_ID??"")
+    if(selectedKeys?.length!==1||selectedKeys[0]!=="a:lead"||process.env.RELEASE_SKIP_CORE!=="true"||(canonicalLearnerOnly?process.env.RELEASE_OPERATIONS_INTELLIGENCE_JOURNEY==="true":process.env.RELEASE_OPERATIONS_INTELLIGENCE_JOURNEY!=="true")||!/^learner-[a-f0-9-]{36}$/.test((canonicalLearnerOnly?process.env.RELEASE_CANONICAL_LEARNER_ID:process.env.RELEASE_OPERATIONS_EXISTING_LEARNER_ID)??"")
       ||Object.entries(process.env).some(([name,value])=>/^RELEASE_.*_JOURNEY$/.test(name)&&value==="true"&&!["RELEASE_OPERATIONS_INTELLIGENCE_JOURNEY","RELEASE_NATIVE_ZOOM_JOURNEY"].includes(name)))throw Error("Lead-only continuation is restricted to the existing core learner and Operations/native zoom");
+    if(canonicalLearnerOnly&&Object.entries(process.env).some(([name,value])=>/^RELEASE_.*_JOURNEY$/.test(name)&&value==="true"))throw Error("Canonical navigation-only excludes all mutation journeys");
     notRunScopes.push("Employee, Manager and second-tenant genuine role boundaries not repeated: prior exact c7d57b1 four-context proof retained separately");
   }
   if(!lifecycleOnly){
@@ -528,6 +530,11 @@ try {
     phase="retained account form after genuine account switch";
     const {verifyRetainedAccountSwitch}=await import("./release-account-browser.mjs");
     await verifyRetainedAccountSwitch({app,mailpit,manifest,contexts,backend,waitForCapturedLink,check});
+  }
+  if(canonicalLearnerOnly){
+    phase="genuine read-only canonical learner navigation";
+    const{verifyCanonicalLearnerNavigation}=await import("./release-canonical-learner-browser.mjs");
+    await independentJourney("canonical learner navigation",()=>verifyCanonicalLearnerNavigation({app,manifest,lead:contexts.get("a:lead"),backend,learnerId:process.env.RELEASE_CANONICAL_LEARNER_ID,check}));
   }
   if(process.env.RELEASE_OPERATIONS_INTELLIGENCE_JOURNEY==="true"){
     phase="genuine source-backed Operations and Intelligence workflow";
