@@ -1,0 +1,81 @@
+{
+  "headedProbe": {
+    "kind": "native-browser-zoom-synthetic-layout-not-authenticated-app",
+    "date": "2026-11-16T09:45:07.214Z",
+    "headless": false,
+    "product": "edge",
+    "browserVersion": "157.0.4341.60",
+    "baselineSetting": {
+      "settingsUrl": "edge://settings/appearance#ZoomPage&1",
+      "selectedPercent": 100,
+      "method": "native-appearance-menu"
+    },
+    "baseline": {
+      "innerWidth": 1272,
+      "innerHeight": 787,
+      "outerWidth": 1280,
+      "outerHeight": 871,
+      "devicePixelRatio": 2,
+      "visualViewportScale": 1,
+      "rootZoom": "1",
+      "bodyZoom": "1",
+      "scrollWidth": 1272
+    },
+    "baselineColumns": 3,
+    "baselineImage": {
+      "width": 2544,
+      "height": 1574
+    },
+    "zoomSetting": {
+      "settingsUrl": "edge://settings/appearance#ZoomPage&1",
+      "selectedPercent": 200,
+      "method": "native-appearance-menu"
+    },
+    "zoomed": {
+      "innerWidth": 636,
+      "innerHeight": 393,
+      "outerWidth": 1280,
+      "outerHeight": 871,
+      "devicePixelRatio": 4,
+      "visualViewportScale": 1,
+      "rootZoom": "1",
+      "bodyZoom": "1",
+      "scrollWidth": 636
+    },
+    "zoomedColumns": 1,
+    "zoomedImage": {
+      "width": 2544,
+      "height": 1574
+    },
+    "restored": {
+      "innerWidth": 1272,
+      "innerHeight": 787,
+      "outerWidth": 1280,
+      "outerHeight": 871,
+      "devicePixelRatio": 2,
+      "visualViewportScale": 1,
+      "rootZoom": "1",
+      "bodyZoom": "1",
+      "scrollWidth": 1272
+    },
+    "result": "PASS",
+    "authRequests": 0,
+    "loopbackRequests": 1,
+    "blockedExternalPageRequests": 0,
+    "temporaryProfileRemoved": true
+  },
+  "verifiedBrowser": {
+    "version": "157.0.4341.60",
+    "source": "https://edgeupdates.microsoft.com/api/products/stable",
+    "sha256": "01a3976ac110c8c408d86650c0342056ce1cfc5097bcfbafdd42af797eb69ad3",
+    "publishedSHA256Matched": true,
+    "packageSignatureVerified": true,
+    "deepStrictCodeSignatureVerified": true,
+    "executable": "/private/tmp/levytate-current-browser-20261116/edge-extracted/MicrosoftEdge-157.0.4341.60.pkg/Payload/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+    "actualExecutableVersionMatches": true,
+    "teamIdentifier": "UBF8T346G9",
+    "packageNotarizationTrusted": true,
+    "playwrightVersion": "1.65.0",
+    "playwrightLockSHA256": "be671387e2732a4152f74b79b9973e18f55d70ab8bdeb01fd240b5cf16f03b4d"
+  }
+}

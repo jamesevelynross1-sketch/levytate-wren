@@ -1,4 +1,4 @@
-/** Native Chrome page-zoom probe. Isolated synthetic layout; no application/Auth proof.
+/** Native Chrome/Edge page-zoom probe. Isolated synthetic layout; no application/Auth proof.
  * Uses the built-in Appearance UI, a new temporary profile, and no viewport/DPR emulation.
  */
 import assert from "node:assert/strict";
@@ -21,11 +21,24 @@ export async function nativeZoomMetrics(page) {
 
 /** Requires the original launchPersistentContext context in a disposable profile.
  * Do not call in browser.newContext(): Playwright explicitly forbids settings there.
- * Chrome settings affect this profile; close and remove it after the test. */
-export async function setNativeBrowserZoom(context, percent) {
+ * Browser settings affect this profile; close and remove it after the test. */
+export async function setNativeBrowserZoom(context, percent, { product = "chrome" } = {}) {
+  assert(["chrome", "edge"].includes(product), "Only inspected Chrome and Edge settings are supported");
   assert([100, 200].includes(percent), "This bounded probe only supports 100% and 200%");
   const settings = await context.newPage();
   try {
+    if (product === "edge") {
+      await settings.goto("edge://settings/appearance");
+      await settings.getByRole("button", { name: "Page zoom", exact: true }).click();
+      // Current Edge uses its native menu, observed in the settings accessibility tree.
+      // This bounded helper only changes a fresh profile between 100% and 200%.
+      await settings.getByText(/^(100|200)%$/).first().click();
+      await settings.getByRole("menuitemradio", { name: `${percent}%`, exact: true }).click();
+      await settings.keyboard.press("Escape");
+      await settings.getByText(`${percent}%`, { exact: true }).first().click();
+      await settings.getByRole("menuitemradio", { name: `${percent}%`, exact: true, checked: true }).waitFor({ state: "visible" });
+      return { settingsUrl: settings.url(), selectedPercent: percent, method: "native-appearance-menu" };
+    }
     await settings.goto("chrome://settings/appearance");
     // Native Chrome settings control, observed in the actual browser, not a page style/API.
     const control = settings.locator("select#zoomLevel");
@@ -66,7 +79,7 @@ export async function captureNativeZoomViewport(context, page, path) {
 }
 
 async function main() {
-  const { values } = parseArgs({ options: { browser: { type: "string" }, playwright: { type: "string" }, output: { type: "string" }, headless: { type: "boolean", default: false } }, strict: true });
+  const { values } = parseArgs({ options: { browser: { type: "string" }, playwright: { type: "string" }, output: { type: "string" }, product: { type: "string", default: "chrome" }, headless: { type: "boolean", default: false } }, strict: true });
   for (const key of ["browser", "playwright", "output"]) assert(isAbsolute(values[key] ?? ""), `Explicit absolute ${key} path required`);
   const output = resolve(values.output);
   assert(output.startsWith("/private/tmp/"), "Evidence and fresh browser profile must stay in temporary test storage");
@@ -76,9 +89,9 @@ async function main() {
   const profile = await mkdtemp(join(output, "native-zoom-profile-"));
   const html = `<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>Native zoom verification — synthetic content</title>
 <style>body{margin:0;font:16px system-ui;background:#f3f7f5;color:#102c3d}main{max-width:1120px;margin:auto;padding:24px}header{display:flex;flex-wrap:wrap;gap:16px;align-items:center}h1{font-size:28px;margin:0}nav{display:flex;flex-wrap:wrap;gap:16px}a{color:#075f55}section{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;margin:24px 0}article{padding:20px;background:white;border-radius:12px}input,button{font:inherit;padding:10px;max-width:100%;box-sizing:border-box}button{background:#075f55;color:white;border:0;border-radius:8px}label{display:grid;gap:8px}p{line-height:1.5}@media(max-width:800px){section{grid-template-columns:1fr}h1{font-size:24px}}</style>
-<main><header><h1>Native browser zoom verification</h1><nav aria-label="Probe navigation"><a href="#summary">Summary</a><a href="#entry">Entry</a></nav></header><p>This is a synthetic layout probe. It contains no authenticated application, customer records or API calls.</p><section id="summary"><article><h2>Window size</h2><p>The outer browser window stays fixed between observations.</p></article><article><h2>Native page zoom</h2><p>Chrome Appearance changes from 100% to 200%.</p></article><article><h2>Responsive layout</h2><p>The real media query changes three columns into one.</p></article></section><form id="entry"><label>Fictional reference<input value="Synthetic local-only entry"></label><p><button type="button">Local probe control</button></p></form></main>`;
+<main><header><h1>Native browser zoom verification</h1><nav aria-label="Probe navigation"><a href="#summary">Summary</a><a href="#entry">Entry</a></nav></header><p>This is a synthetic layout probe. It contains no authenticated application, customer records or API calls.</p><section id="summary"><article><h2>Window size</h2><p>The outer browser window stays fixed between observations.</p></article><article><h2>Native page zoom</h2><p>Browser Appearance changes from 100% to 200%.</p></article><article><h2>Responsive layout</h2><p>The real media query changes three columns into one.</p></article></section><form id="entry"><label>Fictional reference<input value="Synthetic local-only entry"></label><p><button type="button">Local probe control</button></p></form></main>`;
   let context, stage = "listen", requests = 0, blocked = 0;
-  const evidence = { kind: "native-browser-zoom-synthetic-layout-not-authenticated-app", date: new Date().toISOString(), headless: values.headless };
+  const evidence = { kind: "native-browser-zoom-synthetic-layout-not-authenticated-app", date: new Date().toISOString(), headless: values.headless, product: values.product };
   const server = createServer((req, res) => { requests++; assert.equal(req.method, "GET"); res.setHeader("Content-Type", "text/html"); res.end(html); });
   try {
     await new Promise((resolve, reject) => { server.once("error", reject); server.listen(0, "127.0.0.1", resolve); });
@@ -94,20 +107,20 @@ async function main() {
     evidence.browserVersion = context.browser().version();
     const page = await context.newPage();
     stage = "native-100-percent";
-    evidence.baselineSetting = await setNativeBrowserZoom(context, 100);
+    evidence.baselineSetting = await setNativeBrowserZoom(context, 100, { product: values.product });
     await page.goto(origin);
     evidence.baseline = await nativeZoomMetrics(page);
     evidence.baselineColumns = await page.locator("section").evaluate(el => getComputedStyle(el).gridTemplateColumns.split(" ").length);
     evidence.baselineImage = await captureNativeZoomViewport(context, page, join(output, "native-zoom-100.png"));
     stage = "native-200-percent";
-    evidence.zoomSetting = await setNativeBrowserZoom(context, 200);
+    evidence.zoomSetting = await setNativeBrowserZoom(context, 200, { product: values.product });
     evidence.zoomed = await assertNativeZoomDoubled(page, evidence.baseline);
     evidence.zoomedColumns = await page.locator("section").evaluate(el => getComputedStyle(el).gridTemplateColumns.split(" ").length);
     assert.equal(evidence.baselineColumns, 3); assert.equal(evidence.zoomedColumns, 1);
     assert(evidence.zoomed.scrollWidth <= evidence.zoomed.innerWidth, "Synthetic page must reflow without horizontal document overflow");
     evidence.zoomedImage = await captureNativeZoomViewport(context, page, join(output, "native-zoom-200.png"));
     stage = "restore-native-100-percent";
-    await setNativeBrowserZoom(context, 100);
+    await setNativeBrowserZoom(context, 100, { product: values.product });
     await page.waitForFunction(before => devicePixelRatio === before.devicePixelRatio && innerWidth === before.innerWidth, evidence.baseline);
     evidence.restored = await nativeZoomMetrics(page);
     evidence.result = "PASS"; evidence.authRequests = 0; evidence.loopbackRequests = requests; evidence.blockedExternalPageRequests = blocked;
