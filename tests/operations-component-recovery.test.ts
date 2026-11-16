@@ -155,3 +155,45 @@ it('removes canonical navigation targets while a real signal command is in fligh
   }
   expectNoNavigation(); resolve(Response.json({})); await pending; await flush(); expectNoNavigation();
 });
+
+it('keeps linked Autopilot signals reviewable without offering a duplicate action', async () => {
+  const workspace = fictionalAutopilot();
+  const linked = { ...Object.values(workspace.lanes).flat()[0], linkedOperationalActionId: 'existing-action' };
+  const data = { ...workspace, lanes: Object.fromEntries(autopilotLanes.map(lane => [lane, linked.lane === lane ? [linked] : []])) };
+  harness.request.mockImplementation(async () => Response.json({ ok: true, workspace: data }));
+  const openAction = vi.fn();
+  function render() { harness.cursor = 0; return AutopilotOperationsPanel({ onOpenAction: openAction }); }
+  render(); harness.effects.splice(0).forEach(effect => effect()); await flush();
+  const row = actualSignalRows(render()).find(item => text(item).includes(linked.subjectLabel));
+  const review = descendants(row).find(item => item.type === 'button' && text(item.props.children) === 'Review options');
+  expect(review).toBeDefined(); (review!.props.onClick as () => void)();
+  const drawer = descendants(render()).find(item => typeof item.type === 'function' && item.type.name === 'ActionReviewDrawer'); expect(drawer).toBeDefined();
+  const output = renderIsolatedChild(drawer!);
+  expect(text(output)).toContain('Dismiss'); expect(text(output)).not.toContain('Create action'); expect(text(output)).not.toContain('Action title');
+  const open = descendants(output).find(item => item.type === 'button' && text(item.props.children) === 'Open action'); expect(open).toBeDefined();
+  (open!.props.onClick as () => void)(); expect(openAction).toHaveBeenCalledWith('existing-action'); expect(harness.write).not.toHaveBeenCalled();
+});
+
+it('linked-signal dismissal retains the original command and disables existing-action navigation while uncertain', async () => {
+  const workspace = fictionalAutopilot(), linked = { ...Object.values(workspace.lanes).flat()[0], linkedOperationalActionId: 'existing-action' };
+  harness.request.mockImplementation(async () => Response.json({ ok: true, workspace: { ...workspace, lanes: Object.fromEntries(autopilotLanes.map(lane => [lane, linked.lane === lane ? [linked] : []])) } }));
+  const openAction = vi.fn(); function render() { harness.cursor = 0; return AutopilotOperationsPanel({ onOpenAction: openAction }); }
+  render(); harness.effects.splice(0).forEach(effect => effect()); await flush();
+  const row = actualSignalRows(render()).find(item => text(item).includes(linked.subjectLabel));
+  const review = descendants(row).find(item => item.type === 'button' && text(item.props.children) === 'Review options'); expect(review).toBeDefined(); (review!.props.onClick as () => void)();
+  const drawer = descendants(render()).find(item => typeof item.type === 'function' && item.type.name === 'ActionReviewDrawer')!;
+  let release!: (response: Response) => void; harness.write.mockImplementationOnce(() => new Promise<Response>(resolve => { release = resolve; }));
+  const command = (drawer.props.onSubmit as (action: string, fields: Record<string, unknown>) => Promise<void>)('dismiss', { reason: 'Fictional signal reviewed; existing task remains tracked.' }); await flush();
+  function expectLocked() {
+    const current = render(), pending = descendants(current).find(item => typeof item.type === 'function' && item.type.name === 'ActionReviewDrawer')!;
+    expect(pending.props.saving).toBe(true);
+    const open = descendants(renderIsolatedChild(pending)).find(item => item.type === 'button' && text(item.props.children) === 'Open action')!;
+    expect(open.props.disabled).toBe(true); (open.props.onClick as () => void)(); expect(openAction).not.toHaveBeenCalled();
+    expect(descendants(current).some(item => item.props?.mutation && (item.props.mutation as { pending: boolean }).pending)).toBe(true);
+  }
+  expectLocked(); release(Response.json({})); await command; await flush(); expectLocked();
+  const recovery = descendants(render()).find(item => item.props?.mutation && (item.props.mutation as { pending: boolean }).pending)!;
+  (recovery.props.mutation as { retry: () => void }).retry(); await flush();
+  expect(harness.write.mock.calls[1]?.[1].body).toBe(harness.write.mock.calls[0]?.[1].body);
+  expect(JSON.parse(harness.write.mock.calls[0]?.[1].body)).toMatchObject({ action: 'dismiss', signalId: linked.id, expectedRevision: linked.revision, reason: 'Fictional signal reviewed; existing task remains tracked.' });
+});
