@@ -31,3 +31,7 @@ Two explicitly fictional files were uploaded and read back through the actual lo
 ## Login hydration reproduction
 
 A no-Auth probe against both actual login routes held five client scripts before hydration. Both frozen63 forms exposed enabled fields and buttons prematurely. After releasing scripts, both forms sent one correctly intercepted fictional request and displayed confirmation. Separately, the popup probe reproduced typed input being lost during hydration and showed a loaded-page wait prevents that timing failure. The application owner is adding a hydration guard; its corrected current-page probe and subsequent genuine recovery remain required. [Delayed-JS baseline](evidence/LEVYTATE_LOGIN_HYDRATION_BEFORE_2026-11-16.json).
+
+## Actual local advisors
+
+The supported pinned CLI `db advisors --local --type all --level info --fail-on none` completed successfully and returned 350 findings: 133 unindexed foreign keys (INFO), 91 unused indexes (INFO), 48 RLS tables without policies (INFO), 74 RLS expression init-plan warnings, and four mutable-function-search-path warnings. No ERROR-level finding was returned, but this is not a clean-advisor claim. [Full schema-only findings](evidence/LEVYTATE_LOCAL_ADVISORS_2026-11-16.json). The search-path functions and policy relevance are under independent review. Fresh-workload unused-index observations do not justify dropping indexes, and no automatic changes were made.
