@@ -429,7 +429,11 @@ export async function verifyOperationsIntelligence({ app: origin, manifest, cont
       const modal = page.getByRole('dialog').filter({ has: page.getByRole('region', { name: 'Enrolment handoff', exact: true }) });
       const existing = modal.getByRole('link', { name: 'Open learner record', exact: true }); await existing.waitFor();
       report('canonical application offers the exact existing learner and cannot start a duplicate pre-enrolment', await existing.getAttribute('href') === `/levytate/app?module=Learners&learner=${encodeURIComponent(learnerId)}` && await modal.getByRole('button', { name: 'Start pre-enrolment', exact: true }).count() === 0);
-      await existing.click(); await page.getByRole('heading', { name: detail.learner.name, exact: true, level: 2 }).waitFor();
+      phase = 'canonical existing learner link click';
+      await existing.click();
+      phase = 'canonical learner detail heading readback';
+      await page.getByRole('heading', { name: detail.learner.name, exact: true, level: 2 }).waitFor();
+      phase = 'canonical learner origin and identity';
       report('the canonical handoff reaches the same recorded learner on the application origin', new URL(page.url()).origin === app && new URL(page.url()).searchParams.get('learner') === learnerId);
       if (manager) {
         await manager.page.goto(`${app}/levytate/app?module=Approvals&application=${encodeURIComponent(applicationId)}`);
@@ -444,8 +448,9 @@ export async function verifyOperationsIntelligence({ app: origin, manifest, cont
     report('reload and independent reads add no commands or hidden mutations', same(durable, await snapshot()));
     report('other employer Intelligence and Operations remain unchanged', same(otherBefore, await snapshot(otherTenant.id)));
     return { newSignIns: 0, paidModelCalls: false, directSourceWrites: false, missingCoverage: gaps, notRunScopes };
-  } catch {
+  } catch (error) {
     check(`Operations/Intelligence: stopped safely at ${phase}`, false);
-    throw Error(`Operations/Intelligence acceptance stopped at ${phase}`);
+    const category = error && ['TimeoutError', 'TypeError', 'AssertionError'].includes(error.name) ? error.name : 'Error';
+    throw Error(`Operations/Intelligence acceptance stopped at ${phase} (${category})`);
   }
 }
