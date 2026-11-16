@@ -35,3 +35,9 @@ A no-Auth probe against both actual login routes held five client scripts before
 ## Actual local advisors
 
 The supported pinned CLI `db advisors --local --type all --level info --fail-on none` completed successfully and returned 350 findings: 133 unindexed foreign keys (INFO), 91 unused indexes (INFO), 48 RLS tables without policies (INFO), 74 RLS expression init-plan warnings, and four mutable-function-search-path warnings. No ERROR-level finding was returned, but this is not a clean-advisor claim. [Full schema-only findings](evidence/LEVYTATE_LOCAL_ADVISORS_2026-11-16.json). The search-path functions and policy relevance are under independent review. Fresh-workload unused-index observations do not justify dropping indexes, and no automatic changes were made.
+
+## Development trace containment
+
+A counts-only inspection found 27 callback `token_hash=` markers in the owned current Next development trace and 42 in the owned historical verification trace. No values were printed or copied. After confirming the current app was stopped and the historical app was not running, only those generated token-bearing traces were removed. All first-run contexts had already been logged out and closed. Session and rate-limit secrets were not changed.
+
+The local launch wrapper now sets the installed Next reporter's span threshold to its maximum safe integer, disables trace upload and telemetry, and rejects inherited trace-upload configuration. Four focused guard tests pass. An actual no-Auth probe sent public health/login requests with a non-secret sentinel query, stopped and flushed the app, then scanned 81 generated files: zero sentinel occurrences and no trace files. This is local development trace proof only; it does not assert hosting-provider log behaviour. [Counts-only cleanup and sentinel evidence](evidence/LEVYTATE_LOCAL_TRACE_SAFETY_2026-11-16.json).

@@ -5,6 +5,7 @@ import { randomBytes } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { captureCredential } from "./release-local-email-capture.mjs";
+import { applyLocalTraceSafety } from "./release-local-trace-safety.mjs";
 
 const root = process.env.RELEASE_LOCAL_RUNTIME;
 if (!root?.startsWith("/private/tmp/levytate-release-runtime.")) throw new Error("Dedicated local runtime required");
@@ -82,7 +83,8 @@ const [command, args] = commands[mode];
 if(mode==="app"){
   const noPaidModel=["OPENAI_API_KEY","ANTHROPIC_API_KEY","GOOGLE_GENERATIVE_AI_API_KEY"].every(name=>!env[name])&&env.LEVYTATE_AI_ENABLED==="false";
   if(!noPaidModel)throw new Error("Local acceptance app requires explicitly disabled AI and absent paid model credentials");
-  writeFileSync(`${root}/app-launch-evidence.json`,JSON.stringify({environment:"local",startedAt:new Date().toISOString(),noPaidModel,aiEnabled:false,externalEmailCaptured:captureRequests,loopbackOnly:new URL(base).hostname==="127.0.0.1"}),{mode:0o600});
+  const traceSafety=applyLocalTraceSafety(env);
+  writeFileSync(`${root}/app-launch-evidence.json`,JSON.stringify({environment:"local",startedAt:new Date().toISOString(),noPaidModel,aiEnabled:false,externalEmailCaptured:captureRequests,loopbackOnly:new URL(base).hostname==="127.0.0.1",...traceSafety}),{mode:0o600});
 }
 const child = spawn(command, args, { env, stdio: ["ignore", "pipe", "pipe"] });
 function safeOutput(data) {

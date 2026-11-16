@@ -1,0 +1,62 @@
+{
+  "environment": "local",
+  "currentOwnedTraceCleanup": {
+    "environment": "local",
+    "appStoppedBeforeRemoval": true,
+    "noValuesPrintedOrCopied": true,
+    "browserContextsPreviouslyLoggedOutAndClosed": true,
+    "generatedFiles": [
+      {
+        "relativeFile": "trace",
+        "markers": {
+          "token_hash=": 27,
+          "access_token=": 0,
+          "refresh_token=": 0,
+          "code=": 0
+        },
+        "removedOwnedGeneratedFile": true
+      }
+    ],
+    "secretsOrRateLimitsRotated": false
+  },
+  "historicalOwnedTraceCleanup": {
+    "historicalOwnedWorktree": "verification",
+    "noOwnedNextServerRunning": true,
+    "noValuesPrintedOrCopied": true,
+    "generatedFiles": [
+      {
+        "relativeFile": "trace",
+        "markers": {
+          "token_hash=": 42,
+          "access_token=": 0,
+          "refresh_token=": 0,
+          "code=": 0
+        },
+        "removedOwnedGeneratedFile": true
+      }
+    ]
+  },
+  "actualNonAuthSentinelProof": {
+    "environment": "local",
+    "appCommit": "63eeb8fffd0638644b4d2156c861bd2aa26b2a63",
+    "actualAuthRequests": 0,
+    "probeRoutes": [
+      "public health live",
+      "public login"
+    ],
+    "httpStatuses": [
+      200,
+      200
+    ],
+    "appStoppedAndFlushed": true,
+    "generatedFilesScanned": 81,
+    "sentinelOccurrences": 0,
+    "traceFiles": [],
+    "requestTraceRecordingDisabled": true,
+    "traceUploadDisabled": true,
+    "telemetryDisabled": true,
+    "status": "PASS"
+  },
+  "rawLogsRetained": false,
+  "hostedOrProductionChanged": false
+}
