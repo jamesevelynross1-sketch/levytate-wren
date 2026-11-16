@@ -13,13 +13,13 @@ function application(status: MvpApplication['status'] = 'Approved for Enrolment'
 function dataFor(app = application()) {
   const data = createEmptyMvpWorkspace(); data.applications = [app]; data.employees = [{ id: app.employeeId, name: 'Fictional Applicant', email: 'person@fictional.invalid', employeeNumber: 'fixture', jobTitle: 'Fictional role', roleId: '', managerId: '', department: 'Test', site: 'Test', platformRole: 'Employee', status: 'Active', startDate: '', createdAt: at, updatedAt: at }]; return data;
 }
-function modal() { const html = renderToStaticMarkup(createElement(ApplicationsModule, { initialApplicationId: 'application-fixture' })); const start = html.indexOf('role="dialog"'); expect(start).toBeGreaterThan(-1); return html.slice(start); }
+function modal() { const html = renderToStaticMarkup(createElement<NonNullable<Parameters<typeof ApplicationsModule>[0]>>(ApplicationsModule, { initialApplicationId: 'application-fixture' })); const start = html.indexOf('role="dialog"'); expect(start).toBeGreaterThan(-1); return html.slice(start); }
 beforeEach(() => { store.current = { data: dataFor(), meta: { storageMode: 'supabase', userEmail: 'lead@fictional.invalid', userRole: 'Apprenticeship Lead' }, saveApplication: vi.fn(), updateApplicationStatus: vi.fn() }; });
 describe('actual deep-linked Application modal handoff (rendered component, no persistence claim)', () => {
   it('offers the already-authorised pre-enrolment journey inside the approved application detail', () => { expect(modal()).toContain('Start pre-enrolment'); });
-  it('also offers handoff from the completed configured-workflow detail', () => {
+  it('also offers handoff from the ready-for-provider configured-workflow detail', () => {
     const app = application(), version = createDefaultApplicationWorkflow('fictional-tenant', at);
-    app.workflow = { version, instance: { id: 'workflow-instance', organisationId: version.organisationId, applicationId: app.id, workflowVersionId: version.id, currentStepId: version.steps.at(-1)!.id, state: 'completed', lockVersion: 3, lastProgressedAt: at } };
+    app.workflow = { version, instance: { id: 'workflow-instance', organisationId: version.organisationId, applicationId: app.id, workflowVersionId: version.id, currentStepId: version.steps.at(-1)!.id, state: 'ready_for_provider', lockVersion: 3, lastProgressedAt: at } };
     store.current.data = dataFor(app); expect(modal()).toContain('Start pre-enrolment');
   });
   it('opens the existing learner instead of proposing duplicate pre-enrolment', () => {
