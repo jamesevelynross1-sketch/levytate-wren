@@ -12,6 +12,8 @@ import { lockAcceptanceRuntime } from "./release-runtime-lock.mjs";
 
 const results = [];
 const verifiedContexts = new Map();
+const notRunScopes = [];
+let coreLearnerId;
 const commitRead=spawnSync("git",["rev-parse","HEAD"],{encoding:"utf8"});
 const candidateCommit=commitRead.status===0&&/^[a-f0-9]{40}$/.test(commitRead.stdout.trim())?commitRead.stdout.trim():null;
 const appCodeCommit=process.env.RELEASE_APP_COMMIT??candidateCommit;
@@ -112,6 +114,8 @@ try {
   const peopleUiOnly=process.env.RELEASE_PEOPLE_UI_ONLY==="true"||accountUiOnly;
   const exportOnly=process.env.RELEASE_EXPORT_ONLY==="true";
   const lifecycleOnly=process.env.RELEASE_LIFECYCLE_ONLY==="true";
+  const retainCoreLearner=process.env.RELEASE_RETAIN_CORE_LEARNER==="true";
+  if(retainCoreLearner&&(process.env.RELEASE_LEARNER_JOURNEY!=="true"||process.env.RELEASE_OPERATIONS_INTELLIGENCE_JOURNEY!=="true"||process.env.RELEASE_SKIP_CORE==="true"))throw Error("Retained core learner requires this run’s genuine learner and Intelligence journeys");
   const selectedKeys=process.env.RELEASE_AUTH_KEYS?.split(",");
   if(selectedKeys&&(new Set(selectedKeys).size!==selectedKeys.length||selectedKeys.some(key=>!/^[ab]:(lead|manager|employee)$/.test(key))))throw new Error("Exact synthetic authentication roles required");
   if(!lifecycleOnly){
@@ -415,6 +419,7 @@ try {
       check("missing initial progress cannot be silently fabricated",(await mutation(leadA,"enrol",{...enrol,initialProgress:undefined})).status()===400);
       const enrolled=await mutation(leadA,"enrol",enrol),enrolledBody=await enrolled.json();
       check("real Lead enrols learner with explicit initial evidence",enrolled.status()===200&&enrolledBody.learner?.lifecycleStatus==="enrolled");
+      if(enrolled.status()===200&&enrolledBody.learner?.lifecycleStatus==="enrolled")coreLearnerId=row[0].id;
       check("real enrolment retry does not duplicate records",(await mutation(leadA,"enrol",enrol)).status()===200);
       const connected=await backend(`rest/v1/levytate_enrolments?organisation_id=eq.${employeeA.tenant.id}&application_id=eq.${applicationId}&select=id,status`);
       check("actual database links one Live learner enrolment",connected.length===1&&connected[0].status==="Live learner");
@@ -427,6 +432,7 @@ try {
         const{verifyLearningTime}=await import("./release-learning-time-browser.mjs");
         await verifyLearningTime({app,manifest,contexts,learnerId:row[0].id,backend,check});
       }
+      if(!retainCoreLearner){
       learner=await detail(leadA);
       const withdrawal={outcome:"withdrawal",idempotencyKey:randomUUID(),expectedActivityVersion:learner.activityVersion,effectiveDate:today,reasonCategory:"other",initiatedBy:"learner",notes:"Synthetic agreed withdrawal for end-to-end acceptance",providerNotified:false,employeeNotified:false};
       check("Employee cannot set official withdrawal outcome",(await mutation(employeeA,"outcome",withdrawal)).status()===403);
@@ -436,6 +442,10 @@ try {
       const ended=await backend(`rest/v1/levytate_enrolments?organisation_id=eq.${employeeA.tenant.id}&application_id=eq.${applicationId}&select=id,status`);
       check("terminal outcome updates corresponding enrolment to Cancelled",ended.length===1&&ended[0].status==="Cancelled");
       check("no fictional notification claimed delivered",outcomeBody.learner?.withdrawal?.providerNotified===false&&outcomeBody.learner?.withdrawal?.employeeNotified===false);
+      }else{
+        notRunScopes.push("Core learner terminal withdrawal: retained enrolled for genuine source-backed Intelligence; historical withdrawal proof is separate");
+        check("core learner remains genuinely enrolled for subsequent Intelligence source workflow",(await detail(leadA)).lifecycleStatus==="enrolled");
+      }
     }
   }
   });
@@ -498,6 +508,23 @@ try {
     const{verifyStalePeopleEditor}=await import("./release-people-stale-browser.mjs");
     await independentJourney("stale People editor",()=>verifyStalePeopleEditor({app,mailpit,manifest,lead:contexts.get("a:lead"),browser,backend,waitForCapturedLink,check}));
   }
+  if(process.env.RELEASE_ACCOUNT_JOURNEY==="true"){
+    phase="retained account form after genuine account switch";
+    const {verifyRetainedAccountSwitch}=await import("./release-account-browser.mjs");
+    await verifyRetainedAccountSwitch({app,mailpit,manifest,contexts,backend,waitForCapturedLink,check});
+  }
+  if(process.env.RELEASE_OPERATIONS_INTELLIGENCE_JOURNEY==="true"){
+    phase="genuine source-backed Operations and Intelligence workflow";
+    const{verifyOperationsIntelligence}=await import("./release-operations-intelligence-browser.mjs");
+    const launch=JSON.parse(readFileSync(`${process.env.RELEASE_LOCAL_RUNTIME}/app-launch-evidence.json`,"utf8"));
+    if(launch.environment!=="local"||launch.noPaidModel!==true||launch.externalRequestsCaptured!==true)throw Error("Controlled no-paid-model local app launch required");
+    await independentJourney("Operations and Intelligence UI",()=>verifyOperationsIntelligence({app,manifest,contexts,backend,check,learnerId:coreLearnerId,noPaidModel:true}));
+  }
+  if(process.env.RELEASE_EMPLOYEE_RECOVERY_JOURNEY==="true"){
+    phase="genuine Employee malformed-response and expired-session recovery";
+    const{verifyEmployeeRecovery}=await import("./release-employee-recovery-browser.mjs");
+    await independentJourney("Employee retained application recovery",()=>verifyEmployeeRecovery({app,mailpit,manifest,contexts,backend,waitForCapturedLink,check}));
+  }
   if(!peopleUiOnly&&!exportOnly&&process.env.RELEASE_SKIP_CORE!=="true"&&!results.some(item=>item.status==="FAIL"||item.status==="BLOCKED")){
   const employee = contexts.get("a:employee");
   const forged = await employee.context.request.post(`${app}/api/levytate-workspace`, {
@@ -508,16 +535,6 @@ try {
   await backend(`rest/v1/levytate_users?id=eq.${manager.user.membershipId}`, "PATCH", { active: false });
   check("revoked Manager blocked on next authenticated API request", [401, 403].includes((await manager.context.request.get(`${app}/api/levytate-workspace`)).status()));
   check("revocation leaves second tenant unaffected", (await contexts.get("b:manager").context.request.get(`${app}/api/levytate-workspace`)).status() === 200);
-  }
-  if(process.env.RELEASE_ACCOUNT_JOURNEY==="true"){
-    phase="retained account form after genuine account switch";
-    const {verifyRetainedAccountSwitch}=await import("./release-account-browser.mjs");
-    await verifyRetainedAccountSwitch({app,mailpit,manifest,contexts,backend,waitForCapturedLink,check});
-  }
-  if(process.env.RELEASE_EMPLOYEE_RECOVERY_JOURNEY==="true"){
-    phase="genuine Employee malformed-response and expired-session recovery";
-    const{verifyEmployeeRecovery}=await import("./release-employee-recovery-browser.mjs");
-    await independentJourney("Employee retained application recovery",()=>verifyEmployeeRecovery({app,mailpit,manifest,contexts,backend,waitForCapturedLink,check}));
   }
   }
   if(lifecycleOnly||process.env.RELEASE_LIFECYCLE_JOURNEY==="true"){
@@ -550,7 +567,7 @@ try {
   if(app&&contexts.size){let loggedOut=0;for(const{context}of contexts.values()){try{const r=await context.request.post(`${app}/api/levytate-beta-logout`,{headers:{Origin:app},maxRedirects:0});if(r.status()===303)loggedOut++;}catch{/* Raw transport errors may carry Auth details. */}}console.log(`Local failed-run cleanup: ${loggedOut}/${contexts.size} logout responses confirmed; all browser contexts closing`);}
   await browser?.close();
   releaseRuntime?.();
-  const evidence = { schemaVersion: 2, environment: "local", candidateCommit, appCodeCommit, browserEngineVersion, browserDistribution, authenticationMethod: "requested-sign-in-link-through-local-smtp", authenticatedContextsVerified: verifiedContexts.size, distinctAuthenticatedRoles: [...new Set(verifiedContexts.values())].sort(), emailEvidence: "local-smtp-capture-only", results };
+  const evidence = { schemaVersion: 2, environment: "local", candidateCommit, appCodeCommit, browserEngineVersion, browserDistribution, authenticationMethod: "requested-sign-in-link-through-local-smtp", authenticatedContextsVerified: verifiedContexts.size, distinctAuthenticatedRoles: [...new Set(verifiedContexts.values())].sort(), emailEvidence: "local-smtp-capture-only", notRunScopes, results };
   if (process.env.RELEASE_EVIDENCE_PATH?.startsWith("/private/tmp/")) {
     const requested = process.env.RELEASE_EVIDENCE_PATH;
     const path = existsSync(requested) ? requested.replace(/\.json$/, `-${Date.now()}.json`) : requested;

@@ -79,6 +79,7 @@ const commands = {
 };
 if (!commands[mode]) throw new Error("Unsupported local acceptance command");
 const [command, args] = commands[mode];
+if(mode==="app")writeFileSync(`${root}/app-launch-evidence.json`,JSON.stringify({environment:"local",startedAt:new Date().toISOString(),noPaidModel:["OPENAI_API_KEY","ANTHROPIC_API_KEY","GOOGLE_GENERATIVE_AI_API_KEY"].every(name=>!env[name]),externalRequestsCaptured:captureRequests,loopbackOnly:new URL(base).hostname==="127.0.0.1"}),{mode:0o600});
 const child = spawn(command, args, { env, stdio: ["ignore", "pipe", "pipe"] });
 function safeOutput(data) {
   if (mode === "app" || mode === "stop") {
