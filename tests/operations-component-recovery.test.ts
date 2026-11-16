@@ -171,6 +171,7 @@ it('keeps linked Autopilot signals reviewable without offering a duplicate actio
   const output = renderIsolatedChild(drawer!);
   expect(text(output)).toContain('Dismiss'); expect(text(output)).not.toContain('Create action'); expect(text(output)).not.toContain('Action title');
   const open = descendants(output).find(item => item.type === 'button' && text(item.props.children) === 'Open action'); expect(open).toBeDefined();
+  openAction.mockImplementation(() => { expect(descendants(render()).find(item => typeof item.type === 'function' && item.type.name === 'ActionReviewDrawer')).toBeUndefined(); });
   (open!.props.onClick as () => void)(); expect(openAction).toHaveBeenCalledWith('existing-action'); expect(harness.write).not.toHaveBeenCalled();
 });
 
