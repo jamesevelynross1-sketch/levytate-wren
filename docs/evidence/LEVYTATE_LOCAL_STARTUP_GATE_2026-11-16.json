@@ -93,7 +93,7 @@
   "authRequestsSent": 0,
   "hostedActionsPerformed": false,
   "existingAcceptanceRuntimeAccessed": false,
-  "nativeProofComplete": false,
+  "nativeProofComplete": true,
   "correctionSourceCommit": "2f42f4f",
   "finalObservedAt": "2026-11-16T10:27:56.813Z",
   "stage": {
@@ -151,7 +151,7 @@
     "applied": false
   },
   "preApplyGateProofComplete": true,
-  "nativeBootstrapComplete": false,
+  "nativeBootstrapComplete": true,
   "preApplyFinalEmptyMetadata": {
     "authUsers": 0,
     "publicTypes": 0,
@@ -436,5 +436,34 @@
       }
     ]
   },
-  "independentCatalogueComparison": "PENDING"
+  "independentCatalogueComparison": {
+    "status": "PASS",
+    "verifierCommit": "850d0da",
+    "evidenceFile": "LEVYTATE_LOCAL_GUARDED_BOOTSTRAP_PARITY_2026-11-16.json",
+    "checksPassed": 14,
+    "catalogueRows": 4124,
+    "catalogueSha256": "ddde4403f4ca8e9a8f2138e5c01b721702c5c7662ee315717de9e318066e1848",
+    "ledgerSha256": "bcdec756a743e5a30f2e1d3d63b7a1681114b4b6bd5b06c1c85f3d5a34dfa659",
+    "supplementalSha256": "e910512b6eb5b42a57e8e00072c170fe0be9298a658a553201ebbe7bee21f55e",
+    "freshEmptyCounts": {
+      "people": 0,
+      "learners": 0,
+      "authUsers": 0,
+      "employers": 0,
+      "memberships": 0,
+      "applications": 0,
+      "authSessions": 0,
+      "authIdentities": 0,
+      "storageObjects": 0
+    },
+    "requiredRegistrations": {
+      "liftFrameworks": 1,
+      "otjRequirements": 2,
+      "assessmentFrameworks": 3,
+      "apprenticeshipStandards": 0
+    },
+    "readOnly": true,
+    "acceptedBusinessDataRead": false
+  },
+  "hostedAcceptance": false
 }
