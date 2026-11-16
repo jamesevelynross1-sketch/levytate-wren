@@ -19,9 +19,9 @@ function action(id: string, ownerType: AutopilotActionInput['ownerType'], dueDat
 }
 function sourceInput(): AutopilotAnalysisInput {
   return { organisationId, now, learners: [{ learnerRecordId: 'learner-review', learnerName: 'Fictional learner', providerId: 'provider-a', providerName: 'Fictional provider', programmeId: 'programme-a', programmeName: 'Fictional programme', reviews: [
-    { id: 'review-provider', type: 'provider_review', nextReviewDate: '2026-11-09', reviewDate: '2026-10-01', status: 'completed' },
-    { id: 'review-manager', type: 'manager_check_in', nextReviewDate: '2026-11-13', reviewDate: '2026-10-01', status: 'action_required' },
-    { id: 'review-lead', type: 'l_and_d_check_in', nextReviewDate: '2026-11-20', reviewDate: '2026-10-01', status: 'completed' },
+    { id: 'review-provider', type: 'provider_review', nextReviewDate: '2026-11-09', reviewDate: '2026-10-01', status: 'completed', createdAt: '2026-10-01T12:00:00Z' },
+    { id: 'review-manager', type: 'manager_check_in', nextReviewDate: '2026-11-13', reviewDate: '2026-10-01', status: 'action_required', createdAt: '2026-10-01T12:00:00Z' },
+    { id: 'review-lead', type: 'l_and_d_check_in', nextReviewDate: '2026-11-20', reviewDate: '2026-10-01', status: 'completed', createdAt: '2026-10-01T12:00:00Z' },
   ] }], actions: [action('review-related', 'Apprenticeship Lead', '2026-11-14', 'learner-review'), action('provider-action', 'Provider'), action('manager-overdue', 'Line Manager'), action('manager-upcoming', 'Line Manager', '2026-11-12'), action('generic-action', 'Apprenticeship Lead'), action('application-only-action', 'Line Manager', '2026-11-01', '')], applications: [
     { id: 'application-manager', employeeId: 'employee-manager', employeeName: 'Fictional employee', status: 'Awaiting Manager Review', currentOwner: 'Line Manager', updatedAt: '2026-10-01T12:00:00Z' },
     { id: 'application-provider', employeeId: 'employee-provider', employeeName: 'Fictional employee', status: 'Approved for Enrolment', currentOwner: 'Provider Partner', updatedAt: '2026-10-01T12:00:00Z' },

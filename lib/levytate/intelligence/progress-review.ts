@@ -1,5 +1,6 @@
 import type { LearnerProgressUpdate, LearnerReview } from "@/lib/levytate/mvp/learner-lifecycle";
 import type { OperationalOwnerType, OperationalPriorityLevel } from "@/lib/levytate/mvp/operations-centre";
+import { completedReviewEvidence } from "@/lib/levytate/mvp/review-planning";
 
 export const intelligenceSignalCategories = ["risk", "action", "quality", "pattern", "opportunity"] as const;
 export const progressReviewSignalTypes = [
@@ -45,7 +46,7 @@ const sortNewest=<T>(items:T[],date:(item:T)=>string)=>[...items].sort((a,b)=>da
 export function classifyReviewThemes(text:string){return intelligenceThemes.filter(theme=>themeRules[theme].test(text));}
 
 export function extractProgressReviewFacts(input:ProgressReviewAnalysisInput):ProgressReviewFacts {
-  const relevantReviews=input.reviews.filter(review=>review.learnerRecordId===input.learnerRecordId);
+  const relevantReviews=completedReviewEvidence(input.reviews.filter(review=>review.learnerRecordId===input.learnerRecordId));
   const providerReviews=sortNewest(relevantReviews.filter(review=>review.reviewType==="provider_review"),r=>r.reviewDate).slice(0,4);
   const latest=(type:LearnerReview["reviewType"])=>sortNewest(relevantReviews.filter(review=>review.reviewType===type),r=>r.reviewDate)[0]??null;
   const progressUpdates=sortNewest(input.progressUpdates.filter(update=>update.learnerRecordId===input.learnerRecordId),u=>u.updateDate).slice(0,3);

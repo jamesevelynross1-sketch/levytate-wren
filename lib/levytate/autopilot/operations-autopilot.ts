@@ -1,5 +1,6 @@
 import type { MvpApplicationOwner } from "@/lib/levytate/mvp/workspace";
 import type { OperationalOwnerType } from "@/lib/levytate/mvp/operations-centre";
+import { selectReviewPlan } from "@/lib/levytate/mvp/review-planning";
 
 export const autopilotAnalyserVersion = "operations-autopilot-v1";
 export const autopilotLanes = ["needs_your_decision", "ready_to_action", "waiting_externally", "upcoming", "recently_resolved"] as const;
@@ -108,6 +109,7 @@ export type AutopilotReviewInput = {
   nextReviewDate: string;
   reviewDate: string;
   status: string;
+  createdAt: string;
 };
 
 export type AutopilotLearnerInput = {
@@ -178,9 +180,9 @@ export function analyseOperationsAutopilot(input: AutopilotAnalysisInput) {
   for (const learner of input.learners) {
     const learnerActions = activeActions.filter((action) => action.learnerRecordId === learner.learnerRecordId);
     const reviewsByType = latestReviewsByType(learner.reviews);
-    for (const review of reviewsByType) {
-      if (!review.nextReviewDate) continue;
-      const days = daysBetween(today, review.nextReviewDate);
+    for (const { latest: review, nextDate } of reviewsByType) {
+      if (!review || !nextDate) continue;
+      const days = daysBetween(today, nextDate);
       const reviewLabel = reviewTypeLabel(review.type);
       const relatedActions = learnerActions.filter((action) => action.ownerType !== "Provider");
       const matchingReviewAction = learnerActions.find((action) => action.actionType === reviewActionType(review.type));
@@ -192,7 +194,7 @@ export function analyseOperationsAutopilot(input: AutopilotAnalysisInput) {
           title: `${reviewLabel} overdue`, summary: `${learner.learnerName}'s ${reviewLabel.toLowerCase()} is ${Math.abs(days)} day${Math.abs(days) === 1 ? "" : "s"} overdue.`,
           recommendedAction: `Review the recorded evidence and arrange the ${reviewLabel.toLowerCase()}.`, ownerType: review.type === "manager_check_in" ? "Line Manager" : "Apprenticeship Lead",
           dueDate: today, actionType: reviewActionType(review.type),
-          evidence: [reviewEvidence(review, learner)], payload: { rule: "review_overdue", daysOverdue: Math.abs(days), reviewType: review.type }, linkedOperationalActionId: matchingReviewAction?.id,
+          evidence: [reviewEvidence(review, learner, nextDate)], payload: { rule: "review_overdue", daysOverdue: Math.abs(days), reviewType: review.type }, linkedOperationalActionId: matchingReviewAction?.id,
         }));
       } else if (days <= 7 && relatedActions.length) {
         relatedActions.forEach((action) => consumedActionIds.add(action.id));
@@ -201,8 +203,8 @@ export function analyseOperationsAutopilot(input: AutopilotAnalysisInput) {
           priority: "action_now", entityType: "review", entityId: review.id, learner, subjectLabel: learner.learnerName,
           title: `${reviewLabel} due with open actions`, summary: `${learner.learnerName}'s ${reviewLabel.toLowerCase()} is due in ${days} day${days === 1 ? "" : "s"} with ${relatedActions.length} unresolved action${relatedActions.length === 1 ? "" : "s"}.`,
           recommendedAction: "Review the outstanding actions before the scheduled conversation.", ownerType: "Apprenticeship Lead",
-          dueDate: review.nextReviewDate, actionType: reviewActionType(review.type),
-          evidence: [reviewEvidence(review, learner), ...relatedActions.slice(0, 3).map(actionEvidence)], payload: { rule: "review_due_with_outstanding_actions", daysUntilDue: days, unresolvedActionIds: relatedActions.map((action) => action.id) }, linkedOperationalActionId: matchingReviewAction?.id,
+          dueDate: nextDate, actionType: reviewActionType(review.type),
+          evidence: [reviewEvidence(review, learner, nextDate), ...relatedActions.slice(0, 3).map(actionEvidence)], payload: { rule: "review_due_with_outstanding_actions", daysUntilDue: days, unresolvedActionIds: relatedActions.map((action) => action.id) }, linkedOperationalActionId: matchingReviewAction?.id,
         }));
       } else if (days <= 14) {
         signals.push(buildSignal(input, {
@@ -210,7 +212,7 @@ export function analyseOperationsAutopilot(input: AutopilotAnalysisInput) {
           priority: "upcoming", entityType: "review", entityId: review.id, learner, subjectLabel: learner.learnerName,
           title: `${reviewLabel} approaching`, summary: `${learner.learnerName}'s ${reviewLabel.toLowerCase()} is due in ${days} day${days === 1 ? "" : "s"}.`,
           recommendedAction: "Prepare evidence and confirm attendance before the review.", ownerType: "Apprenticeship Lead",
-          dueDate: review.nextReviewDate, actionType: reviewActionType(review.type), evidence: [reviewEvidence(review, learner)], payload: { rule: "review_upcoming", daysUntilDue: days, reviewType: review.type }, linkedOperationalActionId: matchingReviewAction?.id,
+          dueDate: nextDate, actionType: reviewActionType(review.type), evidence: [reviewEvidence(review, learner, nextDate)], payload: { rule: "review_upcoming", daysUntilDue: days, reviewType: review.type }, linkedOperationalActionId: matchingReviewAction?.id,
         }));
       }
     }
@@ -390,16 +392,15 @@ function actionSignal(input: AutopilotAnalysisInput, action: AutopilotActionInpu
 }
 
 function latestReviewsByType(reviews: AutopilotReviewInput[]) {
-  const result = new Map<AutopilotReviewInput["type"], AutopilotReviewInput>();
+  const result = new Map<AutopilotReviewInput["type"], AutopilotReviewInput[]>();
   for (const review of reviews) {
-    const prior = result.get(review.type);
-    if (!prior || (review.reviewDate || review.nextReviewDate) > (prior.reviewDate || prior.nextReviewDate)) result.set(review.type, review);
+    result.set(review.type, [...(result.get(review.type) ?? []), review]);
   }
-  return [...result.values()];
+  return [...result.values()].map(selectReviewPlan);
 }
 
-function reviewEvidence(review: AutopilotReviewInput, learner: AutopilotLearnerInput): AutopilotEvidence {
-  return { sourceType: "learner_review", sourceId: review.id, sourceDate: review.nextReviewDate, label: `${reviewTypeLabel(review.type)} due`, value: review.nextReviewDate, url: `/levytate/app?module=Learners&learner=${encodeURIComponent(learner.learnerRecordId)}` };
+function reviewEvidence(review: AutopilotReviewInput, learner: AutopilotLearnerInput, dueDate: string): AutopilotEvidence {
+  return { sourceType: "learner_review", sourceId: review.id, sourceDate: dueDate, label: `${reviewTypeLabel(review.type)} due`, value: dueDate, url: `/levytate/app?module=Learners&learner=${encodeURIComponent(learner.learnerRecordId)}` };
 }
 function actionEvidence(action: AutopilotActionInput): AutopilotEvidence {
   return { sourceType: "operational_action", sourceId: action.id, sourceDate: action.dueDate || action.updatedAt, label: "Operational action", value: action.title, url: action.sourceUrl || `/levytate/app?module=Operations&action=${encodeURIComponent(action.id)}` };

@@ -110,7 +110,7 @@ export async function refreshAutopilotWorkspace(session: LevyTateBetaSession, ke
       programmeId: detail.programme.programmeId, programmeName: detail.programme.programmeName,
       reviews: detail.reviewHistory
         .filter((review) => ["provider_review", "l_and_d_check_in", "manager_check_in"].includes(review.reviewType))
-        .map((review) => ({ id: review.id, type: review.reviewType as "provider_review" | "l_and_d_check_in" | "manager_check_in", nextReviewDate: review.nextReviewDate, reviewDate: review.reviewDate, status: review.status })),
+        .map((review) => ({ id: review.id, type: review.reviewType as "provider_review" | "l_and_d_check_in" | "manager_check_in", nextReviewDate: review.nextReviewDate, reviewDate: review.reviewDate, status: review.status, createdAt: review.createdAt })),
     })),
       actions: actionInputs, applications: applicationInputs,
     }),
@@ -176,7 +176,7 @@ export async function refreshAutopilotWorkspaceForMicrosoftCopilotActor(actor: M
         programmeName: programme?.programmeName ?? "Programme",
         reviews: data.learnerReviews
           .filter((review) => review.learnerRecordId === record.id && ["provider_review", "l_and_d_check_in", "manager_check_in"].includes(review.reviewType))
-          .map((review) => ({ id: review.id, type: review.reviewType as "provider_review" | "l_and_d_check_in" | "manager_check_in", nextReviewDate: review.nextReviewDate, reviewDate: review.reviewDate, status: review.status })),
+          .map((review) => ({ id: review.id, type: review.reviewType as "provider_review" | "l_and_d_check_in" | "manager_check_in", nextReviewDate: review.nextReviewDate, reviewDate: review.reviewDate, status: review.status, createdAt: review.createdAt })),
       };
     }),
     actions: actionRows.filter(action => prepared.eligibleActionIds.includes(action.id)).map((action) => ({

@@ -14,11 +14,11 @@ function scenario(): ProgressReviewAnalysisInput {
   // These are generator tests, not evidence that the browser or persistence ran.
   return { organisationId, learnerRecordId, providerId: 'provider-one', programmeId: 'programme-one', now,
     progressUpdates: [progress('measured', 30, 5, `${today}T11:00:00Z`), progress('core-enrolment', 0, 0, `${today}T10:00:00Z`)],
-    reviews: [review('current-review', '2026-11-23', 'Fictional acceptance review: on track. Synthetic scenario only; no real provider report.', `${today}T11:01:00Z`), review('core-scheduled-review', '2026-12-16', 'Initial scheduled review', `${today}T10:00:00Z`)],
+    reviews: [review('current-review', '2026-11-23', 'Fictional acceptance review: on track. Synthetic scenario only; no real provider report.', `${today}T11:01:00Z`), { ...review('core-scheduled-review', '', 'Initial scheduled review', `${today}T10:00:00Z`), status: 'scheduled', reviewDate: '2026-12-16' }],
   };
 }
 function autopilot(input = scenario()): AutopilotAnalysisInput {
-  return { organisationId, now, applications: [], actions: [], learners: [{ learnerRecordId, learnerName: 'Fictional learner', providerId: 'provider-one', providerName: 'Fictional provider', programmeId: 'programme-one', programmeName: 'Fictional programme', reviews: input.reviews.map(item => ({ id: item.id, type: 'provider_review', nextReviewDate: item.nextReviewDate, reviewDate: item.reviewDate, status: item.status })) }] };
+  return { organisationId, now, applications: [], actions: [], learners: [{ learnerRecordId, learnerName: 'Fictional learner', providerId: 'provider-one', providerName: 'Fictional provider', programmeId: 'programme-one', programmeName: 'Fictional programme', reviews: input.reviews.map(item => ({ id: item.id, type: 'provider_review', nextReviewDate: item.nextReviewDate, reviewDate: item.reviewDate, status: item.status, createdAt: item.createdAt })) }] };
 }
 describe('current-date Operations acceptance scenario uses actual deterministic analysers', () => {
   it('identifies the stated narrative/metric inconsistency from exact persisted-source identities', () => {

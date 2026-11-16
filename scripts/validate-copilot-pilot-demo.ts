@@ -38,6 +38,7 @@ const signals = analyseOperationsAutopilot({
         type: "provider_review" as const,
         nextReviewDate: review.next_review_date,
         reviewDate: review.review_date,
+        createdAt: review.created_at,
         status: review.status,
       })),
     };
