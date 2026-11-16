@@ -121,6 +121,12 @@ try {
   if(retainCoreLearner&&(process.env.RELEASE_LEARNER_JOURNEY!=="true"||process.env.RELEASE_OPERATIONS_INTELLIGENCE_JOURNEY!=="true"||process.env.RELEASE_SKIP_CORE==="true"))throw Error("Retained core learner requires this run’s genuine learner and Intelligence journeys");
   const selectedKeys=process.env.RELEASE_AUTH_KEYS?.split(",");
   if(selectedKeys&&(new Set(selectedKeys).size!==selectedKeys.length||selectedKeys.some(key=>!/^[ab]:(lead|manager|employee)$/.test(key))))throw new Error("Exact synthetic authentication roles required");
+  const leadOnlyContinuation=process.env.RELEASE_OPERATIONS_LEAD_ONLY==="true";
+  if(leadOnlyContinuation){
+    if(selectedKeys?.length!==1||selectedKeys[0]!=="a:lead"||process.env.RELEASE_SKIP_CORE!=="true"||process.env.RELEASE_OPERATIONS_INTELLIGENCE_JOURNEY!=="true"||!/^learner-[a-f0-9-]{36}$/.test(process.env.RELEASE_OPERATIONS_EXISTING_LEARNER_ID??"")
+      ||Object.entries(process.env).some(([name,value])=>/^RELEASE_.*_JOURNEY$/.test(name)&&value==="true"&&!["RELEASE_OPERATIONS_INTELLIGENCE_JOURNEY","RELEASE_NATIVE_ZOOM_JOURNEY"].includes(name)))throw Error("Lead-only continuation is restricted to the existing core learner and Operations/native zoom");
+    notRunScopes.push("Employee, Manager and second-tenant genuine role boundaries not repeated: prior exact c7d57b1 four-context proof retained separately");
+  }
   if(!lifecycleOnly){
   const failureBudgetStartedAt=new Date().toISOString();
   for (const tenant of manifest.tenants) {
@@ -262,7 +268,7 @@ try {
       check(`${actor.tenant.key} Lead: caller cannot choose tenant or raw fields`,forged.status()===400);
     }
   }
-  for(const key of peopleUiOnly?["a:lead"]:["a:employee","a:manager","a:lead"]) {
+  for(const key of peopleUiOnly||leadOnlyContinuation?["a:lead"]:["a:employee","a:manager","a:lead"]) {
     const actor=contexts.get(key);
     for(const path of ["levytate-lift","levytate-learning-time","levytate-requests","levytate-pastoral"]){
       const gated=await actor.context.request.get(`${app}/api/${path}`);
@@ -530,19 +536,20 @@ try {
     if(launch.environment!=="local"||launch.noPaidModel!==true||launch.externalEmailCaptured!==true)throw Error("Controlled no-paid-model local app launch required");
     if(process.env.RELEASE_OPERATIONS_EXISTING_LEARNER_ID){
       if(process.env.RELEASE_SKIP_CORE!=="true"||coreLearnerId)throw Error("Existing learner continuation cannot also create a core journey");
-      const id=process.env.RELEASE_OPERATIONS_EXISTING_LEARNER_ID,actor=contexts.get("a:employee");
-      if(!/^learner-[a-f0-9-]{36}$/.test(id)||!actor)throw Error("Explicit existing fictional learner and actual Employee context required");
+      const id=process.env.RELEASE_OPERATIONS_EXISTING_LEARNER_ID,ownerTenant=leadOnlyContinuation?contexts.get("a:lead")?.tenant:contexts.get("a:employee")?.tenant;
+      const ownerPerson=leadOnlyContinuation?ownerTenant?.users.find(user=>user.key==="employee"):contexts.get("a:employee")?.user;
+      if(!/^learner-[a-f0-9-]{36}$/.test(id)||!ownerTenant||!ownerPerson)throw Error("Explicit existing fictional learner and verified original owner scope required");
       const {confirmExistingCoreLearner}=await import("./release-existing-core-learner.mjs"),reference=`browser-${manifest.run}`;
       const [learners,applications,enrolments]=await Promise.all([
-        backend(`rest/v1/levytate_learner_records?organisation_id=eq.${actor.tenant.id}&id=eq.${id}&select=id,organisation_id,employee_id,application_id,record_status,lifecycle_status`),
-        backend(`rest/v1/levytate_applications?organisation_id=eq.${actor.tenant.id}&id=eq.${reference}&select=id,organisation_id,employee_id,status`),
-        backend(`rest/v1/levytate_enrolments?organisation_id=eq.${actor.tenant.id}&application_id=eq.${reference}&select=organisation_id,employee_id,application_id,status`),
+        backend(`rest/v1/levytate_learner_records?organisation_id=eq.${ownerTenant.id}&id=eq.${id}&select=id,organisation_id,employee_id,application_id,record_status,lifecycle_status`),
+        backend(`rest/v1/levytate_applications?organisation_id=eq.${ownerTenant.id}&id=eq.${reference}&select=id,organisation_id,employee_id,status`),
+        backend(`rest/v1/levytate_enrolments?organisation_id=eq.${ownerTenant.id}&application_id=eq.${reference}&select=organisation_id,employee_id,application_id,status`),
       ]);
-      coreLearnerId=confirmExistingCoreLearner({id,manifest,tenant:actor.tenant,employee:actor.user,learners,applications,enrolments});
+      coreLearnerId=confirmExistingCoreLearner({id,manifest,tenant:ownerTenant,employee:ownerPerson,learners,applications,enrolments});
       check("Operations continuation uses exact prior current-run live enrolment without resetting records",coreLearnerId===id);
       notRunScopes.push("Core approval/enrolment not repeated: exact current-run completed handoff and live learner verified read-only");
     }
-    await independentJourney("Operations and Intelligence UI",()=>verifyOperationsIntelligence({app,manifest,contexts,backend,check,learnerId:coreLearnerId,noPaidModel:true,notRun:scope=>notRunScopes.push(`Operations/Intelligence: ${scope}`)}));
+    await independentJourney("Operations and Intelligence UI",()=>verifyOperationsIntelligence({app,manifest,contexts,backend,check,learnerId:coreLearnerId,noPaidModel:true,leadOnlyContinuation,notRun:scope=>notRunScopes.push(`Operations/Intelligence: ${scope}`)}));
   }
   if(process.env.RELEASE_NATIVE_ZOOM_JOURNEY==="true"){
     phase="genuine Lead native browser zoom";
