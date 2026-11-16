@@ -10,7 +10,7 @@ const repository = process.env.RELEASE_STARTUP_REVIEW_SOURCE ?? fileURLToPath(ne
 const artifacts: string[] = [];
 afterEach(() => { vi.unstubAllEnvs(); for (const path of artifacts.splice(0)) rmSync(path, { recursive: true, force: true }); });
 function offlineRuntime() {
-  const root = mkdtempSync('/private/tmp/levytate-release-runtime.'); artifacts.push(root);
+  const root = mkdtempSync(`${process.platform === 'darwin' ? '/private/tmp' : '/tmp'}/levytate-release-runtime.`); artifacts.push(root);
   const code = `#!${process.execPath}
 const fs=require('node:fs'),path=require('node:path');
 if(process.argv[2]==='--version'){console.log('2.122.1');process.exit(0);}
@@ -68,12 +68,17 @@ const gate = await import(pathToFileURL(resolve(repository, 'scripts/release-nat
 const staging = await import(pathToFileURL(resolve(repository, 'scripts/release-stage-native-migrations.mjs')).href);
 const countKeys = ['publicRelations', 'publicFunctions', 'publicTypes', 'applicationSchemas', 'ledgerRows', 'authUsers', 'authIdentities', 'authSessions', 'storageBuckets', 'storageObjects'];
 const empty = (): { postgresMajorVersion: number; ledgerExists: boolean; schemaNames: string[] } & Record<string, unknown> => ({ postgresMajorVersion: 17, ledgerExists: false, schemaNames: ['public', 'auth', 'storage', 'extensions'], ...Object.fromEntries(countKeys.map(key => [key, 0])) });
+function offlineStatus(root: string) {
+  const state = JSON.parse(readFileSync(`${root}/private-stack-state.json`, 'utf8'));
+  // CLI2.122.1 stack status differs from stack start: id is nested.
+  return { runtime: state.runtime, identity: { id: state.id }, env: state.env };
+}
 async function stagedFixture() {
   const root = offlineRuntime(); expect(script('release-create-native-runtime.mjs', root).status).toBe(0); expect(script('release-start-local-stack.mjs', root).status).toBe(0);
   vi.stubEnv('RELEASE_LOCAL_RUNTIME', root); vi.stubEnv('RELEASE_RUNTIME_QUIESCENT', 'true');
   const { expected } = await gate.canonicalExpectedMigrations(repository);
   const names = expected.map((item: { filename: string }) => item.filename);
-  const io = { readStatus: vi.fn(async () => JSON.parse(readFileSync(`${root}/private-stack-state.json`, 'utf8'))), readDatabase: vi.fn(() => empty()), invokeCli: vi.fn(async (args: string[]) => { if (args[0] !== 'db' || args[1] !== 'push') throw Error('Unexpected offline CLI command'); return `DRY RUN: The following migrations would be pushed:\n${names.map((name: string) => ` • ${name}`).join('\n')}\n`; }), verifyApplied: vi.fn(async () => ({ offlineStub: true })) };
+  const io = { readStatus: vi.fn<() => Promise<unknown>>(async () => offlineStatus(root)), readDatabase: vi.fn(() => empty()), invokeCli: vi.fn(async (args: string[]) => { if (args[0] !== 'db' || args[1] !== 'push') throw Error('Unexpected offline CLI command'); return `DRY RUN: The following migrations would be pushed:\n${names.map((name: string) => ` • ${name}`).join('\n')}\n`; }), verifyApplied: vi.fn(async () => ({ offlineStub: true })) };
   const run = (mode: string) => staging.runNativeMigrationStage({ runtime: root, repository, mode }, io);
   return { root, expected, names, io, run };
 }
@@ -81,6 +86,7 @@ describe('independent empty managed-database evidence contract (synthetic metada
   it('accepts PostgreSQL17 managed objects only with every application/data/ledger count zero', () => {
     expect(gate.validateEmptyDatabase(empty())).toEqual(empty());
     expect(gate.validateEmptyDatabase({ ...empty(), ledgerExists: true })).toMatchObject({ ledgerRows: 0 });
+    expect(gate.validateEmptyDatabase({ ...empty(), schemaNames: [...empty().schemaNames, '_realtime', 'pgbouncer'] })).toMatchObject({ publicRelations: 0, ledgerRows: 0 });
   });
   it.each(countKeys)('rejects nonempty %s', key => { expect(() => gate.validateEmptyDatabase({ ...empty(), [key]: 1 })).toThrow(); });
   it.each([undefined, null, '0', -1])('does not coerce missing or invalid empty counts: %s', value => { expect(() => gate.validateEmptyDatabase({ ...empty(), authUsers: value })).toThrow(); });
@@ -122,30 +128,41 @@ describe('independent exact staged source and explicit dry-run controls', () => 
     await expect(run('stage')).rejects.toThrow('startup identity'); expect(io.readDatabase).not.toHaveBeenCalled(); expect(io.invokeCli).not.toHaveBeenCalled();
   });
   it.each(['id', 'endpoint'])('refuses live CLI registry %s drift before exposing SQL', async changed => {
-    const { root, io, run } = await stagedFixture(), current = JSON.parse(readFileSync(`${root}/private-stack-state.json`, 'utf8'));
-    if (changed === 'id') current.id = 'another-native-stack';
+    const { root, io, run } = await stagedFixture(), current = offlineStatus(root);
+    if (changed === 'id') current.identity.id = 'another-native-stack';
     else current.env.DB_URL = 'postgresql://offline:offline@127.0.0.1:59998/postgres';
     io.readStatus.mockResolvedValue(current);
     await expect(run('stage')).rejects.toThrow('Live local CLI target');
     expect(io.readDatabase).not.toHaveBeenCalled(); expect(io.invokeCli).not.toHaveBeenCalled(); expect(readdirSync(`${root}/project/supabase/migrations`)).toEqual([]);
   });
+  it.each(['missing identity', 'top-level only', 'ambiguous ids', 'missing runtime'])('rejects malformed actual-status identity: %s', async kind => {
+    const { root, io, run } = await stagedFixture(), valid = offlineStatus(root);
+    let malformed: unknown;
+    if (kind === 'missing identity') malformed = { runtime: valid.runtime, env: valid.env };
+    else if (kind === 'top-level only') malformed = { runtime: valid.runtime, id: valid.identity.id, env: valid.env };
+    else if (kind === 'ambiguous ids') malformed = { ...valid, id: 'different-stack' };
+    else malformed = { identity: valid.identity, env: valid.env };
+    io.readStatus.mockResolvedValue(malformed);
+    await expect(run('stage')).rejects.toThrow('Live local CLI target');
+    expect(io.readDatabase).not.toHaveBeenCalled(); expect(io.invokeCli).not.toHaveBeenCalled(); expect(readdirSync(`${root}/project/supabase/migrations`)).toEqual([]);
+  });
   it('rechecks live targeting after the empty read and before first source activation', async () => {
-    const { root, io, run } = await stagedFixture(), current = JSON.parse(readFileSync(`${root}/private-stack-state.json`, 'utf8'));
-    io.readDatabase.mockImplementationOnce(() => { io.readStatus.mockResolvedValue({ ...current, id: 'changed-during-read' }); return empty(); });
+    const { root, io, run } = await stagedFixture(), current = offlineStatus(root);
+    io.readDatabase.mockImplementationOnce(() => { io.readStatus.mockResolvedValue({ ...current, identity: { id: 'changed-during-read' } }); return empty(); });
     await expect(run('stage')).rejects.toThrow('Live local CLI target');
     expect(io.invokeCli).not.toHaveBeenCalled(); expect(readdirSync(`${root}/project/supabase/migrations`)).toEqual([]);
   });
   it('a target change after the final empty read stops apply despite an earlier valid dry-run', async () => {
     const { root, io, run } = await stagedFixture(); await run('stage'); await run('dry-run');
-    const current = JSON.parse(readFileSync(`${root}/private-stack-state.json`, 'utf8'));
-    io.readDatabase.mockReturnValueOnce(empty()).mockImplementationOnce(() => { io.readStatus.mockResolvedValue({ ...current, id: 'changed-before-apply' }); return empty(); });
+    const current = offlineStatus(root);
+    io.readDatabase.mockReturnValueOnce(empty()).mockImplementationOnce(() => { io.readStatus.mockResolvedValue({ ...current, identity: { id: 'changed-before-apply' } }); return empty(); });
     await expect(run('apply')).rejects.toThrow('Live local CLI target');
     expect(io.invokeCli).toHaveBeenCalledTimes(1); expect(io.verifyApplied).not.toHaveBeenCalled();
   });
   it('an unexpected post-apply registry change is never reported as accepted and does not trigger repair', async () => {
     const { root, io, run } = await stagedFixture(); await run('stage'); await run('dry-run');
-    const current = JSON.parse(readFileSync(`${root}/private-stack-state.json`, 'utf8'));
-    io.invokeCli.mockImplementationOnce(async () => { io.readStatus.mockResolvedValue({ ...current, id: 'changed-after-apply' }); return 'Offline CLI stub accepted command'; });
+    const current = offlineStatus(root);
+    io.invokeCli.mockImplementationOnce(async () => { io.readStatus.mockResolvedValue({ ...current, identity: { id: 'changed-after-apply' } }); return 'Offline CLI stub accepted command'; });
     await expect(run('apply')).rejects.toThrow('Live local CLI target');
     expect(io.invokeCli).toHaveBeenCalledTimes(2); expect(io.verifyApplied).not.toHaveBeenCalled();
     expect(readdirSync(root).some(name => name.startsWith('migration-apply-'))).toBe(false);
