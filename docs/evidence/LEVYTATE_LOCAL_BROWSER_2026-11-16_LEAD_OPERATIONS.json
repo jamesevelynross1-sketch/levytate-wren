@@ -1,0 +1,667 @@
+{
+  "schemaVersion": 2,
+  "environment": "local",
+  "candidateCommit": "c63cd6d90ccf2a469361827b29c93e64df5f770b",
+  "appCodeCommit": "6562e009570444e7e3e0c0c69398898b1e120242",
+  "browserEngineVersion": "157.0.4341.60",
+  "browserDistribution": "isolated-verified-edge",
+  "authenticationMethod": "requested-sign-in-link-through-local-smtp",
+  "authenticatedContextsVerified": 1,
+  "distinctAuthenticatedRoles": [
+    "Apprenticeship Lead"
+  ],
+  "emailEvidence": "local-smtp-capture-only",
+  "notRunScopes": [
+    "Employee, Manager and second-tenant genuine role boundaries not repeated: prior exact c7d57b1 four-context proof retained separately",
+    "A Lead emulated 320/390/768 viewport microchecks skipped: fresh persistent context reserved for actual native browser zoom",
+    "Core approval/enrolment not repeated: exact current-run completed handoff and live learner verified read-only",
+    "Operations/Intelligence: NOT_REPEATED: Employee/Manager/foreign-actor denial requests and Manager handoff UI require their own genuine contexts; earlier multi-role evidence is retained. This continuation signs in only the genuine Lead.",
+    "Operations/Intelligence: NOT_RUN: no actual foreign learner exists for this Lead-only learner-record denial; real foreign-tenant header denials are repeated without fabricating a learner.",
+    "Operations/Intelligence: Genuine aged application Autopilot row absent in the fresh local run; canonical destination is tested separately, and no aging or signal rows are manufactured."
+  ],
+  "results": [
+    {
+      "name": "a Apprenticeship Lead: no demo login required",
+      "status": "PASS"
+    },
+    {
+      "name": "a Apprenticeship Lead: actual sign-in request reached local SMTP capture",
+      "status": "PASS"
+    },
+    {
+      "name": "a Apprenticeship Lead: callback stays on application origin",
+      "status": "PASS"
+    },
+    {
+      "name": "a Apprenticeship Lead: three HttpOnly host-only cookies",
+      "status": "PASS"
+    },
+    {
+      "name": "a Apprenticeship Lead: canonical role and tenant resolved",
+      "status": "PASS"
+    },
+    {
+      "name": "a Apprenticeship Lead: other tenant is absent",
+      "status": "PASS"
+    },
+    {
+      "name": "a Apprenticeship Lead: authenticated refresh persists",
+      "status": "PASS"
+    },
+    {
+      "name": "a Apprenticeship Lead: provider session refresh succeeds",
+      "status": "PASS"
+    },
+    {
+      "name": "1 genuine successful callbacks do not consume failed-link budget",
+      "status": "PASS"
+    },
+    {
+      "name": "a:lead: unapproved levytate-lift remains tenant-gated",
+      "status": "PASS"
+    },
+    {
+      "name": "a:lead: unapproved levytate-learning-time remains tenant-gated",
+      "status": "PASS"
+    },
+    {
+      "name": "a:lead: unapproved levytate-requests remains tenant-gated",
+      "status": "PASS"
+    },
+    {
+      "name": "a:lead: unapproved levytate-pastoral remains tenant-gated",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations continuation uses exact prior current-run live enrolment without resetting records",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: operations returns an authorised live read",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: operations read has the exact current canonical scope",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: operations refuses a foreign retained workspace before returning data",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: operations denied requests preserve all durable state",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: autopilot returns an authorised live read",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: autopilot read has the exact current canonical scope",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: autopilot refuses a foreign retained workspace before returning data",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: autopilot denied requests preserve all durable state",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: intelligence returns an authorised live read",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: intelligence read has the exact current canonical scope",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: intelligence refuses a foreign retained workspace before returning data",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: intelligence denied requests preserve all durable state",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: normal fictional evidence uses the genuinely enrolled current-tenant learner",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: the supplied learner is active and belongs to an actual same-tenant test identity",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: the actual enrolled learner has one visible row",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: progress: no duplicate earlier acceptance observation exists",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: progress: continuation retains the original source, receipt and exact actor-owned events",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: review: no duplicate earlier acceptance observation exists",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: review: continuation retains the original source, receipt and exact actor-owned events",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: current-date scenario durably records 30/5, variance −25 and the distinct fictional provider narrative",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: malformed successful Autopilot read never mutates data or advertises an all-clear",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Autopilot refresh lost: failure injection follows genuine upstream success",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Autopilot refresh lost: in-flight command owns visible recovery and disables premature retry",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Autopilot refresh lost: workspace navigation stays locked",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: refresh: one actor-owned receipt and workspace revision commit",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: refresh: one Intelligence audit commits with the receipt",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: refresh: signal history is durable and exact",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: refresh: analysis never creates operational actions",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Autopilot refresh lost: visible retry preserves exact command and current original identity",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Autopilot refresh lost: retry adds no duplicate action, signal, receipt, history or audit",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Autopilot refresh malformed: failure injection follows genuine upstream success",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Autopilot refresh malformed: in-flight command owns visible recovery and disables premature retry",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Autopilot refresh malformed: workspace navigation stays locked",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: refresh: one actor-owned receipt and workspace revision commit",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: refresh: one Intelligence audit commits with the receipt",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: refresh: signal history is durable and exact",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: refresh: analysis never creates operational actions",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Autopilot refresh malformed: visible retry preserves exact command and current original identity",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Autopilot refresh malformed: retry adds no duplicate action, signal, receipt, history or audit",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: autopilot returns an authorised live read",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: autopilot read has the exact current canonical scope",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: actual scheduled review fires a source-backed Autopilot review signal",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: the selected real Autopilot signal has one unambiguous rendered review",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Autopilot action creation recovery: failure injection follows genuine upstream success",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Autopilot action creation recovery: in-flight command owns visible recovery and disables premature retry",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: in-flight prepared action retains disabled original title and owner",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: create_action: one actor-owned receipt and workspace revision commit",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: create_action: one Intelligence audit commits with the receipt",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: create_action: signal history is durable and exact",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: create_action: original signal revision advances once",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: create_action: signal links to its actual committed action",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Autopilot action creation recovery: visible retry preserves exact command and current original identity",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Autopilot action creation recovery: retry adds no duplicate action, signal, receipt, history or audit",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: autopilot: a foreign retained tenant cannot replay the actual command",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: autopilot: a new command cannot reuse the old signal revision",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: autopilot: tenant and stale-revision denials create no durable changes",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Operations action acknowledgement recovery: failure injection follows genuine upstream success",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Operations action acknowledgement recovery: in-flight command owns visible recovery and disables premature retry",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Operations action acknowledgement recovery: visible retry preserves exact command and current original identity",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Operations action acknowledgement recovery: retry adds no duplicate action, signal, receipt, history or audit",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Operations acknowledgement commits one version, receipt, event and audit",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Autopilot checks the actual updated task before a new human decision",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: autopilot returns an authorised live read",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: autopilot read has the exact current canonical scope",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: the updated source still has its exact linked operational signal",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: the linked signal exposes its own review without another task",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: linked-signal review cannot create a duplicate task",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Autopilot linked-signal dismissal recovery: failure injection follows genuine upstream success",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Autopilot linked-signal dismissal recovery: in-flight command owns visible recovery and disables premature retry",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: in-flight signal dismissal blocks navigation to the original task",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: dismiss: one actor-owned receipt and workspace revision commit",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: dismiss: one Intelligence audit commits with the receipt",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: dismiss: signal history is durable and exact",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: dismiss: original signal revision advances once",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: dismiss: no unrelated operational action is created",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Autopilot linked-signal dismissal recovery: visible retry preserves exact command and current original identity",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Autopilot linked-signal dismissal recovery: retry adds no duplicate action, signal, receipt, history or audit",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: signal dismissal leaves the canonical task and its history unchanged",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: autopilot: a foreign retained tenant cannot replay the actual command",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: autopilot: a new command cannot reuse the old signal revision",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: autopilot: tenant and stale-revision denials create no durable changes",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Operations source synchronisation recovery: failure injection follows genuine upstream success",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Operations source synchronisation recovery: in-flight command owns visible recovery and disables premature retry",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Operations source synchronisation recovery: visible retry preserves exact command and current original identity",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Operations source synchronisation recovery: retry adds no duplicate action, signal, receipt, history or audit",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Progress Intelligence analysis recovery: failure injection follows genuine upstream success",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Progress Intelligence analysis recovery: in-flight command owns visible recovery and disables premature retry",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Progress analysis locks mode switching until its receipt is confirmed",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: analyse: one actor-owned receipt and workspace revision commit",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: analyse: one Intelligence audit commits with the receipt",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: analyse: signal history is durable and exact",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: analyse: analysis never creates operational actions",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Progress Intelligence analysis recovery: visible retry preserves exact command and current original identity",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Progress Intelligence analysis recovery: retry adds no duplicate action, signal, receipt, history or audit",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: intelligence returns an authorised live read",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: intelligence read has the exact current canonical scope",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: actual evidence fires review_progress_inconsistency for the enrolled learner",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: the selected real Progress signal has one unambiguous rendered review",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Progress signal decision recovery: failure injection follows genuine upstream success",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Progress signal decision recovery: in-flight command owns visible recovery and disables premature retry",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: acknowledge: one actor-owned receipt and workspace revision commit",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: acknowledge: one Intelligence audit commits with the receipt",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: acknowledge: signal history is durable and exact",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: acknowledge: original signal revision advances once",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: acknowledge: no unrelated operational action is created",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Progress signal decision recovery: visible retry preserves exact command and current original identity",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Progress signal decision recovery: retry adds no duplicate action, signal, receipt, history or audit",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: intelligence: a foreign retained tenant cannot replay the actual command",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: intelligence: a new command cannot reuse the old signal revision",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: intelligence: tenant and stale-revision denials create no durable changes",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Progress action acceptance recovery: failure injection follows genuine upstream success",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Progress action acceptance recovery: in-flight command owns visible recovery and disables premature retry",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: in-flight acceptance cannot dismiss or close the original review",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: accept: one actor-owned receipt and workspace revision commit",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: accept: one Intelligence audit commits with the receipt",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: accept: signal history is durable and exact",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: accept: original signal revision advances once",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: accept: signal links to its actual committed action",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Progress action acceptance recovery: visible retry preserves exact command and current original identity",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: Progress action acceptance recovery: retry adds no duplicate action, signal, receipt, history or audit",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: intelligence: a foreign retained tenant cannot replay the actual command",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: intelligence: a new command cannot reuse the old signal revision",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: intelligence: tenant and stale-revision denials create no durable changes",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: autopilot returns an authorised live read",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: autopilot read has the exact current canonical scope",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: canonical handoff starts from the actual authorised enrolled learner",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: canonical handoff uses the durable application identity on that exact learner",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: one enrolled learner and its canonical application belong to the exact current tenant and employee",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: canonical application offers the exact existing learner and cannot start a duplicate pre-enrolment",
+      "status": "PASS"
+    },
+    {
+      "name": "Operations/Intelligence: stopped safely at canonical application and existing learner handoff",
+      "status": "FAIL"
+    },
+    {
+      "name": "Operations and Intelligence UI",
+      "status": "FAIL",
+      "errorClass": "Error",
+      "reason": "Independent journey failed; authentication state omitted"
+    },
+    {
+      "name": "Native Lead zoom: actual current role, account and employer remain authenticated",
+      "status": "PASS"
+    },
+    {
+      "name": "Native Lead zoom: Home state is based on actual employer priorities and permission",
+      "status": "PASS"
+    },
+    {
+      "name": "Native Lead zoom: 100 percent uses original native viewport without overflow",
+      "status": "PASS"
+    },
+    {
+      "name": "Native Lead zoom: native zoom halves CSS viewport and doubles DPR at fixed physical window",
+      "status": "PASS"
+    },
+    {
+      "name": "Native Lead zoom: 200 percent reflows without document horizontal overflow",
+      "status": "PASS"
+    },
+    {
+      "name": "Native Lead zoom: actual responsive navigation is available at native 200 percent",
+      "status": "PASS"
+    },
+    {
+      "name": "Native Lead zoom: keyboard closes navigation and restores trigger focus",
+      "status": "PASS"
+    },
+    {
+      "name": "Native Lead zoom: bottom support navigation remains inside the native viewport after actual scrolling",
+      "status": "PASS"
+    },
+    {
+      "name": "Native Lead zoom: authenticated application contains no MPR marketing chrome",
+      "status": "PASS"
+    },
+    {
+      "name": "Native Lead zoom: original native 100 percent setting is restored",
+      "status": "PASS"
+    },
+    {
+      "name": "a Apprenticeship Lead: logout confirmed",
+      "status": "PASS"
+    },
+    {
+      "name": "a Apprenticeship Lead: no access after logout",
+      "status": "PASS"
+    },
+    {
+      "name": "a Apprenticeship Lead: refresh cannot restore logged-out session",
+      "status": "PASS"
+    },
+    {
+      "name": "External inbox delivery",
+      "status": "BLOCKED",
+      "reason": "Local SMTP capture proves no external inbox delivery"
+    },
+    {
+      "name": "Remove disposable native Lead browser profile without exporting sessions",
+      "status": "PASS"
+    }
+  ]
+}
