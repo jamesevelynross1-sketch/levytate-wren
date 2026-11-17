@@ -109,7 +109,18 @@ function handleMarketingHost(request: NextRequest) {
   return NextResponse.next();
 }
 
+function retiredMprAdminNotFound(pathname: string) {
+  const path = pathname.toLowerCase();
+  if (path === "/admin" || path.startsWith("/admin/")) {
+    return new NextResponse("Not Found", { status: 404 });
+  }
+  return null;
+}
+
 export async function middleware(request: NextRequest) {
+  const retiredAdmin = retiredMprAdminNotFound(request.nextUrl.pathname);
+  if (retiredAdmin) return retiredAdmin;
+
   if (isLevyTateMcpStagingOnly()) {
     return isAllowedLevyTateMcpStagingRequest(request.nextUrl.pathname, request.method)
       ? NextResponse.next()

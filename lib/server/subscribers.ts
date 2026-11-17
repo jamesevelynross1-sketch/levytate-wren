@@ -15,21 +15,11 @@ export type Subscriber = {
 
 type SubscriberStatus = "active" | "unsubscribed";
 
-export type AdminSubscriber = {
-  email: string;
-  status: SubscriberStatus;
-  createdAt: string;
-  sourcePage: string | null;
-  segments: IntelligenceSegment[];
-};
-
 type SupabaseSubscriberRow = {
   id: string;
   email: string;
   status?: SubscriberStatus;
   unsubscribe_token?: string | null;
-  created_at?: string;
-  source_page?: string | null;
   segments?: string[] | null;
 };
 
@@ -232,42 +222,6 @@ export async function getActiveSubscribers(): Promise<Subscriber[]> {
     id: row.id,
     email: row.email,
     unsubscribeToken: row.unsubscribe_token ?? null,
-    segments: normaliseSegments(row.segments),
-  }));
-}
-
-export async function getSubscribersForAdmin(search = "", segment = ""): Promise<AdminSubscriber[]> {
-  const { url, serviceRoleKey } = getSupabaseConfig();
-  const trimmedSearch = search.trim().toLowerCase();
-  const query = new URLSearchParams({
-    select: "email,status,created_at,source_page,segments",
-    order: "created_at.desc",
-  });
-
-  if (trimmedSearch) {
-    query.set("email", `ilike.*${trimmedSearch}*`);
-  }
-
-  if (segment) {
-    query.set("segments", `cs.{${segment}}`);
-  }
-
-  const response = await fetchSupabase(`${url}/rest/v1/subscribers?${query.toString()}`, {
-    headers: getSupabaseHeaders(serviceRoleKey),
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    throw await getSupabaseResponseError(response, "Could not fetch admin subscribers.");
-  }
-
-  const rows = (await response.json()) as SupabaseSubscriberRow[];
-
-  return rows.map((row) => ({
-    email: row.email,
-    status: row.status ?? "active",
-    createdAt: row.created_at ?? "",
-    sourcePage: row.source_page ?? null,
     segments: normaliseSegments(row.segments),
   }));
 }

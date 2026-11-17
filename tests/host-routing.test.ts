@@ -146,6 +146,28 @@ describe("levytate.co.uk transition routing", () => {
   });
 });
 
+describe("retired MPR admin subscribers", () => {
+  it.each([
+    "app.levytate.co.uk",
+    "www.levytate.co.uk",
+    "levytate.co.uk",
+    "mprconsulting.co.uk",
+    "preview.example.test",
+  ])("returns 404 for /admin/subscribers on %s", async (host) => {
+    vi.stubEnv("LEVYTATE_MCP_STAGING_ONLY", "");
+    const page = await middleware(requestFor(host, "/admin/subscribers"));
+    const exportRoute = await middleware(requestFor(host, "/admin/subscribers/export?segment=briefing"));
+    const mixedCase = await middleware(requestFor(host, "/Admin/Subscribers"));
+
+    expect(page.status).toBe(404);
+    expect(page.headers.get("location")).toBeNull();
+    expect(page.headers.get("x-middleware-rewrite")).toBeNull();
+    expect(exportRoute.status).toBe(404);
+    expect(exportRoute.headers.get("location")).toBeNull();
+    expect(mixedCase.status).toBe(404);
+  });
+});
+
 describe("other hosts", () => {
   it("still hides legacy demos and leaves preview and MPR routes alone", async () => {
     vi.stubEnv("LEVYTATE_MCP_STAGING_ONLY", "");
