@@ -29,8 +29,9 @@ assert(headerMatch && iconMatch && footerMatch, 'Approved brand shell could not 
 const header = links(headerMatch[0]);
 const icon = links(iconMatch[0]);
 const footer = links(footerMatch[0]);
-const cyberEssentialsEmbed = '<iframe src="https://registry.blockmarktech.com/certificates/af54958b-2804-486b-8ac4-a2cb53317403/widget/?tooltip_position=bottom&theme=transparent" style="border:none;height:150px;width:150px;" loading="lazy" title="Cyber Essentials certified - Control My Costs Ltd"></iframe>';
-assert(footer.includes(cyberEssentialsEmbed), 'The official Cyber Essentials badge must be copied into the shared footer unchanged.');
+const cyberEssentialsBadge = '<img class="footer-certification" src="/mission-v3/cyber-essentials-certified.png" width="112" height="112" alt="Cyber Essentials certified">';
+assert(footer.includes(cyberEssentialsBadge), 'The Cyber Essentials badge image must be copied into the shared footer.');
+assert(!footer.includes('<iframe') && !footer.includes('blockmarktech.com'), 'The marketing footer must not embed the BlockMark badge.');
 const escape = text => text.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;');
 // A native disclosure keeps the definition readable and keyboard accessible even
 // without JavaScript. These styles affect the new explanation only, not the map.
@@ -144,7 +145,8 @@ for (const file of ['index', ...pages.map(p => p.file)]) {
   const html = readFileSync(`${directory}/${file}.html`, 'utf8');
   assert.equal((html.match(/<h1\b/g) || []).length, 1, `${file}: one page heading required`);
   assert(!html.includes('src="/mission-v2/site.js"'), 'Old tab router must not be loaded.');
-  assert(html.includes(cyberEssentialsEmbed), `${file}: shared footer must include the official Cyber Essentials badge.`);
+  assert(html.includes(cyberEssentialsBadge), `${file}: shared footer must include the Cyber Essentials badge image.`);
+  assert(!html.includes('blockmarktech.com'), `${file}: BlockMark embed must not be published.`);
   assert(!html.includes('href="#programmes"') && !html.includes('href="#journey"'), 'Navigation must lead to a page.');
 }
 const home = readFileSync(`${directory}/index.html`, 'utf8');

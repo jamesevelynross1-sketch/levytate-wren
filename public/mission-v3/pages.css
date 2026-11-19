@@ -11,10 +11,9 @@
 /* Retain the enquiry action on touch layouts, including narrow phones. */
 .header nav>.button{display:inline-flex}
 @media(max-width:420px){.header .brand-symbol{width:21px}.header .wordmark{width:105px}.header .button.small{font-size:11px;padding:9px 10px;gap:6px}.header .button.small>span{display:none}}
-/* Layout only. The BlockMark iframe is the official embed and is not restyled. */
+/* Placement only. The badge file is shown at its own proportions. */
 .footer-end{display:flex;align-items:flex-start;justify-content:flex-end;gap:48px;flex-shrink:0}
-.footer-certification{margin:0;display:flex;flex-direction:column;align-items:center;gap:10px;flex:0 0 auto;min-width:150px}
-.footer-certification figcaption{margin:0;color:var(--muted);font-size:12px;line-height:1.35;text-align:center}
+.footer-certification{display:block;width:112px;height:auto;flex:none}
 .home-page .footer{padding-bottom:28px}
 @media(min-width:800px) and (max-height:800px){.home-page .footer{padding-top:20px;padding-bottom:24px}}
-@media(max-width:800px){.footer-end{flex-direction:column;align-items:flex-start;gap:28px}}
+@media(max-width:800px){.footer-end{flex-direction:column;align-items:flex-start;gap:24px}}
