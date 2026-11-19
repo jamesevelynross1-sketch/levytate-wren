@@ -18,11 +18,12 @@ const employerModules: CoreEarlyAccessModuleKey[] = [
 
 for (const role of ["Apprenticeship Lead", "Employer Admin"] as const) {
   const navigation = getRelease2Navigation(role, employerModules);
-  check(navigation.filter((area) => area.priority === "primary").map((area) => area.label).join("|") === "Home|People|Applications|Assessments|Programmes|Insights", `${role} receives the six launch areas`);
+  check(navigation.filter((area) => area.section === "core").map((area) => area.label).join("|") === "Home|People|Applications|Programmes|Insights & Finance", `${role} receives five focused Core areas`);
+  check(navigation.filter((area) => area.section === "add-on").map((area) => area.label).join("|") === "Workforce Intelligence|Provider Intelligence|Provider Requests|Learning Time|Copilot", `${role} retains existing optional features under Add-ons`);
   check(findRelease2NavigationArea(navigation, "Operations")?.label === "Home", `${role} Operations remains immediately accessible from Home`);
   check(findRelease2NavigationArea(navigation, "Learners")?.label === "People", `${role} learner operations are grouped under People`);
   check(findRelease2NavigationArea(navigation, "Marketplace")?.label === "Programmes", `${role} Marketplace is grouped under Programmes`);
-  check(findRelease2NavigationArea(navigation, "Finance")?.label === "Insights", `${role} Finance is grouped under Insights`);
+  check(findRelease2NavigationArea(navigation, "Finance")?.label === "Insights & Finance", `${role} Finance stays in the Core reporting area`);
 }
 
 const capabilityOff = getRelease2Navigation("Apprenticeship Lead", employerModules.filter((module) => module !== "Requests" && module !== "Learning Time"));
@@ -30,12 +31,13 @@ check(!capabilityOff.some((area) => area.modules.includes("Requests")), "Request
 check(!capabilityOff.some((area) => area.modules.includes("Learning Time")), "Learning Time stays hidden when capability access is absent");
 
 const employee = getRelease2Navigation("Employee", ["Home", "My Application", "My Programme", "Assessments", "Learning Time", "Copilot", "Knowledge"]);
-check(employee.filter((area) => area.priority === "primary").map((area) => area.label).join("|") === "Home|My Development|My Application", "Employee navigation is limited to three clear primary areas");
-check(findRelease2NavigationArea(employee, "Learning Time")?.label === "My Development", "Employee Learning Time is contextual to My Development");
+check(employee.filter((area) => area.section === "core").map((area) => area.label).join("|") === "Home|My Application|My Apprenticeship", "Employee Core retains the application and apprenticeship journey");
+check(findRelease2NavigationArea(employee, "Learning Time")?.section === "add-on", "Employee Learning Time is preserved as an add-on");
+check(findRelease2NavigationArea(employee, "Assessments")?.section === "add-on", "Employee Assessments remain accessible as an add-on");
 
 const manager = getRelease2Navigation("Line Manager", ["Home", "My Team", "Approvals", "Assessments", "Learning Time", "Copilot", "Knowledge"]);
 check(manager.filter((area) => area.priority === "primary").map((area) => area.label).join("|") === "Home|My Team|Approvals", "Line Manager navigation prioritises Home, My Team and Approvals");
-check(findRelease2NavigationArea(manager, "Assessments")?.priority === "secondary", "A manager's own assessment remains separately accessible");
+check(findRelease2NavigationArea(manager, "Assessments")?.section === "add-on", "A manager's own assessment remains separately accessible");
 
 const platform = getRelease2Navigation("Platform Admin", ["Home", "Providers", "Settings", "Knowledge", "Support"]);
 check(platform.some((area) => area.label === "Workspaces"), "Platform Admin retains workspace administration");
@@ -48,6 +50,7 @@ check(shell.includes('event.key === "Escape"'), "Mobile drawer supports Escape-t
 check(shell.includes('window.addEventListener("popstate"'), "Browser Back and Forward update the active module");
 check(!shell.includes('<select value={activeModule}'), "The technical mobile module select is removed");
 check(shell.includes('aria-current={active ? "page"'), "Selected navigation state is exposed accessibly");
+check(shell.includes('id="levytate-mobile-add-ons"') && shell.includes('id="levytate-desktop-add-ons"'), "Both navigation layouts have an accessible add-on section");
 
 const ui = readFileSync(new URL("../components/levytate-mvp/MvpUi.tsx", import.meta.url), "utf8");
 check(ui.includes("restoreDialogFocus(previousFocus)"), "Dialogs use the tested focus-restoration contract");
