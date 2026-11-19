@@ -84,7 +84,7 @@ check("approved Apprenticeship Lead recipient receives Learner Support", leadPol
 check("Platform Admin never receives Learner Support", !platformPolicy.modules.some((item) => item.moduleKey === "Learner Support" && item.availability === "enabled"));
 check("capability-off Employee does not receive My Support", !getCoreEarlyAccessPolicy("Employee").modules.some((item) => item.moduleKey === "My Support" && item.availability === "enabled"));
 const employeeNavigation = getRelease2Navigation("Employee", employeePolicy.modules.filter((item) => item.availability === "enabled" || item.availability === "secondary").map((item) => item.moduleKey));
-check("My Support is under My Development", employeeNavigation.some((area) => area.label === "My Development" && area.modules.includes("My Support")));
+check("My Support remains accessible under Add-ons", employeeNavigation.some((area) => area.section === "add-on" && area.modules.includes("My Support")));
 
 const assistantRoute = readFileSync("app/api/levytate-pastoral/assistant/route.ts", "utf8");
 const assistantServer = readFileSync("lib/server/levytate-pastoral-assistant.ts", "utf8");

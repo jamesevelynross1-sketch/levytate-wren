@@ -1,49 +1,69 @@
 import type { CoreEarlyAccessModuleKey } from "@/lib/levytate/core-early-access-policy";
 import type { MvpUserRole } from "@/lib/levytate/mvp/rbac";
+import type { LevyTateProductSection } from "@/lib/levytate/product-packaging";
 
 export type Release2NavigationArea = {
   key: string;
   label: string;
   description: string;
   modules: readonly CoreEarlyAccessModuleKey[];
+  section: LevyTateProductSection;
   priority: "primary" | "secondary";
 };
 
+const core = (key: string, label: string, description: string, modules: readonly CoreEarlyAccessModuleKey[]): Release2NavigationArea =>
+  ({ key, label, description, modules, section: "core", priority: "primary" });
+const addOn = (key: string, label: string, description: string, modules: readonly CoreEarlyAccessModuleKey[]): Release2NavigationArea =>
+  ({ key, label, description, modules, section: "add-on", priority: "secondary" });
+const support = (key: string, label: string, description: string, modules: readonly CoreEarlyAccessModuleKey[]): Release2NavigationArea =>
+  ({ key, label, description, modules, section: "support", priority: "secondary" });
+
 const employerAreas: readonly Release2NavigationArea[] = [
-  { key: "home", label: "Home", description: "Priorities and operational attention", modules: ["Home", "Operations", "Learner Support"], priority: "primary" },
-  { key: "people", label: "People", description: "Employees, learners and roles", modules: ["People", "Learners", "Learning Time"], priority: "primary" },
-  { key: "applications", label: "Applications", description: "Reviews, approvals and history", modules: ["Applications"], priority: "primary" },
-  { key: "assessments", label: "Assessments", description: "Campaigns, submissions and findings", modules: ["Assessments"], priority: "primary" },
-  { key: "programmes", label: "Programmes", description: "Programmes, providers and requests", modules: ["My Programmes", "My Providers", "Marketplace", "Intelligence", "Requests"], priority: "primary" },
-  { key: "insights", label: "Insights", description: "Trusted operating, workforce and finance evidence", modules: ["Insights", "Workforce Development", "Finance"], priority: "primary" },
-  { key: "copilot", label: "Copilot", description: "Grounded help in your current context", modules: ["Copilot"], priority: "secondary" },
-  { key: "guidance", label: "Guidance", description: "Practical apprenticeship guidance", modules: ["Knowledge"], priority: "secondary" },
-  { key: "settings", label: "Settings", description: "Workspace configuration", modules: ["Settings"], priority: "secondary" },
+  core("home", "Home", "Priorities and operational attention", ["Home", "Operations"]),
+  core("people", "People", "Employees, learners and roles", ["People", "Learners"]),
+  core("applications", "Applications", "Reviews, approvals and history", ["Applications"]),
+  core("programmes", "Programmes", "Programmes and provider relationships", ["My Programmes", "My Providers", "Marketplace"]),
+  core("insights", "Insights & Finance", "Operating evidence, reporting and funding", ["Insights", "Finance"]),
+  addOn("workforce", "Workforce Intelligence", "Assessments and development evidence", ["Assessments", "Workforce Development"]),
+  addOn("provider-intelligence", "Provider Intelligence", "Provider and market updates", ["Intelligence"]),
+  addOn("requests", "Provider Requests", "Briefs, comparisons and provider proposals", ["Requests"]),
+  addOn("learning-time", "Learning Time", "Off-the-job learning support", ["Learning Time"]),
+  addOn("learner-support", "Learner Support", "Employee-approved support requests", ["Learner Support"]),
+  addOn("copilot", "Copilot", "Grounded help in your current context", ["Copilot"]),
+  support("guidance", "Guidance", "Practical apprenticeship guidance", ["Knowledge"]),
+  support("settings", "Settings", "Workspace configuration", ["Settings"]),
 ];
 
 const employeeAreas: readonly Release2NavigationArea[] = [
-  { key: "home", label: "Home", description: "Your next important step", modules: ["Home"], priority: "primary" },
-  { key: "development", label: "My Development", description: "Assessment, apprenticeship, learning and support", modules: ["Assessments", "My Programme", "Learning Time", "My Support"], priority: "primary" },
-  { key: "application", label: "My Application", description: "Prepare and track your application", modules: ["My Application"], priority: "primary" },
-  { key: "copilot", label: "Copilot", description: "Help with your LevyTate journey", modules: ["Copilot"], priority: "secondary" },
-  { key: "guidance", label: "Guidance", description: "Practical apprenticeship guidance", modules: ["Knowledge"], priority: "secondary" },
+  core("home", "Home", "Your next important step", ["Home"]),
+  core("application", "My Application", "Prepare and track your application", ["My Application"]),
+  core("programme", "My Apprenticeship", "Your current programme", ["My Programme"]),
+  addOn("assessments", "Assessments", "Your development assessments", ["Assessments"]),
+  addOn("learning-time", "Learning Time", "Off-the-job learning support", ["Learning Time"]),
+  addOn("my-support", "My Support", "Private support and approved requests", ["My Support"]),
+  addOn("copilot", "Copilot", "Help with your LevyTate journey", ["Copilot"]),
+  support("guidance", "Guidance", "Practical apprenticeship guidance", ["Knowledge"]),
 ];
 
 const managerAreas: readonly Release2NavigationArea[] = [
-  { key: "home", label: "Home", description: "Decisions and team attention", modules: ["Home"], priority: "primary" },
-  { key: "team", label: "My Team", description: "Direct-report development", modules: ["My Team", "Learner Support"], priority: "primary" },
-  { key: "approvals", label: "Approvals", description: "Applications awaiting your decision", modules: ["Approvals"], priority: "primary" },
-  { key: "development", label: "My Development", description: "Your own programmes, application, assessment and learning", modules: ["Assessments", "My Programme", "My Application", "Learning Time"], priority: "secondary" },
-  { key: "copilot", label: "Copilot", description: "Grounded manager support", modules: ["Copilot"], priority: "secondary" },
-  { key: "guidance", label: "Guidance", description: "Practical apprenticeship guidance", modules: ["Knowledge"], priority: "secondary" },
+  core("home", "Home", "Decisions and team attention", ["Home"]),
+  core("team", "My Team", "Direct-report development", ["My Team"]),
+  core("approvals", "Approvals", "Applications awaiting your decision", ["Approvals"]),
+  core("development", "My Development", "Your own programme and application", ["My Programme", "My Application"]),
+  addOn("assessments", "Assessments", "Your development assessments", ["Assessments"]),
+  addOn("learning-time", "Learning Time", "Off-the-job learning support", ["Learning Time"]),
+  addOn("learner-support", "Learner Support", "Employee-approved support requests", ["Learner Support"]),
+  addOn("copilot", "Copilot", "Grounded manager support", ["Copilot"]),
+  support("guidance", "Guidance", "Practical apprenticeship guidance", ["Knowledge"]),
 ];
 
 const platformAreas: readonly Release2NavigationArea[] = [
-  { key: "workspaces", label: "Workspaces", description: "Employer workspace administration", modules: ["Home"], priority: "primary" },
-  { key: "catalogue", label: "Provider Catalogue", description: "Platform provider reference data", modules: ["Providers"], priority: "primary" },
-  { key: "access", label: "Access & Tenants", description: "Controlled access and tenant support", modules: ["Settings"], priority: "primary" },
-  { key: "guidance", label: "Guidance Admin", description: "Platform guidance administration", modules: ["Knowledge"], priority: "secondary" },
-  { key: "support", label: "Support Context", description: "Safe audit and support context", modules: ["Support"], priority: "secondary" },
+  core("workspaces", "Workspaces", "Employer workspace administration", ["Home"]),
+  core("catalogue", "Provider Catalogue", "Platform provider reference data", ["Providers"]),
+  // Platform access controls are essential operations; employer Settings are support.
+  core("access", "Access & Tenants", "Controlled access and tenant support", ["Settings"]),
+  support("guidance", "Guidance Admin", "Platform guidance administration", ["Knowledge"]),
+  support("support", "Support Context", "Safe audit and support context", ["Support"]),
 ];
 
 export function getRelease2Navigation(
