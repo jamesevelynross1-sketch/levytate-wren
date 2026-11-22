@@ -66,6 +66,8 @@ export async function verifyFinance({ app: origin, manifest, contexts, backend, 
   report("mapped preview reconciles all rows, received funding, spend and expiry", await fact("Transactions recognised", "4") && await fact("Levy funding received", "£1,000") && await fact("Apprenticeship spend", "£250") && await fact("Expired", "£50") && await fact("Rows need review", "1"));
   report("preview has not yet persisted financial rows", JSON.stringify(await snapshot()) === JSON.stringify(before));
   let command, dropped = false, upstreamFailed = false;
+  let upstreamRecordCount = -1, upstreamStateCount = -1, resolveIntercept;
+  const interceptSettled = new Promise(resolve => { resolveIntercept = resolve; });
   const loseResponse = async route => {
     if (!dropped && route.request().method() === "POST" && route.request().postDataJSON()?.action === "import") {
       dropped = true; command = route.request().postData();
@@ -75,16 +77,32 @@ export async function verifyFinance({ app: origin, manifest, contexts, backend, 
       let upstreamConfirmed = false;
       try {
         const response = await route.fetch(), body = await response.json();
+        upstreamRecordCount = Number(body.record?.newTransactions ?? -1);
+        upstreamStateCount = Array.isArray(body.state?.transactions) ? body.state.transactions.length : -1;
         upstreamConfirmed = response.status() === 200 && body.ok === true && body.state?.mode === "persistent";
       } catch { upstreamFailed = true; }
       if (!upstreamConfirmed) upstreamFailed = true;
       try { await route.abort(upstreamConfirmed ? "connectionreset" : "failed"); }
       catch { upstreamFailed = true; }
+      finally { resolveIntercept(); }
     } else await route.continue();
   };
   await page.route("**/api/levytate-finance", loseResponse);
-  try { await page.getByRole("button", { name: "Import transactions", exact: true }).click(); await page.getByRole("dialog", { name: "Update awaiting confirmation", exact: true }).waitFor(); }
-  finally { await page.unroute("**/api/levytate-finance", loseResponse); }
+  let interceptTimeout;
+  try {
+    await page.getByRole("button", { name: "Import transactions", exact: true }).click();
+    await page.getByRole("dialog", { name: "Update awaiting confirmation", exact: true }).waitFor();
+    // The application may present the uncertainty UI before the route.fetch()
+    // handler has completed. Do not assert persistence or unroute until the
+    // real upstream request and network-drop interception have both settled.
+    await Promise.race([
+      interceptSettled,
+      new Promise((_, reject) => { interceptTimeout = setTimeout(() => reject(new Error("Local Finance import interception did not settle")), 15000); }),
+    ]);
+  } finally {
+    clearTimeout(interceptTimeout);
+    await page.unroute("**/api/levytate-finance", loseResponse);
+  }
   const persisted = await snapshot();
   const importWasAtomic = dropped && !upstreamFailed && persisted.transactions.length === 4 && persisted.imports.length === 1
     && persisted.receipts.length === before.receipts.length + 1 && persisted.audit.length === before.audit.length + 1
@@ -94,6 +112,8 @@ export async function verifyFinance({ app: origin, manifest, contexts, backend, 
     console.log("DIAGNOSTIC local Finance import", JSON.stringify({
       intercepted: dropped,
       upstreamOrInterceptFailed: upstreamFailed,
+      upstreamReportedNewTransactions: upstreamRecordCount,
+      upstreamReportedStateTransactions: upstreamStateCount,
       transactionCount: persisted.transactions.length,
       importCount: persisted.imports.length,
       receiptDelta: persisted.receipts.length - before.receipts.length,
