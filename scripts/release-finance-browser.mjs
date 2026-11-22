@@ -69,11 +69,17 @@ export async function verifyFinance({ app: origin, manifest, contexts, backend, 
   const loseResponse = async route => {
     if (!dropped && route.request().method() === "POST" && route.request().postDataJSON()?.action === "import") {
       dropped = true; command = route.request().postData();
+      // Perform the real write and verify persistence before simulating a lost
+      // browser response. Handle the route exactly once: an abort rejection is
+      // evidence of test failure, never grounds for a second abort.
+      let upstreamConfirmed = false;
       try {
         const response = await route.fetch(), body = await response.json();
-        if (response.status() !== 200 || body.ok !== true || body.state?.mode !== "persistent") throw new Error("Import not confirmed upstream");
-        await route.abort("connectionreset");
-      } catch { upstreamFailed = true; await route.abort(); }
+        upstreamConfirmed = response.status() === 200 && body.ok === true && body.state?.mode === "persistent";
+      } catch { upstreamFailed = true; }
+      if (!upstreamConfirmed) upstreamFailed = true;
+      try { await route.abort(upstreamConfirmed ? "connectionreset" : "failed"); }
+      catch { upstreamFailed = true; }
     } else await route.continue();
   };
   await page.route("**/api/levytate-finance", loseResponse);
