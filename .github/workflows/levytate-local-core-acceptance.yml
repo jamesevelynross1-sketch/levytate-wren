@@ -1,0 +1,102 @@
+name: LevyTate disposable local Core acceptance
+
+on:
+  push:
+    branches:
+      - codex/levytate-core-local-20261122
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: levytate-local-core-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-core:
+    name: Verify guarded local PostgreSQL 17 and release migrations
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CI: "true"
+      NEXT_TELEMETRY_DISABLED: "1"
+      LEVYTATE_AI_ENABLED: "false"
+      RELEASE_PSQL: /usr/bin/psql
+      SUPABASE_TELEMETRY_DISABLED: "true"
+    steps:
+      - name: Checkout exact candidate with no retained Git credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Use reviewed Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install exact npm version and project dependencies
+        run: |
+          npm install --global npm@11.6.2
+          npm ci
+
+      - name: Install local PostgreSQL client
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install --no-install-recommends -y postgresql-client
+          fi
+          test -x "$(command -v psql)"
+          test -x /usr/bin/psql
+
+      - name: Create disposable local runtime with pinned Supabase CLI
+        run: |
+          set -euo pipefail
+          runtime="$(mktemp -d /tmp/levytate-release-runtime.XXXXXXXX)"
+          chmod 0700 "$runtime"
+          echo "RELEASE_LOCAL_RUNTIME=$runtime" >> "$GITHUB_ENV"
+          archive="$runtime/supabase-cli.tar.gz"
+          curl -fsSL --retry 2 --max-time 180 \
+            https://github.com/supabase/cli/releases/download/v2.122.1/supabase_2.122.1_linux_amd64.tar.gz \
+            -o "$archive"
+          printf '%s  %s\n' '3e54b98e5ead7be0a3b0753526833d4cc9a55304e4d57da0d72f1efc342738ea' "$archive" | sha256sum --check --status
+          tar -xzf "$archive" -C "$runtime"
+          rm -f "$archive"
+          test -x "$runtime/supabase"
+          test "$("$runtime/supabase" --version)" = '2.122.1'
+
+      - name: Verify source manifest and prepare empty local stack
+        run: |
+          node scripts/build-fresh-supabase-bootstrap.mjs --verify-only > /dev/null
+          node scripts/release-create-native-runtime.mjs
+
+      - name: Start disposable local native stack (zero active application SQL)
+        run: node scripts/release-start-local-stack.mjs
+
+      - name: Verify actual empty local database and stage reviewed migrations
+        env:
+          RELEASE_RUNTIME_QUIESCENT: "true"
+        run: node scripts/release-stage-native-migrations.mjs stage
+
+      - name: Require exact 28-migration local dry-run
+        env:
+          RELEASE_RUNTIME_QUIESCENT: "true"
+        run: node scripts/release-stage-native-migrations.mjs dry-run
+
+      - name: Apply only reviewed migrations to disposable LOCAL database
+        env:
+          RELEASE_RUNTIME_QUIESCENT: "true"
+        run: |
+          node scripts/release-stage-native-migrations.mjs apply
+          echo 'PASS: exact reviewed local schema and security ledger verified'
+          echo 'This is NOT employer journey acceptance or hosted acceptance.'
+
+      - name: Stop disposable stack without printing endpoint credentials
+        if: always()
+        run: |
+          set +e
+          if [[ "${RELEASE_LOCAL_RUNTIME:-}" =~ ^/tmp/levytate-release-runtime\.[A-Za-z0-9]+$ ]] && [[ -x "$RELEASE_LOCAL_RUNTIME/supabase" ]]; then
+            SUPABASE_HOME="$RELEASE_LOCAL_RUNTIME/home" SUPABASE_EXPERIMENTAL_STACK=1 \
+              "$RELEASE_LOCAL_RUNTIME/supabase" stack stop --workdir "$RELEASE_LOCAL_RUNTIME/project" >/dev/null 2>&1
+          fi

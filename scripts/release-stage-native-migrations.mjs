@@ -30,7 +30,7 @@ export function localMigrationArguments(mode, root) {
 export function readEmptyNativeDatabase(db, root) {
   const env = { ...localEnvironment(root), PGHOST: db.hostname, PGPORT: db.port, PGUSER: decodeURIComponent(db.username), PGPASSWORD: decodeURIComponent(db.password), PGDATABASE: db.pathname.slice(1), PGOPTIONS: "-c default_transaction_read_only=on" };
   function query(sql) {
-    const result = spawnSync("/opt/homebrew/opt/postgresql@17/bin/psql", ["-XAtq", "-v", "ON_ERROR_STOP=1"], { input: `begin transaction read only;\n${sql}\ncommit;`, env, encoding: "utf8" });
+    const result = spawnSync(process.env.RELEASE_PSQL ?? (process.platform === "darwin" ? "/opt/homebrew/opt/postgresql@17/bin/psql" : "/usr/bin/psql"), ["-XAtq", "-v", "ON_ERROR_STOP=1"], { input: `begin transaction read only;\n${sql}\ncommit;`, env, encoding: "utf8" });
     if (result.status !== 0) throw Error("Live local empty-database check failed; private diagnostics withheld");
     try { return JSON.parse(result.stdout.trim()); } catch { throw Error("Unrecognised empty-database evidence"); }
   }
