@@ -86,7 +86,22 @@ export async function verifyFinance({ app: origin, manifest, contexts, backend, 
   try { await page.getByRole("button", { name: "Import transactions", exact: true }).click(); await page.getByRole("dialog", { name: "Update awaiting confirmation", exact: true }).waitFor(); }
   finally { await page.unroute("**/api/levytate-finance", loseResponse); }
   const persisted = await snapshot();
-  report("lost response follows real atomic import, receipt and audit", dropped && !upstreamFailed && persisted.transactions.length === 4 && persisted.imports.length === 1 && persisted.receipts.length === before.receipts.length + 1 && persisted.audit.length === before.audit.length + 1 && persisted.revision === before.revision + 1);
+  const importWasAtomic = dropped && !upstreamFailed && persisted.transactions.length === 4 && persisted.imports.length === 1
+    && persisted.receipts.length === before.receipts.length + 1 && persisted.audit.length === before.audit.length + 1
+    && persisted.revision === before.revision + 1;
+  if (!importWasAtomic) {
+    // Aggregate counts and booleans only. Never log request/response bodies, Auth state or tenant IDs.
+    console.log("DIAGNOSTIC local Finance import", JSON.stringify({
+      intercepted: dropped,
+      upstreamOrInterceptFailed: upstreamFailed,
+      transactionCount: persisted.transactions.length,
+      importCount: persisted.imports.length,
+      receiptDelta: persisted.receipts.length - before.receipts.length,
+      auditDelta: persisted.audit.length - before.audit.length,
+      versionDelta: persisted.revision - before.revision,
+    }));
+  }
+  report("lost response follows real atomic import, receipt and audit", importWasAtomic);
   const expectedRows = [["levy_in", 100000, 100000], ["apprenticeship_spend", -25000, 75000], ["levy_expiry", -5000, 70000], ["other", 1500, 71500]];
   report("persisted pence, categories and reported balances match the fictional source exactly", expectedRows.every(([category, amount, balance], index) => persisted.transactions.some(row => row.description === descriptions[index] && row.transaction_date === `${month}-0${index + 1}` && row.category === category && row.amount_pence === amount && row.reported_balance_pence === balance)));
   report("import metadata retains all source rows and one review row", persisted.imports[0].file_name === fileName && persisted.imports[0].source_rows === 4 && persisted.imports[0].new_transactions === 4 && persisted.imports[0].duplicate_rows === 0 && persisted.imports[0].review_rows === 1);
