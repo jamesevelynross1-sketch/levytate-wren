@@ -62,6 +62,9 @@ jobs:
       - name: Verify credential-free environment manifest
         run: node scripts/validate-levytate-environment-manifest.mjs
 
+      - name: Validate isolated Core acceptance target safety contract
+        run: node --test tests/core-acceptance-target.node.mjs
+
       - name: Verify selected launch-release contracts
         run: |
           npm run validate:launch-release-1
