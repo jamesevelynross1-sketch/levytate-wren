@@ -66,21 +66,62 @@ export async function verifyFinance({ app: origin, manifest, contexts, backend, 
   report("mapped preview reconciles all rows, received funding, spend and expiry", await fact("Transactions recognised", "4") && await fact("Levy funding received", "£1,000") && await fact("Apprenticeship spend", "£250") && await fact("Expired", "£50") && await fact("Rows need review", "1"));
   report("preview has not yet persisted financial rows", JSON.stringify(await snapshot()) === JSON.stringify(before));
   let command, dropped = false, upstreamFailed = false;
+  let upstreamRecordCount = -1, upstreamStateCount = -1, resolveIntercept;
+  const interceptSettled = new Promise(resolve => { resolveIntercept = resolve; });
   const loseResponse = async route => {
     if (!dropped && route.request().method() === "POST" && route.request().postDataJSON()?.action === "import") {
       dropped = true; command = route.request().postData();
+      // Perform the real write and verify persistence before simulating a lost
+      // browser response. Handle the route exactly once: an abort rejection is
+      // evidence of test failure, never grounds for a second abort.
+      let upstreamConfirmed = false;
       try {
         const response = await route.fetch(), body = await response.json();
-        if (response.status() !== 200 || body.ok !== true || body.state?.mode !== "persistent") throw new Error("Import not confirmed upstream");
-        await route.abort("connectionreset");
-      } catch { upstreamFailed = true; await route.abort(); }
+        upstreamRecordCount = Number(body.record?.newTransactions ?? -1);
+        upstreamStateCount = Array.isArray(body.state?.transactions) ? body.state.transactions.length : -1;
+        upstreamConfirmed = response.status() === 200 && body.ok === true && body.state?.mode === "persistent";
+      } catch { upstreamFailed = true; }
+      if (!upstreamConfirmed) upstreamFailed = true;
+      try { await route.abort(upstreamConfirmed ? "connectionreset" : "failed"); }
+      catch { upstreamFailed = true; }
+      finally { resolveIntercept(); }
     } else await route.continue();
   };
   await page.route("**/api/levytate-finance", loseResponse);
-  try { await page.getByRole("button", { name: "Import transactions", exact: true }).click(); await page.getByRole("dialog", { name: "Update awaiting confirmation", exact: true }).waitFor(); }
-  finally { await page.unroute("**/api/levytate-finance", loseResponse); }
+  let interceptTimeout;
+  try {
+    await page.getByRole("button", { name: "Import transactions", exact: true }).click();
+    await page.getByRole("dialog", { name: "Update awaiting confirmation", exact: true }).waitFor();
+    // The application may present the uncertainty UI before the route.fetch()
+    // handler has completed. Do not assert persistence or unroute until the
+    // real upstream request and network-drop interception have both settled.
+    await Promise.race([
+      interceptSettled,
+      new Promise((_, reject) => { interceptTimeout = setTimeout(() => reject(new Error("Local Finance import interception did not settle")), 15000); }),
+    ]);
+  } finally {
+    clearTimeout(interceptTimeout);
+    await page.unroute("**/api/levytate-finance", loseResponse);
+  }
   const persisted = await snapshot();
-  report("lost response follows real atomic import, receipt and audit", dropped && !upstreamFailed && persisted.transactions.length === 4 && persisted.imports.length === 1 && persisted.receipts.length === before.receipts.length + 1 && persisted.audit.length === before.audit.length + 1 && persisted.revision === before.revision + 1);
+  const importWasAtomic = dropped && !upstreamFailed && persisted.transactions.length === 4 && persisted.imports.length === 1
+    && persisted.receipts.length === before.receipts.length + 1 && persisted.audit.length === before.audit.length + 1
+    && persisted.revision === before.revision + 1;
+  if (!importWasAtomic) {
+    // Aggregate counts and booleans only. Never log request/response bodies, Auth state or tenant IDs.
+    console.log("DIAGNOSTIC local Finance import", JSON.stringify({
+      intercepted: dropped,
+      upstreamOrInterceptFailed: upstreamFailed,
+      upstreamReportedNewTransactions: upstreamRecordCount,
+      upstreamReportedStateTransactions: upstreamStateCount,
+      transactionCount: persisted.transactions.length,
+      importCount: persisted.imports.length,
+      receiptDelta: persisted.receipts.length - before.receipts.length,
+      auditDelta: persisted.audit.length - before.audit.length,
+      versionDelta: persisted.revision - before.revision,
+    }));
+  }
+  report("lost response follows real atomic import, receipt and audit", importWasAtomic);
   const expectedRows = [["levy_in", 100000, 100000], ["apprenticeship_spend", -25000, 75000], ["levy_expiry", -5000, 70000], ["other", 1500, 71500]];
   report("persisted pence, categories and reported balances match the fictional source exactly", expectedRows.every(([category, amount, balance], index) => persisted.transactions.some(row => row.description === descriptions[index] && row.transaction_date === `${month}-0${index + 1}` && row.category === category && row.amount_pence === amount && row.reported_balance_pence === balance)));
   report("import metadata retains all source rows and one review row", persisted.imports[0].file_name === fileName && persisted.imports[0].source_rows === 4 && persisted.imports[0].new_transactions === 4 && persisted.imports[0].duplicate_rows === 0 && persisted.imports[0].review_rows === 1);

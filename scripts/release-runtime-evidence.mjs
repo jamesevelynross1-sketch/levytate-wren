@@ -7,14 +7,14 @@ import { fileURLToPath } from "node:url";
 import { verifyReleaseSources } from "./build-release-supabase-worktree.mjs";
 import { releaseRepository } from "./release-repository-path.mjs";
 const root = process.env.RELEASE_LOCAL_RUNTIME;
-if (!/^\/private\/tmp\/levytate-release-runtime\.[A-Za-z0-9]+$/.test(root ?? "")) throw new Error("Dedicated local runtime required");
+if (!/^\/(?:private\/)?tmp\/levytate-release-runtime\.[A-Za-z0-9]+$/.test(root ?? "")) throw new Error("Dedicated local runtime required");
 const state = JSON.parse(readFileSync(`${root}/private-stack-state.json`, "utf8"));
 const db = new URL(state.env.DB_URL);
 if (db.hostname !== "127.0.0.1") throw new Error("Loopback database required");
 const repository = process.env.RELEASE_CANDIDATE_REPOSITORY ? releaseRepository(process.env.RELEASE_CANDIDATE_REPOSITORY) : resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const verified = await verifyReleaseSources(repository);
 const sql = (input) => {
-  const result = spawnSync(process.env.RELEASE_PSQL ?? "/opt/homebrew/opt/postgresql@17/bin/psql", ["-XAtq", "-v", "ON_ERROR_STOP=1"], {
+  const result = spawnSync(process.env.RELEASE_PSQL ?? (process.platform === "darwin" ? "/opt/homebrew/opt/postgresql@17/bin/psql" : "/usr/bin/psql"), ["-XAtq", "-v", "ON_ERROR_STOP=1"], {
     input, encoding: "utf8", env: { ...process.env, PGHOST: db.hostname, PGPORT: db.port, PGUSER: db.username, PGPASSWORD: db.password, PGDATABASE: db.pathname.slice(1) },
   });
   if (result.status) throw new Error("Local evidence query failed; raw database diagnostics withheld");

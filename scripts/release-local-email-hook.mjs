@@ -8,7 +8,7 @@ import { assertLifecycleManifest, lifecycleRecipients } from "./release-lifecycl
 import { assertManagerManifest, managerRecipients } from "./release-manager-fixtures.mjs";
 
 const root = process.env.RELEASE_LOCAL_RUNTIME;
-if (!root?.startsWith("/private/tmp/levytate-release-runtime.")) throw new Error("Dedicated local runtime required");
+if (!/^\/(?:private\/)?tmp\/levytate-release-runtime\.[A-Za-z0-9]+$/.test(root ?? "")) throw new Error("Dedicated local runtime required");
 const secret = JSON.parse(readFileSync(`${root}/private-app-secrets.json`, "utf8")).hookSecret;
 const state = JSON.parse(readFileSync(`${root}/private-stack-state.json`, "utf8"));
 const smtp = state.endpoints["mail.smtp"];

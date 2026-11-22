@@ -7,10 +7,10 @@ function seedSyntheticStandard(standardId) {
   // Official standards are intentionally read-only to the application. Owner
   // fixture setup may insert a clearly synthetic row only in this local stack.
   const root=process.env.RELEASE_LOCAL_RUNTIME;
-  if(!root?.startsWith("/private/tmp/levytate-release-runtime.")||!["ST1490","ST0118"].includes(standardId))throw new Error("Local synthetic standard setup only");
+  if(!/^\/(?:private\/)?tmp\/levytate-release-runtime\.[A-Za-z0-9]+$/.test(root??"")||!["ST1490","ST0118"].includes(standardId))throw new Error("Local synthetic standard setup only");
   const state=JSON.parse(readFileSync(`${root}/private-stack-state.json`,"utf8")),db=new URL(state.env.DB_URL);
   if(db.hostname!=="127.0.0.1")throw new Error("Local standard database only");
-  const result=spawnSync(process.env.RELEASE_PSQL??"/opt/homebrew/opt/postgresql@17/bin/psql",["-XAtq","-v","ON_ERROR_STOP=1"],{env:{...process.env,PGHOST:db.hostname,PGPORT:db.port,PGUSER:db.username,PGPASSWORD:db.password,PGDATABASE:db.pathname.slice(1)},input:`insert into public.levytate_apprenticeship_standards(id,title,reference_code,status,level,occupational_route) values('${standardId}','Synthetic acceptance standard record','${standardId}','Approved for delivery',4,'Synthetic acceptance only');`,encoding:"utf8"});
+  const result=spawnSync(process.env.RELEASE_PSQL??(process.platform==="darwin"?"/opt/homebrew/opt/postgresql@17/bin/psql":"/usr/bin/psql"),["-XAtq","-v","ON_ERROR_STOP=1"],{env:{...process.env,PGHOST:db.hostname,PGPORT:db.port,PGUSER:db.username,PGPASSWORD:db.password,PGDATABASE:db.pathname.slice(1)},input:`insert into public.levytate_apprenticeship_standards(id,title,reference_code,status,level,occupational_route) values('${standardId}','Synthetic acceptance standard record','${standardId}','Approved for delivery',4,'Synthetic acceptance only');`,encoding:"utf8"});
   if(result.status)throw new Error("Synthetic local standard setup failed; no grants changed");
 }
 
@@ -103,7 +103,7 @@ export async function createReleaseFixtures() {
 
 if (process.argv[1]?.endsWith("release-local-fixtures.mjs")) {
   try {
-    if (!process.env.RELEASE_FIXTURE_MANIFEST?.startsWith("/private/tmp/")) throw new Error("BLOCKED: manifest must be a restricted temporary path");
+    if (!/^\/(?:private\/)?tmp\/levytate-release-runtime\.[A-Za-z0-9]+\/fixture-manifest\.json$/.test(process.env.RELEASE_FIXTURE_MANIFEST??"")) throw new Error("BLOCKED: manifest must be a restricted temporary path");
     const manifest = await createReleaseFixtures();
     writeFileSync(process.env.RELEASE_FIXTURE_MANIFEST, `${JSON.stringify(manifest, null, 2)}\n`, { mode: 0o600, flag: "wx" });
     console.log("PASS local synthetic fixtures: two tenants, two bootstrap Lead Auth identities, four pending members and People records; no email sent");

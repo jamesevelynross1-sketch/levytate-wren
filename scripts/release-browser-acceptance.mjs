@@ -34,16 +34,16 @@ function setLocalLiftFixture(manifest,enabled){
   const state=JSON.parse(readFileSync(`${root}/private-stack-state.json`,"utf8")),db=new URL(state.env.DB_URL);
   if(db.hostname!=="127.0.0.1")throw new Error("Loopback only");
   const input=`insert into public.levytate_organisation_capabilities(organisation_id,lift_enabled) select id,${enabled} from public.levytate_organisations where id='${tenant.id}' and slug='release-${manifest.run}-a' on conflict(organisation_id)do update set lift_enabled=excluded.lift_enabled returning organisation_id;`;
-  const r=spawnSync(process.env.RELEASE_PSQL??"/opt/homebrew/opt/postgresql@17/bin/psql",["-XAtq","-v","ON_ERROR_STOP=1"],{input,env:{...process.env,PGHOST:db.hostname,PGPORT:db.port,PGUSER:db.username,PGPASSWORD:db.password,PGDATABASE:db.pathname.slice(1)},encoding:"utf8"});
+  const r=spawnSync(process.env.RELEASE_PSQL??(process.platform==="darwin"?"/opt/homebrew/opt/postgresql@17/bin/psql":"/usr/bin/psql"),["-XAtq","-v","ON_ERROR_STOP=1"],{input,env:{...process.env,PGHOST:db.hostname,PGPORT:db.port,PGUSER:db.username,PGPASSWORD:db.password,PGDATABASE:db.pathname.slice(1)},encoding:"utf8"});
   if(r.status||r.stdout.trim()!==tenant.id)throw new Error("Synthetic capability update not confirmed");
 }
 function failureBudgetWritesSince(since) {
   const root=process.env.RELEASE_LOCAL_RUNTIME;
-  if(!root?.startsWith("/private/tmp/levytate-release-runtime."))return null;
+  if(!/^\/(?:private\/)?tmp\/levytate-release-runtime\.[A-Za-z0-9]+$/.test(root??""))return null;
   const state=JSON.parse(readFileSync(`${root}/private-stack-state.json`,"utf8")),db=new URL(state.env.DB_URL);
   if(db.hostname!=="127.0.0.1")throw new Error("Local failure-budget observation required");
   if(!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(since))throw new Error("Invalid observation timestamp");
-  const r=spawnSync(process.env.RELEASE_PSQL??"/opt/homebrew/opt/postgresql@17/bin/psql",["-X","-A","-t","-q","-v","ON_ERROR_STOP=1"],{env:{...process.env,PGHOST:db.hostname,PGPORT:db.port,PGUSER:db.username,PGPASSWORD:db.password,PGDATABASE:db.pathname.slice(1)},input:`select count(*) from public.levytate_auth_rate_limits where action='magic_link.callback.failure' and updated_at>='${since}'::timestamptz;`,encoding:"utf8"});
+  const r=spawnSync(process.env.RELEASE_PSQL??(process.platform==="darwin"?"/opt/homebrew/opt/postgresql@17/bin/psql":"/usr/bin/psql"),["-X","-A","-t","-q","-v","ON_ERROR_STOP=1"],{env:{...process.env,PGHOST:db.hostname,PGPORT:db.port,PGUSER:db.username,PGPASSWORD:db.password,PGDATABASE:db.pathname.slice(1)},input:`select count(*) from public.levytate_auth_rate_limits where action='magic_link.callback.failure' and updated_at>='${since}'::timestamptz;`,encoding:"utf8"});
   if(r.status||!/^\d+$/.test(r.stdout.trim()))throw new Error("Failure-budget observation unavailable");
   return Number(r.stdout.trim());
 }
@@ -615,7 +615,7 @@ try {
   await browser?.close();
   releaseRuntime?.();
   const evidence = { schemaVersion: 2, environment: "local", candidateCommit, appCodeCommit, browserEngineVersion, browserDistribution, authenticationMethod: "requested-sign-in-link-through-local-smtp", authenticatedContextsVerified: verifiedContexts.size, distinctAuthenticatedRoles: [...new Set(verifiedContexts.values())].sort(), emailEvidence: "local-smtp-capture-only", notRunScopes, results };
-  if (process.env.RELEASE_EVIDENCE_PATH?.startsWith("/private/tmp/")) {
+  if (/^\/(?:private\/)?tmp\/levytate-release-runtime\.[A-Za-z0-9]+\/browser-evidence\.json$/.test(process.env.RELEASE_EVIDENCE_PATH??"")) {
     const requested = process.env.RELEASE_EVIDENCE_PATH;
     const path = existsSync(requested) ? requested.replace(/\.json$/, `-${Date.now()}.json`) : requested;
     writeFileSync(path, `${JSON.stringify(evidence, null, 2)}\n`, { mode: 0o600, flag: "wx" });
