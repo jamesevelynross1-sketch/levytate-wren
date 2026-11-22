@@ -8,7 +8,7 @@ import { captureCredential } from "./release-local-email-capture.mjs";
 import { applyLocalTraceSafety } from "./release-local-trace-safety.mjs";
 
 const root = process.env.RELEASE_LOCAL_RUNTIME;
-if (!root?.startsWith("/private/tmp/levytate-release-runtime.")) throw new Error("Dedicated local runtime required");
+if (!/^\/(?:private\/)?tmp\/levytate-release-runtime\.[A-Za-z0-9]+$/.test(root ?? "")) throw new Error("Dedicated local runtime required");
 const secretPath = `${root}/private-app-secrets.json`;
 if (!existsSync(secretPath)) writeFileSync(secretPath, JSON.stringify({ hookSecret: randomBytes(32).toString("base64"), sessionSecret: randomBytes(48).toString("base64url") }), { mode: 0o600, flag: "wx" });
 const secrets = JSON.parse(readFileSync(secretPath, "utf8"));
@@ -36,7 +36,7 @@ const env = {
   RELEASE_APP_URL: process.env.RELEASE_APP_URL ?? "http://localhost:3107", RELEASE_MAILPIT_URL: state.env.MAILPIT_URL,
   RELEASE_FIXTURE_MANIFEST: process.env.RELEASE_FIXTURE_MANIFEST ?? `${root}/fixture-manifest.json`, RELEASE_EVIDENCE_PATH: `${root}/browser-evidence.json`,
   PGPASSWORD:database.password,RELEASE_PGHOST:database.hostname,RELEASE_PGPORT:database.port,RELEASE_PGUSER:database.username,
-  RELEASE_PGDATABASE:process.env.RELEASE_TEST_DATABASE,RELEASE_PSQL:process.env.RELEASE_PSQL??"/opt/homebrew/opt/postgresql@17/bin/psql",
+  RELEASE_PGDATABASE:process.env.RELEASE_TEST_DATABASE,RELEASE_PSQL:process.env.RELEASE_PSQL??(process.platform==="darwin"?"/opt/homebrew/opt/postgresql@17/bin/psql":"/usr/bin/psql"),
 };
 if(process.env.RELEASE_ENABLE_SYNTHETIC_LIFT==="true"){
   const fixture=JSON.parse(readFileSync(env.RELEASE_FIXTURE_MANIFEST,"utf8"));

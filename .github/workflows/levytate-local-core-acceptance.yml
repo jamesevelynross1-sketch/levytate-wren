@@ -92,6 +92,53 @@ jobs:
           echo 'PASS: exact reviewed local schema and security ledger verified'
           echo 'This is NOT employer journey acceptance or hosted acceptance.'
 
+      - name: Install pinned Playwright and its local Chromium browser
+        run: |
+          npm install --no-save --package-lock=false --no-audit --no-fund playwright@1.57.0
+          npx --no-install playwright install --with-deps chromium
+          test -f node_modules/playwright/index.mjs
+
+      - name: Seed exactly two fictional employer organisations
+        run: |
+          node scripts/release-local-command.mjs seed
+          echo 'PASS: local fictional employers and programme catalogue prepared'
+
+      - name: Start local-only email hook and application
+        run: |
+          set -euo pipefail
+          node scripts/release-local-command.mjs hook >/dev/null 2>&1 &
+          echo "LEVYTATE_HOOK_PID=$!" >> "$GITHUB_ENV"
+          sleep 2
+          node scripts/release-local-command.mjs app >/dev/null 2>&1 &
+          echo "LEVYTATE_APP_PID=$!" >> "$GITHUB_ENV"
+          for attempt in $(seq 1 90); do
+            if curl -fsS --max-time 2 http://127.0.0.1:3107/api/levytate-health/ready >/dev/null 2>&1; then
+              echo 'PASS: local application reports ready against isolated native backend'
+              exit 0
+            fi
+            sleep 2
+          done
+          echo 'BLOCKED: local application did not report ready; no browser journey attempted'
+          exit 2
+
+      - name: Exercise genuine fictional Employee, Manager and Lead flows
+        env:
+          RELEASE_LEARNER_JOURNEY: "true"
+          RELEASE_FINANCE_JOURNEY: "true"
+          RELEASE_READ_SCOPE_JOURNEY: "true"
+          RELEASE_PLAYWRIGHT_MODULE: ${{ github.workspace }}/node_modules/playwright/index.mjs
+          RELEASE_APP_COMMIT: ${{ github.sha }}
+        run: |
+          node scripts/release-local-command.mjs browser
+
+      - name: Stop local-only app and email hook
+        if: always()
+        run: |
+          for variable in LEVYTATE_APP_PID LEVYTATE_HOOK_PID; do
+            pid="${!variable:-}"
+            if [[ "$pid" =~ ^[0-9]+$ ]]; then kill "$pid" >/dev/null 2>&1 || :; fi
+          done
+
       - name: Stop disposable stack without printing endpoint credentials
         if: always()
         run: |

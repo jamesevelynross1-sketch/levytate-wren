@@ -10,3 +10,9 @@ This workflow is a **disposable local migration and isolation checkpoint**, not 
 - No secret values or browser login links should appear in logs or be exported as artifacts. Runtime secrets are generated only inside the disposable runner; stack stop output is suppressed.
 - After this runner passes, extend the existing local test tooling to cover two synthetic tenants and genuine captured-email sign-in/application/manager/lead/learner/finance workflows. Those flows are **NOT RUN** by this bootstrap workflow.
 - This workflow runs on its explicitly named development branch; it will not auto-run against or deploy the default/Production branch.
+
+## Second-stage genuine fictional Core journey
+
+The workflow now also prepares two fictional employers, uses a local-only GoTrue email hook and Mailpit SMTP capture, runs the Next.js application on loopback, and attempts genuine browser logins for Employee, Line Manager and Apprenticeship Lead. The accepted scenario tests Employee application -> manager decision -> Lead final approval -> pre-enrolment -> employee declaration -> verified enrolment/withdrawal, together with finance import, scoped reads, second-tenant denial, session refresh and logout. Playwright is pinned to 1.57.0 and installed only into the disposable GitHub runner.
+
+This is **a test attempt, not a declared success** until its exact GitHub run finishes with the scripted assertions. It never uses Microsoft, paid models, cloud Supabase projects or real mail recipients. Each service remains loopback-only and artifacts containing Auth state are not uploaded. Existing special native-Edge zoom restrictions are unchanged; only generic macOS/Linux native runner paths are broadened.
