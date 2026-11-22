@@ -1,12 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { getCoreEarlyAccessPolicy, resolveCoreEarlyAccessRouteAccess, type CoreEarlyAccessModuleKey } from "@/lib/levytate/core-early-access-policy";
-import { getLevyTateProductSection, levyTateModuleSections } from "@/lib/levytate/product-packaging";
+import { getLevyTateIntegrationSection, getLevyTateProductSection, levyTateModuleSections } from "@/lib/levytate/product-packaging";
 import { getRelease2Navigation } from "@/lib/levytate/release-2-navigation";
 import type { MvpUserRole } from "@/lib/levytate/mvp/rbac";
 
 const roles: readonly MvpUserRole[] = ["Employee", "Line Manager", "Apprenticeship Lead", "Employer Admin", "Platform Admin"];
 
 describe("Core and add-on packaging", () => {
+  it("includes Microsoft 365 Copilot integration in Core without changing the native AI add-on", () => {
+    expect(getLevyTateIntegrationSection("microsoft365Copilot")).toBe("core");
+    expect(getLevyTateProductSection("Copilot")).toBe("add-on");
+    // Commercial classification must not auto-enable a Microsoft tenant connection.
+    expect(getCoreEarlyAccessPolicy("Employee").modules.some((item) => item.moduleKey === "Copilot")).toBe(true);
+  });
   it("classifies every module in the existing early-access policy", () => {
     const policyModules = roles.flatMap((role) => getCoreEarlyAccessPolicy(role).modules.map((module) => module.moduleKey));
     expect(Object.keys(levyTateModuleSections).sort()).toEqual([...new Set(policyModules)].sort());

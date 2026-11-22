@@ -4,6 +4,17 @@ import type { CoreEarlyAccessModuleKey } from "@/lib/levytate/core-early-access-
 // does not revoke existing access, alter permissions, or remove stored data.
 export type LevyTateProductSection = "core" | "add-on" | "support";
 
+// External Microsoft integration is not the in-app LevyTate Copilot module.
+// Packaging classification does not enable the connector or bypass tenant consent,
+// runtime configuration, organisation capabilities or existing role boundaries.
+export const levyTateIntegrationSections = {
+  microsoft365Copilot: "core",
+} as const satisfies Record<"microsoft365Copilot", LevyTateProductSection>;
+
+export function getLevyTateIntegrationSection(integration: keyof typeof levyTateIntegrationSections): LevyTateProductSection {
+  return levyTateIntegrationSections[integration];
+}
+
 export const levyTateModuleSections = {
   Home: "core",
   "My Programme": "core",
