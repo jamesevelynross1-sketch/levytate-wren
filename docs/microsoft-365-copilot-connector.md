@@ -1,5 +1,7 @@
 # LevyTate Microsoft 365 Copilot connector
 
+**Commercial placement (22 November 2026): Included in LevyTate Core, not a separately priced LevyTate add-on.** This does not include Microsoft licences or automatically connect a customer's tenant. The in-platform LevyTate Copilot assistant is a separate product module.
+
 ## Status and boundary
 
 This is the read-only foundation for a Microsoft 365 Copilot custom federated connector. It is disabled by default and is not a Microsoft Graph content sync, public API, provider connector, write assistant or autonomous decision service.

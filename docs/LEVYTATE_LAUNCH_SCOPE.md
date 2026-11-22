@@ -37,6 +37,12 @@ An employer user who also has an active employee record may complete their own a
 | Reports | Deferred navigation | Role-based reporting remains available through operational modules | A general governance-reporting suite is not launch scope |
 | Platform provider catalogue, workspace/access support | Enabled | Platform Admin | No employer operational inheritance |
 
+## Microsoft 365 Copilot connector — Core packaging, controlled enablement
+
+The existing Microsoft 365 Copilot federated connector belongs to LevyTate Core commercially. It provides a read-only route for eligible and authorised employer users to retrieve scoped apprenticeship, learner, provider, operations and finance information through Microsoft 365 Copilot. This is **not** the in-app LevyTate Copilot module, whose separate commercial packaging and access policy are unchanged. Microsoft licensing, tenant-admin consent and approved Entra registration remain the customer's or operator's responsibility, as applicable.
+
+The connector is disabled by default and is **not** considered production-enabled by this classification. Each live tenant requires completed Microsoft SSO registration, tenant/identity binding, existing server-side RBAC, rate limiting, audit, privacy review and staged acceptance in accordance with `docs/microsoft-365-copilot-connector.md`. No writes, approval decisions or autonomous actions are authorised. Failure to activate a customer tenant does not weaken Core application functionality or independently block a Q1 controlled Core release.
+
 ## Core journeys
 
 1. An Employee reviews the organisation-published programme, saves a server-confirmed draft, submits it and tracks status.
@@ -83,7 +89,7 @@ Copilot may explain records and workflows, find authorised records, offer ground
 
 ## Explicitly outside the initial commercial release
 
-Public self-service signup, pupil access, open programme discovery, provider ranking/matching scores, autonomous sourcing, broad Copilot write actions, predictive analytics, complex governance reporting, audit exports, provider CRM/marketplace transactions and Production Microsoft-tenant enablement are deferred. Stable supporting code may remain hidden behind server-controlled capabilities; it is not deleted or implied as launched.
+Public self-service signup, pupil access, open programme discovery, provider ranking/matching scores, autonomous sourcing, broad Copilot write actions, predictive analytics, complex governance reporting, audit exports and provider CRM/marketplace transactions are deferred. Production Microsoft-tenant enablement remains separately approval-gated, even though the existing read-only connector is included in the Core commercial package. Stable supporting code may remain hidden behind server-controlled capabilities; it is not deleted or implied as launched.
 
 ## Release evidence
 

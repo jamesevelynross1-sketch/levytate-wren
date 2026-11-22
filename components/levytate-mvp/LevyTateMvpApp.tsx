@@ -224,6 +224,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
   const [peopleEmployeeId, setPeopleEmployeeId] = useState<string | null>(null);
   const [copilotEntity, setCopilotEntity] = useState<{ type: LevyTateCopilotEntityType; id: string; label: string } | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [addOnsOpen, setAddOnsOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const demoPerspective = useDemoPerspectiveSwitcher();
   const deepLinkHandled = useRef(false);
@@ -242,8 +243,9 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
     .filter((module): module is (typeof modules)[number] => Boolean(module))
     .filter((module) => can(modulePermissions[module.name]));
   const release2Navigation = getRelease2Navigation(meta?.userRole ?? "Employee", availableModules.map((module) => module.name));
-  const primaryNavigation = release2Navigation.filter((area) => area.priority === "primary");
-  const secondaryNavigation = release2Navigation.filter((area) => area.priority === "secondary");
+  const coreNavigation = release2Navigation.filter((area) => area.section === "core");
+  const addOnNavigation = release2Navigation.filter((area) => area.section === "add-on");
+  const supportNavigation = release2Navigation.filter((area) => area.section === "support");
   const activeArea = findRelease2NavigationArea(release2Navigation, activeModule);
   const peopleItems = (["Employees", "Roles"] as PeopleView[]).filter((item) => can(peopleViewPermissions[item]));
   const providerItems = (["Programmes", "Relationships"] as ProviderView[]).filter((item) => can(providerViewPermissions[item]));
@@ -260,6 +262,10 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
     if (availableModules.some((module) => module.name === activeModule)) return;
     setActiveModule(availableModules[0]?.name ?? "Home");
   }, [activeModule, availableModules]);
+
+  useEffect(() => {
+    if (activeArea?.section === "add-on") setAddOnsOpen(true);
+  }, [activeArea?.section, activeModule]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -600,21 +606,55 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
 
       {mobileMenuOpen ? <div className="fixed inset-0 z-50 lg:hidden"><button type="button" onClick={() => setMobileMenuOpen(false)} aria-label="Close navigation" className="absolute inset-0 bg-[#102c3d]/40 backdrop-blur-sm" /><aside ref={mobileDrawerRef} id="levytate-mobile-navigation" role="dialog" aria-modal="true" aria-labelledby="levytate-mobile-navigation-title" className="absolute inset-y-0 left-0 flex w-[min(88vw,22rem)] flex-col overflow-hidden bg-white shadow-[24px_0_80px_rgba(16,44,61,0.24)]">
         <div className="flex h-[4.5rem] items-center justify-between border-b border-[#102c3d]/[0.08] px-4"><div><p id="levytate-mobile-navigation-title" className="text-sm font-semibold">{workspaceName}</p><p className="text-xs text-[#102c3d]/50">Navigation</p></div><button type="button" onClick={() => setMobileMenuOpen(false)} aria-label="Close navigation" className="grid h-11 w-11 place-items-center rounded-xl text-[#102c3d]/60 hover:bg-[#f4f8f5] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20"><X size={19} aria-hidden="true" /></button></div>
-        <nav aria-label="Mobile workspace navigation" className="min-h-0 flex-1 overflow-y-auto px-3 py-4"><p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/40">Your workspace</p><div className="grid gap-1">{primaryNavigation.map((area) => <MobileNavigationArea key={area.key} area={area} activeModule={activeModule} moduleLabel={moduleLabel} onOpenArea={openArea} onOpenModule={openModule} />)}</div>{secondaryNavigation.length ? <div className="mt-5 border-t border-[#102c3d]/[0.07] pt-4"><p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/40">Tools & support</p><div className="grid gap-1">{secondaryNavigation.map((area) => <MobileNavigationArea key={area.key} area={area} activeModule={activeModule} moduleLabel={moduleLabel} onOpenArea={openArea} onOpenModule={openModule} />)}</div></div> : null}</nav>
+        <nav aria-label="Mobile workspace navigation" className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
+          <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/40">Core workspace</p>
+          <div className="grid gap-1">
+            {coreNavigation.map((area) => <MobileNavigationArea key={area.key} area={area} activeModule={activeModule} moduleLabel={moduleLabel} onOpenArea={openArea} onOpenModule={openModule} />)}
+          </div>
+          {addOnNavigation.length > 0 ? (
+            <div className="mt-5 border-t border-[#102c3d]/[0.07] pt-4">
+              <button type="button" onClick={() => setAddOnsOpen((open) => !open)} aria-expanded={addOnsOpen} aria-controls="levytate-mobile-add-ons" className="flex min-h-11 w-full items-center justify-between rounded-lg px-3 text-left text-[11px] font-semibold text-[#102c3d]/65 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20">
+                Add-ons <ChevronRight size={16} aria-hidden="true" className={addOnsOpen ? "rotate-90 transition-transform" : "transition-transform"} />
+              </button>
+              <div id="levytate-mobile-add-ons" className={addOnsOpen ? "grid gap-1" : "hidden"}>
+                {addOnNavigation.map((area) => <MobileNavigationArea key={area.key} area={area} activeModule={activeModule} moduleLabel={moduleLabel} onOpenArea={openArea} onOpenModule={openModule} />)}
+              </div>
+            </div>
+          ) : null}
+          {supportNavigation.length > 0 ? (
+            <div className="mt-5 border-t border-[#102c3d]/[0.07] pt-4">
+              <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/40">Tools & support</p>
+              <div className="grid gap-1">
+                {supportNavigation.map((area) => <MobileNavigationArea key={area.key} area={area} activeModule={activeModule} moduleLabel={moduleLabel} onOpenArea={openArea} onOpenModule={openModule} />)}
+              </div>
+            </div>
+          ) : null}
+        </nav>
         <div className="border-t border-[#102c3d]/[0.08] p-4"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-semibold">{meta?.userRole ?? "Workspace user"}</p><p className="mt-0.5 text-[11px] text-[#102c3d]/50">{storageStatus}</p></div><form action="/api/levytate-beta-logout" method="post"><button type="submit" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#b13b51]/15 px-3 text-xs font-semibold text-[#b13b51]"><LogOut size={14} aria-hidden="true" />Sign out</button></form></div></div>
       </aside></div> : null}
 
       <div className="grid min-h-[calc(100vh-4.5rem)] w-full min-w-0 grid-cols-[minmax(0,1fr)] lg:grid-cols-[232px_minmax(0,1fr)]">
         <aside data-testid="levytate-sidebar" className="hidden min-w-0 border-r border-[#102c3d]/[0.07] bg-white lg:sticky lg:top-[4.5rem] lg:flex lg:h-[calc(100vh-4.5rem)] lg:flex-col">
           <nav className="flex min-h-0 flex-1 flex-col px-3 py-5" aria-label="Workspace areas">
-            <div className="px-3 pb-3"><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/38">Workspace</p><p className="mt-1 text-xs leading-5 text-[#102c3d]/55">Choose an area, then work in context.</p></div>
-            <div className="min-h-0 flex-1 space-y-1 overflow-y-auto">{primaryNavigation.map((area) => {
+            <div className="px-3 pb-3"><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/38">Core workspace</p></div>
+            <div className="min-h-0 flex-1 space-y-1 overflow-y-auto">{coreNavigation.map((area) => {
               const Icon = navigationAreaIcon(area);
               const active = activeArea?.key === area.key;
               const badge = area.modules.reduce((total, module) => total + (moduleBadges[module as ModuleName] ?? 0), 0);
               return <button key={area.key} type="button" onClick={() => openArea(area)} aria-current={active ? "page" : undefined} className={`group flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-left transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 ${active ? "bg-[#eaf5f1] text-[#102c3d] shadow-[inset_3px_0_0_#159b8f]" : "text-[#102c3d]/62 hover:bg-[#f5f8f5] hover:text-[#102c3d]"}`}><span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${active ? "bg-white text-[#087c73]" : "bg-[#f5f8f5] text-[#102c3d]/45 group-hover:bg-white"}`}><Icon size={16} strokeWidth={1.8} aria-hidden="true" /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{area.label}</span></span>{badge ? <span className="min-w-5 rounded-full bg-white px-1.5 text-center text-[10px] font-bold leading-5 text-[#0b6f63] ring-1 ring-[#159b8f]/15">{badge}</span> : null}</button>;
-            })}</div>
-            {secondaryNavigation.length ? <div className="mt-4 border-t border-[#102c3d]/[0.07] pt-3"><p className="px-3 pb-2 text-[9px] font-semibold uppercase tracking-[0.13em] text-[#102c3d]/35">Tools & support</p><div className="grid gap-0.5">{secondaryNavigation.map((area) => { const Icon = navigationAreaIcon(area); const active = activeArea?.key === area.key; return <button key={area.key} type="button" onClick={() => openArea(area)} aria-current={active ? "page" : undefined} className={`flex min-h-10 items-center gap-3 rounded-lg px-3 text-left text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 ${active ? "bg-[#f1f7f4] text-[#087c73]" : "text-[#102c3d]/54 hover:bg-[#f5f8f5] hover:text-[#102c3d]"}`}><Icon size={15} aria-hidden="true" />{area.label}</button>; })}</div></div> : null}
+            })}
+              {addOnNavigation.length > 0 ? (
+                <div className="mt-4 border-t border-[#102c3d]/[0.07] pt-3">
+                  <button type="button" onClick={() => setAddOnsOpen((open) => !open)} aria-expanded={addOnsOpen} aria-controls="levytate-desktop-add-ons" className="flex min-h-10 w-full items-center justify-between rounded-lg px-3 text-left text-[11px] font-semibold text-[#102c3d]/65 hover:bg-[#f5f8f5] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20">
+                    Add-ons <ChevronRight size={15} aria-hidden="true" className={addOnsOpen ? "rotate-90 transition-transform" : "transition-transform"} />
+                  </button>
+                  <div id="levytate-desktop-add-ons" className={addOnsOpen ? "grid gap-0.5" : "hidden"}>
+                    {addOnNavigation.map((area) => <DesktopAddOnNavigationArea key={area.key} area={area} active={activeArea?.key === area.key} onOpen={openArea} />)}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+            {supportNavigation.length ? <div className="mt-4 border-t border-[#102c3d]/[0.07] pt-3"><p className="px-3 pb-2 text-[9px] font-semibold uppercase tracking-[0.13em] text-[#102c3d]/35">Tools & support</p><div className="grid gap-0.5">{supportNavigation.map((area) => { const Icon = navigationAreaIcon(area); const active = activeArea?.key === area.key; return <button key={area.key} type="button" onClick={() => openArea(area)} aria-current={active ? "page" : undefined} className={`flex min-h-10 items-center gap-3 rounded-lg px-3 text-left text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 ${active ? "bg-[#f1f7f4] text-[#087c73]" : "text-[#102c3d]/54 hover:bg-[#f5f8f5] hover:text-[#102c3d]"}`}><Icon size={15} aria-hidden="true" />{area.label}</button>; })}</div></div> : null}
           </nav>
         </aside>
 
@@ -729,6 +769,21 @@ function ModuleStackNav({
   );
 }
 
+function DesktopAddOnNavigationArea({ area, active, onOpen }: {
+  area: Release2NavigationArea;
+  active: boolean;
+  onOpen: (area: Release2NavigationArea) => void;
+}) {
+  const Icon = navigationAreaIcon(area);
+  return (
+    <button type="button" onClick={() => onOpen(area)} aria-current={active ? "page" : undefined}
+      className={`flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 ${active ? "bg-[#eaf5f1] text-[#087c73]" : "text-[#102c3d]/60 hover:bg-[#f5f8f5] hover:text-[#102c3d]"}`}>
+      <Icon size={15} aria-hidden="true" />
+      <span className="truncate">{area.label}</span>
+    </button>
+  );
+}
+
 function MobileNavigationArea({ area, activeModule, moduleLabel, onOpenArea, onOpenModule }: {
   area: Release2NavigationArea;
   activeModule: ModuleName;
@@ -752,11 +807,14 @@ function navigationAreaIcon(area: Release2NavigationArea): LucideIcon {
   if (area.key === "home" || area.key === "workspaces") return LayoutDashboard;
   if (area.key === "people" || area.key === "team") return Users;
   if (area.key === "applications" || area.key === "approvals" || area.key === "application") return ClipboardCheck;
-  if (area.key === "assessments" || area.key === "development") return ClipboardList;
-  if (area.key === "support") return HeartHandshake;
-  if (area.key === "programmes") return GraduationCap;
+  if (area.key === "assessments" || area.key === "workforce") return ClipboardList;
+  if (area.key === "support" || area.key === "my-support" || area.key === "learner-support") return HeartHandshake;
+  if (area.key === "programmes" || area.key === "programme" || area.key === "development") return GraduationCap;
   if (area.key === "catalogue") return Building2;
   if (area.key === "insights") return ChartNoAxesCombined;
+  if (area.key === "provider-intelligence") return Newspaper;
+  if (area.key === "requests") return Handshake;
+  if (area.key === "learning-time") return Hourglass;
   if (area.key === "copilot") return Sparkles;
   if (area.key === "guidance") return CircleHelp;
   if (area.key === "settings" || area.key === "access") return Settings;
