@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import { employerDeliveryActionSchema, providerDeliverySubmitSchema } from "@/lib/levytate/provider-delivery";
 
 const id = "68fa3322-dfad-4a64-bb5b-8479c0f2e7c1";
@@ -33,5 +34,14 @@ describe("provider delivery evidence boundaries", () => {
     expect(employerDeliveryActionSchema.parse({ action: "review", updateId: key, decision: "accepted" }).action).toBe("review");
     expect(employerDeliveryActionSchema.safeParse({ action: "review", updateId: key, decision: "approve-and-modify-learner" }).success).toBe(false);
     expect(employerDeliveryActionSchema.safeParse({ action: "grant", providerId: "qa", enabled: true, organisationId: id }).success).toBe(false);
+  });
+  it("provider Core session validation is not hard-wired to optional Requests", () => {
+    const source = readFileSync(new URL("../lib/server/levytate-provider-auth.ts", import.meta.url), "utf8");
+    const sessionBlock = source.split("export async function readAuthorisedLevyTateProviderSession")[1]
+      ?.split("async function hasProviderWorkspaceAccess")[0];
+    expect(sessionBlock).toContain("hasProviderWorkspaceAccess(membership)");
+    expect(sessionBlock).not.toContain("hasCapabilityEnabledInvitation(membership)");
+    expect(source).toContain("if (await providerHasDeliveryAccess(membership.provider_id)) return true;");
+    expect(source).toContain("return hasCapabilityEnabledInvitation(membership);");
   });
 });
