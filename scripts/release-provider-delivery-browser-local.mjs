@@ -127,6 +127,58 @@ try{
   const canonical=await backend(`rest/v1/levytate_learner_progress_updates?organisation_id=eq.${fixture.organisationId}&select=id,learner_record_id,progress_source&order=id`);
   check("review leaves existing authoritative learner progress history unchanged",
     JSON.stringify(canonical)===JSON.stringify(canonicalBefore));
+  stage="provider learner progress submission";
+  await p.getByRole("radio",{name:"Learner progress"}).check();
+  await p.locator("#delivery-target").selectOption(fixture.learnerId);
+  await p.locator("#delivery-progress").fill("45");
+  await p.locator("#delivery-summary").fill("Fictional learner milestone: assessed progress is 45 percent.");
+  const learnerPost=p.waitForResponse(response=>new URL(response.url()).pathname==="/api/levytate-provider/delivery"
+    && response.request().method()==="POST");
+  await p.getByRole("button",{name:"Submit for employer review"}).click();
+  const learnerResponse=await learnerPost;
+  const learnerBody=await learnerResponse.json();
+  check("provider submits one pending learner progress report",learnerResponse.status()===201&&
+    learnerBody.update?.kind==="learner_progress"&&learnerBody.update?.targetId===fixture.learnerId&&
+    learnerBody.update?.status==="pending");
+
+  stage="employer atomic learner promotion";
+  await panel.getByRole("button",{name:"Refresh provider reports"}).click();
+  await panel.getByText("Awaiting your review (1)").waitFor();
+  const canonicalPrePromotion=await backend(
+    `rest/v1/levytate_learner_progress_updates?organisation_id=eq.${fixture.organisationId}&learner_record_id=eq.${fixture.learnerId}&select=id`);
+  check("fictional learner has existing target evidence, not provider-created rows",canonicalPrePromotion.length===1);
+  const learnerApproval=l.waitForResponse(response=>new URL(response.url()).pathname==="/api/levytate-employer/provider-delivery"
+    && response.request().method()==="POST");
+  await panel.getByRole("button",{name:"Accept report"}).click();
+  check("employer accepted learner progress through protected API",(await learnerApproval).status()===200);
+  const promoted=await backend(
+    `rest/v1/levytate_learner_progress_updates?organisation_id=eq.${fixture.organisationId}&learner_record_id=eq.${fixture.learnerId}&select=id,target_progress_percentage,actual_progress_percentage,variance_percentage,progress_source,source_reference&order=created_at.desc`);
+  check("official learner progress contains exactly one employer-approved provider report",
+    promoted.length===2&&promoted.some(row=>row.actual_progress_percentage===45&&row.target_progress_percentage===40
+      &&row.variance_percentage===5&&row.progress_source==="provider_report"
+      &&row.source_reference===`provider-delivery:${learnerBody.update.id}`));
+  const ledger=await backend(
+    `rest/v1/levytate_learner_records?organisation_id=eq.${fixture.organisationId}&id=eq.${fixture.learnerId}&select=mutation_revision`);
+  check("learner revision advances exactly once",ledger.length===1&&ledger[0].mutation_revision===1);
+  const source=await backend(
+    `rest/v1/levytate_provider_delivery_updates?id=eq.${learnerBody.update.id}&select=review_status,promoted_progress_id`);
+  check("provider report is directly linked to official learner progress",
+    source.length===1&&source[0].review_status==="accepted"&&
+    promoted.some(row=>row.id===source[0].promoted_progress_id));
+  const official=await lead.request.get(`${app}/api/levytate-learners/${fixture.learnerId}/progress`);
+  const officialBody=await official.json();
+  check("employer learner progress API immediately reflects approved evidence",
+    official.status()===200&&officialBody.progress?.some(item=>item.actualProgressPercentage===45&&
+      item.sourceReference===`provider-delivery:${learnerBody.update.id}`));
+  const retry=await lead.request.post(`${app}/api/levytate-employer/provider-delivery`,{
+    headers:{Origin:app},
+    data:{action:"review",updateId:learnerBody.update.id,decision:"accepted",expectedLearnerRevision:0},
+  });
+  const postRetry=await backend(
+    `rest/v1/levytate_learner_progress_updates?organisation_id=eq.${fixture.organisationId}&learner_record_id=eq.${fixture.learnerId}&select=id`);
+  check("lost-response retry is idempotent with no duplicate learner progress",
+    retry.status()===200&&postRetry.length===2);
+
   stage="employer grant revocation";
   l.on("dialog",dialog=>void dialog.accept());
   const revoke=l.waitForResponse(response=>new URL(response.url()).pathname==="/api/levytate-employer/provider-delivery"&&response.request().method()==="POST");
