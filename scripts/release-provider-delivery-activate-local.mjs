@@ -25,10 +25,12 @@ function sql(input) {
   if (output.status !== 0) throw Error("BLOCKED: local provider candidate SQL failed; raw credentials and SQL output withheld");
   return output.stdout.trim();
 }
-if (sql("select json_build_object('candidateMissing',to_regclass('public.levytate_provider_delivery_updates') is null,'restricted038Missing',to_regclass('public.levytate_pastoral_support_actions') is null);")
-  !== '{"candidateMissing":true,"restricted038Missing":true}') throw Error("BLOCKED: unexpected local schema already present");
+const before = JSON.parse(sql("select json_build_object('candidateMissing',to_regclass('public.levytate_provider_delivery_updates') is null,'restricted038Missing',to_regclass('public.levytate_pastoral_support_actions') is null);"));
+if (before.candidateMissing !== true || before.restricted038Missing !== true)
+  throw Error("BLOCKED: unexpected local schema already present");
 const candidate = readFileSync("supabase/candidates/provider-delivery-v1.sql","utf8");
 sql(`begin;\n${candidate}\ncommit;\n`);
-if (sql("select json_build_object('candidatePresent',to_regclass('public.levytate_provider_delivery_updates') is not null,'restricted038Missing',to_regclass('public.levytate_pastoral_support_actions') is null);")
-  !== '{"candidatePresent":true,"restricted038Missing":true}') throw Error("BLOCKED: local candidate activation could not be verified");
+const after = JSON.parse(sql("select json_build_object('candidatePresent',to_regclass('public.levytate_provider_delivery_updates') is not null,'restricted038Missing',to_regclass('public.levytate_pastoral_support_actions') is null);"));
+if (after.candidatePresent !== true || after.restricted038Missing !== true)
+  throw Error("BLOCKED: local candidate activation could not be verified");
 console.log("PASS: isolated ephemeral provider delivery schema activated only in disposable local acceptance database");
