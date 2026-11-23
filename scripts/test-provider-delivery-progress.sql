@@ -85,7 +85,7 @@ begin
   raise notice 'LEVYTATE_TEST_PHASE_FIRST_APPROVAL';
   v_result:=public.levytate_review_provider_delivery_update(v_org,v_lead,(v_result->>'id')::uuid,'accepted',0);
   v_progress_id:=v_result->>'promoted_progress_id';
-  if v_result->>'review_status'<>'accepted' or v_progress_id<>'provider-progress-'||v_result->>'id'
+  if v_result->>'review_status'<>'accepted' or v_progress_id<>('provider-progress-'||(v_result->>'id'))
     or (select mutation_revision from public.levytate_learner_records
       where organisation_id=v_org and id=v_learner)<>1 then
     raise exception 'Approval did not link canonical progress and revision'; end if;
@@ -93,7 +93,7 @@ begin
       organisation_id=v_org and id=v_progress_id and learner_record_id=v_learner
       and target_progress_percentage=42 and actual_progress_percentage=47 and variance_percentage=5
       and update_date=current_date and progress_source='provider_report'
-      and source_reference='provider-delivery:'||v_result->>'id'
+      and source_reference=('provider-delivery:'||(v_result->>'id'))
       and updated_by=(select email from public.levytate_users where id=v_lead)) then
     raise exception 'Canonical progress values or provenance mismatch'; end if;
   if (select count(*) from public.levytate_learner_lifecycle_events where
