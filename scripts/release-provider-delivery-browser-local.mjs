@@ -21,7 +21,7 @@ const modulePath=process.env.RELEASE_PLAYWRIGHT_MODULE;
 if(!modulePath?.startsWith("/"))throw Error("BLOCKED: pinned local Playwright required");
 const {chromium}=await import(pathToFileURL(modulePath).href);
 const release=lockAcceptanceRuntime("genuine-provider-delivery-browser");
-let browser,provider,lead,passes=0;
+let browser,provider,lead,passes=0,stage="initialisation";
 function check(label,condition) {
   if(!condition)throw Error(`FAIL provider Core acceptance: ${label}`);
   passes++;
@@ -58,10 +58,18 @@ try{
   const loginPost=p.waitForResponse(response=>new URL(response.url()).pathname==="/api/levytate-provider-auth/request");
   await p.getByRole("button",{name:"Send secure sign-in link"}).click();
   check("provider secure-link request accepted",(await loginPost).status()===200);
+  stage="provider magic-link capture";
   const link=await capturedLink(fixture.providerEmail,"/levytate/provider/auth/callback",started);
+  stage="provider callback";
   await p.goto(link);
-  await p.waitForURL(url=>url.pathname==="/levytate/provider/delivery",{timeout:30000});
+  const callbackPath = new URL(p.url()).pathname;
+  console.log("DIAGNOSTIC fictional provider callback path:", callbackPath);
+  if (callbackPath==="/levytate/provider/login" || callbackPath.startsWith("/404")) 
+    throw Error("Provider callback did not establish a delivery session");
+  stage="provider delivery redirect";
+  await p.waitForURL(url=>url.pathname==="/levytate/provider/delivery",{timeout:45000});
   check("provider redirected to Core delivery workspace",await p.getByRole("heading",{name:"Programme & learner updates"}).count()===1);
+  stage="provider workspace API read";
   const view=await provider.request.get(`${app}/api/levytate-provider/delivery`);
   const initial=await view.json();
   check("exactly one employer and selected programme shared",view.status()===200&&
@@ -75,6 +83,7 @@ try{
       payload:{reportDate:new Date().toISOString().slice(0,10),deliveryNote:"Synthetic disallowed",capacityStatus:"unknown"}},
   });
   check("provider cannot submit to ungranted employer",notGranted.status()===403);
+  stage="provider programme submission";
   await p.getByRole("radio",{name:"Programme delivery"}).check();
   await p.locator("#delivery-target").selectOption(fixture.programmeId);
   await p.locator("#delivery-summary").fill("Synthetic delivery evidence: January intake capacity is limited.");
@@ -87,6 +96,7 @@ try{
     body.update?.status==="pending"&&body.update?.targetId===fixture.programmeId);
   const before=await backend(`rest/v1/levytate_provider_delivery_updates?organisation_id=eq.${fixture.organisationId}&select=id,review_status`);
   check("one provider report exists in durable database",before.length===1&&before[0].review_status==="pending");
+  stage="employer lead reauthentication";
   lead=await browser.newContext({viewport:{width:1280,height:900}});
   const l=await lead.newPage();
   await l.goto(`${app}/levytate/login`);
@@ -103,6 +113,7 @@ try{
     await l.getByRole("checkbox").check();
     await l.getByRole("button",{name:"Accept Early Access Terms"}).click();
   }
+  stage="employer evidence review";
   await l.goto(`${app}/levytate/app?module=My%20Providers`);
   const panel=l.getByTestId("employer-provider-delivery");
   await panel.waitFor({timeout:30000});
@@ -114,6 +125,7 @@ try{
   check("accepted report persisted with review date",rows.length===1&&rows[0].review_status==="accepted"&&Boolean(rows[0].reviewed_at));
   const canonical=await backend(`rest/v1/levytate_learner_progress_updates?organisation_id=eq.${fixture.organisationId}&select=id`);
   check("review did not modify authoritative learner progress ledger",canonical.length===0);
+  stage="employer grant revocation";
   l.on("dialog",dialog=>void dialog.accept());
   const revoke=l.waitForResponse(response=>new URL(response.url()).pathname==="/api/levytate-employer/provider-delivery"&&response.request().method()==="POST");
   await panel.getByRole("button",{name:"Revoke access"}).click();
@@ -123,7 +135,7 @@ try{
   console.log(`Provider delivery local browser result: ${passes} PASS, 0 FAIL, 0 external emails`);
 }catch(error){
   console.error(error instanceof Error&&error.message.startsWith("BLOCKED:")?error.message:
-    "FAIL provider Core browser acceptance; local auth state and request payloads withheld");
+    `FAIL provider Core browser acceptance during ${stage}; local auth state and request payloads withheld`);
   process.exitCode=1;
 }finally{
   try{await provider?.close();}catch{}
