@@ -96,6 +96,7 @@ try{
     body.update?.status==="pending"&&body.update?.targetId===fixture.programmeId);
   const before=await backend(`rest/v1/levytate_provider_delivery_updates?organisation_id=eq.${fixture.organisationId}&select=id,review_status`);
   check("one provider report exists in durable database",before.length===1&&before[0].review_status==="pending");
+  const canonicalBefore=await backend(`rest/v1/levytate_learner_progress_updates?organisation_id=eq.${fixture.organisationId}&select=id,learner_record_id,progress_source&order=id`);
   stage="employer lead reauthentication";
   lead=await browser.newContext({viewport:{width:1280,height:900}});
   const l=await lead.newPage();
@@ -123,8 +124,9 @@ try{
   check("employer accepted provider evidence via protected API",(await approve).status()===200);
   const rows=await backend(`rest/v1/levytate_provider_delivery_updates?organisation_id=eq.${fixture.organisationId}&select=id,review_status,reviewed_at`);
   check("accepted report persisted with review date",rows.length===1&&rows[0].review_status==="accepted"&&Boolean(rows[0].reviewed_at));
-  const canonical=await backend(`rest/v1/levytate_learner_progress_updates?organisation_id=eq.${fixture.organisationId}&select=id`);
-  check("review did not modify authoritative learner progress ledger",canonical.length===0);
+  const canonical=await backend(`rest/v1/levytate_learner_progress_updates?organisation_id=eq.${fixture.organisationId}&select=id,learner_record_id,progress_source&order=id`);
+  check("review leaves existing authoritative learner progress history unchanged",
+    JSON.stringify(canonical)===JSON.stringify(canonicalBefore));
   stage="employer grant revocation";
   l.on("dialog",dialog=>void dialog.accept());
   const revoke=l.waitForResponse(response=>new URL(response.url()).pathname==="/api/levytate-employer/provider-delivery"&&response.request().method()==="POST");
