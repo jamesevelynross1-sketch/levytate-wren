@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, RefreshCw, ShieldCheck } from "lucide-react";
 import type { EmployerDeliveryWorkspace, ProviderDeliveryUpdateView } from "@/lib/levytate/provider-delivery";
+import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 
 export function EmployerProviderUpdatesPanel() {
+  const { sessionReconnect } = useMvpWorkspace();
   const [data,setData]=useState<EmployerDeliveryWorkspace|null>(null);
   const [error,setError]=useState("");
   const [busy,setBusy]=useState(false);
@@ -36,6 +38,12 @@ export function EmployerProviderUpdatesPanel() {
       const body=await response.json() as {message?:string;workspace?:EmployerDeliveryWorkspace};
       if(!response.ok||!body.workspace)throw Error(body.message??"The update could not be confirmed.");
       setData(body.workspace);
+      if(value.action==="review" && value.decision==="accepted" &&
+        body.workspace.updates.some(update=>update.id===value.updateId &&
+          update.kind==="learner_progress" && Boolean(update.promotedProgressId))) {
+        // Refresh employer learner register and MI without overwriting an open form.
+        await sessionReconnect?.reconnect();
+      }
     }catch(ex){setError(ex instanceof Error?ex.message:"The update could not be confirmed.");}
     finally{setBusy(false);}
   }
@@ -46,7 +54,7 @@ export function EmployerProviderUpdatesPanel() {
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div><p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.12em] text-[#0b776e]"><ShieldCheck size={16}/> Core provider collaboration</p>
         <h2 className="mt-2 text-xl font-semibold">Provider delivery updates</h2>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-[#102c3d]/60">Grant access to selected providers. Reports appear here for your review, with sources and dates. They never automatically overwrite learner or programme records.</p></div>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-[#102c3d]/60">Grant access to selected providers. Reports appear here for your review, with sources and dates. Only employer-accepted learner progress reports enter the official learner progress record. Programme notes remain attributed evidence; neither source can change catalogue standards or compliance decisions automatically.</p></div>
       <button type="button" disabled={busy} onClick={()=>void refresh().catch(()=>setError("Could not refresh provider reports."))}
         aria-label="Refresh provider reports" className="grid h-11 w-11 place-items-center rounded-xl border border-[#102c3d]/10"><RefreshCw size={17}/></button>
     </div>
@@ -64,7 +72,8 @@ export function EmployerProviderUpdatesPanel() {
       <div><h3 className="text-base font-semibold">Awaiting your review ({pending.length})</h3>
         <div className="mt-3 grid gap-3 lg:grid-cols-2">{pending.length?pending.slice(0,40).map(update=><ReportCard key={update.id} update={update} providerName={data.grants.find(g=>g.providerId===update.providerId)?.providerName??"Provider"}>
           <div className="mt-4 flex flex-wrap gap-2">
-            <button type="button" disabled={busy} onClick={()=>void action({action:"review",updateId:update.id,decision:"accepted"})} className="min-h-11 rounded-full bg-[#eaf5f1] px-4 text-xs font-semibold text-[#087c73]">Accept report</button>
+            <button type="button" disabled={busy||(update.kind==="learner_progress"&&update.expectedLearnerRevision==null)} onClick={()=>void action({action:"review",updateId:update.id,decision:"accepted",
+              expectedLearnerRevision:update.kind==="learner_progress"?update.expectedLearnerRevision??null:null})} className="min-h-11 rounded-full bg-[#eaf5f1] px-4 text-xs font-semibold text-[#087c73]">Accept report</button>
             <button type="button" disabled={busy} onClick={()=>void action({action:"review",updateId:update.id,decision:"rejected"})} className="min-h-11 rounded-full border border-[#ad344e]/20 px-4 text-xs font-semibold text-[#ad344e]">Reject report</button>
           </div>
         </ReportCard>):<p className="text-sm text-[#102c3d]/55">No submissions need review.</p>}</div>
@@ -87,7 +96,10 @@ function ReportCard({update,providerName,children}:{update:ProviderDeliveryUpdat
     <p className="mt-2 text-sm font-semibold">Source date: {update.reportDate}</p>
     <p className="mt-2 text-sm leading-6 text-[#102c3d]/75">{text}</p>
     {update.kind==="learner_progress"&&"actualProgressPercentage" in update.payload
-      ? <p className="mt-2 text-xs text-[#102c3d]/60">Provider-reported actual progress: {update.payload.actualProgressPercentage}% · not an official progression decision</p>:null}
+      ? <p className="mt-2 text-xs text-[#102c3d]/60">Provider-reported actual progress: {update.payload.actualProgressPercentage}% · becomes an employer-approved learner progress entry if accepted</p>:null}
+    {update.promotedProgressId?<p className="mt-2 text-xs font-semibold text-[#087c73]">Added to official learner progress · source linked and audited</p>:null}
+    {update.kind==="learner_progress"&&update.status==="pending"&&update.expectedLearnerRevision==null
+      ? <p className="mt-2 text-xs font-semibold text-[#af3452]">Learner record is unavailable for approval. Refresh or review the learner first.</p>:null}
     <p className="mt-2 text-[11px] text-[#102c3d]/45">Received {new Date(update.submittedAt).toLocaleDateString("en-GB")}</p>
     {children}
   </article>;

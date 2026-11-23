@@ -29,6 +29,12 @@ describe("provider delivery evidence boundaries", () => {
     expect(providerDeliverySubmitSchema.safeParse(proposal).success).toBe(true);
     expect(providerDeliverySubmitSchema.safeParse({ ...proposal, payload: { ...proposal.payload, fundingBand: 10000 } }).success).toBe(false);
   });
+  it("requires a non-negative learner revision when the employer supplies one", () => {
+    expect(employerDeliveryActionSchema.safeParse({action:"review",updateId:key,decision:"accepted",expectedLearnerRevision:3}).success).toBe(true);
+    expect(employerDeliveryActionSchema.safeParse({action:"review",updateId:key,decision:"accepted",expectedLearnerRevision:-1}).success).toBe(false);
+    expect(employerDeliveryActionSchema.safeParse({action:"review",updateId:key,decision:"accepted",expectedLearnerRevision:"3"}).success).toBe(false);
+    expect(employerDeliveryActionSchema.safeParse({action:"review",updateId:key,decision:"rejected",expectedLearnerRevision:null}).success).toBe(true);
+  });
   it("allows only explicit employer grant or accept/reject decisions", () => {
     expect(employerDeliveryActionSchema.parse({ action: "grant", providerId: "qa", enabled: true }).action).toBe("grant");
     expect(employerDeliveryActionSchema.parse({ action: "review", updateId: key, decision: "accepted" }).action).toBe("review");

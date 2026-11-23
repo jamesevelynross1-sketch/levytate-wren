@@ -152,12 +152,12 @@ export function ProviderDeliveryWorkspace({initialWorkspace,opportunitiesAvailab
           <div className="flex items-center justify-between gap-3"><h2 className="text-xl font-semibold">Submission history</h2>
             <button type="button" aria-label="Refresh submissions" onClick={()=>void refresh().catch(()=>setError("Could not refresh updates."))}
               className="grid h-11 w-11 place-items-center rounded-xl border border-[#102c3d]/10"><RefreshCw size={17}/></button></div>
-          <p className="mt-2 text-sm text-[#102c3d]/60">Source: {employer.name}. Employer-accepted reports remain separate from official learner records.</p>
+          <p className="mt-2 text-sm text-[#102c3d]/60">Source: {employer.name}. Employer-approved learner progress reports become official learner progress entries; programme notes remain separate evidence.</p>
           <div className="mt-5 space-y-3">{recent.length?recent.slice(0,30).map(item=><article key={item.id} className="rounded-xl border border-[#102c3d]/10 p-4">
             <div className="flex items-center justify-between gap-2"><span className="text-xs font-semibold text-[#102c3d]/55">{item.kind==="learner_progress"?"Learner progress":"Programme delivery"} · {item.reportDate}</span>
               <span className="rounded-full bg-[#f2f5f3] px-2 py-1 text-xs font-semibold capitalize">{item.status}</span></div>
             <p className="mt-2 text-sm leading-6">{item.kind==="learner_progress"?"summary" in item.payload?item.payload.summary:"":"deliveryNote" in item.payload?item.payload.deliveryNote:""}</p>
-            <p className="mt-2 text-xs text-[#102c3d]/50">{item.status==="pending"?"Awaiting employer review":`Employer ${item.status}`}</p>
+            <p className="mt-2 text-xs text-[#102c3d]/50">{item.promotedProgressId?"Included in official learner progress":item.status==="pending"?"Awaiting employer review":`Employer ${item.status}`}</p>
           </article>):<p className="rounded-xl border border-dashed border-[#102c3d]/15 p-5 text-sm text-[#102c3d]/60">No delivery updates submitted yet.</p>}</div>
         </section>
       </div>:<p role="alert">No authorised employer is currently available.</p>}

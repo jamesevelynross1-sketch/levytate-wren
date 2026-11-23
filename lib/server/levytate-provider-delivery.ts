@@ -23,11 +23,12 @@ type ProgrammeRow = { organisation_id: string; programme_id: string; provider_id
 type CanonicalProgrammeRow = { id: string; programme_name: string };
 type CanonicalProviderRow = { provider_id: string; provider_name: string };
 type LearnerRow = { id: string; employee_id: string; programme_id: string; provider_id: string; lifecycle_status: string; record_status: string };
+type LearnerRevisionRow = { id: string; mutation_revision: number; lifecycle_status: string; record_status: string };
 type EmployeeRow = { id: string; name: string };
 type UpdateRow = {
   id: string; organisation_id: string; provider_id: string; update_kind: "learner_progress"|"programme_note";
   target_id: string; report_date: string; payload: ProviderDeliveryUpdateView["payload"];
-  review_status: "pending"|"accepted"|"rejected"; submitted_at: string; reviewed_at: string|null; idempotency_key: string;
+  review_status: "pending"|"accepted"|"rejected"; submitted_at: string; reviewed_at: string|null; idempotency_key: string; promoted_progress_id: string|null;
 };
 
 const acceptedLearnerStatuses = new Set(["enrolled", "assessment_preparation", "in_assessment"]);
@@ -95,11 +96,12 @@ function toUpdateView(row: UpdateRow): ProviderDeliveryUpdateView {
     kind: row.update_kind, targetId: row.target_id, reportDate: row.report_date,
     payload: row.payload, status: row.review_status, submittedAt: row.submitted_at, reviewedAt: row.reviewed_at,
     requestKey: row.idempotency_key,
+    promotedProgressId: row.promoted_progress_id,
   };
 }
 async function updatesForOrganisation(organisationId: string, providerId?: string) {
   const rows = await supabaseSelectAll<UpdateRow>(config(), "levytate_provider_delivery_updates", new URLSearchParams({
-    select: "id,organisation_id,provider_id,update_kind,target_id,report_date,payload,review_status,submitted_at,reviewed_at,idempotency_key",
+    select: "id,organisation_id,provider_id,update_kind,target_id,report_date,payload,review_status,submitted_at,reviewed_at,idempotency_key,promoted_progress_id",
     organisation_id: `eq.${organisationId}`,
     ...(providerId ? { provider_id: `eq.${providerId}` } : {}),
     order: "submitted_at.desc,id.desc",
@@ -199,7 +201,7 @@ export async function getEmployerDeliveryWorkspace(session: LevyTateBetaSession)
   if (!isProviderDeliveryEnvironmentEnabled()) return null;
   const context=await employerContext(session);
   const org=context.organisation.id;
-  const [selected,grants,updates,catalogue]=await Promise.all([
+  const [selected,grants,updates,catalogue,learnerRevisions]=await Promise.all([
     supabaseSelectAll<SelectionRow>(config(),"levytate_organisation_providers",new URLSearchParams({
       select:"organisation_id,provider_id,status",organisation_id:`eq.${org}`,status:"eq.Active",
     }),{maxRows:500}),
@@ -208,11 +210,18 @@ export async function getEmployerDeliveryWorkspace(session: LevyTateBetaSession)
     }),{maxRows:500}),
     updatesForOrganisation(org),
     canonicalCatalogue(),
+    supabaseSelectAll<LearnerRevisionRow>(config(),"levytate_learner_records",new URLSearchParams({
+      select:"id,mutation_revision,lifecycle_status,record_status",
+      organisation_id:`eq.${org}`,record_status:"eq.Active",
+    }),{maxRows:10000}),
   ]);
   const enabled = new Map(grants.map(row=>[row.provider_id,row.enabled]));
+  const revisionByLearner = new Map(learnerRevisions.map(row=>[row.id,row.mutation_revision]));
   return {
     grants:selected.map(item=>({providerId:item.provider_id,providerName:catalogue.providerNames.get(item.provider_id)??"Selected provider",enabled:enabled.get(item.provider_id)===true})),
-    updates,
+    updates:updates.map(update=>update.kind==="learner_progress"&&update.status==="pending"
+      ? {...update,expectedLearnerRevision:revisionByLearner.get(update.targetId)??null}
+      : update),
   };
 }
 
@@ -233,6 +242,7 @@ export async function applyEmployerDeliveryAction(session: LevyTateBetaSession,r
     method:"POST",body:JSON.stringify({
       p_organisation_id:context.organisation.id,p_actor_user_id:context.user.id,
       p_update_id:action.updateId,p_decision:action.decision,
+      p_expected_learner_revision:action.expectedLearnerRevision??null,
     }),
   });
   return toUpdateView(saved);
