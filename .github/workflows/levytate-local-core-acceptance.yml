@@ -103,6 +103,11 @@ jobs:
           node scripts/release-local-command.mjs seed
           echo 'PASS: local fictional employers and programme catalogue prepared'
 
+      - name: Validate provider-delivery SQL candidate in rolled-back fictional transaction
+        run: |
+          node scripts/release-provider-delivery-local.mjs
+          echo 'Provider delivery schema stays unapplied after the verification transaction.'
+
       - name: Start local-only email hook and application
         run: |
           set -euo pipefail
