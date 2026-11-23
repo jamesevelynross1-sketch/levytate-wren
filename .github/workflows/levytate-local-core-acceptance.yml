@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - codex/levytate-core-local-20261122
+      - codex/levytate-provider-delivery-v1-20261123
   workflow_dispatch:
 
 permissions:
