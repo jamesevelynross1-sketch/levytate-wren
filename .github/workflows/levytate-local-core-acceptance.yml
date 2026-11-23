@@ -5,6 +5,7 @@ on:
     branches:
       - codex/levytate-core-local-20261122
       - codex/levytate-provider-delivery-v1-20261123
+      - codex/levytate-provider-progress-promotion-20261123
   workflow_dispatch:
 
 permissions:

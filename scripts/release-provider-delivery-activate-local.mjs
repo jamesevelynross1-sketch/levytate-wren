@@ -29,7 +29,8 @@ const before = JSON.parse(sql("select json_build_object('candidateMissing',to_re
 if (before.candidateMissing !== true || before.restricted038Missing !== true)
   throw Error("BLOCKED: unexpected local schema already present");
 const candidate = readFileSync("supabase/candidates/provider-delivery-v1.sql","utf8");
-sql(`begin;\n${candidate}\ncommit;\n`);
+const promotion = readFileSync("supabase/candidates/provider-delivery-progress-v2.sql","utf8");
+sql(`begin;\n${candidate}\n${promotion}\ncommit;\n`);
 const after = JSON.parse(sql("select json_build_object('candidatePresent',to_regclass('public.levytate_provider_delivery_updates') is not null,'restricted038Missing',to_regclass('public.levytate_pastoral_support_actions') is null);"));
 if (after.candidatePresent !== true || after.restricted038Missing !== true)
   throw Error("BLOCKED: local candidate activation could not be verified");
