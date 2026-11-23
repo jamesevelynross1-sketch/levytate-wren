@@ -12,6 +12,8 @@ declare
   v_member uuid;
   v_learner text:='provider-progress-local-'||gen_random_uuid()::text;
   v_new_no_baseline text:='provider-no-baseline-'||gen_random_uuid()::text;
+  v_no_baseline_employee text:='a-provider-no-baseline-'||gen_random_uuid()::text;
+  v_withdrawn_employee text:='a-provider-withdrawn-'||gen_random_uuid()::text;
   v_withdrawn text:='provider-withdrawn-'||gen_random_uuid()::text;
   v_id uuid;
   v_second uuid;
@@ -145,11 +147,19 @@ begin
 
   -- No baseline is no approval: a target must never be fabricated.
   raise notice 'LEVYTATE_TEST_PHASE_MISSING_BASELINE';
+  -- The real product enforces one active learner per employee. Give each
+  -- negative scenario its own fictional employee rather than bypassing it.
+  insert into public.levytate_employees(
+    organisation_id,id,employee_number,name,email,platform_role,status,start_date
+  ) values(
+    v_org,v_no_baseline_employee,'NOBASE-'||gen_random_uuid()::text,
+    'Synthetic baseline absent','provider-baseline-absent@example.test','Employee','Active',current_date-180
+  );
   insert into public.levytate_learner_records(
     organisation_id,id,employee_id,programme_id,provider_id,lifecycle_status,employment_route,
     actual_start_date,expected_end_date,record_status,demonstration_record
   ) values(
-    v_org,v_new_no_baseline,v_employee,v_programme,v_provider,'enrolled','existing_employee_upskill',
+    v_org,v_new_no_baseline,v_no_baseline_employee,v_programme,v_provider,'enrolled','existing_employee_upskill',
     current_date-90,current_date+200,'Active',false
   );
   v_result:=public.levytate_submit_provider_delivery_update(v_org,v_provider,v_member,'learner_progress',v_new_no_baseline,
@@ -162,11 +172,17 @@ begin
 
   -- Withdrawn learners are never progress-eligible, regardless of client version.
   raise notice 'LEVYTATE_TEST_PHASE_WITHDRAWN';
+  insert into public.levytate_employees(
+    organisation_id,id,employee_number,name,email,platform_role,status,start_date
+  ) values(
+    v_org,v_withdrawn_employee,'WITHDRAW-'||gen_random_uuid()::text,
+    'Synthetic withdrawn learner','provider-withdrawn@example.test','Employee','Active',current_date-180
+  );
   insert into public.levytate_learner_records(
     organisation_id,id,employee_id,programme_id,provider_id,lifecycle_status,employment_route,
     actual_start_date,expected_end_date,record_status,demonstration_record
   ) values(
-    v_org,v_withdrawn,v_employee,v_programme,v_provider,'enrolled','existing_employee_upskill',
+    v_org,v_withdrawn,v_withdrawn_employee,v_programme,v_provider,'enrolled','existing_employee_upskill',
     current_date-90,current_date+200,'Active',false
   );
   insert into public.levytate_learner_progress_updates(
