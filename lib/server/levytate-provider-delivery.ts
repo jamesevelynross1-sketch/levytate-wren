@@ -27,7 +27,7 @@ type EmployeeRow = { id: string; name: string };
 type UpdateRow = {
   id: string; organisation_id: string; provider_id: string; update_kind: "learner_progress"|"programme_note";
   target_id: string; report_date: string; payload: ProviderDeliveryUpdateView["payload"];
-  review_status: "pending"|"accepted"|"rejected"; submitted_at: string; reviewed_at: string|null;
+  review_status: "pending"|"accepted"|"rejected"; submitted_at: string; reviewed_at: string|null; idempotency_key: string;
 };
 
 const acceptedLearnerStatuses = new Set(["enrolled", "assessment_preparation", "in_assessment"]);
@@ -94,11 +94,12 @@ function toUpdateView(row: UpdateRow): ProviderDeliveryUpdateView {
     id: row.id, organisationId: row.organisation_id, providerId: row.provider_id,
     kind: row.update_kind, targetId: row.target_id, reportDate: row.report_date,
     payload: row.payload, status: row.review_status, submittedAt: row.submitted_at, reviewedAt: row.reviewed_at,
+    requestKey: row.idempotency_key,
   };
 }
 async function updatesForOrganisation(organisationId: string, providerId?: string) {
   const rows = await supabaseSelectAll<UpdateRow>(config(), "levytate_provider_delivery_updates", new URLSearchParams({
-    select: "id,organisation_id,provider_id,update_kind,target_id,report_date,payload,review_status,submitted_at,reviewed_at",
+    select: "id,organisation_id,provider_id,update_kind,target_id,report_date,payload,review_status,submitted_at,reviewed_at,idempotency_key",
     organisation_id: `eq.${organisationId}`,
     ...(providerId ? { provider_id: `eq.${providerId}` } : {}),
     order: "submitted_at.desc,id.desc",

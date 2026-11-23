@@ -56,6 +56,7 @@ export type ProviderDeliveryUpdateView = {
   status: ProviderDeliveryReviewStatus;
   submittedAt: string;
   reviewedAt: string | null;
+  requestKey: string;
 };
 
 export type ProviderDeliveryEmployer = {

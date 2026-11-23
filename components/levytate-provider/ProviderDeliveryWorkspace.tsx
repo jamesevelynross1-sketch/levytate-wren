@@ -33,6 +33,7 @@ export function ProviderDeliveryWorkspace({initialWorkspace,opportunitiesAvailab
     if(!response.ok)throw Error("Workspace unavailable");
     const body=await response.json() as {workspace:Workspace};
     setWorkspace(body.workspace);
+    return body.workspace;
   }
   async function submit(update:ProviderDeliverySubmission){
     setBusy(true);setError("");setMessage("");
@@ -138,7 +139,11 @@ export function ProviderDeliveryWorkspace({initialWorkspace,opportunitiesAvailab
               <p>Submission status is uncertain. The original update has been retained unchanged to prevent duplicates.</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <button type="button" disabled={busy} onClick={()=>void submit(retained)} className="min-h-11 rounded-full bg-[#102c3d] px-4 font-semibold text-white">Retry original update</button>
-                <button type="button" disabled={busy} onClick={()=>{void refresh().then(()=>setRetained(null)).catch(()=>setError("Unable to reconcile status; try again."))}} className="min-h-11 rounded-full border px-4">Check current status</button>
+                <button type="button" disabled={busy} onClick={()=>{void refresh().then(updated=>{
+                  const found=updated.employers.flatMap(item=>item.updates).some(item=>item.requestKey===retained.idempotencyKey);
+                  if(found){setRetained(null);setMessage("Original update found in the employer review queue.");}
+                  else setError("No matching receipt yet. Retry the original update; do not create a duplicate.");
+                }).catch(()=>setError("Unable to reconcile status; try again."))}} className="min-h-11 rounded-full border px-4">Check current status</button>
               </div>
             </div>:<button type="submit" disabled={busy||!targetId||!summary.trim()} className="min-h-12 rounded-full bg-[#102c3d] px-6 text-sm font-semibold text-white disabled:opacity-40">{busy?"Submitting…":"Submit for employer review"}</button>}
           </form>
