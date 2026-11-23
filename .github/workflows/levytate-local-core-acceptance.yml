@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - codex/levytate-core-local-20261122
+      - codex/levytate-provider-delivery-v1-20261123
   workflow_dispatch:
 
 permissions:
@@ -103,6 +104,11 @@ jobs:
           node scripts/release-local-command.mjs seed
           echo 'PASS: local fictional employers and programme catalogue prepared'
 
+      - name: Validate provider-delivery SQL candidate in rolled-back fictional transaction
+        run: |
+          node scripts/release-provider-delivery-local.mjs
+          echo 'Provider delivery schema stays unapplied after the verification transaction.'
+
       - name: Start local-only email hook and application
         run: |
           set -euo pipefail
@@ -132,6 +138,52 @@ jobs:
           node scripts/release-local-command.mjs browser
 
       - name: Stop local-only app and email hook
+        if: always()
+        run: |
+          for variable in LEVYTATE_APP_PID LEVYTATE_HOOK_PID; do
+            pid="${!variable:-}"
+            if [[ "$pid" =~ ^[0-9]+$ ]]; then kill "$pid" >/dev/null 2>&1 || :; fi
+          done
+
+      - name: Activate provider candidate on disposable LOCAL database only
+        env:
+          RELEASE_PROVIDER_DELIVERY_LOCAL_ENABLE: "true"
+        run: node scripts/release-provider-delivery-activate-local.mjs
+
+      - name: Create one fictional provider with an employer grant
+        env:
+          RELEASE_PROVIDER_DELIVERY_LOCAL_ENABLE: "true"
+        run: node scripts/release-local-command.mjs provider-seed
+
+      - name: Start new local-only app and email hook for provider Core acceptance
+        env:
+          LEVYTATE_PROVIDER_DELIVERY_ENABLED: "true"
+          RELEASE_PROVIDER_DELIVERY_LOCAL_ENABLE: "true"
+        run: |
+          set -euo pipefail
+          node scripts/release-local-command.mjs hook >/dev/null 2>&1 &
+          echo "LEVYTATE_HOOK_PID=$!" >> "$GITHUB_ENV"
+          sleep 2
+          node scripts/release-local-command.mjs app >/dev/null 2>&1 &
+          echo "LEVYTATE_APP_PID=$!" >> "$GITHUB_ENV"
+          for attempt in $(seq 1 90); do
+            if curl -fsS --max-time 2 http://127.0.0.1:3107/api/levytate-health/ready >/dev/null 2>&1; then
+              echo 'PASS: isolated local provider-delivery application ready'
+              exit 0
+            fi
+            sleep 2
+          done
+          echo 'BLOCKED: local provider-delivery app did not become ready'
+          exit 2
+
+      - name: Exercise genuine fictional provider -> employer review -> revocation
+        env:
+          RELEASE_PROVIDER_DELIVERY_LOCAL_ENABLE: "true"
+          LEVYTATE_PROVIDER_DELIVERY_ENABLED: "true"
+          RELEASE_PLAYWRIGHT_MODULE: ${{ github.workspace }}/node_modules/playwright/index.mjs
+        run: node scripts/release-local-command.mjs provider-browser
+
+      - name: Stop local-only provider app and email hook
         if: always()
         run: |
           for variable in LEVYTATE_APP_PID LEVYTATE_HOOK_PID; do

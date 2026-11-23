@@ -59,6 +59,8 @@ const mode = process.argv[2];
 const commands = {
   hook: [process.execPath, [resolve(scriptDir, "release-local-email-hook.mjs")]],
   seed: [process.execPath, [resolve(scriptDir, "release-local-fixtures.mjs")]],
+  "provider-seed": [process.execPath, [resolve(scriptDir, "release-provider-delivery-seed-local.mjs")]],
+  "provider-browser": [process.execPath, [resolve(scriptDir, "release-provider-delivery-browser-local.mjs")]],
   browser: [process.execPath, [resolve(scriptDir, "release-browser-acceptance.mjs")]],
   "callback-budget": [process.execPath,[resolve(scriptDir,"release-callback-budget-integrity.mjs")]],
   readiness: [process.execPath,[resolve(scriptDir,"release-readiness-integrity.mjs")]],

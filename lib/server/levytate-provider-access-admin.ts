@@ -5,6 +5,7 @@ import { normaliseMvpUserRole } from "@/lib/levytate/mvp/rbac";
 import { providerMembershipRoles, type ProviderMembershipRole } from "@/lib/levytate/requests/domain";
 import { getLearnerLifecycleServerContext } from "@/lib/server/levytate-learner-lifecycle";
 import { isRequestsEnvironmentEnabled } from "@/lib/server/levytate-request-capability";
+import { isProviderDeliveryEnvironmentEnabled } from "@/lib/server/levytate-provider-delivery";
 import { hasCurrentPlatformDiagnosticBinding } from "@/lib/server/levytate-service-health";
 import {
   getLevyTateSupabaseConfig,
@@ -245,7 +246,7 @@ export async function updateProviderAccess(
 
 async function requireProviderAccessAdmin(session: LevyTateBetaSession) {
   if (
-    !isRequestsEnvironmentEnabled()
+    (!isRequestsEnvironmentEnabled() && !isProviderDeliveryEnvironmentEnabled())
     || process.env.VERCEL_ENV === "production"
     || (process.env.VERCEL_ENV !== "preview" && process.env.NODE_ENV === "production")
   ) {

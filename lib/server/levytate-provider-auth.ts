@@ -3,6 +3,7 @@ import { providerMembershipRoles, type ProviderMembershipRole } from "@/lib/levy
 import { checkCallbackAttemptLimit, recordInvalidCallback } from "@/lib/server/levytate-auth-rate-limit";
 import { authProviderRequest } from "@/lib/server/levytate-auth-provider-request";
 import { isRequestsEnabledForOrganisation, isRequestsEnvironmentEnabled } from "@/lib/server/levytate-request-capability";
+import { isProviderDeliveryEnvironmentEnabled, providerHasDeliveryAccess } from "@/lib/server/levytate-provider-delivery";
 import {
   getLevyTateSupabaseConfig,
   readRuntimeEnv,
@@ -14,7 +15,7 @@ export const levytateProviderSessionCookie = "levytate_provider_session";
 export const levytateProviderSupabaseAccessCookie = "levytate_provider_auth_access";
 export const levytateProviderSupabaseRefreshCookie = "levytate_provider_auth_refresh";
 export const levytateProviderAuthCookieMaxAge = 60 * 60 * 8;
-export const genericProviderSignInMessage = "If this email is authorised for LevyTate Opportunities, you’ll receive a secure sign-in link.";
+export const genericProviderSignInMessage = "If this email has authorised LevyTate provider access, you’ll receive a secure sign-in link.";
 
 type ProviderMembershipRow = {
   id: string;
@@ -76,11 +77,11 @@ async function providerAuthFetch(path: string, init: RequestInit = {}) {
 }
 
 export async function requestProviderSignIn(emailInput: string, redirectTo: string) {
-  if (!isRequestsEnvironmentEnabled()) return false;
+  if (!isRequestsEnvironmentEnabled() && !isProviderDeliveryEnvironmentEnabled()) return false;
   const email = normaliseBetaEmail(emailInput);
   const memberships = await findProviderMembershipsByEmail(email);
   if (memberships.length !== 1 || !memberships[0].active || !providerMembershipRoles.includes(memberships[0].role as ProviderMembershipRole)) return false;
-  if (!(await hasCapabilityEnabledInvitation(memberships[0]))) return false;
+  if (!(await hasProviderWorkspaceAccess(memberships[0]))) return false;
 
   const response = await providerAuthFetch(`otp?redirect_to=${encodeURIComponent(redirectTo)}`, {
     method: "POST",
@@ -129,7 +130,7 @@ export async function completeLevyTateProviderMagicLinkCallback(request: Request
   if (subjectOwners.some((owner) => owner.id !== membership.id)) {
     throw new LevyTateProviderAuthError("conflict", "This email is not authorised for LevyTate Opportunities.");
   }
-  if (!(await hasCapabilityEnabledInvitation(membership))) {
+  if (!(await hasProviderWorkspaceAccess(membership))) {
     throw new LevyTateProviderAuthError("unauthorised", "This email is not authorised for LevyTate Opportunities.");
   }
 
@@ -147,7 +148,7 @@ export async function completeLevyTateProviderMagicLinkCallback(request: Request
       updated_at: now,
     },
   );
-  if (saved.length !== 1 || saved[0].auth_subject !== auth.user.id || !saved[0].active || !(await hasCapabilityEnabledInvitation(saved[0]))) {
+  if (saved.length !== 1 || saved[0].auth_subject !== auth.user.id || !saved[0].active || !(await hasProviderWorkspaceAccess(saved[0]))) {
     throw new LevyTateProviderAuthError("conflict", "This email is not authorised for LevyTate Opportunities.");
   }
 
@@ -169,7 +170,7 @@ export async function completeLevyTateProviderMagicLinkCallback(request: Request
 }
 
 export async function readAuthorisedLevyTateProviderSession(token: string | undefined | null) {
-  if (!isRequestsEnvironmentEnabled()) return null;
+  if (!isRequestsEnvironmentEnabled() && !isProviderDeliveryEnvironmentEnabled()) return null;
   const session = await readProviderSession(token);
   if (!session) return null;
   const rows = await supabaseSelect<ProviderMembershipRow>(
@@ -188,7 +189,7 @@ export async function readAuthorisedLevyTateProviderSession(token: string | unde
   const membership = rows[0];
   if (rows.length !== 1 || !membership || normaliseBetaEmail(membership.email) !== session.email
     || !providerMembershipRoles.includes(membership.role as ProviderMembershipRole)
-    || !(await hasCapabilityEnabledInvitation(membership))) return null;
+    || !(await hasProviderWorkspaceAccess(membership))) return null;
   return { ...session, role: normaliseProviderRole(membership.role) };
 }
 
@@ -247,6 +248,12 @@ async function findProviderMembershipsBySubject(subject: string) {
       limit: "2",
     }),
   );
+}
+
+async function hasProviderWorkspaceAccess(membership: ProviderMembershipRow) {
+  if (await providerHasDeliveryAccess(membership.provider_id)) return true;
+  if (!isRequestsEnvironmentEnabled()) return false;
+  return hasCapabilityEnabledInvitation(membership);
 }
 
 async function hasCapabilityEnabledInvitation(membership: ProviderMembershipRow) {

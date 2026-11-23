@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
+import { getProviderDeliveryWorkspace, isProviderDeliveryEnvironmentEnabled } from "@/lib/server/levytate-provider-delivery";
+import { isRequestsEnvironmentEnabled } from "@/lib/server/levytate-request-capability";
 import { ProviderWorkspace } from "@/components/levytate-provider/ProviderWorkspace";
 import {
   levytateProviderSessionCookie,
@@ -25,11 +27,15 @@ export default async function LevyTateProviderPage() {
 
   if (!session) redirect("/levytate/provider/login");
 
-  const initialWorkspace = await getProviderWorkspaceBootstrapForSession(session);
+  const [initialWorkspace, delivery] = await Promise.all([
+    isRequestsEnvironmentEnabled() ? getProviderWorkspaceBootstrapForSession(session) : Promise.resolve(null),
+    isProviderDeliveryEnvironmentEnabled() ? getProviderDeliveryWorkspace(session) : Promise.resolve(null),
+  ]);
 
   // The bootstrap performs provider-membership, invitation and capability checks.
   // A missing/disabled result must not reveal whether an invitation exists.
+  if (!initialWorkspace?.requestsEnabled && delivery) redirect("/levytate/provider/delivery");
   if (!initialWorkspace?.requestsEnabled) notFound();
 
-  return <ProviderWorkspace initialWorkspace={initialWorkspace} />;
+  return <ProviderWorkspace initialWorkspace={initialWorkspace} deliveryAvailable={Boolean(delivery)} />;
 }
