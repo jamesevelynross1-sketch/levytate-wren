@@ -189,7 +189,7 @@ export async function readAuthorisedLevyTateProviderSession(token: string | unde
   const membership = rows[0];
   if (rows.length !== 1 || !membership || normaliseBetaEmail(membership.email) !== session.email
     || !providerMembershipRoles.includes(membership.role as ProviderMembershipRole)
-    || !(await hasCapabilityEnabledInvitation(membership))) return null;
+    || !(await hasProviderWorkspaceAccess(membership))) return null;
   return { ...session, role: normaliseProviderRole(membership.role) };
 }
 
