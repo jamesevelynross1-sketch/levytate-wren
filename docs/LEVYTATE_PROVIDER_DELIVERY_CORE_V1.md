@@ -53,3 +53,7 @@ The dedicated provider report UI sends only programme/learner record IDs and fac
 3. Run genuine browser sign-in as a provider with an approved delivery grant and a second provider denied. Existing Core browser runs currently cover the employer roles but do **not** cover this new provider route.
 4. Validate provider session expiry/revocation during submission, current role and new employer consent, then execute the full protected Preview acceptance.
 5. Only then publish the Core feature for approved users.
+
+## Genuine provider browser acceptance extension
+
+The no-cost CI runner now contains a separate disposable provider test *after* the original 203 Core checks: apply SQL candidate to loopback database only, create a fictional provider membership/GoTrue identity, grant one employer and deliberately withhold the second, sign in through the real provider magic-link callback captured by Mailpit, submit a programme delivery note, review it as the actual employer Lead, verify the canonical learner ledger remains unchanged, and revoke consent. This is not claimed PASS until the exact CI job has finished. Nothing reaches the shared Supabase account or external inboxes.
