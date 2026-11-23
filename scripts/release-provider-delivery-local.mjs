@@ -32,10 +32,12 @@ if(result.status!==0){
   const assertions = readFileSync(resolve("scripts/test-provider-delivery-progress.sql"),"utf8");
   const messages = [...assertions.matchAll(/raise exception '([^']+)'/gi)].map(match => match[1]);
   const assertion = messages.find(message => raw.includes(message)) ?? null;
+  const phase = [...raw.matchAll(/LEVYTATE_TEST_PHASE_[A-Z_]+/g)].map(match=>match[0]).at(-1) ?? "BEFORE_PROMOTION_TEST";
   console.error("FAIL: isolated provider SQL verification", JSON.stringify({
     sqlstate: state,
     ...(line ? { inputLine: Number(line) } : {}),
     ...(assertion ? { assertion } : {}),
+    phase,
   }));
   process.exitCode=1;
 }else{

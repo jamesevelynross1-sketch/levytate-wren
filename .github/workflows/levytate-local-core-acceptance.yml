@@ -94,12 +94,6 @@ jobs:
           echo 'PASS: exact reviewed local schema and security ledger verified'
           echo 'This is NOT employer journey acceptance or hosted acceptance.'
 
-      - name: Install pinned Playwright and its local Chromium browser
-        run: |
-          npm install --no-save --package-lock=false --no-audit --no-fund playwright@1.57.0
-          npx --no-install playwright install --with-deps chromium
-          test -f node_modules/playwright/index.mjs
-
       - name: Seed exactly two fictional employer organisations
         run: |
           node scripts/release-local-command.mjs seed
@@ -109,6 +103,12 @@ jobs:
         run: |
           node scripts/release-provider-delivery-local.mjs
           echo 'Provider delivery schema stays unapplied after the verification transaction.'
+
+      - name: Install pinned Playwright and its local Chromium browser
+        run: |
+          npm install --no-save --package-lock=false --no-audit --no-fund playwright@1.57.0
+          npx --no-install playwright install --with-deps chromium
+          test -f node_modules/playwright/index.mjs
 
       - name: Start local-only email hook and application
         run: |

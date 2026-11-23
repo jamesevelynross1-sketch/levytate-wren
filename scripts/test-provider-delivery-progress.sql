@@ -24,6 +24,7 @@ declare
   v_denied boolean;
   v_event_count int;
 begin
+  raise notice 'LEVYTATE_TEST_PHASE_IDENTITIES';
   select id into strict v_org from public.levytate_organisations where slug like 'release-%-a';
   select id into strict v_other from public.levytate_organisations where slug like 'release-%-b';
   select id into strict v_lead from public.levytate_users where organisation_id=v_org and role='Apprenticeship Lead';
@@ -46,6 +47,7 @@ begin
     raise exception 'Unsafe old provider review signature or public API grant';
   end if;
 
+  raise notice 'LEVYTATE_TEST_PHASE_BASELINE';
   insert into public.levytate_learner_records(
     organisation_id,id,employee_id,programme_id,provider_id,lifecycle_status,employment_route,
     actual_start_date,expected_end_date,record_status,demonstration_record
@@ -60,6 +62,7 @@ begin
     v_org,'baseline-'||gen_random_uuid(),v_learner,current_date-2,42,36,-6,
     'manual_l_and_d_update','fictional-baseline','Baseline provider-controlled target'
   );
+  raise notice 'LEVYTATE_TEST_PHASE_SUBMISSION';
   v_report:=jsonb_build_object('reportDate',v_date,
     'actualProgressPercentage',47,'summary','Synthetic training milestone approved by employer.',
     'nextReviewDate',(current_date+45)::text);
@@ -79,6 +82,7 @@ begin
   exception when sqlstate 'PT403' then v_denied:=true; end;
   if not v_denied then raise exception 'Other employer approved provider progress'; end if;
 
+  raise notice 'LEVYTATE_TEST_PHASE_FIRST_APPROVAL';
   v_result:=public.levytate_review_provider_delivery_update(v_org,v_lead,(v_result->>'id')::uuid,'accepted',0);
   v_progress_id:=v_result->>'promoted_progress_id';
   if v_result->>'review_status'<>'accepted' or v_progress_id<>'provider-progress-'||v_result->>'id'
@@ -112,6 +116,7 @@ begin
   if not v_denied then raise exception 'Accepted report reversed'; end if;
 
   -- Stale client revision must fail without changing report status or ledger.
+  raise notice 'LEVYTATE_TEST_PHASE_STALE_REVISION';
   v_second:=gen_random_uuid();
   v_result:=public.levytate_submit_provider_delivery_update(v_org,v_provider,v_member,
     'learner_progress',v_learner,jsonb_build_object('reportDate',v_date,
@@ -139,6 +144,7 @@ begin
   if not v_denied then raise exception 'Outdated report unexpectedly promoted'; end if;
 
   -- No baseline is no approval: a target must never be fabricated.
+  raise notice 'LEVYTATE_TEST_PHASE_MISSING_BASELINE';
   insert into public.levytate_learner_records(
     organisation_id,id,employee_id,programme_id,provider_id,lifecycle_status,employment_route,
     actual_start_date,expected_end_date,record_status,demonstration_record
@@ -155,6 +161,7 @@ begin
   if not v_denied then raise exception 'Invented target instead of enforcing baseline'; end if;
 
   -- Withdrawn learners are never progress-eligible, regardless of client version.
+  raise notice 'LEVYTATE_TEST_PHASE_WITHDRAWN';
   insert into public.levytate_learner_records(
     organisation_id,id,employee_id,programme_id,provider_id,lifecycle_status,employment_route,
     actual_start_date,expected_end_date,record_status,demonstration_record
@@ -177,6 +184,7 @@ begin
   exception when sqlstate 'PT409' then v_denied:=true; end;
   if not v_denied then raise exception 'Withdrawn learner accepted provider progress'; end if;
 
+  raise notice 'LEVYTATE_TEST_PHASE_REVOKED';
   -- Revocation prevents pending progress being accepted.
   v_result:=public.levytate_submit_provider_delivery_update(v_org,v_provider,v_member,'learner_progress',v_learner,
     jsonb_build_object('reportDate',v_date,'actualProgressPercentage',50,'summary','Pending before revocation'),gen_random_uuid());
@@ -195,4 +203,5 @@ begin
       where organisation_id=v_org and entity_type='learner' and action='learner.progress')<>2 then
     raise exception 'Provider progress audit, canonical entries or atomicity differs';
   end if;
+  raise notice 'LEVYTATE_TEST_PHASE_COMPLETE';
 end $provider_promotion_test$;
