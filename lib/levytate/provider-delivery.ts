@@ -39,7 +39,8 @@ export const providerDeliverySubmitSchema = z.discriminatedUnion("kind", [
 
 export const employerDeliveryActionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("grant"), providerId: z.string().trim().min(1).max(160), enabled: z.boolean() }).strict(),
-  z.object({ action: z.literal("review"), updateId: z.string().uuid(), decision: z.enum(["accepted", "rejected"]) }).strict(),
+  z.object({ action: z.literal("review"), updateId: z.string().uuid(), decision: z.enum(["accepted", "rejected"]),
+    expectedLearnerRevision: z.number().int().min(0).nullable().optional() }).strict(),
 ]);
 
 export type ProviderDeliverySubmission = z.infer<typeof providerDeliverySubmitSchema>;
@@ -57,6 +58,9 @@ export type ProviderDeliveryUpdateView = {
   submittedAt: string;
   reviewedAt: string | null;
   requestKey: string;
+  promotedProgressId: string | null;
+  // Only supplied for employer-side pending learner reports; never browser-authoritative.
+  expectedLearnerRevision?: number | null;
 };
 
 export type ProviderDeliveryEmployer = {
