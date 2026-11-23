@@ -144,7 +144,7 @@ const declineReasons = [
   { value: "other", label: "Other" },
 ] as const;
 
-export function ProviderWorkspace({ initialWorkspace }: { initialWorkspace: ProviderRequestsWorkspaceBootstrap }) {
+export function ProviderWorkspace({ initialWorkspace, deliveryAvailable = false }: { initialWorkspace: ProviderRequestsWorkspaceBootstrap; deliveryAvailable?: boolean }) {
   const [workspace, setWorkspace] = useState(() => normaliseProviderWorkspace(initialWorkspace));
   const [section, setSection] = useState<WorkspaceSection>("open");
   const [selectedOpportunityId, setSelectedOpportunityId] = useState<string | null>(null);
@@ -205,6 +205,7 @@ export function ProviderWorkspace({ initialWorkspace }: { initialWorkspace: Prov
           <ProviderTopBar
             providerName={workspace.provider.name}
             memberRole={workspace.provider.memberRole}
+            deliveryAvailable={deliveryAvailable}
           />
           <MobileNavigation
             section={section}
@@ -332,7 +333,7 @@ function NavButton({
   );
 }
 
-function ProviderTopBar({ providerName, memberRole }: { providerName: string; memberRole: string }) {
+function ProviderTopBar({ providerName, memberRole, deliveryAvailable }: { providerName: string; memberRole: string; deliveryAvailable: boolean }) {
   return (
     <header className="sticky top-0 z-30 border-b border-[#102c3d]/[0.07] bg-white/95 px-4 py-3 backdrop-blur-xl sm:px-6 lg:px-8">
       <div className="mx-auto flex min-h-11 max-w-[1320px] items-center justify-between gap-4">
@@ -348,6 +349,7 @@ function ProviderTopBar({ providerName, memberRole }: { providerName: string; me
           <p className="mt-0.5 text-sm font-semibold">Employer opportunities</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          {deliveryAvailable ? <Link href="/levytate/provider/delivery" className="rounded-full bg-[#eaf5f1] px-3 py-2 text-xs font-semibold text-[#087c73]">Delivery updates</Link> : null}
           <span className="rounded-full bg-[#f4f7f5] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#102c3d]/52">
             {memberRole}
           </span>

@@ -4,6 +4,7 @@ import { useCatalogueAction } from "@/components/levytate-mvp/useCatalogueAction
 
 import { Building2, CalendarDays, GraduationCap, Store } from "lucide-react";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
+import { EmployerProviderUpdatesPanel } from "@/components/levytate-mvp/EmployerProviderUpdatesPanel";
 
 export function MyProvidersModule({ onOpenMarketplace, onRequest }: { onOpenMarketplace: () => void; onRequest?: (providerId: string) => void }) {
   const { data, saveOrganisationProvider } = useMvpWorkspace();
@@ -16,10 +17,10 @@ export function MyProvidersModule({ onOpenMarketplace, onRequest }: { onOpenMark
   });
 
   if (!providers.length) {
-    return <EmptyPortfolio icon={Building2} title="No providers added yet" copy="Add a provider from Marketplace to build your organisation’s delivery network." action="Explore Marketplace" onAction={onOpenMarketplace} />;
+    return <><EmployerProviderUpdatesPanel /><EmptyPortfolio icon={Building2} title="No providers added yet" copy="Add a provider from Marketplace to build your organisation’s delivery network." action="Explore Marketplace" onAction={onOpenMarketplace} /></>;
   }
 
-  return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" data-testid="my-providers">{error ? <p role="alert" className="text-sm text-red-700 sm:col-span-2 xl:col-span-3">{error}</p> : null}
+  return <><EmployerProviderUpdatesPanel /><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" data-testid="my-providers">{error ? <p role="alert" className="text-sm text-red-700 sm:col-span-2 xl:col-span-3">{error}</p> : null}
     {providers.map(({ provider, selection }) => {
       const programmeIds = new Set(data.organisationProgrammes.filter((item) => item.providerId === provider.providerId && item.status === "Active").map((item) => item.programmeId));
       const learnerCount = data.learnerRecords.filter((record) => record.providerId === provider.providerId && record.recordStatus === "Active").length;
@@ -34,7 +35,7 @@ export function MyProvidersModule({ onOpenMarketplace, onRequest }: { onOpenMark
         <div className="mt-5 flex flex-wrap gap-2">{onRequest ? <button type="button" onClick={() => onRequest(provider.providerId)} className="min-h-11 rounded-full bg-[#edf7f3] px-4 text-xs font-semibold text-[#0b6f63]">Request proposal</button> : null}<button type="button" disabled={saving} onClick={() => { if (window.confirm("Remove this provider and unpublish all of its programmes from your workspace? Existing learner history is retained.")) void perform(() => saveOrganisationProvider({ ...selection, status: "Inactive", updatedAt: new Date().toISOString() })); }} className="min-h-11 rounded-full px-3 text-xs font-semibold text-[#ad344e] hover:bg-[#fff2f4]">Remove from My Providers</button></div>
       </article>;
     })}
-  </div>;
+  </div></>;
 }
 
 export function MyProgrammesModule({ onOpenMarketplace, onRequest }: { onOpenMarketplace: () => void; onRequest?: (programmeId: string, providerId: string) => void }) {

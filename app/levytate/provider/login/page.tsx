@@ -8,6 +8,7 @@ import {
 } from "@/lib/server/levytate-provider-auth";
 import { getProviderWorkspaceBootstrapForSession } from "@/lib/server/levytate-service-requests";
 import { isRequestsEnvironmentEnabled } from "@/lib/server/levytate-request-capability";
+import { getProviderDeliveryWorkspace, isProviderDeliveryEnvironmentEnabled } from "@/lib/server/levytate-provider-delivery";
 
 export const metadata: Metadata = {
   title: "Provider sign in | LevyTate",
@@ -23,14 +24,15 @@ export default async function LevyTateProviderLoginPage({
 }: {
   searchParams: Promise<{ auth?: string; logout?: string }>;
 }) {
-  if (!isRequestsEnvironmentEnabled()) notFound();
+  if (!isRequestsEnvironmentEnabled() && !isProviderDeliveryEnvironmentEnabled()) notFound();
   const cookieStore = await cookies();
   const session = await readAuthorisedLevyTateProviderSession(
     cookieStore.get(levytateProviderSessionCookie)?.value,
   );
 
   if (session) {
-    const workspace = await getProviderWorkspaceBootstrapForSession(session);
+    if (isProviderDeliveryEnvironmentEnabled() && await getProviderDeliveryWorkspace(session)) redirect("/levytate/provider/delivery");
+    const workspace = isRequestsEnvironmentEnabled() ? await getProviderWorkspaceBootstrapForSession(session) : null;
     if (workspace?.requestsEnabled) redirect("/levytate/provider");
   }
 
