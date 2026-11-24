@@ -6,6 +6,7 @@ on:
       - codex/levytate-core-local-20261122
       - codex/levytate-provider-delivery-v1-20261123
       - codex/levytate-provider-progress-promotion-20261123
+      - codex/levytate-pilot-recovery-gate-20261124
   workflow_dispatch:
 
 permissions:
@@ -191,6 +192,46 @@ jobs:
             pid="${!variable:-}"
             if [[ "$pid" =~ ^[0-9]+$ ]]; then kill "$pid" >/dev/null 2>&1 || :; fi
           done
+
+      - name: Verify pinned PostgreSQL 17 backup / restore clients
+        run: |
+          set -euo pipefail
+          bin=/usr/lib/postgresql/17/bin
+          if [[ ! -x "$bin/pg_dump" || ! -x "$bin/pg_restore" ]]; then
+            # Ubuntu 24.04 default apt sources only contain PG16. Trust the
+            # official PGDG repository ONLY after the published signing-key
+            # fingerprint is verified, then install the PG17 client tools.
+            . /etc/os-release
+            test "$ID" = "ubuntu" && test "$VERSION_CODENAME" = "noble"
+            sudo install -d -m 0755 /usr/share/postgresql-common/pgdg
+            sudo curl --proto '=https' --tlsv1.2 --fail --silent --show-error --retry 2 \
+              https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+              -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+            key_fingerprint="$(gpg --show-keys --with-colons /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc | awk -F: '$1=="fpr" {print $10; exit}')"
+            test "$key_fingerprint" = "B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8"
+            printf '%s\n' \
+              'Types: deb' \
+              'URIs: https://apt.postgresql.org/pub/repos/apt' \
+              'Suites: noble-pgdg' \
+              'Architectures: amd64' \
+              'Components: main' \
+              'Signed-By: /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc' | \
+              sudo tee /etc/apt/sources.list.d/pgdg.sources >/dev/null
+            sudo apt-get update -qq
+            sudo env DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y postgresql-client-17
+          fi
+          test -x "$bin/pg_dump" && test -x "$bin/pg_restore" && test -x "$bin/psql"
+          "$bin/pg_dump" --version | grep -q ' 17\.'
+          "$bin/pg_restore" --version | grep -q ' 17\.'
+
+      - name: Verify encrypted recovery and isolated restore of provider progress
+        env:
+          RELEASE_RECOVERY_DATABASE: levytate_release_recovery_provider_v2
+          RELEASE_PG_BIN: /usr/lib/postgresql/17/bin
+          RELEASE_DURABLE_RECOVERY: "false"
+        run: |
+          node scripts/release-local-recovery.mjs
+          echo 'PASS: restricted local backup, AES-GCM archive verification and separate restored database; not hosted recovery.'
 
       - name: Stop disposable stack without printing endpoint credentials
         if: always()

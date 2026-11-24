@@ -5,7 +5,7 @@ import { randomBytes, createHash, createCipheriv, createDecipheriv, hkdfSync } f
 import { lockAcceptanceRuntime } from "./release-runtime-lock.mjs";
 const root = process.env.RELEASE_LOCAL_RUNTIME;
 const name = process.env.RELEASE_RECOVERY_DATABASE;
-if (!/^\/private\/tmp\/levytate-release-runtime\.[A-Za-z0-9]+$/.test(root ?? "") || !/^levytate_release_recovery_[a-z0-9_]+$/.test(name ?? "")) throw new Error("Explicit dedicated local recovery target required");
+if (!/^\/(?:private\/)?tmp\/levytate-release-runtime\.[A-Za-z0-9]+$/.test(root ?? "") || !/^levytate_release_recovery_[a-z0-9_]+$/.test(name ?? "")) throw new Error("Explicit dedicated local recovery target required");
 const release = lockAcceptanceRuntime("local encrypted recovery and isolated restore");
 const sensitiveBuffers=[];
 try {
@@ -13,7 +13,16 @@ const state = JSON.parse(readFileSync(`${root}/private-stack-state.json`, "utf8"
 if(!/^[a-f0-9]{64}$/.test(state.id??""))throw Error("Exact native runtime identity required");
 const db = new URL(state.env.DB_URL);
 if (db.hostname !== "127.0.0.1") throw new Error("Loopback source required");
-const bin = "/opt/homebrew/opt/postgresql@17/bin";
+// The archive contains Auth data. Reject even a local fixture whose tenancy
+// cannot be proved fictional before making any backup bytes.
+const fixture = JSON.parse(readFileSync(`${root}/fixture-manifest.json`,"utf8"));
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+if (fixture.synthetic !== true || fixture.environment !== "local"
+  || !uuid.test(fixture.run ?? "") || fixture.tenants?.length !== 2
+  || fixture.tenants.some(t=>!uuid.test(t.id??"") || !["a","b"].includes(t.key))
+  || new Set(fixture.tenants.map(t=>t.id)).size !== 2)
+  throw Error("Local recovery requires the approved two-tenant fictional fixture");
+const bin = process.env.RELEASE_PG_BIN ?? (process.platform === "darwin" ? "/opt/homebrew/opt/postgresql@17/bin" : "/usr/lib/postgresql/17/bin");
 const env = { ...process.env, PGHOST: db.hostname, PGPORT: db.port, PGUSER: db.username, PGPASSWORD: db.password, PGDATABASE: db.pathname.slice(1) };
 function run(command, args, input, commandEnv = env) {
   const result = spawnSync(`${bin}/${command}`, args, { env: commandEnv, input, maxBuffer: 128 * 1024 * 1024 });
@@ -23,9 +32,14 @@ function run(command, args, input, commandEnv = env) {
 const query = (sql, commandEnv = env) => run("psql", ["-XAtq", "-v", "ON_ERROR_STOP=1"], sql, commandEnv).toString().trim();
 if (query(`select count(*) from pg_database where datname='${name}';`) !== "0") throw new Error("Recovery target exists; never overwrite it");
 const [socket, port] = query("select current_setting('unix_socket_directories')||'|'||current_setting('port');").split("|");
-if (!/^\/private\/tmp\/supabase-\d+\/pg-[a-f0-9]+$/.test(socket) || !/^\d+$/.test(port)) throw new Error("Unexpected native administrative socket");
+if (!/^\/(?:private\/)?tmp\/supabase-\d+\/pg-[a-f0-9]+$/.test(socket) || !/^\d+$/.test(port)) throw new Error("Unexpected native administrative socket");
 const admin = { ...env, PGHOST: socket, PGPORT: port, PGUSER: "supabase_admin" };
 if (query("select current_setting('server_version_num')::int/10000=17 and rolsuper from pg_roles where rolname=current_user;", admin) !== "t") throw new Error("Expected local PG17 owner required");
+const organisationSlugs = query("select string_agg(slug,',' order by slug) from public.levytate_organisations;", admin).split(",");
+const allowed = new Set(["levytate-internal", ...fixture.tenants.map(t=>`release-${fixture.run}-${t.key}`)]);
+if (organisationSlugs.length!==allowed.size || organisationSlugs.some(slug=>!allowed.has(slug))) {
+  throw Error("Local recovery source includes an unapproved employer workspace");
+}
 // Full database archive keeps extension dependencies, managed owners and ACLs.
 // No raw archive, Auth material or dump output is printed or stored unencrypted.
 const archive = run("pg_dump", ["--format=custom"], undefined, admin); sensitiveBuffers.push(archive);
@@ -55,9 +69,20 @@ if (digest(restoredArchive) !== digest(archive)) throw new Error("Saved archive 
 query(`create database ${name} template template0;`, admin);
 const target = { ...admin, PGDATABASE: name };
 run("pg_restore", ["--single-transaction", "--exit-on-error", "--dbname", name], restoredArchive, target);
-const summarySQL = `select jsonb_build_object('tables',(select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind='r'),'rls',(select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind='r' and c.relrowsecurity),'authUsers',(select count(*) from auth.users),'storageObjects',(select count(*) from storage.objects),'employers',(select count(*) from levytate_organisations),'people',(select count(*) from levytate_employees),'ledger',(select count(*) from supabase_migrations.schema_migrations),'ledgerHash',(select encode(sha256(convert_to(coalesce(jsonb_agg(to_jsonb(m) order by version),'[]')::text,'UTF8')),'hex') from supabase_migrations.schema_migrations m));`;
+const summarySQL = `select jsonb_build_object('tables',(select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind='r'),'rls',(select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind='r' and c.relrowsecurity),'authUsers',(select count(*) from auth.users),'storageObjects',(select count(*) from storage.objects),'employers',(select count(*) from levytate_organisations),'people',(select count(*) from levytate_employees),'ledger',(select count(*) from supabase_migrations.schema_migrations),'ledgerHash',(select encode(sha256(convert_to(coalesce(jsonb_agg(to_jsonb(m) order by version),'[]')::text,'UTF8')),'hex') from supabase_migrations.schema_migrations m),
+  'providerGrants',(select count(*) from public.levytate_provider_delivery_grants),
+  'providerReports',(select count(*) from public.levytate_provider_delivery_updates),
+  'canonicalProviderProgress',(select count(*) from public.levytate_learner_progress_updates where source_reference like 'provider-delivery:%'),
+  'providerReviewAudit',(select count(*) from public.levytate_audit_events where entity_type='provider_delivery_update'),
+  'providerPromotionLedgerDigest',(select encode(sha256(convert_to(coalesce(jsonb_agg(to_jsonb(p) order by p.id),'[]')::text,'UTF8')),'hex')
+    from public.levytate_learner_progress_updates p where p.source_reference like 'provider-delivery:%')
+);`;
 const sourceSummary = JSON.parse(query(summarySQL, admin));
 const restoredSummary = JSON.parse(query(summarySQL, target));
+if (sourceSummary.providerReports < 2 || sourceSummary.canonicalProviderProgress < 1
+  || sourceSummary.providerReviewAudit < 2 || sourceSummary.providerGrants < 1) {
+  throw Error("Local provider learner progress evidence is missing from the backup source");
+}
 if (JSON.stringify(sourceSummary) !== JSON.stringify(restoredSummary)) throw new Error("Recovery catalogue/count/ledger mismatch; source unchanged");
 const evidence = { status: "PASS", environment: "local", sourceRuntimeId: state.id, database: name, archiveBytes: archive.length, archiveSha256: digest(archive), encryptedArchiveSha256: digest(stored), archiveEncryption: "AES-256-GCM; HKDF key derived from existing restricted local Preview secret", keyLocation: "existing restricted private-app-secrets.json; never in archive/evidence", archiveEntries: list.split("\n").filter(line => /^\d+;/.test(line)).length, ...restoredSummary, fullStorageBytesRecovery: false, hosted: false };
 writeFileSync(`${directory}/database-${stamp}.evidence.json`, JSON.stringify(evidence, null, 2), { mode: 0o600, flag: "wx" });
