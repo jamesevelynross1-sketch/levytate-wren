@@ -6,6 +6,7 @@ on:
       - codex/levytate-core-local-20261122
       - codex/levytate-provider-delivery-v1-20261123
       - codex/levytate-provider-progress-promotion-20261123
+      - codex/levytate-pilot-recovery-gate-20261124
   workflow_dispatch:
 
 permissions:
@@ -191,6 +192,27 @@ jobs:
             pid="${!variable:-}"
             if [[ "$pid" =~ ^[0-9]+$ ]]; then kill "$pid" >/dev/null 2>&1 || :; fi
           done
+
+      - name: Verify pinned PostgreSQL 17 backup / restore clients
+        run: |
+          set -euo pipefail
+          bin=/usr/lib/postgresql/17/bin
+          if [[ ! -x "$bin/pg_dump" || ! -x "$bin/pg_restore" ]]; then
+            sudo apt-get update -qq
+            sudo apt-get install --no-install-recommends -y postgresql-client-17
+          fi
+          test -x "$bin/pg_dump" && test -x "$bin/pg_restore" && test -x "$bin/psql"
+          "$bin/pg_dump" --version | grep -q ' 17\.'
+          "$bin/pg_restore" --version | grep -q ' 17\.'
+
+      - name: Verify encrypted recovery and isolated restore of provider progress
+        env:
+          RELEASE_RECOVERY_DATABASE: levytate_release_recovery_provider_v2
+          RELEASE_PG_BIN: /usr/lib/postgresql/17/bin
+          RELEASE_DURABLE_RECOVERY: "false"
+        run: |
+          node scripts/release-local-recovery.mjs
+          echo 'PASS: restricted local backup, AES-GCM archive verification and separate restored database; not hosted recovery.'
 
       - name: Stop disposable stack without printing endpoint credentials
         if: always()
