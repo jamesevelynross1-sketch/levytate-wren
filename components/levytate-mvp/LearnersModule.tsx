@@ -239,31 +239,31 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
       ]} /> : null}
 
       <MvpPanel title="Learners" eyebrow="Lifecycle operations">
-        {mayMutatePreEnrolment ? <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[#102c3d]/[0.07] pb-4"><p className="text-xs leading-5 text-[#102c3d]/[0.52]">Start pre-enrolment from a final-approved application. Historical learner import is not enabled.</p><button type="button" onClick={() => setOnboarding(true)} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white"><Plus size={15} />Start pre-enrolment</button></div> : null}
+        {mayMutatePreEnrolment ? <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[#102c3d]/[0.07] pb-4"><p className="text-xs leading-5 text-lt-muted">Start pre-enrolment from a final-approved application. Historical learner import is not enabled.</p><button type="button" onClick={() => setOnboarding(true)} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white"><Plus size={15} />Start pre-enrolment</button></div> : null}
         <div className="mb-4 grid gap-3 xl:grid-cols-[minmax(260px,1fr)_minmax(0,1.4fr)]">
           <label className="flex h-11 min-w-0 items-center gap-2 rounded-lg border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 focus-within:border-[#159b8f] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#159b8f]/[0.10]">
-            <Search size={16} strokeWidth={1.8} className="shrink-0 text-[#102c3d]/[0.38]" aria-hidden="true" />
-            <input value={search} onChange={(event) => setSearch(event.target.value)} className="min-w-0 flex-1 bg-transparent text-sm text-[#102c3d] outline-none placeholder:text-[#102c3d]/[0.34]" placeholder="Search learner, role, programme, provider, site" />
+            <Search size={16} strokeWidth={1.8} className="shrink-0 text-lt-muted" aria-hidden="true" />
+            <input value={search} onChange={(event) => setSearch(event.target.value)} className="min-w-0 flex-1 bg-transparent text-sm text-lt-ink outline-none placeholder:text-lt-muted" placeholder="Search learner, role, programme, provider, site" />
           </label>
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
             <CompactSelect label="Status" value={statusFilter} options={filters.statuses} onChange={setStatusFilter} />
             <CompactSelect label="Progress" value={progressFilter} options={progressOptions} onChange={(value) => setProgressFilter(value as LearnerProgressPosition | typeof allOption)} />
             <CompactSelect label="Sort" value={sortMode} options={["Operational priority", "Learner name", "Lifecycle status"]} onChange={(value) => setSortMode(value as SortMode)} />
-            <button type="button" onClick={() => setMoreFilters((current) => !current)} className="min-h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-xs font-semibold text-[#102c3d]/[0.62] hover:bg-[#f8fbfa]">{moreFilters ? "Fewer filters" : "More filters"}</button>
+            <button type="button" onClick={() => setMoreFilters((current) => !current)} className="min-h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-xs font-semibold text-lt-muted hover:bg-[#f8fbfa]">{moreFilters ? "Fewer filters" : "More filters"}</button>
           </div>
         </div>
 
         {moreFilters ? <div className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5"><CompactSelect label="Route" value={routeFilter} options={filters.routes} onChange={setRouteFilter} /><CompactSelect label="Programme" value={programmeFilter} options={filters.programmes} onChange={setProgrammeFilter} /><CompactSelect label="Provider" value={providerFilter} options={filters.providers} onChange={setProviderFilter} /><CompactSelect label="Site" value={siteFilter} options={filters.sites} onChange={setSiteFilter} /><CompactSelect label="Department" value={departmentFilter} options={filters.departments} onChange={setDepartmentFilter} /></div> : null}
 
-        <label className="mb-4 inline-flex items-center gap-2 rounded-full bg-[#f8fbfa] px-3 py-2 text-xs font-semibold text-[#102c3d]/[0.62] ring-1 ring-[#102c3d]/[0.07]">
+        <label className="mb-4 inline-flex items-center gap-2 rounded-full bg-[#f8fbfa] px-3 py-2 text-xs font-semibold text-lt-muted ring-1 ring-[#102c3d]/[0.07]">
           <input type="checkbox" checked={attentionOnly} onChange={(event) => setAttentionOnly(event.target.checked)} className="h-4 w-4 accent-[#159b8f]" />
           Attention required only
         </label>
 
-        {error ? <div role="alert" className="mb-4 rounded-xl bg-[#fff0f2] px-4 py-3 text-sm font-semibold text-[#b13b51]"><p>{error}</p><button type="button" disabled={loading} onClick={() => setReadAttempt(value => value + 1)} className="mt-2 min-h-10 rounded-lg border border-current px-3">Retry loading learners</button></div> : null}
+        {error ? <div role="alert" className="mb-4 rounded-xl bg-[#fff0f2] px-4 py-3 text-sm font-semibold text-lt-risk"><p>{error}</p><button type="button" disabled={loading} onClick={() => setReadAttempt(value => value + 1)} className="mt-2 min-h-10 rounded-lg border border-current px-3">Retry loading learners</button></div> : null}
 
         {loading ? (
-          <div className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] px-5 py-10 text-center text-sm font-semibold text-[#102c3d]/[0.54]">Loading learner lifecycle records.</div>
+          <div className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] px-5 py-10 text-center text-sm font-semibold text-lt-muted">Loading learner lifecycle records.</div>
         ) : error ? null : visible.length ? (
           <>
             <div className="hidden min-w-0 md:block">
@@ -292,29 +292,29 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
                   {visible.map((learner) => (
                     <tr key={learner.learnerRecordId} data-testid="learner-row" className="align-top">
                       <td className="px-3 py-2.5">
-                        <p className="font-semibold leading-[1.15rem] text-[#102c3d]">{learner.learner.name}</p>
-                        <p className="mt-0.5 text-xs leading-[1.1rem] text-[#102c3d]/[0.52]">{learner.learner.jobTitle}</p>
-                        <p className="text-[11px] leading-[1.05rem] text-[#102c3d]/[0.42]">{learner.learner.department} · {learner.learner.site}</p>
+                        <p className="font-semibold leading-[1.15rem] text-lt-ink">{learner.learner.name}</p>
+                        <p className="mt-0.5 text-xs leading-[1.1rem] text-lt-muted">{learner.learner.jobTitle}</p>
+                        <p className="text-xs leading-[1.05rem] text-lt-muted">{learner.learner.department} · {learner.learner.site}</p>
                       </td>
                       <td className="px-3 py-2.5">
-                        <p className="font-semibold leading-[1.15rem] text-[#102c3d]/[0.78]">{learner.programme.programmeName}</p>
-                        <p className="mt-0.5 text-xs leading-[1.1rem] text-[#102c3d]/[0.48]">{learner.programme.providerName}</p>
-                        <p className="mt-0.5 text-[11px] leading-[1.05rem] text-[#102c3d]/[0.42]">{learner.employmentRouteLabel}</p>
+                        <p className="font-semibold leading-[1.15rem] text-lt-secondary">{learner.programme.programmeName}</p>
+                        <p className="mt-0.5 text-xs leading-[1.1rem] text-lt-muted">{learner.programme.providerName}</p>
+                        <p className="mt-0.5 text-xs leading-[1.05rem] text-lt-muted">{learner.employmentRouteLabel}</p>
                       </td>
                       <td className="px-3 py-2.5">
                         <StatusBadge testId="learner-status-badge" tone={statusTone(learner.lifecycleStatusLabel)}>{learner.lifecycleStatusLabel}</StatusBadge>
-                        {learner.activeBreak ? <div className="mt-1.5 text-[11px] leading-[1.05rem] text-[#102c3d]/[0.52]"><p>Return · {learner.activeBreak.expectedReturnUnknown ? "Not confirmed" : formatDate(learner.activeBreak.expectedReturnDate)}</p><p>{learner.breakAttention.daysOnBreak} days · {learnerBreakReasonLabels[learner.activeBreak.reasonCategory]}</p></div> : null}
+                        {learner.activeBreak ? <div className="mt-1.5 text-xs leading-[1.05rem] text-lt-muted"><p>Return · {learner.activeBreak.expectedReturnUnknown ? "Not confirmed" : formatDate(learner.activeBreak.expectedReturnDate)}</p><p>{learner.breakAttention.daysOnBreak} days · {learnerBreakReasonLabels[learner.activeBreak.reasonCategory]}</p></div> : null}
                       </td>
                       <td className="px-3 py-2.5">
                         <ProgressMini learner={learner} />
                       </td>
-                      <td className="px-3 py-2.5 text-[11px] leading-5 text-[#102c3d]/[0.56]">
+                      <td className="px-3 py-2.5 text-xs leading-5 text-lt-muted">
                         <p>Provider · {formatDate(learner.latestProviderReview?.reviewDate) || "No review"}</p>
                         <p>L&amp;D · {formatDate(learner.latestLAndDCheckIn?.reviewDate) || "No check-in"}</p>
                       </td>
                       <td className="px-3 py-2.5">
-                        <p className="text-xs font-semibold leading-[1.1rem] text-[#102c3d]/[0.72]">{learner.attention.label}</p>
-                        {learner.attention.needsAttention ? <p className="mt-0.5 text-[11px] leading-4 text-[#b13b51]">{learner.attention.reasons.length} item{learner.attention.reasons.length === 1 ? "" : "s"} flagged</p> : null}
+                        <p className="text-xs font-semibold leading-[1.1rem] text-lt-secondary">{learner.attention.label}</p>
+                        {learner.attention.needsAttention ? <p className="mt-0.5 text-xs leading-4 text-lt-risk">{learner.attention.reasons.length} item{learner.attention.reasons.length === 1 ? "" : "s"} flagged</p> : null}
                       </td>
                       <td className="px-3 py-2.5 text-right"><TableAction testId="learner-open-record" onClick={() => setSelectedId(learner.learnerRecordId)}>Open record</TableAction></td>
                     </tr>
@@ -329,8 +329,8 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
         ) : (
           <div className="grid min-h-52 place-items-center rounded-xl border border-dashed border-[#102c3d]/[0.14] bg-[#f8fbfa] px-5 py-10 text-center">
             <div className="max-w-md">
-              <h3 className="text-base font-semibold text-[#102c3d]">{learners.length ? "No learners match the selected filters." : "No learner records yet"}</h3>
-              <p className="mt-2 text-sm leading-6 text-[#102c3d]/[0.56]">{learners.length ? "Adjust the filters or search to review existing learner records." : "Import an existing apprentice when your people, provider and programme selections are ready."}</p>
+              <h3 className="text-base font-semibold text-lt-ink">{learners.length ? "No learners match the selected filters." : "No learner records yet"}</h3>
+              <p className="mt-2 text-sm leading-6 text-lt-muted">{learners.length ? "Adjust the filters or search to review existing learner records." : "Import an existing apprentice when your people, provider and programme selections are ready."}</p>
             </div>
           </div>
         )}
@@ -360,16 +360,16 @@ function LearnerRecordView({ detail, loading, error, onRetry, onBack, mayMutateP
   }, [detail, initialAction, onDeepLinkConsumed]);
 
   if (loading) {
-    return <div className="rounded-xl border border-[#102c3d]/[0.07] bg-white p-8 text-sm font-semibold text-[#102c3d]/[0.56]">Loading learner record.</div>;
+    return <div className="rounded-xl border border-[#102c3d]/[0.07] bg-white p-8 text-sm font-semibold text-lt-muted">Loading learner record.</div>;
   }
 
   if (error || !detail) {
     return (
       <div className="grid gap-4">
-        <button type="button" onClick={onBack} className="inline-flex w-fit items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-semibold text-[#102c3d]/[0.68] ring-1 ring-[#102c3d]/[0.08]">
+        <button type="button" onClick={onBack} className="inline-flex w-fit items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-semibold text-lt-muted ring-1 ring-[#102c3d]/[0.08]">
           <ArrowLeft size={15} /> Back to learners
         </button>
-        <div role="alert" className="rounded-xl border border-[#b13b51]/[0.10] bg-[#fff0f2] p-5 text-sm font-semibold text-[#b13b51]"><p>{error || "Learner record was not found."}</p><button type="button" onClick={onRetry} className="mt-2 min-h-10 rounded-lg border border-current px-3">Retry loading learner</button></div>
+        <div role="alert" className="rounded-xl border border-[#b13b51]/[0.10] bg-[#fff0f2] p-5 text-sm font-semibold text-lt-risk"><p>{error || "Learner record was not found."}</p><button type="button" onClick={onRetry} className="mt-2 min-h-10 rounded-lg border border-current px-3">Retry loading learner</button></div>
       </div>
     );
   }
@@ -380,38 +380,38 @@ function LearnerRecordView({ detail, loading, error, onRetry, onBack, mayMutateP
 
   return (
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5">
-      <button type="button" onClick={onBack} className="inline-flex w-fit items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-semibold text-[#102c3d]/[0.68] ring-1 ring-[#102c3d]/[0.08] transition hover:bg-[#f8fbfa] hover:text-[#102c3d]">
+      <button type="button" onClick={onBack} className="inline-flex w-fit items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-semibold text-lt-muted ring-1 ring-[#102c3d]/[0.08] transition hover:bg-[#f8fbfa] hover:text-lt-ink">
         <ArrowLeft size={15} /> Back to learners
       </button>
 
-      <section className="min-w-0 rounded-xl border border-[#102c3d]/[0.075] bg-white p-5 shadow-[0_14px_36px_rgba(16,44,61,0.045)]">
+      <section className="lt-panel min-w-0 p-5">
         <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(280px,0.55fr)]">
           <div className="min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">Learner record</p>
+            <p className="lt-eyebrow">Learner record</p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              <h2 className="text-2xl font-semibold tracking-[-0.025em] text-[#102c3d]">{detail.learner.name}</h2>
+              <h2 className="text-2xl font-semibold tracking-[-0.025em] text-lt-ink">{detail.learner.name}</h2>
               <StatusBadge tone={statusTone(detail.lifecycleStatusLabel)}>{detail.lifecycleStatusLabel}</StatusBadge>
             </div>
-            <p className="mt-2 text-sm leading-6 text-[#102c3d]/[0.62]">{detail.learner.jobTitle} - {detail.learner.department} - {detail.learner.site}</p>
-            <p className="mt-1 text-sm leading-6 text-[#102c3d]/[0.52]">Line manager: {detail.learner.managerName}</p>
+            <p className="mt-2 text-sm leading-6 text-lt-muted">{detail.learner.jobTitle} - {detail.learner.department} - {detail.learner.site}</p>
+            <p className="mt-1 text-sm leading-6 text-lt-muted">Line manager: {detail.learner.managerName}</p>
             <div className="mt-4 grid gap-3 md:grid-cols-3">
               <InfoBlock label="Programme" value={detail.programme.programmeName} helper={detail.programme.apprenticeshipStandardTitle} />
               <InfoBlock label="Provider" value={detail.programme.providerName} helper={detail.employmentRouteLabel} />
               <InfoBlock label="Dates" value={`${formatDate(detail.actualStartDate || detail.expectedStartDate) || "Start to confirm"}`} helper={`Expected end ${formatDate(detail.expectedEndDate) || "to confirm"}`} />
             </div>
-            {success ? <p className="mt-4 rounded-xl bg-[#e9f7f2] px-4 py-3 text-sm font-semibold text-[#0b6f63]">{success}</p> : null}
+            {success ? <p className="mt-4 rounded-xl bg-[#e9f7f2] px-4 py-3 text-sm font-semibold text-lt-accent">{success}</p> : null}
             {mayMutatePreEnrolment && detail.lifecycleStatus === "pre_enrolment" ? (
-              <button type="button" onClick={() => { setWorkflowOpen(true); setSuccess(""); }} className="mt-5 inline-flex h-10 items-center justify-center rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white shadow-[0_8px_18px_rgba(16,44,61,0.12)] transition hover:-translate-y-0.5 hover:bg-[#17394d]">
+              <button type="button" onClick={() => { setWorkflowOpen(true); setSuccess(""); }} className="mt-5 lt-button lt-primary">
                 Complete pre-enrolment
               </button>
             ) : null}
-            {breakStartAllowed ? <button type="button" onClick={() => { setBreakMode("start"); setSuccess(""); }} className="mt-5 inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white shadow-[0_8px_18px_rgba(16,44,61,0.12)] transition hover:-translate-y-0.5 hover:bg-[#17394d]"><CalendarClock size={15} />Start break in learning</button> : null}
-            {detail.activeBreak && mayMutatePreEnrolment ? <button type="button" onClick={() => { setBreakMode("manage"); setSuccess(""); }} className="mt-5 inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white shadow-[0_8px_18px_rgba(16,44,61,0.12)] transition hover:-translate-y-0.5 hover:bg-[#17394d]"><CalendarClock size={15} />Manage break in learning</button> : null}
+            {breakStartAllowed ? <button type="button" onClick={() => { setBreakMode("start"); setSuccess(""); }} className="mt-5 lt-button lt-primary"><CalendarClock size={15} />Start break in learning</button> : null}
+            {detail.activeBreak && mayMutatePreEnrolment ? <button type="button" onClick={() => { setBreakMode("manage"); setSuccess(""); }} className="mt-5 lt-button lt-primary"><CalendarClock size={15} />Manage break in learning</button> : null}
           </div>
           <div className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">Next action</p>
-            <p className="mt-2 text-lg font-semibold leading-7 text-[#102c3d]">{detail.attention.label}</p>
-            <p className="mt-3 text-sm leading-6 text-[#102c3d]/[0.58]">{nextActionNarrative(detail)}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lt-accent">Next action</p>
+            <p className="mt-2 text-lg font-semibold leading-7 text-lt-ink">{detail.attention.label}</p>
+            <p className="mt-3 text-sm leading-6 text-lt-muted">{nextActionNarrative(detail)}</p>
           </div>
         </div>
         <div className="mt-5 border-t border-[#102c3d]/[0.07] pt-5"><StageTracker stages={["Applied", "Approved", "Enrolled", "Learning", "Assessment", "Complete"]} currentIndex={learnerStageIndex(detail.lifecycleStatus)} tone={detail.attention.needsAttention ? "watch" : "info"} exceptionalStatus={detail.lifecycleStatus === "break_in_learning" ? { label: "Break in learning", tone: "watch" } : detail.lifecycleStatus === "withdrawn" ? { label: "Withdrawn", tone: "risk" } : undefined} /></div>
@@ -505,8 +505,8 @@ function LearnerRecordView({ detail, loading, error, onRetry, onBack, mayMutateP
           <InfoBlock label="Expected end date" value={formatDate(detail.expectedEndDate) || "Not recorded"} />
           <InfoBlock label="Actual end date" value={formatDate(detail.actualEndDate) || "Not recorded"} />
         </div>
-        <details className="mt-4 rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] px-4 py-3 text-sm text-[#102c3d]/[0.62]">
-          <summary className="flex cursor-pointer items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#102c3d]/[0.48]"><ChevronDown size={14} /> Standard and funding detail</summary>
+        <details className="mt-4 rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] px-4 py-3 text-sm text-lt-muted">
+          <summary className="flex cursor-pointer items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-lt-muted"><ChevronDown size={14} /> Standard and funding detail</summary>
           <p className="mt-3 leading-6">Standard metadata is used for funding and compliance checks. Provider commercial notes and pricing are not shown in this learner record.</p>
         </details>
       </RecordSection>
@@ -514,7 +514,7 @@ function LearnerRecordView({ detail, loading, error, onRetry, onBack, mayMutateP
       {(progressEntryAllowed || reviewEntryAllowed) ? (
         <RecordSection title="Progress and reviews" eyebrow="Learner support">
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-            <p className="text-sm font-semibold text-[#102c3d]">Record progress, reviews and the next support action.</p>
+            <p className="text-sm font-semibold text-lt-ink">Record progress, reviews and the next support action.</p>
             <div className="flex flex-wrap gap-2">
               {progressEntryAllowed ? <PrimaryRecordAction onClick={() => { setActivityMode("progress"); setSuccess(""); }}>Add progress update</PrimaryRecordAction> : null}
               {reviewEntryAllowed ? <SecondaryRecordAction onClick={() => { setActivityMode("review"); setSuccess(""); }}>Record review or check-in</SecondaryRecordAction> : null}
@@ -528,11 +528,11 @@ function LearnerRecordView({ detail, loading, error, onRetry, onBack, mayMutateP
         {detail.latestProgress ? (
           <div className="grid min-w-0 gap-4 lg:grid-cols-[0.8fr_1.2fr]">
             <div className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">Latest snapshot</p>
+              <p className="lt-eyebrow">Latest snapshot</p>
               <div className="mt-3"><ProgressTrack actual={detail.latestProgress.actualProgressPercentage} target={detail.latestProgress.targetProgressPercentage} /></div>
-              <div className="mt-3 flex flex-wrap items-center gap-2"><StatusBadge tone={detail.progressPosition === "Significantly behind" ? "red" : detail.progressPosition === "Slightly behind" ? "yellow" : "green"}>{detail.progressPosition}</StatusBadge><p className="text-sm font-semibold text-[#102c3d]">Variance: {detail.latestProgress.variancePercentage > 0 ? "+" : ""}{detail.latestProgress.variancePercentage} percentage points</p></div>
-              <p className="mt-2 text-sm leading-6 text-[#102c3d]/[0.58]">{detail.latestProgress.summary}</p>
-              {detail.latestProgress.supportAction ? <p className="mt-2 text-sm leading-6 text-[#0b6f63]">{detail.latestProgress.supportAction}</p> : null}
+              <div className="mt-3 flex flex-wrap items-center gap-2"><StatusBadge tone={detail.progressPosition === "Significantly behind" ? "red" : detail.progressPosition === "Slightly behind" ? "yellow" : "green"}>{detail.progressPosition}</StatusBadge><p className="text-sm font-semibold text-lt-ink">Variance: {detail.latestProgress.variancePercentage > 0 ? "+" : ""}{detail.latestProgress.variancePercentage} percentage points</p></div>
+              <p className="mt-2 text-sm leading-6 text-lt-muted">{detail.latestProgress.summary}</p>
+              {detail.latestProgress.supportAction ? <p className="mt-2 text-sm leading-6 text-lt-accent">{detail.latestProgress.supportAction}</p> : null}
             </div>
             <HistoryTable rows={detail.progressHistory.map((progress) => [
               formatDate(progress.updateDate) || "Not recorded",
@@ -635,9 +635,9 @@ function LearnerRecordView({ detail, loading, error, onRetry, onBack, mayMutateP
             {detail.lifecycleTimeline.map((event) => (
               <li key={event.id} className="relative rounded-xl border border-[#102c3d]/[0.06] bg-[#f8fbfa] p-4">
                 <span className="absolute -left-[1.65rem] top-5 h-2.5 w-2.5 rounded-full bg-[#159b8f] ring-4 ring-white" />
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#102c3d]/[0.42]">{formatDateTime(event.eventDate)} · {event.actorName || "LevyTate"}</p>
-                <p className="mt-1 text-sm font-semibold text-[#102c3d]">{humanise(event.eventType)}</p>
-                <p className="mt-1 text-sm leading-6 text-[#102c3d]/[0.58]">{event.summary}</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-lt-muted">{formatDateTime(event.eventDate)} · {event.actorName || "LevyTate"}</p>
+                <p className="mt-1 text-sm font-semibold text-lt-ink">{humanise(event.eventType)}</p>
+                <p className="mt-1 text-sm leading-6 text-lt-muted">{event.summary}</p>
               </li>
             ))}
           </ol>
@@ -692,8 +692,8 @@ function AssessmentReadinessSection({ detail, mayMutate, onManage, onSaved }: { 
           <div className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">Current assessment status</p>
-                <h4 className="mt-1.5 text-lg font-semibold text-[#102c3d]">{humanise(readiness?.assessmentStatus || "not_started")}</h4>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lt-accent">Current assessment status</p>
+                <h4 className="mt-1.5 text-lg font-semibold text-lt-ink">{humanise(readiness?.assessmentStatus || "not_started")}</h4>
               </div>
               <StatusBadge tone={result.readyForAssessment ? "green" : result.blockingChecks.length ? "red" : "yellow"}>{result.readyForAssessment ? "Ready" : `${result.blockingChecks.length + result.outstandingChecks.length} outstanding`}</StatusBadge>
             </div>
@@ -707,11 +707,11 @@ function AssessmentReadinessSection({ detail, mayMutate, onManage, onSaved }: { 
           </div>
           {mayMutate && eligible ? (
             <div className="rounded-xl border border-[#102c3d]/[0.07] bg-white p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#102c3d]/[0.42]">Next action</p>
-              <p className="mt-2 text-sm leading-6 text-[#102c3d]/[0.60]">{nextAction ? nextAction.label : "Complete the outstanding readiness checks."}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-lt-muted">Next action</p>
+              <p className="mt-2 text-sm leading-6 text-lt-muted">{nextAction ? nextAction.label : "Complete the outstanding readiness checks."}</p>
               {nextAction ? <button type="button" disabled={saving} onClick={() => void runAction(nextAction.route)} className="mt-3 h-10 w-full rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white transition hover:bg-[#17394d] disabled:opacity-50">{saving ? "Updating" : nextAction.label}</button> : <button type="button" onClick={onManage} className="mt-3 h-10 w-full rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white transition hover:bg-[#17394d]">Complete readiness checks</button>}
-              {nextAction ? <button type="button" onClick={onManage} className="mt-2 h-9 w-full rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/[0.66] ring-1 ring-[#102c3d]/[0.1]">Review readiness details</button> : null}
-              {error ? <p className="mt-3 rounded-lg bg-[#fff0f2] px-3 py-2 text-xs font-semibold text-[#b13b51]">{error}</p> : null}
+              {nextAction ? <button type="button" onClick={onManage} className="mt-2 h-9 w-full rounded-full bg-white px-4 text-xs font-semibold text-lt-muted ring-1 ring-[#102c3d]/[0.1]">Review readiness details</button> : null}
+              {error ? <p className="mt-3 rounded-lg bg-[#fff0f2] px-3 py-2 text-xs font-semibold text-lt-risk">{error}</p> : null}
             </div>
           ) : null}
         </div>
@@ -720,8 +720,8 @@ function AssessmentReadinessSection({ detail, mayMutate, onManage, onSaved }: { 
           <div className="grid gap-2 sm:grid-cols-2">
             {result.checks.map((check) => (
               <div key={check.id} className="rounded-xl border border-[#102c3d]/[0.06] bg-[#fbfcfb] p-3.5">
-                <div className="flex items-start justify-between gap-3"><p className="text-sm font-semibold text-[#102c3d]">{check.label}</p><StatusBadge tone={readinessCheckTone(check.status)}>{check.status}</StatusBadge></div>
-                <p className="mt-1.5 text-xs leading-5 text-[#102c3d]/[0.52]">{check.message}</p>
+                <div className="flex items-start justify-between gap-3"><p className="text-sm font-semibold text-lt-ink">{check.label}</p><StatusBadge tone={readinessCheckTone(check.status)}>{check.status}</StatusBadge></div>
+                <p className="mt-1.5 text-xs leading-5 text-lt-muted">{check.message}</p>
               </div>
             ))}
           </div>
@@ -729,7 +729,7 @@ function AssessmentReadinessSection({ detail, mayMutate, onManage, onSaved }: { 
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
               {assessmentConfirmationTypes.map((type) => {
                 const confirmation = readiness.confirmations[type];
-                return <div key={type} className="rounded-xl border border-[#102c3d]/[0.06] bg-white p-3"><p className="text-xs font-semibold text-[#102c3d]">{assessmentConfirmationTypeLabels[type]}</p><div className="mt-2"><StatusBadge tone={confirmation.status === "confirmed" ? "green" : confirmation.status === "not_confirmed" || confirmation.status === "more_information_required" ? "red" : "yellow"}>{assessmentConfirmationStatusLabels[confirmation.status]}</StatusBadge></div><p className="mt-2 text-xs leading-5 text-[#102c3d]/[0.48]">{confirmation.confirmedBy || confirmation.recordedOnBehalfOf || "No confirmer recorded"}</p></div>;
+                return <div key={type} className="rounded-xl border border-[#102c3d]/[0.06] bg-white p-3"><p className="text-xs font-semibold text-lt-ink">{assessmentConfirmationTypeLabels[type]}</p><div className="mt-2"><StatusBadge tone={confirmation.status === "confirmed" ? "green" : confirmation.status === "not_confirmed" || confirmation.status === "more_information_required" ? "red" : "yellow"}>{assessmentConfirmationStatusLabels[confirmation.status]}</StatusBadge></div><p className="mt-2 text-xs leading-5 text-lt-muted">{confirmation.confirmedBy || confirmation.recordedOnBehalfOf || "No confirmer recorded"}</p></div>;
               })}
             </div>
           ) : null}
@@ -815,7 +815,7 @@ function AssessmentReadinessWorkflow({ detail, onClose, onSaved }: { detail: Lea
           <div className="grid gap-3 lg:grid-cols-2">
             {assessmentConfirmationTypes.map((type) => {
               const confirmation = form.confirmations[type];
-              return <div key={type} className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4"><p className="mb-3 text-sm font-semibold text-[#102c3d]">{assessmentConfirmationTypeLabels[type]}</p><div className="grid gap-3 sm:grid-cols-2"><FormSelect label="Status" value={confirmation.status} onChange={(value) => updateConfirmation(type, "status", value as AssessmentConfirmationStatus)} options={Object.entries(assessmentConfirmationStatusLabels).map(([value, label]) => ({ value, label }))} /><FormField label="Confirmation date" type="date" value={confirmation.confirmedDate} onChange={(value) => updateConfirmation(type, "confirmedDate", value)} /><FormField label="Confirmed by" value={confirmation.confirmedBy} onChange={(value) => updateConfirmation(type, "confirmedBy", value)} /><FormField label="Recorded on behalf of" value={confirmation.recordedOnBehalfOf} onChange={(value) => updateConfirmation(type, "recordedOnBehalfOf", value)} /><FormField label="Evidence reference" value={confirmation.evidenceReference} onChange={(value) => updateConfirmation(type, "evidenceReference", value)} /><FormTextArea label="Note or reason" value={confirmation.note} onChange={(value) => updateConfirmation(type, "note", value)} rows={2} /></div></div>;
+              return <div key={type} className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4"><p className="mb-3 text-sm font-semibold text-lt-ink">{assessmentConfirmationTypeLabels[type]}</p><div className="grid gap-3 sm:grid-cols-2"><FormSelect label="Status" value={confirmation.status} onChange={(value) => updateConfirmation(type, "status", value as AssessmentConfirmationStatus)} options={Object.entries(assessmentConfirmationStatusLabels).map(([value, label]) => ({ value, label }))} /><FormField label="Confirmation date" type="date" value={confirmation.confirmedDate} onChange={(value) => updateConfirmation(type, "confirmedDate", value)} /><FormField label="Confirmed by" value={confirmation.confirmedBy} onChange={(value) => updateConfirmation(type, "confirmedBy", value)} /><FormField label="Recorded on behalf of" value={confirmation.recordedOnBehalfOf} onChange={(value) => updateConfirmation(type, "recordedOnBehalfOf", value)} /><FormField label="Evidence reference" value={confirmation.evidenceReference} onChange={(value) => updateConfirmation(type, "evidenceReference", value)} /><FormTextArea label="Note or reason" value={confirmation.note} onChange={(value) => updateConfirmation(type, "note", value)} rows={2} /></div></div>;
             })}
           </div>
         </FormSection>
@@ -826,7 +826,7 @@ function AssessmentReadinessWorkflow({ detail, onClose, onSaved }: { detail: Lea
 }
 
 function AssessmentSummaryRow({ label, value }: { label: string; value: string }) {
-  return <div className="grid grid-cols-[8rem_minmax(0,1fr)] gap-3 border-t border-[#102c3d]/[0.05] pt-2 first:border-0 first:pt-0"><dt className="text-xs font-semibold text-[#102c3d]/[0.42]">{label}</dt><dd className="text-sm font-semibold text-[#102c3d]/[0.72]">{value}</dd></div>;
+  return <div className="grid grid-cols-[8rem_minmax(0,1fr)] gap-3 border-t border-[#102c3d]/[0.05] pt-2 first:border-0 first:pt-0"><dt className="text-xs font-semibold text-lt-muted">{label}</dt><dd className="text-sm font-semibold text-lt-secondary">{value}</dd></div>;
 }
 
 function readinessCheckTone(status: string) {
@@ -912,9 +912,9 @@ function ProgressUpdateForm({ detail, onClose, onSaved }: { detail: LearnerRecor
             {form.supportType !== "no_support_required" ? <FormTextArea label="Support summary" value={form.supportSummary} onChange={(value) => update("supportSummary", value)} wide rows={3} placeholder="What needs to happen next?" /> : null}
           </FormGrid>
         </FormSection>
-        {error ? <p className="rounded-xl bg-[#fff0f2] px-4 py-3 text-sm font-semibold text-[#b13b51]">{error}</p> : null}
+        {error ? <p className="rounded-xl bg-[#fff0f2] px-4 py-3 text-sm font-semibold text-lt-risk">{error}</p> : null}
         <div className="flex justify-end gap-2 border-t border-[#102c3d]/[0.07] pt-4">
-          <button type="button" onClick={onClose} className="h-10 rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/[0.62] ring-1 ring-[#102c3d]/[0.1]">Cancel</button>
+          <button type="button" onClick={onClose} className="h-10 rounded-full bg-white px-4 text-xs font-semibold text-lt-muted ring-1 ring-[#102c3d]/[0.1]">Cancel</button>
           <button disabled={saving} className="h-10 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white disabled:opacity-55">{saving ? "Recording update" : "Record progress update"}</button>
         </div>
       </fieldset></form>
@@ -986,7 +986,7 @@ function ReviewEntryForm({ detail, onClose, onSaved }: { detail: LearnerRecordDe
             <FormField label={form.reviewType === "manager_check_in" ? "Manager" : "Reviewer name"} value={form.reviewerName} onChange={(value) => update("reviewerName", value)} required />
             {form.reviewType === "provider_review" ? <FormField label="Provider ID" value={form.providerId} onChange={(value) => update("providerId", value)} required /> : null}
           </FormGrid>
-          {form.reviewType === "provider_review" ? <p className="mt-3 text-xs leading-5 text-[#102c3d]/[0.48]">Defaults to {detail.programme.providerName}. Provider ownership is validated by the server.</p> : null}
+          {form.reviewType === "provider_review" ? <p className="mt-3 text-xs leading-5 text-lt-muted">Defaults to {detail.programme.providerName}. Provider ownership is validated by the server.</p> : null}
         </FormSection>
         <FormSection title={form.reviewType === "manager_check_in" ? "Workplace application and support" : "Summary and agreed action"}>
           <FormGrid>
@@ -995,9 +995,9 @@ function ReviewEntryForm({ detail, onClose, onSaved }: { detail: LearnerRecordDe
             <FormTextArea label={form.reviewType === "manager_check_in" ? "Support available, concerns or blockers" : "Support required"} value={form.supportRequired} onChange={(value) => update("supportRequired", value)} wide rows={3} />
           </FormGrid>
         </FormSection>
-        {error ? <p className="rounded-xl bg-[#fff0f2] px-4 py-3 text-sm font-semibold text-[#b13b51]">{error}</p> : null}
+        {error ? <p className="rounded-xl bg-[#fff0f2] px-4 py-3 text-sm font-semibold text-lt-risk">{error}</p> : null}
         <div className="flex justify-end gap-2 border-t border-[#102c3d]/[0.07] pt-4">
-          <button type="button" onClick={onClose} className="h-10 rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/[0.62] ring-1 ring-[#102c3d]/[0.1]">Cancel</button>
+          <button type="button" onClick={onClose} className="h-10 rounded-full bg-white px-4 text-xs font-semibold text-lt-muted ring-1 ring-[#102c3d]/[0.1]">Cancel</button>
           <button disabled={saving} className="h-10 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white disabled:opacity-55">{saving ? "Recording review" : "Record review or check-in"}</button>
         </div>
       </fieldset></form>
@@ -1022,10 +1022,10 @@ function BreakManagementWorkflow({ detail, mode, onModeChange, onClose, onSaved 
           <div className="flex flex-wrap gap-2 xl:max-w-[18rem] xl:justify-end">
             <SecondaryRecordAction onClick={() => onModeChange("update")}>Update break details</SecondaryRecordAction>
             <PrimaryRecordAction onClick={() => onModeChange("return")}>Return learner to active learning</PrimaryRecordAction>
-            <button type="button" onClick={() => onModeChange("cancel")} className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-white px-4 text-xs font-semibold text-[#b13b51] ring-1 ring-[#b13b51]/[0.20] transition hover:bg-[#fff0f2]"><XCircle size={14} />Cancel break record</button>
+            <button type="button" onClick={() => onModeChange("cancel")} className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-white px-4 text-xs font-semibold text-lt-risk ring-1 ring-[#b13b51]/[0.20] transition hover:bg-[#fff0f2]"><XCircle size={14} />Cancel break record</button>
           </div>
         </div>
-        <button type="button" onClick={onClose} className="mt-4 text-xs font-semibold text-[#102c3d]/[0.48] hover:text-[#102c3d]">Close break management</button>
+        <button type="button" onClick={onClose} className="mt-4 text-xs font-semibold text-lt-muted hover:text-lt-ink">Close break management</button>
       </RecordSection>
     );
   }
@@ -1115,12 +1115,12 @@ function CancelBreakForm({ detail, onBack, onSaved }: { detail: LearnerRecordDet
 function ActiveBreakBanner({ detail }: { detail: LearnerRecordDetail }) {
   const active = detail.activeBreak!;
   const returnCopy = active.expectedReturnUnknown ? "An expected return date has not yet been confirmed." : detail.breakAttention.state === "overdue" ? `Expected return was ${formatDate(active.expectedReturnDate)} and is now overdue.` : `Expected return ${formatDate(active.expectedReturnDate)}.`;
-  return <section className="rounded-xl border border-[#b89220]/[0.20] bg-[#fff9e7] px-5 py-4"><div className="flex items-start gap-3"><CalendarClock className="mt-0.5 shrink-0 text-[#8a6b00]" size={20} /><div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8a6b00]">Break in learning</p><p className="mt-1 text-base font-semibold leading-6 text-[#102c3d]">On a break in learning since {formatDate(active.startDate)}. {returnCopy}</p><p className="mt-1 text-sm leading-6 text-[#102c3d]/[0.58]">Next action: {detail.breakAttention.label}.</p></div></div></section>;
+  return <section className="rounded-xl border border-[#b89220]/[0.20] bg-[#fff9e7] px-5 py-4"><div className="flex items-start gap-3"><CalendarClock className="mt-0.5 shrink-0 text-[#8a6b00]" size={20} /><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8a6b00]">Break in learning</p><p className="mt-1 text-base font-semibold leading-6 text-lt-ink">On a break in learning since {formatDate(active.startDate)}. {returnCopy}</p><p className="mt-1 text-sm leading-6 text-lt-muted">Next action: {detail.breakAttention.label}.</p></div></div></section>;
 }
 
 function NotificationFields({ label, checked, date, onChecked, onDate }: { label: string; checked: boolean; date: string; onChecked: (value: boolean) => void; onDate: (value: string) => void }) { return <div className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-3"><BreakCheckbox label={label} checked={checked} onChange={onChecked} />{checked ? <div className="mt-3"><FormField label="Notification date" type="date" value={date} onChange={onDate} required /></div> : null}</div>; }
-function BreakCheckbox({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) { return <label className="flex min-h-11 items-center gap-2 rounded-lg border border-[#102c3d]/[0.08] bg-white px-3 text-sm font-semibold text-[#102c3d]/[0.70]"><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="h-4 w-4 accent-[#159b8f]" />{label}</label>; }
-function FormActions({ error, saving, submit, onCancel, danger = false }: { error: string; saving: boolean; submit: string; onCancel: () => void; danger?: boolean }) { return <div>{error ? <p className="mb-4 rounded-xl bg-[#fff0f2] px-4 py-3 text-sm font-semibold text-[#b13b51]">{error}</p> : null}<div className="flex flex-wrap justify-end gap-2 border-t border-[#102c3d]/[0.07] pt-4"><button type="button" onClick={onCancel} className="h-10 rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/[0.62] ring-1 ring-[#102c3d]/[0.1]">Back</button><button disabled={saving} className={`h-10 rounded-full px-5 text-xs font-semibold text-white disabled:opacity-55 ${danger ? "bg-[#b13b51]" : "bg-[#102c3d]"}`}>{saving ? "Saving" : submit}</button></div></div>; }
+function BreakCheckbox({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) { return <label className="flex min-h-11 items-center gap-2 rounded-lg border border-[#102c3d]/[0.08] bg-white px-3 text-sm font-semibold text-lt-secondary"><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="h-4 w-4 accent-[#159b8f]" />{label}</label>; }
+function FormActions({ error, saving, submit, onCancel, danger = false }: { error: string; saving: boolean; submit: string; onCancel: () => void; danger?: boolean }) { return <div>{error ? <p className="mb-4 rounded-xl bg-[#fff0f2] px-4 py-3 text-sm font-semibold text-lt-risk">{error}</p> : null}<div className="flex flex-wrap justify-end gap-2 border-t border-[#102c3d]/[0.07] pt-4"><button type="button" onClick={onCancel} className="h-10 rounded-full bg-white px-4 text-xs font-semibold text-lt-muted ring-1 ring-[#102c3d]/[0.1]">Back</button><button disabled={saving} className={`h-10 rounded-full px-5 text-xs font-semibold text-white disabled:opacity-55 ${danger ? "bg-[#b13b51]" : "bg-[#102c3d]"}`}>{saving ? "Saving" : submit}</button></div></div>; }
 
 type PreEnrolmentForm = {
   employmentRoute: string;
@@ -1255,11 +1255,11 @@ function PreEnrolmentWorkflow({ detail, onCancel, onSaved, onEnrolled }: { detai
       <ClientMutationRecovery mutation={saveMutation} /><ClientMutationRecovery mutation={enrolMutation} /><fieldset disabled={locked} className="min-w-0 border-0 p-0">
       <div className="flex flex-col gap-3 border-b border-[#102c3d]/[0.06] px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">Pre-enrolment workflow</p>
-          <h3 className="mt-0.5 text-xl font-semibold text-[#102c3d]">Complete pre-enrolment</h3>
-          <p className="mt-1 text-sm leading-6 text-[#102c3d]/[0.56]">Record the employer-controlled checks needed before {detail.learner.name} can become an active learner.</p>
+          <p className="lt-eyebrow">Pre-enrolment workflow</p>
+          <h3 className="mt-0.5 text-xl font-semibold text-lt-ink">Complete pre-enrolment</h3>
+          <p className="mt-1 text-sm leading-6 text-lt-muted">Record the employer-controlled checks needed before {detail.learner.name} can become an active learner.</p>
         </div>
-        <button type="button" onClick={onCancel} className="inline-flex h-10 w-fit items-center justify-center rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/[0.62] ring-1 ring-[#102c3d]/[0.1] transition hover:bg-[#f8fbfa]">
+        <button type="button" onClick={onCancel} className="inline-flex h-10 w-fit items-center justify-center rounded-full bg-white px-4 text-xs font-semibold text-lt-muted ring-1 ring-[#102c3d]/[0.1] transition hover:bg-[#f8fbfa]">
           Return to read-only record
         </button>
       </div>
@@ -1277,10 +1277,10 @@ function PreEnrolmentWorkflow({ detail, onCancel, onSaved, onEnrolled }: { detai
           </FormSection>
 
           <FormSection title="England working-hours declaration" copy="The employee declaration is historical evidence and cannot be rewritten by the employer.">
-            <div className="mb-4 rounded-xl border border-[#102c3d]/[0.06] bg-white p-4 text-sm leading-6 text-[#102c3d]/[0.66]">
-              <p className="font-semibold text-[#102c3d]">Employee declaration wording</p>
+            <div className="mb-4 rounded-xl border border-[#102c3d]/[0.06] bg-white p-4 text-sm leading-6 text-lt-muted">
+              <p className="font-semibold text-lt-ink">Employee declaration wording</p>
               <p className="mt-1">&ldquo;{detail.eligibilityDeclaration?.declarationWording || "I confirm that I expect to spend at least 50% of my working hours in England over the duration of the apprenticeship."}&rdquo;</p>
-              <div className="mt-3 grid gap-2 text-xs font-semibold text-[#102c3d]/[0.52] sm:grid-cols-2">
+              <div className="mt-3 grid gap-2 text-xs font-semibold text-lt-muted sm:grid-cols-2">
                 <p>Status: {detail.eligibilityDeclaration?.confirmed ? "Employee confirmed" : "Not confirmed"}</p>
                 <p>Date: {formatDate(detail.eligibilityDeclaration?.confirmedAt) || "Not recorded"}</p>
                 <p>Expected England hours: {detail.eligibilityDeclaration?.expectedEnglandWorkingHoursPercentage ?? "Not recorded"}%</p>
@@ -1339,7 +1339,7 @@ function PreEnrolmentWorkflow({ detail, onCancel, onSaved, onEnrolled }: { detai
 
           <FormSection title="Guides">
             <FormGrid>
-              <label className="flex h-11 items-center gap-2 rounded-lg border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 text-sm font-semibold text-[#102c3d]/[0.70]">
+              <label className="flex h-11 items-center gap-2 rounded-lg border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 text-sm font-semibold text-lt-secondary">
                 <input type="checkbox" checked={form.guidesSent} onChange={(event) => update("guidesSent", event.target.checked)} className="h-4 w-4 accent-[#159b8f]" />
                 Guides sent
               </label>
@@ -1353,26 +1353,26 @@ function PreEnrolmentWorkflow({ detail, onCancel, onSaved, onEnrolled }: { detai
 
         <aside className="grid content-start gap-4">
           <section className="rounded-xl border border-[#102c3d]/[0.075] bg-[#f8fbfa] p-4">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">Enrolment readiness</p>
-            <h4 className="mt-2 text-lg font-semibold text-[#102c3d]">{readiness.readyForEnrolment ? "Ready for enrolment" : "Checks outstanding"}</h4>
-            <p className="mt-1 text-sm leading-6 text-[#102c3d]/[0.56]">{readiness.readyForEnrolment ? "All mandatory checks are complete." : `${readiness.blockingChecks.length} blocking check${readiness.blockingChecks.length === 1 ? "" : "s"} remain.`}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lt-accent">Enrolment readiness</p>
+            <h4 className="mt-2 text-lg font-semibold text-lt-ink">{readiness.readyForEnrolment ? "Ready for enrolment" : "Checks outstanding"}</h4>
+            <p className="mt-1 text-sm leading-6 text-lt-muted">{readiness.readyForEnrolment ? "All mandatory checks are complete." : `${readiness.blockingChecks.length} blocking check${readiness.blockingChecks.length === 1 ? "" : "s"} remain.`}</p>
             <div className="mt-4 grid gap-2">
               {readiness.checks.map((check) => (
                 <div key={check.id} className="rounded-lg border border-[#102c3d]/[0.06] bg-white p-3">
                   <div className="flex items-start justify-between gap-3">
-                    <p className="text-sm font-semibold text-[#102c3d]">{check.label}</p>
+                    <p className="text-sm font-semibold text-lt-ink">{check.label}</p>
                     <StatusBadge tone={statusTone(check.status)}>{check.status}</StatusBadge>
                   </div>
-                  <p className="mt-1 text-xs leading-5 text-[#102c3d]/[0.50]">{check.message}</p>
+                  <p className="mt-1 text-xs leading-5 text-lt-muted">{check.message}</p>
                 </div>
               ))}
             </div>
           </section>
 
-          {error ? <p className="rounded-xl bg-[#fff0f2] px-4 py-3 text-sm font-semibold text-[#b13b51]">{error}</p> : null}
+          {error ? <p className="rounded-xl bg-[#fff0f2] px-4 py-3 text-sm font-semibold text-lt-risk">{error}</p> : null}
 
           <div className="rounded-xl border border-[#102c3d]/[0.075] bg-white p-4">
-            {readiness.readyForEnrolment ? <div className="mb-5 grid gap-3"><h4 className="font-semibold">Initial evidence and review plan</h4><p className="text-xs leading-5 text-[#102c3d]/60">Record the actual starting evidence. The provider review is scheduled, not marked complete.</p>
+            {readiness.readyForEnrolment ? <div className="mb-5 grid gap-3"><h4 className="font-semibold">Initial evidence and review plan</h4><p className="text-xs leading-5 text-lt-muted">Record the actual starting evidence. The provider review is scheduled, not marked complete.</p>
               <FormField label="Initial progress date" type="date" value={initialEvidence.updateDate} onChange={(updateDate) => setInitialEvidence((value) => ({ ...value, updateDate }))} required />
               <FormField label="Initial target progress (%)" type="number" value={initialEvidence.target} onChange={(target) => setInitialEvidence((value) => ({ ...value, target }))} required />
               <FormField label="Initial actual progress (%)" type="number" value={initialEvidence.actual} onChange={(actual) => setInitialEvidence((value) => ({ ...value, actual }))} required />
@@ -1383,10 +1383,10 @@ function PreEnrolmentWorkflow({ detail, onCancel, onSaved, onEnrolled }: { detai
             <button type="button" onClick={saveProgress} disabled={saving || enrolling} className="flex h-11 w-full items-center justify-center rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white transition hover:bg-[#17394d] disabled:cursor-not-allowed disabled:opacity-55">
               {saving ? "Saving progress" : "Save progress"}
             </button>
-            <button type="button" onClick={markEnrolled} disabled={enrolling || saving || !readiness.readyForEnrolment} className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-full bg-[#159b8f] px-5 text-xs font-semibold text-white transition hover:bg-[#0f867b] disabled:cursor-not-allowed disabled:bg-[#102c3d]/[0.18] disabled:text-[#102c3d]/[0.42]">
+            <button type="button" onClick={markEnrolled} disabled={enrolling || saving || !readiness.readyForEnrolment} className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-full bg-[#159b8f] px-5 text-xs font-semibold text-white transition hover:bg-[#0f867b] disabled:cursor-not-allowed disabled:bg-[#102c3d]/[0.18] disabled:text-lt-muted">
               <CheckCircle2 size={15} /> {enrolling ? "Marking enrolled" : "Mark as enrolled"}
             </button>
-            {!readiness.readyForEnrolment ? <p className="mt-3 text-xs leading-5 text-[#102c3d]/[0.48]">The server will also block enrolment until every mandatory readiness check is complete.</p> : null}
+            {!readiness.readyForEnrolment ? <p className="mt-3 text-xs leading-5 text-lt-muted">The server will also block enrolment until every mandatory readiness check is complete.</p> : null}
           </div>
         </aside>
       </div>
@@ -1398,9 +1398,9 @@ function createEnrolmentRequestId() { return `enrol-${globalThis.crypto.randomUU
 
 function CompactSelect({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
   return (
-    <label className="grid gap-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/[0.38]">
+    <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.12em] text-lt-muted">
       {label}
-      <select value={value} onChange={(event) => onChange(event.target.value)} className="h-10 min-w-0 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-sm font-semibold normal-case tracking-normal text-[#102c3d]/[0.72] outline-none">
+      <select value={value} onChange={(event) => onChange(event.target.value)} className="h-10 min-w-0 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-sm font-semibold normal-case tracking-normal text-lt-secondary outline-none">
         {options.map((option) => <option key={option}>{option}</option>)}
       </select>
     </label>
@@ -1412,9 +1412,9 @@ function LearnerMobileCard({ learner, onOpen }: { learner: LearnerOperationalSum
     <article data-testid="learner-card" className="min-w-0 rounded-xl border border-[#102c3d]/[0.07] bg-white p-4 shadow-[0_10px_24px_rgba(16,44,61,0.035)]">
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="font-semibold leading-5 text-[#102c3d]">{learner.learner.name}</h3>
-          <p className="mt-0.5 text-xs leading-[1.1rem] text-[#102c3d]/[0.54]">{learner.learner.jobTitle}</p>
-          <p className="text-[11px] leading-[1.05rem] text-[#102c3d]/[0.42]">{learner.learner.department} · {learner.learner.site}</p>
+          <h3 className="font-semibold leading-5 text-lt-ink">{learner.learner.name}</h3>
+          <p className="mt-0.5 text-xs leading-[1.1rem] text-lt-muted">{learner.learner.jobTitle}</p>
+          <p className="text-xs leading-[1.05rem] text-lt-muted">{learner.learner.department} · {learner.learner.site}</p>
         </div>
         <div className="max-w-[9rem] shrink-0 text-right">
           <StatusBadge testId="learner-status-badge" tone={statusTone(learner.lifecycleStatusLabel)}>{learner.lifecycleStatusLabel}</StatusBadge>
@@ -1422,21 +1422,21 @@ function LearnerMobileCard({ learner, onOpen }: { learner: LearnerOperationalSum
       </div>
 
       <div className="mt-3 border-t border-[#102c3d]/[0.06] pt-3">
-        <p className="text-sm font-semibold leading-5 text-[#102c3d]/[0.78]">{learner.programme.programmeName}</p>
-        <p className="mt-0.5 text-xs text-[#102c3d]/[0.48]">{learner.programme.providerName} · {learner.employmentRouteLabel}</p>
+        <p className="text-sm font-semibold leading-5 text-lt-secondary">{learner.programme.programmeName}</p>
+        <p className="mt-0.5 text-xs text-lt-muted">{learner.programme.providerName} · {learner.employmentRouteLabel}</p>
       </div>
 
       {learner.activeBreak ? <div className="mt-3 rounded-lg bg-[#fff8df] px-3 py-2 text-xs leading-5 text-[#756000]"><p>Expected return · {learner.activeBreak.expectedReturnUnknown ? "Not confirmed" : formatDate(learner.activeBreak.expectedReturnDate)}</p><p>{learner.breakAttention.daysOnBreak} days on break · {learnerBreakReasonLabels[learner.activeBreak.reasonCategory]}</p></div> : <div className="mt-3"><ProgressMini learner={learner} /></div>}
 
-      <dl className="mt-3 grid grid-cols-2 gap-2 rounded-lg bg-[#f8fbfa] px-3 py-2 text-[11px] leading-5 text-[#102c3d]/[0.56]">
-        <div><dt className="font-semibold text-[#102c3d]/[0.42]">Provider review</dt><dd>{formatDate(learner.latestProviderReview?.reviewDate) || "No review"}</dd></div>
-        <div><dt className="font-semibold text-[#102c3d]/[0.42]">L&amp;D check-in</dt><dd>{formatDate(learner.latestLAndDCheckIn?.reviewDate) || "No check-in"}</dd></div>
+      <dl className="mt-3 grid grid-cols-2 gap-2 rounded-lg bg-[#f8fbfa] px-3 py-2 text-xs leading-5 text-lt-muted">
+        <div><dt className="font-semibold text-lt-muted">Provider review</dt><dd>{formatDate(learner.latestProviderReview?.reviewDate) || "No review"}</dd></div>
+        <div><dt className="font-semibold text-lt-muted">L&amp;D check-in</dt><dd>{formatDate(learner.latestLAndDCheckIn?.reviewDate) || "No check-in"}</dd></div>
       </dl>
 
       <div className="mt-3 flex items-center justify-between gap-3 border-t border-[#102c3d]/[0.06] pt-3">
         <div className="min-w-0">
-          <p className="text-xs font-semibold leading-[1.1rem] text-[#102c3d]/[0.72]">{learner.attention.label}</p>
-          {learner.attention.needsAttention ? <p className="mt-0.5 text-[11px] text-[#b13b51]">{learner.attention.reasons.length} item{learner.attention.reasons.length === 1 ? "" : "s"} flagged</p> : null}
+          <p className="text-xs font-semibold leading-[1.1rem] text-lt-secondary">{learner.attention.label}</p>
+          {learner.attention.needsAttention ? <p className="mt-0.5 text-xs text-lt-risk">{learner.attention.reasons.length} item{learner.attention.reasons.length === 1 ? "" : "s"} flagged</p> : null}
         </div>
         <button data-testid="learner-open-record" type="button" onClick={onOpen} className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg bg-[#102c3d] px-3 text-xs font-semibold text-white transition hover:bg-[#17394d]">Open record</button>
       </div>
@@ -1445,28 +1445,28 @@ function LearnerMobileCard({ learner, onOpen }: { learner: LearnerOperationalSum
 }
 
 function ProgressMini({ learner }: { learner: LearnerOperationalSummary }) {
-  if (learner.activeBreak) return <div className="min-w-0 text-[11px] leading-[1.05rem] text-[#756000]"><p className="font-semibold">Progress paused</p><p>{learner.breakAttention.label}</p></div>;
-  if (!learner.latestProgress) return <p className="text-xs text-[#102c3d]/[0.46]">No progress data</p>;
+  if (learner.activeBreak) return <div className="min-w-0 text-xs leading-[1.05rem] text-[#756000]"><p className="font-semibold">Progress paused</p><p>{learner.breakAttention.label}</p></div>;
+  if (!learner.latestProgress) return <p className="text-xs text-lt-muted">No progress data</p>;
   return (
     <div className="min-w-0">
-      <div className="flex items-start justify-between gap-2 text-[11px] font-semibold leading-4 text-[#102c3d]/[0.62]">
+      <div className="flex items-start justify-between gap-2 text-xs font-semibold leading-4 text-lt-muted">
         <span>{learner.latestProgress.actualProgressPercentage}% actual</span>
         <span className="text-right">{learner.progressPosition}</span>
       </div>
       <div className="mt-1.5 h-1.5 rounded-full bg-[#edf3ef]">
         <div className={`h-1.5 rounded-full ${learner.latestProgress.variancePercentage <= -3 ? "bg-[#c95568]" : "bg-[#159b8f]"}`} style={{ width: `${Math.min(100, Math.max(0, learner.latestProgress.actualProgressPercentage))}%` }} />
       </div>
-      <p className="mt-1 text-[11px] leading-4 text-[#102c3d]/[0.42]">Target {learner.latestProgress.targetProgressPercentage}% · {learner.latestProgress.variancePercentage > 0 ? "+" : ""}{learner.latestProgress.variancePercentage} pts</p>
+      <p className="mt-1 text-xs leading-4 text-lt-muted">Target {learner.latestProgress.targetProgressPercentage}% · {learner.latestProgress.variancePercentage > 0 ? "+" : ""}{learner.latestProgress.variancePercentage} pts</p>
     </div>
   );
 }
 
 function RecordSection({ title, eyebrow, children }: { title: string; eyebrow: string; children: ReactNode }) {
   return (
-    <section className="min-w-0 rounded-xl border border-[#102c3d]/[0.075] bg-white shadow-[0_14px_36px_rgba(16,44,61,0.045)]">
+    <section className="lt-panel min-w-0">
       <div className="border-b border-[#102c3d]/[0.06] px-5 py-4">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">{eyebrow}</p>
-        <h3 className="mt-0.5 text-lg font-semibold text-[#102c3d]">{title}</h3>
+        <p className="lt-eyebrow">{eyebrow}</p>
+        <h3 className="mt-0.5 text-lg font-semibold text-lt-ink">{title}</h3>
       </div>
       <div className="min-w-0 p-5">{children}</div>
     </section>
@@ -1475,10 +1475,10 @@ function RecordSection({ title, eyebrow, children }: { title: string; eyebrow: s
 
 function InfoBlock({ label, value, helper }: { label: string; value: string; helper?: string }) {
   return (
-    <div className="rounded-xl border border-[#102c3d]/[0.06] bg-white px-4 py-3">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/[0.38]">{label}</p>
-      <p className="mt-1.5 text-sm font-semibold leading-5 text-[#102c3d]">{value || "Not recorded"}</p>
-      {helper ? <p className="mt-1 text-xs leading-5 text-[#102c3d]/[0.46]">{helper}</p> : null}
+    <div className="lt-record-fact px-4 py-3">
+      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-lt-muted">{label}</p>
+      <p className="mt-1.5 text-sm font-semibold leading-5 text-lt-ink">{value || "Not recorded"}</p>
+      {helper ? <p className="mt-1 text-xs leading-5 text-lt-muted">{helper}</p> : null}
     </div>
   );
 }
@@ -1487,10 +1487,10 @@ function CheckCard({ title, status, lines }: { title: string; status: string; li
   return (
     <div className="rounded-xl border border-[#102c3d]/[0.06] bg-[#fbfcfb] p-4">
       <div className="flex items-start justify-between gap-3">
-        <h4 className="text-sm font-semibold text-[#102c3d]">{title}</h4>
+        <h4 className="text-sm font-semibold text-lt-ink">{title}</h4>
         <StatusBadge tone={statusTone(status)}>{status}</StatusBadge>
       </div>
-      <details className="mt-3"><summary className="min-h-10 cursor-pointer py-2 text-xs font-semibold text-[#0b6f63]">View details</summary><div className="grid gap-1.5 border-t border-[#102c3d]/[0.06] pt-3 text-xs leading-5 text-[#102c3d]/[0.56]">{lines.filter(Boolean).map((line) => <p key={line}>{line}</p>)}</div></details>
+      <details className="mt-3"><summary className="min-h-10 cursor-pointer py-2 text-xs font-semibold text-lt-accent">View details</summary><div className="grid gap-1.5 border-t border-[#102c3d]/[0.06] pt-3 text-xs leading-5 text-lt-muted">{lines.filter(Boolean).map((line) => <p key={line}>{line}</p>)}</div></details>
     </div>
   );
 }
@@ -1498,10 +1498,10 @@ function CheckCard({ title, status, lines }: { title: string; status: string; li
 export function ReviewCard({ title, review, overdue, empty }: { title: string; review: LearnerRecordDetail["latestProviderReview"]; overdue?: boolean; empty: string }) {
   return (
     <div className="rounded-xl border border-[#102c3d]/[0.06] bg-[#fbfcfb] p-4">
-      <div className="flex items-start justify-between gap-3"><h4 className="text-sm font-semibold text-[#102c3d]">{title}</h4>{overdue ? <StatusBadge tone="red">Overdue</StatusBadge> : null}</div>
+      <div className="flex items-start justify-between gap-3"><h4 className="text-sm font-semibold text-lt-ink">{title}</h4>{overdue ? <StatusBadge tone="red">Overdue</StatusBadge> : null}</div>
       {review ? (
-        <div className="mt-3 text-xs leading-5 text-[#102c3d]/[0.56]"><div className="flex items-center gap-3"><span className="h-2.5 w-2.5 rounded-full bg-[#4f7b95]" aria-hidden="true" /><p><strong className="text-[#102c3d]">{formatDate(review.reviewDate)}</strong> · {humanise(review.status)}</p></div><p className="ml-5 mt-1">{review.status === "scheduled" ? "Scheduled appointment" : review.status === "cancelled" ? "No active follow-up plan" : `Next ${formatDate(review.nextReviewDate) || "not scheduled"}`}</p><details className="ml-5 mt-2"><summary className="min-h-10 cursor-pointer py-2 font-semibold text-[#0b6f63]">Review detail</summary><div className="border-t border-[#102c3d]/[0.06] pt-2"><p>{review.reviewerName || "Reviewer not recorded"}</p><p className="mt-1 text-sm leading-6 text-[#102c3d]/[0.68]">{review.summary}</p>{review.supportRequired ? <p className="mt-1 font-semibold text-[#0b6f63]">{review.supportRequired}</p> : null}</div></details></div>
-      ) : <p className="mt-3 text-xs leading-5 text-[#102c3d]/[0.46]">{empty}</p>}
+        <div className="mt-3 text-xs leading-5 text-lt-muted"><div className="flex items-center gap-3"><span className="h-2.5 w-2.5 rounded-full bg-[#4f7b95]" aria-hidden="true" /><p><strong className="text-lt-ink">{formatDate(review.reviewDate)}</strong> · {humanise(review.status)}</p></div><p className="ml-5 mt-1">{review.status === "scheduled" ? "Scheduled appointment" : review.status === "cancelled" ? "No active follow-up plan" : `Next ${formatDate(review.nextReviewDate) || "not scheduled"}`}</p><details className="ml-5 mt-2"><summary className="min-h-10 cursor-pointer py-2 font-semibold text-lt-accent">Review detail</summary><div className="border-t border-[#102c3d]/[0.06] pt-2"><p>{review.reviewerName || "Reviewer not recorded"}</p><p className="mt-1 text-sm leading-6 text-lt-muted">{review.summary}</p>{review.supportRequired ? <p className="mt-1 font-semibold text-lt-accent">{review.supportRequired}</p> : null}</div></details></div>
+      ) : <p className="mt-3 text-xs leading-5 text-lt-muted">{empty}</p>}
     </div>
   );
 }
@@ -1509,12 +1509,12 @@ export function ReviewCard({ title, review, overdue, empty }: { title: string; r
 function InfoGroup({ title, rows }: { title: string; rows: Array<[string, string]> }) {
   return (
     <div className="rounded-xl border border-[#102c3d]/[0.06] bg-[#fbfcfb] p-4">
-      <h4 className="text-sm font-semibold text-[#102c3d]">{title}</h4>
+      <h4 className="text-sm font-semibold text-lt-ink">{title}</h4>
       <dl className="mt-3 grid gap-2 text-sm">
         {rows.map(([label, value]) => (
           <div key={label} className="grid gap-1 border-t border-[#102c3d]/[0.05] pt-2 first:border-t-0 first:pt-0 sm:grid-cols-[11rem_minmax(0,1fr)]">
-            <dt className="text-xs font-semibold uppercase tracking-[0.1em] text-[#102c3d]/[0.38]">{label}</dt>
-            <dd className="text-[#102c3d]/[0.68]">{value || "Not recorded"}</dd>
+            <dt className="text-xs font-semibold uppercase tracking-[0.1em] text-lt-muted">{label}</dt>
+            <dd className="text-lt-muted">{value || "Not recorded"}</dd>
           </div>
         ))}
       </dl>
@@ -1527,13 +1527,13 @@ function HistoryTable({ headings, rows, empty }: { headings: string[]; rows: str
   return (
     <div className="overflow-x-auto rounded-xl border border-[#102c3d]/[0.07]">
       <table className="min-w-[680px] w-full border-collapse text-left text-sm">
-        <thead className="bg-[#f8fbfa] text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/[0.42]">
+        <thead className="bg-[#f8fbfa] text-xs font-semibold uppercase tracking-[0.12em] text-lt-muted">
           <tr>{headings.map((heading) => <th key={heading} className="px-4 py-3">{heading}</th>)}</tr>
         </thead>
         <tbody className="divide-y divide-[#102c3d]/[0.055] bg-white">
           {rows.map((row, index) => (
             <tr key={`${row[0]}-${index}`}>
-              {row.map((cell, cellIndex) => <td key={`${cell}-${cellIndex}`} className="px-4 py-3 text-[#102c3d]/[0.64]">{cell}</td>)}
+              {row.map((cell, cellIndex) => <td key={`${cell}-${cellIndex}`} className="px-4 py-3 text-lt-muted">{cell}</td>)}
             </tr>
           ))}
         </tbody>
@@ -1543,11 +1543,11 @@ function HistoryTable({ headings, rows, empty }: { headings: string[]; rows: str
 }
 
 function InlineEmpty({ copy }: { copy: string }) {
-  return <div className="rounded-xl border border-dashed border-[#102c3d]/[0.14] bg-[#f8fbfa] px-4 py-6 text-sm font-medium text-[#102c3d]/[0.52]">{copy}</div>;
+  return <div className="rounded-xl border border-dashed border-[#102c3d]/[0.14] bg-[#f8fbfa] px-4 py-6 text-sm font-medium text-lt-muted">{copy}</div>;
 }
 
 function ActionEmpty({ copy, action, onAction }: { copy: string; action: string; onAction: () => void }) {
-  return <div className="mt-4 flex flex-col items-start justify-between gap-3 rounded-xl border border-dashed border-[#102c3d]/[0.14] bg-[#f8fbfa] px-4 py-5 sm:flex-row sm:items-center"><p className="text-sm font-medium text-[#102c3d]/[0.52]">{copy}</p><SecondaryRecordAction onClick={onAction}>{action}</SecondaryRecordAction></div>;
+  return <div className="mt-4 flex flex-col items-start justify-between gap-3 rounded-xl border border-dashed border-[#102c3d]/[0.14] bg-[#f8fbfa] px-4 py-5 sm:flex-row sm:items-center"><p className="text-sm font-medium text-lt-muted">{copy}</p><SecondaryRecordAction onClick={onAction}>{action}</SecondaryRecordAction></div>;
 }
 
 function PrimaryRecordAction({ children, onClick }: { children: ReactNode; onClick: () => void }) {
@@ -1555,7 +1555,7 @@ function PrimaryRecordAction({ children, onClick }: { children: ReactNode; onCli
 }
 
 function SecondaryRecordAction({ children, onClick }: { children: ReactNode; onClick: () => void }) {
-  return <button type="button" onClick={onClick} className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/[0.68] ring-1 ring-[#102c3d]/[0.1] transition hover:bg-[#f8fbfa] hover:text-[#102c3d]"><Plus size={14} />{children}</button>;
+  return <button type="button" onClick={onClick} className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-white px-4 text-xs font-semibold text-lt-muted ring-1 ring-[#102c3d]/[0.1] transition hover:bg-[#f8fbfa] hover:text-lt-ink"><Plus size={14} />{children}</button>;
 }
 
 function nextActionNarrative(detail: LearnerRecordDetail) {

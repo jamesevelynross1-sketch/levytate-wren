@@ -586,7 +586,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
           </div>
 
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-            {availableModules.some((module) => module.name === "Copilot") ? <button type="button" onClick={() => openModule("Copilot")} className="hidden h-10 items-center gap-2 rounded-xl px-3 text-xs font-semibold text-lt-muted transition hover:bg-[#f3f7f4] hover:text-lt-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 sm:inline-flex"><Sparkles size={15} aria-hidden="true" />Copilot</button> : null}
+            {availableModules.some((module) => module.name === "Copilot") ? <button type="button" onClick={() => openModule("Copilot")} className="hidden h-10 items-center gap-2 rounded-xl px-3 text-xs font-semibold text-lt-muted transition hover:bg-[#f3f7f4] hover:text-lt-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 sm:inline-flex"><Sparkles size={15} aria-hidden="true" />Copilot workspace</button> : null}
             {notifications.length > 0 && availableModules.some((module) => module.name === "Home") ? <button type="button" onClick={() => openModule("Home")} aria-label={`${notifications.length} items need attention`} className="relative grid h-10 w-10 place-items-center rounded-xl text-lt-muted transition hover:bg-[#f3f7f4] hover:text-lt-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20"><BellRing size={17} aria-hidden="true" /><span className="absolute right-1 top-1 min-w-4 rounded-full bg-[#c95568] px-1 text-center text-[9px] font-bold leading-4 text-white">{notifications.length}</span></button> : null}
             {meta?.prospectAccess?.status === "active" && meta.userRole === "Apprenticeship Lead" ? <ProspectGettingStarted access={meta.prospectAccess} onNavigate={navigateTo} /> : null}
             {demoPerspective.state ? <DemoModeIndicator state={demoPerspective.state} /> : null}
@@ -609,7 +609,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
       {mobileMenuOpen ? <div className="fixed inset-0 z-50 lg:hidden"><button type="button" onClick={() => setMobileMenuOpen(false)} aria-label="Close navigation" className="absolute inset-0 bg-[#102c3d]/40 backdrop-blur-sm" /><aside ref={mobileDrawerRef} id="levytate-mobile-navigation" role="dialog" aria-modal="true" aria-labelledby="levytate-mobile-navigation-title" className="absolute inset-y-0 left-0 flex w-[min(88vw,22rem)] flex-col overflow-hidden bg-white shadow-[24px_0_80px_rgba(16,44,61,0.24)]">
         <div className="flex h-[4.5rem] items-center justify-between border-b border-[#102c3d]/[0.08] px-4"><div><p id="levytate-mobile-navigation-title" className="text-sm font-semibold">{workspaceName}</p><p className="text-xs text-lt-muted">Navigation</p></div><button type="button" onClick={() => setMobileMenuOpen(false)} aria-label="Close navigation" className="grid h-11 w-11 place-items-center rounded-xl text-lt-muted hover:bg-[#f4f8f5] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20"><X size={19} aria-hidden="true" /></button></div>
         <nav aria-label="Mobile workspace navigation" className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
-          <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-[0.14em] text-lt-muted">Core workspace</p>
+          <p className="px-3 pb-2 lt-eyebrow">Core workspace</p>
           <div className="grid gap-1">
             {coreNavigation.map((area) => <MobileNavigationArea key={area.key} area={area} activeModule={activeModule} moduleLabel={moduleLabel} onOpenArea={openArea} onOpenModule={openModule} />)}
           </div>
@@ -625,7 +625,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
           ) : null}
           {supportNavigation.length > 0 ? (
             <div className="mt-5 border-t border-[#102c3d]/[0.07] pt-4">
-              <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-[0.14em] text-lt-muted">Tools & support</p>
+              <p className="px-3 pb-2 lt-eyebrow">Tools & support</p>
               <div className="grid gap-1">
                 {supportNavigation.map((area) => <MobileNavigationArea key={area.key} area={area} activeModule={activeModule} moduleLabel={moduleLabel} onOpenArea={openArea} onOpenModule={openModule} />)}
               </div>
@@ -638,7 +638,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
       <div className="grid min-h-[calc(100vh-4.5rem)] w-full min-w-0 grid-cols-[minmax(0,1fr)] lg:grid-cols-[232px_minmax(0,1fr)]">
         <aside data-testid="levytate-sidebar" className="lt-sidebar hidden min-w-0 lg:sticky lg:top-[4.5rem] lg:flex lg:h-[calc(100vh-4.5rem)] lg:flex-col">
           <nav className="flex min-h-0 flex-1 flex-col px-3 py-5" aria-label="Workspace areas">
-            <div className="px-3 pb-3"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-lt-muted">Core workspace</p></div>
+            <div className="px-3 pb-3"><p className="lt-eyebrow">Core workspace</p></div>
             <div className="min-h-0 flex-1 space-y-1 overflow-y-auto">{coreNavigation.map((area) => {
               const Icon = navigationAreaIcon(area);
               const active = activeArea?.key === area.key;
@@ -656,7 +656,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
                 </div>
               ) : null}
             </div>
-            {supportNavigation.length ? <div className="mt-4 border-t border-[#102c3d]/[0.07] pt-3"><p className="px-3 pb-2 text-[9px] font-semibold uppercase tracking-[0.13em] text-lt-muted">Tools & support</p><div className="grid gap-0.5">{supportNavigation.map((area) => { const Icon = navigationAreaIcon(area); const active = activeArea?.key === area.key; return <button key={area.key} type="button" onClick={() => openArea(area)} aria-current={active ? "page" : undefined} className={`flex min-h-10 items-center gap-3 rounded-lg px-3 text-left text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 ${active ? "bg-[#f1f7f4] text-lt-accent" : "text-lt-muted hover:bg-[#f5f8f5] hover:text-lt-ink"}`}><Icon size={15} aria-hidden="true" />{area.label}</button>; })}</div></div> : null}
+            {supportNavigation.length ? <div className="mt-4 border-t border-[#102c3d]/[0.07] pt-3"><p className="px-3 pb-2 lt-eyebrow">Tools & support</p><div className="grid gap-0.5">{supportNavigation.map((area) => { const Icon = navigationAreaIcon(area); const active = activeArea?.key === area.key; return <button key={area.key} type="button" onClick={() => openArea(area)} aria-current={active ? "page" : undefined} className={`flex min-h-10 items-center gap-3 rounded-lg px-3 text-left text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 ${active ? "bg-[#f1f7f4] text-lt-accent" : "text-lt-muted hover:bg-[#f5f8f5] hover:text-lt-ink"}`}><Icon size={15} aria-hidden="true" />{area.label}</button>; })}</div></div> : null}
           </nav>
         </aside>
 

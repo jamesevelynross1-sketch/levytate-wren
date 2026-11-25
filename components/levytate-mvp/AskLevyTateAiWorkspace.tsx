@@ -963,42 +963,42 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
   if (presentation === "drawer" && context) {
     return <div className="flex h-full min-h-0 flex-col bg-white">
       {!conversationStarted ? <div className="border-b border-[#102c3d]/[0.07] px-4 py-3">
-        <p className="text-xs font-semibold text-[#102c3d]/48">Suggested</p>
-        <div className="mt-2 flex flex-wrap gap-2">{activePrompts.slice(0, 3).map((prompt) => <button key={prompt} type="button" onClick={() => void sendMessage(prompt)} disabled={conversationDisabled} className="min-h-9 rounded-full border border-[#102c3d]/[0.08] bg-[#f8fbfa] px-3 py-1.5 text-left text-[13px] font-medium leading-5 text-[#102c3d]/68 transition hover:border-[#0b776e]/30 hover:bg-white hover:text-[#102c3d] disabled:opacity-45">{prompt}</button>)}</div>
+        <p className="text-xs font-semibold text-lt-muted">Suggested</p>
+        <div className="mt-2 flex flex-wrap gap-2">{activePrompts.slice(0, 3).map((prompt) => <button key={prompt} type="button" onClick={() => void sendMessage(prompt)} disabled={conversationDisabled} className="min-h-9 rounded-full border border-[#102c3d]/[0.08] bg-[#f8fbfa] px-3 py-1.5 text-left text-[13px] font-medium leading-5 text-lt-muted transition hover:border-[#0b776e]/30 hover:bg-white hover:text-lt-ink disabled:opacity-45">{prompt}</button>)}</div>
       </div> : null}
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-white px-4 py-4" aria-live="polite">
-        {contextChanges.map((change, index) => <div key={`${change}-${index}`} className="flex items-center gap-3 py-1"><span className="h-px flex-1 bg-[#102c3d]/10" /><span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#102c3d]/40">{change}</span><span className="h-px flex-1 bg-[#102c3d]/10" /></div>)}
-        {messages.map((message) => <article key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}><div className={`max-w-[92%] text-[14px] leading-6 ${message.role === "user" ? "rounded-2xl rounded-br-md bg-[#102c3d] px-3.5 py-2.5 text-white" : "w-full text-[#102c3d]/72"}`}><p className="whitespace-pre-wrap">{message.content}</p>{message.response ? <InlineResponse response={message.response} onAction={chooseAction} onQuickReply={(reply) => void sendMessage(reply)} onSelectPathway={role === "Employee" ? selectRecommendedPathway : undefined} selectedPathwayTitle={selectedPreferredStandard?.title ?? null} loading={loading} /> : null}</div></article>)}
-        {loading ? <p className="text-sm font-medium text-[#0b776e]">Checking {context.module === "Home" ? "learner operations" : context.contextLabel.toLowerCase()}…</p> : null}
-        {error ? <p className="border border-[#bf4159]/15 bg-[#fff4f5] px-3 py-2 text-sm text-[#ad344e]">{error}</p> : null}
+        {contextChanges.map((change, index) => <div key={`${change}-${index}`} className="flex items-center gap-3 py-1"><span className="h-px flex-1 bg-[#102c3d]/10" /><span className="text-xs font-semibold uppercase tracking-[0.1em] text-lt-muted">{change}</span><span className="h-px flex-1 bg-[#102c3d]/10" /></div>)}
+        {messages.map((message) => <article key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}><div className={`max-w-[92%] text-[14px] leading-6 ${message.role === "user" ? "rounded-2xl rounded-br-md bg-[#102c3d] px-3.5 py-2.5 text-white" : "w-full text-lt-secondary"}`}><p className="whitespace-pre-wrap">{message.content}</p>{message.response ? <InlineResponse response={message.response} onAction={chooseAction} onQuickReply={(reply) => void sendMessage(reply)} onSelectPathway={role === "Employee" ? selectRecommendedPathway : undefined} selectedPathwayTitle={selectedPreferredStandard?.title ?? null} loading={loading} /> : null}</div></article>)}
+        {loading ? <p className="text-sm font-medium text-lt-accent">Checking {context.module === "Home" ? "learner operations" : context.contextLabel.toLowerCase()}…</p> : null}
+        {error ? <p className="border border-[#bf4159]/15 bg-[#fff4f5] px-3 py-2 text-sm text-lt-risk">{error}</p> : null}
         {profileRecovery}
-        {actionStatus ? <p className="text-sm text-[#0b6f63]" role="status">{actionStatus}</p> : null}
+        {actionStatus ? <p className="text-sm text-lt-accent" role="status">{actionStatus}</p> : null}
       </div>
       <form onSubmit={submit} className="border-t border-[#102c3d]/[0.08] bg-white p-3">
         <label htmlFor="levytate-contextual-copilot-message" className="sr-only">Message LevyTate Copilot</label>
-        <div className="flex items-end gap-2 rounded-xl border border-[#102c3d]/[0.1] bg-[#f8fbfa] p-1.5 focus-within:border-[#0b776e] focus-within:ring-2 focus-within:ring-[#0b776e]/10"><textarea id="levytate-contextual-copilot-message" value={input} onChange={(event) => setInput(event.target.value)} rows={1} placeholder={copilotPlaceholderFor(context)} className="max-h-32 min-h-10 flex-1 resize-y bg-transparent px-2 py-2 text-sm leading-5 text-[#102c3d] outline-none" /><button disabled={conversationDisabled} aria-label="Ask Copilot" className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[#102c3d] text-lg font-semibold text-white disabled:opacity-45">↑</button></div>
-        {conversationStarted ? <button type="button" onClick={resetConversation} className="mt-1.5 text-xs font-semibold text-[#102c3d]/42">New conversation</button> : null}
+        <div className="flex items-end gap-2 rounded-xl border border-[#102c3d]/[0.1] bg-[#f8fbfa] p-1.5 focus-within:border-[#0b776e] focus-within:ring-2 focus-within:ring-[#0b776e]/10"><textarea id="levytate-contextual-copilot-message" value={input} onChange={(event) => setInput(event.target.value)} rows={1} placeholder={copilotPlaceholderFor(context)} className="max-h-32 min-h-10 flex-1 resize-y bg-transparent px-2 py-2 text-sm leading-5 text-lt-ink outline-none" /><button disabled={conversationDisabled} aria-label="Ask Copilot" className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[#102c3d] text-lg font-semibold text-white disabled:opacity-45">↑</button></div>
+        {conversationStarted ? <button type="button" onClick={resetConversation} className="mt-1.5 text-xs font-semibold text-lt-muted">New conversation</button> : null}
       </form>
     </div>;
   }
 
   return (
     <div className="grid gap-5">
-      <section className="rounded-[1.25rem] border border-[#102c3d]/[0.07] bg-white p-4 shadow-[0_18px_46px_rgba(16,44,61,0.045)] sm:p-5">
+      <section className="lt-panel p-4 sm:p-5">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="grid gap-3">
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">Platform Copilot</p>
-              <h2 className="mt-1 text-xl font-semibold tracking-[-0.02em]">Choose the workflow mode</h2>
+              <p className="lt-eyebrow">Platform Copilot</p>
+              <h2 className="mt-1 text-xl font-semibold tracking-[-0.02em]">How can Copilot help?</h2>
             </div>
             {role === "Employee" ? (
               <label className="grid gap-1.5">
-                <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/52">Employee in focus</span>
+                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-lt-muted">Employee in focus</span>
                 <select
                   value={selectedEmployeeId}
                   disabled={loading || Boolean(pendingProfileSave)}
                   onChange={(event) => chooseEmployee(event.target.value)}
-                  className="h-11 min-w-[260px] rounded-2xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 text-sm font-semibold text-[#102c3d] outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10"
+                  className="h-11 min-w-[260px] rounded-2xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 text-sm font-semibold text-lt-ink outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10"
                 >
                   {!employees.length ? <option value="">Create an employee first</option> : null}
                   {employees.map((employee) => (
@@ -1015,7 +1015,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
                 type="button"
                 disabled={loading || Boolean(pendingProfileSave)}
                 onClick={() => changeRole(item)}
-                className={`min-h-10 rounded-xl px-3 text-xs font-semibold transition ${role === item ? "bg-white text-[#102c3d] shadow-[0_8px_20px_rgba(16,44,61,0.08)]" : "text-[#102c3d]/52 hover:text-[#102c3d]"}`}
+                className={`min-h-10 rounded-xl px-3 text-xs font-semibold transition ${role === item ? "bg-white text-lt-ink shadow-[0_8px_20px_rgba(16,44,61,0.08)]" : "text-lt-muted hover:text-lt-ink"}`}
               >
                 {item}
               </button>
@@ -1029,20 +1029,20 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
           <div className="flex items-center justify-between gap-4 border-b border-[#102c3d]/[0.07] px-5 py-4">
             <div>
               <p className="font-semibold">LevyTate Copilot</p>
-              <p className="mt-1 text-xs text-[#102c3d]/48">
+              <p className="mt-1 text-xs text-lt-muted">
                 {role === "Employee" && selectedEmployee ? `${selectedEmployee.name} - ${selectedEmployee.department}` : `${role} mode`}
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <button type="button" onClick={resetConversation} className="rounded-full bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/52 ring-1 ring-[#102c3d]/[0.08] transition hover:text-[#102c3d] hover:ring-[#159b8f]/20">
+              <button type="button" onClick={resetConversation} className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-lt-muted ring-1 ring-[#102c3d]/[0.08] transition hover:text-lt-ink hover:ring-[#159b8f]/20">
                 New conversation
               </button>
               {role === "Employee" && selectedPreferredStandard ? (
-                <span className="hidden rounded-full bg-[#edf7f3] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#0b6f63] sm:inline-flex">
+                <span className="hidden rounded-full bg-[#edf7f3] px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-lt-accent sm:inline-flex">
                   Preferred pathway: {selectedPreferredStandard.title}
                 </span>
               ) : null}
-              <span className="rounded-full bg-[#edf7f3] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#0b6f63]">
+              <span className="rounded-full bg-[#edf7f3] px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-lt-accent">
                 {role === "Line Manager"
                   ? latestResponse?.structuredResult ? "Live direct-report data" : "Direct-report scope"
                   : latestResponse?.structuredResult ? "Live LevyTate data" : latestResponse?.source === "openai" ? "Live Copilot" : "Guided mode"}
@@ -1053,7 +1053,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
           <div className="flex-1 space-y-4 overflow-y-auto bg-[#f8fbfa] px-4 py-5 sm:px-5" aria-live="polite">
             {messages.map((message) => (
               <article key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div className={`${message.response?.structuredResult ? "w-full max-w-full" : "max-w-[92%] sm:max-w-[82%]"} rounded-2xl px-4 py-3 text-sm leading-6 shadow-[0_8px_20px_rgba(16,44,61,0.04)] ${message.role === "user" ? "bg-[#102c3d] text-white" : "bg-white text-[#102c3d]/72 ring-1 ring-[#102c3d]/[0.06]"}`}>
+                <div className={`${message.response?.structuredResult ? "w-full max-w-full" : "max-w-[92%] sm:max-w-[82%]"} rounded-2xl px-4 py-3 text-sm leading-6 shadow-[0_8px_20px_rgba(16,44,61,0.04)] ${message.role === "user" ? "bg-[#102c3d] text-white" : "bg-white text-lt-secondary ring-1 ring-[#102c3d]/[0.06]"}`}>
                   <p className="whitespace-pre-wrap">{message.content}</p>
                   {message.response ? (
                     <InlineResponse
@@ -1070,13 +1070,13 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
             ))}
             {loading ? (
               <div className="flex justify-start">
-                <div className="flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm text-[#0b6f63] ring-1 ring-[#102c3d]/[0.06]">
+                <div className="flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm text-lt-accent ring-1 ring-[#102c3d]/[0.06]">
                   <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[#159b8f]/25 border-t-[#159b8f]" />
                   Thinking through the next step
                 </div>
               </div>
             ) : null}
-            {error ? <p className="rounded-xl bg-[#fff4f5] px-4 py-3 text-sm text-[#ad344e] ring-1 ring-[#bf4159]/[0.12]">{error}</p> : null}
+            {error ? <p className="rounded-xl bg-[#fff4f5] px-4 py-3 text-sm text-lt-risk ring-1 ring-[#bf4159]/[0.12]">{error}</p> : null}
             {profileRecovery}
           </div>
 
@@ -1095,9 +1095,9 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
                 }}
                 rows={2}
                 placeholder="How can I help you today?"
-                className="min-h-[54px] flex-1 resize-none rounded-2xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-4 py-3 text-sm font-medium leading-6 text-[#102c3d] outline-none transition placeholder:text-[#102c3d]/34 focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10"
+                className="min-h-[54px] flex-1 resize-none rounded-2xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-4 py-3 text-sm font-medium leading-6 text-lt-ink outline-none transition placeholder:text-lt-muted focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10"
               />
-              <button disabled={conversationDisabled} className="min-h-[48px] rounded-full bg-[#102c3d] px-5 text-sm font-semibold text-white transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-45">
+              <button disabled={conversationDisabled} className="lt-button lt-primary min-h-[48px]">
                 {input.trim() ? "Continue conversation" : conversationCtaLabel}
               </button>
             </div>
@@ -1105,25 +1105,25 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
         </div>
 
         <aside className="border-t border-[#102c3d]/[0.07] bg-white p-5 xl:border-l xl:border-t-0">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">Current purpose</p>
-          <p className="mt-3 text-sm leading-6 text-[#102c3d]/62">{activePurpose}</p>
+          <p className="lt-eyebrow">Current purpose</p>
+          <p className="mt-3 text-sm leading-6 text-lt-muted">{activePurpose}</p>
           {role === "Employee" && selectedEmployee ? (
             <div className="mt-5 rounded-2xl bg-[#f8fbfa] p-4 ring-1 ring-[#102c3d]/[0.055]">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#0b6f63]">Employee context</p>
-              <p className="mt-2 text-sm font-semibold text-[#102c3d]">{selectedEmployee.name}</p>
-              <p className="mt-1 text-xs leading-5 text-[#102c3d]/56">{selectedEmployee.jobTitle || selectedRoleRecord?.title || "Role to confirm"} - {selectedEmployee.department} - {selectedEmployee.site || "Site to confirm"}</p>
-              <p className="mt-2 text-xs leading-5 text-[#102c3d]/56">Manager: {selectedManagerName}</p>
-              <p className="mt-2 text-xs leading-5 text-[#102c3d]/56">Discovery stage: {selectedDevelopmentProfile?.stage === "future_capability" ? "Future capability" : selectedDevelopmentProfile?.stage === "recommendation_ready" ? "Recommendation ready" : "Role context"}</p>
-              {selectedApplication ? <p className="mt-2 text-xs font-semibold leading-5 text-[#0b6f63]">Current application: {getApprenticeshipStandard(selectedApplication.apprenticeshipStandardId)?.title ?? selectedApplication.apprenticeshipStandardId} - {selectedApplication.status}</p> : null}
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-lt-accent">Employee context</p>
+              <p className="mt-2 text-sm font-semibold text-lt-ink">{selectedEmployee.name}</p>
+              <p className="mt-1 text-xs leading-5 text-lt-muted">{selectedEmployee.jobTitle || selectedRoleRecord?.title || "Role to confirm"} - {selectedEmployee.department} - {selectedEmployee.site || "Site to confirm"}</p>
+              <p className="mt-2 text-xs leading-5 text-lt-muted">Manager: {selectedManagerName}</p>
+              <p className="mt-2 text-xs leading-5 text-lt-muted">Discovery stage: {selectedDevelopmentProfile?.stage === "future_capability" ? "Future capability" : selectedDevelopmentProfile?.stage === "recommendation_ready" ? "Recommendation ready" : "Role context"}</p>
+              {selectedApplication ? <p className="mt-2 text-xs font-semibold leading-5 text-lt-accent">Current application: {getApprenticeshipStandard(selectedApplication.apprenticeshipStandardId)?.title ?? selectedApplication.apprenticeshipStandardId} - {selectedApplication.status}</p> : null}
             </div>
           ) : null}
           {employeePrioritySummary.length ? (
             <div className="mt-5 rounded-2xl bg-[#f8fbfa] p-4 ring-1 ring-[#102c3d]/[0.055]">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#0b6f63]">Employer priorities</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-lt-accent">Employer priorities</p>
               <div className="mt-3 grid gap-2">
                 {employeePrioritySummary.map((priority) => (
-                  <div key={priority.id} className="rounded-xl bg-white px-3 py-2 text-xs text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.05]">
-                    <p className="font-semibold text-[#102c3d]">{priority.name}</p>
+                  <div key={priority.id} className="rounded-xl bg-white px-3 py-2 text-xs text-lt-muted ring-1 ring-[#102c3d]/[0.05]">
+                    <p className="font-semibold text-lt-ink">{priority.name}</p>
                     <p className="mt-1">{priority.importance}</p>
                   </div>
                 ))}
@@ -1131,10 +1131,10 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
             </div>
           ) : null}
           <div className="mt-5 border-t border-[#102c3d]/[0.07] pt-5">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#0b6f63]">Try asking</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-lt-accent">Try asking</p>
             <div className="mt-3 grid gap-2">
               {activePrompts.map((prompt) => (
-                <button key={prompt} type="button" onClick={() => void sendMessage(prompt)} disabled={loading || (role === "Employee" && !selectedEmployee)} className="rounded-xl bg-[#f8fbfa] px-3.5 py-3 text-left text-xs font-semibold leading-5 text-[#102c3d]/66 ring-1 ring-[#102c3d]/[0.055] transition hover:bg-white hover:text-[#102c3d] hover:ring-[#159b8f]/20 disabled:opacity-50">
+                <button key={prompt} type="button" onClick={() => void sendMessage(prompt)} disabled={loading || (role === "Employee" && !selectedEmployee)} className="rounded-xl bg-[#f8fbfa] px-3.5 py-3 text-left text-xs font-semibold leading-5 text-lt-muted ring-1 ring-[#102c3d]/[0.055] transition hover:bg-white hover:text-lt-ink hover:ring-[#159b8f]/20 disabled:opacity-50">
                   {prompt}
                 </button>
               ))}
@@ -1143,12 +1143,12 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
           <WorkflowDraft response={latestResponse} action={revealedAction} status={actionStatus} />
           {pendingAction ? (
             <div className="mt-5 rounded-2xl border border-[#ffde59]/50 bg-[#fff9dc] p-4">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#765f00]">Confirmation required</p>
-              <p className="mt-2 text-sm font-semibold text-[#102c3d]">{pendingAction.label}</p>
-              <p className="mt-2 text-xs leading-5 text-[#102c3d]/58">Review the prepared information before this moves into a product workflow.</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#765f00]">Confirmation required</p>
+              <p className="mt-2 text-sm font-semibold text-lt-ink">{pendingAction.label}</p>
+              <p className="mt-2 text-xs leading-5 text-lt-muted">Review the prepared information before this moves into a product workflow.</p>
               <div className="mt-3 flex gap-2">
                 <button type="button" onClick={confirmAction} className="rounded-full bg-[#102c3d] px-3.5 py-2 text-xs font-semibold text-white">Confirm</button>
-                <button type="button" onClick={() => setPendingAction(null)} className="rounded-full bg-white px-3.5 py-2 text-xs font-semibold text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.08]">Cancel</button>
+                <button type="button" onClick={() => setPendingAction(null)} className="rounded-full bg-white px-3.5 py-2 text-xs font-semibold text-lt-muted ring-1 ring-[#102c3d]/[0.08]">Cancel</button>
               </div>
             </div>
           ) : null}
@@ -1181,19 +1181,19 @@ function InlineCapabilityBars({ title, items }: { title: string; items: NonNulla
 
   return (
     <div className="rounded-xl bg-white p-3 ring-1 ring-[#102c3d]/[0.06]">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/42">{title}</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lt-muted">{title}</p>
       <div className="mt-3 grid gap-2">
         {visible.length ? visible.map((item) => (
           <div key={title + "-" + item.domain} className="grid gap-1.5">
             <div className="flex items-center justify-between gap-3">
-              <span className="text-xs font-semibold text-[#102c3d]/68">{item.domain}</span>
-              <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#102c3d]/36">{inlineCapabilityStrength(item.score)}</span>
+              <span className="text-xs font-semibold text-lt-muted">{item.domain}</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.1em] text-lt-muted">{inlineCapabilityStrength(item.score)}</span>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-[#102c3d]/[0.06]">
               <div className="h-full rounded-full bg-[#159b8f]" style={{ width: Math.max(10, Math.min(100, item.score)) + "%" }} />
             </div>
           </div>
-        )) : <p className="text-xs leading-5 text-[#102c3d]/50">Evidence is still being gathered.</p>}
+        )) : <p className="text-xs leading-5 text-lt-muted">Evidence is still being gathered.</p>}
       </div>
     </div>
   );
@@ -1232,21 +1232,21 @@ function InlineRecommendationTrust({
       <div className="rounded-xl bg-white p-3 ring-1 ring-[#102c3d]/[0.055]">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">Why LevyTate recommended this</p>
-            <p className="mt-1 text-sm font-semibold text-[#102c3d]">{top.title}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lt-accent">Why LevyTate recommended this</p>
+            <p className="mt-1 text-sm font-semibold text-lt-ink">{top.title}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-[#102c3d] px-3 py-1.5 text-[11px] font-semibold text-white">{top.recommendationCategory}</span>
-            <span className="rounded-full bg-[#edf8f5] px-3 py-1.5 text-[11px] font-semibold text-[#0b6f63]">{inlineConfidenceLabel(top.confidence)}</span>
+            <span className="rounded-full bg-[#102c3d] px-3 py-1.5 text-xs font-semibold text-white">{top.recommendationCategory}</span>
+            <span className="rounded-full bg-[#edf8f5] px-3 py-1.5 text-xs font-semibold text-lt-accent">{inlineConfidenceLabel(top.confidence)}</span>
           </div>
         </div>
-        <p className="mt-3 text-xs leading-5 text-[#102c3d]/56">
+        <p className="mt-3 text-xs leading-5 text-lt-muted">
           Career stage detected: {recommendationResult.careerStage}. This route is inside the sensible recommendation envelope for the role, capability evidence and organisation priorities.
         </p>
         {evidence.length ? (
           <div className="mt-3 grid gap-2">
             {evidence.map((item) => (
-              <div key={item} className="flex items-start gap-2 rounded-lg bg-[#f8fbfa] px-3 py-2 text-xs leading-5 text-[#102c3d]/62">
+              <div key={item} className="flex items-start gap-2 rounded-lg bg-[#f8fbfa] px-3 py-2 text-xs leading-5 text-lt-muted">
                 <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[#159b8f]" />
                 <span>{item}</span>
               </div>
@@ -1255,13 +1255,13 @@ function InlineRecommendationTrust({
         ) : null}
         {onSelectPathway ? (
           <div className="mt-3 flex items-center justify-between gap-3">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/40">
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-lt-muted">
               {selected ? "Preferred route selected" : "Set preferred route"}
             </span>
             <button
               type="button"
               onClick={() => onSelectPathway(top.title)}
-              className={selected ? "rounded-full bg-[#edf7f3] px-3 py-1.5 text-[11px] font-semibold text-[#0b6f63]" : "rounded-full bg-[#102c3d] px-3 py-1.5 text-[11px] font-semibold text-white transition hover:-translate-y-0.5"}
+              className={selected ? "rounded-full bg-[#edf7f3] px-3 py-1.5 text-xs font-semibold text-lt-accent" : "rounded-full bg-[#102c3d] px-3 py-1.5 text-xs font-semibold text-white transition hover:-translate-y-0.5"}
             >
               {selected ? "Selected" : "Use this pathway"}
             </button>
@@ -1276,20 +1276,20 @@ function InlineRecommendationTrust({
 
       {priorities.length ? (
         <div className="rounded-xl bg-white p-3 ring-1 ring-[#102c3d]/[0.06]">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/42">Business priorities</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lt-muted">Business priorities</p>
           <div className="mt-3 flex flex-wrap gap-2">
-            {priorities.map((item) => <span key={item} className="rounded-full bg-[#edf8f5] px-3 py-1.5 text-[11px] font-semibold text-[#0b6f63]">{item}</span>)}
+            {priorities.map((item) => <span key={item} className="rounded-full bg-[#edf8f5] px-3 py-1.5 text-xs font-semibold text-lt-accent">{item}</span>)}
           </div>
         </div>
       ) : null}
 
       {alternatives.length ? (
         <div className="rounded-xl bg-white p-3 ring-1 ring-[#102c3d]/[0.06]">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/42">Alternative programmes</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lt-muted">Alternative programmes</p>
           <div className="mt-3 grid gap-2">
             {alternatives.map((item) => (
-              <div key={item.pathwayId} className="rounded-lg bg-[#f8fbfa] px-3 py-2 text-xs leading-5 text-[#102c3d]/58">
-                <p className="font-semibold text-[#102c3d]">{item.title}</p>
+              <div key={item.pathwayId} className="rounded-lg bg-[#f8fbfa] px-3 py-2 text-xs leading-5 text-lt-muted">
+                <p className="font-semibold text-lt-ink">{item.title}</p>
                 <p className="mt-1">{item.whyRankedLower[0] ?? item.missingEvidence[0] ?? "Ranked lower because the current evidence is stronger for the top route."}</p>
               </div>
             ))}
@@ -1299,20 +1299,20 @@ function InlineRecommendationTrust({
 
       <div className="grid gap-3 md:grid-cols-2">
         <div className="rounded-xl bg-white p-3 ring-1 ring-[#102c3d]/[0.06]">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/42">Missing evidence</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lt-muted">Missing evidence</p>
           <div className="mt-3 grid gap-2">
             {missing.length ? missing.map((item, index) => (
-              <div key={item} className="flex items-center justify-between gap-3 rounded-lg bg-[#f8fbfa] px-3 py-2 text-xs leading-5 text-[#102c3d]/56">
+              <div key={item} className="flex items-center justify-between gap-3 rounded-lg bg-[#f8fbfa] px-3 py-2 text-xs leading-5 text-lt-muted">
                 <span>{item}</span>
-                <span className="shrink-0 rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-[#102c3d]/42 ring-1 ring-[#102c3d]/[0.05]">{index % 2 === 0 ? "Ask employee" : "Ask manager"}</span>
+                <span className="shrink-0 rounded-full bg-white px-2 py-1 text-xs font-semibold text-lt-muted ring-1 ring-[#102c3d]/[0.05]">{index % 2 === 0 ? "Ask employee" : "Ask manager"}</span>
               </div>
-            )) : <p className="text-xs leading-5 text-[#102c3d]/50">No major evidence gaps are blocking this recommendation.</p>}
+            )) : <p className="text-xs leading-5 text-lt-muted">No major evidence gaps are blocking this recommendation.</p>}
           </div>
         </div>
         <div className="rounded-xl bg-white p-3 ring-1 ring-[#102c3d]/[0.06]">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/42">Next best questions</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lt-muted">Next best questions</p>
           <div className="mt-3 grid gap-2">
-            {questions.length ? questions.map((item) => <p key={item} className="rounded-lg bg-[#f8fbfa] px-3 py-2 text-xs leading-5 text-[#102c3d]/56">{item}</p>) : null}
+            {questions.length ? questions.map((item) => <p key={item} className="rounded-lg bg-[#f8fbfa] px-3 py-2 text-xs leading-5 text-lt-muted">{item}</p>) : null}
           </div>
         </div>
       </div>
@@ -1367,7 +1367,7 @@ function InlineResponse({
       {showQuickReplies ? (
         <div className="flex flex-wrap gap-2">
           {response.quickReplies?.map((reply) => (
-            <button key={reply} type="button" onClick={() => onQuickReply(reply)} disabled={loading} className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#0b6f63] ring-1 ring-[#159b8f]/[0.16] transition hover:bg-[#edf7f3] disabled:opacity-50">
+            <button key={reply} type="button" onClick={() => onQuickReply(reply)} disabled={loading} className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-lt-accent ring-1 ring-[#159b8f]/[0.16] transition hover:bg-[#edf7f3] disabled:opacity-50">
               {reply}
             </button>
           ))}
@@ -1384,25 +1384,25 @@ function CopilotStructuredResultView({ result }: { result: NonNullable<LevyTateA
     <section className="overflow-hidden rounded-xl bg-[#f8fbfa] ring-1 ring-[#102c3d]/[0.07]" aria-label={result.title}>
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#102c3d]/[0.06] px-3 py-3">
         <div>
-          <p className="text-xs font-semibold text-[#102c3d]">{result.title}</p>
-          <p className="mt-1 text-[11px] leading-4 text-[#102c3d]/48">{result.totalCount} result{result.totalCount === 1 ? "" : "s"}{result.truncated ? `, showing ${result.rows.length}` : ""}</p>
+          <p className="text-xs font-semibold text-lt-ink">{result.title}</p>
+          <p className="mt-1 text-xs leading-4 text-lt-muted">{result.totalCount} result{result.totalCount === 1 ? "" : "s"}{result.truncated ? `, showing ${result.rows.length}` : ""}</p>
         </div>
         <div className="text-right">
-          <span className="inline-flex rounded-full bg-[#e8f6f1] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#0b6f63]">{result.dataLabel}</span>
-          <p className="mt-1 text-[10px] text-[#102c3d]/38">As of {evaluated}</p>
+          <span className="inline-flex rounded-full bg-[#e8f6f1] px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.1em] text-lt-accent">{result.dataLabel}</span>
+          <p className="mt-1 text-xs text-lt-muted">As of {evaluated}</p>
         </div>
       </div>
       {hasRows ? (
         <>
           <div className="hidden max-w-full overflow-x-auto md:block">
             <table className="w-full min-w-[720px] border-collapse text-left text-xs">
-              <thead className="bg-white text-[10px] font-semibold uppercase tracking-[0.1em] text-[#102c3d]/42">
+              <thead className="bg-white text-xs font-semibold uppercase tracking-[0.1em] text-lt-muted">
                 <tr>{result.columns.map((column) => <th key={column.key} className={`px-3 py-2.5 ${column.align === "right" ? "text-right" : "text-left"}`}>{column.label}</th>)}<th className="px-3 py-2.5 text-right">Action</th></tr>
               </thead>
               <tbody className="divide-y divide-[#102c3d]/[0.055]">
                 {result.rows.map((row) => (
                   <tr key={row.key} className="bg-[#f8fbfa] align-top">
-                    {result.columns.map((column) => <td key={column.key} className={`max-w-[240px] px-3 py-3 leading-5 text-[#102c3d]/66 ${column.align === "right" ? "text-right font-semibold text-[#102c3d]" : "text-left"}`}>{row.cells[column.key] ?? "Not recorded"}</td>)}
+                    {result.columns.map((column) => <td key={column.key} className={`max-w-[240px] px-3 py-3 leading-5 text-lt-muted ${column.align === "right" ? "text-right font-semibold text-lt-ink" : "text-left"}`}>{row.cells[column.key] ?? "Not recorded"}</td>)}
                     <td className="px-3 py-3 text-right"><ResultActions actions={row.actions} /></td>
                   </tr>
                 ))}
@@ -1415,8 +1415,8 @@ function CopilotStructuredResultView({ result }: { result: NonNullable<LevyTateA
                 <dl className="grid gap-2">
                   {result.columns.map((column) => (
                     <div key={column.key} className="grid grid-cols-[110px_minmax(0,1fr)] gap-3 text-xs leading-5">
-                      <dt className="font-semibold text-[#102c3d]/42">{column.label}</dt>
-                      <dd className="min-w-0 break-words text-[#102c3d]/68">{row.cells[column.key] ?? "Not recorded"}</dd>
+                      <dt className="font-semibold text-lt-muted">{column.label}</dt>
+                      <dd className="min-w-0 break-words text-lt-muted">{row.cells[column.key] ?? "Not recorded"}</dd>
                     </div>
                   ))}
                 </dl>
@@ -1425,11 +1425,11 @@ function CopilotStructuredResultView({ result }: { result: NonNullable<LevyTateA
             ))}
           </div>
         </>
-      ) : <p className="px-3 py-4 text-xs leading-5 text-[#102c3d]/58">{result.emptyMessage}</p>}
+      ) : <p className="px-3 py-4 text-xs leading-5 text-lt-muted">{result.emptyMessage}</p>}
       {result.interpretation || result.viewAllUrl ? (
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#102c3d]/[0.06] bg-white px-3 py-3">
-          {result.interpretation ? <p className="max-w-2xl text-[11px] leading-5 text-[#102c3d]/50">{result.interpretation}</p> : <span />}
-          {result.viewAllUrl ? <a href={result.viewAllUrl} className="text-xs font-semibold text-[#0b6f63] hover:underline">View all results</a> : null}
+          {result.interpretation ? <p className="max-w-2xl text-xs leading-5 text-lt-muted">{result.interpretation}</p> : <span />}
+          {result.viewAllUrl ? <a href={result.viewAllUrl} className="text-xs font-semibold text-lt-accent hover:underline">View all results</a> : null}
         </div>
       ) : null}
     </section>
@@ -1437,10 +1437,10 @@ function CopilotStructuredResultView({ result }: { result: NonNullable<LevyTateA
 }
 
 function ResultActions({ actions }: { actions: Array<{ label: string; url: string }> | undefined }) {
-  if (!actions?.length) return <span className="text-[11px] text-[#102c3d]/36">No action</span>;
+  if (!actions?.length) return <span className="text-xs text-lt-muted">No action</span>;
   return (
     <div className="flex flex-wrap justify-end gap-2">
-      {actions.slice(0, 2).map((action) => <a key={`${action.label}-${action.url}`} href={action.url} className="inline-flex rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-[#0b6f63] ring-1 ring-[#159b8f]/[0.16] transition hover:bg-[#edf7f3]">{action.label}</a>)}
+      {actions.slice(0, 2).map((action) => <a key={`${action.label}-${action.url}`} href={action.url} className="inline-flex rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-lt-accent ring-1 ring-[#159b8f]/[0.16] transition hover:bg-[#edf7f3]">{action.label}</a>)}
     </div>
   );
 }
@@ -1456,27 +1456,27 @@ function WorkflowDraft({ response, action, status }: { response: LevyTateAiRespo
 
   return (
     <div className="mt-5 border-t border-[#102c3d]/[0.07] pt-5">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#0b6f63]">Prepared next step</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-lt-accent">Prepared next step</p>
       <div className="mt-3 rounded-2xl bg-[#f8fbfa] p-4 ring-1 ring-[#102c3d]/[0.055]">
         {showApplication && applicationDraft ? (
-          <div className="grid gap-2 text-xs leading-5 text-[#102c3d]/60">
-            <p className="font-semibold text-[#102c3d]">{applicationDraft.selectedApprenticeship}</p>
+          <div className="grid gap-2 text-xs leading-5 text-lt-muted">
+            <p className="font-semibold text-lt-ink">{applicationDraft.selectedApprenticeship}</p>
             <p>{applicationDraft.reasonForInterest}</p>
           </div>
         ) : null}
-        {showManager && response.managerMessageDraft ? <p className="text-xs leading-5 text-[#102c3d]/62">{response.managerMessageDraft}</p> : null}
+        {showManager && response.managerMessageDraft ? <p className="text-xs leading-5 text-lt-muted">{response.managerMessageDraft}</p> : null}
         {showProvider && response.providerMatchDraft ? (
-          <div className="grid gap-2 text-xs leading-5 text-[#102c3d]/60">
-            <p className="font-semibold text-[#102c3d]">{response.providerMatchDraft.roleFamily}</p>
+          <div className="grid gap-2 text-xs leading-5 text-lt-muted">
+            <p className="font-semibold text-lt-ink">{response.providerMatchDraft.roleFamily}</p>
             <p>{response.providerMatchDraft.providerName} | {response.providerMatchDraft.recommendedProgramme}</p>
             <p>{response.providerMatchDraft.matchScore}% match | {response.providerMatchDraft.linkedStandard}</p>
             <p>{response.providerMatchDraft.notes}</p>
           </div>
         ) : null}
-        {showRationale ? <p className="text-xs leading-5 text-[#102c3d]/62">{response.assistantMessage}</p> : null}
-        {showAdminTask && response.providerMatchDraft ? <p className="text-xs leading-5 text-[#102c3d]/62">Follow up on {response.providerMatchDraft.roleFamily}: {response.providerMatchDraft.notes}</p> : null}
-        {!showApplication && !showManager && !showProvider && !showRationale && !showAdminTask ? <p className="text-xs leading-5 text-[#102c3d]/60">{action.label} is ready to continue in the relevant LevyTate workspace.</p> : null}
-        {status ? <p className="mt-3 rounded-xl bg-white px-3 py-2 text-xs font-semibold leading-5 text-[#0b6f63] ring-1 ring-[#159b8f]/[0.1]">{status}</p> : null}
+        {showRationale ? <p className="text-xs leading-5 text-lt-muted">{response.assistantMessage}</p> : null}
+        {showAdminTask && response.providerMatchDraft ? <p className="text-xs leading-5 text-lt-muted">Follow up on {response.providerMatchDraft.roleFamily}: {response.providerMatchDraft.notes}</p> : null}
+        {!showApplication && !showManager && !showProvider && !showRationale && !showAdminTask ? <p className="text-xs leading-5 text-lt-muted">{action.label} is ready to continue in the relevant LevyTate workspace.</p> : null}
+        {status ? <p className="mt-3 rounded-xl bg-white px-3 py-2 text-xs font-semibold leading-5 text-lt-accent ring-1 ring-[#159b8f]/[0.1]">{status}</p> : null}
       </div>
     </div>
   );

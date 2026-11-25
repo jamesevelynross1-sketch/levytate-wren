@@ -103,7 +103,7 @@
 .lt-design .lt-setup-row:hover { background:#f5f8f6; }
 .lt-design .lt-setup-row[data-next="true"] { background:#eef5f1; }
 .lt-design .lt-account { box-shadow:none; border-color:rgb(var(--lt-border)); }
-.lt-design .lt-auth-shell { min-height:100vh; background:rgb(var(--lt-canvas)); }
+.lt-design.lt-auth-shell { min-height:100vh; background:rgb(var(--lt-canvas)); }
 .lt-design .lt-auth-card { border: 1px solid rgb(var(--lt-border)); border-radius: 16px; box-shadow: var(--lt-shadow); }
 .lt-design .lt-auth-story {
   position: relative; overflow:hidden; display:none; min-width:0; border-radius:22px;
@@ -118,4 +118,26 @@
 }
 @media (prefers-reduced-motion:reduce) {
   .lt-design *, .lt-design *::before, .lt-design *::after { animation-duration: .01ms !important; transition-duration:.01ms !important; scroll-behavior:auto !important; }
+}
+
+/* The first impression and frequently used records share the same restrained treatment. */
+.lt-design .lt-auth-card { align-self: center; }
+.lt-design .lt-auth-story > * { position: relative; z-index: 1; }
+.lt-design .lt-auth-story .lt-auth-message { max-width: 35rem; }
+.lt-design .lt-auth-story h2 { font-size: clamp(32px,4vw,52px); letter-spacing:-.045em; line-height:1.12; font-weight:600; }
+.lt-design .lt-auth-story p { color:#d5e5e6; }
+.lt-design .lt-auth-story .lt-auth-mark { color:white; font-size:20px; font-weight:650; letter-spacing:-.025em; }
+.lt-design .lt-record-fact { min-width:0; background:rgb(var(--lt-soft)); border-radius:var(--lt-control-radius); }
+.lt-design .lt-form-search { display:grid; gap:8px; min-width:0; }
+.lt-design .lt-form-search-count { font-size:12px; color:rgb(var(--lt-muted)); }
+.lt-design .lt-control:disabled { opacity:.7; cursor:not-allowed; }
+.lt-design .lt-panel :where(h2,h3) { line-height:1.35; }
+.lt-design .lt-tab:focus-visible { outline-offset:-3px; }
+.lt-design .lt-table:focus-visible { outline:2px solid rgb(var(--lt-accent)); outline-offset:2px; }
+.lt-design .lt-hero :focus-visible { outline-color:white; outline-offset:3px; }
+.lt-design .lt-auth-story:focus-visible { outline:2px solid white; }
+@media (max-width:639px) {
+  .lt-design .lt-modal { border-radius:12px; }
+  .lt-design .lt-tabs { gap:14px; }
+  .lt-design .lt-auth-card { padding:24px; }
 }

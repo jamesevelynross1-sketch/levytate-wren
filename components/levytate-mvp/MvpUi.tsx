@@ -23,7 +23,7 @@ export function MvpPanel({ title, eyebrow, actions, children }: { title: string;
 
 export function MvpToolbar({ search, onSearch, placeholder, actionLabel, onAction, filters }: { search: string; onSearch: (value: string) => void; placeholder: string; actionLabel?: string; onAction?: () => void; filters?: ReactNode }) {
   return (
-    <div className={`mb-4 grid gap-3 ${filters ? "xl:grid-cols-[minmax(260px,0.8fr)_minmax(480px,1.4fr)_auto] xl:items-end" : "lg:grid-cols-[minmax(260px,1fr)_auto] lg:items-end"}`}>
+    <div className={`mb-4 grid gap-3 ${filters ? "xl:grid-cols-[minmax(180px,0.8fr)_minmax(0,1.4fr)_auto] xl:items-end" : "lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end"}`}>
       <label className="lt-control flex min-h-11 min-w-0 items-center gap-2 px-3">
         <Search size={16} strokeWidth={1.8} className="shrink-0 text-lt-muted" aria-hidden="true" />
         <input aria-label={placeholder} value={search} onChange={(event) => onSearch(event.target.value)} className="min-w-0 flex-1 bg-transparent text-sm text-lt-ink outline-none placeholder:text-lt-muted" placeholder={placeholder} />
@@ -129,6 +129,20 @@ export function FormField({ label, value, onChange, required = false, type = "te
 
 export function FormSelect({ label, value, options, onChange, required = false, wide = false }: { label: string; value: string; options: Array<string | { value: string; label: string }>; onChange: (value: string) => void; required?: boolean; wide?: boolean }) {
   return <label className={`lt-label grid gap-1.5 ${wide ? "md:col-span-2" : ""}`}>{label}<select required={required} value={value} onChange={(event) => onChange(event.target.value)} className="lt-control h-11 min-w-0 px-3 text-sm font-medium outline-none">{options.map((option) => typeof option === "string" ? <option key={option} value={option}>{option}</option> : <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>;
+}
+
+/** Search long option lists while keeping native select semantics, required
+ * validation and the selected option. No hidden automatic programme selection. */
+export function SearchableFormSelect({ label, value, options, onChange, required=false, wide=false, placeholder="Search programmes" }: { label:string;value:string;options:Array<{value:string;label:string}>;onChange:(value:string)=>void;required?:boolean;wide?:boolean;placeholder?:string }) {
+  const [query,setQuery]=useState("");
+  const queryText=query.trim().toLowerCase();
+  const choices=options.filter(option=>option.value===""||option.value===value||option.label.toLowerCase().includes(queryText));
+  const matches=options.filter(option=>option.value!==""&&option.label.toLowerCase().includes(queryText)).length;
+  return <div className={`lt-form-search ${wide?"md:col-span-2":""}`}>
+    <label className="lt-label grid gap-1.5">Find {label.toLowerCase()}<span className="lt-control flex min-h-11 min-w-0 items-center gap-2 px-3"><Search size={16} className="shrink-0 text-lt-muted" aria-hidden="true"/><input type="search" value={query} onChange={event=>setQuery(event.target.value)} placeholder={placeholder} className="min-w-0 flex-1 bg-transparent text-sm font-normal text-lt-ink outline-none"/></span></label>
+    <FormSelect label={label} value={value} options={choices} onChange={onChange} required={required}/>
+    <p className="lt-form-search-count" aria-live="polite">{matches===0?"No matching programmes. Try another search.":`${matches} programme${matches===1?"":"s"} available`}</p>
+  </div>;
 }
 
 export function FormTextArea({ label, value, onChange, required = false, wide = false, rows = 3, placeholder }: { label: string; value: string; onChange: (value: string) => void; required?: boolean; wide?: boolean; rows?: number; placeholder?: string }) {
