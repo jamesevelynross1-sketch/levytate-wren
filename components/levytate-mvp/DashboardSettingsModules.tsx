@@ -6,6 +6,8 @@ import { useEffect, useState, type FormEvent } from "react";
 import { FormField, FormGrid, MvpPanel, StatusBadge } from "@/components/levytate-mvp/MvpUi";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { ManagerActionsHome } from "@/components/levytate-mvp/ManagerActionsHome";
+import type { EmployerSetupProgress } from "@/components/levytate-mvp/useEmployerSetupProgress";
+import { buildEmployerSetupSteps, type EmployerSetupStep } from "@/lib/levytate/mvp/employer-setup";
 import type { ManagerOperationalActionListItem } from "@/lib/levytate/mvp/manager-operational-actions";
 import {
   buildNotifications,
@@ -34,7 +36,7 @@ const importanceOptions: Array<{ value: MvpEmployerPriorityImportance; copy: str
 
 const managerReviewStatuses = ["Submitted to Line Manager", "Awaiting Manager Review"] as const;
 
-export function DashboardModule({ onNavigate }: { onNavigate: (module: string) => void }) {
+export function DashboardModule({ onNavigate, setup }: { onNavigate: (module: string) => void; setup?: EmployerSetupProgress | null }) {
   const { data, can } = useMvpWorkspace();
   const notifications = buildNotifications(data);
   const support = employeesNeedingSupport(data);
@@ -49,34 +51,37 @@ export function DashboardModule({ onNavigate }: { onNavigate: (module: string) =
         ? { label: "Improve provider coverage", target: "Marketplace" }
         : { label: "Open LevyTate Copilot", target: "LevyTate Copilot" };
 
-  const setupSteps = [
-    { label: "Add your first employee", complete: data.employees.length > 0, target: "Employees" },
-    { label: "Add a provider", complete: data.organisationProviders.some((item) => item.status === "Active"), target: "Marketplace" },
-    { label: "Publish a programme", complete: data.organisationProgrammes.some((item) => item.status === "Active"), target: "Marketplace" },
-    { label: "Import an existing learner", complete: data.learnerRecords.length > 0, target: "Learners" },
-    { label: "Bring in DAS finance data", complete: false, target: "Finance" },
-  ];
+  const blankWorkspace = data.employees.length === 0 && data.applications.length === 0 && data.learnerRecords.length === 0;
+  const checklist = setup && !setup.complete
+    ? <ClientSetupHome steps={setup.steps} onNavigate={onNavigate} onRetryFinance={setup.financeStatus === "unavailable" ? setup.refreshFinance : undefined} />
+    : blankWorkspace && !setup
+      ? <ClientSetupHome steps={buildEmployerSetupSteps(data, "pending")} onNavigate={onNavigate} />
+      : null;
 
-  if (data.employees.length === 0 && data.applications.length === 0 && data.learnerRecords.length === 0) {
-    return <ClientSetupHome steps={setupSteps} onNavigate={onNavigate} />;
-  }
+  // A blank employer sees guided setup first. A partially configured employer
+  // keeps the checklist and can use the rest of the product without fake data.
+  if (blankWorkspace && checklist) return checklist;
 
   if (!data.profile.priorities.length) {
     if (!can("settings:write")) {
       return (
-        <MvpPanel title="Workspace setup required" eyebrow="Protected workspace">
-          <p className="text-sm leading-6 text-[#102c3d]/58">
-            Employer priorities have not been configured yet. A workspace admin needs to complete setup before role-specific operating signals appear.
-          </p>
-        </MvpPanel>
+        <div className="grid gap-5">
+          {checklist}
+          <MvpPanel title="Workspace setup required" eyebrow="Protected workspace">
+            <p className="text-sm leading-6 text-[#102c3d]/58">
+              Employer priorities have not been configured yet. A workspace admin needs to complete setup before role-specific operating signals appear.
+            </p>
+          </MvpPanel>
+        </div>
       );
     }
 
-    return <EmployerPrioritiesSetup />;
+    return <div className="grid gap-5">{checklist}<EmployerPrioritiesSetup /></div>;
   }
 
   return (
     <div className="grid gap-5">
+      {checklist}
       <section data-testid="home-attention-hero" className="rounded-[1.25rem] border border-[#102c3d]/[0.07] bg-[#102c3d] p-4 text-white shadow-[0_20px_55px_rgba(16,44,61,0.12)] sm:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-2xl">
@@ -141,11 +146,25 @@ export function DashboardModule({ onNavigate }: { onNavigate: (module: string) =
   );
 }
 
-function ClientSetupHome({ steps, onNavigate }: { steps: Array<{ label: string; complete: boolean; target: string }>; onNavigate: (module: string) => void }) {
+function ClientSetupHome({ steps, onNavigate, onRetryFinance }: { steps: EmployerSetupStep[]; onNavigate: (module: string) => void; onRetryFinance?: () => void }) {
   const complete = steps.filter((step) => step.complete).length;
-  return <div className="grid gap-5" data-testid="blank-employer-home">
-    <section className="rounded-[1.25rem] bg-[#102c3d] p-6 text-white sm:p-7"><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8fe0d2]">Client workspace</p><h2 className="mt-2 text-2xl font-semibold">Set up your LevyTate workspace</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-white/65">Start with your people and the providers and programmes you want employees to use. No demonstration records have been added.</p><p className="mt-5 text-sm font-semibold">{complete} of {steps.length} setup steps complete</p></section>
-    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{steps.map((step, index) => <button key={step.label} type="button" onClick={() => onNavigate(step.target)} className="flex min-h-28 items-start gap-4 border border-[#102c3d]/[0.08] bg-white p-5 text-left shadow-[0_10px_24px_rgba(16,44,61,0.035)] hover:border-[#159b8f]/30"><span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-xs font-semibold ${step.complete ? "bg-[#159b8f] text-white" : "bg-[#edf7f3] text-[#0b6f63]"}`}>{step.complete ? <Check size={15} /> : index + 1}</span><span><strong className="block text-sm">{step.label}</strong><span className="mt-2 block text-xs text-[#102c3d]/[0.48]">{step.complete ? "Complete" : "Open setup"}</span></span></button>)}</section>
+  const next = steps.find((step) => !step.complete);
+  return <div className="grid gap-4" data-testid="blank-employer-home">
+    <section className="rounded-[1.25rem] bg-[#102c3d] p-6 text-white sm:p-7">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8fe0d2]">Client workspace</p>
+      <h2 className="mt-2 text-2xl font-semibold">Set up your LevyTate workspace</h2>
+      <p className="mt-2 max-w-2xl text-sm leading-6 text-white/65">Set up your people, providers and programmes. Your progress is saved automatically; return to Home to continue. Import existing learners and DAS data when they are available.</p>
+      <p aria-live="polite" className="mt-5 text-sm font-semibold" data-testid="employer-setup-progress">{complete} of {steps.length} setup steps complete</p>
+      <div className="mt-2 h-2 max-w-sm overflow-hidden rounded-full bg-white/15" role="progressbar" aria-label="Workspace setup" aria-valuemin={0} aria-valuemax={steps.length} aria-valuenow={complete}><div className="h-full rounded-full bg-[#8fe0d2]" style={{ width: steps.length ? `${100 * complete / steps.length}%` : "0%" }} /></div>
+      {next ? <button type="button" onClick={() => onNavigate(next.target)} className="mt-5 min-h-11 rounded-lg bg-[#ffde59] px-4 text-sm font-semibold text-[#102c3d]">Next: {next.label}</button> : null}
+    </section>
+    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      {steps.map((step, index) => <button key={step.label} type="button" onClick={() => onNavigate(step.target)} className="flex min-h-28 items-start gap-4 border border-[#102c3d]/[0.08] bg-white p-5 text-left shadow-[0_10px_24px_rgba(16,44,61,0.035)] hover:border-[#159b8f]/30">
+        <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-xs font-semibold ${step.complete ? "bg-[#159b8f] text-white" : "bg-[#edf7f3] text-[#0b6f63]"}`}>{step.complete ? <Check size={15} aria-hidden="true" /> : index + 1}</span>
+        <span><strong className="block text-sm">{step.label}</strong><span className="mt-2 block text-xs text-[#102c3d]/60">{step.complete ? "Complete" : step.detail ?? (step.optional ? "Optional · complete when available" : "Open setup")}</span></span>
+      </button>)}
+    </section>
+    {onRetryFinance ? <p role="status" className="text-sm text-[#102c3d]/70">Finance could not be checked. <button type="button" className="font-semibold underline" onClick={onRetryFinance}>Retry finance check</button></p> : null}
   </div>;
 }
 

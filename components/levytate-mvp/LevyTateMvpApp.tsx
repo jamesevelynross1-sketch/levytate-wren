@@ -34,6 +34,7 @@ import { LevyTateLogo } from "@/components/levytate-demo/PlatformShell";
 import { ApplicationsModule } from "@/components/levytate-mvp/ApplicationsModule";
 import { AskLevyTateAiWorkspace } from "@/components/levytate-mvp/AskLevyTateAiWorkspace";
 import { DashboardModule, LineManagerHomeModule, SettingsModule } from "@/components/levytate-mvp/DashboardSettingsModules";
+import { useEmployerSetupProgress } from "@/components/levytate-mvp/useEmployerSetupProgress";
 import { DemoModeIndicator, DemoPerspectiveMenu, useDemoPerspectiveSwitcher } from "@/components/levytate-mvp/DemoPerspectiveSwitcher";
 import { ApplicationWorkflowSettings } from "@/components/levytate-mvp/ApplicationWorkflowSettings";
 import { EarlyAccessModule } from "@/components/levytate-mvp/EarlyAccessModule";
@@ -214,6 +215,7 @@ export function LevyTateMvpApp({ initialWorkspace, persistLocal = false, initial
 function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirectReportDetail: ManagerDirectReportLearnerDetail | null }) {
   const { data, meta, hydrated } = useMvpWorkspace();
   const [activeModule, setActiveModule] = useState<ModuleName>(initialManagerDirectReportDetail ? "My Team" : "Home");
+  const employerSetup = useEmployerSetupProgress(activeModule === "Home");
   const [peopleView, setPeopleView] = useState<PeopleView>("Employees");
   const [providerView, setProviderView] = useState<ProviderView>("Programmes");
   const [settingsView, setSettingsView] = useState<SettingsView>("Workspace");
@@ -665,6 +667,10 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
               {activeArea && activeArea.modules.length > 1 ? <nav aria-label={`${activeArea.label} views`} className="mt-4 flex max-w-full gap-1 overflow-x-auto rounded-xl border border-[#102c3d]/[0.07] bg-white p-1.5 shadow-[0_8px_24px_rgba(16,44,61,0.035)]">{activeArea.modules.map((module) => <button key={module} type="button" onClick={() => openModule(module as ModuleName)} aria-current={activeModule === module ? "page" : undefined} className={`min-h-10 shrink-0 rounded-lg px-3.5 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 ${activeModule === module ? "bg-[#102c3d] text-white shadow-[0_6px_14px_rgba(16,44,61,0.14)]" : "text-[#102c3d]/58 hover:bg-[#f3f7f4] hover:text-[#102c3d]"}`}>{moduleLabel(module as ModuleName)}</button>)}</nav> : null}
             </header>
 
+            {activeModule !== "Home" && employerSetup && !employerSetup.complete ? <section data-testid="employer-setup-return" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#159b8f]/20 bg-[#f1f7f4] px-4 py-3">
+              <p className="text-sm font-semibold text-[#102c3d]">Workspace setup is still in progress. Your saved changes count towards your checklist.</p>
+              <button type="button" onClick={() => navigateTo("Home")} className="min-h-10 rounded-lg bg-[#102c3d] px-4 text-xs font-semibold text-white">Return to setup</button>
+            </section> : null}
             {activeModule === "Home" ? (
               meta?.userRole === "Employee"
                 ? <EmployeeHomeModule onNavigate={(target) => navigateTo(target)} />
@@ -672,7 +678,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
                   ? <LineManagerHomeModule onNavigate={(target) => navigateTo(target)} onOpenApplicationReview={openApplicationReview} />
                 : meta?.userRole === "Platform Admin"
                   ? <PlatformAdminWorkspacesModule onNavigate={navigateTo} />
-                  : <DashboardModule onNavigate={navigateTo} />
+                  : <DashboardModule onNavigate={navigateTo} setup={employerSetup} />
             ) : null}
             {activeModule === "My Programme" ? <EmployeeProgrammeModule onNavigate={(target) => navigateTo(target)} /> : null}
             {activeModule === "My Application" ? <EmployeeApplicationModule onNavigate={navigateTo} /> : null}
