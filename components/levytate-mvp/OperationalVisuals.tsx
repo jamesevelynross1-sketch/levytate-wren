@@ -13,10 +13,10 @@ const toneStyles: Record<OperationalTone, { dot: string; text: string; surface: 
 
 export function OperationalMetricRail({ items }: { items: Array<{ label: string; value: string | number; tone?: OperationalTone; onClick?: () => void }> }) {
   return (
-    <section aria-label="Operational status" className="overflow-hidden border-y border-[#102c3d]/[0.09] bg-white">
+    <section aria-label="Operational status" className="lt-panel overflow-hidden">
       <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-[repeat(auto-fit,minmax(130px,1fr))]">
         {items.map((item) => {
-          const content = <><span className={`h-2 w-2 shrink-0 rounded-full ${toneStyles[item.tone ?? "neutral"].dot}`} aria-hidden="true" /><span><strong className="block text-2xl font-semibold tabular-nums tracking-[-0.035em] text-[#102c3d]">{item.value}</strong><span className="mt-0.5 block text-xs font-semibold leading-4 text-[#102c3d]/[0.60]">{item.label}</span></span></>;
+          const content = <><span className={`h-2 w-2 shrink-0 rounded-full ${toneStyles[item.tone ?? "neutral"].dot}`} aria-hidden="true" /><span><strong className="block text-2xl font-semibold tabular-nums tracking-[-0.035em] text-[#102c3d]">{item.value}</strong><span className="mt-0.5 block text-xs font-medium leading-5 text-lt-muted">{item.label}</span></span></>;
           const className = "flex min-h-20 items-center gap-3 border-b border-r border-[#102c3d]/[0.07] px-4 py-3 text-left last:border-r-0 sm:min-h-24 xl:border-b-0";
           return item.onClick ? <button key={item.label} type="button" onClick={item.onClick} className={`${className} transition hover:bg-[#f8fbfa] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#159b8f]`}>{content}</button> : <div key={item.label} className={className}>{content}</div>;
         })}
@@ -33,12 +33,12 @@ export function StageTracker({ stages, currentIndex, tone = "info", exceptionalS
         {stages.map((stage, index) => {
           const complete = index < currentIndex;
           const current = index === currentIndex;
-          return <li key={stage} className="relative flex min-h-11 items-center gap-3 sm:block sm:min-h-16">
+          return <li key={stage} aria-current={current?"step":undefined} className="relative flex min-h-11 items-center gap-3 sm:block sm:min-h-16">
             <div className="relative flex h-full items-center sm:h-auto">
-              <span className={`relative z-10 grid h-7 w-7 shrink-0 place-items-center rounded-full text-[10px] font-semibold ring-4 ring-white ${complete ? "bg-[#159b8f] text-white" : current ? `${toneStyles[tone].surface} ${toneStyles[tone].text} ring-2 ring-offset-2 ring-offset-white ${tone === "watch" ? "ring-[#d6a62d]" : tone === "risk" ? "ring-[#c95568]" : "ring-[#4f7b95]"}` : "bg-[#edf1ef] text-[#102c3d]/[0.38]"}`}>{complete ? <Check size={13} aria-hidden="true" /> : current ? <Circle size={8} fill="currentColor" aria-hidden="true" /> : index + 1}</span>
+              <span className={`relative z-10 grid h-7 w-7 shrink-0 place-items-center rounded-full text-[10px] font-semibold ring-4 ring-white ${complete ? "bg-lt-accent text-white" : current ? `${toneStyles[tone].surface} ${toneStyles[tone].text} ring-2 ring-offset-2 ring-offset-white ${tone === "watch" ? "ring-[#d6a62d]" : tone === "risk" ? "ring-[#c95568]" : "ring-[#4f7b95]"}` : "bg-[#edf1ef] text-lt-muted"}`}>{complete ? <Check size={13} aria-hidden="true" /> : current ? <Circle size={8} fill="currentColor" aria-hidden="true" /> : index + 1}</span>
               {index < stages.length - 1 ? <span className={`absolute left-3.5 top-7 h-[calc(100%+0.5rem)] w-px sm:left-7 sm:top-3.5 sm:h-px sm:w-[calc(100%-1.75rem)] ${index < currentIndex ? "bg-[#159b8f]" : "bg-[#dce3df]"}`} aria-hidden="true" /> : null}
             </div>
-            <span className={`text-xs font-semibold sm:mt-2 sm:block ${complete ? "text-[#0b6f63]" : current ? "text-[#102c3d]" : "text-[#102c3d]/[0.42]"}`}>{stage}</span>
+            <span className={`text-xs font-semibold sm:mt-2 sm:block ${complete ? "text-[#0b6f63]" : current ? "text-[#102c3d]" : "text-lt-muted"}`}>{stage}</span>
           </li>;
         })}
       </ol>
@@ -52,7 +52,7 @@ export function ProgressTrack({ actual, target, label = "Progress" }: { actual: 
   const tone: OperationalTone = actual + 2 < target ? "risk" : actual < target ? "watch" : "healthy";
   return (
     <div role="img" aria-label={`${label}: ${actual}% actual, ${target}% target`}>
-      <div className="flex items-end justify-between gap-3"><span className="text-xs font-semibold text-[#102c3d]/[0.55]">{label}</span><span className={`text-sm font-semibold tabular-nums ${toneStyles[tone].text}`}>{actual}% <span className="font-normal text-[#102c3d]/[0.42]">/ {target}% target</span></span></div>
+      <div className="flex items-end justify-between gap-3"><span className="text-xs font-semibold text-lt-muted">{label}</span><span className={`text-sm font-semibold tabular-nums ${toneStyles[tone].text}`}>{actual}% <span className="font-normal text-lt-muted">/ {target}% target</span></span></div>
       <div className="relative mt-2 h-2.5 rounded-full bg-[#e7eeea]">
         <span className={`absolute inset-y-0 left-0 rounded-full ${toneStyles[tone].line}`} style={{ width: `${safeActual}%` }} />
         <span className="absolute -top-1 h-4 w-0.5 bg-[#102c3d]" style={{ left: `${safeTarget}%` }} aria-hidden="true" />

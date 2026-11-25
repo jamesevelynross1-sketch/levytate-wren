@@ -2,7 +2,7 @@
 
 import { ArrowLeft, CalendarClock, CheckCircle2, ChevronDown, Plus, Search, XCircle } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { EmptyState, FormField, FormGrid, FormSection, FormSelect, FormTagInput, FormTextArea, MvpModal, MvpPanel, StatusBadge, TableAction, TableBody, TableHead, TableShell } from "@/components/levytate-mvp/MvpUi";
+import { EmptyState, ListResultsBar, FilteredEmptyState, MvpLoadingState, FormField, FormGrid, FormSection, FormSelect, FormTagInput, FormTextArea, MvpModal, MvpPanel, StatusBadge, TableAction, TableBody, TableHead, TableShell } from "@/components/levytate-mvp/MvpUi";
 import { OperationalMetricRail, ProgressTrack, StageTracker } from "@/components/levytate-mvp/OperationalVisuals";
 import { ClientMutationRecovery } from "@/components/levytate-mvp/ClientMutationRecovery";
 import { useLearnerCommand } from "@/components/levytate-mvp/useLearnerCommand";
@@ -197,6 +197,9 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
     }), [attentionOnly, departmentFilter, learners, progressFilter, programmeFilter, providerFilter, routeFilter, search, siteFilter, sortMode, statusFilter]);
 
 
+  const filtered=Boolean(search.trim()) || attentionOnly || sortMode!=="Operational priority" || [statusFilter,routeFilter,programmeFilter,providerFilter,siteFilter,departmentFilter,progressFilter].some(value=>value!==allOption);
+  function clearFilters(){setSearch("");setStatusFilter(allOption);setRouteFilter(allOption);setProgrammeFilter(allOption);setProviderFilter(allOption);setSiteFilter(allOption);setDepartmentFilter(allOption);setProgressFilter(allOption);setAttentionOnly(false);setSortMode("Operational priority");}
+
   if (!mayReadOrganisationLearners) {
     return <EmptyState title="Learners is not available for this role" copy="Organisation-wide learner lifecycle records are available to Apprenticeship Leads and Employer Admins only." actionLabel="Return home" onAction={() => window.scrollTo({ top: 0, behavior: "smooth" })} />;
   }
@@ -239,17 +242,17 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
       ]} /> : null}
 
       <MvpPanel title="Learners" eyebrow="Lifecycle operations">
-        {mayMutatePreEnrolment ? <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[#102c3d]/[0.07] pb-4"><p className="text-xs leading-5 text-lt-muted">Start pre-enrolment from a final-approved application. Historical learner import is not enabled.</p><button type="button" onClick={() => setOnboarding(true)} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white"><Plus size={15} />Start pre-enrolment</button></div> : null}
+        {mayMutatePreEnrolment ? <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[#102c3d]/[0.07] pb-4"><p className="text-xs leading-5 text-lt-muted">Start pre-enrolment from a final-approved application. Historical learner import is not enabled.</p><button type="button" onClick={() => setOnboarding(true)} className="lt-button lt-primary"><Plus size={15} />Start pre-enrolment</button></div> : null}
         <div className="mb-4 grid gap-3 xl:grid-cols-[minmax(260px,1fr)_minmax(0,1.4fr)]">
           <label className="flex h-11 min-w-0 items-center gap-2 rounded-lg border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 focus-within:border-[#159b8f] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#159b8f]/[0.10]">
             <Search size={16} strokeWidth={1.8} className="shrink-0 text-lt-muted" aria-hidden="true" />
-            <input value={search} onChange={(event) => setSearch(event.target.value)} className="min-w-0 flex-1 bg-transparent text-sm text-lt-ink outline-none placeholder:text-lt-muted" placeholder="Search learner, role, programme, provider, site" />
+            <input aria-label="Search learners" value={search} onChange={(event) => setSearch(event.target.value)} className="min-w-0 flex-1 bg-transparent text-sm text-lt-ink outline-none placeholder:text-lt-muted" placeholder="Search learner, role, programme, provider, site" />
           </label>
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
             <CompactSelect label="Status" value={statusFilter} options={filters.statuses} onChange={setStatusFilter} />
             <CompactSelect label="Progress" value={progressFilter} options={progressOptions} onChange={(value) => setProgressFilter(value as LearnerProgressPosition | typeof allOption)} />
             <CompactSelect label="Sort" value={sortMode} options={["Operational priority", "Learner name", "Lifecycle status"]} onChange={(value) => setSortMode(value as SortMode)} />
-            <button type="button" onClick={() => setMoreFilters((current) => !current)} className="min-h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-xs font-semibold text-lt-muted hover:bg-[#f8fbfa]">{moreFilters ? "Fewer filters" : "More filters"}</button>
+            <button type="button" onClick={() => setMoreFilters((current) => !current)} aria-expanded={moreFilters} className="lt-button lt-secondary">{moreFilters ? "Fewer filters" : "More filters"}</button>
           </div>
         </div>
 
@@ -262,8 +265,9 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
 
         {error ? <div role="alert" className="mb-4 rounded-xl bg-[#fff0f2] px-4 py-3 text-sm font-semibold text-lt-risk"><p>{error}</p><button type="button" disabled={loading} onClick={() => setReadAttempt(value => value + 1)} className="mt-2 min-h-10 rounded-lg border border-current px-3">Retry loading learners</button></div> : null}
 
+        {!loading && !error ? <ListResultsBar count={visible.length} total={learners.length} singular="learner" plural="learners" filtered={filtered} onReset={clearFilters}/> : null}
         {loading ? (
-          <div className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] px-5 py-10 text-center text-sm font-semibold text-lt-muted">Loading learner lifecycle records.</div>
+          <MvpLoadingState label="Loading learner lifecycle records." />
         ) : error ? null : visible.length ? (
           <>
             <div className="hidden min-w-0 md:block">
@@ -326,11 +330,11 @@ export function LearnersModule({ initialLearnerRecordId = "", initialAction = "o
               {visible.map((learner) => <LearnerMobileCard key={learner.learnerRecordId} learner={learner} onOpen={() => setSelectedId(learner.learnerRecordId)} />)}
             </div>
           </>
-        ) : (
-          <div className="grid min-h-52 place-items-center rounded-xl border border-dashed border-[#102c3d]/[0.14] bg-[#f8fbfa] px-5 py-10 text-center">
+        ) : filtered ? <FilteredEmptyState title="No learners match the selected filters." onReset={clearFilters}/> : (
+          <div className="lt-empty grid min-h-52 place-items-center px-5 py-10 text-center">
             <div className="max-w-md">
-              <h3 className="text-base font-semibold text-lt-ink">{learners.length ? "No learners match the selected filters." : "No learner records yet"}</h3>
-              <p className="mt-2 text-sm leading-6 text-lt-muted">{learners.length ? "Adjust the filters or search to review existing learner records." : "Import an existing apprentice when your people, provider and programme selections are ready."}</p>
+              <h3 className="text-base font-semibold text-lt-ink">No learner records yet</h3>
+              <p className="mt-2 text-sm leading-6 text-lt-muted">Start pre-enrolment from an approved application when your employee, provider and programme are ready.</p>
             </div>
           </div>
         )}
@@ -1398,9 +1402,9 @@ function createEnrolmentRequestId() { return `enrol-${globalThis.crypto.randomUU
 
 function CompactSelect({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
   return (
-    <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.12em] text-lt-muted">
+    <label className="lt-label grid gap-1">
       {label}
-      <select value={value} onChange={(event) => onChange(event.target.value)} className="h-10 min-w-0 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-sm font-semibold normal-case tracking-normal text-lt-secondary outline-none">
+      <select value={value} onChange={(event) => onChange(event.target.value)} className="lt-control h-11 min-w-0 px-3 text-sm outline-none">
         {options.map((option) => <option key={option}>{option}</option>)}
       </select>
     </label>

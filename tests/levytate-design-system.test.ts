@@ -6,6 +6,7 @@ describe("Searchable programme choices",()=>{
   const options=[{value:"",label:"Select programme"},{value:"one",label:"Level 4 · Data Analyst",searchText:"Provider A ST0118"},{value:"two",label:"Level 3 · Team Leader",searchText:"Provider B"},{value:"three",label:"Level 4 · Data Technician",searchText:"Provider C"}];
   it("retains the complete catalogue and order when not searching",()=>expect(filterSearchableOptions(options,"","").choices).toEqual(options));
   it("matches multiple case-insensitive terms across a provider and standard",()=>expect(filterSearchableOptions(options,"","provider a DATA").choices.map(x=>x.value)).toEqual(["","one"]));
+  it("allows a single-letter search without narrowing the entire catalogue prematurely",()=>expect(filterSearchableOptions(options,"","a").matches).toBe(3));
   it("retains the selected record without presenting it as a query match",()=>expect(filterSearchableOptions(options,"two","ST0118")).toEqual({choices:[options[0],options[1],options[2]],matches:1}));
   it("keeps the empty prompt when there are no matches",()=>expect(filterSearchableOptions(options,"","unknown")).toEqual({choices:[options[0]],matches:0}));
 });

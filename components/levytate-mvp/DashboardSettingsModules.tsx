@@ -62,11 +62,18 @@ export function DashboardModule({ onNavigate, setup }: { onNavigate: (module: st
   // keeps the checklist and can use the rest of the product without fake data.
   if (blankWorkspace && checklist) return checklist;
 
+  const overview = (
+      <section className="lt-panel grid divide-y divide-lt-border sm:grid-cols-3 sm:divide-x sm:divide-y-0" aria-label="Workspace overview">
+        {[{label:"Active employee records",value:data.employees.filter(item=>item.status==="Active").length},{label:"Active learner records",value:data.learnerRecords.filter(item=>item.recordStatus==="Active" && !["withdrawn","achieved","completed_without_achievement","pre_enrolment"].includes(item.lifecycleStatus)).length},{label:"Published programmes",value:data.organisationProgrammes.filter(item=>item.status==="Active").length}].map(metric=><div key={metric.label} className="px-5 py-4"><p className="text-sm text-lt-muted">{metric.label}</p><p className="mt-1 text-3xl font-semibold tabular-nums tracking-tight">{metric.value}</p></div>)}
+      </section>
+  );
+
   if (!data.profile.priorities.length) {
     if (!can("settings:write")) {
       return (
         <div className="grid gap-5">
           {checklist}
+          {overview}
           <MvpPanel title="Workspace setup required" eyebrow="Protected workspace">
             <p className="text-sm leading-6 text-lt-muted">
               Employer priorities have not been configured yet. A workspace admin needs to complete setup before role-specific operating signals appear.
@@ -76,7 +83,7 @@ export function DashboardModule({ onNavigate, setup }: { onNavigate: (module: st
       );
     }
 
-    return <div className="grid gap-5">{checklist}<EmployerPrioritiesSetup /></div>;
+    return <div className="grid gap-5">{checklist}{overview}<EmployerPrioritiesSetup /></div>;
   }
 
   return (
@@ -95,16 +102,14 @@ export function DashboardModule({ onNavigate, setup }: { onNavigate: (module: st
         </div>
       </section>
 
-      <section className="lt-panel grid divide-y divide-lt-border sm:grid-cols-3 sm:divide-x sm:divide-y-0" aria-label="Workspace overview">
-        {[{label:"Active employee records",value:data.employees.filter(item=>item.status==="Active").length},{label:"Active learner records",value:data.learnerRecords.filter(item=>item.recordStatus==="Active" && !["withdrawn","achieved","completed_without_achievement","pre_enrolment"].includes(item.lifecycleStatus)).length},{label:"Published programmes",value:data.organisationProgrammes.filter(item=>item.status==="Active").length}].map(metric=><div key={metric.label} className="px-5 py-4"><p className="text-sm text-lt-muted">{metric.label}</p><p className="mt-1 text-3xl font-semibold tabular-nums tracking-tight">{metric.value}</p></div>)}
-      </section>
-      <div data-testid="home-attention-grid" className="grid items-start gap-4 xl:grid-cols-3">
+      {overview}
+      <div data-testid="home-attention-grid" className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,1fr)]">
         <div data-testid="home-urgent-card" className="min-w-0 self-start">
           <MvpPanel title="Urgent approvals" eyebrow="Decision">
           {notifications.length ? (
             <div className="grid gap-3">
               {notifications.slice(0, 4).map((notification) => (
-                <button key={notification.id} type="button" onClick={() => onNavigate(notification.target ?? notification.module)} className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] px-4 py-3 text-left transition hover:border-[#159b8f]/18 hover:bg-white">
+                <button key={notification.id} type="button" onClick={() => onNavigate(notification.target ?? notification.module)} className="lt-attention-row px-3 py-3 text-left">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-lt-ink">{notification.title}</p>
@@ -125,7 +130,7 @@ export function DashboardModule({ onNavigate, setup }: { onNavigate: (module: st
           <MvpPanel title="Employees requiring attention" eyebrow="People">
           <div className="grid gap-3">
             {support.length ? support.slice(0, 4).map((employee) => (
-              <button key={employee.id} type="button" onClick={() => onNavigate(`Employees:${employee.id}`)} className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] px-4 py-3 text-left transition hover:border-[#159b8f]/18 hover:bg-white">
+              <button key={employee.id} type="button" onClick={() => onNavigate(`Employees:${employee.id}`)} className="lt-attention-row px-3 py-3 text-left">
                 <p className="text-sm font-semibold text-lt-ink">{employee.name}</p>
                 <p className="mt-1 text-xs leading-5 text-lt-muted">{employee.jobTitle || "Role to confirm"} needs discovery context.</p>
               </button>
@@ -284,7 +289,7 @@ function DashboardFact({ label, value }: { label: string; value: string }) {
 
 function ActionCard({ title, copy, cta, onClick }: { title: string; copy: string; cta: string; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] px-4 py-3 text-left transition hover:border-[#159b8f]/18 hover:bg-white">
+    <button type="button" onClick={onClick} className="lt-attention-row px-3 py-3 text-left">
       <p className="text-sm font-semibold text-lt-ink">{title}</p>
       <p className="mt-1 text-xs leading-5 text-lt-muted">{copy}</p>
       <p className="mt-3 text-xs font-semibold text-lt-accent">{cta}</p>

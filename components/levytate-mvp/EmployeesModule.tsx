@@ -4,6 +4,8 @@ import { ChevronDown, FileUp, Sparkles, UserPlus } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   EmptyState,
+  ListResultsBar,
+  FilteredEmptyState,
   FormActions,
   FormField,
   FormGrid,
@@ -89,6 +91,10 @@ export function EmployeesModule({ onStartDiscovery, onSetupPeopleSaved, onOpenDi
         search,
       );
   });
+
+  const filtered = Boolean(search.trim()) || status !== "Active" || [departmentFilter,managerFilter,siteFilter,applicationFilter].some(value=>value!=="All");
+  const directoryTotal=data.employees.filter(employee=>status==="All"||employee.status===status).length;
+  function clearFilters(){setSearch("");setStatus("Active");setDepartmentFilter("All");setManagerFilter("All");setSiteFilter("All");setApplicationFilter("All");}
 
   const selectedEmployee = selectedEmployeeId
     ? data.employees.find((employee) => employee.id === selectedEmployeeId) ?? null
@@ -221,27 +227,28 @@ export function EmployeesModule({ onStartDiscovery, onSetupPeopleSaved, onOpenDi
         onAction={canWriteEmployees ? () => openEmployee() : undefined}
         filters={
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-            <select value={status} onChange={(event) => setStatus(event.target.value)} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-sm font-semibold text-lt-muted"><option>Active</option><option>Archived</option><option>All</option></select>
-            <select value={departmentFilter} onChange={(event) => setDepartmentFilter(event.target.value)} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-sm font-semibold text-lt-muted"><option>All</option>{departments.map((department) => <option key={department}>{department}</option>)}</select>
+            <select aria-label="Employee record status" value={status} onChange={(event) => setStatus(event.target.value)} className="lt-control h-11 min-w-0 px-3 text-sm"><option value="Active">Active records</option><option value="Archived">Archived records</option><option value="All">All records</option></select>
+            <select aria-label="Department" value={departmentFilter} onChange={(event) => setDepartmentFilter(event.target.value)} className="lt-control h-11 min-w-0 px-3 text-sm"><option value="All">All departments</option>{departments.map((department) => <option key={department}>{department}</option>)}</select>
             <details className="group rounded-lg border border-[#102c3d]/[0.09] bg-white">
-              <summary className="flex h-10 cursor-pointer list-none items-center justify-between gap-2 px-3 text-sm font-semibold text-lt-muted">
+              <summary className="flex h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 text-sm font-semibold text-lt-secondary">
                 More filters
                 <ChevronDown size={15} className="transition group-open:rotate-180" aria-hidden="true" />
               </summary>
               <div className="grid gap-2 border-t border-[#102c3d]/[0.06] p-2">
-                <select value={managerFilter} onChange={(event) => setManagerFilter(event.target.value)} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-sm font-semibold text-lt-muted"><option value="All">All managers</option>{managers.map((manager) => <option key={manager.id} value={manager.id}>{manager.name}</option>)}</select>
-                <select value={siteFilter} onChange={(event) => setSiteFilter(event.target.value)} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-sm font-semibold text-lt-muted"><option value="All">All sites</option>{sites.map((site) => <option key={site}>{site}</option>)}</select>
-                <select value={applicationFilter} onChange={(event) => setApplicationFilter(event.target.value)} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-sm font-semibold text-lt-muted"><option value="All">All applications</option>{applicationStatuses.map((statusOption) => <option key={statusOption}>{statusOption}</option>)}</select>
+                <select aria-label="Manager" value={managerFilter} onChange={(event) => setManagerFilter(event.target.value)} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-sm font-semibold text-lt-muted"><option value="All">All managers</option>{managers.map((manager) => <option key={manager.id} value={manager.id}>{manager.name}</option>)}</select>
+                <select aria-label="Site" value={siteFilter} onChange={(event) => setSiteFilter(event.target.value)} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-sm font-semibold text-lt-muted"><option value="All">All sites</option>{sites.map((site) => <option key={site}>{site}</option>)}</select>
+                <select aria-label="Application status" value={applicationFilter} onChange={(event) => setApplicationFilter(event.target.value)} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-sm font-semibold text-lt-muted"><option value="All">All applications</option>{applicationStatuses.map((statusOption) => <option key={statusOption}>{statusOption}</option>)}</select>
               </div>
             </details>
           </div>
         }
       />
-      {canWriteEmployees ? <div className="mb-4 flex flex-wrap items-center gap-3"><label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border border-[#102c3d]/[0.10] bg-white px-4 text-xs font-semibold text-lt-ink"><FileUp size={15} />Import CSV<input type="file" accept=".csv,text/csv" disabled={saving} className="sr-only" onChange={(event) => { void choosePeopleFile(event.target.files?.[0]); event.target.value = ""; }} /></label><span className="text-xs text-lt-muted">Required: name, work email, job title, department. No invitations are sent.</span>{importComplete ? <span role="status" className="text-xs font-semibold text-lt-accent">{importComplete} employee{importComplete === 1 ? "" : "s"} imported.</span> : null}</div> : null}
+      {canWriteEmployees ? <div className="mb-4 flex flex-wrap items-center gap-3"><label className="lt-button lt-secondary cursor-pointer"><FileUp size={15} />Import CSV<input type="file" accept=".csv,text/csv" disabled={saving} className="sr-only" onChange={(event) => { void choosePeopleFile(event.target.files?.[0]); event.target.value = ""; }} /></label><span className="text-xs text-lt-muted">Required: name, work email, job title, department. No invitations are sent.</span>{importComplete ? <span role="status" className="text-xs font-semibold text-lt-accent">{importComplete} employee{importComplete === 1 ? "" : "s"} imported.</span> : null}</div> : null}
       {error && !draft && !peopleImport ? <p role="alert" className="mb-4 text-sm font-semibold text-lt-risk">{error}</p> : null}
 
+      <ListResultsBar count={visible.length} total={directoryTotal} singular="employee" plural="employees" filtered={filtered} onReset={clearFilters}/>
       {visible.length ? (
-        <div className="grid gap-4 xl:grid-cols-2">
+        <div className={isLineManager?"grid gap-4 xl:grid-cols-2":"lt-people-directory"} role="list" aria-label={isLineManager?"Direct reports":"Employee directory"}>
           {visible.map((employee) => {
             const role = data.roles.find((item) => item.id === employee.roleId);
             const application = employeeCurrentApplication(data, employee.id);
@@ -272,11 +279,11 @@ export function EmployeesModule({ onStartDiscovery, onSetupPeopleSaved, onOpenDi
               ? "Review"
               : routeOutcome
                 ? "Continue"
-                : "Start AI";
+                : "Start discovery";
 
             return (
-              <article key={employee.id} className="border border-[#102c3d]/[0.07] bg-white p-4 shadow-[0_10px_24px_rgba(16,44,61,0.03)]">
-                <div className="flex items-start justify-between gap-4">
+              <article role="listitem" key={employee.id} className={isLineManager?"lt-panel p-4":"lt-people-row"}>
+                <div className="lt-people-identity flex min-w-0 items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="truncate text-base font-semibold text-lt-ink">{employee.name}</p>
                     <p className="mt-1 text-sm leading-6 text-lt-muted">{employee.jobTitle || role?.title || "Role to confirm"}</p>
@@ -286,7 +293,7 @@ export function EmployeesModule({ onStartDiscovery, onSetupPeopleSaved, onOpenDi
                   </StatusBadge>
                 </div>
 
-                <div className="mt-3 grid gap-x-5 gap-y-2 border-t border-[#102c3d]/[0.06] pt-3 sm:grid-cols-2">
+                <div className="lt-people-facts mt-3 grid min-w-0 gap-x-5 gap-y-2 border-t border-lt-border pt-3 sm:grid-cols-2">
                   {isLineManager && operationalSummary ? (
                     <>
                       <DecisionFact label="Programme" value={operationalSummary.programme} />
@@ -305,23 +312,23 @@ export function EmployeesModule({ onStartDiscovery, onSetupPeopleSaved, onOpenDi
                 </div>
 
                 {routeOutcome && !operationalSummary?.hasLearnerLifecycle ? (
-                  <div className="mt-3 border-l-2 border-[#4f7b95] bg-[#f8fbfa] px-4 py-3">
+                  <div className="lt-people-route mt-3 rounded-lg bg-lt-soft px-4 py-3">
                     <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lt-accent">{routeOutcome.label}</p>
                     <p className="mt-1 text-sm font-semibold text-lt-ink">{routeOutcome.title}</p>
                   </div>
                 ) : null}
 
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#102c3d]/[0.06] pt-4">
+                <div className="lt-people-actions mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-lt-border pt-3">
                   {isLineManager ? (
-                    <button type="button" onClick={() => onOpenDirectReport?.(employee.id)} className="rounded-full bg-[#102c3d] px-4 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5">
+                    <button type="button" onClick={() => onOpenDirectReport?.(employee.id)} className="lt-button lt-primary">
                       View apprenticeship journey
                     </button>
                   ) : (
                     <>
-                      <button type="button" onClick={() => application ? setSelectedEmployeeId(employee.id) : onStartDiscovery?.(employee.id)} className="rounded-full bg-[#102c3d] px-4 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5">
+                      <button type="button" onClick={() => application ? setSelectedEmployeeId(employee.id) : onStartDiscovery?.(employee.id)} className="lt-button lt-primary">
                         {primaryAction}
                       </button>
-                      <button type="button" onClick={() => setSelectedEmployeeId(employee.id)} className="rounded-full bg-[#f5f7f3] px-4 py-2 text-xs font-semibold text-lt-muted ring-1 ring-[#102c3d]/[0.07] transition hover:text-lt-ink">
+                      <button type="button" onClick={() => setSelectedEmployeeId(employee.id)} className="lt-button lt-secondary">
                         Details
                       </button>
                     </>
@@ -332,7 +339,7 @@ export function EmployeesModule({ onStartDiscovery, onSetupPeopleSaved, onOpenDi
           })}
         </div>
       ) : (
-        canWriteEmployees ? (
+        filtered ? <FilteredEmptyState title="No employees match these filters" onReset={clearFilters}/> : canWriteEmployees ? (
           <EmptyState
             title="Add the first employee"
             copy="Create one record. LevyTate will guide discovery and recommend the next development route."

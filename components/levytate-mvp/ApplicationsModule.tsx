@@ -5,6 +5,8 @@ import type { RequestStatus } from "@/lib/levytate/domain";
 import { getApprenticeshipStandard } from "@/lib/levytate/domain";
 import {
   EmptyState,
+  ListResultsBar,
+  FilteredEmptyState,
   FormActions,
   FormGrid,
   FormSelect,
@@ -102,6 +104,9 @@ export function ApplicationsModule({
       );
   });
 
+  const filtered=Boolean(search.trim()) || status!=="All" || ownerFilter!=="All";
+  function clearFilters(){setSearch("");setStatus("All");setOwnerFilter("All");}
+
   const queueSummary = {
     total: data.applications.filter((application) => activeSet.has(application.status)).length,
     manager: data.applications.filter((application) => reviewableManagerStatuses.includes(application.status)).length,
@@ -179,18 +184,12 @@ export function ApplicationsModule({
     }
     setSavingDraft(true);
     setError("");
-    const result = await saveApplication({
-      ...draft,
-      status: "Draft",
-      currentOwner: "Employee",
-      updatedAt: nowIso(),
-    });
-    setSavingDraft(false);
-    if (!result.ok) {
-      setError(result.message);
-      return;
-    }
-    setDraft(null);
+    try {
+      const result = await saveApplication({ ...draft, status: "Draft", currentOwner: "Employee", updatedAt: nowIso() });
+      if (!result.ok) { setError(result.message); return; }
+      setDraft(null);
+    } catch { setError("The application save could not be confirmed. Your draft has been retained. Check the record before retrying."); }
+    finally { setSavingDraft(false); }
   }
 
   return (
@@ -212,22 +211,23 @@ export function ApplicationsModule({
           onAction={() => setDraft(blank())}
           filters={
             <div className="grid gap-2 sm:grid-cols-2">
-              <select value={status} onChange={(event) => setStatus(event.target.value)} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-sm font-semibold"><option>All</option>{requestStatuses.map((item) => <option key={item}>{item}</option>)}</select>
-              <select value={ownerFilter} onChange={(event) => setOwnerFilter(event.target.value)} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-sm font-semibold"><option>All</option><option>Employee</option><option>Line Manager</option><option>Apprenticeship Lead</option><option>Employer Admin</option><option>Provider Partner</option><option>Completed</option></select>
+              <select aria-label="Application status" value={status} onChange={(event) => setStatus(event.target.value)} className="lt-control h-11 min-w-0 px-3 text-sm"><option value="All">All statuses</option>{requestStatuses.map((item) => <option key={item}>{item}</option>)}</select>
+              <select aria-label="Current owner" value={ownerFilter} onChange={(event) => setOwnerFilter(event.target.value)} className="lt-control h-11 min-w-0 px-3 text-sm"><option value="All">All owners</option><option>Employee</option><option>Line Manager</option><option>Apprenticeship Lead</option><option>Employer Admin</option><option>Provider Partner</option><option>Completed</option></select>
             </div>
           }
         />
 
+        <ListResultsBar count={visible.length} total={data.applications.length} singular="application" plural="applications" filtered={filtered} onReset={clearFilters}/>
         {visible.length ? (
-          <TableShell>
+          <TableShell responsive label="Applications" testId="applications-responsive-list">
             <TableHead>
-              <tr>
-                <th className="px-4 py-3">Employee</th>
-                <th className="px-4 py-3">Pathway</th>
-                <th className="px-4 py-3">Owner</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Submitted</th>
-                <th className="px-4 py-3 text-right">Actions</th>
+              <tr role="row">
+                <th scope="col" role="columnheader" className="px-4 py-3">Employee</th>
+                <th scope="col" role="columnheader" className="px-4 py-3">Programme</th>
+                <th scope="col" role="columnheader" className="px-4 py-3">Owner</th>
+                <th scope="col" role="columnheader" className="px-4 py-3">Status</th>
+                <th scope="col" role="columnheader" className="px-4 py-3">Submitted</th>
+                <th scope="col" role="columnheader" className="px-4 py-3 text-right">Actions</th>
               </tr>
             </TableHead>
             <TableBody>
@@ -236,20 +236,20 @@ export function ApplicationsModule({
                 const standard = getApprenticeshipStandard(application.apprenticeshipStandardId);
 
                 return (
-                  <tr key={application.id}>
-                    <td className="px-4 py-3">
+                  <tr key={application.id} role="row">
+                    <td role="cell" className="lt-mobile-record-title px-4 py-3">
                       <p className="font-semibold">{displayEmployee(employee)}</p>
                       <p className="mt-0.5 text-xs text-lt-muted">{employee?.department || "Department to confirm"} · {employee?.site || "Site to confirm"}</p>
                     </td>
-                    <td className="px-4 py-3">
+                    <td role="cell" className="px-4 py-3"><span aria-hidden="true" className="lt-mobile-field-label">Programme</span>
                       <p className="text-lt-secondary">{standard?.title ?? application.apprenticeshipStandardId}</p>
                       <p className="mt-0.5 text-xs text-lt-muted">{standard?.referenceCode ?? "Reference to confirm"}</p>
                     </td>
-                    <td className="px-4 py-3"><p className="text-sm font-semibold text-lt-ink">{application.currentOwner}</p></td>
-                    <td className="px-4 py-3"><StatusBadge tone={statusTone(application.status)}>{application.status}</StatusBadge><p className="mt-1 text-xs text-lt-muted">Stage {applicationTracker(application).currentIndex + 1} of {applicationTracker(application).stages.length}</p></td>
-                    <td className="px-4 py-3 text-lt-muted">{application.submittedAt.slice(0, 10)}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end gap-2">
+                    <td role="cell" className="px-4 py-3"><span aria-hidden="true" className="lt-mobile-field-label">Current owner</span><p className="text-sm font-semibold text-lt-ink">{application.currentOwner}</p></td>
+                    <td role="cell" className="px-4 py-3"><span aria-hidden="true" className="lt-mobile-field-label">Status</span><StatusBadge tone={statusTone(application.status)}>{application.status}</StatusBadge><p className="mt-1 text-xs text-lt-muted">Stage {applicationTracker(application).currentIndex + 1} of {applicationTracker(application).stages.length}</p></td>
+                    <td role="cell" className="px-4 py-3 text-lt-muted"><span aria-hidden="true" className="lt-mobile-field-label">Submitted</span>{application.submittedAt.slice(0, 10)}</td>
+                    <td role="cell" className="lt-mobile-record-actions px-4 py-3">
+                      <div className="flex flex-wrap justify-end gap-2">
                         <TableAction onClick={() => setSelectedId(application.id)}>View</TableAction>
                         {application.status === "Draft" && !application.workflow ? <TableAction onClick={() => setDraft({ ...application })}>Edit draft</TableAction> : null}
                         {application.status === "Draft" ? <span className="self-center text-xs font-semibold text-lt-muted">Awaiting employee submission</span> : null}
@@ -261,7 +261,7 @@ export function ApplicationsModule({
               })}
             </TableBody>
           </TableShell>
-        ) : (
+        ) : filtered ? <FilteredEmptyState title="No applications match these filters" onReset={clearFilters}/> : (
           <EmptyState
             title="No applications yet"
             copy="Choose an apprenticeship offered by a verified provider and track it through manager review, lead review and enrolment readiness."
@@ -320,6 +320,7 @@ export function ApplicationsModule({
                   <button type="button" disabled={!publicationOffer || publishingProgramme || savingDraft} onClick={() => void publishProgramme()} className="min-h-11 justify-self-start rounded-lg bg-[#102c3d] px-4 text-xs font-semibold text-white disabled:opacity-50">{publishingProgramme ? "Publishing…" : "Add to My Programmes"}</button>
                 </section> : null}
               </div>
+              <div className="md:col-span-2"><h3 className="border-t border-lt-border pt-3 text-sm font-semibold">Development context</h3><p className="mt-1 text-xs text-lt-muted">Add useful context for the employee to review before submitting.</p></div>
               <FormTextArea label="Reason for interest" value={draft.reason} onChange={(value) => setDraft({ ...draft, reason: value })} wide />
               <FormTextArea label="Career goal" value={draft.careerGoal} onChange={(value) => setDraft({ ...draft, careerGoal: value })} wide />
               <FormTextArea label="Support required" value={draft.supportRequired} onChange={(value) => setDraft({ ...draft, supportRequired: value })} wide />

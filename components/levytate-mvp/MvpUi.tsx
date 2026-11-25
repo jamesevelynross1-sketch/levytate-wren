@@ -40,6 +40,17 @@ export function MvpToolbar({ search, onSearch, placeholder, actionLabel, onActio
   );
 }
 
+export function ListResultsBar({ count, total, singular, plural, filtered, onReset, actions }: { count:number;total:number;singular:string;plural:string;filtered:boolean;onReset:()=>void;actions?:ReactNode }) {
+  return <div className="mb-3 flex min-h-10 flex-wrap items-center justify-between gap-2 border-b border-lt-border pb-2">
+    <p role="status" aria-live="polite" className="text-sm text-lt-muted"><strong className="font-semibold tabular-nums text-lt-ink">{count}</strong>{filtered?` of ${total}`:""} {total===1?singular:plural}</p>
+    <div className="flex flex-wrap items-center gap-3">{actions}{filtered?<button type="button" onClick={onReset} className="min-h-10 px-2 text-sm font-semibold text-lt-accent hover:underline">Clear filters</button>:null}</div>
+  </div>;
+}
+
+export function FilteredEmptyState({title,onReset}:{title:string;onReset:()=>void}) {
+  return <div className="lt-empty grid min-h-44 place-items-center p-5 text-center"><div><Search className="mx-auto mb-3 text-lt-muted" size={22} aria-hidden="true"/><h3 className="text-base font-semibold">{title}</h3><p className="mt-1 text-sm text-lt-muted">Try another search or clear the filters.</p><button type="button" className="lt-button lt-secondary mt-4" onClick={onReset}>Clear filters</button></div></div>;
+}
+
 export function EmptyState({ title, copy, actionLabel, onAction }: { title: string; copy: string; actionLabel: string; onAction: () => void }) {
   return (
     <div className="lt-empty grid min-h-52 place-items-center px-5 py-10 text-center">
@@ -249,7 +260,7 @@ export function MvpLoadingState({ label = "Loading workspace…" }: { label?: st
   return <div role="status" aria-live="polite" className="rounded-2xl border border-[#102c3d]/[0.07] bg-white p-6"><span className="sr-only">{label}</span><div aria-hidden="true" className="grid animate-pulse gap-3"><div className="h-3 w-24 rounded-full bg-[#102c3d]/10" /><div className="h-7 w-2/5 rounded-lg bg-[#102c3d]/10" /><div className="h-16 rounded-xl bg-[#f1f5f2]" /></div></div>;
 }
 
-export function TableShell({ children, minimumWidthClass = "min-w-[900px]", tableClassName = "", testId }: { children: ReactNode; minimumWidthClass?: string; tableClassName?: string; testId?: string }) { return <div data-testid={testId} className="lt-table min-w-0 max-w-full overflow-x-auto"><table className={`w-full ${minimumWidthClass} border-collapse text-left text-sm ${tableClassName}`}>{children}</table></div>; }
-export function TableHead({ children }: { children: ReactNode }) { return <thead className="bg-[#f5f7f6] text-xs font-semibold text-lt-secondary">{children}</thead>; }
-export function TableBody({ children }: { children: ReactNode }) { return <tbody className="divide-y divide-[#102c3d]/[0.055] bg-white">{children}</tbody>; }
+export function TableShell({ children, minimumWidthClass = "min-w-[900px]", tableClassName = "", testId, responsive=false, label }: { children: ReactNode; minimumWidthClass?: string; tableClassName?: string; testId?: string; responsive?:boolean;label?:string }) { return <div data-testid={testId} className={`lt-table min-w-0 max-w-full overflow-x-auto ${responsive?"lt-responsive-table":""}`}><table role="table" aria-label={label} className={`w-full ${responsive?"min-w-0":minimumWidthClass} border-collapse text-left text-sm ${tableClassName}`}>{children}</table></div>; }
+export function TableHead({ children }: { children: ReactNode }) { return <thead role="rowgroup" className="bg-[#f5f7f6] text-xs font-semibold text-lt-secondary">{children}</thead>; }
+export function TableBody({ children }: { children: ReactNode }) { return <tbody role="rowgroup" className="divide-y divide-[#102c3d]/[0.055] bg-white">{children}</tbody>; }
 export function TableAction({ children, onClick, danger = false, testId }: { children: ReactNode; onClick: () => void; danger?: boolean; testId?: string }) { return <button data-testid={testId} type="button" onClick={onClick} className={`relative inline-flex min-h-9 items-center justify-center whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold leading-4 ring-1 transition after:absolute after:-inset-y-1 after:inset-x-0 after:content-[''] ${danger ? "bg-white text-lt-risk ring-[#b13b51]/[0.15] hover:bg-[#fff0f2]" : "bg-[#f5f7f3] text-lt-muted ring-[#102c3d]/[0.07] hover:text-lt-ink"}`}>{children}</button>; }
