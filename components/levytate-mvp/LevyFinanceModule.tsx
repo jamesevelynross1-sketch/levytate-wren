@@ -117,7 +117,7 @@ export function LevyFinanceModule({ organisationId, demoMode }: { organisationId
   if (loading && !state) return <section className="grid min-h-[300px] place-items-center bg-white text-sm font-semibold text-[#102c3d]/[0.55]">Loading organisation finance…</section>;
   if (!state && error && !upload) return <section role="alert" className="bg-white p-6"><p>{error}</p><button type="button" onClick={() => setReload((value) => value + 1)} className="mt-4 min-h-11 px-4 font-semibold">Retry Finance</button></section>;
   const importPanel = upload ? <div className="grid gap-4"><ClientMutationRecovery mutation={mutation}/><fieldset disabled={mutation.locked} className="min-w-0 border-0 p-0"><ImportWorkspace upload={upload} setUpload={setUpload} onMapping={confirmMapping} onImport={importTransactions} onCancel={() => { if (!mutation.locked) setUpload(null); }} error={error} busy={busy} /></fieldset></div> : undefined;
-  const shared = { onChooseFile: (file?: File) => { void chooseFile(file); }, importPanel, uploadDisabled: Boolean(upload) || mutation.locked || loading };
+  const shared = { onChooseFile: (file?: File) => { void chooseFile(file).catch(() => setError("The DAS file could not be read. Choose a valid CSV and retry.")); }, importPanel, uploadDisabled: Boolean(upload) || mutation.locked || loading, dataMessage:error, refreshing:loading };
   if (!state || !summary || !state.transactions.length) return <LevyFundingPlanner summary={summary ?? calculateLevyFinance({version:1,mode:"persistent",transactions:[],imports:[]})} {...shared} actuals={<EmptyFinance onFile={chooseFile} error={error} />} />;
 
   const latest = summary.latest;
@@ -126,7 +126,7 @@ export function LevyFinanceModule({ organisationId, demoMode }: { organisationId
   const providerSpend = breakdown(state, "providerName");
   const programmeSpend = breakdown(state, "programmeName");
 
-  const actuals = <div className="grid gap-4"><ClientMutationRecovery mutation={mutation}/><fieldset disabled={mutation.locked} className="min-w-0 border-0 p-0"><div className="grid gap-5" data-testid="levy-finance-module">
+  const actuals = <div className="grid gap-4">{!upload?<ClientMutationRecovery mutation={mutation}/>:null}<fieldset disabled={mutation.locked} className="min-w-0 border-0 p-0"><div className="grid gap-5" data-testid="levy-finance-module">
     <div className="flex flex-wrap items-start justify-between gap-4">
       <div className="flex items-center gap-2"><PoundSterling size={18} className="text-[#0b776e]" /><p className="text-sm font-semibold text-[#102c3d]">Levy position</p></div>
       <div className="text-right"><p className="text-xs font-semibold text-[#0b776e]">{state.mode === "fixture" ? "Illustrative finance data" : "Latest DAS import"}</p><p className="mt-1 text-xs text-[#102c3d]/[0.44]">{lastImport ? `Imported ${displayDate(lastImport.importedAt)}` : "No data imported"}</p></div>
