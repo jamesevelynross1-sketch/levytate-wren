@@ -10,7 +10,7 @@ Core implementation:
 - 12/24/36/48 month baseline vs proposed cohort forecast, monthly reconciled balances, expiry, transfer shortfalls and cash exposure;
 - multiple planned cohorts, official standard selection, editable agreed price / band / duration / start / age / department; 80/20 estimated funding schedule with payment lag;
 - manual aggregate existing commitments and transfer schedule, clearly separate from proposed cohorts; counts of live learners and approved applications shown;
-- in-session scenario comparison and user-initiated CSV/JSON downloads (no browser storage or server write).
+- in-session scenario comparison and user-initiated CSV/JSON downloads and bounded JSON reload (no browser storage or server write).
 - old DAS import/report untouched. Planner is not an application/enrolment write.
 
 Limitations: unknown opening age is explicitly optimistic, exact expiry cannot be calculated from aggregate balance alone. Baseline historical spend is not remaining learner commitments. Transfer allowance and incoming transfers not modelled, no live provider/learner contract reconciliation, actual ILR payment dates, units, funding incentive or detailed eligibility checks. Mixed age/rates require separate cohorts. Assumptions and scenarios not persisted across module unmount; no automatic approvals. Next: tenant-scoped persistent scenario versions and audited approval, exact monthly commitments and fund-age import, transfer allowance, departmental budgets, units and Copilot. Do not mark complete launch acceptance on build success.

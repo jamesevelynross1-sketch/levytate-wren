@@ -44,7 +44,7 @@ export function cohortEligibility(c: PlannedCohort): Eligibility {
   if (!c.fundingChecked) return deny("Funding eligibility not confirmed — excluded from levy");
   if (c.startMonth < "2026-08") return deny("Earlier start needs its original funding rules");
   if (withdrawnStandardIds.has(c.standardId.toUpperCase().split("-")[0]) && c.startMonth >= "2026-09") return deny("Government funding withdrawn for new starts");
-  if (!c.standardId || c.bandPence <= 0) return deny("Standard and funding band required");
+  if (!c.standardId || c.bandPence <= 0 || c.bandPence > 2_700_000) return deny("Standard and funding band required");
   if (c.level === 7 && c.ageAtStart > 21 && !(c.ageAtStart <= 24 && c.exception === "care-ehcp")) return deny("Level 7 age restriction");
   if (/foundation apprenticeship/i.test(c.standardTitle) && c.ageAtStart > 21 && !(c.ageAtStart <= 24 && c.exception !== "none")) return deny("Foundation apprenticeship age restriction");
   if (c.level === 2 && /^(administrative|administration) assistant\b/i.test(c.standardTitle) && c.ageAtStart > 24) return deny("Level 2 administrative assistant age restriction");
@@ -63,7 +63,7 @@ export function validatePlanner(input: PlannerInputs): string[] {
   if (input.openingFunds.reduce((n,f)=>n+f.amountPence,0)>input.openingPence) errors.push("Opening fund amounts exceed the opening balance.");
   if (new Set(input.cohorts.map(c=>c.id)).size !== input.cohorts.length) errors.push("Duplicate cohort identifier.");
   for (const c of input.cohorts) {
-    if (!c.name.trim() || !validMonth(c.startMonth) || c.startMonth <= input.openingMonth || !integer(c.learners,1,10000) || !money(c.pricePence) || c.pricePence === 0 || !money(c.bandPence) || !integer(c.durationMonths,8,72) || !integer(c.assessmentMonths,0,12) || !integer(c.ageAtStart,16,100) || !integer(c.level,2,7) || !["none","care-ehcp","foundation-other"].includes(c.exception) || !["levy","private"].includes(c.route)) errors.push(`Check cohort "${c.name || "Untitled"}": start month, cost, age, duration and learner count are required.`);
+    if (!c.name.trim() || !validMonth(c.startMonth) || c.startMonth <= input.openingMonth || !integer(c.learners,1,10000) || !money(c.pricePence) || c.pricePence === 0 || c.pricePence > 100_000_000 || !money(c.bandPence) || c.bandPence > 2_700_000 || !integer(c.durationMonths,8,72) || !integer(c.assessmentMonths,0,12) || !integer(c.ageAtStart,16,100) || !integer(c.level,2,7) || !["none","care-ehcp","foundation-other"].includes(c.exception) || !["levy","private"].includes(c.route)) errors.push(`Check cohort "${c.name || "Untitled"}": start month, cost, age, duration and learner count are required.`);
   }
   return [...new Set(errors)];
 }

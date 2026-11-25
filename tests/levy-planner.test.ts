@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { addMonths, expiryMonth, cohortEligibility, cohortPayments, forecastLevy, validatePlanner, withdrawnStandardIds, type PlannedCohort, type PlannerInputs } from "@/lib/levytate/finance/levy-planner";
+import { decodePlannerFile } from "@/lib/levytate/finance/levy-planner-file";
+import { fundingRuleVersion, addMonths, expiryMonth, cohortEligibility, cohortPayments, forecastLevy, validatePlanner, withdrawnStandardIds, type PlannedCohort, type PlannerInputs } from "@/lib/levytate/finance/levy-planner";
 
 const base: PlannerInputs={openingMonth:"2026-07",openingPence:0,openingFunds:[],horizon:24,monthlyReceiptsPence:0,monthlyExistingPence:0,existingMonths:0,existingShortfallRate:5,monthlyTransferPence:0,transferMonths:0,cohorts:[]};
 const cohort: PlannedCohort={id:"c",name:"Data",standardId:"ST0118",standardTitle:"Data analyst",level:4,startMonth:"2026-08",learners:3,pricePence:1_200_001,bandPence:1_000_000,durationMonths:12,assessmentMonths:3,ageAtStart:30,exception:"none",route:"levy",fundingChecked:true,department:"Digital"};
@@ -32,10 +33,10 @@ describe("England levy planner policy and arithmetic",()=>{
     const row=forecastLevy(input).rows[0];expect(row.levyUsed).toBe(90000);expect(row.expired).toBe(10000);expect(row.closing).toBe(0);
   });
   it("applies 25% or zero to eligible shortfalls, never the full price",()=>{
-    const c={...cohort,learners:1,pricePence:100000,bandPence:100000};
-    const full=forecastLevy({...base,cohorts:[c]});expect(full.proposedCash).toBe(25000);
+    const c={...cohort,learners:1,pricePence:120000,bandPence:120000};
+    const full=forecastLevy({...base,cohorts:[c]});expect(full.proposedCash).toBe(30000);
     expect(forecastLevy({...base,cohorts:[{...c,ageAtStart:24}]}).proposedCash).toBe(0);
-    expect(forecastLevy({...base,cohorts:[{...c,route:"private"}]}).proposedCash).toBe(100000);
+    expect(forecastLevy({...base,cohorts:[{...c,route:"private"}]}).proposedCash).toBe(120000);
   });
   it("retains unknown opening age, does not invent its expiry, and rejects excess buckets",()=>{
     const f=forecastLevy({...base,openingPence:50000});expect(f.openingUnaged).toBe(50000);expect(f.expiry).toBe(0);expect(f.closing).toBe(50000);
@@ -45,5 +46,15 @@ describe("England levy planner policy and arithmetic",()=>{
     const input={...base,horizon:12 as const,monthlyReceiptsPence:20000,cohorts:[{...cohort,startMonth:"2027-05"}]};
     const result=forecastLevy(input);for(const r of result.rows)expect(r.closing).toBe(r.opening+r.receipts-r.levyUsed-r.expired);
     expect(result.futureProposedDue).toBeGreaterThan(0);expect(forecastLevy(input,false).proposedDue).toBe(0);
+  });
+});
+
+describe("bounded scenario file reload",()=>{
+  it("revalidates assumptions and resets imported funding confirmations",()=>{
+    const result=decodePlannerFile({ruleVersion:fundingRuleVersion,scenarioName:"Test",plan:{...base,cohorts:[cohort]}});
+    expect(result.plan.cohorts[0].fundingChecked).toBe(false);
+    expect(()=>decodePlannerFile({ruleVersion:"obsolete",scenarioName:"Test",plan:base})).toThrow();
+    expect(()=>decodePlannerFile({ruleVersion:fundingRuleVersion,scenarioName:"Test",plan:{...base,openingPence:-1}})).toThrow();
+    expect(()=>decodePlannerFile({ruleVersion:fundingRuleVersion,scenarioName:"Test",plan:{...base,unexpected:"bad"}})).toThrow();
   });
 });
