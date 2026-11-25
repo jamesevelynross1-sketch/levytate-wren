@@ -114,11 +114,11 @@ export function LevyFinanceModule({ organisationId, demoMode }: { organisationId
     setBalanceInput(""); setError("");
   }
 
-  if (loading) return <section className="grid min-h-[300px] place-items-center bg-white text-sm font-semibold text-[#102c3d]/[0.55]">Loading organisation finance…</section>;
+  if (loading && !state) return <section className="grid min-h-[300px] place-items-center bg-white text-sm font-semibold text-[#102c3d]/[0.55]">Loading organisation finance…</section>;
   if (!state && error && !upload) return <section role="alert" className="bg-white p-6"><p>{error}</p><button type="button" onClick={() => setReload((value) => value + 1)} className="mt-4 min-h-11 px-4 font-semibold">Retry Finance</button></section>;
-  if ((!state || !state.transactions.length) && !upload) return <FinanceViews summary={summary ?? calculateLevyFinance({version:1,mode:"persistent",transactions:[],imports:[]})}><EmptyFinance onFile={chooseFile} error={error} /></FinanceViews>;
-  if (upload) return <div className="grid gap-4"><ClientMutationRecovery mutation={mutation}/><fieldset disabled={mutation.locked} className="min-w-0 border-0 p-0"><ImportWorkspace upload={upload} setUpload={setUpload} onMapping={confirmMapping} onImport={importTransactions} onCancel={() => { if (!mutation.locked) setUpload(null); }} error={error} busy={busy} /></fieldset></div>;
-  if (!state || !summary) return null;
+  const importPanel = upload ? <div className="grid gap-4"><ClientMutationRecovery mutation={mutation}/><fieldset disabled={mutation.locked} className="min-w-0 border-0 p-0"><ImportWorkspace upload={upload} setUpload={setUpload} onMapping={confirmMapping} onImport={importTransactions} onCancel={() => { if (!mutation.locked) setUpload(null); }} error={error} busy={busy} /></fieldset></div> : undefined;
+  const shared = { onChooseFile: (file?: File) => { void chooseFile(file); }, importPanel, uploadDisabled: Boolean(upload) || mutation.locked || loading };
+  if (!state || !summary || !state.transactions.length) return <LevyFundingPlanner summary={summary ?? calculateLevyFinance({version:1,mode:"persistent",transactions:[],imports:[]})} {...shared} actuals={<EmptyFinance onFile={chooseFile} error={error} />} />;
 
   const latest = summary.latest;
   const reportingPeriod = financeReportingPeriod(summary);
@@ -126,7 +126,7 @@ export function LevyFinanceModule({ organisationId, demoMode }: { organisationId
   const providerSpend = breakdown(state, "providerName");
   const programmeSpend = breakdown(state, "programmeName");
 
-  return <FinanceViews summary={summary}><div className="grid gap-4"><ClientMutationRecovery mutation={mutation}/><fieldset disabled={mutation.locked} className="min-w-0 border-0 p-0"><div className="grid gap-5" data-testid="levy-finance-module">
+  const actuals = <div className="grid gap-4"><ClientMutationRecovery mutation={mutation}/><fieldset disabled={mutation.locked} className="min-w-0 border-0 p-0"><div className="grid gap-5" data-testid="levy-finance-module">
     <div className="flex flex-wrap items-start justify-between gap-4">
       <div className="flex items-center gap-2"><PoundSterling size={18} className="text-[#0b776e]" /><p className="text-sm font-semibold text-[#102c3d]">Levy position</p></div>
       <div className="text-right"><p className="text-xs font-semibold text-[#0b776e]">{state.mode === "fixture" ? "Illustrative finance data" : "Latest DAS import"}</p><p className="mt-1 text-xs text-[#102c3d]/[0.44]">{lastImport ? `Imported ${displayDate(lastImport.importedAt)}` : "No data imported"}</p></div>
@@ -164,13 +164,8 @@ export function LevyFinanceModule({ organisationId, demoMode }: { organisationId
     {(providerSpend.length || programmeSpend.length) ? <section className="grid gap-4 lg:grid-cols-2">{providerSpend.length ? <Breakdown title="Spend by provider" rows={providerSpend} /> : null}{programmeSpend.length ? <Breakdown title="Spend by programme" rows={programmeSpend} /> : null}</section> : null}
     {summary.unknownTransactions.length ? <section className="border border-[#e6b74a]/[0.25] bg-[#fffaf0] p-5"><div className="flex items-center gap-2"><AlertTriangle size={17} className="text-[#9a6a00]" /><h2 className="text-lg font-semibold">Needs review</h2></div><p className="mt-1 text-sm text-[#102c3d]/[0.56]">{summary.unknownTransactions.length} imported rows could not be classified and are excluded from category totals.</p><div className="mt-3 grid gap-2">{summary.unknownTransactions.slice(0, 8).map((item) => <div key={item.fingerprint} className="grid gap-1 border-t border-[#102c3d]/[0.07] pt-2 text-xs sm:grid-cols-[100px_1fr_auto]"><span>{item.transactionDate}</span><span>{item.description}</span><span className="font-semibold tabular-nums">{formatGbp(item.amountPence, true)}</span></div>)}</div></section> : null}
     {error ? <p className="text-sm font-semibold text-[#ad344e]">{error}</p> : null}
-  </div></fieldset></div></FinanceViews>;
-}
-
-function FinanceViews({summary,children}:{summary:ReturnType<typeof calculateLevyFinance>;children:React.ReactNode}) {
-  const [view,setView]=useState<"actuals"|"planner">("actuals");
-  const [plannerOpened,setPlannerOpened]=useState(false);
-  return <div className="grid gap-4"><nav aria-label="Finance views" className="flex flex-wrap gap-2 rounded-xl border border-[#102c3d]/[0.07] bg-white p-2">{([["actuals","DAS reporting"],["planner","Funding & investment planner"]] as const).map(([key,label])=><button key={key} type="button" aria-current={view===key?"page":undefined} onClick={()=>{if(key==="planner")setPlannerOpened(true);setView(key);}} className={`min-h-11 rounded-lg px-4 text-sm font-semibold ${view===key?"bg-[#102c3d] text-white":"text-[#102c3d]/65 hover:bg-[#f4f7f5]"}`}>{label}</button>)}</nav><div hidden={view!=="actuals"}>{children}</div>{plannerOpened?<div hidden={view!=="planner"}><LevyFundingPlanner summary={summary}/></div>:null}</div>;
+  </div></fieldset></div>;
+  return <LevyFundingPlanner summary={summary} {...shared} actuals={actuals} />;
 }
 
 function EmptyFinance({ onFile, error }: { onFile: (file?: File) => void; error: string }) { return <section className="grid min-h-[360px] place-items-center border border-[#102c3d]/[0.07] bg-white p-6 text-center"><div className="max-w-lg"><div className="mx-auto grid h-12 w-12 place-items-center bg-[#eaf5f1] text-[#0b776e]"><FileUp size={22} /></div><h2 className="mt-5 text-2xl font-semibold">Bring your DAS finance data into LevyTate</h2><p className="mt-3 text-sm leading-6 text-[#102c3d]/[0.56]">Upload the transaction history from your Apprenticeship Service account to calculate the monthly levy position. Imports are stored only in this organisation.</p><label className="mt-5 inline-flex min-h-11 cursor-pointer items-center bg-[#102c3d] px-5 text-sm font-semibold text-white">Upload DAS transactions<input type="file" accept=".csv,text/csv" className="sr-only" onChange={(event) => void onFile(event.target.files?.[0])} /></label>{error ? <p className="mt-4 text-sm text-[#ad344e]">{error}</p> : null}</div></section>; }
