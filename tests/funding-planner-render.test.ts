@@ -20,5 +20,8 @@ describe("Funding planner actual initial render",()=>{
     expect(markup).not.toContain("NaN");
     expect(markup).toContain("Historical reporting retained");
     expect(markup).toContain("historical-das-evidence");
+    expect(markup).toContain("DAS history");
+    expect(markup).toContain("Saved plans");
+    expect(markup).toContain("stroke-dasharray=\"5 4\"");
   });
 });
