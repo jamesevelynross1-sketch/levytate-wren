@@ -35,8 +35,9 @@ import {
   type MvpEmployee,
 } from "@/lib/levytate/mvp/workspace";
 
-export function EmployeesModule({ onStartDiscovery, onOpenDirectReport, initialEmployeeId = null }: {
+export function EmployeesModule({ onStartDiscovery, onSetupPeopleSaved, onOpenDirectReport, initialEmployeeId = null }: {
   onStartDiscovery?: (employeeId: string) => void;
+  onSetupPeopleSaved?: () => void;
   onOpenDirectReport?: (employeeId: string) => void;
   initialEmployeeId?: string | null;
 }) {
@@ -156,7 +157,10 @@ export function EmployeesModule({ onStartDiscovery, onOpenDirectReport, initialE
       const result = await saveEmployee(employee, draftRevision);
       if (!result.ok) { setError(result.message); return; }
       setDraft(null);
-      if (isNew) onStartDiscovery?.(employee.id);
+      if (isNew) {
+        if (onSetupPeopleSaved) onSetupPeopleSaved();
+        else onStartDiscovery?.(employee.id);
+      }
     } catch (failure) { setError(failure instanceof Error ? failure.message : "The employee save was not confirmed. Your form has been kept."); }
     finally { setSaving(false); }
   }
@@ -193,6 +197,7 @@ export function EmployeesModule({ onStartDiscovery, onOpenDirectReport, initialE
       const result = await importEmployees(peopleImport.importId, peopleImport.employees);
       if (!result.ok) { setError(result.message); return; }
       setImportComplete(peopleImport.employees.length); setPeopleImport(null);
+      onSetupPeopleSaved?.();
     } catch { setError("The import outcome was not confirmed. Keep this preview open and retry the same request."); }
     finally { setSaving(false); }
   }
@@ -350,7 +355,7 @@ export function EmployeesModule({ onStartDiscovery, onOpenDirectReport, initialE
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white text-[#0b8e82]"><UserPlus size={17} aria-hidden="true" /></span>
               <div>
                 <p className="text-sm font-semibold">Start with the essentials</p>
-                <p className="mt-1 text-xs leading-5 text-[#102c3d]/[0.54]">After saving, LevyTate Copilot can guide the role and capability conversation before any application begins.</p>
+                <p className="mt-1 text-xs leading-5 text-[#102c3d]/[0.54]">{onSetupPeopleSaved ? "After saving, return to your workspace setup and continue with the next step." : "After saving, LevyTate Copilot can guide the role and capability conversation before any application begins."}</p>
               </div>
             </div>
 

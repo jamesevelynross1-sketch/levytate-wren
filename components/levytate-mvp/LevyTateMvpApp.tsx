@@ -699,7 +699,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
             {activeModule === "Assessments" ? <AssessmentsModule /> : null}
             {activeModule === "People" ? (
               <ModuleStackNav items={peopleItems} active={peopleView} onSelect={(item) => setPeopleView(item as PeopleView)}>
-                {peopleView === "Employees" ? <EmployeesModule initialEmployeeId={peopleEmployeeId} onStartDiscovery={(employeeId) => { setAiEmployeeId(employeeId); openModule("Copilot"); }} /> : null}
+                {peopleView === "Employees" ? <EmployeesModule initialEmployeeId={peopleEmployeeId} onSetupPeopleSaved={employerSetup && !employerSetup.complete ? () => navigateTo("Home") : undefined} onStartDiscovery={(employeeId) => { setAiEmployeeId(employeeId); openModule("Copilot"); }} /> : null}
                 {peopleView === "Roles" ? <RolesModule /> : null}
               </ModuleStackNav>
             ) : null}

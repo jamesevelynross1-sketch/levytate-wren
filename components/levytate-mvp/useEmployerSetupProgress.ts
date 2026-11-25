@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { authenticatedClientFetch } from "@/lib/levytate/client-session";
 import { decodeFinanceReadResponse } from "@/lib/levytate/client-employer-module-reads";
+import { hasMvpPermission, permissionsForMvpRole } from "@/lib/levytate/mvp/rbac";
 import { buildEmployerSetupSteps, employerSetupComplete, financeSetupStatus, isEmployerSetupRole, type EmployerSetupStep, type SetupFinanceStatus } from "@/lib/levytate/mvp/employer-setup";
 
 export type EmployerSetupProgress = {
@@ -14,10 +15,10 @@ export type EmployerSetupProgress = {
 };
 
 export function useEmployerSetupProgress(onHome: boolean): EmployerSetupProgress | null {
-  const { data, meta, hydrated, can } = useMvpWorkspace();
+  const { data, meta, hydrated } = useMvpWorkspace();
   const email = meta?.userEmail;
   const organisationId = meta?.organisationId;
-  const enabled = hydrated && meta?.storageMode === "supabase" && isEmployerSetupRole(meta.userRole) && can("finance:read");
+  const enabled = hydrated && meta?.storageMode === "supabase" && isEmployerSetupRole(meta.userRole) && hasMvpPermission(meta.permissions ?? permissionsForMvpRole(meta.userRole), "finance:read");
   const key = enabled && email && organisationId ? JSON.stringify([organisationId, email]) : null;
   const [finance, setFinance] = useState<{ key: string; status: SetupFinanceStatus } | null>(null);
   const [reload, setReload] = useState(0);
