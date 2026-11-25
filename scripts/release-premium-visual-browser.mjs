@@ -28,10 +28,10 @@ async function layout(page,width,height=900){
     return {viewport,scroll:document.documentElement.scrollWidth,fit:document.documentElement.scrollWidth<=viewport+1};
   });
 }
-async function capture(page,app,path,output,name){
+async function capture(page,app,path,output,name,scrollToTop=true){
   approvedPage(page,app,path);
   if(!/^[a-z0-9-]+$/.test(name))throw Error("Invalid screenshot name");
-  await page.evaluate(()=>window.scrollTo({top:0,behavior:"instant"}));
+  if(scrollToTop)await page.evaluate(()=>window.scrollTo({top:0,behavior:"instant"}));
   await page.screenshot({path:output+"/"+name+".png",fullPage:false,animations:"disabled",caret:"hide"});
 }
 async function matrix({page,app,path,output,name,check,widths=[390,640,768,1280,1440]}){
@@ -148,6 +148,7 @@ export async function verifyPremiumVisual({app,manifest,contexts,check}){
     await editor.waitFor();
     const search=editor.getByPlaceholder("Search title, level or reference",{exact:true});
     await search.waitFor();
+    await page.waitForFunction(()=>document.activeElement?.getAttribute("placeholder")==="Search title, level or reference");
     check("Visual Finance: cohort search receives focus",await search.evaluate(el=>el===document.activeElement));
     const programme=editor.getByLabel("Apprenticeship programme",{exact:true});
     const option=await programme.locator("option").nth(1).getAttribute("value");
@@ -157,7 +158,8 @@ export async function verifyPremiumVisual({app,manifest,contexts,check}){
     await editor.getByLabel("Learners",{exact:true}).fill("3");
     await page.getByText("Live preview of unsaved cohort",{exact:true}).waitFor();
     await layout(page,1440);
-    await capture(page,app,"/levytate/app",output,"employer-finance-cohort-1440");
+    await editor.scrollIntoViewIfNeeded();
+    await capture(page,app,"/levytate/app",output,"employer-finance-cohort-1440",false);
     await editor.getByRole("button",{name:"Cancel",exact:true}).click();
     await editor.waitFor({state:"hidden"});
     await page.getByRole("button",{name:"DAS history",exact:true}).click();
@@ -173,7 +175,8 @@ export async function verifyPremiumVisual({app,manifest,contexts,check}){
     await drawer.getByRole("heading",{name:"Copilot",exact:true}).waitFor();
     await capture(page,app,"/levytate/app",output,"employer-copilot-drawer-1280");
     await page.keyboard.press("Escape");
-    await drawer.waitFor({state:"hidden"}).catch(()=>undefined);
+    await page.waitForFunction(()=>document.getElementById("levytate-persistent-copilot")?.getAttribute("aria-hidden")==="true");
+    await page.waitForFunction(()=>document.activeElement?.getAttribute("aria-label")==="Open Copilot");
     check("Visual Copilot: Escape restores launcher focus",await launcher.evaluate(el=>el===document.activeElement));
   });
   console.log("VISUAL matrix: "+screenList.length+" screen targets, "+failures.length+" failed or blocked checks");
