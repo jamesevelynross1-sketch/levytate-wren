@@ -313,7 +313,7 @@ export function ApplicationsModule({
                 {selectedProgramme && !selectedProgramme.published ? <section className="grid gap-3 rounded-xl border border-[#102c3d]/10 bg-[#f8fbfa] p-4">
                   <p className="font-semibold">Add this apprenticeship to your organisation before saving the application.</p>
                   <FormSelect label="Provider programme to publish" value={publicationOffer?.programmeId ?? ""} onChange={setPublicationProgrammeId} options={[{ value: "", label: "Select a provider programme" }, ...selectedProgramme.offers.map(offer => ({ value: offer.programmeId, label: `${offer.providerName} · ${offer.programmeName}` }))]} />
-                  <p>Publishing makes this programme available to your organisation's employees. It does not enrol this employee or assign a provider to the application.</p>
+                  <p>Publishing makes this programme available to your organisation&apos;s employees. It does not enrol this employee or assign a provider to the application.</p>
                   <button type="button" disabled={!publicationOffer || publishingProgramme || savingDraft} onClick={() => void publishProgramme()} className="min-h-11 justify-self-start rounded-lg bg-[#102c3d] px-4 text-xs font-semibold text-white disabled:opacity-50">{publishingProgramme ? "Publishing…" : "Add to My Programmes"}</button>
                 </section> : null}
               </div>
