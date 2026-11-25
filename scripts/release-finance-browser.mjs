@@ -36,7 +36,8 @@ export async function verifyFinance({ app: origin, manifest, contexts, backend, 
   const initialBody = await initial.json();
   report("Lead reads actual empty persistent Finance without fixture totals", initial.status() === 200 && initialBody.state?.mode === "persistent" && initialBody.state.transactions.length === 0);
   await page.goto(`${app}/levytate/app?module=Finance`);
-  await page.getByRole("heading", { name: "Bring your DAS finance data into LevyTate", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "Plan your next investment", exact: true }).waitFor();
+  await page.getByLabel("Update DAS CSV", { exact:true }).waitFor({state:"attached"});
 
   // Client preview must reject partial imports before any network mutation.
   let validationPosts = 0;
@@ -44,7 +45,7 @@ export async function verifyFinance({ app: origin, manifest, contexts, backend, 
   page.on("request", countPosts);
   try {
     const invalid = `Date,Description,Amount\n${month}-01,Levy contribution fictional validation,100.00\n${month}-02,Training payment fictional validation,not-money`;
-    await page.locator('input[type="file"]').setInputFiles({ name: `invalid-${fileName}`, mimeType: "text/csv", buffer: Buffer.from(invalid) });
+    await page.getByLabel("Update DAS CSV",{exact:true}).setInputFiles({ name: `invalid-${fileName}`, mimeType: "text/csv", buffer: Buffer.from(invalid) });
     await page.getByRole("heading", { name: "Import preview", exact: true }).waitFor();
     await page.getByRole("alert").filter({ hasText: "No partial import will be saved" }).waitFor();
     report("malformed CSV shows source errors and disables import", await page.getByRole("button", { name: "Import transactions", exact: true }).isDisabled());
@@ -53,7 +54,7 @@ export async function verifyFinance({ app: origin, manifest, contexts, backend, 
   } finally { page.off("request", countPosts); }
 
   async function uploadAndMap() {
-    await page.locator('input[type="file"]').setInputFiles({ name: fileName, mimeType: "text/csv", buffer: Buffer.from(content) });
+    await page.getByLabel("Update DAS CSV",{exact:true}).setInputFiles({ name: fileName, mimeType: "text/csv", buffer: Buffer.from(content) });
     await page.getByRole("heading", { name: "We need to confirm your file", exact: true }).waitFor();
     await page.getByRole("combobox", { name: /^Date \*/ }).selectOption("When");
     await page.getByRole("combobox", { name: /^Transaction description\/type \*/ }).selectOption("Details");
@@ -130,10 +131,14 @@ export async function verifyFinance({ app: origin, manifest, contexts, backend, 
   await page.getByRole("dialog", { name: "Update awaiting confirmation", exact: true }).getByRole("button", { name: "Retry original update", exact: true }).click();
   const retry = await retried;
   report("explicit retry preserves the exact import body", retry.status() === 200 && retry.request().postData() === command);
+  await page.getByTestId("levy-funding-planner").waitFor();
+  await page.getByRole("button",{name:"DAS history",exact:true}).click();
   await page.getByTestId("levy-finance-module").waitFor();
   report("retry returns original import without duplicate rows, receipt, audit or revision", JSON.stringify(await snapshot()) === JSON.stringify(persisted));
   for (const actor of [employee, manager, other]) report(`${actor.tenant.key}:${actor.user.role} cannot replay the Lead import`, (await actor.context.request.post(path, { headers: { Origin: app }, data: JSON.parse(command) })).status() === 403);
-  await page.reload(); await page.getByTestId("levy-finance-module").waitFor();
+  await page.reload(); await page.getByTestId("levy-funding-planner").waitFor();
+  await page.getByRole("button",{name:"DAS history",exact:true}).click();
+  await page.getByTestId("levy-finance-module").waitFor();
   report("Finance values survive refresh and match stored evidence", await fact("Latest evidenced levy balance", "£715") && await page.getByText("1 imported rows could not be classified and are excluded from category totals.", { exact: true }).count() === 1 && await page.getByText(provider, { exact: true }).count() === 1 && await page.getByText(programme, { exact: true }).count() === 1);
   const monthRow = page.getByRole("heading", { name: "Monthly position", exact: true }).locator("..");
   const monthlyText = await monthRow.textContent();
@@ -142,6 +147,8 @@ export async function verifyFinance({ app: origin, manifest, contexts, backend, 
   const duplicateResponse = page.waitForResponse(response => new URL(response.url()).pathname === "/api/levytate-finance" && response.request().method() === "POST");
   await page.getByRole("button", { name: "Import transactions", exact: true }).click();
   report("same CSV re-upload confirms safely", (await duplicateResponse).status() === 200);
+  await page.getByTestId("levy-funding-planner").waitFor();
+  await page.getByRole("button",{name:"DAS history",exact:true}).click();
   await page.getByTestId("levy-finance-module").waitFor();
   report("repeat file after refresh remains exactly one atomic import", JSON.stringify(await snapshot()) === JSON.stringify(persisted));
 
