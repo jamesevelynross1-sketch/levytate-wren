@@ -68,7 +68,7 @@ export function DashboardModule({ onNavigate, setup }: { onNavigate: (module: st
         <div className="grid gap-5">
           {checklist}
           <MvpPanel title="Workspace setup required" eyebrow="Protected workspace">
-            <p className="text-sm leading-6 text-[#102c3d]/58">
+            <p className="text-sm leading-6 text-lt-muted">
               Employer priorities have not been configured yet. A workspace admin needs to complete setup before role-specific operating signals appear.
             </p>
           </MvpPanel>
@@ -82,19 +82,22 @@ export function DashboardModule({ onNavigate, setup }: { onNavigate: (module: st
   return (
     <div className="grid gap-5">
       {checklist}
-      <section data-testid="home-attention-hero" className="rounded-[1.25rem] border border-[#102c3d]/[0.07] bg-[#102c3d] p-4 text-white shadow-[0_20px_55px_rgba(16,44,61,0.12)] sm:p-5">
+      <section data-testid="home-attention-hero" className="lt-hero p-4 sm:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-2xl">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8fe0d2]">Today</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8fe0d2]">Today</p>
             <h2 className="mt-1.5 text-2xl font-semibold">What needs attention?</h2>
             <p className="mt-1.5 text-sm leading-5 text-white/62">A short operating briefing. Open the next decision, then let LevyTate handle the detail.</p>
           </div>
-          <button type="button" onClick={() => onNavigate(primaryAction.target)} className="h-10 self-start rounded-lg bg-[#ffde59] px-4 text-sm font-semibold text-[#102c3d] transition hover:-translate-y-0.5 lg:self-center">
+          <button type="button" onClick={() => onNavigate(primaryAction.target)} className="lt-button lt-hero-action self-start lg:self-center">
             {primaryAction.label}
           </button>
         </div>
       </section>
 
+      <section className="lt-panel grid divide-y divide-lt-border sm:grid-cols-3 sm:divide-x sm:divide-y-0" aria-label="Workspace overview">
+        {[{label:"Active employee records",value:data.employees.filter(item=>item.status==="Active").length},{label:"Active learner records",value:data.learnerRecords.filter(item=>item.recordStatus==="Active" && !["withdrawn","achieved","completed_without_achievement","pre_enrolment"].includes(item.lifecycleStatus)).length},{label:"Published programmes",value:data.organisationProgrammes.filter(item=>item.status==="Active").length}].map(metric=><div key={metric.label} className="px-5 py-4"><p className="text-sm text-lt-muted">{metric.label}</p><p className="mt-1 text-3xl font-semibold tabular-nums tracking-tight">{metric.value}</p></div>)}
+      </section>
       <div data-testid="home-attention-grid" className="grid items-start gap-4 xl:grid-cols-3">
         <div data-testid="home-urgent-card" className="min-w-0 self-start">
           <MvpPanel title="Urgent approvals" eyebrow="Decision">
@@ -104,8 +107,8 @@ export function DashboardModule({ onNavigate, setup }: { onNavigate: (module: st
                 <button key={notification.id} type="button" onClick={() => onNavigate(notification.target ?? notification.module)} className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] px-4 py-3 text-left transition hover:border-[#159b8f]/18 hover:bg-white">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-sm font-semibold text-[#102c3d]">{notification.title}</p>
-                      <p className="mt-1 text-xs leading-5 text-[#102c3d]/54">{notification.copy}</p>
+                      <p className="text-sm font-semibold text-lt-ink">{notification.title}</p>
+                      <p className="mt-1 text-xs leading-5 text-lt-muted">{notification.copy}</p>
                     </div>
                     <StatusBadge tone={notification.tone}>{notification.module}</StatusBadge>
                   </div>
@@ -113,7 +116,7 @@ export function DashboardModule({ onNavigate, setup }: { onNavigate: (module: st
               ))}
             </div>
           ) : (
-            <p className="text-sm leading-6 text-[#102c3d]/56">Nothing urgent is waiting. Use LevyTate Copilot if you want to plan the next development move.</p>
+            <p className="text-sm leading-6 text-lt-muted">Nothing urgent is waiting. Use LevyTate Copilot if you want to plan the next development move.</p>
           )}
           </MvpPanel>
         </div>
@@ -123,10 +126,10 @@ export function DashboardModule({ onNavigate, setup }: { onNavigate: (module: st
           <div className="grid gap-3">
             {support.length ? support.slice(0, 4).map((employee) => (
               <button key={employee.id} type="button" onClick={() => onNavigate(`Employees:${employee.id}`)} className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] px-4 py-3 text-left transition hover:border-[#159b8f]/18 hover:bg-white">
-                <p className="text-sm font-semibold text-[#102c3d]">{employee.name}</p>
-                <p className="mt-1 text-xs leading-5 text-[#102c3d]/54">{employee.jobTitle || "Role to confirm"} needs discovery context.</p>
+                <p className="text-sm font-semibold text-lt-ink">{employee.name}</p>
+                <p className="mt-1 text-xs leading-5 text-lt-muted">{employee.jobTitle || "Role to confirm"} needs discovery context.</p>
               </button>
-            )) : <p className="text-sm leading-6 text-[#102c3d]/56">Employee records look ready. New recommendations will appear as AI conversations progress.</p>}
+            )) : <p className="text-sm leading-6 text-lt-muted">Employee records look ready. New recommendations will appear as AI conversations progress.</p>}
           </div>
           </MvpPanel>
         </div>
@@ -136,7 +139,7 @@ export function DashboardModule({ onNavigate, setup }: { onNavigate: (module: st
           <div className="grid gap-3">
             {providerIssues.length ? providerIssues.map((issue) => (
               <ActionCard key={issue} title={issue} copy="Preferred provider coverage is not complete for this category." cta="Explore providers" onClick={() => onNavigate("Marketplace")} />
-            )) : <p className="text-sm leading-6 text-[#102c3d]/56">Provider coverage is in place for the current priority areas.</p>}
+            )) : <p className="text-sm leading-6 text-lt-muted">Provider coverage is in place for the current priority areas.</p>}
             {enrolments.length ? <ActionCard title="Approved learners need handoff" copy={`${enrolments.length} enrolment record${enrolments.length === 1 ? "" : "s"} need dates, provider or learner readiness checked.`} cta="Open enrolments" onClick={() => onNavigate("Enrolments")} /> : null}
           </div>
           </MvpPanel>
@@ -150,21 +153,22 @@ function ClientSetupHome({ steps, onNavigate, onRetryFinance }: { steps: Employe
   const complete = steps.filter((step) => step.complete).length;
   const next = steps.find((step) => !step.complete);
   return <div className="grid gap-4" data-testid="blank-employer-home">
-    <section className="rounded-[1.25rem] bg-[#102c3d] p-6 text-white sm:p-7">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8fe0d2]">Client workspace</p>
+    <section className="lt-hero p-6 sm:p-7">
+      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8fe0d2]">Client workspace</p>
       <h2 className="mt-2 text-2xl font-semibold">Set up your LevyTate workspace</h2>
       <p className="mt-2 max-w-2xl text-sm leading-6 text-white/65">Set up your people, providers and programmes. Your progress is saved automatically; return to Home to continue. Import existing learners and DAS data when they are available.</p>
       <p aria-live="polite" className="mt-5 text-sm font-semibold" data-testid="employer-setup-progress">{complete} of {steps.length} setup steps complete</p>
       <div className="mt-2 h-2 max-w-sm overflow-hidden rounded-full bg-white/15" role="progressbar" aria-label="Workspace setup" aria-valuemin={0} aria-valuemax={steps.length} aria-valuenow={complete}><div className="h-full rounded-full bg-[#8fe0d2]" style={{ width: steps.length ? `${100 * complete / steps.length}%` : "0%" }} /></div>
-      {next ? <button type="button" onClick={() => onNavigate(next.target)} className="mt-5 min-h-11 rounded-lg bg-[#ffde59] px-4 text-sm font-semibold text-[#102c3d]">Next: {next.label}</button> : null}
+      {next ? <button type="button" onClick={() => onNavigate(next.target)} className="lt-button lt-hero-action mt-5">Next: {next.label}</button> : null}
     </section>
-    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-      {steps.map((step, index) => <button key={step.label} type="button" onClick={() => onNavigate(step.target)} className="flex min-h-28 items-start gap-4 border border-[#102c3d]/[0.08] bg-white p-5 text-left shadow-[0_10px_24px_rgba(16,44,61,0.035)] hover:border-[#159b8f]/30">
-        <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-xs font-semibold ${step.complete ? "bg-[#159b8f] text-white" : "bg-[#edf7f3] text-[#0b6f63]"}`}>{step.complete ? <Check size={15} aria-hidden="true" /> : index + 1}</span>
-        <span><strong className="block text-sm">{step.label}</strong><span className="mt-2 block text-xs text-[#102c3d]/60">{step.complete ? "Complete" : step.detail ?? (step.optional ? "Optional · complete when available" : "Open setup")}</span></span>
+    <section className="lt-panel overflow-hidden" aria-label="Workspace setup checklist">
+      <div className="lt-panel-heading px-5 py-4"><h3 className="text-base font-semibold">Your setup checklist</h3><p className="mt-1 text-sm text-lt-muted">Continue at your own pace. Your saved progress is retained.</p></div>
+      {steps.map((step, index) => <button key={step.label} type="button" onClick={() => onNavigate(step.target)} data-next={step===next} className="lt-setup-row">
+        <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg text-sm font-semibold ${step.complete ? "bg-lt-accent text-white" : "bg-lt-soft text-lt-accent"}`}>{step.complete ? <Check size={15} aria-hidden="true" /> : index + 1}</span>
+        <span className="min-w-0 flex-1"><strong className="block text-sm">{step.label}</strong><span className="mt-1 block text-sm text-lt-muted">{step.complete ? "Complete" : step.detail ?? (step.optional ? "Optional · complete when available" : "Open setup")}</span></span><span className="shrink-0 text-xs font-semibold text-lt-accent">{step.complete?"Done":step===next?"Continue":"Open"}</span>
       </button>)}
     </section>
-    {onRetryFinance ? <p role="status" className="text-sm text-[#102c3d]/70">Finance could not be checked. <button type="button" className="font-semibold underline" onClick={onRetryFinance}>Retry finance check</button></p> : null}
+    {onRetryFinance ? <p role="status" className="text-sm text-lt-secondary">Finance could not be checked. <button type="button" className="font-semibold underline" onClick={onRetryFinance}>Retry finance check</button></p> : null}
   </div>;
 }
 
@@ -212,7 +216,7 @@ export function LineManagerHomeModule({ onNavigate, onOpenApplicationReview }: {
       <section className="rounded-[1.25rem] border border-[#102c3d]/[0.07] bg-[#102c3d] p-5 text-white shadow-[0_20px_55px_rgba(16,44,61,0.12)] sm:p-6">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
           <div className="max-w-2xl">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8fe0d2]">Line Manager</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8fe0d2]">Line Manager</p>
             <h2 className="mt-2 text-2xl font-semibold">What needs my decision today?</h2>
             <p className="mt-2 text-sm leading-6 text-white/62">
               {awaitingReview.length
@@ -220,7 +224,7 @@ export function LineManagerHomeModule({ onNavigate, onOpenApplicationReview }: {
                 : "No direct-report applications are awaiting review right now."}
             </p>
           </div>
-          <button type="button" onClick={() => nextApplication ? onOpenApplicationReview(nextApplication.id) : onNavigate("My Team")} className="h-11 self-start rounded-full bg-[#ffde59] px-5 text-sm font-semibold text-[#102c3d] transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#ffde59]/35 xl:self-center">
+          <button type="button" onClick={() => nextApplication ? onOpenApplicationReview(nextApplication.id) : onNavigate("My Team")} className="h-11 self-start rounded-full bg-[#ffde59] px-5 text-sm font-semibold text-lt-ink transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#ffde59]/35 xl:self-center">
             {awaitingReview.length ? "Review application" : "View my team"}
           </button>
         </div>
@@ -232,8 +236,8 @@ export function LineManagerHomeModule({ onNavigate, onOpenApplicationReview }: {
             <button type="button" aria-label={`Open review for ${nextEmployee.name}`} onClick={() => onOpenApplicationReview(nextApplication.id)} className="w-full rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4 text-left transition hover:border-[#159b8f]/18 hover:bg-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/15">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <p className="text-base font-semibold text-[#102c3d]">{nextEmployee.name}</p>
-                  <p className="mt-1 text-sm leading-6 text-[#102c3d]/58">{nextEmployee.jobTitle || "Role to confirm"} - {nextEmployee.department || "Department to confirm"}</p>
+                  <p className="text-base font-semibold text-lt-ink">{nextEmployee.name}</p>
+                  <p className="mt-1 text-sm leading-6 text-lt-muted">{nextEmployee.jobTitle || "Role to confirm"} - {nextEmployee.department || "Department to confirm"}</p>
                 </div>
                 <div className="flex flex-wrap justify-end gap-2">
                   <StatusBadge tone="yellow">{nextApplication.status}</StatusBadge>
@@ -244,19 +248,19 @@ export function LineManagerHomeModule({ onNavigate, onOpenApplicationReview }: {
                 <DashboardFact label="Programme" value={nextStandard?.title ?? nextApplication.apprenticeshipStandardId} />
                 <DashboardFact label="Submitted" value={nextApplication.submittedAt.slice(0, 10)} />
               </div>
-              <p className="mt-4 line-clamp-2 text-sm leading-6 text-[#102c3d]/62">{nextApplication.reason || "No reason recorded yet."}</p>
-              <p className="mt-4 text-xs font-semibold text-[#0b6f63]">Open review</p>
+              <p className="mt-4 line-clamp-2 text-sm leading-6 text-lt-muted">{nextApplication.reason || "No reason recorded yet."}</p>
+              <p className="mt-4 text-xs font-semibold text-lt-accent">Open review</p>
             </button>
           ) : (
-            <p className="text-sm leading-6 text-[#102c3d]/56">Your approval queue is clear. Use My Team to check direct-report development status.</p>
+            <p className="text-sm leading-6 text-lt-muted">Your approval queue is clear. Use My Team to check direct-report development status.</p>
           )}
         </MvpPanel>
 
         <MvpPanel title="Direct reports needing support" eyebrow="Team support">
           <div className="grid gap-3">
             <div className="rounded-xl bg-[#f8fbfa] px-4 py-3 ring-1 ring-[#102c3d]/[0.055]">
-              <p className="text-2xl font-semibold text-[#102c3d]">{needingSupport.length}</p>
-              <p className="mt-1 text-sm leading-6 text-[#102c3d]/56">Direct reports with a current application or learner support action.</p>
+              <p className="text-2xl font-semibold text-lt-ink">{needingSupport.length}</p>
+              <p className="mt-1 text-sm leading-6 text-lt-muted">Direct reports with a current application or learner support action.</p>
             </div>
             <button type="button" onClick={() => onNavigate("My Team")} className="h-10 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/15">
               View my team
@@ -272,8 +276,8 @@ export function LineManagerHomeModule({ onNavigate, onOpenApplicationReview }: {
 function DashboardFact({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-white px-3.5 py-3 ring-1 ring-[#102c3d]/[0.055]">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#102c3d]/38">{label}</p>
-      <p className="mt-1 line-clamp-2 text-sm font-semibold text-[#102c3d]/72">{value}</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.13em] text-lt-muted">{label}</p>
+      <p className="mt-1 line-clamp-2 text-sm font-semibold text-lt-secondary">{value}</p>
     </div>
   );
 }
@@ -281,9 +285,9 @@ function DashboardFact({ label, value }: { label: string; value: string }) {
 function ActionCard({ title, copy, cta, onClick }: { title: string; copy: string; cta: string; onClick: () => void }) {
   return (
     <button type="button" onClick={onClick} className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] px-4 py-3 text-left transition hover:border-[#159b8f]/18 hover:bg-white">
-      <p className="text-sm font-semibold text-[#102c3d]">{title}</p>
-      <p className="mt-1 text-xs leading-5 text-[#102c3d]/54">{copy}</p>
-      <p className="mt-3 text-xs font-semibold text-[#0b6f63]">{cta}</p>
+      <p className="text-sm font-semibold text-lt-ink">{title}</p>
+      <p className="mt-1 text-xs leading-5 text-lt-muted">{copy}</p>
+      <p className="mt-3 text-xs font-semibold text-lt-accent">{cta}</p>
     </button>
   );
 }
@@ -324,13 +328,13 @@ function EmployerPrioritiesSetup({ compact = false, readOnly = false }: { compac
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap gap-2">
             {data.profile.priorities.map((priority) => (
-              <span key={priority.id} className="rounded-full bg-[#edf7f3] px-3 py-2 text-xs font-semibold text-[#0b6f63] ring-1 ring-[#159b8f]/10">
+              <span key={priority.id} className="rounded-full bg-[#edf7f3] px-3 py-2 text-xs font-semibold text-lt-accent ring-1 ring-[#159b8f]/10">
                 {priority.name} - {priority.importance}
               </span>
             ))}
           </div>
-          {readOnly ? <p className="text-xs font-semibold text-[#102c3d]/42">Read-only</p> : (
-            <button type="button" onClick={() => { setDraftRevision(meta?.mutationRevisions?.[`levytate_organisations:${meta?.organisationId}`] ?? 0); setStep("priorities"); }} className="shrink-0 rounded-full bg-[#f5f8f6] px-4 py-2 text-xs font-semibold text-[#102c3d]/64 ring-1 ring-[#102c3d]/[0.07]">
+          {readOnly ? <p className="text-xs font-semibold text-lt-muted">Read-only</p> : (
+            <button type="button" onClick={() => { setDraftRevision(meta?.mutationRevisions?.[`levytate_organisations:${meta?.organisationId}`] ?? 0); setStep("priorities"); }} className="shrink-0 rounded-full bg-[#f5f8f6] px-4 py-2 text-xs font-semibold text-lt-muted ring-1 ring-[#102c3d]/[0.07]">
               Refine priorities
             </button>
           )}
@@ -342,7 +346,7 @@ function EmployerPrioritiesSetup({ compact = false, readOnly = false }: { compac
   if (readOnly) {
     return (
       <MvpPanel title="Business priorities" eyebrow="Recommendation context">
-        <p className="text-sm leading-6 text-[#102c3d]/58">No business priorities have been configured. A workspace administrator can add them.</p>
+        <p className="text-sm leading-6 text-lt-muted">No business priorities have been configured. A workspace administrator can add them.</p>
       </MvpPanel>
     );
   }
@@ -350,22 +354,22 @@ function EmployerPrioritiesSetup({ compact = false, readOnly = false }: { compac
   return (
     <section className={`mx-auto w-full max-w-4xl rounded-[1.35rem] border border-[#102c3d]/[0.07] bg-white ${compact ? "p-5" : "p-6 sm:p-8"} shadow-[0_24px_70px_rgba(16,44,61,0.07)]`}>
       <div className="flex items-center gap-3">
-        <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#edf7f3] text-[#0b8e82]"><Target size={19} aria-hidden="true" /></span>
+        <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#edf7f3] text-lt-accent"><Target size={19} aria-hidden="true" /></span>
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c95568]">Workspace setup</p>
-          <p className="mt-0.5 text-xs text-[#102c3d]/48">Question {step === "priorities" ? "1" : "2"} of 2</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lt-risk">Workspace setup</p>
+          <p className="mt-0.5 text-xs text-lt-muted">Question {step === "priorities" ? "1" : "2"} of 2</p>
         </div>
       </div>
 
       {step === "priorities" ? (
         <div className="mt-6">
           <h2 className="text-2xl font-semibold">What are you hoping to achieve?</h2>
-          <p className="mt-2 text-sm leading-6 text-[#102c3d]/56">Choose up to three priorities. LevyTate uses them as business context, not as a substitute for employee evidence.</p>
+          <p className="mt-2 text-sm leading-6 text-lt-muted">Choose up to three priorities. LevyTate uses them as business context, not as a substitute for employee evidence.</p>
           <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {mvpEmployerPriorityOptions.map((priority) => {
               const active = selected.includes(priority);
               return (
-                <button key={priority} type="button" onClick={() => togglePriority(priority)} aria-pressed={active} className={`flex min-h-12 items-center justify-between gap-3 rounded-xl px-3.5 py-3 text-left text-sm font-semibold ring-1 transition ${active ? "bg-[#edf7f3] text-[#0b6f63] ring-[#159b8f]/25" : "bg-[#f8fbfa] text-[#102c3d]/64 ring-[#102c3d]/[0.06] hover:bg-white hover:ring-[#159b8f]/20"}`}>
+                <button key={priority} type="button" onClick={() => togglePriority(priority)} aria-pressed={active} className={`flex min-h-12 items-center justify-between gap-3 rounded-xl px-3.5 py-3 text-left text-sm font-semibold ring-1 transition ${active ? "bg-[#edf7f3] text-lt-accent ring-[#159b8f]/25" : "bg-[#f8fbfa] text-lt-muted ring-[#102c3d]/[0.06] hover:bg-white hover:ring-[#159b8f]/20"}`}>
                   <span>{priority}</span>
                   {active ? <Check size={16} className="shrink-0" aria-hidden="true" /> : null}
                 </button>
@@ -373,24 +377,24 @@ function EmployerPrioritiesSetup({ compact = false, readOnly = false }: { compac
             })}
           </div>
           <div className="mt-6 flex items-center justify-between">
-            <p className="text-xs font-semibold text-[#102c3d]/42">{selected.length} of 3 selected</p>
+            <p className="text-xs font-semibold text-lt-muted">{selected.length} of 3 selected</p>
             <button type="button" disabled={!selected.length} onClick={() => setStep("importance")} className="h-11 rounded-full bg-[#102c3d] px-5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">Continue</button>
           </div>
         </div>
       ) : (
         <div className="mt-6">
           <h2 className="text-2xl font-semibold">How important is this over the next 12 months?</h2>
-          <p className="mt-2 text-sm leading-6 text-[#102c3d]/56">This helps LevyTate weigh organisational urgency alongside role and capability evidence.</p>
+          <p className="mt-2 text-sm leading-6 text-lt-muted">This helps LevyTate weigh organisational urgency alongside role and capability evidence.</p>
           <div className="mt-5 grid gap-3 sm:grid-cols-3">
             {importanceOptions.map((option) => (
-              <button key={option.value} type="button" onClick={() => setImportance(option.value)} className={`rounded-xl p-4 text-left ring-1 transition ${importance === option.value ? "bg-[#102c3d] text-white ring-[#102c3d]" : "bg-[#f8fbfa] text-[#102c3d] ring-[#102c3d]/[0.06] hover:ring-[#159b8f]/20"}`}>
+              <button key={option.value} type="button" onClick={() => setImportance(option.value)} className={`rounded-xl p-4 text-left ring-1 transition ${importance === option.value ? "bg-[#102c3d] text-white ring-[#102c3d]" : "bg-[#f8fbfa] text-lt-ink ring-[#102c3d]/[0.06] hover:ring-[#159b8f]/20"}`}>
                 <p className="text-sm font-semibold">{option.value}</p>
-                <p className={`mt-2 text-xs leading-5 ${importance === option.value ? "text-white/62" : "text-[#102c3d]/52"}`}>{option.copy}</p>
+                <p className={`mt-2 text-xs leading-5 ${importance === option.value ? "text-white/62" : "text-lt-muted"}`}>{option.copy}</p>
               </button>
             ))}
           </div>
           <div className="mt-6 flex items-center justify-between">
-            <button type="button" onClick={() => setStep("priorities")} className="text-xs font-semibold text-[#102c3d]/52">Back</button>
+            <button type="button" onClick={() => setStep("priorities")} className="text-xs font-semibold text-lt-muted">Back</button>
             {error ? <p role="alert" className="text-sm text-red-700">{error}</p> : null}
             <button type="button" disabled={saving} onClick={save} className="h-11 rounded-full bg-[#102c3d] px-5 text-sm font-semibold text-white">{saving ? "Saving…" : "Save priorities"}</button>
           </div>
@@ -465,9 +469,9 @@ export function SettingsModule() {
         <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4">
           <div>
             <p className="text-sm font-semibold">Workspace details</p>
-            <p className="mt-1 text-xs text-[#102c3d]/48">Organisation, contacts, sites and departments</p>
+            <p className="mt-1 text-xs text-lt-muted">Organisation, contacts, sites and departments</p>
           </div>
-          <ChevronDown size={18} className="text-[#102c3d]/42 transition group-open:rotate-180" aria-hidden="true" />
+          <ChevronDown size={18} className="text-lt-muted transition group-open:rotate-180" aria-hidden="true" />
         </summary>
         {canEdit ? (
           <form onSubmit={submit} onChange={() => { setDirty(true); setSaved(false); }} className="border-t border-[#102c3d]/[0.07] p-5"><fieldset disabled={saving}>
@@ -481,7 +485,7 @@ export function SettingsModule() {
               <FormField label="Departments" value={draft.departments.join(", ")} onChange={(value) => setDraft({ ...draft, departments: splitMvpList(value) })} wide />
             </FormGrid>
             <div className="mt-5 flex items-center justify-between border-t border-[#102c3d]/[0.07] pt-4">
-              {saveError ? <p role="alert" className="text-sm text-red-700">{saveError}</p> : saved ? <p role="status" className="text-xs font-semibold text-[#0b6f63]">Workspace saved.</p> : <span />}
+              {saveError ? <p role="alert" className="text-sm text-red-700">{saveError}</p> : saved ? <p role="status" className="text-xs font-semibold text-lt-accent">Workspace saved.</p> : <span />}
               <button className="h-10 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white">{saving ? "Saving…" : "Save details"}</button>
             </div>
           </fieldset></form>
@@ -496,49 +500,49 @@ export function SettingsModule() {
               <ReadOnlySetting label="Sites" value={data.profile.sites.join(", ")} />
               <ReadOnlySetting label="Departments" value={data.profile.departments.join(", ")} wide />
             </div>
-            <p className="mt-5 border-t border-[#102c3d]/[0.07] pt-4 text-xs font-semibold text-[#102c3d]/42">Workspace settings are read-only for this role.</p>
+            <p className="mt-5 border-t border-[#102c3d]/[0.07] pt-4 text-xs font-semibold text-lt-muted">Workspace settings are read-only for this role.</p>
           </div>
         )}
       </details>
       <MvpPanel title="Authorised users" eyebrow="Access">
         {accessError ? (
-          <p className="text-sm leading-6 text-[#ad344e]">{accessError}</p>
+          <p className="text-sm leading-6 text-lt-risk">{accessError}</p>
         ) : accessUsers === null ? (
-          <p className="text-sm leading-6 text-[#102c3d]/56">Loading authorised users...</p>
+          <p className="text-sm leading-6 text-lt-muted">Loading authorised users...</p>
         ) : accessUsers.length ? (
           <div className="grid gap-2">
             {accessUsers.map((user) => (
               <div key={user.id} className="grid gap-3 rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center">
-                <div className="min-w-0"><p className="truncate text-sm font-semibold text-[#102c3d]">{user.displayName}</p><p className="truncate text-xs text-[#102c3d]/52">{user.email}</p></div>
+                <div className="min-w-0"><p className="truncate text-sm font-semibold text-lt-ink">{user.displayName}</p><p className="truncate text-xs text-lt-muted">{user.email}</p></div>
                 <StatusBadge tone="blue">{user.role}</StatusBadge>
                 <StatusBadge tone={user.accessState === "Active" ? "green" : "red"}>{user.accessState} · {user.authenticationState}</StatusBadge>
               </div>
             ))}
           </div>
         ) : (
-          <p className="text-sm leading-6 text-[#102c3d]/56">No authorised users are configured.</p>
+          <p className="text-sm leading-6 text-lt-muted">No authorised users are configured.</p>
         )}
-        <p className="mt-4 border-t border-[#102c3d]/[0.07] pt-4 text-xs leading-5 text-[#102c3d]/48">Platform Admin controls user provisioning, roles and access state. Workspace settings never expose authentication credentials.</p>
+        <p className="mt-4 border-t border-[#102c3d]/[0.07] pt-4 text-xs leading-5 text-lt-muted">Platform Admin controls user provisioning, roles and access state. Workspace settings never expose authentication credentials.</p>
       </MvpPanel>
       {meta?.userRole === "Employer Admin" ? (
         <MvpPanel title="Microsoft 365 Copilot" eyebrow="Integrations">
           {microsoftCopilotError ? (
-            <p className="text-sm leading-6 text-[#ad344e]">{microsoftCopilotError}</p>
+            <p className="text-sm leading-6 text-lt-risk">{microsoftCopilotError}</p>
           ) : microsoftCopilot === null ? (
-            <p className="text-sm leading-6 text-[#102c3d]/56">Loading connection status...</p>
+            <p className="text-sm leading-6 text-lt-muted">Loading connection status...</p>
           ) : (
             <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
               <div>
-                <p className="text-sm font-semibold text-[#102c3d]">{microsoftCopilot.displayName || "LevyTate for Microsoft 365 Copilot"}</p>
-                <p className="mt-1 text-sm leading-6 text-[#102c3d]/56">Read-only access to role-scoped LevyTate operations through your organisation&apos;s Microsoft tenant.</p>
-                <p className="mt-3 text-xs leading-5 text-[#102c3d]/48">Connection identifiers, bearer tokens and credentials are never displayed here. Setup and tenant consent are completed by an authorised administrator.</p>
+                <p className="text-sm font-semibold text-lt-ink">{microsoftCopilot.displayName || "LevyTate for Microsoft 365 Copilot"}</p>
+                <p className="mt-1 text-sm leading-6 text-lt-muted">Read-only access to role-scoped LevyTate operations through your organisation&apos;s Microsoft tenant.</p>
+                <p className="mt-3 text-xs leading-5 text-lt-muted">Connection identifiers, bearer tokens and credentials are never displayed here. Setup and tenant consent are completed by an authorised administrator.</p>
               </div>
               <StatusBadge tone={microsoftCopilot.status === "active" && microsoftCopilot.runtimeEnabled && microsoftCopilot.organisationEnabled ? "green" : "blue"}>
                 {microsoftCopilot.status === "active" && microsoftCopilot.runtimeEnabled && microsoftCopilot.organisationEnabled ? "Connected" : microsoftCopilot.status === "suspended" ? "Suspended" : "Not active"}
               </StatusBadge>
-              <div className="grid gap-2 border-t border-[#102c3d]/[0.07] pt-4 text-xs text-[#102c3d]/54 sm:col-span-2 sm:grid-cols-2">
-                <p>Connected: <span className="font-semibold text-[#102c3d]">{microsoftCopilot.connectedAt ? new Date(microsoftCopilot.connectedAt).toLocaleDateString("en-GB") : "Not configured"}</span></p>
-                <p>Last activity: <span className="font-semibold text-[#102c3d]">{microsoftCopilot.lastSuccessfulActivityAt ? new Date(microsoftCopilot.lastSuccessfulActivityAt).toLocaleString("en-GB") : "No activity recorded"}</span></p>
+              <div className="grid gap-2 border-t border-[#102c3d]/[0.07] pt-4 text-xs text-lt-muted sm:col-span-2 sm:grid-cols-2">
+                <p>Connected: <span className="font-semibold text-lt-ink">{microsoftCopilot.connectedAt ? new Date(microsoftCopilot.connectedAt).toLocaleDateString("en-GB") : "Not configured"}</span></p>
+                <p>Last activity: <span className="font-semibold text-lt-ink">{microsoftCopilot.lastSuccessfulActivityAt ? new Date(microsoftCopilot.lastSuccessfulActivityAt).toLocaleString("en-GB") : "No activity recorded"}</span></p>
               </div>
             </div>
           )}
@@ -551,8 +555,8 @@ export function SettingsModule() {
 function ReadOnlySetting({ label, value, wide = false }: { label: string; value: string; wide?: boolean }) {
   return (
     <div className={wide ? "md:col-span-2" : ""}>
-      <p className="text-xs font-semibold text-[#102c3d]/48">{label}</p>
-      <p className="mt-1 text-sm font-medium text-[#102c3d]">{value || "Not configured"}</p>
+      <p className="text-xs font-semibold text-lt-muted">{label}</p>
+      <p className="mt-1 text-sm font-medium text-lt-ink">{value || "Not configured"}</p>
     </div>
   );
 }
