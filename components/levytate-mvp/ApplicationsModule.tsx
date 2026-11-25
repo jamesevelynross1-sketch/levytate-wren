@@ -23,6 +23,7 @@ import { useMvpWorkspace, type WorkspaceMutationResult } from "@/components/levy
 import { ApplicationPreEnrolmentModal } from "@/components/levytate-mvp/ApplicationPreEnrolmentModal";
 import { displayEmployee, includesSearch, statusTone } from "@/components/levytate-mvp/module-utils";
 import { managerName } from "@/lib/levytate/mvp/workspace-insights";
+import { applicationProgrammeOptions, applicationProgrammeLabel } from "@/lib/levytate/mvp/application-programme-options";
 
 import {
   buildApplicationHistoryEntry,
@@ -62,7 +63,7 @@ export function ApplicationsModule({
   initialApplicationId = null,
   onApplicationSelectionChange,
 }: ApplicationsModuleProps = {}) {
-  const { data, saveApplication, meta } = useMvpWorkspace();
+  const { data, saveApplication, saveOrganisationProgramme, meta } = useMvpWorkspace();
   const configurableWorkflowPublished = meta?.applicationWorkflowPublished === true;
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("All");
@@ -71,6 +72,8 @@ export function ApplicationsModule({
   const [selectedId, setSelectedId] = useState<string | null>(initialApplicationId ?? null);
   const [error, setError] = useState("");
   const [savingDraft, setSavingDraft] = useState(false);
+  const [publishingProgramme, setPublishingProgramme] = useState(false);
+  const [publicationProgrammeId, setPublicationProgrammeId] = useState("");
   const [handoff, setHandoff] = useState<MvpApplication | null>(null);
   const [handoffConfirmation, setHandoffConfirmation] = useState("");
 
@@ -117,20 +120,32 @@ export function ApplicationsModule({
     setHandoff(application);
   }
 
-  function pathwaysForEmployee(employeeId: string) {
-    const employee = data.employees.find((item) => item.id === employeeId);
-    const role = data.roles.find((item) => item.id === employee?.roleId);
-    return role ? [...role.pathwayMappings].sort((a, b) => a.priority - b.priority) : [];
+  const programmeOptions = draft ? applicationProgrammeOptions(data, draft.employeeId) : [];
+  const selectedProgramme = programmeOptions.find(option => option.standard.id === draft?.apprenticeshipStandardId);
+  const publicationOffer = selectedProgramme?.offers.find(offer => offer.programmeId === publicationProgrammeId)
+    ?? (selectedProgramme?.offers.length === 1 ? selectedProgramme.offers[0] : undefined);
+
+  async function publishProgramme() {
+    if (publishingProgramme || savingDraft || !selectedProgramme || selectedProgramme.published || !publicationOffer) return;
+    setPublishingProgramme(true);
+    setError("");
+    try {
+      const now = nowIso();
+      const result = await saveOrganisationProgramme({ programmeId: publicationOffer.programmeId, providerId: publicationOffer.providerId, status: "Active", selectedAt: now, updatedAt: now });
+      if (!result.ok) setError(result.message);
+    } catch { setError("Programme publication could not be confirmed. Your draft has been kept; check My Programmes before retrying."); }
+    finally { setPublishingProgramme(false); }
   }
 
   function blank(): MvpApplication {
     const employee = data.employees.find((item) => item.status === "Active");
-    const mappedPathways = employee ? pathwaysForEmployee(employee.id) : [];
+    setPublicationProgrammeId("");
+    setError("");
     const now = nowIso();
     return {
       id: createMvpId("application"),
       employeeId: employee?.id ?? "",
-      apprenticeshipStandardId: mappedPathways[0]?.apprenticeshipStandardId ?? "",
+      apprenticeshipStandardId: "",
       status: "Draft",
       currentOwner: "Employee",
       reason: "",
@@ -145,16 +160,13 @@ export function ApplicationsModule({
 
   async function saveDraft(event: FormEvent) {
     event.preventDefault();
-    if (!draft) return;
+    if (!draft || savingDraft || publishingProgramme) return;
     if (!draft.employeeId || !draft.apprenticeshipStandardId) {
       setError("Employee and apprenticeship standard are required.");
       return;
     }
-    const allowed = pathwaysForEmployee(draft.employeeId).some(
-      (mapping) => mapping.apprenticeshipStandardId === draft.apprenticeshipStandardId,
-    );
-    if (!allowed) {
-      setError("Select a pathway that is mapped to the employee's assigned role.");
+    if (!selectedProgramme || !selectedProgramme.published) {
+      setError("Select a verified apprenticeship programme and add it to My Programmes before saving.");
       return;
     }
     const anotherActive = data.applications.some(
@@ -251,7 +263,7 @@ export function ApplicationsModule({
         ) : (
           <EmptyState
             title="No applications yet"
-            copy="Create an application from a role-mapped pathway and track it through manager review, lead review and enrolment readiness."
+            copy="Choose an apprenticeship offered by a verified provider and track it through manager review, lead review and enrolment readiness."
             actionLabel="Create application"
             onAction={() => setDraft(blank())}
           />
@@ -261,17 +273,17 @@ export function ApplicationsModule({
       {draft ? (
         <MvpModal title={data.applications.some((item) => item.id === draft.id) ? "Edit application" : "Create application"} eyebrow="Application workflow" onClose={() => setDraft(null)}>
           <form onSubmit={saveDraft}>
+            <fieldset className="min-w-0" disabled={savingDraft || publishingProgramme}>
             <FormGrid>
               <FormSelect
                 label="Employee"
                 value={draft.employeeId}
                 onChange={(value) => {
-                  const pathways = pathwaysForEmployee(value);
                   const employee = data.employees.find((item) => item.id === value);
                   setDraft({
                     ...draft,
                     employeeId: value,
-                    apprenticeshipStandardId: pathways[0]?.apprenticeshipStandardId ?? "",
+                    apprenticeshipStandardId: draft.apprenticeshipStandardId,
                     supportRequired: draft.supportRequired || `Manager: ${employee ? managerName(data, employee) : "Not assigned"}`,
                   });
                 }}
@@ -285,30 +297,33 @@ export function ApplicationsModule({
                 </div>
               )}
               <FormSelect
-                label="Apprenticeship standard"
+                label="Apprenticeship programme"
                 value={draft.apprenticeshipStandardId}
-                onChange={(value) => setDraft({ ...draft, apprenticeshipStandardId: value })}
+                onChange={(value) => { setPublicationProgrammeId(""); setError(""); setDraft({ ...draft, apprenticeshipStandardId: value }); }}
                 required
                 wide
                 options={[
-                  { value: "", label: "Select role-mapped pathway" },
-                  ...pathwaysForEmployee(draft.employeeId).map((mapping) => {
-                    const standard = getApprenticeshipStandard(mapping.apprenticeshipStandardId);
-                    return {
-                      value: mapping.apprenticeshipStandardId,
-                      label: standard
-                        ? `Level ${standard.level} · ${standard.title} · ${standard.referenceCode}`
-                        : mapping.apprenticeshipStandardId,
-                    };
-                  }),
+                  { value: "", label: "Select an available apprenticeship programme" },
+                  ...programmeOptions.map(option => ({ value: option.standard.id, label: applicationProgrammeLabel(option) })),
                 ]}
               />
+              <div className="space-y-3 text-xs leading-5 text-[#102c3d]/65 md:col-span-2">
+                <p>{programmeOptions.length ? "All verified provider-backed apprenticeships are listed. Role recommendations are guidance, not a restriction. The provider is confirmed during pre-enrolment." : "No verified, active provider-backed apprenticeships are available. Check the Marketplace and official standards catalogue."}</p>
+                {selectedProgramme?.published ? <p className="font-semibold text-[#0b6f63]">Available in My Programmes · {Array.from(new Set(selectedProgramme.offers.filter(offer => offer.published).map(offer => offer.providerName))).join(", ")}</p> : null}
+                {selectedProgramme && !selectedProgramme.published ? <section className="grid gap-3 rounded-xl border border-[#102c3d]/10 bg-[#f8fbfa] p-4">
+                  <p className="font-semibold">Add this apprenticeship to your organisation before saving the application.</p>
+                  <FormSelect label="Provider programme to publish" value={publicationOffer?.programmeId ?? ""} onChange={setPublicationProgrammeId} options={[{ value: "", label: "Select a provider programme" }, ...selectedProgramme.offers.map(offer => ({ value: offer.programmeId, label: `${offer.providerName} · ${offer.programmeName}` }))]} />
+                  <p>Publishing makes this programme available to your organisation's employees. It does not enrol this employee or assign a provider to the application.</p>
+                  <button type="button" disabled={!publicationOffer || publishingProgramme || savingDraft} onClick={() => void publishProgramme()} className="min-h-11 justify-self-start rounded-lg bg-[#102c3d] px-4 text-xs font-semibold text-white disabled:opacity-50">{publishingProgramme ? "Publishing…" : "Add to My Programmes"}</button>
+                </section> : null}
+              </div>
               <FormTextArea label="Reason for interest" value={draft.reason} onChange={(value) => setDraft({ ...draft, reason: value })} wide />
               <FormTextArea label="Career goal" value={draft.careerGoal} onChange={(value) => setDraft({ ...draft, careerGoal: value })} wide />
               <FormTextArea label="Support required" value={draft.supportRequired} onChange={(value) => setDraft({ ...draft, supportRequired: value })} wide />
             </FormGrid>
+            </fieldset>
             {draftUsesConfigurableWorkflow ? <p className="mt-4 rounded-xl bg-[#eef7f5] px-4 py-3 text-xs font-semibold leading-5 text-[#0b6f63]">Application draft created for the employee. The employee needs to review and submit it before the approval workflow begins.</p> : null}
-            <FormActions onCancel={() => setDraft(null)} label={savingDraft ? "Saving…" : draftUsesConfigurableWorkflow ? "Save draft" : "Save application"} error={error} disabled={savingDraft} />
+            <FormActions onCancel={() => setDraft(null)} label={savingDraft ? "Saving…" : draftUsesConfigurableWorkflow ? "Save draft" : "Save application"} error={error} disabled={savingDraft || publishingProgramme || !selectedProgramme?.published} />
           </form>
         </MvpModal>
       ) : null}
