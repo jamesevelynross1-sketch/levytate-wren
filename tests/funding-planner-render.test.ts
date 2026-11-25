@@ -1,0 +1,18 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it, vi } from "vitest";
+import { createEmptyMvpWorkspace } from "@/lib/levytate/mvp/workspace";
+import { calculateLevyFinance } from "@/lib/levytate/finance/calculations";
+vi.mock("@/components/levytate-mvp/MvpWorkspaceStore",()=>({useMvpWorkspace:()=>({data:createEmptyMvpWorkspace()})}));
+import { LevyFundingPlanner } from "@/components/levytate-mvp/LevyFundingPlanner";
+describe("Funding planner actual initial render",()=>{
+  it("renders a usable planner with dated DAS evidence and explicit unknown-age warning",()=>{
+    const summary=calculateLevyFinance({version:1,mode:"persistent",transactions:[],imports:[],manualBalancePence:70_000_000,manualBalanceConfirmedAt:"2026-08-31"});
+    const markup=renderToStaticMarkup(createElement(LevyFundingPlanner,{summary}));
+    expect(markup).toContain("Plan your next investment");
+    expect(markup).toContain("£700,000");
+    expect(markup).toContain("opening funds have no confirmed age");
+    expect(markup).toContain("Existing commitments only");
+    expect(markup).not.toContain("NaN");
+  });
+});

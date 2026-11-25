@@ -41,13 +41,13 @@ export function cohortEligibility(c: PlannedCohort): Eligibility {
   const shortfallRate = c.ageAtStart < 25 ? 0 : 25;
   const deny = (reason: string): Eligibility => ({ eligible: false, reason, shortfallRate, provisional });
   if (c.route === "private") return deny("Private funding selected");
-  if (!c.fundingChecked) return deny("Funding eligibility not confirmed — excluded from levy");
   if (c.startMonth < "2026-08") return deny("Earlier start needs its original funding rules");
   if (withdrawnStandardIds.has(c.standardId.toUpperCase().split("-")[0]) && c.startMonth >= "2026-09") return deny("Government funding withdrawn for new starts");
   if (!c.standardId || c.bandPence <= 0 || c.bandPence > 2_700_000) return deny("Standard and funding band required");
   if (c.level === 7 && c.ageAtStart > 21 && !(c.ageAtStart <= 24 && c.exception === "care-ehcp")) return deny("Level 7 age restriction");
   if (/foundation apprenticeship/i.test(c.standardTitle) && c.ageAtStart > 21 && !(c.ageAtStart <= 24 && c.exception !== "none")) return deny("Foundation apprenticeship age restriction");
   if (c.level === 2 && /^(administrative|administration) assistant\b/i.test(c.standardTitle) && c.ageAtStart > 24) return deny("Level 2 administrative assistant age restriction");
+  if (!c.fundingChecked) return deny("Funding eligibility not confirmed — excluded from levy");
   return { eligible: true, reason: provisional ? "2026/27 rules carried forward as an assumption" : "Modelled as eligible; provider must confirm", shortfallRate, provisional };
 }
 export function validatePlanner(input: PlannerInputs): string[] {

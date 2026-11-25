@@ -10,6 +10,7 @@ describe("England levy planner policy and arithmetic",()=>{
   });
   it("blocks all 16 withdrawn standards including current version IDs",()=>{
     expect(withdrawnStandardIds.size).toBe(16);
+    expect(cohortEligibility({...cohort,standardId:"ST0384",startMonth:"2026-09",fundingChecked:false}).reason).toContain("withdrawn");
     for(const id of withdrawnStandardIds)expect(cohortEligibility({...cohort,standardId:id+"-v1-1",startMonth:"2026-09"}).eligible).toBe(false);
   });
   it("uses the age at start, level 7 exception and provisional later rules",()=>{
