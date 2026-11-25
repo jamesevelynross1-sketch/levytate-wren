@@ -307,7 +307,7 @@ export function ApplicationsModule({
                 wide
                 options={[
                   { value: "", label: "Select an available apprenticeship programme" },
-                  ...programmeOptions.map(option => ({ value: option.standard.id, label: applicationProgrammeLabel(option) })),
+                  ...programmeOptions.map(option => ({ value: option.standard.id, label: applicationProgrammeLabel(option), searchText: [option.standard.referenceCode, ...option.offers.flatMap(offer=>[offer.providerName,offer.programmeName])].join(" ") })),
                 ]}
               />
               <div className="space-y-3 text-xs leading-5 text-lt-muted md:col-span-2">

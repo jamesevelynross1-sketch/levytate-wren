@@ -112,7 +112,7 @@
 }
 .lt-design .lt-auth-story::after { content:""; position:absolute; width:420px; height:420px; right:-150px; bottom:-190px; border:1px solid #ffffff25; border-radius:50%; box-shadow:0 0 0 44px #ffffff0a,0 0 0 88px #ffffff08; pointer-events:none; }
 @media (min-width:1024px) {
-  .lt-design.lt-auth-shell { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:24px; padding:24px; align-items:stretch; }
+  .lt-design.lt-auth-shell { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:24px; padding:24px; align-items:stretch; justify-items:stretch; }
   .lt-design .lt-auth-story { display:flex; flex-direction:column; justify-content:space-between; min-height:calc(100vh - 48px); }
   .lt-design .lt-auth-card { margin:auto; width:min(100%,460px); padding:32px; }
 }

@@ -2,6 +2,7 @@
 
 import { WorkspaceSessionRecovery } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { dialogTabBoundary, dialogTabStops, isTopmostDialog, restoreDialogFocus } from "@/lib/levytate/dialog-focus";
+import { filterSearchableOptions, type SearchableOption } from "@/lib/levytate/mvp/searchable-options";
 
 import { Plus, Search, X } from "lucide-react";
 import { useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type KeyboardEvent, type ReactNode } from "react";
@@ -133,13 +134,11 @@ export function FormSelect({ label, value, options, onChange, required = false, 
 
 /** Search long option lists while keeping native select semantics, required
  * validation and the selected option. No hidden automatic programme selection. */
-export function SearchableFormSelect({ label, value, options, onChange, required=false, wide=false, placeholder="Search programmes" }: { label:string;value:string;options:Array<{value:string;label:string}>;onChange:(value:string)=>void;required?:boolean;wide?:boolean;placeholder?:string }) {
+export function SearchableFormSelect({ label, value, options, onChange, required=false, wide=false, placeholder="Search programmes" }: { label:string;value:string;options:SearchableOption[];onChange:(value:string)=>void;required?:boolean;wide?:boolean;placeholder?:string }) {
   const [query,setQuery]=useState("");
-  const queryText=query.trim().toLowerCase();
-  const choices=options.filter(option=>option.value===""||option.value===value||option.label.toLowerCase().includes(queryText));
-  const matches=options.filter(option=>option.value!==""&&option.label.toLowerCase().includes(queryText)).length;
+  const {choices,matches}=filterSearchableOptions(options,value,query);
   return <div className={`lt-form-search ${wide?"md:col-span-2":""}`}>
-    <label className="lt-label grid gap-1.5">Find {label.toLowerCase()}<span className="lt-control flex min-h-11 min-w-0 items-center gap-2 px-3"><Search size={16} className="shrink-0 text-lt-muted" aria-hidden="true"/><input type="search" value={query} onChange={event=>setQuery(event.target.value)} placeholder={placeholder} className="min-w-0 flex-1 bg-transparent text-sm font-normal text-lt-ink outline-none"/></span></label>
+    <label className="lt-label grid gap-1.5">Find {label.toLowerCase()}<span className="lt-control flex min-h-11 min-w-0 items-center gap-2 px-3"><Search size={16} className="shrink-0 text-lt-muted" aria-hidden="true"/><input type="search" value={query} onChange={event=>setQuery(event.target.value)} onKeyDown={event=>{if(event.key==="Enter")event.preventDefault();}} placeholder={placeholder} className="min-w-0 flex-1 bg-transparent text-sm font-normal text-lt-ink outline-none"/></span></label>
     <FormSelect label={label} value={value} options={choices} onChange={onChange} required={required}/>
     <p className="lt-form-search-count" aria-live="polite">{matches===0?"No matching programmes. Try another search.":`${matches} programme${matches===1?"":"s"} available`}</p>
   </div>;
