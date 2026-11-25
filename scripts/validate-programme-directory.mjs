@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 
 const directory = await fs.readFile(new URL("../components/levytate-mvp/EmployerProgrammeDirectory.tsx", import.meta.url), "utf8");
+const comparison = await fs.readFile(new URL("../lib/levytate/mvp/marketplace-comparison.ts", import.meta.url), "utf8");
 const providers = await fs.readFile(new URL("../components/levytate-mvp/ProvidersModule.tsx", import.meta.url), "utf8");
 const policy = await fs.readFile(new URL("../lib/levytate/core-early-access-policy.ts", import.meta.url), "utf8");
 const rbac = await fs.readFile(new URL("../lib/levytate/mvp/rbac.ts", import.meta.url), "utf8");
@@ -28,7 +29,7 @@ check("tabs retain keyboard and panel semantics", directory.includes("onViewKeyD
 check("result summary is derived from filtered records", directory.includes("resultSummary") && directory.includes("results.length") && directory.includes("visibleProviders"));
 for (const field of ["Standard", "Duration", "Delivery", "Locations", "Typical learner activities", "Suitable roles or teams", "Employer considerations", "Learner support", "Assessment model"]) check(`programme detail: ${field}`, directory.includes(field));
 for (const field of ["Delivery approach", "Geographic coverage", "Learner support", "Employer support", "Programmes available"]) check(`provider profile: ${field}`, directory.includes(field));
-check("programme comparison is capped", directory.includes("[...current, id].slice(-3)"));
+check("programme comparison is capped without evicting existing selections", directory.includes("toggleMarketplaceComparison(current,id)") && comparison.includes("marketplaceComparisonLimit=3") && comparison.includes("current.length>=marketplaceComparisonLimit"));
 check("inactive records excluded", directory.includes('programme.recordStatus === "Active" && programme.status === "Active"') && directory.includes('provider.status === "Active"'));
 check("empty states are safe", directory.includes("No programmes match the selected filters.") && directory.includes("No active programmes are currently listed for this provider.") && directory.includes("Further programme information is being reviewed."));
 check("employer surface excludes ranking and recommendation scores", !/match percentage|match score|star rating|fit score|relevance score|ranking number|AI confidence|recommendation score|provider leaderboard|matching engine|weighted relevance|algorithm score|recommendation percentage|internal fit/i.test(directory));

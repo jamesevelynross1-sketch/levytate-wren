@@ -960,11 +960,13 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
   const conversationDisabled = loading || Boolean(pendingProfileSave) || (role === "Employee" && !selectedEmployee);
   const profileRecovery = pendingProfileSave ? <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[#bf4159]/15 bg-[#fff4f5] p-3 text-sm" role="status"><p className="w-full">The profile change is not yet confirmed. The exact draft is kept here.</p><button type="button" disabled={loading} onClick={() => void persistProfile(pendingProfileSave)} className="rounded-lg bg-white px-3 py-2 font-semibold disabled:opacity-50">Retry profile save</button><button type="button" disabled={loading} onClick={() => { setPendingProfileSave(null); setError(""); setActionStatus("Pending profile retry dismissed. Reconnect the workspace to confirm whether the earlier save committed."); }} className="rounded-lg bg-white px-3 py-2 disabled:opacity-50">Dismiss retry</button></div> : null;
 
+  const confirmationPanel=pendingAction?<div className="lt-confirmation" role="status"><p className="lt-eyebrow">Confirmation required</p><p className="mt-2 text-sm font-semibold">{pendingAction.label}</p><p className="mt-1 text-sm text-lt-muted">Review the prepared information before continuing. Confirming prepares the draft; nothing is sent automatically.</p><div className="mt-3 flex flex-wrap gap-2"><button type="button" onClick={confirmAction} className="lt-button lt-primary">Confirm</button><button type="button" onClick={()=>setPendingAction(null)} className="lt-button lt-secondary">Cancel</button></div></div>:null;
+
   if (presentation === "drawer" && context) {
     return <div className="flex h-full min-h-0 flex-col bg-white">
       {!conversationStarted ? <div className="border-b border-[#102c3d]/[0.07] px-4 py-3">
-        <p className="text-xs font-semibold text-lt-muted">Suggested</p>
-        <div className="mt-2 flex flex-wrap gap-2">{activePrompts.slice(0, 3).map((prompt) => <button key={prompt} type="button" onClick={() => void sendMessage(prompt)} disabled={conversationDisabled} className="min-h-9 rounded-full border border-[#102c3d]/[0.08] bg-[#f8fbfa] px-3 py-1.5 text-left text-[13px] font-medium leading-5 text-lt-muted transition hover:border-[#0b776e]/30 hover:bg-white hover:text-lt-ink disabled:opacity-45">{prompt}</button>)}</div>
+        <p className="text-sm font-semibold text-lt-ink">Suggested for this screen</p>
+        <div className="mt-2 flex flex-wrap gap-2">{activePrompts.slice(0, 3).map((prompt) => <button key={prompt} type="button" onClick={() => void sendMessage(prompt)} disabled={conversationDisabled} className="lt-prompt min-h-10 text-left">{prompt}</button>)}</div>
       </div> : null}
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-white px-4 py-4" aria-live="polite">
         {contextChanges.map((change, index) => <div key={`${change}-${index}`} className="flex items-center gap-3 py-1"><span className="h-px flex-1 bg-[#102c3d]/10" /><span className="text-xs font-semibold uppercase tracking-[0.1em] text-lt-muted">{change}</span><span className="h-px flex-1 bg-[#102c3d]/10" /></div>)}
@@ -972,11 +974,13 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
         {loading ? <p className="text-sm font-medium text-lt-accent">Checking {context.module === "Home" ? "learner operations" : context.contextLabel.toLowerCase()}…</p> : null}
         {error ? <p className="border border-[#bf4159]/15 bg-[#fff4f5] px-3 py-2 text-sm text-lt-risk">{error}</p> : null}
         {profileRecovery}
+        {confirmationPanel}
+        <WorkflowDraft response={latestResponse} action={revealedAction} status={actionStatus}/>
         {actionStatus ? <p className="text-sm text-lt-accent" role="status">{actionStatus}</p> : null}
       </div>
       <form onSubmit={submit} className="border-t border-[#102c3d]/[0.08] bg-white p-3">
         <label htmlFor="levytate-contextual-copilot-message" className="sr-only">Message LevyTate Copilot</label>
-        <div className="flex items-end gap-2 rounded-xl border border-[#102c3d]/[0.1] bg-[#f8fbfa] p-1.5 focus-within:border-[#0b776e] focus-within:ring-2 focus-within:ring-[#0b776e]/10"><textarea id="levytate-contextual-copilot-message" value={input} onChange={(event) => setInput(event.target.value)} rows={1} placeholder={copilotPlaceholderFor(context)} className="max-h-32 min-h-10 flex-1 resize-y bg-transparent px-2 py-2 text-sm leading-5 text-lt-ink outline-none" /><button disabled={conversationDisabled} aria-label="Ask Copilot" className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[#102c3d] text-lg font-semibold text-white disabled:opacity-45">↑</button></div>
+        <div className="lt-control flex items-end gap-2 p-1.5"><textarea id="levytate-contextual-copilot-message" value={input} onChange={(event) => setInput(event.target.value)} rows={1} placeholder={copilotPlaceholderFor(context)} className="max-h-32 min-h-10 flex-1 resize-y bg-transparent px-2 py-2 text-sm leading-5 text-lt-ink outline-none" /><button disabled={conversationDisabled} aria-label="Ask Copilot" className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[#102c3d] text-lg font-semibold text-white disabled:opacity-45">↑</button></div>
         {conversationStarted ? <button type="button" onClick={resetConversation} className="mt-1.5 text-xs font-semibold text-lt-muted">New conversation</button> : null}
       </form>
     </div>;
@@ -998,7 +1002,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
                   value={selectedEmployeeId}
                   disabled={loading || Boolean(pendingProfileSave)}
                   onChange={(event) => chooseEmployee(event.target.value)}
-                  className="h-11 min-w-[260px] rounded-2xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 text-sm font-semibold text-lt-ink outline-none transition focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10"
+                  className="lt-control h-11 w-full min-w-0 px-3 text-sm outline-none"
                 >
                   {!employees.length ? <option value="">Create an employee first</option> : null}
                   {employees.map((employee) => (
@@ -1013,9 +1017,10 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
               <button
                 key={item}
                 type="button"
+                aria-pressed={role===item}
                 disabled={loading || Boolean(pendingProfileSave)}
                 onClick={() => changeRole(item)}
-                className={`min-h-10 rounded-xl px-3 text-xs font-semibold transition ${role === item ? "bg-white text-lt-ink shadow-[0_8px_20px_rgba(16,44,61,0.08)]" : "text-lt-muted hover:text-lt-ink"}`}
+                className={`min-h-11 rounded-lg px-3 text-sm font-semibold transition ${role===item?"bg-white text-lt-ink ring-1 ring-lt-border":"text-lt-muted hover:text-lt-ink"}`}
               >
                 {item}
               </button>
@@ -1024,17 +1029,17 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
         </div>
       </section>
 
-      <section className="grid min-h-[620px] overflow-hidden rounded-[1.25rem] border border-[#102c3d]/[0.07] bg-white shadow-[0_22px_60px_rgba(16,44,61,0.07)] xl:grid-cols-[minmax(0,1fr)_320px]">
+      <section className="lt-panel lt-copilot-layout grid min-w-0 overflow-hidden">
         <div className="flex min-h-0 flex-col">
-          <div className="flex items-center justify-between gap-4 border-b border-[#102c3d]/[0.07] px-5 py-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-lt-border px-5 py-4">
             <div>
               <p className="font-semibold">LevyTate Copilot</p>
               <p className="mt-1 text-xs text-lt-muted">
                 {role === "Employee" && selectedEmployee ? `${selectedEmployee.name} - ${selectedEmployee.department}` : `${role} mode`}
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <button type="button" onClick={resetConversation} className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-lt-muted ring-1 ring-[#102c3d]/[0.08] transition hover:text-lt-ink hover:ring-[#159b8f]/20">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <button type="button" onClick={resetConversation} className="lt-button lt-secondary">
                 New conversation
               </button>
               {role === "Employee" && selectedPreferredStandard ? (
@@ -1050,10 +1055,10 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
             </div>
           </div>
 
-          <div className="flex-1 space-y-4 overflow-y-auto bg-[#f8fbfa] px-4 py-5 sm:px-5" aria-live="polite">
+          <div className="lt-conversation min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-5 sm:px-6" role="log" aria-live="polite" aria-busy={loading}>
             {messages.map((message) => (
               <article key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div className={`${message.response?.structuredResult ? "w-full max-w-full" : "max-w-[92%] sm:max-w-[82%]"} rounded-2xl px-4 py-3 text-sm leading-6 shadow-[0_8px_20px_rgba(16,44,61,0.04)] ${message.role === "user" ? "bg-[#102c3d] text-white" : "bg-white text-lt-secondary ring-1 ring-[#102c3d]/[0.06]"}`}>
+                <div className={`min-w-0 ${message.role==="user"?"lt-user-message max-w-[92%] sm:max-w-[82%] rounded-xl px-4 py-3 text-white":"w-full text-lt-secondary"} text-sm leading-6`}>
                   <p className="whitespace-pre-wrap">{message.content}</p>
                   {message.response ? (
                     <InlineResponse
@@ -1068,6 +1073,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
                 </div>
               </article>
             ))}
+            {!conversationStarted&&!loading?<div className="grid gap-2" aria-label="Suggested starting questions">{activePrompts.slice(0,3).map(prompt=><button type="button" key={prompt} disabled={conversationDisabled} className="lt-prompt text-left" onClick={()=>void sendMessage(prompt)}>{prompt}</button>)}</div>:null}
             {loading ? (
               <div className="flex justify-start">
                 <div className="flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm text-lt-accent ring-1 ring-[#102c3d]/[0.06]">
@@ -1078,6 +1084,8 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
             ) : null}
             {error ? <p className="rounded-xl bg-[#fff4f5] px-4 py-3 text-sm text-lt-risk ring-1 ring-[#bf4159]/[0.12]">{error}</p> : null}
             {profileRecovery}
+            {confirmationPanel}
+            <WorkflowDraft response={latestResponse} action={revealedAction} status={actionStatus}/>
           </div>
 
           <form onSubmit={submit} className="border-t border-[#102c3d]/[0.07] bg-white p-4">
@@ -1095,7 +1103,7 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
                 }}
                 rows={2}
                 placeholder="How can I help you today?"
-                className="min-h-[54px] flex-1 resize-none rounded-2xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-4 py-3 text-sm font-medium leading-6 text-lt-ink outline-none transition placeholder:text-lt-muted focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10"
+                className="lt-control min-h-[54px] min-w-0 flex-1 resize-y px-4 py-3 text-sm leading-6 outline-none"
               />
               <button disabled={conversationDisabled} className="lt-button lt-primary min-h-[48px]">
                 {input.trim() ? "Continue conversation" : conversationCtaLabel}
@@ -1104,8 +1112,8 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
           </form>
         </div>
 
-        <aside className="border-t border-[#102c3d]/[0.07] bg-white p-5 xl:border-l xl:border-t-0">
-          <p className="lt-eyebrow">Current purpose</p>
+        <aside className="lt-copilot-context border-t border-lt-border bg-white p-4 sm:p-5"><details className="group"><summary className="lt-disclosure cursor-pointer text-sm font-semibold">Context and guidance</summary>
+          <p className="lt-eyebrow mt-4">Current purpose</p>
           <p className="mt-3 text-sm leading-6 text-lt-muted">{activePurpose}</p>
           {role === "Employee" && selectedEmployee ? (
             <div className="mt-5 rounded-2xl bg-[#f8fbfa] p-4 ring-1 ring-[#102c3d]/[0.055]">
@@ -1134,24 +1142,13 @@ export function AskLevyTateAiWorkspace({ initialEmployeeId = null, onNavigate, p
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-lt-accent">Try asking</p>
             <div className="mt-3 grid gap-2">
               {activePrompts.map((prompt) => (
-                <button key={prompt} type="button" onClick={() => void sendMessage(prompt)} disabled={loading || (role === "Employee" && !selectedEmployee)} className="rounded-xl bg-[#f8fbfa] px-3.5 py-3 text-left text-xs font-semibold leading-5 text-lt-muted ring-1 ring-[#102c3d]/[0.055] transition hover:bg-white hover:text-lt-ink hover:ring-[#159b8f]/20 disabled:opacity-50">
+                <button key={prompt} type="button" onClick={() => void sendMessage(prompt)} disabled={conversationDisabled} className="lt-prompt text-left">
                   {prompt}
                 </button>
               ))}
             </div>
           </div>
-          <WorkflowDraft response={latestResponse} action={revealedAction} status={actionStatus} />
-          {pendingAction ? (
-            <div className="mt-5 rounded-2xl border border-[#ffde59]/50 bg-[#fff9dc] p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#765f00]">Confirmation required</p>
-              <p className="mt-2 text-sm font-semibold text-lt-ink">{pendingAction.label}</p>
-              <p className="mt-2 text-xs leading-5 text-lt-muted">Review the prepared information before this moves into a product workflow.</p>
-              <div className="mt-3 flex gap-2">
-                <button type="button" onClick={confirmAction} className="rounded-full bg-[#102c3d] px-3.5 py-2 text-xs font-semibold text-white">Confirm</button>
-                <button type="button" onClick={() => setPendingAction(null)} className="rounded-full bg-white px-3.5 py-2 text-xs font-semibold text-lt-muted ring-1 ring-[#102c3d]/[0.08]">Cancel</button>
-              </div>
-            </div>
-          ) : null}
+          </details>
         </aside>
       </section>
     </div>
