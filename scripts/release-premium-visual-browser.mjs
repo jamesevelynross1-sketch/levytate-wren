@@ -123,7 +123,7 @@ export async function verifyPremiumVisual({app,manifest,contexts,check}){
           if(lines.size>1)wordBreaks.push(true);
         }
       }
-      const row=el.querySelector('tbody tr'),cells=[...row.querySelectorAll('td')];
+      const row=el.querySelector('tbody tr');if(!row)return {wordBreaks:1,aligned:false,font:"",loaded:false};const cells=[...row.querySelectorAll('td')];
       return {wordBreaks:wordBreaks.length,aligned:Math.max(...cells.map(cell=>cell.getBoundingClientRect().top))-Math.min(...cells.map(cell=>cell.getBoundingClientRect().top))<2,font:getComputedStyle(cells[0]).fontFamily,loaded:[...document.fonts].some(f=>f.family.replace(/["']/g,"")==="LevyTate Inter"&&f.status==="loaded")};
     });
     check("Visual Applications: bundled Inter actually loaded",geometry.loaded&&geometry.font.includes("LevyTate Inter"));
@@ -216,6 +216,7 @@ export async function verifyPremiumVisual({app,manifest,contexts,check}){
     await editor.getByLabel("Funding band (£)",{exact:true}).fill("12000");
     await editor.getByLabel("Training months",{exact:true}).fill("12");
     await editor.getByLabel("Learners",{exact:true}).fill("3");
+    console.log("VISUAL finance valid draft input controls reached");
     await page.getByText("Live preview of unsaved cohort",{exact:true}).waitFor();
     await layout(page,1440);
     await editor.scrollIntoViewIfNeeded();

@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createEmptyMvpWorkspace } from "@/lib/levytate/mvp/workspace";
 import { calculateLevyFinance } from "@/lib/levytate/finance/calculations";
 vi.mock("@/components/levytate-mvp/MvpWorkspaceStore",()=>({useMvpWorkspace:()=>({data:createEmptyMvpWorkspace()})}));
+vi.mock("@/components/levytate-mvp/LevyTateStandardsProvider",()=>({useLevyTateStandards:()=>({selectableStandards:[],loading:false})}));
 import { LevyFundingPlanner } from "@/components/levytate-mvp/LevyFundingPlanner";
 describe("Funding planner actual initial render",()=>{
   it("renders a usable planner with dated DAS evidence and explicit unknown-age warning",()=>{

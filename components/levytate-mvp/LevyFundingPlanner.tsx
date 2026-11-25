@@ -90,7 +90,7 @@ export function LevyFundingPlanner({summary,actuals,importPanel,onChooseFile,upl
   function selectStandard(c:PlannedCohort,id:string){
     const s=standards.find(item=>item.id===id);
     if(!s){updateCohort(c.id,{standardId:"",standardTitle:"",fundingChecked:false});return;}
-    const duration=(s.typicalDuration??"").match(/(\d+(?:\.\d+)?)\s*(month|year)/i);
+    const duration=String(s.typicalDuration??"").match(/(\d+(?:\.\d+)?)\s*(month|year)/i);
     const months=duration?Math.round(Number(duration[1])*(duration[2].toLowerCase()==="year"?12:1)):12;
     updateCohort(c.id,{standardId:s.referenceCode||s.id,standardTitle:s.title,level:s.level,bandPence:(s.fundingBand??0)*100,pricePence:(s.fundingBand??0)*100,durationMonths:Math.min(72,Math.max(8,months)),fundingChecked:false});
   }

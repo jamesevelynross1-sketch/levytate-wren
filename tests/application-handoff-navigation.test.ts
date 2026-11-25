@@ -29,3 +29,19 @@ describe('actual deep-linked Application modal handoff (rendered component, no p
   it.each(['Employee', 'Department Head'])('does not grant handoff controls to %s', role => { store.current.meta = { storageMode: 'supabase', userEmail: 'other@fictional.invalid', userRole: role }; expect(modal()).not.toContain('Start pre-enrolment'); });
   it.each(['Draft', 'Awaiting Final Approval', 'Declined by Apprenticeship Lead', 'Cancelled', 'Withdrawn'] as const)('does not offer handoff for %s', status => { store.current.data = dataFor(application(status)); expect(modal()).not.toContain('Start pre-enrolment'); });
 });
+
+
+describe("Application record presentation",()=>{
+  it("keeps owner, stage and date visible without an action-column status message",()=>{
+    store.current.data=dataFor(application("Draft"));
+    const html=renderToStaticMarkup(createElement(ApplicationsModule,{}));
+    expect(html).toContain('lt-application-table');
+    expect(html).toContain('Status &amp; owner');
+    expect(html).toContain('data-testid="application-owner"');
+    expect(html).toContain('data-testid="application-stage"');
+    expect(html).toContain('10 Nov 2026');
+    expect(html).toContain('Draft created');
+    expect(html).toContain('Awaiting employee submission');
+    expect(html).toContain('Edit draft');
+  });
+});
