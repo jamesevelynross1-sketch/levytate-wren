@@ -69,7 +69,8 @@ a {
 }
 
 .levytate-workspace :where(h1, h2, h3, p, td, th) {
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
 .text-balance {

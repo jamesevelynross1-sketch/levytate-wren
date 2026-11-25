@@ -21,7 +21,7 @@ function approvedPage(page,app,path){
 }
 async function layout(page,width,height=900){
   await page.setViewportSize({width,height});
-  await page.evaluate(()=>document.fonts.ready);
+  await page.evaluate(async()=>{await document.fonts.load('400 14px "LevyTate Inter"');await document.fonts.ready;});
   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   return page.evaluate(()=>{
     const viewport=document.documentElement.clientWidth;
@@ -104,6 +104,60 @@ export async function verifyPremiumVisual({app,manifest,contexts,check}){
     await matrix({page,app,path:"/levytate/app",output,name,check});
   });
 
+  await run("typography, application row and KPI alignment",async()=>{
+    const page=await open(lead,"Applications","Applications");
+    await page.setViewportSize({width:1600,height:900});
+    const table=page.getByTestId("applications-responsive-list");
+    await table.waitFor();
+    await page.evaluate(async()=>{await document.fonts.load('600 14px "LevyTate Inter"');await document.fonts.ready;});
+    const geometry=await table.evaluate(el=>{
+      const wordBreaks=[];
+      const walk=document.createTreeWalker(el,NodeFilter.SHOW_TEXT);
+      while(walk.nextNode()){
+        const node=walk.currentNode;
+        if(!node.parentElement||node.parentElement.getBoundingClientRect().width===0)continue;
+        if(!node.parentElement.closest('[data-testid="application-owner"],[data-testid="application-stage"],time'))continue;
+        for(const match of node.textContent.matchAll(/\S+/g)){
+          const range=document.createRange();range.setStart(node,match.index);range.setEnd(node,match.index+match[0].length);
+          const lines=new Set([...range.getClientRects()].map(r=>Math.round(r.top)));
+          if(lines.size>1)wordBreaks.push(true);
+        }
+      }
+      const row=el.querySelector('tbody tr'),cells=[...row.querySelectorAll('td')];
+      return {wordBreaks:wordBreaks.length,aligned:Math.max(...cells.map(cell=>cell.getBoundingClientRect().top))-Math.min(...cells.map(cell=>cell.getBoundingClientRect().top))<2,font:getComputedStyle(cells[0]).fontFamily,loaded:[...document.fonts].some(f=>f.family.replace(/["']/g,"")==="LevyTate Inter"&&f.status==="loaded")};
+    });
+    check("Visual Applications: bundled Inter actually loaded",geometry.loaded&&geometry.font.includes("LevyTate Inter"));
+    check("Visual Applications: owner, stage and date words do not split",geometry.wordBreaks===0&&geometry.aligned);
+    await table.scrollIntoViewIfNeeded();await capture(page,app,"/levytate/app",output,"application-table-aligned-1600",false);
+    const brief=await open(lead,"Insights","Overview",p=>p.getByTestId("insight-metric-rail").waitFor());
+    for(const width of [768,1280,1440,1600]){
+      await layout(brief,width);
+      const rail=brief.getByTestId("insight-metric-rail");
+      const aligned=await rail.evaluate(el=>{
+        const groups=new Map();
+        for(const card of el.querySelectorAll('[data-testid="insight-metric"]')){
+          const top=Math.round(card.getBoundingClientRect().top);
+          const values=['label','value','detail','evidence'].map(name=>card.querySelector('[data-testid="insight-metric-'+name+'"]').getBoundingClientRect().top);
+          const row=groups.get(top)??[];row.push(values);groups.set(top,row);
+        }
+        return [...groups.values()].every(row=>[0,1,2,3].every(i=>Math.max(...row.map(v=>v[i]))-Math.min(...row.map(v=>v[i]))<=1));
+      });
+      check("Visual Insights: shared label/value/detail/evidence baselines at "+width+"px",aligned);
+      if(width===1440||width===1600){await rail.scrollIntoViewIfNeeded();await capture(brief,app,"/levytate/app",output,"insight-kpis-aligned-"+width,false);}
+    }
+  });
+  await run("employee record detail hierarchy",async()=>{
+    const page=await open(lead,"People","People");
+    for(const width of [390,1440]){
+      await layout(page,width);
+      await page.getByRole("button",{name:"Details",exact:true}).first().click();
+      const detail=page.getByTestId("employee-record-detail");
+      await detail.waitFor();
+      check("Visual employee record: one Copilot action at "+width+"px",await detail.getByRole("button",{name:"Open Copilot",exact:true}).count()===1);
+      await capture(page,app,"/levytate/app",output,"employee-record-"+width,false);
+      await page.keyboard.press("Escape");await detail.waitFor({state:"hidden"});
+    }
+  });
   await run("mobile navigation and keyboard focus",async()=>{
     const page=await open(lead,"Home","Home");
     await layout(page,390,850);
@@ -151,10 +205,16 @@ export async function verifyPremiumVisual({app,manifest,contexts,check}){
     await page.waitForFunction(()=>document.activeElement?.getAttribute("placeholder")==="Search title, level or reference");
     check("Visual Finance: cohort search receives focus",await search.evaluate(el=>el===document.activeElement));
     const programme=editor.getByLabel("Apprenticeship programme",{exact:true});
+    await programme.locator("option").nth(1).waitFor({state:"attached"});
     const option=await programme.locator("option").nth(1).getAttribute("value");
     if(!option)throw Error("Synthetic standards unavailable");
     await programme.selectOption(option);
     await editor.getByLabel("Price per learner (£)",{exact:true}).fill("12000");
+    // The local catalogue fixture has no confirmed band or duration; supply
+    // explicit synthetic planning assumptions without claiming eligibility.
+    await editor.getByText("Programme details & eligibility",{exact:true}).click();
+    await editor.getByLabel("Funding band (£)",{exact:true}).fill("12000");
+    await editor.getByLabel("Training months",{exact:true}).fill("12");
     await editor.getByLabel("Learners",{exact:true}).fill("3");
     await page.getByText("Live preview of unsaved cohort",{exact:true}).waitFor();
     await layout(page,1440);

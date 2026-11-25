@@ -219,45 +219,44 @@ export function ApplicationsModule({
 
         <ListResultsBar count={visible.length} total={data.applications.length} singular="application" plural="applications" filtered={filtered} onReset={clearFilters}/>
         {visible.length ? (
-          <TableShell responsive label="Applications" testId="applications-responsive-list">
-            <TableHead>
-              <tr role="row">
-                <th scope="col" role="columnheader" className="px-4 py-3">Employee</th>
-                <th scope="col" role="columnheader" className="px-4 py-3">Programme</th>
-                <th scope="col" role="columnheader" className="px-4 py-3">Owner</th>
-                <th scope="col" role="columnheader" className="px-4 py-3">Status</th>
-                <th scope="col" role="columnheader" className="px-4 py-3">Submitted</th>
-                <th scope="col" role="columnheader" className="px-4 py-3 text-right">Actions</th>
-              </tr>
-            </TableHead>
+          <TableShell responsive label="Applications" testId="applications-responsive-list" tableClassName="lt-application-table">
+            <colgroup><col className="lt-app-col-person"/><col className="lt-app-col-programme"/><col className="lt-app-col-status"/><col className="lt-app-col-date"/><col className="lt-app-col-actions"/></colgroup>
+            <TableHead><tr role="row">
+              <th scope="col" role="columnheader">Employee</th>
+              <th scope="col" role="columnheader">Programme</th>
+              <th scope="col" role="columnheader">Status &amp; owner</th>
+              <th scope="col" role="columnheader">Date</th>
+              <th scope="col" role="columnheader" className="text-right">Actions</th>
+            </tr></TableHead>
             <TableBody>
               {visible.map((application) => {
                 const employee = data.employees.find((item) => item.id === application.employeeId);
                 const standard = getApprenticeshipStandard(application.apprenticeshipStandardId);
-
-                return (
-                  <tr key={application.id} role="row">
-                    <td role="cell" className="lt-mobile-record-title px-4 py-3">
-                      <p className="font-semibold">{displayEmployee(employee)}</p>
-                      <p className="mt-0.5 text-xs text-lt-muted">{employee?.department || "Department to confirm"} · {employee?.site || "Site to confirm"}</p>
-                    </td>
-                    <td role="cell" className="px-4 py-3"><span aria-hidden="true" className="lt-mobile-field-label">Programme</span>
-                      <p className="text-lt-secondary">{standard?.title ?? application.apprenticeshipStandardId}</p>
-                      <p className="mt-0.5 text-xs text-lt-muted">{standard?.referenceCode ?? "Reference to confirm"}</p>
-                    </td>
-                    <td role="cell" className="px-4 py-3"><span aria-hidden="true" className="lt-mobile-field-label">Current owner</span><p className="text-sm font-semibold text-lt-ink">{application.currentOwner}</p></td>
-                    <td role="cell" className="px-4 py-3"><span aria-hidden="true" className="lt-mobile-field-label">Status</span><StatusBadge tone={statusTone(application.status)}>{application.status}</StatusBadge><p className="mt-1 text-xs text-lt-muted">Stage {applicationTracker(application).currentIndex + 1} of {applicationTracker(application).stages.length}</p></td>
-                    <td role="cell" className="px-4 py-3 text-lt-muted"><span aria-hidden="true" className="lt-mobile-field-label">Submitted</span>{application.submittedAt.slice(0, 10)}</td>
-                    <td role="cell" className="lt-mobile-record-actions px-4 py-3">
-                      <div className="flex flex-wrap justify-end gap-2">
-                        <TableAction onClick={() => setSelectedId(application.id)}>View</TableAction>
-                        {application.status === "Draft" && !application.workflow ? <TableAction onClick={() => setDraft({ ...application })}>Edit draft</TableAction> : null}
-                        {application.status === "Draft" ? <span className="self-center text-xs font-semibold text-lt-muted">Awaiting employee submission</span> : null}
-                        <ApplicationHandoffControls application={application} onStartPreEnrolment={() => startPreEnrolment(application)} compact />
-                      </div>
-                    </td>
-                  </tr>
-                );
+                const tracker=applicationTracker(application);
+                const recordedDate=application.submittedAt.slice(0,10);
+                const displayDate=recordedDate&&Number.isFinite(Date.parse(recordedDate))?new Intl.DateTimeFormat("en-GB",{day:"numeric",month:"short",year:"numeric",timeZone:"UTC"}).format(new Date(recordedDate)):"Not recorded";
+                return <tr key={application.id} role="row">
+                  <td role="cell" className="lt-mobile-record-title">
+                    <p className="lt-record-name">{displayEmployee(employee)}</p>
+                    <p className="lt-record-meta">{[employee?.department,employee?.site].filter(Boolean).join(" · ")||"Department and site to confirm"}</p>
+                  </td>
+                  <td role="cell" className="lt-app-programme"><span aria-hidden="true" className="lt-mobile-field-label">Programme</span>
+                    <p className="lt-record-name font-medium">{standard?.title ?? application.apprenticeshipStandardId}</p>
+                    <p className="lt-record-meta">{standard?.referenceCode ?? "Reference to confirm"}</p>
+                  </td>
+                  <td role="cell" className="lt-app-status"><span aria-hidden="true" className="lt-mobile-field-label">Status &amp; owner</span>
+                    <StatusBadge tone={statusTone(application.status)}>{application.status}</StatusBadge>
+                    <p className="lt-record-meta" data-testid="application-owner">{application.currentOwner}</p>
+                    <p className="lt-record-meta whitespace-nowrap" data-testid="application-stage">Stage {tracker.currentIndex + 1} of {tracker.stages.length}</p>
+                    {application.status==="Draft"?<p className="lt-record-meta">Awaiting employee submission</p>:null}
+                  </td>
+                  <td role="cell"><span aria-hidden="true" className="lt-mobile-field-label">Date</span><time className="lt-app-date" dateTime={recordedDate||undefined}>{displayDate}</time><p className="lt-record-meta">{application.status==="Draft"?"Draft created":"Submitted"}</p></td>
+                  <td role="cell" className="lt-mobile-record-actions"><div className="lt-app-actions">
+                    <TableAction onClick={() => setSelectedId(application.id)}>View</TableAction>
+                    {application.status === "Draft" && !application.workflow ? <TableAction onClick={() => setDraft({ ...application })}>Edit draft</TableAction> : null}
+                    <ApplicationHandoffControls application={application} onStartPreEnrolment={() => startPreEnrolment(application)} compact />
+                  </div></td>
+                </tr>;
               })}
             </TableBody>
           </TableShell>

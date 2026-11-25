@@ -65,7 +65,7 @@ export function EmptyState({ title, copy, actionLabel, onAction }: { title: stri
   );
 }
 
-export function MvpModal({ title, eyebrow, children, onClose, wide = false }: { title: string; eyebrow?: string; children: ReactNode; onClose: () => void; wide?: boolean }) {
+export function MvpModal({ title, eyebrow, description, children, onClose, wide = false }: { title: string; eyebrow?: string; description?: string; children: ReactNode; onClose: () => void; wide?: boolean }) {
   const titleId = useId();
   const modalRef = useRef<HTMLElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -111,11 +111,11 @@ export function MvpModal({ title, eyebrow, children, onClose, wide = false }: { 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-[#102c3d]/[0.38] px-4 py-6 backdrop-blur-sm" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <section ref={modalRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className={`lt-modal mx-auto bg-white ${wide ? "max-w-6xl" : "max-w-2xl"}`}>
-        <div className="flex items-start justify-between gap-4 border-b border-[#102c3d]/[0.07] px-5 py-4">
-          <div>{eyebrow ? <p className="lt-eyebrow">{eyebrow}</p> : null}<h2 id={titleId} className="mt-0.5 text-xl font-semibold text-lt-ink">{title}</h2></div>
+        <div className="lt-dialog-heading flex items-start justify-between gap-4">
+          <div className="min-w-0">{eyebrow ? <p className="lt-eyebrow">{eyebrow}</p> : null}<h2 id={titleId} className="lt-dialog-title">{title}</h2>{description?<p className="mt-1 text-sm leading-5 text-lt-muted">{description}</p>:null}</div>
           <button ref={closeRef} type="button" onClick={onClose} title="Close" aria-label="Close dialog" className="grid h-11 w-11 place-items-center rounded-xl text-lt-muted transition hover:bg-[#f5f8f6] hover:text-lt-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20"><X size={18} /></button>
         </div>
-        <div className="p-5"><WorkspaceSessionRecovery />{children}</div>
+        <div className="lt-dialog-body min-w-0"><WorkspaceSessionRecovery />{children}</div>
       </section>
     </div>
   );
@@ -263,4 +263,4 @@ export function MvpLoadingState({ label = "Loading workspace…" }: { label?: st
 export function TableShell({ children, minimumWidthClass = "min-w-[900px]", tableClassName = "", testId, responsive=false, label }: { children: ReactNode; minimumWidthClass?: string; tableClassName?: string; testId?: string; responsive?:boolean;label?:string }) { return <div data-testid={testId} className={`lt-table min-w-0 max-w-full overflow-x-auto ${responsive?"lt-responsive-table":""}`}><table role="table" aria-label={label} className={`w-full ${responsive?"min-w-0":minimumWidthClass} border-collapse text-left text-sm ${tableClassName}`}>{children}</table></div>; }
 export function TableHead({ children }: { children: ReactNode }) { return <thead role="rowgroup" className="bg-[#f5f7f6] text-xs font-semibold text-lt-secondary">{children}</thead>; }
 export function TableBody({ children }: { children: ReactNode }) { return <tbody role="rowgroup" className="divide-y divide-[#102c3d]/[0.055] bg-white">{children}</tbody>; }
-export function TableAction({ children, onClick, danger = false, testId }: { children: ReactNode; onClick: () => void; danger?: boolean; testId?: string }) { return <button data-testid={testId} type="button" onClick={onClick} className={`relative inline-flex min-h-9 items-center justify-center whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold leading-4 ring-1 transition after:absolute after:-inset-y-1 after:inset-x-0 after:content-[''] ${danger ? "bg-white text-lt-risk ring-[#b13b51]/[0.15] hover:bg-[#fff0f2]" : "bg-[#f5f7f3] text-lt-muted ring-[#102c3d]/[0.07] hover:text-lt-ink"}`}>{children}</button>; }
+export function TableAction({ children, onClick, danger = false, testId }: { children: ReactNode; onClick: () => void; danger?: boolean; testId?: string }) { return <button data-testid={testId} type="button" onClick={onClick} className={`lt-row-action ${danger?"lt-row-action-danger":""}`}>{children}</button>; }

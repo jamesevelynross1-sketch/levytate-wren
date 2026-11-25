@@ -410,125 +410,53 @@ export function EmployeesModule({ onStartDiscovery, onSetupPeopleSaved, onOpenDi
       </MvpModal> : null}
 
       {selectedEmployee ? (
-        <MvpModal title={selectedEmployee.name} eyebrow="Employee apprenticeship record" onClose={() => setSelectedEmployeeId(null)} wide>
-          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[#f8fbfa] px-4 py-3 ring-1 ring-[#102c3d]/[0.055]">
-            <p className="text-sm leading-6 text-lt-muted">Keep the record simple. Use AI for discovery, then open details only when needed.</p>
-            <div className="flex flex-wrap gap-2">
-              <TableAction onClick={() => onStartDiscovery?.(selectedEmployee.id)}>Open Copilot</TableAction>
-              {canWriteEmployees ? (
-                <>
-                  <TableAction onClick={() => openEmployee(selectedEmployee)}>Edit</TableAction>
-                  <TableAction onClick={() => void toggleEmployeeArchive(selectedEmployee.id)} danger={selectedEmployee.status === "Active"}>
-                    {selectedEmployee.status === "Archived" ? "Restore" : "Archive"}
-                  </TableAction>
-                </>
-              ) : null}
+        <MvpModal title={selectedEmployee.name} eyebrow="Employee record" description={[selectedEmployee.jobTitle||"Role to confirm",selectedEmployee.department,selectedEmployee.site].filter(Boolean).join(" · ")} onClose={() => setSelectedEmployeeId(null)} wide>
+          <div className="lt-employee-record" data-testid="employee-record-detail">
+            <div className="lt-record-toolbar">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <StatusBadge tone={selectedCurrentApplication ? statusTone(selectedCurrentApplication.status) : "neutral"}>{selectedCurrentApplication?.status ?? "No active application"}</StatusBadge>
+                {selectedProfile?<StatusBadge tone={selectedProfile.stage==="recommendation_ready"?"green":"yellow"}>{selectedProfile.stage==="recommendation_ready"?"Recommendation ready":"Discovery in progress"}</StatusBadge>:null}
+              </div>
+              <div className="lt-record-actions">
+                {onStartDiscovery?<button type="button" onClick={()=>onStartDiscovery(selectedEmployee.id)} className="lt-button lt-primary"><Sparkles size={15} aria-hidden="true"/>Open Copilot</button>:null}
+                {canWriteEmployees?<><TableAction onClick={()=>openEmployee(selectedEmployee)}>Edit</TableAction><TableAction onClick={()=>void toggleEmployeeArchive(selectedEmployee.id)} danger={selectedEmployee.status==="Active"}>{selectedEmployee.status==="Archived"?"Restore":"Archive"}</TableAction></>:null}
+              </div>
             </div>
-          </div>
-          {error ? <p role="alert" className="mb-4 text-sm font-semibold text-lt-risk">{error}</p> : null}
-          <div className="grid gap-5 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
-            <div className="space-y-4 rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4">
-              <section>
-                <p className="lt-eyebrow">Current profile</p>
-                <h3 className="mt-1 text-lg font-semibold text-lt-ink">{selectedEmployee.jobTitle || "Role to confirm"}</h3>
-                <p className="mt-2 text-sm leading-6 text-lt-muted">{selectedEmployee.department || "Department to confirm"} - {selectedEmployee.site || "Site to confirm"}</p>
-                <p className="mt-2 text-sm leading-6 text-lt-muted">Manager: {managerName(data, selectedEmployee)}</p>
-              </section>
-
-              <section>
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-lt-accent">Current status</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <StatusBadge tone={selectedCurrentApplication ? statusTone(selectedCurrentApplication.status) : "neutral"}>
-                    {selectedCurrentApplication?.status ?? "No active application"}
-                  </StatusBadge>
-                  {selectedProfile ? (
-                    <StatusBadge tone={selectedProfile.stage === "recommendation_ready" ? "green" : "yellow"}>
-                      {selectedProfile.stage === "recommendation_ready" ? "Recommendation ready" : "Discovery in progress"}
-                    </StatusBadge>
-                  ) : null}
-                </div>
-              </section>
-
-              <section>
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-lt-accent">Development interests</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {employeeDevelopmentInterests(data, selectedEmployee.id).length ? employeeDevelopmentInterests(data, selectedEmployee.id).map((interest) => (
-                    <span key={interest} className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-lt-muted ring-1 ring-[#102c3d]/[0.08]">{interest}</span>
-                  )) : <p className="text-sm text-lt-muted">No interests captured yet.</p>}
-                </div>
-              </section>
-
-              <section>
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-lt-accent">Recommended pathway</p>
-                    <p className="mt-1 text-xs text-lt-muted">Sourced from the employee conversation and role library.</p>
-                  </div>
-                  <button type="button" onClick={() => onStartDiscovery?.(selectedEmployee.id)} className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-lt-accent ring-1 ring-[#102c3d]/[0.08]">
-                    <Sparkles size={12} aria-hidden="true" />
-                    Open Copilot
-                  </button>
-                </div>
-                {selectedRouteOutcome ? (
-                  <div className="mt-2 rounded-xl bg-white px-4 py-3 ring-1 ring-[#102c3d]/[0.07]">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-lt-ink">{selectedRouteOutcome.title}</p>
-                        <p className="mt-1 text-xs leading-5 text-lt-muted">{selectedRouteOutcome.copy}</p>
-                      </div>
-                      <StatusBadge tone={selectedRouteOutcome.tone}>{selectedRouteOutcome.badge}</StatusBadge>
-                    </div>
-                  </div>
-                ) : <p className="mt-2 text-sm text-lt-muted">LevyTate will show the leading recommendation once discovery is complete.</p>}
-              </section>
-            </div>
-
-            <div className="space-y-5">
-              <section className="rounded-xl border border-[#102c3d]/[0.07] bg-white p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="lt-eyebrow">Application history</p>
-                    <p className="mt-1 text-sm text-lt-muted">Every workflow step is kept on the employee record.</p>
-                  </div>
-                  <TableAction onClick={() => onStartDiscovery?.(selectedEmployee.id)}>Open Copilot</TableAction>
-                </div>
-                <div className="mt-4 grid gap-3">
-                  {selectedEmployeeApplications.length ? selectedEmployeeApplications.map((application) => (
-                    <div key={application.id} className="rounded-xl bg-[#f8fbfa] px-4 py-3 ring-1 ring-[#102c3d]/[0.06]">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-semibold text-lt-ink">{applicationLabel(application.apprenticeshipStandardId)}</p>
-                          <p className="mt-1 text-xs leading-5 text-lt-muted">{application.reason || "No reason recorded yet."}</p>
-                        </div>
-                        <StatusBadge tone={statusTone(application.status)}>{application.status}</StatusBadge>
-                      </div>
-                      <div className="mt-3 space-y-2">
-                        {application.history.map((entry) => (
-                          <div key={entry.id} className="rounded-lg bg-white px-3 py-2 text-xs text-lt-muted ring-1 ring-[#102c3d]/[0.05]">
-                            <div className="flex items-center justify-between gap-3">
-                              <p className="font-semibold text-lt-ink">{entry.status}</p>
-                              <span className="text-lt-muted">{entry.owner}</span>
-                            </div>
-                            <p className="mt-1">{entry.note}</p>
-                            <p className="mt-1 text-lt-muted">{entry.createdAt.slice(0, 10)}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )) : <p className="text-sm text-lt-muted">No applications created yet for this employee.</p>}
-                </div>
-              </section>
-
-              <section className="rounded-xl border border-[#102c3d]/[0.07] bg-white p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-lt-accent">Conversation history</p>
-                <div className="mt-4 grid gap-3">
-                  {selectedProfile?.conversationHistory.length ? selectedProfile.conversationHistory.slice(-6).map((message, index) => (
-                    <div key={`${message.role}-${index}`} className={`rounded-xl px-4 py-3 text-sm leading-6 ${message.role === "user" ? "bg-[#102c3d] text-white" : "bg-[#f8fbfa] text-lt-muted ring-1 ring-[#102c3d]/[0.06]"}`}>
-                      {message.content}
-                    </div>
-                  )) : <p className="text-sm text-lt-muted">Conversation history will appear after guided discovery begins.</p>}
-                </div>
-              </section>
+            {error?<p role="alert" className="mt-3 text-sm font-semibold text-lt-risk">{error}</p>:null}
+            <div className="lt-record-columns">
+              <div className="lt-record-profile min-w-0">
+                <section className="lt-record-section">
+                  <h3 className="lt-section-title">Current profile</h3>
+                  <dl className="lt-profile-facts">
+                    <div><dt>Role</dt><dd>{selectedEmployee.jobTitle||"Role to confirm"}</dd></div>
+                    <div><dt>Department</dt><dd>{selectedEmployee.department||"Not confirmed"}</dd></div>
+                    <div><dt>Site</dt><dd>{selectedEmployee.site||"Not confirmed"}</dd></div>
+                    <div><dt>Line manager</dt><dd>{managerName(data,selectedEmployee)}</dd></div>
+                  </dl>
+                </section>
+                <section className="lt-record-section">
+                  <h3 className="lt-section-title">Development interests</h3>
+                  <div className="mt-3 flex flex-wrap gap-2">{employeeDevelopmentInterests(data,selectedEmployee.id).length?employeeDevelopmentInterests(data,selectedEmployee.id).map(interest=><span key={interest} className="rounded-md bg-lt-soft px-2.5 py-1.5 text-xs font-medium text-lt-secondary">{interest}</span>):<p className="text-sm text-lt-muted">No interests captured yet.</p>}</div>
+                </section>
+                <section className="lt-record-section">
+                  <h3 className="lt-section-title">Recommended pathway</h3>
+                  <p className="mt-1 text-xs leading-5 text-lt-muted">Based on the development conversation and role library.</p>
+                  {selectedRouteOutcome?<div className="mt-3"><div className="flex flex-wrap items-start gap-2"><p className="text-sm font-semibold text-lt-ink">{selectedRouteOutcome.title}</p><StatusBadge tone={selectedRouteOutcome.tone}>{selectedRouteOutcome.badge}</StatusBadge></div><p className="mt-2 text-sm leading-6 text-lt-muted">{selectedRouteOutcome.copy}</p></div>:<p className="mt-3 text-sm leading-6 text-lt-muted">A recommendation will appear when discovery is complete.</p>}
+                </section>
+              </div>
+              <div className="lt-record-activity min-w-0">
+                <section className="lt-record-section">
+                  <div className="flex items-baseline justify-between gap-3"><h3 className="lt-section-title">Application history</h3><span className="shrink-0 text-xs tabular-nums text-lt-muted">{selectedEmployeeApplications.length} {selectedEmployeeApplications.length===1?"application":"applications"}</span></div>
+                  {selectedEmployeeApplications.length?selectedEmployeeApplications.map(application=><article key={application.id} className="lt-application-history">
+                    <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><p className="lt-record-name">{applicationLabel(application.apprenticeshipStandardId)}</p><p className="mt-1 text-sm leading-6 text-lt-muted">{application.reason||"No reason recorded yet."}</p></div><StatusBadge tone={statusTone(application.status)}>{application.status}</StatusBadge></div>
+                    <ol className="lt-history-list">{application.history.map(entry=><li key={entry.id} className="lt-history-event"><div className="flex flex-wrap items-baseline justify-between gap-2"><p className="font-semibold text-lt-ink">{entry.status}</p><time className="text-xs tabular-nums text-lt-muted">{entry.createdAt.slice(0,10)}</time></div><p className="mt-1 text-xs text-lt-muted">{entry.owner}</p><p className="mt-1 text-sm leading-6 text-lt-secondary">{entry.note}</p></li>)}</ol>
+                  </article>):<p className="mt-3 text-sm leading-6 text-lt-muted">No applications created yet for this employee.</p>}
+                </section>
+                <section className="lt-record-section">
+                  <h3 className="lt-section-title">Conversation history</h3>
+                  <div className="mt-3 grid gap-3">{selectedProfile?.conversationHistory.length?selectedProfile.conversationHistory.slice(-6).map((message,index)=><div key={`${message.role}-${index}`} className={`rounded-lg px-3 py-2.5 text-sm leading-6 ${message.role==="user"?"bg-lt-ink text-white":"bg-lt-soft text-lt-secondary"}`}>{message.content}</div>):<p className="text-sm leading-6 text-lt-muted">Conversation history will appear after guided discovery begins.</p>}</div>
+                </section>
+              </div>
             </div>
           </div>
         </MvpModal>
