@@ -11,5 +11,7 @@ describe("Self-hosted LevyTate typeface",()=>{
     const css=readFileSync(new URL("../app/levytate/design-system.css",import.meta.url),"utf8");
     expect(css).toContain('font-family: "LevyTate Inter"');
     expect(css).toContain('url("/fonts/levytate-inter-variable.woff2")');
+    const planner=readFileSync(new URL("../components/levytate-mvp/LevyFundingPlanner.tsx",import.meta.url),"utf8");
+    expect(planner).toContain('aria-label="Apprenticeship programme"');
   });
 });
