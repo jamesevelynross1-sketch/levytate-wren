@@ -579,9 +579,9 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
             </button>
             <LevyTateLogo className="shrink-0 [--levytate-logo-size:2.05rem] sm:[--levytate-logo-size:2.25rem]" />
             <div className="hidden h-8 w-px bg-[#102c3d]/[0.09] sm:block" />
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-lt-ink">{workspaceName}</p>
-              <p className="hidden truncate text-xs text-lt-muted sm:block">{workspaceLabel}</p>
+            <div className="hidden min-w-0 sm:block">
+              <p data-testid="workspace-header-name" title={workspaceName} className="truncate text-sm font-semibold text-lt-ink">{workspaceName}</p>
+              <p className="truncate text-xs text-lt-muted">{workspaceLabel}</p>
             </div>
           </div>
 

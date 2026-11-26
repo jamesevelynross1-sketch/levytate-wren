@@ -294,3 +294,12 @@
   .lt-design .lt-insight-metric { grid-row:span 4; grid-template-rows:subgrid; }
 }
 @media (max-width:639px) { .lt-design .lt-dialog-heading { padding:16px; } .lt-design .lt-dialog-body { padding:16px; } .lt-design .lt-record-toolbar { align-items:flex-start; } }
+
+/* Contextual actions must never sit on top of an in-progress finance edit.
+   The full Copilot workspace remains reachable from the desktop top bar. */
+@supports selector(:has(*)) {
+  .lt-design:has([data-testid="cohort-editor"]) .lt-contextual-copilot-trigger {
+    visibility: hidden;
+    pointer-events: none;
+  }
+}

@@ -161,6 +161,7 @@ export async function verifyPremiumVisual({app,manifest,contexts,check}){
   await run("mobile navigation and keyboard focus",async()=>{
     const page=await open(lead,"Home","Home");
     await layout(page,390,850);
+    check("Visual mobile header: workspace identity remains in navigation instead of truncating", await page.getByTestId("workspace-header-name").isHidden());
     const trigger=page.getByRole("button",{name:"Open navigation",exact:true});
     await trigger.focus();
     await page.keyboard.press("Enter");
@@ -169,6 +170,8 @@ export async function verifyPremiumVisual({app,manifest,contexts,check}){
     await page.keyboard.press("Escape");
     await page.getByRole("navigation",{name:"Mobile workspace navigation",exact:true}).waitFor({state:"hidden"});
     check("Visual mobile navigation: Escape closes and returns focus",await trigger.evaluate(el=>el===document.activeElement));
+    await layout(page,1440);
+    check("Visual desktop header: full workspace identity visible",await page.getByTestId("workspace-header-name").isVisible());
   });
   await run("employee editor cancel and focus",async()=>{
     const page=await open(lead,"People","People");
@@ -243,6 +246,8 @@ export async function verifyPremiumVisual({app,manifest,contexts,check}){
     console.log("VISUAL finance valid draft input controls reached");
     await page.getByText("Live preview of unsaved cohort",{exact:true}).waitFor();
     await layout(page,1440);
+    check("Visual Finance: floating Copilot does not cover cohort controls",await page.getByTestId("contextual-copilot-trigger").isHidden());
+    check("Visual Finance: full Copilot remains accessible in the top bar",await page.getByRole("button",{name:"Open full Copilot workspace",exact:true}).isVisible());
     await editor.scrollIntoViewIfNeeded();
     await capture(page,app,"/levytate/app",output,"employer-finance-cohort-1440",false);
     await editor.getByRole("button",{name:"Cancel",exact:true}).click();
