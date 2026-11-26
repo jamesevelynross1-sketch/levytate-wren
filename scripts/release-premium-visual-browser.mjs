@@ -205,16 +205,37 @@ export async function verifyPremiumVisual({app,manifest,contexts,check}){
     await page.waitForFunction(()=>document.activeElement?.getAttribute("placeholder")==="Search title, level or reference");
     check("Visual Finance: cohort search receives focus",await search.evaluate(el=>el===document.activeElement));
     const programme=editor.getByLabel("Apprenticeship programme",{exact:true});
-    await programme.locator("option").nth(1).waitFor({state:"attached"});
+    console.log("VISUAL finance step: awaiting a real approved standard in the selector");
+    try {
+      await programme.locator("option").nth(1).waitFor({state:"attached",timeout:12000});
+    } catch {
+      // This is an isolated fictional browser session; only status/counts are
+      // recorded, never the response body, learner data or authentication.
+      const response=await page.request.get(app+"/api/levytate-standards");
+      let data=null;
+      try {data=await response.json();}catch{}
+      console.log("VISUAL finance catalogue diagnostic",JSON.stringify({
+        httpStatus:response.status(),
+        source:typeof data?.source==="string"?data.source:"unavailable",
+        approvedCount:Number(data?.counts?.approvedForDelivery??0),
+        responseCount:Array.isArray(data?.standards)?data.standards.length:0,
+        selectorCount:await programme.locator("option").count(),
+      }));
+      throw Error("Finance programme selector has no approved standard after catalogue load");
+    }
+    console.log("VISUAL finance step: approved programme option now available");
     const option=await programme.locator("option").nth(1).getAttribute("value");
     if(!option)throw Error("Synthetic standards unavailable");
     await programme.selectOption(option);
+    console.log("VISUAL finance step: programme selected");
     await editor.getByLabel("Price per learner (£)",{exact:true}).fill("12000");
     // The local catalogue fixture has no confirmed band or duration; supply
     // explicit synthetic planning assumptions without claiming eligibility.
+    console.log("VISUAL finance step: opening funding assumptions");
     await editor.getByText("Programme details & eligibility",{exact:true}).click();
     await editor.getByLabel("Funding band (£)",{exact:true}).fill("12000");
     await editor.getByLabel("Training months",{exact:true}).fill("12");
+    console.log("VISUAL finance step: funding assumptions entered");
     await editor.getByLabel("Learners",{exact:true}).fill("3");
     console.log("VISUAL finance valid draft input controls reached");
     await page.getByText("Live preview of unsaved cohort",{exact:true}).waitFor();

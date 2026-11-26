@@ -8,6 +8,7 @@ on:
       - codex/levytate-provider-progress-promotion-20261123
       - codex/levytate-pilot-recovery-gate-20261124
       - codex/levytate-free-staging-20261124
+      - codex/levytate-finance-visual-qa-20261126
   workflow_dispatch:
 
 permissions:
