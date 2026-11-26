@@ -204,7 +204,8 @@ export async function verifyPremiumVisual({app,manifest,contexts,check}){
     await search.waitFor();
     await page.waitForFunction(()=>document.activeElement?.getAttribute("placeholder")==="Search title, level or reference");
     check("Visual Finance: cohort search receives focus",await search.evaluate(el=>el===document.activeElement));
-    const programme=editor.getByLabel("Apprenticeship programme",{exact:true});
+    const programme=editor.getByRole("combobox",{name:"Apprenticeship programme",exact:true});
+    console.log("VISUAL finance programme selector count",await programme.count());
     console.log("VISUAL finance step: awaiting a real approved standard in the selector");
     try {
       await programme.locator("option").nth(1).waitFor({state:"attached",timeout:12000});
@@ -219,6 +220,8 @@ export async function verifyPremiumVisual({app,manifest,contexts,check}){
         source:typeof data?.source==="string"?data.source:"unavailable",
         approvedCount:Number(data?.counts?.approvedForDelivery??0),
         responseCount:Array.isArray(data?.standards)?data.standards.length:0,
+        accessibleSelectCount:await programme.count(),
+        allEditorSelects:await editor.locator("select").count(),
         selectorCount:await programme.locator("option").count(),
       }));
       throw Error("Finance programme selector has no approved standard after catalogue load");
