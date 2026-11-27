@@ -1,6 +1,7 @@
 "use client";
 
 import { WorkspaceSessionRecovery } from "@/components/levytate-mvp/MvpWorkspaceStore";
+import { SetupContextHelp } from "@/components/levytate-mvp/SetupContextHelp";
 import { dialogTabBoundary, dialogTabStops, isTopmostDialog, restoreDialogFocus } from "@/lib/levytate/dialog-focus";
 import { filterSearchableOptions, type SearchableOption } from "@/lib/levytate/mvp/searchable-options";
 
@@ -135,12 +136,23 @@ export function FormSection({ title, copy, children }: { title: string; copy?: s
 
 export function FormGrid({ children }: { children: ReactNode }) { return <div className="grid gap-4 md:grid-cols-2">{children}</div>; }
 
-export function FormField({ label, value, onChange, required = false, type = "text", wide = false, placeholder }: { label: string; value: string; onChange: (value: string) => void; required?: boolean; type?: string; wide?: boolean; placeholder?: string }) {
-  return <label className={`lt-label grid gap-1.5 ${wide ? "md:col-span-2" : ""}`}>{label}<input type={type} required={required} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="lt-control h-11 min-w-0 px-3 text-sm font-medium outline-none" /></label>;
+export function FormField({ label, value, onChange, required = false, type = "text", wide = false, placeholder, help, hint }: { label: string; value: string; onChange: (value: string) => void; required?: boolean; type?: string; wide?: boolean; placeholder?: string; help?: string; hint?: string }) {
+  const fieldId = useId();
+  if (!help && !hint) return <label className={`lt-label grid gap-1.5 ${wide ? "md:col-span-2" : ""}`}>{label}<input type={type} required={required} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="lt-control h-11 min-w-0 px-3 text-sm font-medium outline-none" /></label>;
+  return <div className={`lt-label grid min-w-0 gap-1.5 ${wide ? "md:col-span-2" : ""}`}>
+    <div className="flex min-w-0 items-center gap-1"><label htmlFor={fieldId}>{label}</label>{help ? <SetupContextHelp label={label} description={help}/> : null}</div>
+    <input id={fieldId} type={type} required={required} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} aria-describedby={hint ? fieldId + "-hint" : undefined} className="lt-control h-11 min-w-0 px-3 text-sm font-medium outline-none" />
+    {hint ? <p id={fieldId + "-hint"} className="text-xs font-normal leading-5 text-lt-muted">{hint}</p> : null}
+  </div>;
 }
 
-export function FormSelect({ label, value, options, onChange, required = false, wide = false }: { label: string; value: string; options: Array<string | { value: string; label: string }>; onChange: (value: string) => void; required?: boolean; wide?: boolean }) {
-  return <label className={`lt-label grid gap-1.5 ${wide ? "md:col-span-2" : ""}`}>{label}<select required={required} value={value} onChange={(event) => onChange(event.target.value)} className="lt-control h-11 min-w-0 px-3 text-sm font-medium outline-none">{options.map((option) => typeof option === "string" ? <option key={option} value={option}>{option}</option> : <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>;
+export function FormSelect({ label, value, options, onChange, required = false, wide = false, help }: { label: string; value: string; options: Array<string | { value: string; label: string }>; onChange: (value: string) => void; required?: boolean; wide?: boolean; help?: string }) {
+  const fieldId = useId();
+  if (!help) return <label className={`lt-label grid gap-1.5 ${wide ? "md:col-span-2" : ""}`}>{label}<select required={required} value={value} onChange={(event) => onChange(event.target.value)} className="lt-control h-11 min-w-0 px-3 text-sm font-medium outline-none">{options.map((option) => typeof option === "string" ? <option key={option} value={option}>{option}</option> : <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>;
+  return <div className={`lt-label grid min-w-0 gap-1.5 ${wide ? "md:col-span-2" : ""}`}>
+    <div className="flex min-w-0 items-center gap-1"><label htmlFor={fieldId}>{label}</label><SetupContextHelp label={label} description={help}/></div>
+    <select id={fieldId} required={required} value={value} onChange={(event) => onChange(event.target.value)} className="lt-control h-11 min-w-0 px-3 text-sm font-medium outline-none">{options.map((option) => typeof option === "string" ? <option key={option} value={option}>{option}</option> : <option key={option.value} value={option.value}>{option.label}</option>)}</select>
+  </div>;
 }
 
 /** Search long option lists while keeping native select semantics, required
