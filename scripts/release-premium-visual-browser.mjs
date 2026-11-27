@@ -123,6 +123,23 @@ export async function verifyPremiumVisual({app,manifest,contexts,check}){
     await page.getByTestId("setup-step-organisation").click();
     check("Guided setup: all six essential stages exist",await wizard.locator('nav[aria-label="Guided setup steps"] li').count()===6);
     check("Guided setup: optional data never enters mandatory progress",await wizard.getByRole("progressbar",{name:"Workspace setup"}).getAttribute("aria-valuemax")==="6");
+    const sectionHelp=wizard.getByRole("button",{name:"Help: Organisation",exact:true});
+    const sectionTooltip=sectionHelp.locator('xpath=following-sibling::*[@role="tooltip"]');
+    check("Guided setup: step explanation visible even before opening help",
+      await wizard.getByText(/who manages the account and where your people physically work/).isVisible());
+    await layout(page,1440);
+    await sectionHelp.hover();
+    check("Guided setup: tooltip visible on hover",await sectionTooltip.isVisible());
+    await sectionHelp.focus();
+    check("Guided setup: explanation available to keyboard focus",await sectionTooltip.isVisible());
+    await layout(page,390);
+    await sectionHelp.click();
+    check("Guided setup: help toggle opens at mobile width",await sectionHelp.getAttribute("aria-expanded")==="true"&&await sectionTooltip.isVisible());
+    check("Guided setup: help causes no mobile document overflow",(await layout(page,390)).fit);
+    await sectionHelp.scrollIntoViewIfNeeded();
+    await capture(page,app,"/levytate/app",output,"setup-contextual-help-390",false);
+    await page.keyboard.press("Escape");
+    check("Guided setup: Escape closes help",await sectionHelp.getAttribute("aria-expanded")==="false");
   });
   await run("typography, application row and KPI alignment",async()=>{
     const page=await open(lead,"Applications","Applications");
