@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useId, useState, type FormEvent, type ReactNode } from "react";
 import { ArrowRight, Check, CheckCircle2, ChevronRight, GraduationCap, Landmark, RotateCcw } from "lucide-react";
 import { EmployeesModule } from "@/components/levytate-mvp/EmployeesModule";
 import { EmployerProgrammeDirectory } from "@/components/levytate-mvp/EmployerProgrammeDirectory";
+import { SetupContextHelp, employerSetupGuidance, workspaceFieldGuidance } from "@/components/levytate-mvp/SetupContextHelp";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import type { EmployerSetupProgress } from "@/components/levytate-mvp/useEmployerSetupProgress";
 import type { EmployerSetupKey } from "@/lib/levytate/mvp/employer-setup";
@@ -55,6 +56,7 @@ export function EmployerSetupJourney({ progress, prioritiesPanel, onNavigate, on
           {required.map((step, index) => <li key={step.key}>
             <button type="button" aria-current={selected.key === step.key ? "step" : undefined} onClick={() => setSelectedKey(step.key)}
               data-testid={"setup-step-" + step.key}
+              title={employerSetupGuidance[step.key]}
               className={"flex min-h-14 w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lt-accent " + (selected.key === step.key ? "bg-[#e8f2ed] text-lt-ink" : "text-lt-secondary hover:bg-lt-soft")}>
               <span className={"grid h-8 w-8 shrink-0 place-items-center rounded-lg text-xs font-semibold " + (step.complete ? "bg-lt-accent text-white" : selected.key === step.key ? "bg-white text-lt-ink" : "bg-lt-soft text-lt-secondary")}>{step.complete ? <Check size={17} aria-hidden="true"/> : index + 1}</span>
               <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{step.label}</span><span className="block text-xs text-lt-muted">{step.complete ? "Complete" : "To do"}</span></span>
@@ -67,7 +69,14 @@ export function EmployerSetupJourney({ progress, prioritiesPanel, onNavigate, on
         <div className="border-b border-lt-border px-5 py-5 sm:px-6">
           <p className="lt-eyebrow">WORKSPACE SETUP · STEP {required.indexOf(selected) + 1} OF {required.length}</p>
           <div className="mt-2 flex items-start justify-between gap-3">
-            <div className="min-w-0"><h3 id="selected-setup-heading" className="text-xl font-semibold tracking-[-0.025em] sm:text-2xl">{selected.label}</h3><p className="mt-2 text-sm leading-6 text-lt-muted">{selected.detail}</p></div>
+            <div className="min-w-0">
+              <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                <h3 id="selected-setup-heading" className="text-xl font-semibold tracking-[-0.025em] sm:text-2xl">{selected.label}</h3>
+                <SetupContextHelp label={selected.label} description={employerSetupGuidance[selected.key]}/>
+              </div>
+              <p className="mt-2 text-sm leading-6 text-lt-muted">{employerSetupGuidance[selected.key]}</p>
+              <p className="mt-1 text-xs leading-5 text-lt-muted">{selected.detail}</p>
+            </div>
             {selected.complete ? <CheckCircle2 aria-label="Step complete" size={23} className="shrink-0 text-lt-accent"/> : null}
           </div>
         </div>
@@ -179,12 +188,12 @@ function OrganisationSetupForm() {
 
   return <form onSubmit={submit} className="grid gap-4" data-testid="employer-organisation-form">
     <div className="grid min-w-0 gap-4 sm:grid-cols-2">
-      <SetupField label="Employer name" required value={draft.employerName} onChange={(value) => change("employerName",value)}/>
-      <SetupField label="Primary contact" required value={draft.primaryContact} onChange={(value) => change("primaryContact",value)}/>
-      <SetupField label="Work contact email" type="email" required value={draft.contactEmail} onChange={(value) => change("contactEmail",value)}/>
-      <SetupField label="Default site" value={draft.defaultSite} onChange={(value) => change("defaultSite",value)}/>
-      <SetupField label="Sites" required value={draft.sitesText} onChange={(value) => change("sitesText",value)} hint="Separate multiple sites with a comma."/>
-      <SetupField label="Departments" required value={draft.departmentsText} onChange={(value) => change("departmentsText",value)} hint="Separate multiple departments with a comma."/>
+      <SetupField label="Employer name" required value={draft.employerName} onChange={(value) => change("employerName",value)} help={workspaceFieldGuidance.employerName}/>
+      <SetupField label="Primary contact" required value={draft.primaryContact} onChange={(value) => change("primaryContact",value)} help={workspaceFieldGuidance.primaryContact}/>
+      <SetupField label="Work contact email" type="email" required value={draft.contactEmail} onChange={(value) => change("contactEmail",value)} help={workspaceFieldGuidance.contactEmail}/>
+      <SetupField label="Default site" value={draft.defaultSite} onChange={(value) => change("defaultSite",value)} help={workspaceFieldGuidance.defaultSite} hint="Your main physical workplace — not your website."/>
+      <SetupField label="Sites" required value={draft.sitesText} onChange={(value) => change("sitesText",value)} help={workspaceFieldGuidance.sites} hint="Physical workplaces, e.g. Hull office or Leeds depot — not website addresses. Separate multiple sites with a comma."/>
+      <SetupField label="Departments" required value={draft.departmentsText} onChange={(value) => change("departmentsText",value)} help={workspaceFieldGuidance.departments} hint="Teams such as Operations, Sales or HR. Separate multiple departments with a comma."/>
     </div>
     {error ? <p role="alert" className="text-sm font-semibold text-lt-risk">{error}</p> : null}
     {notice ? <p role="status" className="text-sm font-semibold text-lt-accent">{notice}</p> : null}
@@ -193,6 +202,16 @@ function OrganisationSetupForm() {
   </form>;
 }
 
-function SetupField({ label, value, onChange, type = "text", required = false, hint }: { label: string; value: string; onChange: (value: string) => void; type?: "text" | "email"; required?: boolean; hint?: string }) {
-  return <label className="lt-label grid min-w-0 gap-1.5">{label}<input type={type} required={required} value={value} onChange={(event) => onChange(event.target.value)} className="lt-control h-11 min-w-0 px-3 text-sm font-medium outline-none" maxLength={type === "email" ? 254 : 400}/>{hint ? <span className="text-xs font-normal text-lt-muted">{hint}</span> : null}</label>;
+function SetupField({ label, value, onChange, type = "text", required = false, hint, help }: { label: string; value: string; onChange: (value: string) => void; type?: "text" | "email"; required?: boolean; hint?: string; help?: string }) {
+  const inputId = useId();
+  return <div className="lt-label grid min-w-0 gap-1.5">
+    <div className="flex min-w-0 items-center gap-1">
+      <label htmlFor={inputId}>{label}</label>
+      {help ? <SetupContextHelp label={label} description={help}/> : null}
+    </div>
+    <input id={inputId} type={type} required={required} value={value} onChange={(event) => onChange(event.target.value)}
+      aria-describedby={hint ? inputId + "-hint" : undefined}
+      className="lt-control h-11 min-w-0 px-3 text-sm font-medium outline-none" maxLength={type === "email" ? 254 : 400}/>
+    {hint ? <p id={inputId + "-hint"} className="text-xs font-normal leading-5 text-lt-muted">{hint}</p> : null}
+  </div>;
 }
