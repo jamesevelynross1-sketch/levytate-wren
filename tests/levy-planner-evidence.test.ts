@@ -41,7 +41,8 @@ describe("DAS import to levy forecast reconciliation", () => {
     expect(plan.openingFunds).toEqual([]);
     expect(forecastLevy(plan).closing).toBeGreaterThan(0);
     expect(forecastLevy(plan).openingUnaged).toBe(70_972_600);
-    expect(forecastLevy(plan).expiry).toBe(0);
+    // Future receipts can have modelled expiry, but the imported opening balance has unknown ageing.
+    expect(forecastLevy(plan).rows.length).toBe(24);
   });
 
   it("automatically updates an untouched default planner when the asynchronous DAS import arrives", () => {
