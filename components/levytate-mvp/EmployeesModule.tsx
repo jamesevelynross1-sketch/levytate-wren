@@ -2,6 +2,7 @@
 
 import { ChevronDown, FileUp, Sparkles, UserPlus } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { employeeFieldGuidance } from "@/components/levytate-mvp/SetupContextHelp";
 import {
   EmptyState,
   ListResultsBar,
@@ -368,12 +369,12 @@ export function EmployeesModule({ onStartDiscovery, onSetupPeopleSaved, onOpenDi
             </div>
 
             <FormGrid>
-              <FormField label="Employee name" value={draft.name} onChange={(value) => setDraft({ ...draft, name: value })} required />
-              <FormField label="Work email" type="email" value={draft.email} onChange={(value) => setDraft({ ...draft, email: value })} required />
-              <FormField label="Job title" value={draft.jobTitle} onChange={(value) => setDraft({ ...draft, jobTitle: value })} required />
-              <FormField label="Department" value={draft.department} onChange={(value) => setDraft({ ...draft, department: value })} required />
-              <FormSelect label="Line manager" value={draft.managerId} onChange={(value) => setDraft({ ...draft, managerId: value })} options={[{ value: "", label: managers.length ? "Assign later" : "Add a Line Manager record first" }, ...managers.filter((employee) => employee.id !== draft.id).map((employee) => ({ value: employee.id, label: employee.name }))]} />
-              <FormField label="Site" value={draft.site} onChange={(value) => setDraft({ ...draft, site: value })} wide />
+              <FormField label="Employee name" value={draft.name} onChange={(value) => setDraft({ ...draft, name: value })} help={employeeFieldGuidance.name} required />
+              <FormField label="Work email" type="email" value={draft.email} onChange={(value) => setDraft({ ...draft, email: value })} help={employeeFieldGuidance.email} required />
+              <FormField label="Job title" value={draft.jobTitle} onChange={(value) => setDraft({ ...draft, jobTitle: value })} help={employeeFieldGuidance.jobTitle} required />
+              <FormField label="Department" value={draft.department} onChange={(value) => setDraft({ ...draft, department: value })} help={employeeFieldGuidance.department} required />
+              <FormSelect label="Line manager" help={employeeFieldGuidance.lineManager} value={draft.managerId} onChange={(value) => setDraft({ ...draft, managerId: value })} options={[{ value: "", label: managers.length ? "Assign later" : "Add a Line Manager record first" }, ...managers.filter((employee) => employee.id !== draft.id).map((employee) => ({ value: employee.id, label: employee.name }))]} />
+              <FormField label="Site" value={draft.site} onChange={(value) => setDraft({ ...draft, site: value })} help={employeeFieldGuidance.site} hint="Physical work location (e.g. Hull office), not a website." wide />
             </FormGrid>
 
             <details className="group mt-5 rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa]">
