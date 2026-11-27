@@ -36,7 +36,7 @@ export const employeeFieldGuidance = {
 } as const;
 
 /** Hover, keyboard focus and touch/click all reveal the same short description.
- * A native title is retained as a fallback where tooltip CSS is unavailable. */
+ * The explanation is accessible to screen readers and touch users. */
 export function SetupContextHelp({ label, description }: { label: string; description: string }) {
   const tooltipId = useId();
   const [open, setOpen] = useState(false);
@@ -48,7 +48,6 @@ export function SetupContextHelp({ label, description }: { label: string; descri
         aria-label={`Help: ${label}`}
         aria-describedby={tooltipId}
         aria-expanded={open}
-        title={description}
         onClick={() => setOpen((value) => !value)}
         onBlur={() => setOpen(false)}
         onKeyDown={(event) => { if (event.key === "Escape") { setOpen(false); event.currentTarget.blur(); } }}
