@@ -4,6 +4,7 @@ import { dialogTabBoundary, dialogTabStops, isTopmostDialog, topmostModalDialog 
 import type { LucideIcon } from "lucide-react";
 import dynamic from "next/dynamic";
 import {
+  ArrowRight,
   BellRing,
   BookOpenCheck,
   Building2,
