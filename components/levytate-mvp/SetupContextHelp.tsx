@@ -58,7 +58,7 @@ export function SetupContextHelp({ label, description }: { label: string; descri
       <span
         id={tooltipId}
         role="tooltip"
-        className={`pointer-events-none absolute left-0 top-full z-40 mt-1 w-56 max-w-[calc(100vw-4rem)] rounded-xl bg-[#102c3d] px-3 py-2.5 text-left text-xs font-normal leading-5 text-white shadow-[0_12px_28px_rgba(16,44,61,0.22)] transition-opacity duration-150 ${open ? "visible opacity-100" : "invisible opacity-0 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100"}`}
+        className={`pointer-events-none fixed inset-x-4 bottom-4 z-50 mx-auto w-auto rounded-xl sm:absolute sm:bottom-auto sm:left-0 sm:right-auto sm:top-full sm:z-40 sm:mx-0 sm:mt-1 sm:w-56 bg-[#102c3d] px-3 py-2.5 text-left text-xs font-normal leading-5 text-white shadow-[0_12px_28px_rgba(16,44,61,0.22)] transition-opacity duration-150 ${open ? "visible opacity-100" : "invisible opacity-0 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100"}`}
       >
         {description}
       </span>
