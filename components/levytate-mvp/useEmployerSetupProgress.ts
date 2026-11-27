@@ -18,7 +18,7 @@ export function useEmployerSetupProgress(onHome: boolean): EmployerSetupProgress
   const { data, meta, hydrated } = useMvpWorkspace();
   const email = meta?.userEmail;
   const organisationId = meta?.organisationId;
-  const enabled = hydrated && meta?.storageMode === "supabase" && isEmployerSetupRole(meta.userRole) && hasMvpPermission(meta.permissions ?? permissionsForMvpRole(meta.userRole), "finance:read");
+  const enabled = hydrated && meta?.storageMode === "supabase" && isEmployerSetupRole(meta.userRole) && hasMvpPermission(meta.permissions ?? permissionsForMvpRole(meta.userRole), "workspace:read");
   const key = enabled && email && organisationId ? JSON.stringify([organisationId, email]) : null;
   const [finance, setFinance] = useState<{ key: string; status: SetupFinanceStatus } | null>(null);
   const [reload, setReload] = useState(0);

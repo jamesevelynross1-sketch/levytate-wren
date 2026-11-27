@@ -124,11 +124,11 @@ function matchesSearch(index: string, term: string) {
   return index.includes(term);
 }
 
-export function EmployerProgrammeDirectory({ onRequest }: { onRequest?: (context: { programmeId?: string; providerId?: string }) => void }) {
+export function EmployerProgrammeDirectory({ onRequest, initialView = "Programmes" }: { onRequest?: (context: { programmeId?: string; providerId?: string }) => void; initialView?: MarketplaceView }) {
   const { data, meta, saveOrganisationProvider, saveOrganisationProgramme } = useMvpWorkspace();
   const { selectableStandards } = useLevyTateStandards();
   const [filters, setFilters] = useState<Filters>(emptyFilters);
-  const [view, setView] = useState<MarketplaceView>("Programmes");
+  const [view, setView] = useState<MarketplaceView>(initialView);
   const [programmeId, setProgrammeId] = useState<string | null>(null);
   const [providerId, setProviderId] = useState<string | null>(null);
   const [comparison, setComparison] = useState<string[]>([]);

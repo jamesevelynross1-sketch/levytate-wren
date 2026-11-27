@@ -2,12 +2,13 @@
 import { useCatalogueAction } from "@/components/levytate-mvp/useCatalogueAction";
 
 import { Check, ChevronDown, Target } from "lucide-react";
+import { EmployerSetupJourney } from "@/components/levytate-mvp/EmployerSetupJourney";
 import { useEffect, useState, type FormEvent } from "react";
 import { FormField, FormGrid, MvpPanel, StatusBadge } from "@/components/levytate-mvp/MvpUi";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { ManagerActionsHome } from "@/components/levytate-mvp/ManagerActionsHome";
 import type { EmployerSetupProgress } from "@/components/levytate-mvp/useEmployerSetupProgress";
-import { buildEmployerSetupSteps, type EmployerSetupStep } from "@/lib/levytate/mvp/employer-setup";
+import { isEmployerSetupRole } from "@/lib/levytate/mvp/employer-setup";
 import type { ManagerOperationalActionListItem } from "@/lib/levytate/mvp/manager-operational-actions";
 import {
   buildNotifications,
@@ -37,7 +38,12 @@ const importanceOptions: Array<{ value: MvpEmployerPriorityImportance; copy: str
 const managerReviewStatuses = ["Submitted to Line Manager", "Awaiting Manager Review"] as const;
 
 export function DashboardModule({ onNavigate, setup }: { onNavigate: (module: string) => void; setup?: EmployerSetupProgress | null }) {
-  const { data, can } = useMvpWorkspace();
+  const { data, can, meta } = useMvpWorkspace();
+  const [keepSetupOpen, setKeepSetupOpen] = useState(false);
+  const [reviewSetup, setReviewSetup] = useState(false);
+  useEffect(() => {
+    if (setup && !setup.complete) setKeepSetupOpen(true);
+  }, [setup?.complete]);
   const notifications = buildNotifications(data);
   const support = employeesNeedingSupport(data);
   const enrolments = upcomingEnrolments(data);
@@ -52,15 +58,17 @@ export function DashboardModule({ onNavigate, setup }: { onNavigate: (module: st
         : { label: "Open LevyTate Copilot", target: "LevyTate Copilot" };
 
   const blankWorkspace = data.employees.length === 0 && data.applications.length === 0 && data.learnerRecords.length === 0;
-  const checklist = setup && !setup.complete
-    ? <ClientSetupHome steps={setup.steps} onNavigate={onNavigate} onRetryFinance={setup.financeStatus === "unavailable" ? setup.refreshFinance : undefined} />
-    : blankWorkspace && !setup
-      ? <ClientSetupHome steps={buildEmployerSetupSteps(data, "pending")} onNavigate={onNavigate} />
+  const setupVisible = Boolean(setup && (!setup.complete || keepSetupOpen || reviewSetup));
+  const checklist = setupVisible && setup
+    ? <EmployerSetupJourney progress={setup} prioritiesPanel={<EmployerPrioritiesSetup compact readOnly={!can("settings:write")} />} onNavigate={onNavigate} onFinish={() => { setKeepSetupOpen(false); setReviewSetup(false); }} />
+    : setup?.complete
+      ? <section className="lt-panel flex flex-wrap items-center justify-between gap-3 px-5 py-4" data-testid="employer-setup-complete">
+          <p className="flex items-center gap-2 text-sm font-semibold"><Check size={17} className="text-lt-accent" aria-hidden="true"/> Your essential setup is complete.</p>
+          <button type="button" onClick={() => setReviewSetup(true)} className="min-h-11 text-sm font-semibold text-lt-accent">Review setup</button>
+        </section>
       : null;
 
-  // A blank employer sees guided setup first. A partially configured employer
-  // keeps the checklist and can use the rest of the product without fake data.
-  if (blankWorkspace && checklist) return checklist;
+  if (blankWorkspace && setupVisible && checklist) return checklist;
 
   const overview = (
       <section className="lt-panel grid divide-y divide-lt-border sm:grid-cols-3 sm:divide-x sm:divide-y-0" aria-label="Workspace overview">
@@ -68,7 +76,7 @@ export function DashboardModule({ onNavigate, setup }: { onNavigate: (module: st
       </section>
   );
 
-  if (!data.profile.priorities.length) {
+  if (!data.profile.priorities.length && !(setupVisible && isEmployerSetupRole(meta?.userRole))) {
     if (!can("settings:write")) {
       return (
         <div className="grid gap-5">
@@ -152,29 +160,6 @@ export function DashboardModule({ onNavigate, setup }: { onNavigate: (module: st
       </div>
     </div>
   );
-}
-
-function ClientSetupHome({ steps, onNavigate, onRetryFinance }: { steps: EmployerSetupStep[]; onNavigate: (module: string) => void; onRetryFinance?: () => void }) {
-  const complete = steps.filter((step) => step.complete).length;
-  const next = steps.find((step) => !step.complete);
-  return <div className="grid gap-4" data-testid="blank-employer-home">
-    <section className="lt-hero p-6 sm:p-7">
-      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8fe0d2]">Client workspace</p>
-      <h2 className="mt-2 text-2xl font-semibold">Set up your LevyTate workspace</h2>
-      <p className="mt-2 max-w-2xl text-sm leading-6 text-white/65">Set up your people, providers and programmes. Your progress is saved automatically; return to Home to continue. Import existing learners and DAS data when they are available.</p>
-      <p aria-live="polite" className="mt-5 text-sm font-semibold" data-testid="employer-setup-progress">{complete} of {steps.length} setup steps complete</p>
-      <div className="mt-2 h-2 max-w-sm overflow-hidden rounded-full bg-white/15" role="progressbar" aria-label="Workspace setup" aria-valuemin={0} aria-valuemax={steps.length} aria-valuenow={complete}><div className="h-full rounded-full bg-[#8fe0d2]" style={{ width: steps.length ? `${100 * complete / steps.length}%` : "0%" }} /></div>
-      {next ? <button type="button" onClick={() => onNavigate(next.target)} className="lt-button lt-hero-action mt-5">Next: {next.label}</button> : null}
-    </section>
-    <section className="lt-panel overflow-hidden" aria-label="Workspace setup checklist">
-      <div className="lt-panel-heading px-5 py-4"><h3 className="text-base font-semibold">Your setup checklist</h3><p className="mt-1 text-sm text-lt-muted">Continue at your own pace. Your saved progress is retained.</p></div>
-      {steps.map((step, index) => <button key={step.label} type="button" onClick={() => onNavigate(step.target)} data-next={step===next} className="lt-setup-row">
-        <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg text-sm font-semibold ${step.complete ? "bg-lt-accent text-white" : "bg-lt-soft text-lt-accent"}`}>{step.complete ? <Check size={15} aria-hidden="true" /> : index + 1}</span>
-        <span className="min-w-0 flex-1"><strong className="block text-sm">{step.label}</strong><span className="mt-1 block text-sm text-lt-muted">{step.complete ? "Complete" : step.detail ?? (step.optional ? "Optional · complete when available" : "Open setup")}</span></span><span className="shrink-0 text-xs font-semibold text-lt-accent">{step.complete?"Done":step===next?"Continue":"Open"}</span>
-      </button>)}
-    </section>
-    {onRetryFinance ? <p role="status" className="text-sm text-lt-secondary">Finance could not be checked. <button type="button" className="font-semibold underline" onClick={onRetryFinance}>Retry finance check</button></p> : null}
-  </div>;
 }
 
 export function LineManagerHomeModule({ onNavigate, onOpenApplicationReview }: {

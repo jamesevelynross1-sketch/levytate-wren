@@ -606,6 +606,13 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
         </div>
       </header>
 
+      {employerSetup && !employerSetup.complete && activeModule !== "Home" && availableModules.some((module) => module.name === "Home") ? <div className="border-b border-[#102c3d]/[0.08] bg-[#f1f7f3] px-4 py-2 sm:px-6" data-testid="employer-setup-return">
+        <div className="mx-auto flex max-w-[1520px] flex-wrap items-center justify-between gap-3 text-sm">
+          <span className="font-medium text-lt-secondary">Workspace setup in progress · {employerSetup.steps.filter((step) => !step.optional && step.complete).length} of {employerSetup.steps.filter((step) => !step.optional).length} essentials saved</span>
+          <button type="button" onClick={() => openModule("Home")} className="min-h-10 font-semibold text-lt-accent hover:underline">Return to guided setup <ArrowRight size={14} className="ml-1 inline" aria-hidden="true"/></button>
+        </div>
+      </div> : null}
+
       {mobileMenuOpen ? <div className="fixed inset-0 z-50 lg:hidden"><button type="button" onClick={() => setMobileMenuOpen(false)} aria-label="Close navigation" className="absolute inset-0 bg-[#102c3d]/40 backdrop-blur-sm" /><aside ref={mobileDrawerRef} id="levytate-mobile-navigation" role="dialog" aria-modal="true" aria-labelledby="levytate-mobile-navigation-title" className="absolute inset-y-0 left-0 flex w-[min(88vw,22rem)] flex-col overflow-hidden bg-white shadow-[24px_0_80px_rgba(16,44,61,0.24)]">
         <div className="flex h-[4.5rem] items-center justify-between border-b border-[#102c3d]/[0.08] px-4"><div><p id="levytate-mobile-navigation-title" className="text-sm font-semibold">{workspaceName}</p><p className="text-xs text-lt-muted">Navigation</p></div><button type="button" onClick={() => setMobileMenuOpen(false)} aria-label="Close navigation" className="grid h-11 w-11 place-items-center rounded-xl text-lt-muted hover:bg-[#f4f8f5] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20"><X size={19} aria-hidden="true" /></button></div>
         <nav aria-label="Mobile workspace navigation" className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
@@ -699,7 +706,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
             {activeModule === "Assessments" ? <AssessmentsModule /> : null}
             {activeModule === "People" ? (
               <ModuleStackNav items={peopleItems} active={peopleView} onSelect={(item) => setPeopleView(item as PeopleView)}>
-                {peopleView === "Employees" ? <EmployeesModule initialEmployeeId={peopleEmployeeId} onSetupPeopleSaved={employerSetup && !employerSetup.complete ? () => navigateTo("Home") : undefined} onStartDiscovery={(employeeId) => { setAiEmployeeId(employeeId); openModule("Copilot"); }} /> : null}
+                {peopleView === "Employees" ? <EmployeesModule initialEmployeeId={peopleEmployeeId} onSetupPeopleSaved={employerSetup && !employerSetup.complete ? () => {} : undefined} onStartDiscovery={(employeeId) => { setAiEmployeeId(employeeId); openModule("Copilot"); }} /> : null}
                 {peopleView === "Roles" ? <RolesModule /> : null}
               </ModuleStackNav>
             ) : null}

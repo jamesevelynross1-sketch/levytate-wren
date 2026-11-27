@@ -37,9 +37,10 @@ import {
   type MvpEmployee,
 } from "@/lib/levytate/mvp/workspace";
 
-export function EmployeesModule({ onStartDiscovery, onSetupPeopleSaved, onOpenDirectReport, initialEmployeeId = null }: {
+export function EmployeesModule({ onStartDiscovery, onSetupPeopleSaved, onOpenDirectReport, initialEmployeeId = null, setupStage }: {
   onStartDiscovery?: (employeeId: string) => void;
   onSetupPeopleSaved?: () => void;
+  setupStage?: "manager" | "employees";
   onOpenDirectReport?: (employeeId: string) => void;
   initialEmployeeId?: string | null;
 }) {
@@ -129,7 +130,7 @@ export function EmployeesModule({ onStartDiscovery, onSetupPeopleSaved, onOpenDi
       managerId: "",
       department: "",
       site: "",
-      platformRole: "Employee",
+      platformRole: setupStage === "manager" ? "Line Manager" : "Employee",
       status: "Active",
       startDate: todayIso(),
       createdAt: now,
@@ -223,7 +224,7 @@ export function EmployeesModule({ onStartDiscovery, onSetupPeopleSaved, onOpenDi
         search={search}
         onSearch={setSearch}
         placeholder="Search name, role, department, manager or site"
-        actionLabel={canWriteEmployees ? "Add employee" : undefined}
+        actionLabel={canWriteEmployees ? (setupStage === "manager" ? "Add line manager" : "Add employee") : undefined}
         onAction={canWriteEmployees ? () => openEmployee() : undefined}
         filters={
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
@@ -341,9 +342,9 @@ export function EmployeesModule({ onStartDiscovery, onSetupPeopleSaved, onOpenDi
       ) : (
         filtered ? <FilteredEmptyState title="No employees match these filters" onReset={clearFilters}/> : canWriteEmployees ? (
           <EmptyState
-            title="Add the first employee"
+            title={setupStage === "manager" ? "Add your first line manager" : "Add the first employee"}
             copy="Create one record. LevyTate will guide discovery and recommend the next development route."
-            actionLabel="Add employee"
+            actionLabel={setupStage === "manager" ? "Add line manager" : "Add employee"}
             onAction={() => openEmployee()}
           />
         ) : (
@@ -355,14 +356,14 @@ export function EmployeesModule({ onStartDiscovery, onSetupPeopleSaved, onOpenDi
       )}
 
       {draft ? (
-        <MvpModal title={data.employees.some((item) => item.id === draft.id) ? "Edit employee" : "Add employee"} onClose={() => { if (!saving) setDraft(null); }}>
+        <MvpModal title={data.employees.some((item) => item.id === draft.id) ? "Edit employee" : setupStage === "manager" ? "Add line manager" : "Add employee"} onClose={() => { if (!saving) setDraft(null); }}>
           <form onSubmit={submit}>
             <fieldset disabled={saving} className="min-w-0">
             <div className="mb-5 flex items-start gap-3 rounded-xl bg-[#edf7f3] p-4 ring-1 ring-[#159b8f]/[0.10]">
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white text-lt-accent"><UserPlus size={17} aria-hidden="true" /></span>
               <div>
                 <p className="text-sm font-semibold">Start with the essentials</p>
-                <p className="mt-1 text-xs leading-5 text-lt-muted">{onSetupPeopleSaved ? "After saving, return to your workspace setup and continue with the next step." : "After saving, LevyTate Copilot can guide the role and capability conversation before any application begins."}</p>
+                <p className="mt-1 text-xs leading-5 text-lt-muted">{onSetupPeopleSaved ? "Your saved team stays here so you can add another person, assign a line manager or continue setup when ready." : "After saving, LevyTate Copilot can guide the role and capability conversation before any application begins."}</p>
               </div>
             </div>
 
