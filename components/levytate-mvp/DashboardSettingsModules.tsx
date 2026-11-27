@@ -42,7 +42,7 @@ export function DashboardModule({ onNavigate, setup }: { onNavigate: (module: st
   const [keepSetupOpen, setKeepSetupOpen] = useState(false);
   const [reviewSetup, setReviewSetup] = useState(false);
   useEffect(() => {
-    if (setup && !setup.complete) setKeepSetupOpen(true);
+    if (setup?.complete === false) setKeepSetupOpen(true);
   }, [setup?.complete]);
   const notifications = buildNotifications(data);
   const support = employeesNeedingSupport(data);
@@ -57,7 +57,6 @@ export function DashboardModule({ onNavigate, setup }: { onNavigate: (module: st
         ? { label: "Improve provider coverage", target: "Marketplace" }
         : { label: "Open LevyTate Copilot", target: "LevyTate Copilot" };
 
-  const blankWorkspace = data.employees.length === 0 && data.applications.length === 0 && data.learnerRecords.length === 0;
   const setupVisible = Boolean(setup && (!setup.complete || keepSetupOpen || reviewSetup));
   const checklist = setupVisible && setup
     ? <EmployerSetupJourney progress={setup} prioritiesPanel={<EmployerPrioritiesSetup compact readOnly={!can("settings:write")} />} onNavigate={onNavigate} onFinish={() => { setKeepSetupOpen(false); setReviewSetup(false); }} />
@@ -68,7 +67,9 @@ export function DashboardModule({ onNavigate, setup }: { onNavigate: (module: st
         </section>
       : null;
 
-  if (blankWorkspace && setupVisible && checklist) return checklist;
+  // Setup is a single focused workspace until the employer explicitly finishes.
+  // Do not render the normal attention briefing under an unfinished journey.
+  if (setupVisible && checklist) return checklist;
 
   const overview = (
       <section className="lt-panel grid divide-y divide-lt-border sm:grid-cols-3 sm:divide-x sm:divide-y-0" aria-label="Workspace overview">
