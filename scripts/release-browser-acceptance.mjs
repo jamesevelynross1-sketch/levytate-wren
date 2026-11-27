@@ -154,6 +154,10 @@ try {
       });
       contexts.set(`${tenant.key}:${user.key}`, { context, page, user, tenant,nativePersistent });
       await page.goto(`${app}/levytate/login`);
+      if(process.env.RELEASE_PREMIUM_VISUAL_JOURNEY==="true"&&tenant.key==="a"&&user.key==="lead"){
+        const {captureBlankLogin}=await import("./release-premium-visual-browser.mjs");
+        await independentJourney("sign-in visual reflow",()=>captureBlankLogin({app,page,manifest,check}));
+      }
       check(`${label}: no demo login required`, !(await page.getByText("Internal demonstration access", { exact: true }).count()));
       const after = Date.now();
       const memberships = await backend(`rest/v1/levytate_users?id=eq.${user.membershipId}&select=auth_binding_status,invitation_generation`);
@@ -512,6 +516,11 @@ try {
     phase="genuine Finance CSV preview import retry and aggregate evidence";
     const{verifyFinance}=await import("./release-finance-browser.mjs");
     await independentJourney("Finance import and report evidence",()=>verifyFinance({app,manifest,contexts,backend,check}));
+  }
+  if(process.env.RELEASE_PREMIUM_VISUAL_JOURNEY==="true"){
+    phase="genuine multi-role responsive visual and interaction acceptance";
+    const{verifyPremiumVisual}=await import("./release-premium-visual-browser.mjs");
+    await independentJourney("premium visual acceptance",()=>verifyPremiumVisual({app,manifest,contexts,check}));
   }
   if(process.env.RELEASE_READ_SCOPE_JOURNEY==="true"){
     phase="genuine retained account and employer read boundaries";

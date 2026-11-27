@@ -5,6 +5,8 @@ import type { RequestStatus } from "@/lib/levytate/domain";
 import { getApprenticeshipStandard } from "@/lib/levytate/domain";
 import {
   EmptyState,
+  ListResultsBar,
+  FilteredEmptyState,
   FormActions,
   FormGrid,
   FormSelect,
@@ -18,11 +20,13 @@ import {
   TableHead,
   TableShell,
 } from "@/components/levytate-mvp/MvpUi";
+import { SearchableFormSelect } from "@/components/levytate-mvp/MvpUi";
 import { OperationalMetricRail, StageTracker } from "@/components/levytate-mvp/OperationalVisuals";
 import { useMvpWorkspace, type WorkspaceMutationResult } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { ApplicationPreEnrolmentModal } from "@/components/levytate-mvp/ApplicationPreEnrolmentModal";
 import { displayEmployee, includesSearch, statusTone } from "@/components/levytate-mvp/module-utils";
 import { managerName } from "@/lib/levytate/mvp/workspace-insights";
+import { applicationProgrammeOptions, applicationProgrammeLabel } from "@/lib/levytate/mvp/application-programme-options";
 
 import {
   buildApplicationHistoryEntry,
@@ -62,7 +66,7 @@ export function ApplicationsModule({
   initialApplicationId = null,
   onApplicationSelectionChange,
 }: ApplicationsModuleProps = {}) {
-  const { data, saveApplication, meta } = useMvpWorkspace();
+  const { data, saveApplication, saveOrganisationProgramme, meta } = useMvpWorkspace();
   const configurableWorkflowPublished = meta?.applicationWorkflowPublished === true;
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("All");
@@ -71,6 +75,8 @@ export function ApplicationsModule({
   const [selectedId, setSelectedId] = useState<string | null>(initialApplicationId ?? null);
   const [error, setError] = useState("");
   const [savingDraft, setSavingDraft] = useState(false);
+  const [publishingProgramme, setPublishingProgramme] = useState(false);
+  const [publicationProgrammeId, setPublicationProgrammeId] = useState("");
   const [handoff, setHandoff] = useState<MvpApplication | null>(null);
   const [handoffConfirmation, setHandoffConfirmation] = useState("");
 
@@ -98,6 +104,9 @@ export function ApplicationsModule({
       );
   });
 
+  const filtered=Boolean(search.trim()) || status!=="All" || ownerFilter!=="All";
+  function clearFilters(){setSearch("");setStatus("All");setOwnerFilter("All");}
+
   const queueSummary = {
     total: data.applications.filter((application) => activeSet.has(application.status)).length,
     manager: data.applications.filter((application) => reviewableManagerStatuses.includes(application.status)).length,
@@ -117,20 +126,32 @@ export function ApplicationsModule({
     setHandoff(application);
   }
 
-  function pathwaysForEmployee(employeeId: string) {
-    const employee = data.employees.find((item) => item.id === employeeId);
-    const role = data.roles.find((item) => item.id === employee?.roleId);
-    return role ? [...role.pathwayMappings].sort((a, b) => a.priority - b.priority) : [];
+  const programmeOptions = draft ? applicationProgrammeOptions(data, draft.employeeId) : [];
+  const selectedProgramme = programmeOptions.find(option => option.standard.id === draft?.apprenticeshipStandardId);
+  const publicationOffer = selectedProgramme?.offers.find(offer => offer.programmeId === publicationProgrammeId)
+    ?? (selectedProgramme?.offers.length === 1 ? selectedProgramme.offers[0] : undefined);
+
+  async function publishProgramme() {
+    if (publishingProgramme || savingDraft || !selectedProgramme || selectedProgramme.published || !publicationOffer) return;
+    setPublishingProgramme(true);
+    setError("");
+    try {
+      const now = nowIso();
+      const result = await saveOrganisationProgramme({ programmeId: publicationOffer.programmeId, providerId: publicationOffer.providerId, status: "Active", selectedAt: now, updatedAt: now });
+      if (!result.ok) setError(result.message);
+    } catch { setError("Programme publication could not be confirmed. Your draft has been kept; check My Programmes before retrying."); }
+    finally { setPublishingProgramme(false); }
   }
 
   function blank(): MvpApplication {
     const employee = data.employees.find((item) => item.status === "Active");
-    const mappedPathways = employee ? pathwaysForEmployee(employee.id) : [];
+    setPublicationProgrammeId("");
+    setError("");
     const now = nowIso();
     return {
       id: createMvpId("application"),
       employeeId: employee?.id ?? "",
-      apprenticeshipStandardId: mappedPathways[0]?.apprenticeshipStandardId ?? "",
+      apprenticeshipStandardId: "",
       status: "Draft",
       currentOwner: "Employee",
       reason: "",
@@ -145,16 +166,13 @@ export function ApplicationsModule({
 
   async function saveDraft(event: FormEvent) {
     event.preventDefault();
-    if (!draft) return;
+    if (!draft || savingDraft || publishingProgramme) return;
     if (!draft.employeeId || !draft.apprenticeshipStandardId) {
       setError("Employee and apprenticeship standard are required.");
       return;
     }
-    const allowed = pathwaysForEmployee(draft.employeeId).some(
-      (mapping) => mapping.apprenticeshipStandardId === draft.apprenticeshipStandardId,
-    );
-    if (!allowed) {
-      setError("Select a pathway that is mapped to the employee's assigned role.");
+    if (!selectedProgramme || !selectedProgramme.published) {
+      setError("Select a verified apprenticeship programme and add it to My Programmes before saving.");
       return;
     }
     const anotherActive = data.applications.some(
@@ -166,23 +184,17 @@ export function ApplicationsModule({
     }
     setSavingDraft(true);
     setError("");
-    const result = await saveApplication({
-      ...draft,
-      status: "Draft",
-      currentOwner: "Employee",
-      updatedAt: nowIso(),
-    });
-    setSavingDraft(false);
-    if (!result.ok) {
-      setError(result.message);
-      return;
-    }
-    setDraft(null);
+    try {
+      const result = await saveApplication({ ...draft, status: "Draft", currentOwner: "Employee", updatedAt: nowIso() });
+      if (!result.ok) { setError(result.message); return; }
+      setDraft(null);
+    } catch { setError("The application save could not be confirmed. Your draft has been retained. Check the record before retrying."); }
+    finally { setSavingDraft(false); }
   }
 
   return (
     <div className="grid min-w-0 gap-5">
-      {handoffConfirmation ? <p role="status" className="rounded-xl bg-[#eef7f5] p-4 text-sm text-[#0b6f63]">{handoffConfirmation}</p> : null}
+      {handoffConfirmation ? <p role="status" className="rounded-xl bg-[#eef7f5] p-4 text-sm text-lt-accent">{handoffConfirmation}</p> : null}
       <OperationalMetricRail items={[
         { label: "Active applications", value: queueSummary.total },
         { label: "Manager review", value: queueSummary.manager, tone: "watch" },
@@ -199,59 +211,59 @@ export function ApplicationsModule({
           onAction={() => setDraft(blank())}
           filters={
             <div className="grid gap-2 sm:grid-cols-2">
-              <select value={status} onChange={(event) => setStatus(event.target.value)} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-sm font-semibold"><option>All</option>{requestStatuses.map((item) => <option key={item}>{item}</option>)}</select>
-              <select value={ownerFilter} onChange={(event) => setOwnerFilter(event.target.value)} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-sm font-semibold"><option>All</option><option>Employee</option><option>Line Manager</option><option>Apprenticeship Lead</option><option>Employer Admin</option><option>Provider Partner</option><option>Completed</option></select>
+              <select aria-label="Application status" value={status} onChange={(event) => setStatus(event.target.value)} className="lt-control h-11 min-w-0 px-3 text-sm"><option value="All">All statuses</option>{requestStatuses.map((item) => <option key={item}>{item}</option>)}</select>
+              <select aria-label="Current owner" value={ownerFilter} onChange={(event) => setOwnerFilter(event.target.value)} className="lt-control h-11 min-w-0 px-3 text-sm"><option value="All">All owners</option><option>Employee</option><option>Line Manager</option><option>Apprenticeship Lead</option><option>Employer Admin</option><option>Provider Partner</option><option>Completed</option></select>
             </div>
           }
         />
 
+        <ListResultsBar count={visible.length} total={data.applications.length} singular="application" plural="applications" filtered={filtered} onReset={clearFilters}/>
         {visible.length ? (
-          <TableShell>
-            <TableHead>
-              <tr>
-                <th className="px-4 py-3">Employee</th>
-                <th className="px-4 py-3">Pathway</th>
-                <th className="px-4 py-3">Owner</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Submitted</th>
-                <th className="px-4 py-3 text-right">Actions</th>
-              </tr>
-            </TableHead>
+          <TableShell responsive label="Applications" testId="applications-responsive-list" tableClassName="lt-application-table">
+            <colgroup><col className="lt-app-col-person"/><col className="lt-app-col-programme"/><col className="lt-app-col-status"/><col className="lt-app-col-date"/><col className="lt-app-col-actions"/></colgroup>
+            <TableHead><tr role="row">
+              <th scope="col" role="columnheader">Employee</th>
+              <th scope="col" role="columnheader">Programme</th>
+              <th scope="col" role="columnheader">Status &amp; owner</th>
+              <th scope="col" role="columnheader">Date</th>
+              <th scope="col" role="columnheader" className="text-right">Actions</th>
+            </tr></TableHead>
             <TableBody>
               {visible.map((application) => {
                 const employee = data.employees.find((item) => item.id === application.employeeId);
                 const standard = getApprenticeshipStandard(application.apprenticeshipStandardId);
-
-                return (
-                  <tr key={application.id}>
-                    <td className="px-4 py-3">
-                      <p className="font-semibold">{displayEmployee(employee)}</p>
-                      <p className="mt-0.5 text-xs text-[#102c3d]/[0.46]">{employee?.department || "Department to confirm"} · {employee?.site || "Site to confirm"}</p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="text-[#102c3d]/[0.72]">{standard?.title ?? application.apprenticeshipStandardId}</p>
-                      <p className="mt-0.5 text-xs text-[#102c3d]/[0.42]">{standard?.referenceCode ?? "Reference to confirm"}</p>
-                    </td>
-                    <td className="px-4 py-3"><p className="text-sm font-semibold text-[#102c3d]">{application.currentOwner}</p></td>
-                    <td className="px-4 py-3"><StatusBadge tone={statusTone(application.status)}>{application.status}</StatusBadge><p className="mt-1 text-xs text-[#102c3d]/[0.45]">Stage {applicationTracker(application).currentIndex + 1} of {applicationTracker(application).stages.length}</p></td>
-                    <td className="px-4 py-3 text-[#102c3d]/[0.54]">{application.submittedAt.slice(0, 10)}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end gap-2">
-                        <TableAction onClick={() => setSelectedId(application.id)}>View</TableAction>
-                        {application.status === "Draft" && !application.workflow ? <TableAction onClick={() => setDraft({ ...application })}>Edit draft</TableAction> : null}
-                        {application.status === "Draft" ? <span className="self-center text-xs font-semibold text-[#102c3d]/45">Awaiting employee submission</span> : null}
-                        <ApplicationHandoffControls application={application} onStartPreEnrolment={() => startPreEnrolment(application)} compact />
-                      </div>
-                    </td>
-                  </tr>
-                );
+                const tracker=applicationTracker(application);
+                const recordedDate=application.submittedAt.slice(0,10);
+                const displayDate=recordedDate&&Number.isFinite(Date.parse(recordedDate))?new Intl.DateTimeFormat("en-GB",{day:"numeric",month:"short",year:"numeric",timeZone:"UTC"}).format(new Date(recordedDate)):"Not recorded";
+                return <tr key={application.id} role="row">
+                  <td role="cell" className="lt-mobile-record-title">
+                    <p className="lt-record-name">{displayEmployee(employee)}</p>
+                    <p className="lt-record-meta">{[employee?.department,employee?.site].filter(Boolean).join(" · ")||"Department and site to confirm"}</p>
+                  </td>
+                  <td role="cell" className="lt-app-programme"><span aria-hidden="true" className="lt-mobile-field-label">Programme</span>
+                    <p className="lt-record-name font-medium">{standard?.title ?? application.apprenticeshipStandardId}</p>
+                    <p className="lt-record-meta">{standard?.referenceCode ?? "Reference to confirm"}</p>
+                  </td>
+                  <td role="cell" className="lt-app-status"><span aria-hidden="true" className="lt-mobile-field-label">Status &amp; owner</span>
+                    <StatusBadge tone={statusTone(application.status)}>{application.status}</StatusBadge>
+                    <p className="lt-record-meta" data-testid="application-owner">{application.currentOwner}</p>
+                    <p className="lt-record-meta whitespace-nowrap" data-testid="application-stage">Stage {tracker.currentIndex + 1} of {tracker.stages.length}</p>
+                    {application.status==="Draft"?<p className="lt-record-meta">Awaiting employee submission</p>:null}
+                  </td>
+                  <td role="cell"><span aria-hidden="true" className="lt-mobile-field-label">Date</span><time className="lt-app-date" dateTime={recordedDate||undefined}>{displayDate}</time><p className="lt-record-meta">{application.status==="Draft"?"Draft created":"Submitted"}</p></td>
+                  <td role="cell" className="lt-mobile-record-actions"><div className="lt-app-actions">
+                    <TableAction onClick={() => setSelectedId(application.id)}>View</TableAction>
+                    {application.status === "Draft" && !application.workflow ? <TableAction onClick={() => setDraft({ ...application })}>Edit draft</TableAction> : null}
+                    <ApplicationHandoffControls application={application} onStartPreEnrolment={() => startPreEnrolment(application)} compact />
+                  </div></td>
+                </tr>;
               })}
             </TableBody>
           </TableShell>
-        ) : (
+        ) : filtered ? <FilteredEmptyState title="No applications match these filters" onReset={clearFilters}/> : (
           <EmptyState
             title="No applications yet"
-            copy="Create an application from a role-mapped pathway and track it through manager review, lead review and enrolment readiness."
+            copy="Choose an apprenticeship offered by a verified provider and track it through manager review, lead review and enrolment readiness."
             actionLabel="Create application"
             onAction={() => setDraft(blank())}
           />
@@ -259,19 +271,19 @@ export function ApplicationsModule({
       </MvpPanel>
 
       {draft ? (
-        <MvpModal title={data.applications.some((item) => item.id === draft.id) ? "Edit application" : "Create application"} eyebrow="Application workflow" onClose={() => setDraft(null)}>
+        <MvpModal title={data.applications.some((item) => item.id === draft.id) ? "Edit application" : "Create application"} eyebrow="Application workflow" onClose={() => { if (!savingDraft && !publishingProgramme) setDraft(null); }}>
           <form onSubmit={saveDraft}>
+            <fieldset className="min-w-0" disabled={savingDraft || publishingProgramme}>
             <FormGrid>
               <FormSelect
                 label="Employee"
                 value={draft.employeeId}
                 onChange={(value) => {
-                  const pathways = pathwaysForEmployee(value);
                   const employee = data.employees.find((item) => item.id === value);
                   setDraft({
                     ...draft,
                     employeeId: value,
-                    apprenticeshipStandardId: pathways[0]?.apprenticeshipStandardId ?? "",
+                    apprenticeshipStandardId: draft.apprenticeshipStandardId,
                     supportRequired: draft.supportRequired || `Manager: ${employee ? managerName(data, employee) : "Not assigned"}`,
                   });
                 }}
@@ -279,36 +291,42 @@ export function ApplicationsModule({
                 options={[{ value: "", label: "Select employee" }, ...data.employees.filter((item) => item.status === "Active").map((item) => ({ value: item.id, label: item.name }))]}
               />
               {(
-                <div className="grid gap-1.5 text-xs font-semibold text-[#102c3d]/58">
+                <div className="grid gap-1.5 text-xs font-semibold text-lt-muted">
                   Status
-                  <div className="min-h-11 rounded-lg border border-[#102c3d]/[0.07] bg-[#f8fbfa] px-3 py-3 text-sm font-medium text-[#102c3d]">Draft · Owner: Employee</div>
+                  <div className="min-h-11 rounded-lg border border-[#102c3d]/[0.07] bg-[#f8fbfa] px-3 py-3 text-sm font-medium text-lt-ink">Draft · Owner: Employee</div>
                 </div>
               )}
-              <FormSelect
-                label="Apprenticeship standard"
+              <SearchableFormSelect
+                key={draft.id}
+                label="Apprenticeship programme"
+                placeholder="Search programme, level or provider"
                 value={draft.apprenticeshipStandardId}
-                onChange={(value) => setDraft({ ...draft, apprenticeshipStandardId: value })}
+                onChange={(value) => { setPublicationProgrammeId(""); setError(""); setDraft({ ...draft, apprenticeshipStandardId: value }); }}
                 required
                 wide
                 options={[
-                  { value: "", label: "Select role-mapped pathway" },
-                  ...pathwaysForEmployee(draft.employeeId).map((mapping) => {
-                    const standard = getApprenticeshipStandard(mapping.apprenticeshipStandardId);
-                    return {
-                      value: mapping.apprenticeshipStandardId,
-                      label: standard
-                        ? `Level ${standard.level} · ${standard.title} · ${standard.referenceCode}`
-                        : mapping.apprenticeshipStandardId,
-                    };
-                  }),
+                  { value: "", label: "Select an available apprenticeship programme" },
+                  ...programmeOptions.map(option => ({ value: option.standard.id, label: applicationProgrammeLabel(option), searchText: [option.standard.referenceCode, ...option.offers.flatMap(offer=>[offer.providerName,offer.programmeName])].join(" ") })),
                 ]}
               />
+              <div className="space-y-3 text-xs leading-5 text-lt-muted md:col-span-2">
+                <p>{programmeOptions.length ? "Choose any available programme. Role recommendations are guidance only; the provider is confirmed during pre-enrolment." : "No verified, active programmes are available. Check the Marketplace."}</p>
+                {selectedProgramme?.published ? <p className="font-semibold text-lt-accent">Available in My Programmes · {Array.from(new Set(selectedProgramme.offers.filter(offer => offer.published).map(offer => offer.providerName))).join(", ")}</p> : null}
+                {selectedProgramme && !selectedProgramme.published ? <section className="grid gap-3 rounded-xl border border-[#102c3d]/10 bg-[#f8fbfa] p-4">
+                  <p className="font-semibold">Add this apprenticeship to your organisation before saving the application.</p>
+                  <FormSelect label="Provider programme to publish" value={publicationOffer?.programmeId ?? ""} onChange={setPublicationProgrammeId} options={[{ value: "", label: "Select a provider programme" }, ...selectedProgramme.offers.map(offer => ({ value: offer.programmeId, label: `${offer.providerName} · ${offer.programmeName}` }))]} />
+                  <p>Publishing makes this programme available to your organisation&apos;s employees. It does not enrol this employee or assign a provider to the application.</p>
+                  <button type="button" disabled={!publicationOffer || publishingProgramme || savingDraft} onClick={() => void publishProgramme()} className="min-h-11 justify-self-start rounded-lg bg-[#102c3d] px-4 text-xs font-semibold text-white disabled:opacity-50">{publishingProgramme ? "Publishing…" : "Add to My Programmes"}</button>
+                </section> : null}
+              </div>
+              <div className="md:col-span-2"><h3 className="border-t border-lt-border pt-3 text-sm font-semibold">Development context</h3><p className="mt-1 text-xs text-lt-muted">Add useful context for the employee to review before submitting.</p></div>
               <FormTextArea label="Reason for interest" value={draft.reason} onChange={(value) => setDraft({ ...draft, reason: value })} wide />
               <FormTextArea label="Career goal" value={draft.careerGoal} onChange={(value) => setDraft({ ...draft, careerGoal: value })} wide />
               <FormTextArea label="Support required" value={draft.supportRequired} onChange={(value) => setDraft({ ...draft, supportRequired: value })} wide />
             </FormGrid>
-            {draftUsesConfigurableWorkflow ? <p className="mt-4 rounded-xl bg-[#eef7f5] px-4 py-3 text-xs font-semibold leading-5 text-[#0b6f63]">Application draft created for the employee. The employee needs to review and submit it before the approval workflow begins.</p> : null}
-            <FormActions onCancel={() => setDraft(null)} label={savingDraft ? "Saving…" : draftUsesConfigurableWorkflow ? "Save draft" : "Save application"} error={error} disabled={savingDraft} />
+            </fieldset>
+            {draftUsesConfigurableWorkflow ? <p className="mt-4 rounded-xl bg-[#eef7f5] px-4 py-3 text-xs font-semibold leading-5 text-lt-accent">Application draft created for the employee. The employee needs to review and submit it before the approval workflow begins.</p> : null}
+            <FormActions onCancel={() => setDraft(null)} label={savingDraft ? "Saving…" : draftUsesConfigurableWorkflow ? "Save draft" : "Save application"} error={error} disabled={savingDraft || publishingProgramme} submissionBlocked={!selectedProgramme?.published} />
           </form>
         </MvpModal>
       ) : null}
@@ -377,19 +395,19 @@ function LineManagerApprovalsModule({ onOpenDirectReport, initialApplicationId, 
                   <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-base font-semibold text-[#102c3d]">{displayEmployee(employee)}</h3>
+                        <h3 className="text-base font-semibold text-lt-ink">{displayEmployee(employee)}</h3>
                         <StatusBadge tone={statusTone(application.status)}>{application.status}</StatusBadge>
                       </div>
-                      <p className="mt-1 text-sm leading-6 text-[#102c3d]/[0.58]">{employee?.jobTitle || "Role to confirm"} - {employee?.department || "Department to confirm"} - {employee?.site || "Site to confirm"}</p>
-                      <p className="mt-3 text-sm font-semibold text-[#102c3d]">{standard?.title ?? application.apprenticeshipStandardId}</p>
-                      <p className="mt-1 line-clamp-2 text-sm leading-6 text-[#102c3d]/[0.58]">{application.reason || "No reason recorded yet."}</p>
-                      <p className="mt-2 text-xs font-medium text-[#102c3d]/[0.42]">Submitted {application.submittedAt.slice(0, 10)}</p>
+                      <p className="mt-1 text-sm leading-6 text-lt-muted">{employee?.jobTitle || "Role to confirm"} - {employee?.department || "Department to confirm"} - {employee?.site || "Site to confirm"}</p>
+                      <p className="mt-3 text-sm font-semibold text-lt-ink">{standard?.title ?? application.apprenticeshipStandardId}</p>
+                      <p className="mt-1 line-clamp-2 text-sm leading-6 text-lt-muted">{application.reason || "No reason recorded yet."}</p>
+                      <p className="mt-2 text-xs font-medium text-lt-muted">Submitted {application.submittedAt.slice(0, 10)}</p>
                     </div>
                     <div className="flex flex-col items-stretch gap-2">
                       <button type="button" onClick={() => selectApplication(application.id)} className="h-10 rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/[0.15]">
                         Review application
                       </button>
-                      {employee ? <button type="button" onClick={() => onOpenDirectReport?.(employee.id)} className="px-2 py-1 text-xs font-semibold text-[#0b766b] transition hover:text-[#102c3d]">View apprenticeship journey</button> : null}
+                      {employee ? <button type="button" onClick={() => onOpenDirectReport?.(employee.id)} className="px-2 py-1 text-xs font-semibold text-[#0b766b] transition hover:text-lt-ink">View apprenticeship journey</button> : null}
                     </div>
                   </div>
                 </article>
@@ -398,8 +416,8 @@ function LineManagerApprovalsModule({ onOpenDirectReport, initialApplicationId, 
           </div>
         ) : (
           <div className="rounded-xl border border-dashed border-[#102c3d]/[0.14] bg-[#f8fbfa] px-5 py-10 text-center">
-            <h3 className="text-base font-semibold text-[#102c3d]">No applications awaiting review</h3>
-            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#102c3d]/[0.56]">Applications will appear here only when a direct report has submitted or resubmitted a request for your decision.</p>
+            <h3 className="text-base font-semibold text-lt-ink">No applications awaiting review</h3>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-lt-muted">Applications will appear here only when a direct report has submitted or resubmitted a request for your decision.</p>
           </div>
         )}
       </MvpPanel>
@@ -521,8 +539,8 @@ function ManagerReviewModal({ application, managerName: reviewerName, onClose, o
           </ReviewSection>
 
           <ReviewSection title="Programme">
-            <h3 className="text-lg font-semibold text-[#102c3d]">{programme?.programmeName ?? standard?.title ?? application.apprenticeshipStandardId}</h3>
-            <p className="mt-2 text-sm leading-6 text-[#102c3d]/[0.58]">{programme?.shortDescription || standard?.overview || "Programme summary will be confirmed by the Apprenticeship Lead."}</p>
+            <h3 className="text-lg font-semibold text-lt-ink">{programme?.programmeName ?? standard?.title ?? application.apprenticeshipStandardId}</h3>
+            <p className="mt-2 text-sm leading-6 text-lt-muted">{programme?.shortDescription || standard?.overview || "Programme summary will be confirmed by the Apprenticeship Lead."}</p>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <ReviewFact label="Provider" value={data.providers.find((provider) => provider.providerId === programme?.providerId)?.providerName ?? "Provider to confirm"} />
               <ReviewFact label="Duration" value={programme?.duration || standard?.typicalDuration || "Duration to confirm"} />
@@ -530,8 +548,8 @@ function ManagerReviewModal({ application, managerName: reviewerName, onClose, o
               <ReviewFact label="Time commitment" value="Manager to confirm protected learning time" />
             </div>
             <details className="mt-4 rounded-xl border border-[#102c3d]/[0.07] bg-white">
-              <summary className="cursor-pointer list-none px-4 py-3 text-xs font-semibold text-[#102c3d]/[0.62]">Funding and standard details</summary>
-              <div className="border-t border-[#102c3d]/[0.06] px-4 py-3 text-sm leading-6 text-[#102c3d]/[0.58]">
+              <summary className="cursor-pointer list-none px-4 py-3 text-xs font-semibold text-lt-muted">Funding and standard details</summary>
+              <div className="border-t border-[#102c3d]/[0.06] px-4 py-3 text-sm leading-6 text-lt-muted">
                 <p>{standard ? `Level ${standard.level} - ${standard.title} - ${standard.referenceCode}` : application.apprenticeshipStandardId}</p>
                 <p>{mapping?.fundingRoute ?? programme?.fundingRoute ?? "Potential funding route to confirm"}</p>
               </div>
@@ -539,7 +557,7 @@ function ManagerReviewModal({ application, managerName: reviewerName, onClose, o
           </ReviewSection>
 
           <ReviewSection title="Why this may fit">
-            <p className="text-sm leading-6 text-[#102c3d]/[0.62]">
+            <p className="text-sm leading-6 text-lt-muted">
               LevyTate identified a credible alignment between the {employee?.jobTitle || "current role"} responsibilities held by {employee?.name ?? "the employee"} and {standard?.title ?? "the selected programme"}. The manager should still confirm workload, role relevance and available support before approving.
             </p>
             <div className="mt-4 grid gap-3">
@@ -567,7 +585,7 @@ function ManagerReviewModal({ application, managerName: reviewerName, onClose, o
           </ReviewSection>
 
           <ReviewSection title="Manager considerations">
-            <ul className="grid gap-2 text-sm leading-6 text-[#102c3d]/[0.62]">
+            <ul className="grid gap-2 text-sm leading-6 text-lt-muted">
               {[
                 "Is the programme relevant to the employee's current or planned role?",
                 "Can the learning be applied in the workplace?",
@@ -581,7 +599,7 @@ function ManagerReviewModal({ application, managerName: reviewerName, onClose, o
 
           <ReviewSection title="Decision">
             {confirmation ? (
-              <div className="rounded-xl bg-[#edf7f3] p-4 text-sm font-semibold leading-6 text-[#0b6f63] ring-1 ring-[#159b8f]/[0.15]">{confirmation}</div>
+              <div className="rounded-xl bg-[#edf7f3] p-4 text-sm font-semibold leading-6 text-lt-accent ring-1 ring-[#159b8f]/[0.15]">{confirmation}</div>
             ) : null}
             {!confirmation && canDecide ? (
               <form onSubmit={submitDecision}>
@@ -614,12 +632,12 @@ function ManagerReviewModal({ application, managerName: reviewerName, onClose, o
                 ) : null}
 
                 <div className="mt-4 flex flex-col gap-3 border-t border-[#102c3d]/[0.07] pt-4 sm:flex-row sm:items-center sm:justify-between">
-                  {error ? <p className="text-xs font-semibold text-[#b53c52]">{error}</p> : <p className="text-xs leading-5 text-[#102c3d]/[0.48]">Your decision will be recorded in the application history.</p>}
+                  {error ? <p className="text-xs font-semibold text-lt-risk">{error}</p> : <p className="text-xs leading-5 text-lt-muted">Your decision will be recorded in the application history.</p>}
                   <button disabled={busy} className="h-10 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white disabled:opacity-50">{busy ? "Saving decision…" : "Confirm decision"}</button>
                 </div>
               </form>
             ) : null}
-            {!canDecide && !confirmation ? <p className="text-sm leading-6 text-[#102c3d]/[0.56]">This application is no longer awaiting a line manager decision.</p> : null}
+            {!canDecide && !confirmation ? <p className="text-sm leading-6 text-lt-muted">This application is no longer awaiting a line manager decision.</p> : null}
           </ReviewSection>
 
           <ReviewSection title="Application history">
@@ -628,12 +646,12 @@ function ManagerReviewModal({ application, managerName: reviewerName, onClose, o
                 <div key={entry.id} className="rounded-xl bg-[#f8fbfa] px-4 py-3 ring-1 ring-[#102c3d]/[0.06]">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-sm font-semibold text-[#102c3d]">{entry.status}</p>
-                      <p className="mt-1 whitespace-pre-line text-xs leading-5 text-[#102c3d]/[0.54]">{entry.note}</p>
+                      <p className="text-sm font-semibold text-lt-ink">{entry.status}</p>
+                      <p className="mt-1 whitespace-pre-line text-xs leading-5 text-lt-muted">{entry.note}</p>
                     </div>
-                    <span className="text-xs font-semibold text-[#102c3d]/[0.52]">{entry.owner}</span>
+                    <span className="text-xs font-semibold text-lt-muted">{entry.owner}</span>
                   </div>
-                  <p className="mt-2 text-[11px] font-medium text-[#102c3d]/[0.42]">{entry.createdAt.slice(0, 10)}</p>
+                  <p className="mt-2 text-xs font-medium text-lt-muted">{entry.createdAt.slice(0, 10)}</p>
                 </div>
               ))}
             </div>
@@ -676,11 +694,11 @@ function ConfigurableWorkflowDecisionModal({ application, onClose, onStartPreEnr
   return <MvpModal title={step?.label ?? "Application decision"} eyebrow="Application workflow" onClose={onClose} wide>
     <ApplicationHandoffControls application={application} onStartPreEnrolment={onStartPreEnrolment} />
     <div className="mb-5 border-y border-[#102c3d]/[0.07] py-4"><StageTracker {...applicationTracker(application)} tone="info" /></div>
-    <p className="text-sm leading-6 text-[#102c3d]/60">Responsible role: <strong>{step?.responsibleRole}</strong>. This decision is recorded against workflow version {workflow.version.version}.</p>
-    <label className="mt-5 block text-xs font-semibold text-[#102c3d]">Decision note<textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={2000} className="mt-2 min-h-28 w-full rounded-xl border border-[#102c3d]/10 p-3 text-sm font-normal" /></label>
-    {!authorised ? <p className="mt-4 text-sm text-[#102c3d]/55">This step can only be completed by {step?.responsibleRole}.</p> : <div className="mt-5 flex flex-wrap gap-2">{actions.map((item) => <button key={item.action} type="button" disabled={busy} onClick={() => void decide(item.action)} className="h-10 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white disabled:opacity-40">{item.label}</button>)}</div>}
+    <p className="text-sm leading-6 text-lt-muted">Responsible role: <strong>{step?.responsibleRole}</strong>. This decision is recorded against workflow version {workflow.version.version}.</p>
+    <label className="mt-5 block text-xs font-semibold text-lt-ink">Decision note<textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={2000} className="mt-2 min-h-28 w-full rounded-xl border border-[#102c3d]/10 p-3 text-sm font-normal" /></label>
+    {!authorised ? <p className="mt-4 text-sm text-lt-muted">This step can only be completed by {step?.responsibleRole}.</p> : <div className="mt-5 flex flex-wrap gap-2">{actions.map((item) => <button key={item.action} type="button" disabled={busy} onClick={() => void decide(item.action)} className="h-10 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white disabled:opacity-40">{item.label}</button>)}</div>}
     {error ? <p role="alert" className="mt-4 text-xs font-semibold text-red-700">{error}</p> : null}
-    {workflow.events?.length ? <section className="mt-6 border-t border-[#102c3d]/[0.07] pt-5"><p className="text-xs font-semibold uppercase tracking-[0.13em] text-[#102c3d]/45">Workflow history</p><div className="mt-3 grid gap-2">{workflow.events.map((event) => { const eventStep = workflow.version.steps.find((item) => item.id === event.stepId); return <div key={event.id} className="rounded-xl bg-[#f8fbfa] px-4 py-3"><p className="text-sm font-semibold text-[#102c3d]">{workflowEventLabel(event.action, eventStep?.label)}</p><p className="mt-1 text-xs text-[#102c3d]/55">{new Date(event.createdAt).toLocaleDateString("en-GB")} · {event.actorLabel ?? event.actorRole}</p>{event.note ? <p className="mt-2 text-xs leading-5 text-[#102c3d]/60">{event.note}</p> : null}</div>; })}</div></section> : null}
+    {workflow.events?.length ? <section className="mt-6 border-t border-[#102c3d]/[0.07] pt-5"><p className="text-xs font-semibold uppercase tracking-[0.13em] text-lt-muted">Workflow history</p><div className="mt-3 grid gap-2">{workflow.events.map((event) => { const eventStep = workflow.version.steps.find((item) => item.id === event.stepId); return <div key={event.id} className="rounded-xl bg-[#f8fbfa] px-4 py-3"><p className="text-sm font-semibold text-lt-ink">{workflowEventLabel(event.action, eventStep?.label)}</p><p className="mt-1 text-xs text-lt-muted">{new Date(event.createdAt).toLocaleDateString("en-GB")} · {event.actorLabel ?? event.actorRole}</p>{event.note ? <p className="mt-2 text-xs leading-5 text-lt-muted">{event.note}</p> : null}</div>; })}</div></section> : null}
   </MvpModal>;
 }
 
@@ -695,7 +713,7 @@ function workflowEventLabel(action: string, stepLabel?: string) {
 function ReviewSection({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="rounded-xl border border-[#102c3d]/[0.07] bg-[#fbfcfb] p-4">
-      <h3 className="text-sm font-semibold text-[#102c3d]">{title}</h3>
+      <h3 className="text-sm font-semibold text-lt-ink">{title}</h3>
       <div className="mt-3">{children}</div>
     </section>
   );
@@ -704,8 +722,8 @@ function ReviewSection({ title, children }: { title: string; children: ReactNode
 function ReviewFact({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-white px-3.5 py-3 ring-1 ring-[#102c3d]/[0.055]">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#102c3d]/[0.38]">{label}</p>
-      <p className="mt-1 line-clamp-2 text-sm font-semibold text-[#102c3d]/[0.72]">{value}</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.13em] text-lt-muted">{label}</p>
+      <p className="mt-1 line-clamp-2 text-sm font-semibold text-lt-secondary">{value}</p>
     </div>
   );
 }
@@ -713,8 +731,8 @@ function ReviewFact({ label, value }: { label: string; value: string }) {
 function EvidenceItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-white px-4 py-3 ring-1 ring-[#102c3d]/[0.06]">
-      <p className="text-xs font-semibold text-[#102c3d]">{label}</p>
-      <p className="mt-1 text-sm leading-6 text-[#102c3d]/[0.58]">{value}</p>
+      <p className="text-xs font-semibold text-lt-ink">{label}</p>
+      <p className="mt-1 text-sm leading-6 text-lt-muted">{value}</p>
     </div>
   );
 }
@@ -722,8 +740,8 @@ function EvidenceItem({ label, value }: { label: string; value: string }) {
 function AnswerBlock({ question, answer }: { question: string; answer: string }) {
   return (
     <div className="rounded-xl bg-white px-4 py-3 ring-1 ring-[#102c3d]/[0.06]">
-      <p className="text-xs font-semibold text-[#102c3d]">{question}</p>
-      <p className="mt-1 text-sm leading-6 text-[#102c3d]/[0.58]">{answer || "No answer recorded yet."}</p>
+      <p className="text-xs font-semibold text-lt-ink">{question}</p>
+      <p className="mt-1 text-sm leading-6 text-lt-muted">{answer || "No answer recorded yet."}</p>
     </div>
   );
 }
@@ -736,9 +754,9 @@ function DecisionButton({ active, onClick, danger = false, disabled = false, chi
       onClick={onClick}
       className={`min-h-10 rounded-xl px-3 py-2 text-xs font-semibold ring-1 transition disabled:opacity-50 ${active
         ? danger
-          ? "bg-[#fff0f2] text-[#b13b51] ring-[#b13b51]/[0.20]"
+          ? "bg-[#fff0f2] text-lt-risk ring-[#b13b51]/[0.20]"
           : "bg-[#102c3d] text-white ring-[#102c3d]"
-        : "bg-white text-[#102c3d]/[0.64] ring-[#102c3d]/[0.08] hover:text-[#102c3d]"}`}
+        : "bg-white text-lt-muted ring-[#102c3d]/[0.08] hover:text-lt-ink"}`}
     >
       {children}
     </button>
@@ -765,7 +783,7 @@ function LeadDecisionControls({ application }: { application: MvpApplication }) 
     } catch { setError("The decision could not be confirmed. Your note has been retained; retry the same action."); }
     finally { setBusy(false); }
   }
-  if (saved) return <p role="status" className="mb-4 rounded-xl bg-[#eef7f5] p-4 text-sm text-[#0b6f63]">Decision saved.</p>;
+  if (saved) return <p role="status" className="mb-4 rounded-xl bg-[#eef7f5] p-4 text-sm text-lt-accent">Decision saved.</p>;
   if (!canDecide) return null;
   return <section className="mb-5 rounded-xl border border-[#102c3d]/10 p-4"><h3 className="text-sm font-semibold">Final application review</h3>
     <label className="mt-3 block text-sm">Decision note<textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={2000} className="mt-2 min-h-24 w-full rounded-lg border border-[#102c3d]/15 p-3" /></label>
@@ -778,7 +796,7 @@ function ApplicationHandoffControls({ application, onStartPreEnrolment, compact 
   const { data, meta } = useMvpWorkspace();
   if (!["Apprenticeship Lead", "Employer Admin"].includes(meta?.userRole ?? "")) return null;
   const learners = data.learnerRecords.filter(learner => learner.applicationId === application.id && learner.recordStatus === "Active");
-  if (learners.length > 1) return compact ? null : <p role="alert" className="mb-4 text-sm text-[#b53c52]">More than one current learner record is linked. Open Learners to check the records before continuing.</p>;
+  if (learners.length > 1) return compact ? null : <p role="alert" className="mb-4 text-sm text-lt-risk">More than one current learner record is linked. Open Learners to check the records before continuing.</p>;
   const learner = learners[0];
   if (!learner && (application.status !== "Approved for Enrolment" || !onStartPreEnrolment)) return null;
   const controlClass = "inline-flex min-h-10 items-center rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white";
@@ -788,7 +806,7 @@ function ApplicationHandoffControls({ application, onStartPreEnrolment, compact 
   if (compact) return control;
   return <section aria-label="Enrolment handoff" className="mb-5 rounded-xl border border-[#102c3d]/10 p-4">
     <h3 className="text-sm font-semibold">{learner ? "Continue the learner journey" : "Ready for pre-enrolment"}</h3>
-    <p className="mb-3 mt-2 text-sm leading-6 text-[#102c3d]/60">{learner ? "A learner record is already linked to this application. Continue its recorded checks and provider arrangements." : "The application is approved. Select the programme and provider, then complete eligibility and employer checks in the learner record."}</p>
+    <p className="mb-3 mt-2 text-sm leading-6 text-lt-muted">{learner ? "A learner record is already linked to this application. Continue its recorded checks and provider arrangements." : "The application is approved. Select the programme and provider, then complete eligibility and employer checks in the learner record."}</p>
     {control}
   </section>;
 }
@@ -806,51 +824,51 @@ function ApplicationDetailModal({ application, onClose, onStartPreEnrolment }: {
       <div className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <div className="space-y-4 rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4">
           <section>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#c95568]">Application summary</p>
-            <h3 className="mt-1 text-lg font-semibold text-[#102c3d]">{standard?.title ?? application.apprenticeshipStandardId}</h3>
-            <p className="mt-2 text-sm leading-6 text-[#102c3d]/[0.56]">{employee?.jobTitle || "Role to confirm"} · {employee?.department || "Department to confirm"} · {employee?.site || "Site to confirm"}</p>
+            <p className="lt-eyebrow">Application summary</p>
+            <h3 className="mt-1 text-lg font-semibold text-lt-ink">{standard?.title ?? application.apprenticeshipStandardId}</h3>
+            <p className="mt-2 text-sm leading-6 text-lt-muted">{employee?.jobTitle || "Role to confirm"} · {employee?.department || "Department to confirm"} · {employee?.site || "Site to confirm"}</p>
           </section>
           {application.workflow ? <WorkflowDecisionSummary application={application} /> : application.workflowPreview ? <WorkflowPreviewSummary application={application} /> : null}
           <section>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#0b6f63]">Workflow status</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-lt-accent">Workflow status</p>
             <div className="mt-2 flex flex-wrap gap-2">
               <StatusBadge tone={statusTone(application.status)}>{application.status}</StatusBadge>
-              <span className="inline-flex items-center text-xs font-semibold text-[#102c3d]/[0.52]">Owner: {application.currentOwner}</span>
+              <span className="inline-flex items-center text-xs font-semibold text-lt-muted">Owner: {application.currentOwner}</span>
             </div>
-            <p className="mt-3 text-xs leading-5 text-[#102c3d]/[0.54]">Submitted {application.submittedAt.slice(0, 10)}</p>
+            <p className="mt-3 text-xs leading-5 text-lt-muted">Submitted {application.submittedAt.slice(0, 10)}</p>
           </section>
           <section>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#0b6f63]">Business case</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-lt-accent">Business case</p>
             <div className="mt-2 space-y-3 rounded-xl bg-white p-4 ring-1 ring-[#102c3d]/[0.06]">
               <div>
-                <p className="text-xs font-semibold text-[#102c3d]">Reason for interest</p>
-                <p className="mt-1 text-sm leading-6 text-[#102c3d]/[0.60]">{application.reason || "No reason recorded yet."}</p>
+                <p className="text-xs font-semibold text-lt-ink">Reason for interest</p>
+                <p className="mt-1 text-sm leading-6 text-lt-muted">{application.reason || "No reason recorded yet."}</p>
               </div>
               <div>
-                <p className="text-xs font-semibold text-[#102c3d]">Career goal</p>
-                <p className="mt-1 text-sm leading-6 text-[#102c3d]/[0.60]">{application.careerGoal || "No career goal recorded yet."}</p>
+                <p className="text-xs font-semibold text-lt-ink">Career goal</p>
+                <p className="mt-1 text-sm leading-6 text-lt-muted">{application.careerGoal || "No career goal recorded yet."}</p>
               </div>
               <div>
-                <p className="text-xs font-semibold text-[#102c3d]">Support required</p>
-                <p className="mt-1 text-sm leading-6 text-[#102c3d]/[0.60]">{application.supportRequired || "No support needs recorded."}</p>
+                <p className="text-xs font-semibold text-lt-ink">Support required</p>
+                <p className="mt-1 text-sm leading-6 text-lt-muted">{application.supportRequired || "No support needs recorded."}</p>
               </div>
             </div>
           </section>
         </div>
 
         <section className="rounded-xl border border-[#102c3d]/[0.07] bg-white p-4">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#c95568]">Workflow history</p>
+          <p className="lt-eyebrow">Workflow history</p>
           <div className="mt-4 grid gap-3">
             {application.history.map((entry) => (
               <div key={entry.id} className="rounded-xl bg-[#f8fbfa] px-4 py-3 ring-1 ring-[#102c3d]/[0.06]">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold text-[#102c3d]">{entry.status}</p>
-                    <p className="mt-1 text-xs leading-5 text-[#102c3d]/[0.54]">{entry.note}</p>
+                    <p className="text-sm font-semibold text-lt-ink">{entry.status}</p>
+                    <p className="mt-1 text-xs leading-5 text-lt-muted">{entry.note}</p>
                   </div>
-                  <span className="text-xs font-semibold text-[#102c3d]/[0.52]">{entry.owner}</span>
+                  <span className="text-xs font-semibold text-lt-muted">{entry.owner}</span>
                 </div>
-                <p className="mt-2 text-[11px] font-medium text-[#102c3d]/[0.42]">{entry.createdAt.slice(0, 10)}</p>
+                <p className="mt-2 text-xs font-medium text-lt-muted">{entry.createdAt.slice(0, 10)}</p>
               </div>
             ))}
           </div>
@@ -862,12 +880,12 @@ function ApplicationDetailModal({ application, onClose, onStartPreEnrolment }: {
 
 function WorkflowDecisionSummary({ application }: { application: MvpApplication }) {
   const step = application.workflow?.version.steps.find((item) => item.id === application.workflow?.instance.currentStepId);
-  return <section className="rounded-xl border border-[#087c73]/15 bg-[#eef7f5] p-4"><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#087c73]">Versioned workflow</p><p className="mt-2 text-sm font-semibold text-[#102c3d]">{step?.label}</p><p className="mt-1 text-xs text-[#102c3d]/55">Version {application.workflow?.version.version} · {step?.responsibleRole}</p></section>;
+  return <section className="rounded-xl border border-[#087c73]/15 bg-[#eef7f5] p-4"><p className="text-xs font-semibold uppercase tracking-[0.12em] text-lt-accent">Versioned workflow</p><p className="mt-2 text-sm font-semibold text-lt-ink">{step?.label}</p><p className="mt-1 text-xs text-lt-muted">Version {application.workflow?.version.version} · {step?.responsibleRole}</p></section>;
 }
 
 function WorkflowPreviewSummary({ application }: { application: MvpApplication }) {
   const version = application.workflowPreview?.version;
-  return <section className="rounded-xl border border-[#087c73]/15 bg-[#eef7f5] p-4"><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#087c73]">Configured workflow</p><p className="mt-2 text-sm font-semibold text-[#102c3d]">Workflow begins when employee submits</p><p className="mt-1 text-xs leading-5 text-[#102c3d]/55">The workflow version published at submission will be pinned. Current preview: version {version?.version}.</p></section>;
+  return <section className="rounded-xl border border-[#087c73]/15 bg-[#eef7f5] p-4"><p className="text-xs font-semibold uppercase tracking-[0.12em] text-lt-accent">Configured workflow</p><p className="mt-2 text-sm font-semibold text-lt-ink">Workflow begins when employee submits</p><p className="mt-1 text-xs leading-5 text-lt-muted">The workflow version published at submission will be pinned. Current preview: version {version?.version}.</p></section>;
 }
 
 function applicationStage(status: RequestStatus) {

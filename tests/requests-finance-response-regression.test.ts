@@ -21,6 +21,7 @@ vi.mock("react", async original => {
   } };
 });
 vi.mock("@/components/levytate-mvp/MvpWorkspaceStore", () => ({ useMvpWorkspace: () => ({ meta: { userEmail: "lead@example.invalid", organisationId: "tenant-a" } }) }));
+vi.mock("@/components/levytate-mvp/LevyTateStandardsProvider",()=>({useLevyTateStandards:()=>({selectableStandards:[],loading:false})}));
 vi.mock("@/components/levytate-mvp/usePinnedClientMutation", () => ({ usePinnedClientMutation: () => ({ locked: false, working: false, pending: false, reconciled: 0, error: "", execute: vi.fn(), retry: vi.fn() }) }));
 import { EmployerRequestsContainer } from "@/components/levytate-mvp/EmployerRequestsContainer";
 import { LevyFinanceModule } from "@/components/levytate-mvp/LevyFinanceModule";

@@ -4,6 +4,7 @@ import { dialogTabBoundary, dialogTabStops, isTopmostDialog, topmostModalDialog 
 import type { LucideIcon } from "lucide-react";
 import dynamic from "next/dynamic";
 import {
+  ArrowRight,
   BellRing,
   BookOpenCheck,
   Building2,
@@ -34,6 +35,7 @@ import { LevyTateLogo } from "@/components/levytate-demo/PlatformShell";
 import { ApplicationsModule } from "@/components/levytate-mvp/ApplicationsModule";
 import { AskLevyTateAiWorkspace } from "@/components/levytate-mvp/AskLevyTateAiWorkspace";
 import { DashboardModule, LineManagerHomeModule, SettingsModule } from "@/components/levytate-mvp/DashboardSettingsModules";
+import { useEmployerSetupProgress } from "@/components/levytate-mvp/useEmployerSetupProgress";
 import { DemoModeIndicator, DemoPerspectiveMenu, useDemoPerspectiveSwitcher } from "@/components/levytate-mvp/DemoPerspectiveSwitcher";
 import { ApplicationWorkflowSettings } from "@/components/levytate-mvp/ApplicationWorkflowSettings";
 import { EarlyAccessModule } from "@/components/levytate-mvp/EarlyAccessModule";
@@ -214,6 +216,7 @@ export function LevyTateMvpApp({ initialWorkspace, persistLocal = false, initial
 function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirectReportDetail: ManagerDirectReportLearnerDetail | null }) {
   const { data, meta, hydrated } = useMvpWorkspace();
   const [activeModule, setActiveModule] = useState<ModuleName>(initialManagerDirectReportDetail ? "My Team" : "Home");
+  const employerSetup = useEmployerSetupProgress(activeModule === "Home");
   const [peopleView, setPeopleView] = useState<PeopleView>("Employees");
   const [providerView, setProviderView] = useState<ProviderView>("Programmes");
   const [settingsView, setSettingsView] = useState<SettingsView>("Workspace");
@@ -568,52 +571,59 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
   }, [activeModule, copilotEntity, earlyAccessPolicy.modules]);
 
   return (
-    <main data-testid="levytate-app-shell" className="levytate-workspace min-h-screen w-full min-w-0 bg-[#f7f6f2] text-[#102c3d]">
-      <header className="sticky top-0 z-40 border-b border-[#102c3d]/[0.08] bg-white/[0.96] backdrop-blur-xl">
+    <main data-testid="levytate-app-shell" className="levytate-workspace lt-design min-h-screen w-full min-w-0 bg-lt-canvas text-lt-ink">
+      <header className="lt-topbar sticky top-0 z-40 backdrop-blur-xl">
         <div className="mx-auto flex h-[4.5rem] max-w-[1580px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-7">
           <div className="flex min-w-0 items-center gap-3">
-            <button ref={mobileMenuButtonRef} type="button" onClick={() => setMobileMenuOpen(true)} aria-expanded={mobileMenuOpen} aria-controls="levytate-mobile-navigation" aria-label="Open navigation" className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-[#102c3d]/[0.09] bg-white text-[#102c3d] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 lg:hidden">
+            <button ref={mobileMenuButtonRef} type="button" onClick={() => setMobileMenuOpen(true)} aria-expanded={mobileMenuOpen} aria-controls="levytate-mobile-navigation" aria-label="Open navigation" className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-[#102c3d]/[0.09] bg-white text-lt-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 lg:hidden">
               <Menu size={19} aria-hidden="true" />
             </button>
             <LevyTateLogo className="shrink-0 [--levytate-logo-size:2.05rem] sm:[--levytate-logo-size:2.25rem]" />
             <div className="hidden h-8 w-px bg-[#102c3d]/[0.09] sm:block" />
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-[#102c3d]">{workspaceName}</p>
-              <p className="hidden truncate text-[11px] text-[#102c3d]/55 sm:block">{workspaceLabel}</p>
+            <div className="hidden min-w-0 sm:block">
+              <p data-testid="workspace-header-name" title={workspaceName} className="truncate text-sm font-semibold text-lt-ink">{workspaceName}</p>
+              <p className="truncate text-xs text-lt-muted">{workspaceLabel}</p>
             </div>
           </div>
 
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-            {availableModules.some((module) => module.name === "Copilot") ? <button type="button" onClick={() => openModule("Copilot")} className="hidden h-10 items-center gap-2 rounded-xl px-3 text-xs font-semibold text-[#102c3d]/65 transition hover:bg-[#f3f7f4] hover:text-[#102c3d] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 sm:inline-flex"><Sparkles size={15} aria-hidden="true" />Copilot</button> : null}
-            {notifications.length > 0 && availableModules.some((module) => module.name === "Home") ? <button type="button" onClick={() => openModule("Home")} aria-label={`${notifications.length} items need attention`} className="relative grid h-10 w-10 place-items-center rounded-xl text-[#102c3d]/60 transition hover:bg-[#f3f7f4] hover:text-[#102c3d] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20"><BellRing size={17} aria-hidden="true" /><span className="absolute right-1 top-1 min-w-4 rounded-full bg-[#c95568] px-1 text-center text-[9px] font-bold leading-4 text-white">{notifications.length}</span></button> : null}
+            {availableModules.some((module) => module.name === "Copilot") ? <button type="button" onClick={() => openModule("Copilot")} aria-label="Open full Copilot workspace" title="Open full Copilot workspace" className="hidden h-10 items-center gap-2 rounded-xl px-3 text-xs font-semibold text-lt-muted transition hover:bg-[#f3f7f4] hover:text-lt-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 sm:inline-flex"><Sparkles size={15} aria-hidden="true" />Copilot</button> : null}
+            {notifications.length > 0 && availableModules.some((module) => module.name === "Home") ? <button type="button" onClick={() => openModule("Home")} aria-label={`${notifications.length} items need attention`} className="relative grid h-10 w-10 place-items-center rounded-xl text-lt-muted transition hover:bg-[#f3f7f4] hover:text-lt-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20"><BellRing size={17} aria-hidden="true" /><span className="absolute right-1 top-1 min-w-4 rounded-full bg-[#c95568] px-1 text-center text-[9px] font-bold leading-4 text-white">{notifications.length}</span></button> : null}
             {meta?.prospectAccess?.status === "active" && meta.userRole === "Apprenticeship Lead" ? <ProspectGettingStarted access={meta.prospectAccess} onNavigate={navigateTo} /> : null}
             {demoPerspective.state ? <DemoModeIndicator state={demoPerspective.state} /> : null}
             <div className="relative">
-              <button ref={accountButtonRef} type="button" onClick={() => setAccountMenuOpen((open) => !open)} aria-expanded={accountMenuOpen} aria-haspopup="menu" aria-label="Open account menu" className="flex h-11 items-center gap-2 rounded-xl border border-[#102c3d]/[0.09] bg-white px-2.5 text-left shadow-[0_7px_20px_rgba(16,44,61,0.05)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 sm:px-3">
+              <button ref={accountButtonRef} type="button" onClick={() => setAccountMenuOpen((open) => !open)} aria-expanded={accountMenuOpen} aria-haspopup="menu" aria-label="Open account menu" className="lt-account flex h-11 items-center gap-2 rounded-lg border bg-white px-2.5 text-left focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 sm:px-3">
                 <span className="grid h-7 w-7 place-items-center rounded-lg bg-[#102c3d] text-white"><UserRound size={14} aria-hidden="true" /></span>
-                <span className="hidden max-w-36 sm:block"><span data-testid="current-role" className="block truncate text-xs font-semibold text-[#102c3d]">{meta?.userRole ?? "Workspace user"}</span><span className="block text-[10px] text-[#102c3d]/45">{storageStatus}</span></span>
+                <span className="hidden max-w-36 sm:block"><span data-testid="current-role" className="block truncate text-xs font-semibold text-lt-ink">{meta?.userRole ?? "Workspace user"}</span><span className="block text-xs text-lt-muted">{storageStatus}</span></span>
               </button>
               {accountMenuOpen ? <div ref={accountMenuRef} role="menu" className="absolute right-0 top-[calc(100%+0.55rem)] z-50 w-80 max-w-[calc(100vw-2rem)] rounded-2xl border border-[#102c3d]/[0.09] bg-white p-3 shadow-[0_24px_70px_rgba(16,44,61,0.17)]">
-                <div className="rounded-xl bg-[#f4f8f5] px-3 py-3"><p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#0b6f63]">Signed in as</p><p className="mt-1 text-sm font-semibold">{meta?.userRole ?? "Workspace user"}</p><p className="mt-1 text-xs text-[#102c3d]/52">{workspaceName} · {storageStatus}</p></div>
+                <div className="rounded-xl bg-[#f4f8f5] px-3 py-3"><p className="text-xs font-semibold uppercase tracking-[0.13em] text-lt-accent">Signed in as</p><p className="mt-1 text-sm font-semibold">{meta?.userRole ?? "Workspace user"}</p><p className="mt-1 text-xs text-lt-muted">{workspaceName} · {storageStatus}</p></div>
                 <DemoPerspectiveMenu controller={demoPerspective} />
-                {availableModules.some((module) => module.name === "Knowledge") ? <button role="menuitem" type="button" onClick={() => openModule("Knowledge")} className="mt-2 flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-xs font-semibold text-[#102c3d]/65 hover:bg-[#f4f8f5]"><CircleHelp size={15} aria-hidden="true" />Help and guidance</button> : null}
-                <form action="/api/levytate-beta-logout" method="post"><button role="menuitem" type="submit" className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-xs font-semibold text-[#b13b51] hover:bg-[#fff2f3]"><LogOut size={15} aria-hidden="true" />Sign out</button></form>
+                {availableModules.some((module) => module.name === "Knowledge") ? <button role="menuitem" type="button" onClick={() => openModule("Knowledge")} className="mt-2 flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-xs font-semibold text-lt-muted hover:bg-[#f4f8f5]"><CircleHelp size={15} aria-hidden="true" />Help and guidance</button> : null}
+                <form action="/api/levytate-beta-logout" method="post"><button role="menuitem" type="submit" className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-xs font-semibold text-lt-risk hover:bg-[#fff2f3]"><LogOut size={15} aria-hidden="true" />Sign out</button></form>
               </div> : null}
             </div>
           </div>
         </div>
       </header>
 
+      {employerSetup && !employerSetup.complete && activeModule !== "Home" && availableModules.some((module) => module.name === "Home") ? <div className="border-b border-[#102c3d]/[0.08] bg-[#f1f7f3] px-4 py-2 sm:px-6" data-testid="employer-setup-return">
+        <div className="mx-auto flex max-w-[1520px] flex-wrap items-center justify-between gap-3 text-sm">
+          <span className="font-medium text-lt-secondary">Workspace setup in progress · {employerSetup.steps.filter((step) => !step.optional && step.complete).length} of {employerSetup.steps.filter((step) => !step.optional).length} essentials saved</span>
+          <button type="button" onClick={() => openModule("Home")} className="min-h-10 font-semibold text-lt-accent hover:underline">Return to guided setup <ArrowRight size={14} className="ml-1 inline" aria-hidden="true"/></button>
+        </div>
+      </div> : null}
+
       {mobileMenuOpen ? <div className="fixed inset-0 z-50 lg:hidden"><button type="button" onClick={() => setMobileMenuOpen(false)} aria-label="Close navigation" className="absolute inset-0 bg-[#102c3d]/40 backdrop-blur-sm" /><aside ref={mobileDrawerRef} id="levytate-mobile-navigation" role="dialog" aria-modal="true" aria-labelledby="levytate-mobile-navigation-title" className="absolute inset-y-0 left-0 flex w-[min(88vw,22rem)] flex-col overflow-hidden bg-white shadow-[24px_0_80px_rgba(16,44,61,0.24)]">
-        <div className="flex h-[4.5rem] items-center justify-between border-b border-[#102c3d]/[0.08] px-4"><div><p id="levytate-mobile-navigation-title" className="text-sm font-semibold">{workspaceName}</p><p className="text-xs text-[#102c3d]/50">Navigation</p></div><button type="button" onClick={() => setMobileMenuOpen(false)} aria-label="Close navigation" className="grid h-11 w-11 place-items-center rounded-xl text-[#102c3d]/60 hover:bg-[#f4f8f5] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20"><X size={19} aria-hidden="true" /></button></div>
+        <div className="flex h-[4.5rem] items-center justify-between border-b border-[#102c3d]/[0.08] px-4"><div><p id="levytate-mobile-navigation-title" className="text-sm font-semibold">{workspaceName}</p><p className="text-xs text-lt-muted">Navigation</p></div><button type="button" onClick={() => setMobileMenuOpen(false)} aria-label="Close navigation" className="grid h-11 w-11 place-items-center rounded-xl text-lt-muted hover:bg-[#f4f8f5] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20"><X size={19} aria-hidden="true" /></button></div>
         <nav aria-label="Mobile workspace navigation" className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
-          <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/40">Core workspace</p>
+          <p className="px-3 pb-2 lt-eyebrow">Core workspace</p>
           <div className="grid gap-1">
             {coreNavigation.map((area) => <MobileNavigationArea key={area.key} area={area} activeModule={activeModule} moduleLabel={moduleLabel} onOpenArea={openArea} onOpenModule={openModule} />)}
           </div>
           {addOnNavigation.length > 0 ? (
             <div className="mt-5 border-t border-[#102c3d]/[0.07] pt-4">
-              <button type="button" onClick={() => setAddOnsOpen((open) => !open)} aria-expanded={addOnsOpen} aria-controls="levytate-mobile-add-ons" className="flex min-h-11 w-full items-center justify-between rounded-lg px-3 text-left text-[11px] font-semibold text-[#102c3d]/65 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20">
+              <button type="button" onClick={() => setAddOnsOpen((open) => !open)} aria-expanded={addOnsOpen} aria-controls="levytate-mobile-add-ons" className="flex min-h-11 w-full items-center justify-between rounded-lg px-3 text-left text-xs font-semibold text-lt-muted focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20">
                 Add-ons <ChevronRight size={16} aria-hidden="true" className={addOnsOpen ? "rotate-90 transition-transform" : "transition-transform"} />
               </button>
               <div id="levytate-mobile-add-ons" className={addOnsOpen ? "grid gap-1" : "hidden"}>
@@ -623,29 +633,29 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
           ) : null}
           {supportNavigation.length > 0 ? (
             <div className="mt-5 border-t border-[#102c3d]/[0.07] pt-4">
-              <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/40">Tools & support</p>
+              <p className="px-3 pb-2 lt-eyebrow">Tools & support</p>
               <div className="grid gap-1">
                 {supportNavigation.map((area) => <MobileNavigationArea key={area.key} area={area} activeModule={activeModule} moduleLabel={moduleLabel} onOpenArea={openArea} onOpenModule={openModule} />)}
               </div>
             </div>
           ) : null}
         </nav>
-        <div className="border-t border-[#102c3d]/[0.08] p-4"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-semibold">{meta?.userRole ?? "Workspace user"}</p><p className="mt-0.5 text-[11px] text-[#102c3d]/50">{storageStatus}</p></div><form action="/api/levytate-beta-logout" method="post"><button type="submit" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#b13b51]/15 px-3 text-xs font-semibold text-[#b13b51]"><LogOut size={14} aria-hidden="true" />Sign out</button></form></div></div>
+        <div className="border-t border-[#102c3d]/[0.08] p-4"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-semibold">{meta?.userRole ?? "Workspace user"}</p><p className="mt-0.5 text-xs text-lt-muted">{storageStatus}</p></div><form action="/api/levytate-beta-logout" method="post"><button type="submit" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#b13b51]/15 px-3 text-xs font-semibold text-lt-risk"><LogOut size={14} aria-hidden="true" />Sign out</button></form></div></div>
       </aside></div> : null}
 
       <div className="grid min-h-[calc(100vh-4.5rem)] w-full min-w-0 grid-cols-[minmax(0,1fr)] lg:grid-cols-[232px_minmax(0,1fr)]">
-        <aside data-testid="levytate-sidebar" className="hidden min-w-0 border-r border-[#102c3d]/[0.07] bg-white lg:sticky lg:top-[4.5rem] lg:flex lg:h-[calc(100vh-4.5rem)] lg:flex-col">
+        <aside data-testid="levytate-sidebar" className="lt-sidebar hidden min-w-0 lg:sticky lg:top-[4.5rem] lg:flex lg:h-[calc(100vh-4.5rem)] lg:flex-col">
           <nav className="flex min-h-0 flex-1 flex-col px-3 py-5" aria-label="Workspace areas">
-            <div className="px-3 pb-3"><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#102c3d]/38">Core workspace</p></div>
+            <div className="px-3 pb-3"><p className="lt-eyebrow">Core workspace</p></div>
             <div className="min-h-0 flex-1 space-y-1 overflow-y-auto">{coreNavigation.map((area) => {
               const Icon = navigationAreaIcon(area);
               const active = activeArea?.key === area.key;
               const badge = area.modules.reduce((total, module) => total + (moduleBadges[module as ModuleName] ?? 0), 0);
-              return <button key={area.key} type="button" onClick={() => openArea(area)} aria-current={active ? "page" : undefined} className={`group flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-left transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 ${active ? "bg-[#eaf5f1] text-[#102c3d] shadow-[inset_3px_0_0_#159b8f]" : "text-[#102c3d]/62 hover:bg-[#f5f8f5] hover:text-[#102c3d]"}`}><span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${active ? "bg-white text-[#087c73]" : "bg-[#f5f8f5] text-[#102c3d]/45 group-hover:bg-white"}`}><Icon size={16} strokeWidth={1.8} aria-hidden="true" /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{area.label}</span></span>{badge ? <span className="min-w-5 rounded-full bg-white px-1.5 text-center text-[10px] font-bold leading-5 text-[#0b6f63] ring-1 ring-[#159b8f]/15">{badge}</span> : null}</button>;
+              return <button key={area.key} type="button" onClick={() => openArea(area)} aria-current={active ? "page" : undefined} className={`lt-nav-item group flex w-full items-center gap-3 px-3 text-left transition`}><span className={`grid h-7 w-7 shrink-0 place-items-center ${active ? "text-lt-accent" : "text-lt-muted"}`}><Icon size={18} strokeWidth={1.75} aria-hidden="true" /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{area.label}</span></span>{badge ? <span className="min-w-5 rounded-full bg-white px-1.5 text-center text-xs font-bold leading-5 text-lt-accent ring-1 ring-[#159b8f]/15">{badge}</span> : null}</button>;
             })}
               {addOnNavigation.length > 0 ? (
                 <div className="mt-4 border-t border-[#102c3d]/[0.07] pt-3">
-                  <button type="button" onClick={() => setAddOnsOpen((open) => !open)} aria-expanded={addOnsOpen} aria-controls="levytate-desktop-add-ons" className="flex min-h-10 w-full items-center justify-between rounded-lg px-3 text-left text-[11px] font-semibold text-[#102c3d]/65 hover:bg-[#f5f8f5] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20">
+                  <button type="button" onClick={() => setAddOnsOpen((open) => !open)} aria-expanded={addOnsOpen} aria-controls="levytate-desktop-add-ons" className="flex min-h-10 w-full items-center justify-between rounded-lg px-3 text-left text-xs font-semibold text-lt-muted hover:bg-[#f5f8f5] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20">
                     Add-ons <ChevronRight size={15} aria-hidden="true" className={addOnsOpen ? "rotate-90 transition-transform" : "transition-transform"} />
                   </button>
                   <div id="levytate-desktop-add-ons" className={addOnsOpen ? "grid gap-0.5" : "hidden"}>
@@ -654,17 +664,21 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
                 </div>
               ) : null}
             </div>
-            {supportNavigation.length ? <div className="mt-4 border-t border-[#102c3d]/[0.07] pt-3"><p className="px-3 pb-2 text-[9px] font-semibold uppercase tracking-[0.13em] text-[#102c3d]/35">Tools & support</p><div className="grid gap-0.5">{supportNavigation.map((area) => { const Icon = navigationAreaIcon(area); const active = activeArea?.key === area.key; return <button key={area.key} type="button" onClick={() => openArea(area)} aria-current={active ? "page" : undefined} className={`flex min-h-10 items-center gap-3 rounded-lg px-3 text-left text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 ${active ? "bg-[#f1f7f4] text-[#087c73]" : "text-[#102c3d]/54 hover:bg-[#f5f8f5] hover:text-[#102c3d]"}`}><Icon size={15} aria-hidden="true" />{area.label}</button>; })}</div></div> : null}
+            {supportNavigation.length ? <div className="mt-4 border-t border-[#102c3d]/[0.07] pt-3"><p className="px-3 pb-2 lt-eyebrow">Tools & support</p><div className="grid gap-0.5">{supportNavigation.map((area) => { const Icon = navigationAreaIcon(area); const active = activeArea?.key === area.key; return <button key={area.key} type="button" onClick={() => openArea(area)} aria-current={active ? "page" : undefined} className={`flex min-h-10 items-center gap-3 rounded-lg px-3 text-left text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 ${active ? "bg-[#f1f7f4] text-lt-accent" : "text-lt-muted hover:bg-[#f5f8f5] hover:text-lt-ink"}`}><Icon size={15} aria-hidden="true" />{area.label}</button>; })}</div></div> : null}
           </nav>
         </aside>
 
         <section className="w-full min-w-0 max-w-full">
           <div className="mx-auto w-full min-w-0 max-w-[1580px] px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
             <header className="mb-5">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">{activeArea?.label ?? "Protected workspace"}</p><h1 className="mt-1 text-[1.7rem] font-semibold tracking-[-0.035em] text-[#102c3d] sm:text-[2rem]">{moduleLabel(activeModule)}</h1><p className="mt-1.5 max-w-3xl text-sm leading-6 text-[#102c3d]/60">{moduleCopy[activeModule]}</p></div></div>
-              {activeArea && activeArea.modules.length > 1 ? <nav aria-label={`${activeArea.label} views`} className="mt-4 flex max-w-full gap-1 overflow-x-auto rounded-xl border border-[#102c3d]/[0.07] bg-white p-1.5 shadow-[0_8px_24px_rgba(16,44,61,0.035)]">{activeArea.modules.map((module) => <button key={module} type="button" onClick={() => openModule(module as ModuleName)} aria-current={activeModule === module ? "page" : undefined} className={`min-h-10 shrink-0 rounded-lg px-3.5 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 ${activeModule === module ? "bg-[#102c3d] text-white shadow-[0_6px_14px_rgba(16,44,61,0.14)]" : "text-[#102c3d]/58 hover:bg-[#f3f7f4] hover:text-[#102c3d]"}`}>{moduleLabel(module as ModuleName)}</button>)}</nav> : null}
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div>{activeArea && activeArea.label !== moduleLabel(activeModule) ? <p className="lt-eyebrow mb-1">{activeArea.label}</p> : null}<h1 className="lt-page-title">{moduleLabel(activeModule)}</h1><p className="mt-1.5 max-w-3xl text-sm leading-6 text-lt-muted">{moduleCopy[activeModule]}</p></div></div>
+              {activeArea && activeArea.modules.length > 1 ? <nav aria-label={`${activeArea.label} views`} className="lt-tabs mt-4 flex max-w-full overflow-x-auto">{activeArea.modules.map((module) => <button key={module} type="button" onClick={() => openModule(module as ModuleName)} aria-current={activeModule === module ? "page" : undefined} className={`lt-tab min-h-11 shrink-0 transition`}>{moduleLabel(module as ModuleName)}</button>)}</nav> : null}
             </header>
 
+            {activeModule !== "Home" && employerSetup && !employerSetup.complete ? <section data-testid="employer-setup-return" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#159b8f]/20 bg-[#f1f7f4] px-4 py-3">
+              <div className="flex min-w-0 flex-wrap items-center gap-3"><p className="text-sm font-semibold">Workspace setup <span className="font-normal text-lt-muted">· {employerSetup.steps.filter(step => step.complete).length} of {employerSetup.steps.length} complete</span></p><div aria-hidden="true" className="h-1.5 w-20 overflow-hidden rounded-full bg-lt-border"><div className="h-full rounded-full bg-lt-accent" style={{width: `${100 * employerSetup.steps.filter(step => step.complete).length / Math.max(1, employerSetup.steps.length)}%`}} /></div></div>
+              <button type="button" onClick={() => navigateTo("Home")} className="min-h-10 rounded-lg px-3 text-sm font-semibold text-lt-accent hover:underline">Return to setup</button>
+            </section> : null}
             {activeModule === "Home" ? (
               meta?.userRole === "Employee"
                 ? <EmployeeHomeModule onNavigate={(target) => navigateTo(target)} />
@@ -672,7 +686,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
                   ? <LineManagerHomeModule onNavigate={(target) => navigateTo(target)} onOpenApplicationReview={openApplicationReview} />
                 : meta?.userRole === "Platform Admin"
                   ? <PlatformAdminWorkspacesModule onNavigate={navigateTo} />
-                  : <DashboardModule onNavigate={navigateTo} />
+                  : <DashboardModule onNavigate={navigateTo} setup={employerSetup} />
             ) : null}
             {activeModule === "My Programme" ? <EmployeeProgrammeModule onNavigate={(target) => navigateTo(target)} /> : null}
             {activeModule === "My Application" ? <EmployeeApplicationModule onNavigate={navigateTo} /> : null}
@@ -693,7 +707,7 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
             {activeModule === "Assessments" ? <AssessmentsModule /> : null}
             {activeModule === "People" ? (
               <ModuleStackNav items={peopleItems} active={peopleView} onSelect={(item) => setPeopleView(item as PeopleView)}>
-                {peopleView === "Employees" ? <EmployeesModule initialEmployeeId={peopleEmployeeId} onStartDiscovery={(employeeId) => { setAiEmployeeId(employeeId); openModule("Copilot"); }} /> : null}
+                {peopleView === "Employees" ? <EmployeesModule initialEmployeeId={peopleEmployeeId} onSetupPeopleSaved={employerSetup && !employerSetup.complete ? () => {} : undefined} onStartDiscovery={(employeeId) => { setAiEmployeeId(employeeId); openModule("Copilot"); }} /> : null}
                 {peopleView === "Roles" ? <RolesModule /> : null}
               </ModuleStackNav>
             ) : null}
@@ -724,11 +738,11 @@ function MvpAppShell({ initialManagerDirectReportDetail }: { initialManagerDirec
               </ModuleStackNav>
             ) : null}
           </div>
-          <nav aria-label="Trust and support" className="mx-auto mt-4 flex max-w-[1540px] flex-wrap gap-x-5 gap-y-1 border-t border-[#102c3d]/[0.06] px-4 pb-5 pt-3 text-xs font-semibold text-[#102c3d]/[0.48] sm:px-6 lg:px-8">
-            <a href="/levytate/privacy" className="min-h-11 content-center hover:text-[#087c73]">Privacy</a>
-            <a href="/levytate/early-access-terms" className="min-h-11 content-center hover:text-[#087c73]">Terms</a>
-            <a href="/levytate/support" className="min-h-11 content-center hover:text-[#087c73]">Support</a>
-            <a href="/levytate/data-rights" className="min-h-11 content-center hover:text-[#087c73]">Data rights</a>
+          <nav aria-label="Trust and support" className="mx-auto mt-4 flex max-w-[1540px] flex-wrap gap-x-5 gap-y-1 border-t border-[#102c3d]/[0.06] px-4 pb-5 pt-3 text-xs font-semibold text-lt-muted sm:px-6 lg:px-8">
+            <a href="/levytate/privacy" className="min-h-11 content-center hover:text-lt-accent">Privacy</a>
+            <a href="/levytate/early-access-terms" className="min-h-11 content-center hover:text-lt-accent">Terms</a>
+            <a href="/levytate/support" className="min-h-11 content-center hover:text-lt-accent">Support</a>
+            <a href="/levytate/data-rights" className="min-h-11 content-center hover:text-lt-accent">Data rights</a>
           </nav>
         </section>
       </div>
@@ -750,7 +764,7 @@ function ModuleStackNav({
 }) {
   return (
     <div className="grid gap-4">
-      <div className="flex max-w-full gap-1 overflow-x-auto rounded-xl border border-[#102c3d]/[0.07] bg-white p-1.5 shadow-[0_8px_24px_rgba(16,44,61,0.035)]" role="tablist">
+      <div className="lt-tabs flex max-w-full overflow-x-auto" role="tablist">
         {items.map((item) => (
           <button
             key={item}
@@ -758,7 +772,7 @@ function ModuleStackNav({
             onClick={() => onSelect(item)}
             role="tab"
             aria-selected={active === item}
-            className={`min-h-10 shrink-0 rounded-lg px-4 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 ${active === item ? "bg-[#102c3d] text-white shadow-[0_6px_14px_rgba(16,44,61,0.14)]" : "text-[#102c3d]/[0.58] hover:bg-[#f4f8f5] hover:text-[#102c3d]"}`}
+            className={`lt-tab min-h-11 shrink-0 transition`}
           >
             {item}
           </button>
@@ -777,7 +791,7 @@ function DesktopAddOnNavigationArea({ area, active, onOpen }: {
   const Icon = navigationAreaIcon(area);
   return (
     <button type="button" onClick={() => onOpen(area)} aria-current={active ? "page" : undefined}
-      className={`flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 ${active ? "bg-[#eaf5f1] text-[#087c73]" : "text-[#102c3d]/60 hover:bg-[#f5f8f5] hover:text-[#102c3d]"}`}>
+      className={`flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 ${active ? "bg-[#eaf5f1] text-lt-accent" : "text-lt-muted hover:bg-[#f5f8f5] hover:text-lt-ink"}`}>
       <Icon size={15} aria-hidden="true" />
       <span className="truncate">{area.label}</span>
     </button>
@@ -794,12 +808,12 @@ function MobileNavigationArea({ area, activeModule, moduleLabel, onOpenArea, onO
   const active = area.modules.includes(activeModule);
   const Icon = navigationAreaIcon(area);
   return <div>
-    <button type="button" onClick={() => onOpenArea(area)} aria-current={active ? "page" : undefined} className={`flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-left transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 ${active ? "bg-[#eaf5f1] text-[#102c3d]" : "text-[#102c3d]/65 hover:bg-[#f4f8f5]"}`}>
-      <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${active ? "bg-white text-[#087c73]" : "bg-[#f4f8f5] text-[#102c3d]/45"}`}><Icon size={16} aria-hidden="true" /></span>
-      <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{area.label}</span><span className="mt-0.5 block truncate text-[11px] font-medium text-[#102c3d]/45">{area.description}</span></span>
-      <ChevronRight size={15} className="text-[#102c3d]/35" aria-hidden="true" />
+    <button type="button" onClick={() => onOpenArea(area)} aria-current={active ? "page" : undefined} className={`flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-left transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 ${active ? "bg-[#eaf5f1] text-lt-ink" : "text-lt-muted hover:bg-[#f4f8f5]"}`}>
+      <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${active ? "bg-white text-lt-accent" : "bg-[#f4f8f5] text-lt-muted"}`}><Icon size={16} aria-hidden="true" /></span>
+      <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{area.label}</span><span className="mt-0.5 block truncate text-xs font-medium text-lt-muted">{area.description}</span></span>
+      <ChevronRight size={15} className="text-lt-muted" aria-hidden="true" />
     </button>
-    {active && area.modules.length > 1 ? <div className="ml-11 mt-1 grid gap-0.5 border-l border-[#159b8f]/20 pl-3">{area.modules.map((module) => <button key={module} type="button" onClick={() => onOpenModule(module as ModuleName)} aria-current={activeModule === module ? "page" : undefined} className={`min-h-10 rounded-lg px-3 text-left text-xs font-semibold focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 ${activeModule === module ? "bg-[#102c3d] text-white" : "text-[#102c3d]/55 hover:bg-[#f4f8f5] hover:text-[#102c3d]"}`}>{moduleLabel(module as ModuleName)}</button>)}</div> : null}
+    {active && area.modules.length > 1 ? <div className="ml-11 mt-1 grid gap-0.5 border-l border-[#159b8f]/20 pl-3">{area.modules.map((module) => <button key={module} type="button" onClick={() => onOpenModule(module as ModuleName)} aria-current={activeModule === module ? "page" : undefined} className={`min-h-10 rounded-lg px-3 text-left text-xs font-semibold focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/20 ${activeModule === module ? "bg-[#102c3d] text-white" : "text-lt-muted hover:bg-[#f4f8f5] hover:text-lt-ink"}`}>{moduleLabel(module as ModuleName)}</button>)}</div> : null}
   </div>;
 }
 

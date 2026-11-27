@@ -65,21 +65,21 @@ export function ProviderDeliveryWorkspace({initialWorkspace,opportunitiesAvailab
     setRetained(null);setMessage("");setError("");
     setTargetId("");setSummary("");setNextReviewDate("");setPercentage("0");
   }
-  return <main className="min-h-screen bg-[#f6f8f6] text-[#102c3d]">
-    <header className="border-b border-[#102c3d]/10 bg-white">
+  return <main className="lt-design min-h-screen bg-lt-canvas text-lt-ink">
+    <header className="lt-topbar">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-5 py-4">
         <LevyTateLogo className="[--levytate-logo-size:2.3rem]" />
         <div className="flex flex-wrap items-center gap-3 text-xs font-semibold">
-          {opportunitiesAvailable?<Link href="/levytate/provider" className="flex min-h-11 items-center gap-2 text-[#0b776e]"><ArrowLeft size={15}/> Opportunities</Link>:null}
-          <span className="rounded-full bg-[#eaf5f1] px-3 py-2 text-[#0b776e]">Delivery updates</span>
-          <form action="/api/levytate-provider/logout" method="post"><button type="submit" className="min-h-11 rounded-full border border-[#102c3d]/15 px-3 text-[#102c3d]/70">Sign out</button></form>
+          {opportunitiesAvailable?<Link href="/levytate/provider" className="flex min-h-11 items-center gap-2 text-lt-accent"><ArrowLeft size={15}/> Opportunities</Link>:null}
+          <span className="rounded-full bg-[#eaf5f1] px-3 py-2 text-lt-accent">Delivery updates</span>
+          <form action="/api/levytate-provider/logout" method="post"><button type="submit" className="min-h-11 rounded-full border border-[#102c3d]/15 px-3 text-lt-secondary">Sign out</button></form>
         </div>
       </div>
     </header>
     <div className="mx-auto max-w-6xl space-y-7 px-5 py-8">
-      <header><p className="text-xs font-bold uppercase tracking-[0.14em] text-[#0b776e]">Provider workspace · {workspace.provider.name}</p>
+      <header><p className="text-xs font-bold uppercase tracking-[0.14em] text-lt-accent">Provider workspace · {workspace.provider.name}</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">Programme & learner updates</h1>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-[#102c3d]/65">Share delivery evidence with employers who have granted access. Every update is attributed, time-stamped and reviewed by the employer. No compliance record changes automatically.</p>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-lt-muted">Share delivery evidence with employers who have granted access. Every update is attributed, time-stamped and reviewed by the employer. No compliance record changes automatically.</p>
       </header>
       <label className="block max-w-lg text-sm font-semibold" htmlFor="delivery-employer">Employer
         <select id="delivery-employer" value={employerId} disabled={busy||Boolean(retained)}
@@ -90,8 +90,8 @@ export function ProviderDeliveryWorkspace({initialWorkspace,opportunitiesAvailab
       </label>
       {employer?<div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
         <section className="rounded-2xl border border-[#102c3d]/10 bg-white p-5 shadow-sm sm:p-7">
-          <div className="flex items-center gap-2"><ClipboardList className="text-[#0b776e]" size={20}/><h2 className="text-xl font-semibold">Submit an update</h2></div>
-          <p className="mt-2 text-sm leading-6 text-[#102c3d]/60">Choose the employer-approved record and supply a concise, factual update.</p>
+          <div className="flex items-center gap-2"><ClipboardList className="text-lt-accent" size={20}/><h2 className="text-xl font-semibold">Submit an update</h2></div>
+          <p className="mt-2 text-sm leading-6 text-lt-muted">Choose the employer-approved record and supply a concise, factual update.</p>
           <form onSubmit={handleSubmit} className="mt-6 space-y-5">
             <fieldset disabled={busy||Boolean(retained)} className="grid gap-3 sm:grid-cols-2">
               <legend className="mb-2 text-sm font-semibold">Update type</legend>
@@ -133,7 +133,7 @@ export function ProviderDeliveryWorkspace({initialWorkspace,opportunitiesAvailab
                 onChange={event=>setSummary(event.target.value)} placeholder="What has changed, and what should the employer know?"
                 className="mt-2 block w-full rounded-xl border border-[#102c3d]/15 p-3 text-sm"/>
             </label>
-            {message?<p role="status" className="flex gap-2 text-sm font-semibold text-[#087c73]"><CheckCircle2 size={18}/>{message}</p>:null}
+            {message?<p role="status" className="flex gap-2 text-sm font-semibold text-lt-accent"><CheckCircle2 size={18}/>{message}</p>:null}
             {error?<p role="alert" className="text-sm font-semibold text-[#a63348]">{error}</p>:null}
             {retained?<div className="rounded-xl bg-[#fff6e8] p-4 text-sm">
               <p>Submission status is uncertain. The original update has been retained unchanged to prevent duplicates.</p>
@@ -152,13 +152,13 @@ export function ProviderDeliveryWorkspace({initialWorkspace,opportunitiesAvailab
           <div className="flex items-center justify-between gap-3"><h2 className="text-xl font-semibold">Submission history</h2>
             <button type="button" aria-label="Refresh submissions" onClick={()=>void refresh().catch(()=>setError("Could not refresh updates."))}
               className="grid h-11 w-11 place-items-center rounded-xl border border-[#102c3d]/10"><RefreshCw size={17}/></button></div>
-          <p className="mt-2 text-sm text-[#102c3d]/60">Source: {employer.name}. Employer-approved learner progress reports become official learner progress entries; programme notes remain separate evidence.</p>
+          <p className="mt-2 text-sm text-lt-muted">Source: {employer.name}. Employer-approved learner progress reports become official learner progress entries; programme notes remain separate evidence.</p>
           <div className="mt-5 space-y-3">{recent.length?recent.slice(0,30).map(item=><article key={item.id} className="rounded-xl border border-[#102c3d]/10 p-4">
-            <div className="flex items-center justify-between gap-2"><span className="text-xs font-semibold text-[#102c3d]/55">{item.kind==="learner_progress"?"Learner progress":"Programme delivery"} · {item.reportDate}</span>
+            <div className="flex items-center justify-between gap-2"><span className="text-xs font-semibold text-lt-muted">{item.kind==="learner_progress"?"Learner progress":"Programme delivery"} · {item.reportDate}</span>
               <span className="rounded-full bg-[#f2f5f3] px-2 py-1 text-xs font-semibold capitalize">{item.status}</span></div>
             <p className="mt-2 text-sm leading-6">{item.kind==="learner_progress"?"summary" in item.payload?item.payload.summary:"":"deliveryNote" in item.payload?item.payload.deliveryNote:""}</p>
-            <p className="mt-2 text-xs text-[#102c3d]/50">{item.promotedProgressId?"Included in official learner progress":item.status==="pending"?"Awaiting employer review":`Employer ${item.status}`}</p>
-          </article>):<p className="rounded-xl border border-dashed border-[#102c3d]/15 p-5 text-sm text-[#102c3d]/60">No delivery updates submitted yet.</p>}</div>
+            <p className="mt-2 text-xs text-lt-muted">{item.promotedProgressId?"Included in official learner progress":item.status==="pending"?"Awaiting employer review":`Employer ${item.status}`}</p>
+          </article>):<p className="rounded-xl border border-dashed border-[#102c3d]/15 p-5 text-sm text-lt-muted">No delivery updates submitted yet.</p>}</div>
         </section>
       </div>:<p role="alert">No authorised employer is currently available.</p>}
     </div>

@@ -2,8 +2,11 @@
 
 import { ChevronDown, FileUp, Sparkles, UserPlus } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { employeeFieldGuidance } from "@/components/levytate-mvp/SetupContextHelp";
 import {
   EmptyState,
+  ListResultsBar,
+  FilteredEmptyState,
   FormActions,
   FormField,
   FormGrid,
@@ -35,8 +38,10 @@ import {
   type MvpEmployee,
 } from "@/lib/levytate/mvp/workspace";
 
-export function EmployeesModule({ onStartDiscovery, onOpenDirectReport, initialEmployeeId = null }: {
+export function EmployeesModule({ onStartDiscovery, onSetupPeopleSaved, onOpenDirectReport, initialEmployeeId = null, setupStage }: {
   onStartDiscovery?: (employeeId: string) => void;
+  onSetupPeopleSaved?: () => void;
+  setupStage?: "manager" | "employees";
   onOpenDirectReport?: (employeeId: string) => void;
   initialEmployeeId?: string | null;
 }) {
@@ -89,6 +94,10 @@ export function EmployeesModule({ onStartDiscovery, onOpenDirectReport, initialE
       );
   });
 
+  const filtered = Boolean(search.trim()) || status !== "Active" || [departmentFilter,managerFilter,siteFilter,applicationFilter].some(value=>value!=="All");
+  const directoryTotal=data.employees.filter(employee=>status==="All"||employee.status===status).length;
+  function clearFilters(){setSearch("");setStatus("Active");setDepartmentFilter("All");setManagerFilter("All");setSiteFilter("All");setApplicationFilter("All");}
+
   const selectedEmployee = selectedEmployeeId
     ? data.employees.find((employee) => employee.id === selectedEmployeeId) ?? null
     : null;
@@ -122,7 +131,7 @@ export function EmployeesModule({ onStartDiscovery, onOpenDirectReport, initialE
       managerId: "",
       department: "",
       site: "",
-      platformRole: "Employee",
+      platformRole: setupStage === "manager" ? "Line Manager" : "Employee",
       status: "Active",
       startDate: todayIso(),
       createdAt: now,
@@ -156,7 +165,10 @@ export function EmployeesModule({ onStartDiscovery, onOpenDirectReport, initialE
       const result = await saveEmployee(employee, draftRevision);
       if (!result.ok) { setError(result.message); return; }
       setDraft(null);
-      if (isNew) onStartDiscovery?.(employee.id);
+      if (isNew) {
+        if (onSetupPeopleSaved) onSetupPeopleSaved();
+        else onStartDiscovery?.(employee.id);
+      }
     } catch (failure) { setError(failure instanceof Error ? failure.message : "The employee save was not confirmed. Your form has been kept."); }
     finally { setSaving(false); }
   }
@@ -193,6 +205,7 @@ export function EmployeesModule({ onStartDiscovery, onOpenDirectReport, initialE
       const result = await importEmployees(peopleImport.importId, peopleImport.employees);
       if (!result.ok) { setError(result.message); return; }
       setImportComplete(peopleImport.employees.length); setPeopleImport(null);
+      onSetupPeopleSaved?.();
     } catch { setError("The import outcome was not confirmed. Keep this preview open and retry the same request."); }
     finally { setSaving(false); }
   }
@@ -212,31 +225,32 @@ export function EmployeesModule({ onStartDiscovery, onOpenDirectReport, initialE
         search={search}
         onSearch={setSearch}
         placeholder="Search name, role, department, manager or site"
-        actionLabel={canWriteEmployees ? "Add employee" : undefined}
+        actionLabel={canWriteEmployees ? (setupStage === "manager" ? "Add line manager" : "Add employee") : undefined}
         onAction={canWriteEmployees ? () => openEmployee() : undefined}
         filters={
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-            <select value={status} onChange={(event) => setStatus(event.target.value)} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-sm font-semibold text-[#102c3d]/[0.66]"><option>Active</option><option>Archived</option><option>All</option></select>
-            <select value={departmentFilter} onChange={(event) => setDepartmentFilter(event.target.value)} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-sm font-semibold text-[#102c3d]/[0.66]"><option>All</option>{departments.map((department) => <option key={department}>{department}</option>)}</select>
+            <select aria-label="Employee record status" value={status} onChange={(event) => setStatus(event.target.value)} className="lt-control h-11 min-w-0 px-3 text-sm"><option value="Active">Active records</option><option value="Archived">Archived records</option><option value="All">All records</option></select>
+            <select aria-label="Department" value={departmentFilter} onChange={(event) => setDepartmentFilter(event.target.value)} className="lt-control h-11 min-w-0 px-3 text-sm"><option value="All">All departments</option>{departments.map((department) => <option key={department}>{department}</option>)}</select>
             <details className="group rounded-lg border border-[#102c3d]/[0.09] bg-white">
-              <summary className="flex h-10 cursor-pointer list-none items-center justify-between gap-2 px-3 text-sm font-semibold text-[#102c3d]/[0.66]">
+              <summary className="flex h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 text-sm font-semibold text-lt-secondary">
                 More filters
                 <ChevronDown size={15} className="transition group-open:rotate-180" aria-hidden="true" />
               </summary>
               <div className="grid gap-2 border-t border-[#102c3d]/[0.06] p-2">
-                <select value={managerFilter} onChange={(event) => setManagerFilter(event.target.value)} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-sm font-semibold text-[#102c3d]/[0.66]"><option value="All">All managers</option>{managers.map((manager) => <option key={manager.id} value={manager.id}>{manager.name}</option>)}</select>
-                <select value={siteFilter} onChange={(event) => setSiteFilter(event.target.value)} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-sm font-semibold text-[#102c3d]/[0.66]"><option value="All">All sites</option>{sites.map((site) => <option key={site}>{site}</option>)}</select>
-                <select value={applicationFilter} onChange={(event) => setApplicationFilter(event.target.value)} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-sm font-semibold text-[#102c3d]/[0.66]"><option value="All">All applications</option>{applicationStatuses.map((statusOption) => <option key={statusOption}>{statusOption}</option>)}</select>
+                <select aria-label="Manager" value={managerFilter} onChange={(event) => setManagerFilter(event.target.value)} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-sm font-semibold text-lt-muted"><option value="All">All managers</option>{managers.map((manager) => <option key={manager.id} value={manager.id}>{manager.name}</option>)}</select>
+                <select aria-label="Site" value={siteFilter} onChange={(event) => setSiteFilter(event.target.value)} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-sm font-semibold text-lt-muted"><option value="All">All sites</option>{sites.map((site) => <option key={site}>{site}</option>)}</select>
+                <select aria-label="Application status" value={applicationFilter} onChange={(event) => setApplicationFilter(event.target.value)} className="h-10 rounded-lg border border-[#102c3d]/[0.09] bg-white px-3 text-sm font-semibold text-lt-muted"><option value="All">All applications</option>{applicationStatuses.map((statusOption) => <option key={statusOption}>{statusOption}</option>)}</select>
               </div>
             </details>
           </div>
         }
       />
-      {canWriteEmployees ? <div className="mb-4 flex flex-wrap items-center gap-3"><label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border border-[#102c3d]/[0.10] bg-white px-4 text-xs font-semibold text-[#102c3d]"><FileUp size={15} />Import CSV<input type="file" accept=".csv,text/csv" disabled={saving} className="sr-only" onChange={(event) => { void choosePeopleFile(event.target.files?.[0]); event.target.value = ""; }} /></label><span className="text-xs text-[#102c3d]/[0.48]">Required: name, work email, job title, department. No invitations are sent.</span>{importComplete ? <span role="status" className="text-xs font-semibold text-[#0b6f63]">{importComplete} employee{importComplete === 1 ? "" : "s"} imported.</span> : null}</div> : null}
-      {error && !draft && !peopleImport ? <p role="alert" className="mb-4 text-sm font-semibold text-[#b53c52]">{error}</p> : null}
+      {canWriteEmployees ? <div className="mb-4 flex flex-wrap items-center gap-3"><label className="lt-button lt-secondary cursor-pointer"><FileUp size={15} />Import CSV<input type="file" accept=".csv,text/csv" disabled={saving} className="sr-only" onChange={(event) => { void choosePeopleFile(event.target.files?.[0]); event.target.value = ""; }} /></label><span className="text-xs text-lt-muted">Required: name, work email, job title, department. No invitations are sent.</span>{importComplete ? <span role="status" className="text-xs font-semibold text-lt-accent">{importComplete} employee{importComplete === 1 ? "" : "s"} imported.</span> : null}</div> : null}
+      {error && !draft && !peopleImport ? <p role="alert" className="mb-4 text-sm font-semibold text-lt-risk">{error}</p> : null}
 
+      <ListResultsBar count={visible.length} total={directoryTotal} singular="employee" plural="employees" filtered={filtered} onReset={clearFilters}/>
       {visible.length ? (
-        <div className="grid gap-4 xl:grid-cols-2">
+        <div className={isLineManager?"grid gap-4 xl:grid-cols-2":"lt-people-directory"} role="list" aria-label={isLineManager?"Direct reports":"Employee directory"}>
           {visible.map((employee) => {
             const role = data.roles.find((item) => item.id === employee.roleId);
             const application = employeeCurrentApplication(data, employee.id);
@@ -267,21 +281,21 @@ export function EmployeesModule({ onStartDiscovery, onOpenDirectReport, initialE
               ? "Review"
               : routeOutcome
                 ? "Continue"
-                : "Start AI";
+                : "Start discovery";
 
             return (
-              <article key={employee.id} className="border border-[#102c3d]/[0.07] bg-white p-4 shadow-[0_10px_24px_rgba(16,44,61,0.03)]">
-                <div className="flex items-start justify-between gap-4">
+              <article role="listitem" key={employee.id} className={isLineManager?"lt-panel p-4":"lt-people-row"}>
+                <div className="lt-people-identity flex min-w-0 items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate text-base font-semibold text-[#102c3d]">{employee.name}</p>
-                    <p className="mt-1 text-sm leading-6 text-[#102c3d]/[0.58]">{employee.jobTitle || role?.title || "Role to confirm"}</p>
+                    <p className="truncate text-base font-semibold text-lt-ink">{employee.name}</p>
+                    <p className="mt-1 text-sm leading-6 text-lt-muted">{employee.jobTitle || role?.title || "Role to confirm"}</p>
                   </div>
                   <StatusBadge tone={operationalSummary ? statusTone(operationalSummary.primaryStatus) : application ? statusTone(application.status) : routeOutcome ? routeOutcome.tone : profile ? "yellow" : "neutral"}>
                     {operationalSummary?.primaryStatus ?? application?.status ?? statusLabel}
                   </StatusBadge>
                 </div>
 
-                <div className="mt-3 grid gap-x-5 gap-y-2 border-t border-[#102c3d]/[0.06] pt-3 sm:grid-cols-2">
+                <div className="lt-people-facts mt-3 grid min-w-0 gap-x-5 gap-y-2 border-t border-lt-border pt-3 sm:grid-cols-2">
                   {isLineManager && operationalSummary ? (
                     <>
                       <DecisionFact label="Programme" value={operationalSummary.programme} />
@@ -300,23 +314,23 @@ export function EmployeesModule({ onStartDiscovery, onOpenDirectReport, initialE
                 </div>
 
                 {routeOutcome && !operationalSummary?.hasLearnerLifecycle ? (
-                  <div className="mt-3 border-l-2 border-[#4f7b95] bg-[#f8fbfa] px-4 py-3">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">{routeOutcome.label}</p>
-                    <p className="mt-1 text-sm font-semibold text-[#102c3d]">{routeOutcome.title}</p>
+                  <div className="lt-people-route mt-3 rounded-lg bg-lt-soft px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lt-accent">{routeOutcome.label}</p>
+                    <p className="mt-1 text-sm font-semibold text-lt-ink">{routeOutcome.title}</p>
                   </div>
                 ) : null}
 
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#102c3d]/[0.06] pt-4">
+                <div className="lt-people-actions mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-lt-border pt-3">
                   {isLineManager ? (
-                    <button type="button" onClick={() => onOpenDirectReport?.(employee.id)} className="rounded-full bg-[#102c3d] px-4 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5">
+                    <button type="button" onClick={() => onOpenDirectReport?.(employee.id)} className="lt-button lt-primary">
                       View apprenticeship journey
                     </button>
                   ) : (
                     <>
-                      <button type="button" onClick={() => application ? setSelectedEmployeeId(employee.id) : onStartDiscovery?.(employee.id)} className="rounded-full bg-[#102c3d] px-4 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5">
+                      <button type="button" onClick={() => application ? setSelectedEmployeeId(employee.id) : onStartDiscovery?.(employee.id)} className="lt-button lt-primary">
                         {primaryAction}
                       </button>
-                      <button type="button" onClick={() => setSelectedEmployeeId(employee.id)} className="rounded-full bg-[#f5f7f3] px-4 py-2 text-xs font-semibold text-[#102c3d]/[0.62] ring-1 ring-[#102c3d]/[0.07] transition hover:text-[#102c3d]">
+                      <button type="button" onClick={() => setSelectedEmployeeId(employee.id)} className="lt-button lt-secondary">
                         Details
                       </button>
                     </>
@@ -327,44 +341,44 @@ export function EmployeesModule({ onStartDiscovery, onOpenDirectReport, initialE
           })}
         </div>
       ) : (
-        canWriteEmployees ? (
+        filtered ? <FilteredEmptyState title="No employees match these filters" onReset={clearFilters}/> : canWriteEmployees ? (
           <EmptyState
-            title="Add the first employee"
+            title={setupStage === "manager" ? "Add your first line manager" : "Add the first employee"}
             copy="Create one record. LevyTate will guide discovery and recommend the next development route."
-            actionLabel="Add employee"
+            actionLabel={setupStage === "manager" ? "Add line manager" : "Add employee"}
             onAction={() => openEmployee()}
           />
         ) : (
           <div className="rounded-xl border border-dashed border-[#102c3d]/[0.14] bg-[#f8fbfa] px-5 py-10 text-center">
-            <h3 className="text-base font-semibold text-[#102c3d]">No direct reports found</h3>
-            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#102c3d]/[0.56]">Your view is limited to your own profile and direct reports. Ask a workspace admin if your reporting line looks incorrect.</p>
+            <h3 className="text-base font-semibold text-lt-ink">No direct reports found</h3>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-lt-muted">Your view is limited to your own profile and direct reports. Ask a workspace admin if your reporting line looks incorrect.</p>
           </div>
         )
       )}
 
       {draft ? (
-        <MvpModal title={data.employees.some((item) => item.id === draft.id) ? "Edit employee" : "Add employee"} onClose={() => { if (!saving) setDraft(null); }}>
+        <MvpModal title={data.employees.some((item) => item.id === draft.id) ? "Edit employee" : setupStage === "manager" ? "Add line manager" : "Add employee"} onClose={() => { if (!saving) setDraft(null); }}>
           <form onSubmit={submit}>
             <fieldset disabled={saving} className="min-w-0">
             <div className="mb-5 flex items-start gap-3 rounded-xl bg-[#edf7f3] p-4 ring-1 ring-[#159b8f]/[0.10]">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white text-[#0b8e82]"><UserPlus size={17} aria-hidden="true" /></span>
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white text-lt-accent"><UserPlus size={17} aria-hidden="true" /></span>
               <div>
                 <p className="text-sm font-semibold">Start with the essentials</p>
-                <p className="mt-1 text-xs leading-5 text-[#102c3d]/[0.54]">After saving, LevyTate Copilot can guide the role and capability conversation before any application begins.</p>
+                <p className="mt-1 text-xs leading-5 text-lt-muted">{onSetupPeopleSaved ? "Your saved team stays here so you can add another person, assign a line manager or continue setup when ready." : "After saving, LevyTate Copilot can guide the role and capability conversation before any application begins."}</p>
               </div>
             </div>
 
             <FormGrid>
-              <FormField label="Employee name" value={draft.name} onChange={(value) => setDraft({ ...draft, name: value })} required />
-              <FormField label="Work email" type="email" value={draft.email} onChange={(value) => setDraft({ ...draft, email: value })} required />
-              <FormField label="Job title" value={draft.jobTitle} onChange={(value) => setDraft({ ...draft, jobTitle: value })} required />
-              <FormField label="Department" value={draft.department} onChange={(value) => setDraft({ ...draft, department: value })} required />
-              <FormSelect label="Line manager" value={draft.managerId} onChange={(value) => setDraft({ ...draft, managerId: value })} options={[{ value: "", label: managers.length ? "Assign later" : "Add a Line Manager record first" }, ...managers.filter((employee) => employee.id !== draft.id).map((employee) => ({ value: employee.id, label: employee.name }))]} />
-              <FormField label="Site" value={draft.site} onChange={(value) => setDraft({ ...draft, site: value })} wide />
+              <FormField label="Employee name" value={draft.name} onChange={(value) => setDraft({ ...draft, name: value })} help={employeeFieldGuidance.name} required />
+              <FormField label="Work email" type="email" value={draft.email} onChange={(value) => setDraft({ ...draft, email: value })} help={employeeFieldGuidance.email} required />
+              <FormField label="Job title" value={draft.jobTitle} onChange={(value) => setDraft({ ...draft, jobTitle: value })} help={employeeFieldGuidance.jobTitle} required />
+              <FormField label="Department" value={draft.department} onChange={(value) => setDraft({ ...draft, department: value })} help={employeeFieldGuidance.department} required />
+              <FormSelect label="Line manager" help={employeeFieldGuidance.lineManager} value={draft.managerId} onChange={(value) => setDraft({ ...draft, managerId: value })} options={[{ value: "", label: managers.length ? "Assign later" : "Add a Line Manager record first" }, ...managers.filter((employee) => employee.id !== draft.id).map((employee) => ({ value: employee.id, label: employee.name }))]} />
+              <FormField label="Site" value={draft.site} onChange={(value) => setDraft({ ...draft, site: value })} help={employeeFieldGuidance.site} hint="Physical work location (e.g. Hull office), not a website." wide />
             </FormGrid>
 
             <details className="group mt-5 rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa]">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-xs font-semibold text-[#102c3d]/[0.58]">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-xs font-semibold text-lt-muted">
                 Additional record details
                 <ChevronDown size={16} className="transition group-open:rotate-180" aria-hidden="true" />
               </summary>
@@ -390,133 +404,61 @@ export function EmployeesModule({ onStartDiscovery, onOpenDirectReport, initialE
       {peopleImport ? <MvpModal title="Review employee import" eyebrow={peopleImport.fileName} onClose={() => { if (!saving) setPeopleImport(null); }} wide>
         <div className="grid gap-4">
           <div className="grid gap-3 sm:grid-cols-2"><DecisionFact label="Employees to import" value={String(peopleImport.employees.length)} /><DecisionFact label="Issues requiring correction" value={String(peopleImport.result.issues.length)} /></div>
-          <p className="text-sm text-[#102c3d]/70">All rows are saved together or none are. Existing emails are not skipped or overwritten. Access must be prepared and invited separately.</p>
+          <p className="text-sm text-lt-secondary">All rows are saved together or none are. Existing emails are not skipped or overwritten. Access must be prepared and invited separately.</p>
           {peopleImport.result.issues.length ? <div role="alert" className="max-h-48 overflow-y-auto rounded-xl bg-[#fff8df] p-4 text-xs text-[#765b00]">{peopleImport.result.issues.slice(0, 30).map((issue) => <p key={`${issue.sourceRow}:${issue.message}`} className="py-1">{issue.sourceRow ? `Row ${issue.sourceRow}: ` : ""}{issue.message}</p>)}</div> : null}
-          {error ? <p role="alert" className="text-sm font-semibold text-[#b53c52]">{error}</p> : null}
-          <div className="flex flex-wrap gap-3"><button type="button" disabled={saving || Boolean(sessionRecovery) || !peopleImport.employees.length || Boolean(peopleImport.result.issues.length)} onClick={() => void importPeople()} className="min-h-11 rounded-full bg-[#102c3d] px-5 text-sm font-semibold text-white disabled:opacity-40">{saving ? "Importing…" : "Import all employees"}</button><button type="button" disabled={saving} onClick={() => setPeopleImport(null)} className="min-h-11 rounded-full px-4 text-sm font-semibold text-[#102c3d]/[0.55] disabled:opacity-40">Cancel</button></div>
+          {error ? <p role="alert" className="text-sm font-semibold text-lt-risk">{error}</p> : null}
+          <div className="flex flex-wrap gap-3"><button type="button" disabled={saving || Boolean(sessionRecovery) || !peopleImport.employees.length || Boolean(peopleImport.result.issues.length)} onClick={() => void importPeople()} className="min-h-11 rounded-full bg-[#102c3d] px-5 text-sm font-semibold text-white disabled:opacity-40">{saving ? "Importing…" : "Import all employees"}</button><button type="button" disabled={saving} onClick={() => setPeopleImport(null)} className="min-h-11 rounded-full px-4 text-sm font-semibold text-lt-muted disabled:opacity-40">Cancel</button></div>
         </div>
       </MvpModal> : null}
 
       {selectedEmployee ? (
-        <MvpModal title={selectedEmployee.name} eyebrow="Employee apprenticeship record" onClose={() => setSelectedEmployeeId(null)} wide>
-          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[#f8fbfa] px-4 py-3 ring-1 ring-[#102c3d]/[0.055]">
-            <p className="text-sm leading-6 text-[#102c3d]/[0.58]">Keep the record simple. Use AI for discovery, then open details only when needed.</p>
-            <div className="flex flex-wrap gap-2">
-              <TableAction onClick={() => onStartDiscovery?.(selectedEmployee.id)}>Open Copilot</TableAction>
-              {canWriteEmployees ? (
-                <>
-                  <TableAction onClick={() => openEmployee(selectedEmployee)}>Edit</TableAction>
-                  <TableAction onClick={() => void toggleEmployeeArchive(selectedEmployee.id)} danger={selectedEmployee.status === "Active"}>
-                    {selectedEmployee.status === "Archived" ? "Restore" : "Archive"}
-                  </TableAction>
-                </>
-              ) : null}
+        <MvpModal title={selectedEmployee.name} eyebrow="Employee record" description={[selectedEmployee.jobTitle||"Role to confirm",selectedEmployee.department,selectedEmployee.site].filter(Boolean).join(" · ")} onClose={() => setSelectedEmployeeId(null)} wide>
+          <div className="lt-employee-record" data-testid="employee-record-detail">
+            <div className="lt-record-toolbar">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <StatusBadge tone={selectedCurrentApplication ? statusTone(selectedCurrentApplication.status) : "neutral"}>{selectedCurrentApplication?.status ?? "No active application"}</StatusBadge>
+                {selectedProfile?<StatusBadge tone={selectedProfile.stage==="recommendation_ready"?"green":"yellow"}>{selectedProfile.stage==="recommendation_ready"?"Recommendation ready":"Discovery in progress"}</StatusBadge>:null}
+              </div>
+              <div className="lt-record-actions">
+                {onStartDiscovery?<button type="button" onClick={()=>onStartDiscovery(selectedEmployee.id)} className="lt-button lt-primary"><Sparkles size={15} aria-hidden="true"/>Open Copilot</button>:null}
+                {canWriteEmployees?<><TableAction onClick={()=>openEmployee(selectedEmployee)}>Edit</TableAction><TableAction onClick={()=>void toggleEmployeeArchive(selectedEmployee.id)} danger={selectedEmployee.status==="Active"}>{selectedEmployee.status==="Archived"?"Restore":"Archive"}</TableAction></>:null}
+              </div>
             </div>
-          </div>
-          {error ? <p role="alert" className="mb-4 text-sm font-semibold text-[#b53c52]">{error}</p> : null}
-          <div className="grid gap-5 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
-            <div className="space-y-4 rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4">
-              <section>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#c95568]">Current profile</p>
-                <h3 className="mt-1 text-lg font-semibold text-[#102c3d]">{selectedEmployee.jobTitle || "Role to confirm"}</h3>
-                <p className="mt-2 text-sm leading-6 text-[#102c3d]/[0.56]">{selectedEmployee.department || "Department to confirm"} - {selectedEmployee.site || "Site to confirm"}</p>
-                <p className="mt-2 text-sm leading-6 text-[#102c3d]/[0.56]">Manager: {managerName(data, selectedEmployee)}</p>
-              </section>
-
-              <section>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#0b6f63]">Current status</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <StatusBadge tone={selectedCurrentApplication ? statusTone(selectedCurrentApplication.status) : "neutral"}>
-                    {selectedCurrentApplication?.status ?? "No active application"}
-                  </StatusBadge>
-                  {selectedProfile ? (
-                    <StatusBadge tone={selectedProfile.stage === "recommendation_ready" ? "green" : "yellow"}>
-                      {selectedProfile.stage === "recommendation_ready" ? "Recommendation ready" : "Discovery in progress"}
-                    </StatusBadge>
-                  ) : null}
-                </div>
-              </section>
-
-              <section>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#0b6f63]">Development interests</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {employeeDevelopmentInterests(data, selectedEmployee.id).length ? employeeDevelopmentInterests(data, selectedEmployee.id).map((interest) => (
-                    <span key={interest} className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#102c3d]/[0.68] ring-1 ring-[#102c3d]/[0.08]">{interest}</span>
-                  )) : <p className="text-sm text-[#102c3d]/[0.54]">No interests captured yet.</p>}
-                </div>
-              </section>
-
-              <section>
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#0b6f63]">Recommended pathway</p>
-                    <p className="mt-1 text-xs text-[#102c3d]/[0.48]">Sourced from the employee conversation and role library.</p>
-                  </div>
-                  <button type="button" onClick={() => onStartDiscovery?.(selectedEmployee.id)} className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-[#0b6f63] ring-1 ring-[#102c3d]/[0.08]">
-                    <Sparkles size={12} aria-hidden="true" />
-                    Open Copilot
-                  </button>
-                </div>
-                {selectedRouteOutcome ? (
-                  <div className="mt-2 rounded-xl bg-white px-4 py-3 ring-1 ring-[#102c3d]/[0.07]">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-[#102c3d]">{selectedRouteOutcome.title}</p>
-                        <p className="mt-1 text-xs leading-5 text-[#102c3d]/[0.56]">{selectedRouteOutcome.copy}</p>
-                      </div>
-                      <StatusBadge tone={selectedRouteOutcome.tone}>{selectedRouteOutcome.badge}</StatusBadge>
-                    </div>
-                  </div>
-                ) : <p className="mt-2 text-sm text-[#102c3d]/[0.54]">LevyTate will show the leading recommendation once discovery is complete.</p>}
-              </section>
-            </div>
-
-            <div className="space-y-5">
-              <section className="rounded-xl border border-[#102c3d]/[0.07] bg-white p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#c95568]">Application history</p>
-                    <p className="mt-1 text-sm text-[#102c3d]/[0.54]">Every workflow step is kept on the employee record.</p>
-                  </div>
-                  <TableAction onClick={() => onStartDiscovery?.(selectedEmployee.id)}>Open Copilot</TableAction>
-                </div>
-                <div className="mt-4 grid gap-3">
-                  {selectedEmployeeApplications.length ? selectedEmployeeApplications.map((application) => (
-                    <div key={application.id} className="rounded-xl bg-[#f8fbfa] px-4 py-3 ring-1 ring-[#102c3d]/[0.06]">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-semibold text-[#102c3d]">{applicationLabel(application.apprenticeshipStandardId)}</p>
-                          <p className="mt-1 text-xs leading-5 text-[#102c3d]/[0.54]">{application.reason || "No reason recorded yet."}</p>
-                        </div>
-                        <StatusBadge tone={statusTone(application.status)}>{application.status}</StatusBadge>
-                      </div>
-                      <div className="mt-3 space-y-2">
-                        {application.history.map((entry) => (
-                          <div key={entry.id} className="rounded-lg bg-white px-3 py-2 text-xs text-[#102c3d]/[0.62] ring-1 ring-[#102c3d]/[0.05]">
-                            <div className="flex items-center justify-between gap-3">
-                              <p className="font-semibold text-[#102c3d]">{entry.status}</p>
-                              <span className="text-[#102c3d]/[0.42]">{entry.owner}</span>
-                            </div>
-                            <p className="mt-1">{entry.note}</p>
-                            <p className="mt-1 text-[#102c3d]/[0.42]">{entry.createdAt.slice(0, 10)}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )) : <p className="text-sm text-[#102c3d]/[0.54]">No applications created yet for this employee.</p>}
-                </div>
-              </section>
-
-              <section className="rounded-xl border border-[#102c3d]/[0.07] bg-white p-4">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#0b6f63]">Conversation history</p>
-                <div className="mt-4 grid gap-3">
-                  {selectedProfile?.conversationHistory.length ? selectedProfile.conversationHistory.slice(-6).map((message, index) => (
-                    <div key={`${message.role}-${index}`} className={`rounded-xl px-4 py-3 text-sm leading-6 ${message.role === "user" ? "bg-[#102c3d] text-white" : "bg-[#f8fbfa] text-[#102c3d]/[0.68] ring-1 ring-[#102c3d]/[0.06]"}`}>
-                      {message.content}
-                    </div>
-                  )) : <p className="text-sm text-[#102c3d]/[0.54]">Conversation history will appear after guided discovery begins.</p>}
-                </div>
-              </section>
+            {error?<p role="alert" className="mt-3 text-sm font-semibold text-lt-risk">{error}</p>:null}
+            <div className="lt-record-columns">
+              <div className="lt-record-profile min-w-0">
+                <section className="lt-record-section">
+                  <h3 className="lt-section-title">Current profile</h3>
+                  <dl className="lt-profile-facts">
+                    <div><dt>Role</dt><dd>{selectedEmployee.jobTitle||"Role to confirm"}</dd></div>
+                    <div><dt>Department</dt><dd>{selectedEmployee.department||"Not confirmed"}</dd></div>
+                    <div><dt>Site</dt><dd>{selectedEmployee.site||"Not confirmed"}</dd></div>
+                    <div><dt>Line manager</dt><dd>{managerName(data,selectedEmployee)}</dd></div>
+                  </dl>
+                </section>
+                <section className="lt-record-section">
+                  <h3 className="lt-section-title">Development interests</h3>
+                  <div className="mt-3 flex flex-wrap gap-2">{employeeDevelopmentInterests(data,selectedEmployee.id).length?employeeDevelopmentInterests(data,selectedEmployee.id).map(interest=><span key={interest} className="rounded-md bg-lt-soft px-2.5 py-1.5 text-xs font-medium text-lt-secondary">{interest}</span>):<p className="text-sm text-lt-muted">No interests captured yet.</p>}</div>
+                </section>
+                <section className="lt-record-section">
+                  <h3 className="lt-section-title">Recommended pathway</h3>
+                  <p className="mt-1 text-xs leading-5 text-lt-muted">Based on the development conversation and role library.</p>
+                  {selectedRouteOutcome?<div className="mt-3"><div className="flex flex-wrap items-start gap-2"><p className="text-sm font-semibold text-lt-ink">{selectedRouteOutcome.title}</p><StatusBadge tone={selectedRouteOutcome.tone}>{selectedRouteOutcome.badge}</StatusBadge></div><p className="mt-2 text-sm leading-6 text-lt-muted">{selectedRouteOutcome.copy}</p></div>:<p className="mt-3 text-sm leading-6 text-lt-muted">A recommendation will appear when discovery is complete.</p>}
+                </section>
+              </div>
+              <div className="lt-record-activity min-w-0">
+                <section className="lt-record-section">
+                  <div className="flex items-baseline justify-between gap-3"><h3 className="lt-section-title">Application history</h3><span className="shrink-0 text-xs tabular-nums text-lt-muted">{selectedEmployeeApplications.length} {selectedEmployeeApplications.length===1?"application":"applications"}</span></div>
+                  {selectedEmployeeApplications.length?selectedEmployeeApplications.map(application=><article key={application.id} className="lt-application-history">
+                    <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><p className="lt-record-name">{applicationLabel(application.apprenticeshipStandardId)}</p><p className="mt-1 text-sm leading-6 text-lt-muted">{application.reason||"No reason recorded yet."}</p></div><StatusBadge tone={statusTone(application.status)}>{application.status}</StatusBadge></div>
+                    <ol className="lt-history-list">{application.history.map(entry=><li key={entry.id} className="lt-history-event"><div className="flex flex-wrap items-baseline justify-between gap-2"><p className="font-semibold text-lt-ink">{entry.status}</p><time className="text-xs tabular-nums text-lt-muted">{entry.createdAt.slice(0,10)}</time></div><p className="mt-1 text-xs text-lt-muted">{entry.owner}</p><p className="mt-1 text-sm leading-6 text-lt-secondary">{entry.note}</p></li>)}</ol>
+                  </article>):<p className="mt-3 text-sm leading-6 text-lt-muted">No applications created yet for this employee.</p>}
+                </section>
+                <section className="lt-record-section">
+                  <h3 className="lt-section-title">Conversation history</h3>
+                  <div className="mt-3 grid gap-3">{selectedProfile?.conversationHistory.length?selectedProfile.conversationHistory.slice(-6).map((message,index)=><div key={`${message.role}-${index}`} className={`rounded-lg px-3 py-2.5 text-sm leading-6 ${message.role==="user"?"bg-lt-ink text-white":"bg-lt-soft text-lt-secondary"}`}>{message.content}</div>):<p className="text-sm leading-6 text-lt-muted">Conversation history will appear after guided discovery begins.</p>}</div>
+                </section>
+              </div>
             </div>
           </div>
         </MvpModal>
@@ -530,8 +472,8 @@ export function EmployeesModule({ onStartDiscovery, onOpenDirectReport, initialE
 function DecisionFact({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#102c3d]/[0.38]">{label}</p>
-      <p className="mt-1 line-clamp-2 text-sm font-semibold leading-5 text-[#102c3d]/[0.72]">{value}</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.13em] text-lt-muted">{label}</p>
+      <p className="mt-1 line-clamp-2 text-sm font-semibold leading-5 text-lt-secondary">{value}</p>
     </div>
   );
 }

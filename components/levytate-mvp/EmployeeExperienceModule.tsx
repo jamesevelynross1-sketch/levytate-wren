@@ -96,23 +96,23 @@ export function EmployeeHomeModule({ onNavigate }: { onNavigate: (target: Employ
 
   return (
     <div className="grid gap-5">
-      <section className="rounded-2xl bg-[#102c3d] p-5 text-white shadow-[0_20px_54px_rgba(16,44,61,0.14)] sm:p-6">
+      <section className="lt-hero p-5 sm:p-6">
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-          <div className="max-w-3xl"><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8fe0d2]">Your next step</p><h2 className="mt-2 text-2xl font-semibold tracking-[-0.025em]">{nextAction.heading}</h2><p className="mt-2 text-sm leading-6 text-white/68">{nextAction.copy}</p><p className="mt-3 text-xs font-semibold text-white/52">Next owner: {nextAction.owner}</p></div>
-          <button type="button" onClick={() => onNavigate(nextAction.target)} className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#ffde59] px-5 text-sm font-semibold text-[#102c3d] shadow-[0_9px_20px_rgba(0,0,0,0.1)] transition hover:bg-[#ffe780] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/30">{nextAction.primaryLabel}</button>
+          <div className="max-w-3xl"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8fe0d2]">Your next step</p><h2 className="mt-2 text-2xl font-semibold tracking-[-0.025em]">{nextAction.heading}</h2><p className="mt-2 text-sm leading-6 text-white/68">{nextAction.copy}</p><p className="mt-3 text-xs font-semibold text-white/52">Next owner: {nextAction.owner}</p></div>
+          <button type="button" onClick={() => onNavigate(nextAction.target)} className="lt-button lt-hero-action">{nextAction.primaryLabel}</button>
         </div>
       </section>
 
-      <section className="rounded-2xl border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_14px_36px_rgba(16,44,61,0.04)] sm:p-6">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">Your journey</p><h2 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-[#102c3d]">Good to see you, {firstName(context.employee.name)}.</h2></div><button type="button" onClick={() => onNavigate("Copilot")} className="min-h-11 self-start rounded-xl border border-[#102c3d]/10 px-4 text-xs font-semibold text-[#102c3d] hover:bg-[#f4f8f5]">Ask LevyTate Copilot</button></div>
+      <section className="lt-panel p-5 sm:p-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-lt-accent">Your journey</p><h2 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-lt-ink">Good to see you, {firstName(context.employee.name)}.</h2></div><button type="button" onClick={() => onNavigate("Copilot")} className="min-h-11 self-start rounded-xl border border-[#102c3d]/10 px-4 text-xs font-semibold text-lt-ink hover:bg-[#f4f8f5]">Ask LevyTate Copilot</button></div>
         <div className="mt-5 grid gap-3 md:grid-cols-3"><EmployeeSummaryTile label={closed ? "Recorded programme" : "Recommended programme"} value={context.programmeName} /><EmployeeSummaryTile label={closed ? "Latest application" : "Current application"} value={employeeStatusLabel(context.application)} /><EmployeeSummaryTile label="Line manager" value={managerName(data, context.employee)} /></div>
         {context.application ? <div className="mt-5 border-t border-[#102c3d]/[0.07] pt-5"><ApplicationProgress application={context.application} compact /></div> : null}
-        {closed ? <button type="button" onClick={() => onNavigate("My Application")} className="mt-4 min-h-11 rounded-xl border border-[#102c3d]/15 px-4 text-xs font-semibold text-[#102c3d]">View application record</button> : null}
+        {closed ? <button type="button" onClick={() => onNavigate("My Application")} className="mt-4 min-h-11 rounded-xl border border-[#102c3d]/15 px-4 text-xs font-semibold text-lt-ink">View application record</button> : null}
       </section>
 
       {meta?.storageMode === "supabase" ? data.learnerRecords.filter((record) => record.employeeId === context.employee?.id && record.recordStatus === "Active" && record.lifecycleStatus === "pre_enrolment").map((record) => <EmployeeEligibilityPanel key={record.id} learnerId={record.id} />) : null}
 
-      {meta?.pastoralSupportEnabled ? <section className="rounded-2xl border border-[#159b8f]/15 bg-[#eef8f4] p-5 sm:p-6"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-[#087c73] shadow-sm"><HeartHandshake size={19} aria-hidden="true" /></span><div><h2 className="text-sm font-semibold text-[#102c3d]">Need some support with your apprenticeship?</h2><p className="mt-1 max-w-2xl text-xs leading-5 text-[#102c3d]/58">Talk something through privately with My Support, or go directly to an approved human support contact. Nothing is shared unless you choose to send a separate request.</p></div></div><button type="button" onClick={() => onNavigate("My Support")} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#102c3d] px-4 text-xs font-semibold text-white">Open My Support<ChevronRightIcon /></button></div></section> : null}
+      {meta?.pastoralSupportEnabled ? <section className="rounded-2xl border border-[#159b8f]/15 bg-[#eef8f4] p-5 sm:p-6"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-lt-accent shadow-sm"><HeartHandshake size={19} aria-hidden="true" /></span><div><h2 className="text-sm font-semibold text-lt-ink">Need some support with your apprenticeship?</h2><p className="mt-1 max-w-2xl text-xs leading-5 text-lt-muted">Talk something through privately with My Support, or go directly to an approved human support contact. Nothing is shared unless you choose to send a separate request.</p></div></div><button type="button" onClick={() => onNavigate("My Support")} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#102c3d] px-4 text-xs font-semibold text-white">Open My Support<ChevronRightIcon /></button></div></section> : null}
     </div>
   );
 }
@@ -143,8 +143,8 @@ export function EmployeeProgrammeModule({ onNavigate }: { onNavigate: (target: E
           <div className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-5">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <p className="text-sm font-semibold text-[#102c3d]">{context.standardTitle}</p>
-                <p className="mt-1 text-sm leading-6 text-[#102c3d]/56">
+                <p className="text-sm font-semibold text-lt-ink">{context.standardTitle}</p>
+                <p className="mt-1 text-sm leading-6 text-lt-muted">
                   Suggested for your role as {context.employee.jobTitle}. This page explains what the programme involves and what you need to do next.
                 </p>
               </div>
@@ -160,12 +160,12 @@ export function EmployeeProgrammeModule({ onNavigate }: { onNavigate: (target: E
           </section>
 
           <details className="rounded-xl border border-[#102c3d]/[0.07] bg-white p-4">
-            <summary className="cursor-pointer text-sm font-semibold text-[#102c3d]">Funding and programme details</summary>
-            <div className="mt-4 grid gap-3 text-sm leading-6 text-[#102c3d]/62 sm:grid-cols-2">
-              <p><span className="font-semibold text-[#102c3d]">Level:</span> {context.standardLevel}</p>
-              <p><span className="font-semibold text-[#102c3d]">Funding route:</span> {context.mapping?.fundingRoute ?? "Potentially funded through levy/co-investment"}</p>
-              <p><span className="font-semibold text-[#102c3d]">Reference:</span> {standard?.referenceCode ?? "To confirm"}</p>
-              <p><span className="font-semibold text-[#102c3d]">Route:</span> {standard?.occupationalRoute ?? "To confirm"}</p>
+            <summary className="cursor-pointer text-sm font-semibold text-lt-ink">Funding and programme details</summary>
+            <div className="mt-4 grid gap-3 text-sm leading-6 text-lt-muted sm:grid-cols-2">
+              <p><span className="font-semibold text-lt-ink">Level:</span> {context.standardLevel}</p>
+              <p><span className="font-semibold text-lt-ink">Funding route:</span> {context.mapping?.fundingRoute ?? "Potentially funded through levy/co-investment"}</p>
+              <p><span className="font-semibold text-lt-ink">Reference:</span> {standard?.referenceCode ?? "To confirm"}</p>
+              <p><span className="font-semibold text-lt-ink">Route:</span> {standard?.occupationalRoute ?? "To confirm"}</p>
             </div>
           </details>
 
@@ -173,7 +173,7 @@ export function EmployeeProgrammeModule({ onNavigate }: { onNavigate: (target: E
             <button type="button" onClick={() => onNavigate("My Application")} className="inline-flex h-10 items-center justify-center rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white">
               Open my application
             </button>
-            <button type="button" onClick={() => onNavigate("Copilot")} className="inline-flex h-10 items-center justify-center rounded-full bg-white px-5 text-xs font-semibold text-[#102c3d]/70 ring-1 ring-[#102c3d]/[0.1]">
+            <button type="button" onClick={() => onNavigate("Copilot")} className="inline-flex h-10 items-center justify-center rounded-full bg-white px-5 text-xs font-semibold text-lt-secondary ring-1 ring-[#102c3d]/[0.1]">
               Ask about this programme
             </button>
           </div>
@@ -212,9 +212,9 @@ export function EmployeeApplicationModule({ onNavigate }: { onNavigate: (target:
     return (
       <MvpPanel title="My application" eyebrow="Employee workflow">
         <div className="rounded-xl border border-dashed border-[#102c3d]/[0.14] bg-white p-6 text-center">
-          <GraduationCap className="mx-auto text-[#0b776e]" size={24} aria-hidden="true" />
-          <h2 className="mt-4 text-xl font-semibold text-[#102c3d]">Your organisation has not published any apprenticeship programmes yet.</h2>
-          <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-[#102c3d]/58">When an Apprenticeship Lead publishes a programme that is relevant to your role, you will be able to review it and start an application here.</p>
+          <GraduationCap className="mx-auto text-lt-accent" size={24} aria-hidden="true" />
+          <h2 className="mt-4 text-xl font-semibold text-lt-ink">Your organisation has not published any apprenticeship programmes yet.</h2>
+          <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-lt-muted">When an Apprenticeship Lead publishes a programme that is relevant to your role, you will be able to review it and start an application here.</p>
         </div>
       </MvpPanel>
     );
@@ -350,8 +350,8 @@ export function EmployeeApplicationModule({ onNavigate }: { onNavigate: (target:
               <div className="rounded-xl border border-[#102c3d]/[0.07] bg-white p-4">
                 <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold text-[#102c3d]">{state === "more-info" ? "Provide requested information" : state === "draft" ? "Continue application" : "Start application"}</p>
-                    <p className="mt-1 text-xs leading-5 text-[#102c3d]/52">{configurableWorkflow ? "You can save this as a draft. The approval workflow begins only when you submit it." : <>You can save this as a draft. It will not be sent to {manager} until you submit it.</>}</p>
+                    <p className="text-sm font-semibold text-lt-ink">{state === "more-info" ? "Provide requested information" : state === "draft" ? "Continue application" : "Start application"}</p>
+                    <p className="mt-1 text-xs leading-5 text-lt-muted">{configurableWorkflow ? "You can save this as a draft. The approval workflow begins only when you submit it." : <>You can save this as a draft. It will not be sent to {manager} until you submit it.</>}</p>
                   </div>
                   <StatusBadge tone={state === "more-info" ? "yellow" : "blue"}>{state === "more-info" ? "Reopened" : existing?.status ?? "Not started"}</StatusBadge>
                 </div>
@@ -370,9 +370,9 @@ export function EmployeeApplicationModule({ onNavigate }: { onNavigate: (target:
               </div>
 
               <div className="mt-4 flex flex-col gap-3 rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4 sm:flex-row sm:items-center sm:justify-between">
-                <p className={`text-xs font-semibold ${error ? "text-[#b53c52]" : "text-[#102c3d]/52"}`}>{error || savedMessage || "Save a draft or submit when the first three answers are complete."}</p>
+                <p className={`text-xs font-semibold ${error ? "text-lt-risk" : "text-lt-muted"}`}>{error || savedMessage || "Save a draft or submit when the first three answers are complete."}</p>
                 <div className="flex flex-wrap justify-end gap-2">
-                  <button type="submit" disabled={saving} className="h-10 rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.1] disabled:opacity-50">{saving ? "Saving…" : "Save draft"}</button>
+                  <button type="submit" disabled={saving} className="h-10 rounded-full bg-white px-4 text-xs font-semibold text-lt-muted ring-1 ring-[#102c3d]/[0.1] disabled:opacity-50">{saving ? "Saving…" : "Save draft"}</button>
                   <button type="button" disabled={saving} onClick={submitCurrent} className="h-10 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white disabled:opacity-50">
                     {saving ? "Submitting…" : state === "more-info" ? "Respond and resubmit" : configurableWorkflow ? "Submit application" : "Submit to line manager"}
                   </button>
@@ -434,9 +434,9 @@ function EmployeeProgrammeUnavailable({ onNavigate }: { onNavigate: (target: Emp
   return (
     <MvpPanel title="My programme" eyebrow="Employee workspace">
       <div className="rounded-xl border border-dashed border-[#102c3d]/[0.14] bg-white p-6 text-center">
-        <GraduationCap className="mx-auto text-[#0b776e]" size={24} aria-hidden="true" />
-        <h2 className="mt-4 text-xl font-semibold text-[#102c3d]">Your organisation has not published any apprenticeship programmes yet.</h2>
-        <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-[#102c3d]/58">Your Apprenticeship Lead manages the programmes available to employees.</p>
+        <GraduationCap className="mx-auto text-lt-accent" size={24} aria-hidden="true" />
+        <h2 className="mt-4 text-xl font-semibold text-lt-ink">Your organisation has not published any apprenticeship programmes yet.</h2>
+        <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-lt-muted">Your Apprenticeship Lead manages the programmes available to employees.</p>
         <button type="button" onClick={() => onNavigate("Copilot")} className="mt-5 min-h-11 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white">Ask LevyTate Copilot</button>
       </div>
     </MvpPanel>
@@ -455,7 +455,7 @@ function buildEmployeeDraft(context: EmployeeContext, existing: MvpApplication |
 function EmployeeSetupNotice() {
   return (
     <MvpPanel title="Employee setup required" eyebrow="Employee workspace">
-      <p className="text-sm leading-6 text-[#102c3d]/58">Your account is not linked to an active employee record yet. Please contact your apprenticeship lead.</p>
+      <p className="text-sm leading-6 text-lt-muted">Your account is not linked to an active employee record yet. Please contact your apprenticeship lead.</p>
     </MvpPanel>
   );
 }
@@ -463,8 +463,8 @@ function EmployeeSetupNotice() {
 function EmployeeSummaryTile({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-h-[96px] rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/38">{label}</p>
-      <p className="mt-2 text-sm font-semibold leading-5 text-[#102c3d]">{value}</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-lt-muted">{label}</p>
+      <p className="mt-2 text-sm font-semibold leading-5 text-lt-ink">{value}</p>
     </div>
   );
 }
@@ -472,8 +472,8 @@ function EmployeeSummaryTile({ label, value }: { label: string; value: string })
 function InfoBlock({ title, copy }: { title: string; copy: string }) {
   return (
     <article className="rounded-xl border border-[#102c3d]/[0.07] bg-white p-4">
-      <p className="text-sm font-semibold text-[#102c3d]">{title}</p>
-      <p className="mt-2 text-sm leading-6 text-[#102c3d]/58">{copy}</p>
+      <p className="text-sm font-semibold text-lt-ink">{title}</p>
+      <p className="mt-2 text-sm leading-6 text-lt-muted">{copy}</p>
     </article>
   );
 }
@@ -482,12 +482,12 @@ function SideCard({ icon: Icon, title, copy }: { icon: LucideIcon; title: string
   return (
     <article className="rounded-xl border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_14px_34px_rgba(16,44,61,0.045)]">
       <div className="flex items-start gap-3">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#e9f7f2] text-[#0b6f63]">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#e9f7f2] text-lt-accent">
           <Icon size={17} strokeWidth={1.9} aria-hidden="true" />
         </span>
         <div>
-          <p className="text-sm font-semibold text-[#102c3d]">{title}</p>
-          <p className="mt-1 text-sm leading-6 text-[#102c3d]/56">{copy}</p>
+          <p className="text-sm font-semibold text-lt-ink">{title}</p>
+          <p className="mt-1 text-sm leading-6 text-lt-muted">{copy}</p>
         </div>
       </div>
     </article>
@@ -510,11 +510,11 @@ function ApplicationStateHero({
   icon: LucideIcon;
 }) {
   const toneStyles = {
-    blue: "border-[#159b8f]/15 bg-[#edf7f3] text-[#0b6f63]",
-    green: "border-[#159b8f]/15 bg-[#edf7f3] text-[#0b6f63]",
+    blue: "border-[#159b8f]/15 bg-[#edf7f3] text-lt-accent",
+    green: "border-[#159b8f]/15 bg-[#edf7f3] text-lt-accent",
     yellow: "border-[#d8a900]/20 bg-[#fff9dc] text-[#8d6f00]",
-    red: "border-[#b13b51]/15 bg-[#fff0f2] text-[#b13b51]",
-    neutral: "border-[#102c3d]/[0.07] bg-[#f8fbfa] text-[#102c3d]",
+    red: "border-[#b13b51]/15 bg-[#fff0f2] text-lt-risk",
+    neutral: "border-[#102c3d]/[0.07] bg-[#f8fbfa] text-lt-ink",
   }[tone];
 
   return (
@@ -525,9 +525,9 @@ function ApplicationStateHero({
             <Icon size={18} strokeWidth={1.9} aria-hidden="true" />
           </span>
           <div className="min-w-0">
-            <p className="text-base font-semibold tracking-[-0.01em] text-[#102c3d]">{title}</p>
-            <p className="mt-1 text-sm leading-6 text-[#102c3d]/62">{copy}</p>
-            {supportingCopy ? <p className="mt-2 text-xs font-semibold leading-5 text-[#102c3d]/50">{supportingCopy}</p> : null}
+            <p className="text-base font-semibold tracking-[-0.01em] text-lt-ink">{title}</p>
+            <p className="mt-1 text-sm leading-6 text-lt-muted">{copy}</p>
+            {supportingCopy ? <p className="mt-2 text-xs font-semibold leading-5 text-lt-muted">{supportingCopy}</p> : null}
           </div>
         </div>
         <StatusBadge tone={statusToneFromState(tone)}>{status}</StatusBadge>
@@ -553,14 +553,14 @@ function ActionCard({
 }) {
   return (
     <section className="rounded-xl border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_14px_34px_rgba(16,44,61,0.04)]">
-      <p className="text-sm font-semibold text-[#102c3d]">{title}</p>
-      <p className="mt-2 max-w-2xl text-sm leading-6 text-[#102c3d]/58">{copy}</p>
+      <p className="text-sm font-semibold text-lt-ink">{title}</p>
+      <p className="mt-2 max-w-2xl text-sm leading-6 text-lt-muted">{copy}</p>
       <div className="mt-4 flex flex-wrap gap-2">
         <button type="button" onClick={onPrimary} className="h-10 rounded-full bg-[#102c3d] px-5 text-xs font-semibold text-white">
           {primaryLabel}
         </button>
         {secondaryLabel && onSecondary ? (
-          <button type="button" onClick={onSecondary} className="h-10 rounded-full bg-white px-4 text-xs font-semibold text-[#102c3d]/62 ring-1 ring-[#102c3d]/[0.1]">
+          <button type="button" onClick={onSecondary} className="h-10 rounded-full bg-white px-4 text-xs font-semibold text-lt-muted ring-1 ring-[#102c3d]/[0.1]">
             {secondaryLabel}
           </button>
         ) : null}
@@ -575,8 +575,8 @@ function ManagerRequestPanel({ application, manager }: { application: MvpApplica
     <section className="rounded-xl border border-[#d8a900]/20 bg-[#fff9dc] p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-[#102c3d]">{manager} has requested more information</p>
-          <p className="mt-1 text-sm leading-6 text-[#102c3d]/62">{latest?.note || application.managerNote || "Please add the requested detail before your manager reviews this again."}</p>
+          <p className="text-sm font-semibold text-lt-ink">{manager} has requested more information</p>
+          <p className="mt-1 text-sm leading-6 text-lt-muted">{latest?.note || application.managerNote || "Please add the requested detail before your manager reviews this again."}</p>
         </div>
         <StatusBadge tone="yellow">Reopened section</StatusBadge>
       </div>
@@ -595,9 +595,9 @@ function SubmittedAnswerSummary({ application, context, data }: { application: M
     <section className="rounded-xl border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_14px_34px_rgba(16,44,61,0.04)]">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0b6f63]">{closed ? "Recorded answers" : "Submitted version"}</p>
-          <h3 className="mt-1 text-base font-semibold tracking-[-0.01em] text-[#102c3d]">{context.programmeName}</h3>
-          <p className="mt-1 text-sm leading-6 text-[#102c3d]/56">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lt-accent">{closed ? "Recorded answers" : "Submitted version"}</p>
+          <h3 className="mt-1 text-base font-semibold tracking-[-0.01em] text-lt-ink">{context.programmeName}</h3>
+          <p className="mt-1 text-sm leading-6 text-lt-muted">
             {closed ? "This application record is read-only. Any future application starts separately." : <>These answers are locked while the application is with {applicationOwnerLabel(application, context, data)}.</>}
           </p>
         </div>
@@ -607,8 +607,8 @@ function SubmittedAnswerSummary({ application, context, data }: { application: M
       <div className="mt-4 grid gap-3">
         {answerRows(application).map((row) => (
           <article key={row.label} className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/38">{row.label}</p>
-            <p className="mt-2 text-sm leading-6 text-[#102c3d]/66">{row.value || "No answer recorded."}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-lt-muted">{row.label}</p>
+            <p className="mt-2 text-sm leading-6 text-lt-muted">{row.value || "No answer recorded."}</p>
           </article>
         ))}
       </div>
@@ -620,8 +620,8 @@ function EnrolmentNextSteps({ context, data }: { context: EmployeeContext; data:
   const enrolment = context.application ? data.enrolments.find((item) => item.applicationId === context.application?.id) : null;
   return (
     <section className="rounded-xl border border-[#159b8f]/15 bg-[#edf7f3] p-4">
-      <p className="text-sm font-semibold text-[#102c3d]">Enrolment next steps</p>
-      <p className="mt-1 text-sm leading-6 text-[#102c3d]/62">
+      <p className="text-sm font-semibold text-lt-ink">Enrolment next steps</p>
+      <p className="mt-1 text-sm leading-6 text-lt-muted">
         Your application is approved. The apprenticeship lead will prepare the provider introduction and confirm the enrolment plan.
       </p>
       <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -638,8 +638,8 @@ function DeclinedFeedback({ application }: { application: MvpApplication }) {
   const latest = latestHistory(application);
   return (
     <section className="rounded-xl border border-[#b13b51]/15 bg-[#fff0f2] p-4">
-      <p className="text-sm font-semibold text-[#102c3d]">Decision feedback</p>
-      <p className="mt-1 text-sm leading-6 text-[#102c3d]/62">{latest?.note || application.managerNote || "The decision note will appear here when available."}</p>
+      <p className="text-sm font-semibold text-lt-ink">Decision feedback</p>
+      <p className="mt-1 text-sm leading-6 text-lt-muted">{latest?.note || application.managerNote || "The decision note will appear here when available."}</p>
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
         <ReadonlyField label="Decision maker" value={closedApplicationOutcome(application)?.decisionMaker || "Recorded reviewer"} />
         <ReadonlyField label="Decision date" value={formatDate(latest?.createdAt ?? application.updatedAt)} />
@@ -651,9 +651,9 @@ function DeclinedFeedback({ application }: { application: MvpApplication }) {
 
 function ReadonlyField({ label, value }: { label: string; value: string }) {
   return (
-    <div className="grid gap-1.5 text-xs font-semibold text-[#102c3d]/58">
+    <div className="grid gap-1.5 text-xs font-semibold text-lt-muted">
       {label}
-      <div className="min-h-11 rounded-lg border border-[#102c3d]/[0.07] bg-[#f8fbfa] px-3 py-3 text-sm font-medium leading-5 text-[#102c3d]">
+      <div className="min-h-11 rounded-lg border border-[#102c3d]/[0.07] bg-[#f8fbfa] px-3 py-3 text-sm font-medium leading-5 text-lt-ink">
         {value}
       </div>
     </div>
@@ -670,7 +670,7 @@ function ApplicationProgress({ application, compact = false }: { application: Mv
   return (
     <section className="rounded-xl border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_14px_34px_rgba(16,44,61,0.04)]">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-semibold text-[#102c3d]">Application timeline</p>
+        <p className="text-sm font-semibold text-lt-ink">Application timeline</p>
         <StatusBadge tone={application ? statusTone(application.status) : "neutral"}>{current}</StatusBadge>
       </div>
       <div className={`mt-4 grid gap-2 ${compact ? "sm:grid-cols-3" : ""}`}>
@@ -684,12 +684,12 @@ function ApplicationProgress({ application, compact = false }: { application: Mv
                     ? "bg-[#102c3d] text-white"
                     : row.kind === "declined"
                       ? "bg-[#b13b51] text-white"
-                      : "bg-[#102c3d]/10 text-[#102c3d]/35"
+                      : "bg-[#102c3d]/10 text-lt-muted"
               }`}>
                 {row.kind === "complete" ? <CheckCircle2 size={10} strokeWidth={2.2} aria-hidden="true" /> : row.kind === "current" ? <Clock3 size={10} strokeWidth={2.2} aria-hidden="true" /> : null}
               </span>
               <span className={`text-xs font-semibold ${
-                row.kind === "future" ? "text-[#102c3d]/40" : row.kind === "declined" ? "text-[#b13b51]" : "text-[#102c3d]"
+                row.kind === "future" ? "text-lt-muted" : row.kind === "declined" ? "text-lt-risk" : "text-lt-ink"
               }`}>{row.stage}</span>
             </div>
           );
@@ -697,8 +697,8 @@ function ApplicationProgress({ application, compact = false }: { application: Mv
       </div>
       {application && (application.workflow?.events?.length || application.history.length) ? (
         <div className="mt-4 rounded-xl bg-[#f8fbfa] p-3">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/36">Latest comment</p>
-          <p className="mt-1 text-xs leading-5 text-[#102c3d]/58">{application.workflow?.events?.at(-1)?.note || application.history.at(-1)?.note || "Application progressed to the next workflow step."}</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-lt-muted">Latest comment</p>
+          <p className="mt-1 text-xs leading-5 text-lt-muted">{application.workflow?.events?.at(-1)?.note || application.history.at(-1)?.note || "Application progressed to the next workflow step."}</p>
         </div>
       ) : null}
     </section>
@@ -709,10 +709,10 @@ function ClosedApplicationHistory({ application, label, compact }: { application
   const history = personalApplicationHistory(application);
   const visible = compact ? history.slice(-3) : history;
   return <section className="rounded-xl border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_14px_34px_rgba(16,44,61,0.04)]">
-    <div className="flex items-center justify-between gap-3"><p className="text-sm font-semibold text-[#102c3d]">Application history</p><StatusBadge tone={statusTone(application.status)}>{label}</StatusBadge></div>
-    <p className="mt-2 text-xs leading-5 text-[#102c3d]/58">Closed record · no review is pending.</p>
-    {visible.length ? <ol className="mt-4 grid gap-3">{visible.map((entry) => <li key={entry.id} className="rounded-xl bg-[#f8fbfa] p-3"><p className="text-xs font-semibold text-[#102c3d]">{entry.status} · <time dateTime={entry.createdAt}>{formatDate(entry.createdAt)}</time></p><p className="mt-1 text-xs leading-5 text-[#102c3d]/58">{entry.note || "No note recorded."}</p></li>)}</ol> : <p className="mt-4 text-xs leading-5 text-[#102c3d]/58">No earlier history entries were recorded.</p>}
-    {visible.length < history.length ? <p className="mt-3 text-xs leading-5 text-[#102c3d]/58">Showing the latest three updates. Open My Application for the full record.</p> : null}
+    <div className="flex items-center justify-between gap-3"><p className="text-sm font-semibold text-lt-ink">Application history</p><StatusBadge tone={statusTone(application.status)}>{label}</StatusBadge></div>
+    <p className="mt-2 text-xs leading-5 text-lt-muted">Closed record · no review is pending.</p>
+    {visible.length ? <ol className="mt-4 grid gap-3">{visible.map((entry) => <li key={entry.id} className="rounded-xl bg-[#f8fbfa] p-3"><p className="text-xs font-semibold text-lt-ink">{entry.status} · <time dateTime={entry.createdAt}>{formatDate(entry.createdAt)}</time></p><p className="mt-1 text-xs leading-5 text-lt-muted">{entry.note || "No note recorded."}</p></li>)}</ol> : <p className="mt-4 text-xs leading-5 text-lt-muted">No earlier history entries were recorded.</p>}
+    {visible.length < history.length ? <p className="mt-3 text-xs leading-5 text-lt-muted">Showing the latest three updates. Open My Application for the full record.</p> : null}
   </section>;
 }
 

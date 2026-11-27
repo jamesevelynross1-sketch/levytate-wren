@@ -76,6 +76,11 @@ try{
     initial.workspace?.employers?.length===1&&initial.workspace.employers[0].id===fixture.organisationId&&
     initial.workspace.employers[0].programmes.some(x=>x.id===fixture.programmeId));
   check("second employer records not revealed",!JSON.stringify(initial).includes(fixture.ungrantedOtherEmployerId));
+  if(process.env.RELEASE_PREMIUM_VISUAL_JOURNEY==="true"){
+    stage="provider delivery visual reflow";
+    const{captureProviderVisual}=await import("./release-premium-visual-browser.mjs");
+    await captureProviderVisual({app,page:p,fixture,check});
+  }
   const notGranted=await provider.request.post(`${app}/api/levytate-provider/delivery`,{
     headers:{Origin:app},
     data:{kind:"programme_note",organisationId:fixture.ungrantedOtherEmployerId,

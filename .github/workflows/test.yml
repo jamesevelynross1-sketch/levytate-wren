@@ -65,6 +65,9 @@ jobs:
       - name: Validate isolated Core acceptance target safety contract
         run: node --test tests/core-acceptance-target.node.mjs
 
+      - name: Validate separate $0 Supabase staging project isolation contract
+        run: node --test tests/free-staging-provisioning.node.mjs
+
       - name: Verify selected launch-release contracts
         run: |
           npm run validate:launch-release-1

@@ -7,6 +7,8 @@ on:
       - codex/levytate-provider-delivery-v1-20261123
       - codex/levytate-provider-progress-promotion-20261123
       - codex/levytate-pilot-recovery-gate-20261124
+      - codex/levytate-free-staging-20261124
+      - codex/levytate-finance-visual-qa-20261126
   workflow_dispatch:
 
 permissions:
@@ -134,6 +136,7 @@ jobs:
           RELEASE_LEARNER_JOURNEY: "true"
           RELEASE_FINANCE_JOURNEY: "true"
           RELEASE_READ_SCOPE_JOURNEY: "true"
+          RELEASE_PREMIUM_VISUAL_JOURNEY: ${{ (github.ref_name == 'codex/levytate-free-staging-20261124' || github.ref_name == 'codex/levytate-finance-visual-qa-20261126') && 'true' || 'false' }}
           RELEASE_PLAYWRIGHT_MODULE: ${{ github.workspace }}/node_modules/playwright/index.mjs
           RELEASE_APP_COMMIT: ${{ github.sha }}
         run: |
@@ -183,6 +186,7 @@ jobs:
           RELEASE_PROVIDER_DELIVERY_LOCAL_ENABLE: "true"
           LEVYTATE_PROVIDER_DELIVERY_ENABLED: "true"
           RELEASE_PLAYWRIGHT_MODULE: ${{ github.workspace }}/node_modules/playwright/index.mjs
+          RELEASE_PREMIUM_VISUAL_JOURNEY: ${{ (github.ref_name == 'codex/levytate-free-staging-20261124' || github.ref_name == 'codex/levytate-finance-visual-qa-20261126') && 'true' || 'false' }}
         run: node scripts/release-local-command.mjs provider-browser
 
       - name: Stop local-only provider app and email hook
@@ -232,6 +236,15 @@ jobs:
         run: |
           node scripts/release-local-recovery.mjs
           echo 'PASS: restricted local backup, AES-GCM archive verification and separate restored database; not hosted recovery.'
+
+      - name: Upload synthetic screenshots only (no session data, logs or credentials)
+        if: always() && (github.ref_name == 'codex/levytate-free-staging-20261124' || github.ref_name == 'codex/levytate-finance-visual-qa-20261126') && env.RELEASE_LOCAL_RUNTIME != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: levytate-synthetic-visual-evidence
+          path: ${{ env.RELEASE_LOCAL_RUNTIME }}/visual-evidence/*.png
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Stop disposable stack without printing endpoint credentials
         if: always()

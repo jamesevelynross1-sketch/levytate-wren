@@ -100,6 +100,54 @@ describe("app.levytate.co.uk platform routing", () => {
   });
 });
 
+describe("isolated staging Preview hosts", () => {
+  const branchHost = "levytate-preview-branch.example.vercel.app";
+  const deploymentHost = "levytate-preview-deploy.example.vercel.app";
+
+  function configureStaging() {
+    vi.stubEnv("LEVYTATE_MCP_STAGING_ONLY", "");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("LEVYTATE_STAGING_ENTRY_ENABLED", "true");
+    vi.stubEnv("LEVYTATE_APP_BASE_URL", `https://${branchHost}`);
+    vi.stubEnv("VERCEL_BRANCH_URL", branchHost);
+    vi.stubEnv("VERCEL_URL", deploymentHost);
+  }
+
+  it("routes the immutable deployment host through LevyTate rather than MPR", async () => {
+    configureStaging();
+    const anonymous = await middleware(requestFor(deploymentHost, "/app"));
+    expect(anonymous.status).toBe(307);
+    expect(anonymous.headers.get("location")).toBe(`https://${deploymentHost}/login`);
+
+    const login = await middleware(requestFor(deploymentHost, "/login"));
+    expect(login.headers.get("x-middleware-rewrite")).toContain("/levytate/login");
+
+    const authenticated = await middleware(requestFor(deploymentHost, "/app", await signedCookie()));
+    expect(authenticated.status).toBe(200);
+    expect(authenticated.headers.get("x-middleware-rewrite")).toContain("/levytate/app");
+  });
+
+  it("keeps the stable branch alias in LevyTate and unrelated hosts outside it", async () => {
+    configureStaging();
+    const branchLogin = await middleware(requestFor(branchHost, "/login"));
+    expect(branchLogin.headers.get("x-middleware-rewrite")).toContain("/levytate/login");
+
+    const unrelated = await middleware(requestFor("other-preview.example.vercel.app", "/app"));
+    const mpr = await middleware(requestFor("mprconsulting.co.uk", "/"));
+    expect(unrelated.headers.get("x-middleware-rewrite")).toBeNull();
+    expect(unrelated.headers.get("location")).toBeNull();
+    expect(mpr.headers.get("location")).toBeNull();
+  });
+
+  it("does not hijack a preview when the isolated staging switch is disabled", async () => {
+    configureStaging();
+    vi.stubEnv("LEVYTATE_STAGING_ENTRY_ENABLED", "false");
+    const other = await middleware(requestFor(deploymentHost, "/app"));
+    expect(other.headers.get("location")).toBeNull();
+    expect(other.headers.get("x-middleware-rewrite")).toBeNull();
+  });
+});
+
 describe("levytate.co.uk transition routing", () => {
   it.each(["levytate.co.uk", "www.levytate.co.uk"])("sends %s sign-in and app paths to the platform host", async (host) => {
     vi.stubEnv("LEVYTATE_MCP_STAGING_ONLY", "");

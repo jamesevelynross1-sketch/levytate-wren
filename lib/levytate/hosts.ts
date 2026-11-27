@@ -133,7 +133,21 @@ export function getLevyTateLinkOrigin() {
 }
 
 export function isLevyTatePlatformHost(host: string) {
-  return requestHostname(host) === getLevyTatePlatformHost();
+  const hostname = requestHostname(host);
+  if (hostname === getLevyTatePlatformHost()) return true;
+
+  // The isolated staging branch has a stable preview alias and an immutable
+  // deployment hostname. Both must serve the same app routes, not the MPR
+  // fallback. Never grant this routing to other previews or production.
+  if (
+    process.env.VERCEL_ENV !== "preview"
+    || process.env.LEVYTATE_STAGING_ENTRY_ENABLED?.trim().toLowerCase() !== "true"
+  ) return false;
+
+  return [process.env.VERCEL_BRANCH_URL, process.env.VERCEL_URL]
+    .map(vercelDeploymentHostname)
+    .filter(Boolean)
+    .includes(hostname);
 }
 
 export function isLevyTateMarketingHost(host: string) {

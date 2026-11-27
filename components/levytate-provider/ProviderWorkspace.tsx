@@ -191,7 +191,7 @@ export function ProviderWorkspace({ initialWorkspace, deliveryAvailable = false 
   }
 
   return (
-    <main data-testid="provider-workspace" className="min-h-screen overflow-x-hidden bg-[#f4f7f5] text-[#102c3d]">
+    <main data-testid="provider-workspace" className="lt-design min-h-screen bg-lt-canvas text-lt-ink">
       <div className="grid min-h-screen lg:grid-cols-[244px_minmax(0,1fr)]">
         <ProviderSidebar
           providerName={workspace.provider.name}
@@ -251,17 +251,17 @@ function ProviderSidebar({
   onSectionChange: (section: WorkspaceSection) => void;
 }) {
   return (
-    <aside className="hidden border-r border-[#102c3d]/[0.08] bg-white px-4 py-5 lg:flex lg:h-screen lg:flex-col">
+    <aside className="lt-sidebar hidden px-4 py-5 lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col">
       <LevyTateLogo className="px-2 [--levytate-logo-size:2.55rem]" />
       <div className="mt-5 rounded-xl border border-[#102c3d]/[0.07] bg-[#f7faf8] px-4 py-3">
         <p className="truncate text-sm font-semibold">{providerName}</p>
-        <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.13em] text-[#087c73]">
+        <p className="mt-1 text-xs font-semibold uppercase tracking-[0.13em] text-lt-accent">
           {memberRole}
         </p>
       </div>
 
       <nav aria-label="Provider workspace" className="mt-6 flex-1">
-        <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-[#102c3d]/35">
+        <p className="px-2 text-xs font-semibold uppercase tracking-[0.15em] text-lt-muted">
           Opportunities
         </p>
         <div className="mt-2 grid gap-1">
@@ -275,7 +275,7 @@ function ProviderSidebar({
             />
           ))}
         </div>
-        <p className="mt-6 px-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-[#102c3d]/35">
+        <p className="mt-6 px-2 text-xs font-semibold uppercase tracking-[0.15em] text-lt-muted">
           Insight
         </p>
         <div className="mt-2">
@@ -289,11 +289,11 @@ function ProviderSidebar({
 
       <div className="border-t border-[#102c3d]/[0.07] pt-4">
         <form action="/api/levytate-provider/logout" method="post">
-          <button className="min-h-11 w-full rounded-full bg-[#f4f7f5] px-4 text-xs font-semibold text-[#102c3d]/65 transition hover:bg-[#edf4f0] hover:text-[#102c3d] focus:outline-none focus:ring-4 focus:ring-[#159b8f]/15">
+          <button className="min-h-11 w-full rounded-full bg-[#f4f7f5] px-4 text-xs font-semibold text-lt-muted transition hover:bg-[#edf4f0] hover:text-lt-ink focus:outline-none focus:ring-4 focus:ring-[#159b8f]/15">
             Sign out
           </button>
         </form>
-        <Link href="/levytate/support" className="mt-2 flex min-h-11 items-center justify-center text-xs font-semibold text-[#102c3d]/48 hover:text-[#087c73]">
+        <Link href="/levytate/support" className="mt-2 flex min-h-11 items-center justify-center text-xs font-semibold text-lt-muted hover:text-lt-accent">
           Provider support
         </Link>
       </div>
@@ -319,13 +319,13 @@ function NavButton({
       onClick={onClick}
       className={`flex min-h-11 w-full items-center justify-between rounded-xl px-3 text-left text-sm font-semibold transition focus:outline-none focus:ring-4 focus:ring-[#159b8f]/15 ${
         active
-          ? "bg-[#eaf5f1] text-[#102c3d] shadow-[inset_3px_0_0_#159b8f]"
-          : "text-[#102c3d]/56 hover:bg-[#f7faf8] hover:text-[#102c3d]"
+          ? "bg-[#eaf5f1] text-lt-ink shadow-[inset_3px_0_0_#159b8f]"
+          : "text-lt-muted hover:bg-[#f7faf8] hover:text-lt-ink"
       }`}
     >
       <span>{label}</span>
       {typeof count === "number" ? (
-        <span className="grid min-w-6 place-items-center rounded-full bg-white px-1.5 py-1 text-[10px] text-[#102c3d]/55 ring-1 ring-[#102c3d]/[0.07]">
+        <span className="grid min-w-6 place-items-center rounded-full bg-white px-1.5 py-1 text-xs text-lt-muted ring-1 ring-[#102c3d]/[0.07]">
           {count}
         </span>
       ) : null}
@@ -335,7 +335,7 @@ function NavButton({
 
 function ProviderTopBar({ providerName, memberRole, deliveryAvailable }: { providerName: string; memberRole: string; deliveryAvailable: boolean }) {
   return (
-    <header className="sticky top-0 z-30 border-b border-[#102c3d]/[0.07] bg-white/95 px-4 py-3 backdrop-blur-xl sm:px-6 lg:px-8">
+    <header className="lt-topbar sticky top-0 z-30 px-4 py-3 backdrop-blur-xl sm:px-6 lg:px-8">
       <div className="mx-auto flex min-h-11 max-w-[1320px] items-center justify-between gap-4">
         <div className="flex min-w-0 items-center gap-3 lg:hidden">
           <LevyTateLogo className="[--levytate-logo-size:2.1rem]" />
@@ -343,18 +343,18 @@ function ProviderTopBar({ providerName, memberRole, deliveryAvailable }: { provi
           <p className="truncate text-xs font-semibold">{providerName}</p>
         </div>
         <div className="hidden lg:block">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#087c73]">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lt-accent">
             Provider workspace
           </p>
           <p className="mt-0.5 text-sm font-semibold">Employer opportunities</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {deliveryAvailable ? <Link href="/levytate/provider/delivery" className="rounded-full bg-[#eaf5f1] px-3 py-2 text-xs font-semibold text-[#087c73]">Delivery updates</Link> : null}
-          <span className="rounded-full bg-[#f4f7f5] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#102c3d]/52">
+          {deliveryAvailable ? <Link href="/levytate/provider/delivery" className="rounded-full bg-[#eaf5f1] px-3 py-2 text-xs font-semibold text-lt-accent">Delivery updates</Link> : null}
+          <span className="rounded-full bg-[#f4f7f5] px-3 py-2 text-xs font-semibold uppercase tracking-[0.1em] text-lt-muted">
             {memberRole}
           </span>
           <form action="/api/levytate-provider/logout" method="post" className="lg:hidden">
-            <button type="submit" aria-label="Sign out of provider workspace" title="Sign out" className="grid h-11 w-11 place-items-center rounded-full bg-[#f4f7f5] text-[#102c3d]/65 transition hover:bg-[#edf4f0] hover:text-[#102c3d] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/15">
+            <button type="submit" aria-label="Sign out of provider workspace" title="Sign out" className="grid h-11 w-11 place-items-center rounded-full bg-[#f4f7f5] text-lt-muted transition hover:bg-[#edf4f0] hover:text-lt-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#159b8f]/15">
               <LogOut size={17} aria-hidden="true" />
               <span className="sr-only">Sign out</span>
             </button>
@@ -385,7 +385,7 @@ function MobileNavigation({
               type="button"
               aria-current={section === item ? "page" : undefined}
               onClick={() => onSectionChange(item)}
-              className={`min-h-11 shrink-0 rounded-full px-4 text-xs font-semibold focus:outline-none focus:ring-4 focus:ring-[#159b8f]/15 ${section === item ? "bg-[#102c3d] text-white" : "text-[#102c3d]/55"}`}
+              className={`min-h-11 shrink-0 rounded-full px-4 text-xs font-semibold focus:outline-none focus:ring-4 focus:ring-[#159b8f]/15 ${section === item ? "bg-[#102c3d] text-white" : "text-lt-muted"}`}
             >
               {titleCase(item)}{count === null ? "" : ` · ${count}`}
             </button>
@@ -409,13 +409,13 @@ function OpportunityList({
     <section data-testid="provider-opportunity-list" aria-labelledby="opportunity-list-heading">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">
+          <p className="lt-eyebrow">
             Opportunities
           </p>
           <h1 id="opportunity-list-heading" className="mt-1 text-2xl font-semibold tracking-[-0.025em] sm:text-3xl">
             {titleCase(section)}
           </h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-[#102c3d]/58">
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-lt-muted">
             {section === "open"
               ? "Review employer-approved briefs and respond before their deadline."
               : section === "responded"
@@ -423,7 +423,7 @@ function OpportunityList({
                 : "Completed, declined, cancelled or expired opportunities."}
           </p>
         </div>
-        <p className="text-xs font-semibold text-[#102c3d]/45">
+        <p className="text-xs font-semibold text-lt-muted">
           {opportunities.length} {opportunities.length === 1 ? "opportunity" : "opportunities"}
         </p>
       </header>
@@ -431,9 +431,9 @@ function OpportunityList({
       {opportunities.length === 0 ? (
         <div className="mt-5 grid min-h-64 place-items-center rounded-2xl border border-dashed border-[#102c3d]/[0.13] bg-white px-6 text-center">
           <div className="max-w-sm">
-            <Inbox className="mx-auto text-[#159b8f]" size={28} strokeWidth={1.7} aria-hidden="true" />
+            <Inbox className="mx-auto text-lt-accent" size={28} strokeWidth={1.7} aria-hidden="true" />
             <h2 className="mt-4 text-base font-semibold">No {section} opportunities</h2>
-            <p className="mt-2 text-sm leading-6 text-[#102c3d]/55">
+            <p className="mt-2 text-sm leading-6 text-lt-muted">
               Employer invitations that are available to this provider will appear here.
             </p>
           </div>
@@ -456,10 +456,10 @@ function OpportunityCard({ opportunity, onSelect }: { opportunity: ProviderOppor
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <StatusPill status={opportunity.invitationStatus} />
-            <span className="text-[11px] font-semibold text-[#102c3d]/42">Brief v{opportunity.requestVersion}</span>
+            <span className="text-xs font-semibold text-lt-muted">Brief v{opportunity.requestVersion}</span>
           </div>
           <h2 className="mt-3 text-lg font-semibold tracking-[-0.01em]">{opportunity.title}</h2>
-          <p className="mt-1 text-sm font-medium text-[#102c3d]/56">{opportunity.employerName}</p>
+          <p className="mt-1 text-sm font-medium text-lt-muted">{opportunity.employerName}</p>
           <dl className="mt-4 grid gap-3 text-xs sm:grid-cols-2 xl:grid-cols-4">
             <CardFact label="Learners" value={opportunity.learnerVolume} />
             <CardFact label="Preferred start" value={opportunity.preferredStart} />
@@ -482,8 +482,8 @@ function OpportunityCard({ opportunity, onSelect }: { opportunity: ProviderOppor
 function CardFact({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="font-semibold uppercase tracking-[0.1em] text-[#102c3d]/34">{label}</dt>
-      <dd className="mt-1 leading-5 text-[#102c3d]/66">{value}</dd>
+      <dt className="font-semibold uppercase tracking-[0.1em] text-lt-muted">{label}</dt>
+      <dd className="mt-1 leading-5 text-lt-muted">{value}</dd>
     </div>
   );
 }
@@ -500,22 +500,22 @@ function OpportunityDetail({
   return (
     <div data-testid="provider-opportunity-detail" className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
       <div className="min-w-0 space-y-5">
-        <section className="rounded-2xl border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_10px_28px_rgba(16,44,61,0.04)] sm:p-6">
+        <section className="lt-panel p-5 sm:p-6">
           <button
             type="button"
             onClick={onBack}
-            className="inline-flex min-h-11 items-center gap-2 text-xs font-semibold text-[#087c73] focus:outline-none focus:ring-4 focus:ring-[#159b8f]/15"
+            className="inline-flex min-h-11 items-center gap-2 text-xs font-semibold text-lt-accent focus:outline-none focus:ring-4 focus:ring-[#159b8f]/15"
           >
             <ArrowLeft size={15} aria-hidden="true" /> Back to opportunities
           </button>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <StatusPill status={opportunity.invitationStatus} />
-            <span className="rounded-lg bg-[#f4f7f5] px-2.5 py-1 text-[11px] font-semibold text-[#102c3d]/55">
+            <span className="rounded-lg bg-[#f4f7f5] px-2.5 py-1 text-xs font-semibold text-lt-muted">
               Brief version {opportunity.requestVersion}
             </span>
           </div>
           <h1 className="mt-4 text-2xl font-semibold tracking-[-0.025em] sm:text-3xl">{opportunity.title}</h1>
-          <p className="mt-2 text-sm font-semibold text-[#102c3d]/55">{opportunity.employerName}</p>
+          <p className="mt-2 text-sm font-semibold text-lt-muted">{opportunity.employerName}</p>
           <div className="mt-5 grid gap-3 rounded-xl bg-[#f7faf8] p-4 sm:grid-cols-3">
             <IconFact icon={<FileCheck2 size={16} />} label="Published" value={formatDate(opportunity.publishedAt)} />
             <IconFact icon={<CalendarDays size={16} />} label="Response deadline" value={formatDate(opportunity.responseDeadline)} />
@@ -549,8 +549,8 @@ function BriefPanel({ opportunity }: { opportunity: ProviderOpportunity }) {
   ].filter((item): item is [string, string] => Boolean(item[1]));
 
   return (
-    <section aria-labelledby="approved-brief-heading" className="rounded-2xl border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_10px_28px_rgba(16,44,61,0.04)] sm:p-6">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#c95568]">Employer-approved brief</p>
+    <section aria-labelledby="approved-brief-heading" className="lt-panel p-5 sm:p-6">
+      <p className="lt-eyebrow">Employer-approved brief</p>
       <h2 id="approved-brief-heading" className="mt-1 text-xl font-semibold">What the employer needs</h2>
       <dl className="mt-5 grid gap-x-6 gap-y-5 sm:grid-cols-2">
         <BriefFact label="Requirement" value={opportunity.requirement} wide />
@@ -565,10 +565,10 @@ function BriefPanel({ opportunity }: { opportunity: ProviderOpportunity }) {
       </dl>
       {opportunity.providersShouldAddress.length ? (
         <div className="mt-6 border-t border-[#102c3d]/[0.07] pt-5">
-          <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-[#102c3d]/42">Providers should address</h3>
-          <ul className="mt-3 grid gap-2 text-sm leading-6 text-[#102c3d]/68 sm:grid-cols-2">
+          <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-lt-muted">Providers should address</h3>
+          <ul className="mt-3 grid gap-2 text-sm leading-6 text-lt-muted sm:grid-cols-2">
             {opportunity.providersShouldAddress.map((item) => (
-              <li key={item} className="flex gap-2"><Check size={15} className="mt-1 shrink-0 text-[#159b8f]" aria-hidden="true" /><span>{item}</span></li>
+              <li key={item} className="flex gap-2"><Check size={15} className="mt-1 shrink-0 text-lt-accent" aria-hidden="true" /><span>{item}</span></li>
             ))}
           </ul>
         </div>
@@ -580,8 +580,8 @@ function BriefPanel({ opportunity }: { opportunity: ProviderOpportunity }) {
 function BriefFact({ label, value, wide = false }: { label: string; value: string; wide?: boolean }) {
   return (
     <div className={wide ? "sm:col-span-2" : ""}>
-      <dt className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#102c3d]/38">{label}</dt>
-      <dd className="mt-1.5 text-sm leading-6 text-[#102c3d]/70">{value}</dd>
+      <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-lt-muted">{label}</dt>
+      <dd className="mt-1.5 text-sm leading-6 text-lt-secondary">{value}</dd>
     </div>
   );
 }
@@ -618,14 +618,14 @@ function ClarificationsPanel({ opportunity, onUpdate }: { opportunity: ProviderO
   }
 
   return (
-    <section aria-labelledby="clarifications-heading" className="rounded-2xl border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_10px_28px_rgba(16,44,61,0.04)] sm:p-6">
+    <section aria-labelledby="clarifications-heading" className="lt-panel p-5 sm:p-6">
       <div className="flex items-start gap-3">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#eef9f5] text-[#087c73]">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#eef9f5] text-lt-accent">
           <MessageSquareText size={17} aria-hidden="true" />
         </span>
         <div>
           <h2 id="clarifications-heading" className="text-lg font-semibold">Clarifications</h2>
-          <p className="mt-1 text-xs leading-5 text-[#102c3d]/52">
+          <p className="mt-1 text-xs leading-5 text-lt-muted">
             Shared employer clarifications do not identify which provider asked the original question.
           </p>
         </div>
@@ -636,12 +636,12 @@ function ClarificationsPanel({ opportunity, onUpdate }: { opportunity: ProviderO
           {opportunity.clarifications.map((item) => <ProviderClarificationCard key={item.id} item={item} opportunity={opportunity} onUpdate={onUpdate} />)}
         </div>
       ) : (
-        <p className="mt-5 rounded-xl bg-[#f8fbfa] px-4 py-3 text-sm text-[#102c3d]/52">No clarifications yet.</p>
+        <p className="mt-5 rounded-xl bg-[#f8fbfa] px-4 py-3 text-sm text-lt-muted">No clarifications yet.</p>
       )}
 
       {canAsk ? (
         <form onSubmit={askQuestion} className="mt-5 border-t border-[#102c3d]/[0.07] pt-5">
-          <label className="grid gap-2 text-xs font-semibold text-[#102c3d]/60">
+          <label className="grid gap-2 text-xs font-semibold text-lt-muted">
             Ask a concise question
             <textarea
               required
@@ -649,13 +649,13 @@ function ClarificationsPanel({ opportunity, onUpdate }: { opportunity: ProviderO
               maxLength={600}
               value={question}
               onChange={(event) => setQuestion(event.target.value)}
-              className="min-w-0 resize-y rounded-xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 py-2.5 text-sm font-medium leading-6 text-[#102c3d] outline-none focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10"
+              className="min-w-0 resize-y rounded-xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 py-2.5 text-sm font-medium leading-6 text-lt-ink outline-none focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10"
               placeholder="What would help you prepare an accurate response?"
             />
           </label>
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
             <ResponseMessage error={error} message={message} />
-            <button disabled={busy} className="min-h-11 rounded-full bg-[#f0f6f3] px-4 text-xs font-semibold text-[#087c73] ring-1 ring-[#087c73]/10 focus:outline-none focus:ring-4 focus:ring-[#159b8f]/15 disabled:opacity-60">
+            <button disabled={busy} className="min-h-11 rounded-full bg-[#f0f6f3] px-4 text-xs font-semibold text-lt-accent ring-1 ring-[#087c73]/10 focus:outline-none focus:ring-4 focus:ring-[#159b8f]/15 disabled:opacity-60">
               {busy ? "Sending question" : "Ask clarification"}
             </button>
           </div>
@@ -686,9 +686,9 @@ function ProviderClarificationCard({ item, opportunity, onUpdate }: { item: Prov
     }
   }
   return <article className="rounded-xl border border-[#102c3d]/[0.07] bg-[#f8fbfa] p-4">
-    <p className="text-[10px] font-semibold uppercase tracking-[0.11em] text-[#087c73]">{employerQuestion ? "Employer question" : item.visibility === "shared_with_invited_providers" ? "Employer clarification" : "Your question"}</p>
+    <p className="text-xs font-semibold uppercase tracking-[0.11em] text-lt-accent">{employerQuestion ? "Employer question" : item.visibility === "shared_with_invited_providers" ? "Employer clarification" : "Your question"}</p>
     {item.question ? <p className="mt-2 text-sm font-semibold leading-6">{item.question}</p> : null}
-    {item.answer ? <p className="mt-2 text-sm leading-6 text-[#102c3d]/68">{item.answer}</p> : employerQuestion ? <form onSubmit={submitAnswer} className="mt-3 grid gap-2"><label className="text-xs font-semibold text-[#102c3d]/60">Your answer<textarea required rows={3} maxLength={1000} value={answer} onChange={(event) => setAnswer(event.target.value)} className="mt-2 w-full resize-y rounded-xl border border-[#102c3d]/[0.09] bg-white px-3 py-2.5 text-sm font-medium leading-6 outline-none focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10" /></label>{error ? <p role="alert" className="text-xs font-semibold text-[#ad344e]">{error}</p> : null}<button disabled={busy} className="min-h-11 w-fit rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white disabled:opacity-60">{busy ? "Sending answer" : "Send answer"}</button></form> : <p className="mt-2 text-xs font-medium text-[#8a6418]">Awaiting employer response</p>}
+    {item.answer ? <p className="mt-2 text-sm leading-6 text-lt-muted">{item.answer}</p> : employerQuestion ? <form onSubmit={submitAnswer} className="mt-3 grid gap-2"><label className="text-xs font-semibold text-lt-muted">Your answer<textarea required rows={3} maxLength={1000} value={answer} onChange={(event) => setAnswer(event.target.value)} className="mt-2 w-full resize-y rounded-xl border border-[#102c3d]/[0.09] bg-white px-3 py-2.5 text-sm font-medium leading-6 outline-none focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10" /></label>{error ? <p role="alert" className="text-xs font-semibold text-lt-risk">{error}</p> : null}<button disabled={busy} className="min-h-11 w-fit rounded-full bg-[#102c3d] px-4 text-xs font-semibold text-white disabled:opacity-60">{busy ? "Sending answer" : "Send answer"}</button></form> : <p className="mt-2 text-xs font-medium text-[#8a6418]">Awaiting employer response</p>}
   </article>;
 }
 
@@ -800,27 +800,27 @@ function ResponsePanel({ opportunity, onUpdate }: { opportunity: ProviderOpportu
 
   if (declined) {
     return (
-      <aside className="h-fit rounded-2xl border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_10px_28px_rgba(16,44,61,0.04)] xl:sticky xl:top-24">
+      <aside className="h-fit lt-panel p-5 xl:sticky xl:top-24">
         <StatusPill status="Declined" />
         <h2 className="mt-4 text-lg font-semibold">Opportunity declined</h2>
-        <p className="mt-2 text-sm leading-6 text-[#102c3d]/60">{response?.declinedReason ?? "Your response has been recorded."}</p>
-        {response?.declinedNote ? <p className="mt-3 rounded-xl bg-[#f8fbfa] p-3 text-xs leading-5 text-[#102c3d]/58">{response.declinedNote}</p> : null}
+        <p className="mt-2 text-sm leading-6 text-lt-muted">{response?.declinedReason ?? "Your response has been recorded."}</p>
+        {response?.declinedNote ? <p className="mt-3 rounded-xl bg-[#f8fbfa] p-3 text-xs leading-5 text-lt-muted">{response.declinedNote}</p> : null}
       </aside>
     );
   }
 
   return (
-    <aside className="h-fit min-w-0 rounded-2xl border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_10px_28px_rgba(16,44,61,0.04)] xl:sticky xl:top-24" data-testid="provider-response-form">
+    <aside className="h-fit min-w-0 lt-panel p-5 xl:sticky xl:top-24" data-testid="provider-response-form">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#c95568]">Your response</p>
+          <p className="lt-eyebrow">Your response</p>
           <h2 className="mt-1 text-lg font-semibold">Structured proposal</h2>
         </div>
         <StatusPill status={responseStatusLabel(response)} />
       </div>
 
       {submitted ? (
-        <p className="mt-4 rounded-xl bg-[#eef9f5] px-4 py-3 text-xs leading-5 text-[#0b6f63]">
+        <p className="mt-4 rounded-xl bg-[#eef9f5] px-4 py-3 text-xs leading-5 text-lt-accent">
           Submitted response version {response?.responseVersion ?? 1}, against brief version {response?.requestVersion ?? opportunity.requestVersion}.
           {response?.canRevise ? " A revised response is permitted." : " This version is read-only."}
         </p>
@@ -831,18 +831,18 @@ function ResponsePanel({ opportunity, onUpdate }: { opportunity: ProviderOpportu
         </p>
       ) : null}
       {deadlinePassed ? (
-        <p className="mt-3 rounded-xl bg-[#fff4f5] px-4 py-3 text-xs font-semibold text-[#ad344e]">Response deadline passed.</p>
+        <p className="mt-3 rounded-xl bg-[#fff4f5] px-4 py-3 text-xs font-semibold text-lt-risk">Response deadline passed.</p>
       ) : null}
 
       <form onSubmit={submitResponse} className="mt-5 grid gap-4">
-        <label className="grid gap-1.5 text-xs font-semibold text-[#102c3d]/60">
+        <label className="grid gap-1.5 text-xs font-semibold text-lt-muted">
           Proposed programme
           <select
             required
             disabled={!editable}
             value={draft.proposedProgrammeId}
             onChange={(event) => setField("proposedProgrammeId", event.target.value)}
-            className="h-11 min-w-0 rounded-xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 text-sm font-medium text-[#102c3d] outline-none focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10 disabled:cursor-not-allowed disabled:opacity-70"
+            className="h-11 min-w-0 rounded-xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 text-sm font-medium text-lt-ink outline-none focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10 disabled:cursor-not-allowed disabled:opacity-70"
           >
             <option value="">Select a programme</option>
             {opportunity.programmeOptions.map((programme) => (
@@ -874,10 +874,10 @@ function ResponsePanel({ opportunity, onUpdate }: { opportunity: ProviderOpportu
         ))}
 
         <fieldset disabled={!editable} className="rounded-xl border border-[#102c3d]/[0.08] bg-[#f8fbfa] p-3">
-          <legend className="px-1 text-xs font-semibold text-[#102c3d]/60">Delivery approach</legend>
+          <legend className="px-1 text-xs font-semibold text-lt-muted">Delivery approach</legend>
           <div className="mt-1 grid grid-cols-2 gap-2">
             {["Online", "Blended", "Face-to-face", "Flexible"].map((model) => (
-              <label key={model} className="flex min-h-11 items-center gap-2 rounded-lg bg-white px-3 text-xs font-semibold text-[#102c3d]/65 ring-1 ring-[#102c3d]/[0.06]">
+              <label key={model} className="flex min-h-11 items-center gap-2 rounded-lg bg-white px-3 text-xs font-semibold text-lt-muted ring-1 ring-[#102c3d]/[0.06]">
                 <input
                   type="checkbox"
                   checked={draft.deliveryModels.includes(model)}
@@ -893,15 +893,15 @@ function ResponsePanel({ opportunity, onUpdate }: { opportunity: ProviderOpportu
               </label>
             ))}
           </div>
-          <label className="mt-3 grid gap-1.5 text-xs font-semibold text-[#102c3d]/60">
+          <label className="mt-3 grid gap-1.5 text-xs font-semibold text-lt-muted">
             Concise delivery notes
             <textarea rows={2} maxLength={900} value={draft.deliveryNotes} onChange={(event) => setField("deliveryNotes", event.target.value)} className="resize-y rounded-xl border border-[#102c3d]/[0.09] bg-white px-3 py-2.5 text-sm font-medium leading-6 outline-none focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10" />
           </label>
         </fieldset>
 
         <fieldset disabled={!editable} className="rounded-xl border border-[#102c3d]/[0.08] bg-[#f8fbfa] p-3">
-          <legend className="px-1 text-xs font-semibold text-[#102c3d]/60">Learner / cohort capacity</legend>
-          <label className="mt-1 grid gap-1.5 text-xs font-semibold text-[#102c3d]/60">
+          <legend className="px-1 text-xs font-semibold text-lt-muted">Learner / cohort capacity</legend>
+          <label className="mt-1 grid gap-1.5 text-xs font-semibold text-lt-muted">
             Capacity position
             <select value={draft.capacityKind} onChange={(event) => setField("capacityKind", event.target.value as ResponseDraft["capacityKind"])} className="h-11 rounded-xl border border-[#102c3d]/[0.09] bg-white px-3 text-sm">
               <option value="can_accommodate">Can accommodate requested cohort</option>
@@ -911,19 +911,19 @@ function ResponsePanel({ opportunity, onUpdate }: { opportunity: ProviderOpportu
             </select>
           </label>
           {draft.capacityKind === "minimum_required" || draft.capacityKind === "maximum_places" ? (
-            <label className="mt-3 grid gap-1.5 text-xs font-semibold text-[#102c3d]/60">
+            <label className="mt-3 grid gap-1.5 text-xs font-semibold text-lt-muted">
               Number of learners
               <input type="number" min="1" step="1" required value={draft.capacityValue} onChange={(event) => setField("capacityValue", event.target.value)} className="h-11 rounded-xl border border-[#102c3d]/[0.09] bg-white px-3 text-sm" />
             </label>
           ) : null}
-          <label className="mt-3 grid gap-1.5 text-xs font-semibold text-[#102c3d]/60">
+          <label className="mt-3 grid gap-1.5 text-xs font-semibold text-lt-muted">
             Capacity notes
             <textarea rows={2} maxLength={900} value={draft.capacityNotes} onChange={(event) => setField("capacityNotes", event.target.value)} className="resize-y rounded-xl border border-[#102c3d]/[0.09] bg-white px-3 py-2.5 text-sm font-medium leading-6 outline-none focus:border-[#159b8f] focus:ring-4 focus:ring-[#159b8f]/10" />
           </label>
         </fieldset>
 
         {editable ? (
-          <label className="flex gap-3 rounded-xl bg-[#f8fbfa] p-3 text-xs leading-5 text-[#102c3d]/62">
+          <label className="flex gap-3 rounded-xl bg-[#f8fbfa] p-3 text-xs leading-5 text-lt-muted">
             <input
               type="checkbox"
               checked={confirmed}
@@ -942,7 +942,7 @@ function ResponsePanel({ opportunity, onUpdate }: { opportunity: ProviderOpportu
               type="button"
               disabled={busyAction !== null}
               onClick={saveDraft}
-              className="min-h-11 rounded-full bg-[#f0f6f3] px-4 text-xs font-semibold text-[#087c73] ring-1 ring-[#087c73]/10 focus:outline-none focus:ring-4 focus:ring-[#159b8f]/15 disabled:opacity-60"
+              className="min-h-11 rounded-full bg-[#f0f6f3] px-4 text-xs font-semibold text-lt-accent ring-1 ring-[#087c73]/10 focus:outline-none focus:ring-4 focus:ring-[#159b8f]/15 disabled:opacity-60"
             >
               {busyAction === "draft" ? "Saving draft" : "Save draft"}
             </button>
@@ -963,19 +963,19 @@ function ResponsePanel({ opportunity, onUpdate }: { opportunity: ProviderOpportu
             type="button"
             aria-expanded={showDecline}
             onClick={() => setShowDecline((current) => !current)}
-            className="min-h-11 text-xs font-semibold text-[#ad344e] focus:outline-none focus:ring-4 focus:ring-[#ad344e]/10"
+            className="min-h-11 text-xs font-semibold text-lt-risk focus:outline-none focus:ring-4 focus:ring-[#ad344e]/10"
           >
             {showDecline ? "Keep opportunity open" : "Decline opportunity"}
           </button>
           {showDecline ? (
             <form onSubmit={declineOpportunity} className="mt-3 grid gap-3 rounded-xl bg-[#fff7f8] p-4">
-              <label className="grid gap-1.5 text-xs font-semibold text-[#102c3d]/60">
+              <label className="grid gap-1.5 text-xs font-semibold text-lt-muted">
                 Reason
                 <select value={declineReason} onChange={(event) => setDeclineReason(event.target.value as (typeof declineReasons)[number]["value"])} className="h-11 rounded-xl border border-[#102c3d]/[0.09] bg-white px-3 text-sm">
                   {declineReasons.map((reason) => <option key={reason.value} value={reason.value}>{reason.label}</option>)}
                 </select>
               </label>
-              <label className="grid gap-1.5 text-xs font-semibold text-[#102c3d]/60">
+              <label className="grid gap-1.5 text-xs font-semibold text-lt-muted">
                 Optional note
                 <textarea rows={2} maxLength={600} value={declineNote} onChange={(event) => setDeclineNote(event.target.value)} className="resize-y rounded-xl border border-[#102c3d]/[0.09] bg-white px-3 py-2.5 text-sm" />
               </label>
@@ -992,7 +992,7 @@ function ResponsePanel({ opportunity, onUpdate }: { opportunity: ProviderOpportu
 
 function ResponseField({ label, value, onChange, disabled, required = false }: { label: string; value: string; onChange: (value: string) => void; disabled: boolean; required?: boolean }) {
   return (
-    <label className="grid gap-1.5 text-xs font-semibold text-[#102c3d]/60">
+    <label className="grid gap-1.5 text-xs font-semibold text-lt-muted">
       {label}{required ? <span className="sr-only"> (required)</span> : null}
       <textarea
         required={required}
@@ -1001,7 +1001,7 @@ function ResponseField({ label, value, onChange, disabled, required = false }: {
         maxLength={1800}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="min-w-0 resize-y rounded-xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 py-2.5 text-sm font-medium leading-6 text-[#102c3d] outline-none focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10 disabled:cursor-not-allowed disabled:opacity-70"
+        className="min-w-0 resize-y rounded-xl border border-[#102c3d]/[0.09] bg-[#f8fbfa] px-3 py-2.5 text-sm font-medium leading-6 text-lt-ink outline-none focus:border-[#159b8f] focus:bg-white focus:ring-4 focus:ring-[#159b8f]/10 disabled:cursor-not-allowed disabled:opacity-70"
       />
     </label>
   );
@@ -1018,22 +1018,22 @@ function ActivityPanel({ activity }: { activity: ProviderWorkspaceData["activity
 
   return (
     <section data-testid="provider-activity" aria-labelledby="provider-activity-heading">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c95568]">Provider activity</p>
+      <p className="lt-eyebrow">Provider activity</p>
       <h1 id="provider-activity-heading" className="mt-1 text-2xl font-semibold tracking-[-0.025em] sm:text-3xl">Factual activity</h1>
-      <p className="mt-2 max-w-2xl text-sm leading-6 text-[#102c3d]/58">
+      <p className="mt-2 max-w-2xl text-sm leading-6 text-lt-muted">
         A simple record of this provider’s LevyTate opportunity activity. These figures are not rankings, quality scores or revenue claims.
       </p>
       <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {metrics.map(([label, value, Icon]) => (
-          <article key={label} className="rounded-2xl border border-[#102c3d]/[0.07] bg-white p-5 shadow-[0_10px_28px_rgba(16,44,61,0.04)]">
-            <Icon size={18} strokeWidth={1.8} className="text-[#159b8f]" aria-hidden="true" />
+          <article key={label} className="lt-panel p-5">
+            <Icon size={18} strokeWidth={1.8} className="text-lt-accent" aria-hidden="true" />
             <p className="mt-5 text-3xl font-semibold tracking-[-0.04em]">{value}</p>
-            <p className="mt-2 text-xs font-semibold leading-5 text-[#102c3d]/52">{label}</p>
+            <p className="mt-2 text-xs font-semibold leading-5 text-lt-muted">{label}</p>
           </article>
         ))}
       </div>
-      <div className="mt-5 flex gap-3 rounded-2xl border border-[#102c3d]/[0.07] bg-white p-5 text-sm leading-6 text-[#102c3d]/58">
-        <CircleHelp size={18} className="mt-0.5 shrink-0 text-[#087c73]" aria-hidden="true" />
+      <div className="mt-5 flex gap-3 rounded-2xl border border-[#102c3d]/[0.07] bg-white p-5 text-sm leading-6 text-lt-muted">
+        <CircleHelp size={18} className="mt-0.5 shrink-0 text-lt-accent" aria-hidden="true" />
         <p>Progressed opportunities represent continued commercial or operational discussion. They are not confirmed contracts or attributed revenue.</p>
       </div>
     </section>
@@ -1043,10 +1043,10 @@ function ActivityPanel({ activity }: { activity: ProviderWorkspaceData["activity
 function IconFact({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
     <div className="flex items-start gap-2.5">
-      <span className="mt-0.5 text-[#159b8f]" aria-hidden="true">{icon}</span>
+      <span className="mt-0.5 text-lt-accent" aria-hidden="true">{icon}</span>
       <div>
-        <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#102c3d]/36">{label}</p>
-        <p className="mt-1 text-xs font-semibold leading-5 text-[#102c3d]/68">{value}</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.1em] text-lt-muted">{label}</p>
+        <p className="mt-1 text-xs font-semibold leading-5 text-lt-muted">{value}</p>
       </div>
     </div>
   );
@@ -1055,17 +1055,17 @@ function IconFact({ icon, label, value }: { icon: ReactNode; label: string; valu
 function StatusPill({ status }: { status: string }) {
   const normalised = status.toLowerCase();
   const tone = normalised.includes("declin") || normalised.includes("cancel") || normalised.includes("expired")
-    ? "bg-[#fff0f2] text-[#ad344e]"
+    ? "bg-[#fff0f2] text-lt-risk"
     : normalised.includes("submit") || normalised.includes("progress") || normalised.includes("shortlist")
-      ? "bg-[#e9f7f2] text-[#0b6f63]"
+      ? "bg-[#e9f7f2] text-lt-accent"
       : "bg-[#eef4f8] text-[#315e78]";
 
-  return <span className={`inline-flex rounded-lg px-2.5 py-1 text-[11px] font-semibold ${tone}`}>{titleCase(status)}</span>;
+  return <span className={`inline-flex rounded-lg px-2.5 py-1 text-xs font-semibold ${tone}`}>{titleCase(status)}</span>;
 }
 
 function ResponseMessage({ error, message }: { error: string; message: string }) {
-  if (error) return <p role="alert" className="text-xs font-semibold leading-5 text-[#ad344e]">{error}</p>;
-  if (message) return <p role="status" className="text-xs font-semibold leading-5 text-[#087c73]">{message}</p>;
+  if (error) return <p role="alert" className="text-xs font-semibold leading-5 text-lt-risk">{error}</p>;
+  if (message) return <p role="status" className="text-xs font-semibold leading-5 text-lt-accent">{message}</p>;
   return <span />;
 }
 

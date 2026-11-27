@@ -7,7 +7,9 @@ assert("login does not use client-side router navigation", !source.includes("rou
 assert("login has no automatic reload loop", !source.includes("window.location.reload(") && occurrences(source, "window.location.assign(") === 1);
 assert("successful login destination stays inside LevyTate", source.includes('window.location.assign("/levytate/app")') && !/window\.location\.assign\((?:body|response|[a-zA-Z]+\.)/.test(source));
 
-console.log(JSON.stringify({ ok: true, checks: 4 }, null, 2));
+assert("public site link does not loop back to the staging login", source.includes('<Link href="/levytate"') && !source.includes('<Link href="/" className'));
+
+console.log(JSON.stringify({ ok: true, checks: 5 }, null, 2));
 
 function occurrences(value, term) {
   return value.split(term).length - 1;

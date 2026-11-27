@@ -31,6 +31,8 @@ vi.mock('@/components/levytate-mvp/DemoPerspectiveSwitcher', () => ({ useDemoPer
 import { LevyTateMvpApp } from '@/components/levytate-mvp/LevyTateMvpApp';
 import { LearnersModule } from '@/components/levytate-mvp/LearnersModule';
 import { OperationsCentreModule } from '@/components/levytate-mvp/OperationsCentreModule';
+import { EmployeesModule } from '@/components/levytate-mvp/EmployeesModule';
+import { DashboardModule } from '@/components/levytate-mvp/DashboardSettingsModules';
 
 type Element = { type: unknown; props: Record<string, unknown> };
 function descendants(tree: unknown): Element[] { if (!tree || typeof tree !== 'object') return []; if (Array.isArray(tree)) return tree.flatMap(descendants); const item = tree as Element; return [item, ...descendants(item.props?.children)]; }
@@ -124,5 +126,40 @@ describe('actual shell learner deep-link effects', () => {
     invokeLearners(learnerId); hooks.pending[0]?.();
     invokeLearners(''); hooks.pending[0]?.();
     expect(descendants(invokeLearners('')).some(item => typeof item.type === 'function' && item.type.name === 'LearnerRecordView')).toBe(false);
+  });
+});
+
+describe('employer onboarding navigation in the actual shell', () => {
+  it('keeps People open after a save so another employee can be added, with an explicit return to setup', () => {
+    hooks.store.meta = { storageMode: 'supabase', userRole: 'Apprenticeship Lead', userEmail: 'lead@fictional.invalid', organisationId: 'fixture-tenant' };
+    // Test the shell contract without sending real authenticated requests.
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => {})));
+    location = new URL('https://fictional.invalid/levytate/app?module=People');
+    const people = descendants(render()).find(item => item.type === EmployeesModule);
+    expect(typeof people?.props.onSetupPeopleSaved).toBe('function');
+    const data = createEmptyMvpWorkspace();
+    data.employees = [{ id: 'employee-fixture', employeeNumber: '001', name: 'Synthetic Employee', email: 'employee@fictional.invalid', jobTitle: 'Test role', roleId: '', managerId: '', department: '', site: '', platformRole: 'Employee', status: 'Active', startDate: '2026-11-25', createdAt: '2026-11-25', updatedAt: '2026-11-25' }];
+    hooks.store.data = data;
+    (people!.props.onSetupPeopleSaved as () => void)();
+    expect(location.searchParams.get('module')).toBe('People');
+    const returnPanel = descendants(render()).find(item => item.props['data-testid'] === 'employer-setup-return');
+    expect(returnPanel).toBeDefined();
+    const returnButton = descendants(returnPanel).find(item => item.type === 'button');
+    expect(returnButton).toBeDefined();
+    (returnButton!.props.onClick as () => void)();
+    const home = descendants(render()).find(item => item.type === DashboardModule);
+    expect(location.searchParams.get('module') ?? 'Home').toBe('Home');
+    const steps = (home!.props.setup as { steps: { key: string; complete: boolean }[] }).steps;
+    expect(steps.filter(step => !step.complete).length).toBeGreaterThan(0);
+    expect(steps.find(step => step.key === 'employees')?.complete).toBe(false); // Not assigned to an active manager.
+  });
+  it('retains explicit Copilot discovery even during incomplete setup', () => {
+    hooks.store.meta = { storageMode: 'supabase', userRole: 'Apprenticeship Lead', userEmail: 'lead@fictional.invalid', organisationId: 'fixture-tenant' };
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => {})));
+    location = new URL('https://fictional.invalid/levytate/app?module=People');
+    const people = descendants(render()).find(item => item.type === EmployeesModule);
+    (people!.props.onStartDiscovery as (id: string) => void)('employee-fixture');
+    render();
+    expect(location.searchParams.get('module')).toBe('Copilot');
   });
 });

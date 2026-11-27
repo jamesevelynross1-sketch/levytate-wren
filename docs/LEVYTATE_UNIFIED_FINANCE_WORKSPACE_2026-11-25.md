@@ -1,0 +1,5 @@
+# Unified LevyTate Finance workspace — 25 November 2026
+
+User feedback: the first planner was fragmented across reporting, forecast, plan and assumption tabs. The redesign preserves the existing funding engine and historical reporting while presenting one decision workspace. The evidence rail, live projected balance/expiry/cash, horizon controls, cohort editor and monthly assumptions are visible without changing pages. Detailed fund ageing, commitments, scenarios, exports and original reporting are inline disclosures. Draft cohort changes are previewed only when valid; incomplete drafts do not remove the current forecast. Adding the cohort to the plan is explicit. New DAS import preview appears in the same workspace and changed evidence does not automatically overwrite plan assumptions.
+
+The underlying funding model and its limitations are unchanged: unknown age is optimistic, commitment amounts and schedules are manual, policy after July 2027 is provisional, forecasts are estimates and do not commit operational records. Scenarios are session-only with file export/reload. This is staging only, not full commercial acceptance. Browser acceptance required.

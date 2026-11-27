@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import { LevyTatePwaBootstrap } from "@/components/levytate-pwa/LevyTatePwa";
 import { isLevyTatePlatformHost, requestHostname } from "@/lib/levytate/hosts";
+import "./design-system.css";
 
 export const metadata: Metadata = {
   applicationName: "LevyTate",
