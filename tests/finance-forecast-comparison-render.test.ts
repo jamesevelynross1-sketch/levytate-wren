@@ -27,6 +27,8 @@ describe("readable, honest finance comparison UI",()=>{
     expect(html).toContain("Existing commitments only");
     expect(html).toContain("With proposed starts");
     expect(html).toContain("Explore forecast month");
+    expect(html).toContain("chart-mobile-scale");
+    expect(html).toContain("chart-mobile-months");
     expect(html).toContain("Employer cash");
     expect(html).toContain("Unknown");
     const cashButton=html.match(/<button[^>]*aria-pressed="true"[^>]*>Employer cash<\/button>/);
