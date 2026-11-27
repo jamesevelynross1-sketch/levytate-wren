@@ -16,3 +16,5 @@ The previous five-item checklist could not be completed without optional DAS and
 - Isolated Preview branch only. No Supabase DDL/migrations, seeds, real identities, production aliases, money calculations, permissions or feature flags changed.
 - Do not represent synthetic journey verification as hosted customer acceptance. Check multi-role hosted Auth and permissions before commercial pilots.
 - Validate desktop/mobile keyboard focus, pending save/recovery, multi-person creation, and programme-backed application choices.
+- Guided setup is rendered for authorised employer roles independently of whether finance identity metadata is available; optional finance checks still require a scoped authenticated client read.
+- Browser acceptance captures organisation, manager, employee, provider and programme stages at 390 and 1440 CSS px, checking for horizontal overflow and six-step progress.

@@ -104,6 +104,26 @@ export async function verifyPremiumVisual({app,manifest,contexts,check}){
     await matrix({page,app,path:"/levytate/app",output,name,check});
   });
 
+  await run("resumable employer setup on real browser layouts",async()=>{
+    const page=await open(lead,"Home","Home");
+    const wizard=page.getByTestId("blank-employer-home");
+    await wizard.waitFor({timeout:12000});
+    const steps=["organisation","managers","employees","providers","programmes"];
+    for(const key of steps){
+      await page.getByTestId("setup-step-"+key).click();
+      const selected=page.locator('section[aria-labelledby="selected-setup-heading"]');
+      await selected.waitFor({state:"visible"});
+      for(const width of [390,1440]){
+        const dimensions=await layout(page,width);
+        check("Guided setup "+key+" "+width+"px: no horizontal overflow",dimensions.fit);
+        await selected.scrollIntoViewIfNeeded();
+        await capture(page,app,"/levytate/app",output,"setup-"+key+"-"+width,false);
+      }
+    }
+    await page.getByTestId("setup-step-organisation").click();
+    check("Guided setup: all six essential stages exist",await wizard.locator('nav[aria-label="Guided setup steps"] li').count()===6);
+    check("Guided setup: optional data never enters mandatory progress",await wizard.getByRole("progressbar",{name:"Workspace setup"}).getAttribute("aria-valuemax")==="6");
+  });
   await run("typography, application row and KPI alignment",async()=>{
     const page=await open(lead,"Applications","Applications");
     await page.setViewportSize({width:1600,height:900});

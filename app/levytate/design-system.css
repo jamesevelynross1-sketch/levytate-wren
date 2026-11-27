@@ -303,3 +303,12 @@
     pointer-events: none;
   }
 }
+
+/* Guided setup is the primary action on Home. Do not obscure the wizard with
+   the optional floating Copilot launcher; the full top-bar Copilot remains. */
+@supports selector(:has(*)) {
+  .lt-design:has([data-testid="blank-employer-home"]) .lt-contextual-copilot-trigger {
+    visibility: hidden;
+    pointer-events: none;
+  }
+}

@@ -19,7 +19,10 @@ export function useEmployerSetupProgress(onHome: boolean): EmployerSetupProgress
   const email = meta?.userEmail;
   const organisationId = meta?.organisationId;
   const enabled = hydrated && meta?.storageMode === "supabase" && isEmployerSetupRole(meta.userRole) && hasMvpPermission(meta.permissions ?? permissionsForMvpRole(meta.userRole), "workspace:read");
-  const key = enabled && email && organisationId ? JSON.stringify([organisationId, email]) : null;
+  // The guided setup must remain available to an authorised lead even when
+  // their finance identity metadata is temporarily incomplete. Only the
+  // optional server finance read needs both identity coordinates.
+  const key = enabled ? JSON.stringify([organisationId ?? "unknown-organisation", email ?? "unknown-user"]) : null;
   const [finance, setFinance] = useState<{ key: string; status: SetupFinanceStatus } | null>(null);
   const [reload, setReload] = useState(0);
 
@@ -40,7 +43,7 @@ export function useEmployerSetupProgress(onHome: boolean): EmployerSetupProgress
   }, [key, email, organisationId, onHome, reload]);
 
   if (!key) return null;
-  const financeStatus = finance?.key === key ? finance.status : "checking";
+  const financeStatus = finance?.key === key ? finance.status : email && organisationId ? "checking" : "unavailable";
   const steps = buildEmployerSetupSteps(data, financeStatus);
   return { steps, complete: employerSetupComplete(steps), financeStatus, refreshFinance: () => setReload((value) => value + 1) };
 }
