@@ -22,7 +22,11 @@ describe("Funding planner actual initial render",()=>{
     expect(markup).toContain("Historical reporting retained");
     expect(markup).toContain("historical-das-evidence");
     expect(markup).toContain("DAS history");
-    expect(markup).toContain("Saved plans");
+    expect(markup).toContain("Session plans");
+    expect(markup).toContain("Compare the financial impact");
+    expect(markup).toContain("Forecast chart view");
+    expect(markup).toContain("Employer cash");
+    expect(markup).toContain("finance-forecast-chart-levy");
     expect(markup).toContain("stroke-dasharray=\"5 4\"");
   });
 });

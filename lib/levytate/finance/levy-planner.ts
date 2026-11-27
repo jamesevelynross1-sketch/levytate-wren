@@ -41,6 +41,9 @@ export function cohortEligibility(c: PlannedCohort): Eligibility {
   const shortfallRate = c.ageAtStart < 25 ? 0 : 25;
   const deny = (reason: string): Eligibility => ({ eligible: false, reason, shortfallRate, provisional });
   if (c.route === "private") return deny("Private funding selected");
+  // Staging may contain test standards with realistic-looking ST references.
+  // An eligibility checkbox must not turn a fixture into a funded programme.
+  if (/\b(synthetic|fixture|test only|dummy)\b/i.test(c.standardTitle)) return deny("Test-only standard cannot be confirmed for levy funding");
   if (c.startMonth < "2026-08") return deny("Earlier start needs its original funding rules");
   if (withdrawnStandardIds.has(c.standardId.toUpperCase().split("-")[0]) && c.startMonth >= "2026-09") return deny("Government funding withdrawn for new starts");
   if (!c.standardId || c.bandPence <= 0 || c.bandPence > 2_700_000) return deny("Standard and funding band required");
@@ -99,7 +102,9 @@ export function forecastLevy(input: PlannerInputs, includeCohorts = true) {
   // Unknown age is kept available until spent. This is an optimistic assumption,
   // never treated as confirmed expiry or a decision-ready affordability forecast.
   const buckets: Bucket[] = input.openingFunds.map(f=>({...f,expiry:expiryMonth(f.receiptMonth)})).sort((a,b)=>a.receiptMonth.localeCompare(b.receiptMonth));
-  if (openingUnaged) buckets.unshift({receiptMonth:"unknown",amountPence:openingUnaged,expiry:null});
+  // Spend known-age funding by its earliest expiry before unknown-aged funds.
+  // Consuming unknown-age funds first would overstate avoidable expiry.
+  if (openingUnaged) buckets.push({receiptMonth:"unknown",amountPence:openingUnaged,expiry:null});
   const payments = includeCohorts ? input.cohorts.flatMap(cohortPayments) : [];
   const balance = () => buckets.reduce((n,b)=>n+b.amountPence,0);
   function consume(amount:number) {

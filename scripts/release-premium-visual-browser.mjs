@@ -287,8 +287,34 @@ export async function verifyPremiumVisual({app,manifest,contexts,check}){
     check("Visual Finance: full Copilot remains accessible in the top bar",await page.getByRole("button",{name:"Open full Copilot workspace",exact:true}).isVisible());
     await editor.scrollIntoViewIfNeeded();
     await capture(page,app,"/levytate/app",output,"employer-finance-cohort-1440",false);
-    await editor.getByRole("button",{name:"Cancel",exact:true}).click();
+    await editor.getByRole("button",{name:"Add to plan",exact:true}).click();
     await editor.waitFor({state:"hidden"});
+    const comparison=page.getByTestId("finance-scenario-comparison");
+    await comparison.waitFor();
+    const cashView=comparison.getByRole("button",{name:"Employer cash",exact:true});
+    check("Visual Finance: unconfirmed cohort defaults to cumulative employer cash",await cashView.getAttribute("aria-pressed")==="true");
+    await page.getByTestId("finance-forecast-chart-cash").waitFor();
+    const cashPaths=await Promise.all([
+      comparison.getByTestId("forecast-baseline-line").getAttribute("points"),
+      comparison.getByTestId("forecast-planned-line").getAttribute("points"),
+    ]);
+    check("Visual Finance: cash chart actually separates baseline from planned starts",cashPaths[0]!==cashPaths[1]);
+    await comparison.getByRole("button",{name:"Levy balance",exact:true}).click();
+    await page.getByTestId("finance-forecast-chart-levy").waitFor();
+    const levyPaths=await Promise.all([
+      comparison.getByTestId("forecast-baseline-line").getAttribute("points"),
+      comparison.getByTestId("forecast-planned-line").getAttribute("points"),
+    ]);
+    check("Visual Finance: levy lines remain equal while eligibility is unconfirmed",levyPaths[0]===levyPaths[1]);
+    check("Visual Finance: reason for overlap is plainly stated",await page.getByTestId("matched-levy-explanation").isVisible());
+    await cashView.click();
+    await layout(page,390);
+    check("Visual Finance: cash comparison reflows without horizontal overflow",(await layout(page,390)).fit);
+    await comparison.scrollIntoViewIfNeeded();
+    await capture(page,app,"/levytate/app",output,"employer-finance-cash-comparison-390",false);
+    await layout(page,1440);
+    await comparison.scrollIntoViewIfNeeded();
+    await capture(page,app,"/levytate/app",output,"employer-finance-cash-comparison-1440",false);
     await page.getByRole("button",{name:"DAS history",exact:true}).click();
     check("Visual Finance: historical evidence remains available",await page.getByTestId("historical-das-evidence").evaluate(el=>el.open));
   });
