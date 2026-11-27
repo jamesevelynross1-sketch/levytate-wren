@@ -17,7 +17,7 @@ export type PlannedCohort = {
   startMonth: string; learners: number; pricePence: number; bandPence: number;
   durationMonths: number; assessmentMonths: number; ageAtStart: number;
   exception: "none" | "care-ehcp" | "foundation-other";
-  route: "levy" | "private"; fundingChecked: boolean; department: string;
+  route: "levy"; fundingChecked: boolean; department: string;
 };
 export type PlannerInputs = {
   openingMonth: string; openingPence: number; openingFunds: OpeningFund[];
@@ -25,7 +25,10 @@ export type PlannerInputs = {
   monthlyExistingPence: number; existingMonths: number; existingShortfallRate: 0 | 5 | 25;
   monthlyTransferPence: number; transferMonths: number; cohorts: PlannedCohort[];
 };
-export type Eligibility = { eligible: boolean; reason: string; shortfallRate: 0 | 25; provisional: boolean };
+/** Forecastable means the standard/rules are plausible for a hypothetical
+ * levy scenario. Eligible means the user has reviewed the eligibility inputs;
+ * neither is official funding approval. */
+export type Eligibility = { eligible: boolean; forecastable: boolean; reason: string; shortfallRate: 0 | 25; provisional: boolean };
 const monthPattern = /^(20[2-4][0-9])-(0[1-9]|1[0-2])$/;
 export function validMonth(month: string) { return monthPattern.test(month); }
 export function addMonths(month: string, offset: number) {
@@ -39,8 +42,7 @@ const integer = (n: number, min: number, max: number) => Number.isInteger(n) && 
 export function cohortEligibility(c: PlannedCohort): Eligibility {
   const provisional = c.startMonth > "2027-07";
   const shortfallRate = c.ageAtStart < 25 ? 0 : 25;
-  const deny = (reason: string): Eligibility => ({ eligible: false, reason, shortfallRate, provisional });
-  if (c.route === "private") return deny("Private funding selected");
+  const deny = (reason: string): Eligibility => ({ eligible: false, forecastable: false, reason, shortfallRate, provisional });
   // Staging may contain test standards with realistic-looking ST references.
   // An eligibility checkbox must not turn a fixture into a funded programme.
   if (/\b(synthetic|fixture|test only|dummy)\b/i.test(c.standardTitle)) return deny("Test-only standard cannot be confirmed for levy funding");
@@ -50,8 +52,8 @@ export function cohortEligibility(c: PlannedCohort): Eligibility {
   if (c.level === 7 && c.ageAtStart > 21 && !(c.ageAtStart <= 24 && c.exception === "care-ehcp")) return deny("Level 7 age restriction");
   if (/foundation apprenticeship/i.test(c.standardTitle) && c.ageAtStart > 21 && !(c.ageAtStart <= 24 && c.exception !== "none")) return deny("Foundation apprenticeship age restriction");
   if (c.level === 2 && /^(administrative|administration) assistant\b/i.test(c.standardTitle) && c.ageAtStart > 24) return deny("Level 2 administrative assistant age restriction");
-  if (!c.fundingChecked) return deny("Funding eligibility not confirmed — excluded from levy");
-  return { eligible: true, reason: provisional ? "2026/27 rules carried forward as an assumption" : "Modelled as eligible; provider must confirm", shortfallRate, provisional };
+  if (!c.fundingChecked) return { eligible: false, forecastable: true, reason: "Indicative levy scenario — confirm provider and learner eligibility before relying on it", shortfallRate, provisional };
+  return { eligible: true, forecastable: true, reason: provisional ? "2026/27 rules carried forward as a future assumption" : "Funding assumptions reviewed by user; provider must still confirm", shortfallRate, provisional };
 }
 export function validatePlanner(input: PlannerInputs): string[] {
   const errors: string[] = [];
@@ -66,22 +68,26 @@ export function validatePlanner(input: PlannerInputs): string[] {
   if (input.openingFunds.reduce((n,f)=>n+f.amountPence,0)>input.openingPence) errors.push("Opening fund amounts exceed the opening balance.");
   if (new Set(input.cohorts.map(c=>c.id)).size !== input.cohorts.length) errors.push("Duplicate cohort identifier.");
   for (const c of input.cohorts) {
-    if (!c.name.trim() || !validMonth(c.startMonth) || c.startMonth <= input.openingMonth || !integer(c.learners,1,10000) || !money(c.pricePence) || c.pricePence === 0 || c.pricePence > 100_000_000 || !money(c.bandPence) || c.bandPence > 2_700_000 || !integer(c.durationMonths,8,72) || !integer(c.assessmentMonths,0,12) || !integer(c.ageAtStart,16,100) || !integer(c.level,2,7) || !["none","care-ehcp","foundation-other"].includes(c.exception) || !["levy","private"].includes(c.route)) errors.push(`Check cohort "${c.name || "Untitled"}": start month, cost, age, duration and learner count are required.`);
+    if (!c.name.trim() || !validMonth(c.startMonth) || c.startMonth <= input.openingMonth || !integer(c.learners,1,10000) || !money(c.pricePence) || c.pricePence === 0 || c.pricePence > 100_000_000 || !money(c.bandPence) || c.bandPence > 2_700_000 || !integer(c.durationMonths,8,72) || !integer(c.assessmentMonths,0,12) || !integer(c.ageAtStart,16,100) || !integer(c.level,2,7) || !["none","care-ehcp","foundation-other"].includes(c.exception) || c.route !== "levy") errors.push(`Check cohort "${c.name || "Untitled"}": start month, cost, age, duration and learner count are required.`);
   }
   return [...new Set(errors)];
 }
 type Payment = { cohortId: string; month: string; eligiblePence: number; directPence: number; shortfallRate: 0 | 25 };
 export function cohortPayments(c: PlannedCohort): Payment[] {
   const eligibility = cohortEligibility(c);
-  const eligiblePerLearner = eligibility.eligible ? Math.min(c.pricePence,c.bandPence) : 0;
-  const privatePerLearner = c.pricePence - eligiblePerLearner;
+  // This is a levy-only planner. Never silently book an unverified/withdrawn
+  // apprenticeship as privately funded commercial training. Such records stay
+  // in the pipeline, but are excluded from the financial forecast.
+  if (!eligibility.forecastable) return [];
+  const eligiblePerLearner = Math.min(c.pricePence,c.bandPence);
+  const aboveBandPerLearner = c.pricePence - eligiblePerLearner;
   const training = Math.floor(eligiblePerLearner * 80 / 100);
   const split = (total: number,i: number) => Math.floor(total*(i+1)/c.durationMonths)-Math.floor(total*i/c.durationMonths);
   // One-month payment lag is a planning assumption. Completion is separate;
-  // over-band/private costs are assumed spread over training (not a mandated schedule).
+  // agreed costs above the funding band are modelled as employer contributions.
   const payments = Array.from({length:c.durationMonths},(_,i)=>({
     cohortId:c.id, month:addMonths(c.startMonth,i+1), eligiblePence:split(training,i)*c.learners,
-    directPence:split(privatePerLearner,i)*c.learners, shortfallRate:eligibility.shortfallRate,
+    directPence:split(aboveBandPerLearner,i)*c.learners, shortfallRate:eligibility.shortfallRate,
   }));
   if (eligiblePerLearner > 0) payments.push({
     cohortId:c.id,month:addMonths(c.startMonth,c.durationMonths+Math.max(1,c.assessmentMonths)),

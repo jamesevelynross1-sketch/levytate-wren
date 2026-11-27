@@ -276,6 +276,8 @@ export async function verifyPremiumVisual({app,manifest,contexts,check}){
     // explicit synthetic planning assumptions without claiming eligibility.
     console.log("VISUAL finance step: opening funding assumptions");
     await editor.getByText("Programme details & eligibility",{exact:true}).click();
+    check("Visual Finance: funding is fixed to the apprenticeship levy",await editor.getByText("Apprenticeship levy",{exact:true}).isVisible());
+    check("Visual Finance: no commercial/private budget selector remains",await editor.getByText("Private budget",{exact:true}).count()===0&&await editor.getByText("Funding route",{exact:true}).count()===0);
     await editor.getByLabel("Funding band (£)",{exact:true}).fill("12000");
     await editor.getByLabel("Training months",{exact:true}).fill("12");
     console.log("VISUAL finance step: funding assumptions entered");
@@ -291,23 +293,23 @@ export async function verifyPremiumVisual({app,manifest,contexts,check}){
     await editor.waitFor({state:"hidden"});
     const comparison=page.getByTestId("finance-scenario-comparison");
     await comparison.waitFor();
+    await page.getByTestId("funding-pending-warning").waitFor();
+    check("Visual Finance: synthetic test programme clearly excluded from levy forecast",await page.getByTestId("finance-excluded-cohorts").isVisible());
+    const levyView=comparison.getByRole("button",{name:"Levy balance",exact:true});
+    check("Visual Finance: excluded standard does not trigger private cash mode",await levyView.getAttribute("aria-pressed")==="true");
+    const levyPaths=await Promise.all([
+      comparison.getByTestId("forecast-baseline-line").getAttribute("points"),
+      comparison.getByTestId("forecast-planned-line").getAttribute("points"),
+    ]);
+    check("Visual Finance: synthetic standard is not misrepresented as funded",levyPaths[0]===levyPaths[1]);
     const cashView=comparison.getByRole("button",{name:"Employer cash",exact:true});
-    check("Visual Finance: unconfirmed cohort defaults to cumulative employer cash",await cashView.getAttribute("aria-pressed")==="true");
+    await cashView.click();
     await page.getByTestId("finance-forecast-chart-cash").waitFor();
     const cashPaths=await Promise.all([
       comparison.getByTestId("forecast-baseline-line").getAttribute("points"),
       comparison.getByTestId("forecast-planned-line").getAttribute("points"),
     ]);
-    check("Visual Finance: cash chart actually separates baseline from planned starts",cashPaths[0]!==cashPaths[1]);
-    await comparison.getByRole("button",{name:"Levy balance",exact:true}).click();
-    await page.getByTestId("finance-forecast-chart-levy").waitFor();
-    const levyPaths=await Promise.all([
-      comparison.getByTestId("forecast-baseline-line").getAttribute("points"),
-      comparison.getByTestId("forecast-planned-line").getAttribute("points"),
-    ]);
-    check("Visual Finance: levy lines remain equal while eligibility is unconfirmed",levyPaths[0]===levyPaths[1]);
-    check("Visual Finance: reason for overlap is plainly stated",await page.getByTestId("matched-levy-explanation").isVisible());
-    await cashView.click();
+    check("Visual Finance: synthetic standard is not charged as commercial training",cashPaths[0]===cashPaths[1]);
     await layout(page,390);
     check("Visual Finance: cash comparison reflows without horizontal overflow",(await layout(page,390)).fit);
     await comparison.scrollIntoViewIfNeeded();

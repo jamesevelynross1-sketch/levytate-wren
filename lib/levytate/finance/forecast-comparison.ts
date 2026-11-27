@@ -1,6 +1,6 @@
-/** Separate levy balances and cumulative employer cash. Unverified or
- * private programmes may create cash obligations without reducing DAS.
- * Never combine unrelated measures on one axis or invent divergence. */
+/** Separate DAS drawdown and employer co-investment/above-band costs.
+ * Unsupported or withdrawn programmes are excluded from both charts.
+ * Never invent a levy reduction or model commercial private training. */
 import { forecastLevy } from "./levy-planner";
 
 export type ForecastChartView = "levy" | "cash";

@@ -9,10 +9,11 @@ type Props={
   planned:ForecastScenario;
   horizon:12|24|36|48;
   unknownOpeningPence:number;
+  excludedCohorts?:number;
 };
 const gbp=(p:number)=>formatGbp(p);
 
-export function FinanceForecastComparison({baseline,planned,horizon,unknownOpeningPence}:Props){
+export function FinanceForecastComparison({baseline,planned,horizon,unknownOpeningPence,excludedCohorts=0}:Props){
   const comparison=useMemo(()=>compareForecastScenarios(baseline,planned),[baseline,planned]);
   const [selectedView,setSelectedView]=useState<"auto"|ForecastChartView>("auto");
   const [selectedMonth,setSelectedMonth]=useState<string|null>(null);
@@ -35,11 +36,13 @@ export function FinanceForecastComparison({baseline,planned,horizon,unknownOpeni
       </div>
     </div>
 
+    {excludedCohorts>0 ? <p data-testid="finance-excluded-cohorts" role="status" className="mt-3 rounded-xl border border-[#e6b74a]/30 bg-[#fffaf0] p-3 text-xs leading-5 text-lt-secondary">
+      {excludedCohorts} planned {excludedCohorts===1?"cohort is":"cohorts are"} awaiting valid apprenticeship funding evidence and are excluded from both charts. A missing funding band or test-only standard cannot be treated as privately funded spending.
+    </p> : null}
     {comparison.levyLinesMatch && !comparison.cashLinesMatch ?
       <p role="status" data-testid="matched-levy-explanation" className="mt-3 rounded-xl bg-[#f4f8f6] px-4 py-3 text-xs leading-5 text-lt-secondary">
-        Your levy-balance scenarios overlap because the planned starts have no confirmed levy-funded payments. No levy reduction is invented.
-        The additional employer cash modelled over {horizon} months is <strong className="text-lt-ink">{gbp(difference)}</strong>.
-        {activeView==="cash"?" The graph below shows that cash difference.":" Select Employer cash to see it."}
+        Both levy-balance curves match because the proposed starts do not reduce DAS funding within this horizon. The estimated additional employer contribution of <strong className="text-lt-ink">{gbp(difference)}</strong> over {horizon} months is from co-investment when levy funds run short, or agreed costs above the funding band.
+        {activeView==="cash"?" The graph below shows that contribution.":" Select Employer cash to see it."}
       </p> : null}
     {activeView==="levy" && unaged ?
       <p className="mt-3 text-xs leading-5 text-lt-muted">This balance projection is indicative: {gbp(unknownOpeningPence)} of opening levy funds have no known expiry age.</p> : null}

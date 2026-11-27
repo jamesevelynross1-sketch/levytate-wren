@@ -21,13 +21,13 @@ describe("England levy planner policy and arithmetic",()=>{
     expect(cohortEligibility({...cohort,level:7,ageAtStart:25,exception:"care-ehcp"}).eligible).toBe(false);
     expect(cohortEligibility({...cohort,startMonth:"2027-08"}).provisional).toBe(true);
   });
-  it("does not assume unconfirmed funding, and preserves total pence across rounding",()=>{
+  it("models unconfirmed but plausible funding as an indicative levy scenario and preserves pence",()=>{
     const items=cohortPayments(cohort);
     expect(items.reduce((n,p)=>n+p.eligiblePence,0)).toBe(3_000_000);
     expect(items.reduce((n,p)=>n+p.directPence,0)).toBe(600_003);
     expect(items.at(-1)?.eligiblePence).toBe(600_000);
     expect(items.at(-1)?.month).toBe("2027-11");
-    expect(cohortPayments({...cohort,fundingChecked:false}).every(p=>p.eligiblePence===0)).toBe(true);
+    expect(cohortPayments({...cohort,fundingChecked:false}).some(p=>p.eligiblePence>0)).toBe(true);expect(cohortEligibility({...cohort,fundingChecked:false}).eligible).toBe(false);expect(cohortEligibility({...cohort,fundingChecked:false}).forecastable).toBe(true);
   });
   it("consumes older funds before expiry and honours transfer priority",()=>{
     const input={...base,openingPence:100000,openingFunds:[{receiptMonth:"2024-08",amountPence:100000}],monthlyExistingPence:40000,existingMonths:1,monthlyTransferPence:50000,transferMonths:1};
@@ -37,7 +37,7 @@ describe("England levy planner policy and arithmetic",()=>{
     const c={...cohort,learners:1,pricePence:120000,bandPence:120000};
     const full=forecastLevy({...base,cohorts:[c]});expect(full.proposedCash).toBe(30000);
     expect(forecastLevy({...base,cohorts:[{...c,ageAtStart:24}]}).proposedCash).toBe(0);
-    expect(forecastLevy({...base,cohorts:[{...c,route:"private"}]}).proposedCash).toBe(120000);
+    expect(forecastLevy({...base,cohorts:[{...c,standardTitle:"Synthetic test standard"}]}).proposedCash).toBe(0);expect(forecastLevy({...base,cohorts:[{...c,standardTitle:"Synthetic test standard"}]}).proposedDue).toBe(0);
   });
   it("retains unknown opening age, does not invent its expiry, and rejects excess buckets",()=>{
     const f=forecastLevy({...base,openingPence:50000});expect(f.openingUnaged).toBe(50000);expect(f.expiry).toBe(0);expect(f.closing).toBe(50000);
@@ -57,5 +57,9 @@ describe("bounded scenario file reload",()=>{
     expect(()=>decodePlannerFile({ruleVersion:"obsolete",scenarioName:"Test",plan:base})).toThrow();
     expect(()=>decodePlannerFile({ruleVersion:fundingRuleVersion,scenarioName:"Test",plan:{...base,openingPence:-1}})).toThrow();
     expect(()=>decodePlannerFile({ruleVersion:fundingRuleVersion,scenarioName:"Test",plan:{...base,unexpected:"bad"}})).toThrow();
+    const legacy=decodePlannerFile({ruleVersion:fundingRuleVersion,scenarioName:"Former private scenario",plan:{...base,cohorts:[{...cohort,route:"private",fundingChecked:true}]}});
+    expect(legacy.convertedPrivateCohorts).toBe(1);
+    expect(legacy.plan.cohorts[0].route).toBe("levy");
+    expect(legacy.plan.cohorts[0].fundingChecked).toBe(false);
   });
 });

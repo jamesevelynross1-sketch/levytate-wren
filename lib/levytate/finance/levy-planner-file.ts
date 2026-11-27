@@ -15,11 +15,15 @@ export const plannerInputSchema=z.strictObject({
   existingShortfallRate:z.union([z.literal(0),z.literal(5),z.literal(25)]),
   monthlyTransferPence:money,transferMonths:z.number().int().min(0).max(48),cohorts:z.array(cohort).max(50),
 });
-export function decodePlannerFile(value:unknown):{scenarioName:string;plan:PlannerInputs} {
+export function decodePlannerFile(value:unknown):{scenarioName:string;plan:PlannerInputs;convertedPrivateCohorts:number} {
   const parsed=z.strictObject({ruleVersion:z.literal(fundingRuleVersion),scenarioName:z.string().trim().min(1).max(100),plan:plannerInputSchema}).safeParse(value);
   if(!parsed.success)throw new Error("This is not a valid plan for the current funding-rule version.");
-  const errors=validatePlanner(parsed.data.plan);
+  // Backward compatibility: a legacy exported "private" plan is imported as
+  // an unconfirmed levy scenario. Keep dates and prices, but never copy a
+  // private funding decision into the new levy-only financial model.
+  const convertedPrivateCohorts=parsed.data.plan.cohorts.filter(c=>c.route==="private").length;
+  const plan:PlannerInputs={...parsed.data.plan,cohorts:parsed.data.plan.cohorts.map(c=>({...c,route:"levy" as const,fundingChecked:false}))};
+  const errors=validatePlanner(plan);
   if(errors.length)throw new Error(errors.join(" "));
-  // The file is not trusted eligibility evidence. Require fresh confirmation.
-  return {scenarioName:parsed.data.scenarioName,plan:{...parsed.data.plan,cohorts:parsed.data.plan.cohorts.map(c=>({...c,fundingChecked:false}))}};
+  return {scenarioName:parsed.data.scenarioName,plan,convertedPrivateCohorts};
 }
