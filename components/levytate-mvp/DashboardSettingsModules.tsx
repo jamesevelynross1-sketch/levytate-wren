@@ -5,6 +5,7 @@ import { Check, ChevronDown, Target } from "lucide-react";
 import { EmployerSetupJourney } from "@/components/levytate-mvp/EmployerSetupJourney";
 import { useEffect, useState, type FormEvent } from "react";
 import { FormField, FormGrid, MvpPanel, StatusBadge } from "@/components/levytate-mvp/MvpUi";
+import { workspaceFieldGuidance } from "@/components/levytate-mvp/SetupContextHelp";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import { ManagerActionsHome } from "@/components/levytate-mvp/ManagerActionsHome";
 import type { EmployerSetupProgress } from "@/components/levytate-mvp/useEmployerSetupProgress";
@@ -467,13 +468,13 @@ export function SettingsModule() {
         {canEdit ? (
           <form onSubmit={submit} onChange={() => { setDirty(true); setSaved(false); }} className="border-t border-[#102c3d]/[0.07] p-5"><fieldset disabled={saving}>
             <FormGrid>
-              <FormField label="Employer name" value={draft.employerName} onChange={(value) => setDraft({ ...draft, employerName: value })} />
-              <FormField label="Workspace name" value={draft.workspaceName} onChange={(value) => setDraft({ ...draft, workspaceName: value })} required />
-              <FormField label="Primary contact" value={draft.primaryContact} onChange={(value) => setDraft({ ...draft, primaryContact: value })} />
-              <FormField label="Contact email" type="email" value={draft.contactEmail} onChange={(value) => setDraft({ ...draft, contactEmail: value })} />
-              <FormField label="Default site" value={draft.defaultSite} onChange={(value) => setDraft({ ...draft, defaultSite: value })} />
-              <FormField label="Sites" value={draft.sites.join(", ")} onChange={(value) => setDraft({ ...draft, sites: splitMvpList(value) })} />
-              <FormField label="Departments" value={draft.departments.join(", ")} onChange={(value) => setDraft({ ...draft, departments: splitMvpList(value) })} wide />
+              <FormField label="Employer name" value={draft.employerName} onChange={(value) => setDraft({ ...draft, employerName: value })} help={workspaceFieldGuidance.employerName} />
+              <FormField label="Workspace name" value={draft.workspaceName} onChange={(value) => setDraft({ ...draft, workspaceName: value })} help={workspaceFieldGuidance.workspaceName} required />
+              <FormField label="Primary contact" value={draft.primaryContact} onChange={(value) => setDraft({ ...draft, primaryContact: value })} help={workspaceFieldGuidance.primaryContact} />
+              <FormField label="Contact email" type="email" value={draft.contactEmail} onChange={(value) => setDraft({ ...draft, contactEmail: value })} help={workspaceFieldGuidance.contactEmail} />
+              <FormField label="Default site" value={draft.defaultSite} onChange={(value) => setDraft({ ...draft, defaultSite: value })} help={workspaceFieldGuidance.defaultSite} hint="Your main physical work location, not your website." />
+              <FormField label="Sites" value={draft.sites.join(", ")} onChange={(value) => setDraft({ ...draft, sites: splitMvpList(value) })} help={workspaceFieldGuidance.sites} hint="Offices, depots or other physical workplaces — not web addresses." />
+              <FormField label="Departments" value={draft.departments.join(", ")} onChange={(value) => setDraft({ ...draft, departments: splitMvpList(value) })} help={workspaceFieldGuidance.departments} wide />
             </FormGrid>
             <div className="mt-5 flex items-center justify-between border-t border-[#102c3d]/[0.07] pt-4">
               {saveError ? <p role="alert" className="text-sm text-red-700">{saveError}</p> : saved ? <p role="status" className="text-xs font-semibold text-lt-accent">Workspace saved.</p> : <span />}
