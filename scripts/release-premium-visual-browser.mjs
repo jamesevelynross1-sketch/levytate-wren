@@ -126,7 +126,7 @@ export async function verifyPremiumVisual({app,manifest,contexts,check}){
     const sectionHelp=wizard.getByRole("button",{name:"Help: Organisation",exact:true});
     const sectionTooltip=sectionHelp.locator('xpath=following-sibling::*[@role="tooltip"]');
     check("Guided setup: step explanation visible even before opening help",
-      await wizard.getByText(/who manages the account and where your people physically work/).isVisible());
+      await wizard.locator('section[aria-labelledby="selected-setup-heading"] p.mt-2').filter({hasText:"who manages the account"}).isVisible());
     await layout(page,1440);
     await sectionHelp.hover();
     check("Guided setup: tooltip visible on hover",await sectionTooltip.isVisible());
