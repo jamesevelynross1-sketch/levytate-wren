@@ -6,7 +6,7 @@ import { EmployeesModule } from "@/components/levytate-mvp/EmployeesModule";
 import { EmployerProgrammeDirectory } from "@/components/levytate-mvp/EmployerProgrammeDirectory";
 import { useMvpWorkspace } from "@/components/levytate-mvp/MvpWorkspaceStore";
 import type { EmployerSetupProgress } from "@/components/levytate-mvp/useEmployerSetupProgress";
-import type { EmployerSetupKey, EmployerSetupStep } from "@/lib/levytate/mvp/employer-setup";
+import type { EmployerSetupKey } from "@/lib/levytate/mvp/employer-setup";
 import { splitMvpList, type MvpWorkspaceProfile } from "@/lib/levytate/mvp/workspace";
 
 type Props = {

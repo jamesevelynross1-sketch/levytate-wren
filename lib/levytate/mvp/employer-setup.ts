@@ -40,7 +40,7 @@ export function buildEmployerSetupSteps(data: SetupEvidence, finance: SetupFinan
   const organisationReady = Boolean(
     profile.employerName.trim() &&
     profile.primaryContact.trim() &&
-    /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(profile.contactEmail.trim()) &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profile.contactEmail.trim()) &&
     profile.contactEmail.trim().toLowerCase() !== "hello@levytate.co.uk" &&
     profile.sites.some((site) => site.trim()) &&
     profile.departments.some((department) => department.trim())
